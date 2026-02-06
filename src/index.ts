@@ -22,6 +22,7 @@ import {
   createThinkingBlockValidatorHook,
   createCategorySkillReminderHook,
   createRalphLoopHook,
+  createReviewLoopHook,
   createAutoSlashCommandHook,
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
@@ -249,6 +250,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const ralphLoop = isHookEnabled("ralph-loop")
     ? createRalphLoopHook(ctx, {
         config: pluginConfig.ralph_loop,
+        checkSessionExists: async (sessionId) => sessionExists(sessionId),
+      })
+    : null;
+
+  const reviewLoop = isHookEnabled("review-loop")
+    ? createReviewLoopHook(ctx, {
+        config: pluginConfig.review_loop,
         checkSessionExists: async (sessionId) => sessionExists(sessionId),
       })
     : null;
@@ -603,6 +611,36 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           ralphLoop.cancelLoop(input.sessionID);
         }
       }
+
+      if (reviewLoop) {
+        const parts = (
+          output as { parts?: Array<{ type: string; text?: string }> }
+        ).parts;
+        const promptText =
+          parts
+            ?.filter((p) => p.type === "text" && p.text)
+            .map((p) => p.text)
+            .join("\n")
+            .trim() || "";
+
+        const isReviewLoopTemplate =
+          promptText.includes("You are starting a Review Loop") &&
+          promptText.includes("<user-task>");
+
+        if (isReviewLoopTemplate) {
+          const taskMatch = promptText.match(
+            /<user-task>\s*([\s\S]*?)\s*<\/user-task>/i,
+          );
+          const targetBranch = taskMatch?.[1]?.trim() || "";
+
+          log("[review-loop] Starting loop from chat.message", {
+            sessionID: input.sessionID,
+            targetBranch,
+          });
+          // prFiles empty at start - template gathers them in STEP 0
+          reviewLoop.startLoop(input.sessionID, targetBranch, []);
+        }
+      }
     },
 
     "experimental.chat.messages.transform": async (
@@ -638,6 +676,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await categorySkillReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
+      await reviewLoop?.event(input);
       await stopContinuationGuard?.event(input);
       await atlasHook?.handler(input);
 
@@ -802,6 +841,20 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         }
       }
 
+      if (reviewLoop && input.tool === "slashcommand") {
+        const args = output.args as { command?: string } | undefined;
+        const command = args?.command?.replace(/^\//, "").toLowerCase();
+        const sessionID = input.sessionID || getMainSessionID();
+
+        if (command === "review-loop" && sessionID) {
+          const rawArgs =
+            args?.command?.replace(/^\/?(review-loop)\s*/i, "") || "";
+          const targetBranch = rawArgs.trim();
+
+          reviewLoop.startLoop(sessionID, targetBranch, []);
+        }
+      }
+
       if (input.tool === "slashcommand") {
         const args = output.args as { command?: string } | undefined;
         const command = args?.command?.replace(/^\//, "").toLowerCase();
@@ -811,6 +864,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           stopContinuationGuard?.stop(sessionID);
           todoContinuationEnforcer?.cancelAllCountdowns();
           ralphLoop?.cancelLoop(sessionID);
+          reviewLoop?.cancelLoop(sessionID);
           clearBoulderState(ctx.directory);
           log("[stop-continuation] All continuation mechanisms stopped", {
             sessionID,
