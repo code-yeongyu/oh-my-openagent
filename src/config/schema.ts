@@ -32,6 +32,7 @@ export const BuiltinAgentNameSchema = z.enum([
 export const BuiltinSkillNameSchema = z.enum([
   "playwright",
   "agent-browser",
+  "dev-browser",
   "frontend-ui-ux",
   "git-master",
 ])
@@ -63,10 +64,12 @@ export const HookNameSchema = z.enum([
   "comment-checker",
   "grep-output-truncator",
   "tool-output-truncator",
+  "question-label-truncator",
   "directory-agents-injector",
   "directory-readme-injector",
   "empty-task-response-detector",
   "think-mode",
+  "subagent-question-blocker",
   "anthropic-context-window-limit-recovery",
   "preemptive-compaction",
   "rules-injector",
@@ -92,6 +95,8 @@ export const HookNameSchema = z.enum([
   "start-work",
   "atlas",
   "unstable-agent-babysitter",
+  "task-reminder",
+  "task-resume-info",
   "stop-continuation-guard",
   "tasks-todowrite-disabler",
   "write-existing-file-guard",
@@ -99,7 +104,12 @@ export const HookNameSchema = z.enum([
 
 export const BuiltinCommandNameSchema = z.enum([
   "init-deep",
+  "ralph-loop",
+  "ulw-loop",
+  "cancel-ralph",
+  "refactor",
   "start-work",
+  "stop-continuation",
 ])
 
 export const AgentOverrideConfigSchema = z.object({
