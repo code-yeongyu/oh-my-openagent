@@ -1994,56 +1994,137 @@ describe("sisyphus-task", () => {
     test("prepends plan agent system prompt when agentName is 'plan'", () => {
       // given
       const { buildSystemContent } = require("./tools")
-      const { PLAN_AGENT_SYSTEM_PREPEND } = require("./constants")
+      const { buildPlanAgentSystemPrepend } = require("./constants")
+
+      const availableCategories = [
+        {
+          name: "deep",
+          description: "Goal-oriented autonomous problem-solving",
+          model: "openai/gpt-5.3-codex",
+        },
+      ]
+      const availableSkills = [
+        {
+          name: "typescript-programmer",
+          description: "Production TypeScript code.",
+          location: "plugin",
+        },
+      ]
 
       // when
-      const result = buildSystemContent({ agentName: "plan" })
+      const result = buildSystemContent({
+        agentName: "plan",
+        availableCategories,
+        availableSkills,
+      })
 
       // then
       expect(result).toContain("<system>")
       expect(result).toContain("MANDATORY CONTEXT GATHERING PROTOCOL")
-      expect(result).toBe(PLAN_AGENT_SYSTEM_PREPEND)
+      expect(result).toContain("### AVAILABLE CATEGORIES")
+      expect(result).toContain("`deep`")
+      expect(result).not.toContain("prompt-engineer")
+      expect(result).toBe(buildPlanAgentSystemPrepend(availableCategories, availableSkills))
     })
 
     test("prepends plan agent system prompt when agentName is 'prometheus'", () => {
       // given
       const { buildSystemContent } = require("./tools")
-      const { PLAN_AGENT_SYSTEM_PREPEND } = require("./constants")
+      const { buildPlanAgentSystemPrepend } = require("./constants")
+
+      const availableCategories = [
+        {
+          name: "ultrabrain",
+          description: "Complex architecture, deep logical reasoning",
+          model: "openai/gpt-5.3-codex",
+        },
+      ]
+      const availableSkills = [
+        {
+          name: "git-master",
+          description: "Atomic commits, git operations.",
+          location: "plugin",
+        },
+      ]
 
       // when
-      const result = buildSystemContent({ agentName: "prometheus" })
+      const result = buildSystemContent({
+        agentName: "prometheus",
+        availableCategories,
+        availableSkills,
+      })
 
       // then
       expect(result).toContain("<system>")
-      expect(result).toBe(PLAN_AGENT_SYSTEM_PREPEND)
+      expect(result).toBe(buildPlanAgentSystemPrepend(availableCategories, availableSkills))
     })
 
     test("prepends plan agent system prompt when agentName is 'Prometheus' (case insensitive)", () => {
       // given
       const { buildSystemContent } = require("./tools")
-      const { PLAN_AGENT_SYSTEM_PREPEND } = require("./constants")
+      const { buildPlanAgentSystemPrepend } = require("./constants")
+
+      const availableCategories = [
+        {
+          name: "quick",
+          description: "Trivial tasks",
+          model: "anthropic/claude-haiku-4-5",
+        },
+      ]
+      const availableSkills = [
+        {
+          name: "dev-browser",
+          description: "Persistent browser state automation.",
+          location: "plugin",
+        },
+      ]
 
       // when
-      const result = buildSystemContent({ agentName: "Prometheus" })
+      const result = buildSystemContent({
+        agentName: "Prometheus",
+        availableCategories,
+        availableSkills,
+      })
 
       // then
       expect(result).toContain("<system>")
-      expect(result).toBe(PLAN_AGENT_SYSTEM_PREPEND)
+      expect(result).toBe(buildPlanAgentSystemPrepend(availableCategories, availableSkills))
     })
 
     test("combines plan agent prepend with skill content", () => {
       // given
       const { buildSystemContent } = require("./tools")
-      const { PLAN_AGENT_SYSTEM_PREPEND } = require("./constants")
+      const { buildPlanAgentSystemPrepend } = require("./constants")
       const skillContent = "You are a planning expert"
 
+      const availableCategories = [
+        {
+          name: "writing",
+          description: "Documentation, prose, technical writing",
+          model: "google/gemini-3-flash",
+        },
+      ]
+      const availableSkills = [
+        {
+          name: "python-programmer",
+          description: "Production Python code.",
+          location: "plugin",
+        },
+      ]
+      const planPrepend = buildPlanAgentSystemPrepend(availableCategories, availableSkills)
+
       // when
-      const result = buildSystemContent({ skillContent, agentName: "plan" })
+      const result = buildSystemContent({
+        skillContent,
+        agentName: "plan",
+        availableCategories,
+        availableSkills,
+      })
 
       // then
-      expect(result).toContain(PLAN_AGENT_SYSTEM_PREPEND)
+      expect(result).toContain(planPrepend)
       expect(result).toContain(skillContent)
-      expect(result!.indexOf(PLAN_AGENT_SYSTEM_PREPEND)).toBeLessThan(result!.indexOf(skillContent))
+      expect(result!.indexOf(planPrepend)).toBeLessThan(result!.indexOf(skillContent))
     })
 
     test("does not prepend plan agent prompt for non-plan agents", () => {
