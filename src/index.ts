@@ -176,7 +176,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const toolOutputTruncator = isHookEnabled("tool-output-truncator")
     ? createToolOutputTruncatorHook(ctx, {
         experimental: pluginConfig.experimental,
-      })
+      }, modelCacheState)
     : null;
   // Check for native OpenCode AGENTS.md injection support before creating hook
   let directoryAgentsInjector = null;

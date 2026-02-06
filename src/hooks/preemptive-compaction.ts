@@ -2,9 +2,6 @@ import type { ModelCacheState } from "../plugin-state"
 import { resolveContextWindowLimit } from "../shared/context-window-limit-resolver"
 
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
-const FALLBACK_MODEL_CONTEXT_LIMITS_CACHE = new Map<string, number>([
-  ["anthropic/claude-sonnet-4-5", 500_000],
-])
 
 interface AssistantMessageInfo {
   role: "assistant"
@@ -65,9 +62,7 @@ export function createPreemptiveCompactionHook(ctx: PluginInput, modelCacheState
       const effectiveLimit = resolveContextWindowLimit({
         providerID: lastAssistant.providerID,
         modelID: lastAssistant.modelID,
-        modelContextLimitsCache:
-          modelCacheState?.modelContextLimitsCache ??
-          FALLBACK_MODEL_CONTEXT_LIMITS_CACHE,
+        modelContextLimitsCache: modelCacheState?.modelContextLimitsCache,
       })
       const usageRatio = totalInputTokens / effectiveLimit
 

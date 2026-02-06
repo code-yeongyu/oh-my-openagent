@@ -133,9 +133,7 @@ export async function getContextWindowUsage(
 			(lastTokens?.input ?? 0) +
 			(lastTokens?.cache?.read ?? 0) +
 			(lastTokens?.output ?? 0);
-		const contextWindowLimit = resolveContextWindowLimit(
-			limitOptions ?? { contextWindowLimit: 1_000_000 },
-		);
+		const contextWindowLimit = resolveContextWindowLimit(limitOptions);
 		const remainingTokens = contextWindowLimit - usedTokens;
 
 		return {

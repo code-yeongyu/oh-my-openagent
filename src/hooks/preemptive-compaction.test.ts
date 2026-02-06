@@ -152,7 +152,11 @@ describe("preemptive-compaction", () => {
       })
     )
     const summarize = mock(() => Promise.resolve())
-    const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }))
+    const modelCacheState = {
+      modelContextLimitsCache: new Map([["anthropic/claude-sonnet-4-5", 500_000]]),
+      anthropicContext1MEnabled: false,
+    }
+    const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }), modelCacheState)
     const output = { title: "", output: "", metadata: {} }
 
     //#when
@@ -162,7 +166,7 @@ describe("preemptive-compaction", () => {
     )
 
     //#then
-    // Future behavior: model cache limit = 500k, usage = 300k/500k = 0.6 (< 0.78)
+    // model cache limit = 500k, usage = 300k/500k = 0.6 (< 0.78 threshold)
     expect(summarize).not.toHaveBeenCalled()
   })
 

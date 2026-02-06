@@ -30,7 +30,7 @@ function createMockCtx(messagesData: Array<{
 }
 
 describe("getContextWindowUsage", () => {
-  test("returns remainingTokens from resolved model-specific sonnet 1M limit", async () => {
+  test("returns remainingTokens using model cache limit", async () => {
     //#given
     const mockCtx = createMockCtx([
       {
@@ -45,9 +45,14 @@ describe("getContextWindowUsage", () => {
         },
       },
     ])
+    const limitOptions = {
+      modelContextLimitsCache: new Map([["anthropic/claude-sonnet-4-5", 1_000_000]]),
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-5",
+    }
 
     //#when
-    const usage = await getContextWindowUsage(mockCtx, "session-1")
+    const usage = await getContextWindowUsage(mockCtx, "session-1", limitOptions)
 
     //#then
     expect(usage).not.toBeNull()
@@ -55,7 +60,7 @@ describe("getContextWindowUsage", () => {
     expect(usage!.remainingTokens).toBe(835000)
   })
 
-  test("returns usagePercentage based on resolved model-specific limit", async () => {
+  test("returns usagePercentage using model cache limit", async () => {
     //#given
     const mockCtx = createMockCtx([
       {
@@ -70,9 +75,14 @@ describe("getContextWindowUsage", () => {
         },
       },
     ])
+    const limitOptions = {
+      modelContextLimitsCache: new Map([["anthropic/claude-sonnet-4-5", 1_000_000]]),
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-5",
+    }
 
     //#when
-    const usage = await getContextWindowUsage(mockCtx, "session-1")
+    const usage = await getContextWindowUsage(mockCtx, "session-1", limitOptions)
 
     //#then
     expect(usage).not.toBeNull()
