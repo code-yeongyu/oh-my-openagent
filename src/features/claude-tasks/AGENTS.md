@@ -12,6 +12,7 @@ claude-tasks/
 ├── types.test.ts     # Schema validation tests (8 tests)
 ├── storage.ts        # File operations
 ├── storage.test.ts   # Storage tests (14 tests)
+├── todo-sync.ts      # Task → Todo synchronization
 └── index.ts          # Barrel exports
 ```
 
@@ -44,86 +45,21 @@ interface Task {
 
 ## TODO SYNC
 
-The task system includes a sync layer (`todo-sync.ts`) that automatically mirrors task state to the project's Todo system.
+Task system includes sync layer (`todo-sync.ts`) that automatically mirrors task state to the project's Todo system.
 
-- **Creation**: Creating a task via `task_create` adds a corresponding item to the Todo list.
-- **Updates**: Updating a task's `status` or `subject` via `task_update` reflects in the Todo list.
-- **Completion**: Marking a task as `completed` automatically marks the Todo item as done.
+- **Creation**: `task_create` adds corresponding Todo item
+- **Updates**: `task_update` reflects in Todo list
+- **Completion**: `completed` status marks Todo item done
 
 ## STORAGE UTILITIES
 
-### getTaskDir(config)
-
-Returns the task storage directory path.
-
-**Default behavior (no config override):**
-Returns `~/.config/opencode/tasks/<task-list-id>/` where:
-- Task list ID is resolved via `resolveTaskListId()`
-
-**With `storage_path` config:**
-- Absolute paths (starting with `/`) are returned as-is
-- Relative paths are joined with `process.cwd()`
-
-### resolveTaskListId(config)
-
-Resolves the task list ID for directory scoping.
-
-**Priority order:**
-1. `ULTRAWORK_TASK_LIST_ID` environment variable
-2. `config.sisyphus?.tasks?.task_list_id` config option
-3. Sanitized `basename(process.cwd())` as fallback
-
-**Sanitization:** Replaces non-alphanumeric characters (except `-` and `_`) with `-`
-
-### readJsonSafe(filePath, schema)
-
-- Returns parsed & validated data or `null`
-- Safe for missing files, invalid JSON, schema violations
-
-### writeJsonAtomic(filePath, data)
-
-- Atomic write via temp file + rename
-- Creates parent directories automatically
-- Cleans up temp file on error
-
-### acquireLock(dirPath)
-
-- File-based lock: `.lock` file with timestamp
-- 30-second stale threshold
-- Returns `{ acquired: boolean, release: () => void }`
-
-## TESTING
-
-**types.test.ts** (8 tests):
-- Valid status enum values
-- Required vs optional fields
-- Array validation (blocks, blockedBy)
-- Schema rejection for invalid data
-
-**storage.test.ts** (14 tests):
-- Path construction
-- Safe JSON reading (missing files, invalid JSON, schema failures)
-- Atomic writes (directory creation, overwrites)
-- Lock acquisition (fresh locks, stale locks, release)
-
-## USAGE
-
-```typescript
-import { TaskSchema, getTaskDir, readJsonSafe, writeJsonAtomic, acquireLock } from "./features/claude-tasks"
-
-const taskDir = getTaskDir(config)
-const lock = acquireLock(taskDir)
-
-try {
-  const task = readJsonSafe(join(taskDir, "1.json"), TaskSchema)
-  if (task) {
-    task.status = "completed"
-    writeJsonAtomic(join(taskDir, "1.json"), task)
-  }
-} finally {
-  lock.release()
-}
-```
+| Function | Purpose |
+|----------|---------|
+| `getTaskDir(config)` | Returns task storage directory path |
+| `resolveTaskListId(config)` | Resolves task list ID (env → config → cwd basename) |
+| `readJsonSafe(path, schema)` | Parse + validate, returns null on failure |
+| `writeJsonAtomic(path, data)` | Atomic write via temp file + rename |
+| `acquireLock(dirPath)` | File-based lock with 30s stale threshold |
 
 ## ANTI-PATTERNS
 
