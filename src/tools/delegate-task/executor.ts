@@ -796,6 +796,17 @@ export async function resolveCategoryExecution(
   const overrideModel = sisyphusJuniorModel
   const explicitCategoryModel = userCategories?.[args.category!]?.model
 
+  // Debug logging for category model resolution
+  log("[resolveCategoryExecution] Category model resolution debug", {
+    category: args.category,
+    userCategoriesKeys: userCategories ? Object.keys(userCategories) : "undefined",
+    userCategoryConfig: userCategories?.[args.category!],
+    explicitCategoryModel,
+    sisyphusJuniorModel: overrideModel,
+    resolvedModel: resolved.model,
+    willUse: explicitCategoryModel ?? overrideModel ?? "fallback-chain",
+  })
+
   if (!requirement) {
     // Precedence: explicit category model > sisyphus-junior default > category resolved model
     // This keeps `sisyphus-junior.model` useful as a global default while allowing

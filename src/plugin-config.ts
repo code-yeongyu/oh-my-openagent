@@ -127,6 +127,8 @@ export function loadPluginConfig(
 
   log("Final merged config", {
     agents: config.agents,
+    categories: config.categories,
+    categoriesKeys: config.categories ? Object.keys(config.categories) : "undefined",
     disabled_agents: config.disabled_agents,
     disabled_mcps: config.disabled_mcps,
     disabled_hooks: config.disabled_hooks,
