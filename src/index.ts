@@ -56,8 +56,10 @@ import {
   discoverOpencodeProjectSkills,
   mergeSkills,
 } from "./features/opencode-skill-loader";
+import type { SkillScope } from "./features/opencode-skill-loader/types";
 import { createBuiltinSkills } from "./features/builtin-skills";
 import { getSystemMcpServerNames } from "./features/claude-code-mcp-loader";
+import type { AvailableSkill } from "./agents/dynamic-agent-prompt-builder";
 import {
   setMainSession,
   getMainSessionID,
@@ -84,6 +86,10 @@ import {
   createTaskList,
   createTaskUpdateTool,
 } from "./tools";
+import {
+  CATEGORY_DESCRIPTIONS,
+  DEFAULT_CATEGORIES,
+} from "./tools/delegate-task/constants";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { initTaskToastManager } from "./features/task-toast-manager";
@@ -394,33 +400,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const browserProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
-  const delegateTask = createDelegateTask({
-    manager: backgroundManager,
-    client: ctx.client,
-    directory: ctx.directory,
-    userCategories: pluginConfig.categories,
-    gitMasterConfig: pluginConfig.git_master,
-    sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
-    browserProvider,
-    disabledSkills,
-    onSyncSessionCreated: async (event) => {
-      log("[index] onSyncSessionCreated callback", {
-        sessionID: event.sessionID,
-        parentID: event.parentID,
-        title: event.title,
-      });
-      await tmuxSessionManager.onSessionCreated({
-        type: "session.created",
-        properties: {
-          info: {
-            id: event.sessionID,
-            parentID: event.parentID,
-            title: event.title,
-          },
-        },
-      });
-    },
-  });
   const systemMcpNames = getSystemMcpServerNames();
   const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills }).filter((skill) => {
       if (skill.mcpConfig) {
@@ -447,6 +426,63 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     projectSkills,
     opencodeProjectSkills,
   );
+
+  function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
+    if (scope === "user" || scope === "opencode") return "user";
+    if (scope === "project" || scope === "opencode-project") return "project";
+    return "plugin";
+  }
+
+  const availableSkills: AvailableSkill[] = mergedSkills.map((skill) => ({
+    name: skill.name,
+    description: skill.definition.description ?? "",
+    location: mapScopeToLocation(skill.scope),
+  }));
+
+  const mergedCategories = pluginConfig.categories
+    ? { ...DEFAULT_CATEGORIES, ...pluginConfig.categories }
+    : DEFAULT_CATEGORIES;
+
+  const availableCategories = Object.entries(mergedCategories).map(
+    ([name, categoryConfig]) => ({
+      name,
+      description:
+        pluginConfig.categories?.[name]?.description
+          ?? CATEGORY_DESCRIPTIONS[name]
+          ?? "General tasks",
+      model: categoryConfig.model,
+    }),
+  );
+
+  const delegateTask = createDelegateTask({
+    manager: backgroundManager,
+    client: ctx.client,
+    directory: ctx.directory,
+    userCategories: pluginConfig.categories,
+    gitMasterConfig: pluginConfig.git_master,
+    sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
+    browserProvider,
+    disabledSkills,
+    availableCategories,
+    availableSkills,
+    onSyncSessionCreated: async (event) => {
+      log("[index] onSyncSessionCreated callback", {
+        sessionID: event.sessionID,
+        parentID: event.parentID,
+        title: event.title,
+      });
+      await tmuxSessionManager.onSessionCreated({
+        type: "session.created",
+        properties: {
+          info: {
+            id: event.sessionID,
+            parentID: event.parentID,
+            title: event.title,
+          },
+        },
+      });
+    },
+  });
   const skillMcpManager = new SkillMcpManager();
   const getSessionIDForMcp = () => getMainSessionID() || "";
   const skillTool = createSkillTool({
