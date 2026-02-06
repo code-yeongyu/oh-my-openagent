@@ -136,18 +136,44 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
         return
       }
 
-      // Block bash commands completely - Prometheus is read-only
+      // Block file-writing bash commands - allow read-only and mkdir
       if (toolName === "bash") {
-        log(`[${HOOK_NAME}] Blocked: Prometheus cannot execute bash commands`, {
-          sessionID: input.sessionID,
-          tool: toolName,
-          agent: agentName,
-        })
-        throw new Error(
-          `[${HOOK_NAME}] ${getAgentDisplayName("prometheus")} cannot execute bash commands. ` +
-          `${getAgentDisplayName("prometheus")} is a READ-ONLY planner. Use /start-work to execute the plan. ` +
-          `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
-        )
+        const command = (output.args.command as string) ?? ""
+        
+        // Blocked patterns: file creation/writing commands
+        const blockedPatterns = [
+          /[^2]>\s*[^&]/,         // Redirect write (but not 2>&1)
+          /\s>>\s*/,              // Append redirect
+          /\btouch\s+/,           // Create file
+          /\btee\s+/,             // Write via tee
+          /\bcp\s+.*\s+/,         // Copy files
+          /\bmv\s+/,              // Move/rename
+          /\brm\s+/,              // Delete
+          /\bchmod\s+/,           // Change permissions
+          /\bchown\s+/,           // Change owner
+          /\bln\s+/,              // Create links
+          /\binstall\s+/,         // Install command
+          /\bdd\s+/,              // Direct write
+          /\bsed\s+-i/,           // In-place edit
+        ]
+        
+        const isBlocked = blockedPatterns.some(pattern => pattern.test(command))
+        
+        if (isBlocked) {
+          log(`[${HOOK_NAME}] Blocked: Prometheus cannot execute file-writing bash commands`, {
+            sessionID: input.sessionID,
+            tool: toolName,
+            command: command.slice(0, 100),
+            agent: agentName,
+          })
+          throw new Error(
+            `[${HOOK_NAME}] ${getAgentDisplayName("prometheus")} cannot execute file-writing commands. ` +
+            `Blocked command pattern detected. Use Write/Edit tools for changes/*.md files only.`
+          )
+        }
+        
+        // Allow other bash commands (mkdir, ls, cat, git status, etc.)
+        return
       }
 
       const filePath = (output.args.filePath ?? output.args.path ?? output.args.file) as string | undefined
