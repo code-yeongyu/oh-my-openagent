@@ -15,32 +15,32 @@
 agents/
 ├── atlas/                      # Master Orchestrator (holds todo list)
 │   ├── index.ts
-│   ├── default.ts
-│   ├── gpt.ts
+│   ├── default.ts              # Claude-optimized prompt (390 lines)
+│   ├── gpt.ts                  # GPT-optimized prompt (330 lines)
 │   └── utils.ts
-├── sisyphus.ts                 # Main prompt (SF Bay Area engineer identity)
-├── hephaestus.ts               # Autonomous Deep Worker (GPT 5.2 Codex, "The Legitimate Craftsman")
+├── prometheus/                 # Planning Agent (Interview/Consultant mode)
+│   ├── index.ts
+│   ├── plan-template.ts        # Work plan structure (423 lines)
+│   ├── interview-mode.ts       # Interview flow (335 lines)
+│   ├── plan-generation.ts
+│   ├── high-accuracy-mode.ts
+│   ├── identity-constraints.ts # Identity rules (301 lines)
+│   └── behavioral-summary.ts
 ├── sisyphus-junior/            # Delegated task executor (category-spawned)
 │   ├── index.ts
 │   ├── default.ts
 │   └── gpt.ts
+├── sisyphus.ts                 # Main orchestrator prompt (530 lines)
+├── hephaestus.ts               # Autonomous deep worker (618 lines, GPT 5.3 Codex)
 ├── oracle.ts                   # Strategic advisor (GPT-5.2)
-├── librarian.ts                # Multi-repo research (GitHub CLI, Context7)
-├── explore.ts                  # Fast contextual grep (Grok Code Fast)
+├── librarian.ts                # Multi-repo research (328 lines)
+├── explore.ts                  # Fast contextual grep
 ├── multimodal-looker.ts        # Media analyzer (Gemini 3 Flash)
-├── prometheus/                 # Planning (Interview/Consultant mode)
-│   ├── index.ts
-│   ├── plan-template.ts
-│   ├── interview-mode.ts
-│   ├── plan-generation.ts
-│   ├── high-accuracy-mode.ts
-│   ├── identity-constraints.ts
-│   └── behavioral-summary.ts
-├── metis.ts                    # Pre-planning analysis (Gap detection)
-├── momus.ts                    # Plan reviewer (Ruthless fault-finding)
-├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation
+├── metis.ts                    # Pre-planning analysis (347 lines)
+├── momus.ts                    # Plan reviewer
+├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation (431 lines)
 ├── types.ts                    # AgentModelConfig, AgentPromptMetadata
-├── utils.ts                    # createBuiltinAgents(), resolveModelWithFallback()
+├── utils.ts                    # createBuiltinAgents(), resolveModelWithFallback() (485 lines)
 └── index.ts                    # builtinAgents export
 ```
 
@@ -73,15 +73,17 @@ agents/
 | explore | write, edit, task, delegate_task, call_omo_agent |
 | multimodal-looker | Allowlist: read only |
 | Sisyphus-Junior | task, delegate_task |
+| Atlas | task, call_omo_agent |
 
 ## PATTERNS
 - **Factory**: `createXXXAgent(model: string): AgentConfig`
-- **Metadata**: `XXX_PROMPT_METADATA` with category, cost, triggers.
-- **Tool restrictions**: `createAgentToolRestrictions(tools)` or `createAgentToolAllowlist(tools)`.
-- **Thinking**: 32k budget tokens for Sisyphus, Oracle, Prometheus, Atlas.
+- **Metadata**: `XXX_PROMPT_METADATA` with category, cost, triggers
+- **Tool restrictions**: `createAgentToolRestrictions(tools)` or `createAgentToolAllowlist(tools)`
+- **Thinking**: 32k budget tokens for Sisyphus, Oracle, Prometheus, Atlas
+- **Model-specific routing**: Atlas, Sisyphus-Junior have GPT vs Claude prompt variants
 
 ## ANTI-PATTERNS
-- **Trust reports**: NEVER trust "I'm done" - verify outputs.
-- **High temp**: Don't use >0.3 for code agents.
-- **Sequential calls**: Use `delegate_task` with `run_in_background` for exploration.
-- **Prometheus writing code**: Planner only - never implements.
+- **Trust reports**: NEVER trust "I'm done" - verify outputs
+- **High temp**: Don't use >0.3 for code agents
+- **Sequential calls**: Use `delegate_task` with `run_in_background` for exploration
+- **Prometheus writing code**: Planner only - never implements
