@@ -7,7 +7,7 @@
 
 | Field | Value |
 |-------|-------|
-| Model | `anthropic/claude-opus-4-5` |
+| Model | `anthropic/claude-opus-4-6` |
 | Max Tokens | `64000` |
 | Mode | `primary` |
 | Thinking | Budget: 32000 |

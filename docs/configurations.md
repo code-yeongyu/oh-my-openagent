@@ -693,7 +693,7 @@ Configure concurrency limits for background agent tasks. This controls how many 
       "google": 10
     },
     "modelConcurrency": {
-      "anthropic/claude-opus-4-5": 2,
+      "anthropic/claude-opus-4-6": 2,
       "google/gemini-3-flash": 10
     }
   }
@@ -705,7 +705,7 @@ Configure concurrency limits for background agent tasks. This controls how many 
 | `defaultConcurrency`  | -       | Default maximum concurrent background tasks for all providers/models                                                    |
 | `staleTimeoutMs`      | `180000` | Stale timeout in milliseconds - interrupt tasks with no activity for this duration (minimum: 60000 = 1 minute)             |
 | `providerConcurrency` | -       | Per-provider concurrency limits. Keys are provider names (e.g., `anthropic`, `openai`, `google`)                        |
-| `modelConcurrency`    | -       | Per-model concurrency limits. Keys are full model names (e.g., `anthropic/claude-opus-4-5`). Overrides provider limits. |
+| `modelConcurrency`    | -       | Per-model concurrency limits. Keys are full model names (e.g., `anthropic/claude-opus-4-6`). Overrides provider limits. |
 
 **Priority Order**: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
 
@@ -725,11 +725,11 @@ All 7 categories come with optimal model defaults, but **you must configure them
 | Category             | Built-in Default Model             | Description                                                          |
 | -------------------- | ---------------------------------- | -------------------------------------------------------------------- |
 | `visual-engineering` | `google/gemini-3-pro-preview`      | Frontend, UI/UX, design, styling, animation                          |
-| `ultrabrain`         | `openai/gpt-5.2-codex` (xhigh)     | Deep logical reasoning, complex architecture decisions               |
+| `ultrabrain`         | `openai/gpt-5.3-codex` (xhigh)     | Deep logical reasoning, complex architecture decisions               |
 | `artistry`           | `google/gemini-3-pro-preview` (max)| Highly creative/artistic tasks, novel ideas                          |
 | `quick`              | `anthropic/claude-haiku-4-5`       | Trivial tasks - single file changes, typo fixes, simple modifications|
 | `unspecified-low`    | `anthropic/claude-sonnet-4-5`      | Tasks that don't fit other categories, low effort required           |
-| `unspecified-high`   | `anthropic/claude-opus-4-5` (max)  | Tasks that don't fit other categories, high effort required          |
+| `unspecified-high`   | `anthropic/claude-opus-4-6` (max)  | Tasks that don't fit other categories, high effort required          |
 | `writing`            | `google/gemini-3-flash-preview`    | Documentation, prose, technical writing                              |
 
 ### ⚠️ Critical: Model Resolution Priority
@@ -768,7 +768,7 @@ All 7 categories come with optimal model defaults, but **you must configure them
       "model": "google/gemini-3-pro-preview"
     },
     "ultrabrain": { 
-      "model": "openai/gpt-5.2-codex",
+      "model": "openai/gpt-5.3-codex",
       "variant": "xhigh"
     },
     "artistry": { 
@@ -782,7 +782,7 @@ All 7 categories come with optimal model defaults, but **you must configure them
       "model": "anthropic/claude-sonnet-4-5"
     },
     "unspecified-high": { 
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max"
     },
     "writing": { 
@@ -870,9 +870,9 @@ At runtime, Oh My OpenCode uses a 3-step resolution process to determine which m
 │   │ anthropic → github-copilot → opencode → antigravity     │   │
 │   │     │            │              │            │          │   │
 │   │     ▼            ▼              ▼            ▼          │   │
-│   │ Try: anthropic/claude-opus-4-5                          │   │
-│   │ Try: github-copilot/claude-opus-4-5                     │   │
-│   │ Try: opencode/claude-opus-4-5                           │   │
+│   │ Try: anthropic/claude-opus-4-6                          │   │
+│   │ Try: github-copilot/claude-opus-4-6                     │   │
+│   │ Try: opencode/claude-opus-4-6                           │   │
 │   │ ...                                                     │   │
 │   │                                                         │   │
 │   │ Found in available models? → Return matched model       │   │
@@ -894,13 +894,13 @@ Each agent has a defined provider priority chain. The system tries providers in 
 
 | Agent | Model (no prefix) | Provider Priority Chain |
 |-------|-------------------|-------------------------|
-| **Sisyphus** | `claude-opus-4-5` | anthropic → kimi-for-coding → zai-coding-plan → openai → google |
+| **Sisyphus** | `claude-opus-4-6` | anthropic → kimi-for-coding → zai-coding-plan → openai → google |
 | **oracle** | `gpt-5.2` | openai → google → anthropic |
 | **librarian** | `glm-4.7` | zai-coding-plan → opencode → anthropic |
 | **explore** | `claude-haiku-4-5` | anthropic → github-copilot → opencode |
 | **multimodal-looker** | `gemini-3-flash` | google → openai → zai-coding-plan → kimi-for-coding → anthropic → opencode |
-| **Prometheus (Planner)** | `claude-opus-4-5` | anthropic → kimi-for-coding → openai → google |
-| **Metis (Plan Consultant)** | `claude-opus-4-5` | anthropic → kimi-for-coding → openai → google |
+| **Prometheus (Planner)** | `claude-opus-4-6` | anthropic → kimi-for-coding → openai → google |
+| **Metis (Plan Consultant)** | `claude-opus-4-6` | anthropic → kimi-for-coding → openai → google |
 | **Momus (Plan Reviewer)** | `gpt-5.2` | openai → anthropic → google |
 | **Atlas** | `claude-sonnet-4-5` | anthropic → kimi-for-coding → openai → google |
 
@@ -911,12 +911,12 @@ Categories follow the same resolution logic:
 | Category | Model (no prefix) | Provider Priority Chain |
 |----------|-------------------|-------------------------|
 | **visual-engineering** | `gemini-3-pro` | google → anthropic → zai-coding-plan |
-| **ultrabrain** | `gpt-5.2-codex` | openai → google → anthropic |
-| **deep** | `gpt-5.2-codex` | openai → anthropic → google |
+| **ultrabrain** | `gpt-5.3-codex` | openai → google → anthropic |
+| **deep** | `gpt-5.3-codex` | openai → anthropic → google |
 | **artistry** | `gemini-3-pro` | google → anthropic → openai |
 | **quick** | `claude-haiku-4-5` | anthropic → google → opencode |
 | **unspecified-low** | `claude-sonnet-4-5` | anthropic → openai → google |
-| **unspecified-high** | `claude-opus-4-5` | anthropic → openai → google |
+| **unspecified-high** | `claude-opus-4-6` | anthropic → openai → google |
 | **writing** | `gemini-3-flash` | google → anthropic → zai-coding-plan → openai |
 
 ### Checking Your Configuration
@@ -949,7 +949,7 @@ Override any agent or category model in `oh-my-opencode.json`:
   },
   "categories": {
     "visual-engineering": {
-      "model": "anthropic/claude-opus-4-5"
+      "model": "anthropic/claude-opus-4-6"
     }
   }
 }
