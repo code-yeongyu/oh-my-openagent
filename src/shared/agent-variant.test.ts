@@ -84,14 +84,14 @@ describe("applyAgentVariant", () => {
 
 describe("resolveVariantForModel", () => {
   test("returns agent override variant when configured", () => {
-    // given - use a model in sisyphus chain (claude-opus-4-5 has default variant "max")
+    // given - use a model in sisyphus chain (claude-opus-4-6 has default variant "max")
     // to verify override takes precedence over fallback chain
     const config = {
       agents: {
         sisyphus: { variant: "high" },
       },
     } as OhMyOpenCodeConfig
-    const model = { providerID: "anthropic", modelID: "claude-opus-4-5" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
@@ -103,7 +103,7 @@ describe("resolveVariantForModel", () => {
   test("returns correct variant for anthropic provider", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "anthropic", modelID: "claude-opus-4-5" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
@@ -151,7 +151,7 @@ describe("resolveVariantForModel", () => {
   test("returns undefined for unknown agent", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "anthropic", modelID: "claude-opus-4-5" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
     // when
     const variant = resolveVariantForModel(config, "nonexistent-agent", model)
@@ -203,7 +203,7 @@ describe("resolveVariantForModel", () => {
   test("returns correct variant for oracle agent with anthropic", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "anthropic", modelID: "claude-opus-4-5" }
+    const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
     // when
     const variant = resolveVariantForModel(config, "oracle", model)
