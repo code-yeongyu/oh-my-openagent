@@ -8,6 +8,7 @@ import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAG
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { consumeNewMessages } from "../../shared/session-cursor"
+import { storeToolMetadata } from "../../features/tool-metadata-store"
 
 type BackgroundOutputMessage = {
   info?: { role?: string; time?: string | { created?: number }; agent?: string }
@@ -140,15 +141,37 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
           parentAgent,
         })
 
-        ctx.metadata?.({
+        const WAIT_FOR_SESSION_INTERVAL_MS = 50
+        const WAIT_FOR_SESSION_TIMEOUT_MS = 30000
+        const waitStart = Date.now()
+        let sessionId = task.sessionID
+        while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
+          if (ctx.abort?.aborted) {
+            await manager.cancelTask(task.id)
+            return `Task aborted and cancelled while waiting for session to start.\n\nTask ID: ${task.id}`
+          }
+          await delay(WAIT_FOR_SESSION_INTERVAL_MS)
+          const updated = manager.getTask(task.id)
+          if (!updated || updated.status === "error") {
+            return `Task ${!updated ? "was deleted" : `entered error state`}.\n\nTask ID: ${task.id}`
+          }
+          sessionId = updated?.sessionID
+        }
+
+        const bgMeta = {
           title: args.description,
-          metadata: { sessionId: task.sessionID },
-        })
+          metadata: { sessionId: sessionId ?? "pending" } as Record<string, unknown>,
+        }
+        await ctx.metadata?.(bgMeta)
+        const callID = (ctx as any).callID as string | undefined
+        if (callID) {
+          storeToolMetadata(ctx.sessionID, callID, bgMeta)
+        }
 
         return `Background task launched successfully.
 
 Task ID: ${task.id}
-Session ID: ${task.sessionID}
+Session ID: ${sessionId ?? "pending"}
 Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}
@@ -663,7 +686,7 @@ export function createBackgroundCancel(manager: BackgroundManager, client: Backg
 
 To continue a cancelled task, use:
 \`\`\`
-delegate_task(session_id="<session_id>", prompt="Continue: <your follow-up>")
+task(session_id="<session_id>", prompt="Continue: <your follow-up>")
 \`\`\`
 
 Continuable sessions:

@@ -257,7 +257,7 @@ export function createClaudeCodeHooksHook(
       const cachedInput = getToolInput(input.sessionID, input.tool, input.callID) || {}
 
       // Use metadata if available and non-empty, otherwise wrap output.output in a structured object
-      // This ensures plugin tools (call_omo_agent, delegate_task, task) that return strings
+      // This ensures plugin tools (call_omo_agent, task) that return strings
       // get their results properly recorded in transcripts instead of empty {}
       const metadata = output.metadata as Record<string, unknown> | undefined
       const hasMetadata = metadata && typeof metadata === "object" && Object.keys(metadata).length > 0

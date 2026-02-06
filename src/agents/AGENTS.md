@@ -68,11 +68,11 @@ agents/
 ## TOOL RESTRICTIONS
 | Agent | Denied Tools |
 |-------|-------------|
-| oracle | write, edit, task, delegate_task |
-| librarian | write, edit, task, delegate_task, call_omo_agent |
-| explore | write, edit, task, delegate_task, call_omo_agent |
+| oracle | write, edit, task, task |
+| librarian | write, edit, task, task, call_omo_agent |
+| explore | write, edit, task, task, call_omo_agent |
 | multimodal-looker | Allowlist: read only |
-| Sisyphus-Junior | task, delegate_task |
+| Sisyphus-Junior | task, task |
 | Atlas | task, call_omo_agent |
 
 ## PATTERNS
@@ -85,5 +85,5 @@ agents/
 ## ANTI-PATTERNS
 - **Trust reports**: NEVER trust "I'm done" - verify outputs
 - **High temp**: Don't use >0.3 for code agents
-- **Sequential calls**: Use `delegate_task` with `run_in_background` for exploration
+- **Sequential calls**: Use `task` with `run_in_background` for exploration
 - **Prometheus writing code**: Planner only - never implements

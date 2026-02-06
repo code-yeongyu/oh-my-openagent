@@ -39,7 +39,7 @@ tools/
 | Search | ast_grep_search, ast_grep_replace, grep, glob | Direct |
 | Session | session_list, session_read, session_search, session_info | Direct |
 | Task | task_create, task_get, task_list, task_update | Factory |
-| Agent | delegate_task, call_omo_agent | Factory |
+| Agent | task, call_omo_agent | Factory |
 | Background | background_output, background_cancel | Factory |
 | System | interactive_bash, look_at | Mixed |
 | Skill | skill, skill_mcp, slashcommand | Factory |

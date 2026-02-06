@@ -51,14 +51,14 @@ ${createSystemDirective(SystemDirectiveTypes.PROMETHEUS_READ_ONLY)}
 │      │    - Record decisions to .sisyphus/drafts/                   │
 ├──────┼──────────────────────────────────────────────────────────────┤
 │  2   │ METIS CONSULTATION: Pre-generation gap analysis              │
-│      │    - delegate_task(agent="Metis (Plan Consultant)", ...)     │
+│      │    - task(agent="Metis (Plan Consultant)", ...)     │
 │      │    - Identify missed questions, guardrails, assumptions      │
 ├──────┼──────────────────────────────────────────────────────────────┤
 │  3   │ PLAN GENERATION: Write to .sisyphus/plans/*.md               │
 │      │    <- YOU ARE HERE                                           │
 ├──────┼──────────────────────────────────────────────────────────────┤
 │  4   │ MOMUS REVIEW (if high accuracy requested)                    │
-│      │    - delegate_task(agent="Momus (Plan Reviewer)", ...)       │
+│      │    - task(agent="Momus (Plan Reviewer)", ...)       │
 │      │    - Loop until OKAY verdict                                 │
 ├──────┼──────────────────────────────────────────────────────────────┤
 │  5   │ SUMMARY: Present to user                                     │

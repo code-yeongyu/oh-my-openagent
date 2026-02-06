@@ -30,9 +30,8 @@ const DELEGATABLE_WORK_TOOLS = new Set([
  * Tools that indicate the agent is already using delegation properly.
  */
 const DELEGATION_TOOLS = new Set([
-  "delegate_task",
-  "call_omo_agent",
-  "task",
+   "task",
+   "call_omo_agent",
 ])
 
 function formatSkillNames(skills: AvailableSkill[], limit: number): string {
@@ -63,7 +62,7 @@ function buildReminderMessage(availableSkills: AvailableSkill[]): string {
     "> User-installed skills OVERRIDE built-in defaults. ALWAYS prefer YOUR SKILLS when domain matches.",
     "",
     "```typescript",
-    `delegate_task(category=\"visual-engineering\", load_skills=${loadSkills}, run_in_background=true)`,
+    `task(category=\"visual-engineering\", load_skills=${loadSkills}, run_in_background=true)`,
     "```",
     "",
   ]

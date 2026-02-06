@@ -146,7 +146,6 @@ export async function startTask(
       tools: {
         ...getAgentToolRestrictions(input.agent),
         task: false,
-        delegate_task: false,
         call_omo_agent: true,
         question: false,
       },
@@ -231,7 +230,6 @@ export async function resumeTask(
       tools: {
         ...getAgentToolRestrictions(task.agent),
         task: false,
-        delegate_task: false,
         call_omo_agent: true,
         question: false,
       },

@@ -86,7 +86,7 @@ describe("atlas hook", () => {
 
       // when - calling with undefined output
       const result = await hook["tool.execute.after"](
-        { tool: "delegate_task", sessionID: "session-123" },
+        { tool: "task", sessionID: "session-123" },
         undefined as unknown as { title: string; output: string; metadata: Record<string, unknown> }
       )
 
@@ -94,8 +94,8 @@ describe("atlas hook", () => {
       expect(result).toBeUndefined()
     })
 
-    test("should ignore non-delegate_task tools", async () => {
-      // given - hook and non-delegate_task tool
+    test("should ignore non-task tools", async () => {
+      // given - hook and non-task tool
       const hook = createAtlasHook(createMockPluginInput())
       const output = {
         title: "Test Tool",
@@ -138,7 +138,7 @@ describe("atlas hook", () => {
 
       // when
       await hook["tool.execute.after"](
-        { tool: "delegate_task", sessionID },
+        { tool: "task", sessionID },
         output
       )
 
@@ -162,14 +162,14 @@ describe("atlas hook", () => {
 
       // when
       await hook["tool.execute.after"](
-        { tool: "delegate_task", sessionID },
+        { tool: "task", sessionID },
         output
       )
 
       // then - standalone verification reminder appended
       expect(output.output).toContain("Task completed successfully")
       expect(output.output).toContain("MANDATORY:")
-      expect(output.output).toContain("delegate_task(session_id=")
+      expect(output.output).toContain("task(session_id=")
       
       cleanupMessageStorage(sessionID)
     })
@@ -199,7 +199,7 @@ describe("atlas hook", () => {
 
       // when
       await hook["tool.execute.after"](
-        { tool: "delegate_task", sessionID },
+        { tool: "task", sessionID },
         output
       )
 
@@ -208,7 +208,7 @@ describe("atlas hook", () => {
       expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.output).toContain("test-plan")
       expect(output.output).toContain("LIE")
-      expect(output.output).toContain("delegate_task(session_id=")
+      expect(output.output).toContain("task(session_id=")
       
       cleanupMessageStorage(sessionID)
     })
@@ -238,7 +238,7 @@ describe("atlas hook", () => {
 
       // when
       await hook["tool.execute.after"](
-        { tool: "delegate_task", sessionID },
+        { tool: "task", sessionID },
         output
       )
 
@@ -275,7 +275,7 @@ describe("atlas hook", () => {
 
       // when
       await hook["tool.execute.after"](
-        { tool: "delegate_task", sessionID },
+        { tool: "task", sessionID },
         output
       )
 
@@ -311,7 +311,7 @@ describe("atlas hook", () => {
 
       // when
       await hook["tool.execute.after"](
-        { tool: "delegate_task", sessionID },
+        { tool: "task", sessionID },
         output
       )
 
@@ -348,7 +348,7 @@ describe("atlas hook", () => {
 
       // when
       await hook["tool.execute.after"](
-        { tool: "delegate_task", sessionID },
+        { tool: "task", sessionID },
         output
       )
 
@@ -385,12 +385,12 @@ describe("atlas hook", () => {
 
       // when
       await hook["tool.execute.after"](
-        { tool: "delegate_task", sessionID },
+        { tool: "task", sessionID },
         output
       )
 
       // then - should include session_id instructions and verification
-      expect(output.output).toContain("delegate_task(session_id=")
+      expect(output.output).toContain("task(session_id=")
       expect(output.output).toContain("[x]")
       expect(output.output).toContain("MANDATORY:")
       
@@ -425,8 +425,8 @@ describe("atlas hook", () => {
 
         // then
         expect(output.output).toContain("ORCHESTRATOR, not an IMPLEMENTER")
-        expect(output.output).toContain("delegate_task")
-        expect(output.output).toContain("delegate_task")
+        expect(output.output).toContain("task")
+        expect(output.output).toContain("task")
       })
 
       test("should append delegation reminder when orchestrator edits outside .sisyphus/", async () => {

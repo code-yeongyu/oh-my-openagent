@@ -214,7 +214,7 @@ Parallel Speedup: ~40% faster than sequential
 
 | Wave | Tasks | Recommended Agents |
 |------|-------|-------------------|
-| 1 | 1, 5 | delegate_task(category="...", load_skills=[...], run_in_background=false) |
+| 1 | 1, 5 | task(category="...", load_skills=[...], run_in_background=false) |
 | 2 | 2, 3, 6 | dispatch parallel after Wave 1 completes |
 | 3 | 4 | final integration task |
 
