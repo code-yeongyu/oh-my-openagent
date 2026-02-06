@@ -40,6 +40,7 @@ import {
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
 } from "./hooks";
+import { createAnthropicEffortHook } from "./hooks/anthropic-effort";
 import {
   contextCollector,
   createContextInjectorMessagesTransformHook,
@@ -293,6 +294,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const taskResumeInfo = createTaskResumeInfoHook();
+
+  const anthropicEffort = isHookEnabled("anthropic-effort")
+    ? createAnthropicEffortHook()
+    : null;
 
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
 
@@ -549,6 +554,29 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   return {
     tool: filteredTools,
+
+    "chat.params": async (
+      input: {
+        sessionID: string
+        agent: string
+        model: Record<string, unknown>
+        provider: Record<string, unknown>
+        message: Record<string, unknown>
+      },
+      output: {
+        temperature: number
+        topP: number
+        topK: number
+        options: Record<string, unknown>
+      },
+    ) => {
+      const model = input.model as { providerID: string; modelID: string }
+      const message = input.message as { variant?: string }
+      await anthropicEffort?.["chat.params"]?.(
+        { ...input, agent: { name: input.agent }, model, provider: input.provider as { id: string }, message },
+        output,
+      );
+    },
 
     "chat.message": async (input, output) => {
       if (input.agent) {
