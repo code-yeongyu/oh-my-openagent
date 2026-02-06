@@ -156,6 +156,25 @@ describe("createAnthropicEffortHook", () => {
       //#then effort should NOT be injected
       expect(output.options.effort).toBeUndefined()
     })
+
+    it("should NOT throw when model.modelID is undefined", async () => {
+      //#given model with undefined modelID (runtime edge case)
+      const hook = createAnthropicEffortHook()
+      const input = {
+        sessionID: "test-session",
+        agent: { name: "sisyphus" },
+        model: { providerID: "anthropic", modelID: undefined as unknown as string },
+        provider: { id: "anthropic" },
+        message: { variant: "max" as const },
+      }
+      const output = { temperature: 0.1, options: {} }
+
+      //#when chat.params hook is called with undefined modelID
+      await hook["chat.params"](input, output)
+
+      //#then should gracefully skip without throwing
+      expect(output.options.effort).toBeUndefined()
+    })
   })
 
   describe("preserves existing options", () => {
