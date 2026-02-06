@@ -20,7 +20,7 @@ import { readProviderModelsCache, hasProviderModelsCache, readConnectedProviders
  * If providers array is given, only models starting with "provider/" are considered.
  * 
  * @example
- * const available = new Set(["openai/gpt-5.2", "openai/gpt-5.2-codex", "anthropic/claude-opus-4-5"])
+ * const available = new Set(["openai/gpt-5.2", "openai/gpt-5.3-codex", "anthropic/claude-opus-4-6"])
  * fuzzyMatchModel("gpt-5.2", available) // → "openai/gpt-5.2"
  * fuzzyMatchModel("claude", available, ["openai"]) // → null (provider filter excludes anthropic)
  */
@@ -105,7 +105,7 @@ export function fuzzyMatchModel(
 /**
  * Check if a target model is available (fuzzy match by model name, no provider filtering)
  * 
- * @param targetModel - Model name to check (e.g., "gpt-5.2-codex")
+ * @param targetModel - Model name to check (e.g., "gpt-5.3-codex")
  * @param availableModels - Set of available models in "provider/model" format
  * @returns true if model is available, false otherwise
  */

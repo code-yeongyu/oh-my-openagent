@@ -63,7 +63,7 @@ beforeEach(() => {
   spyOn(mcpModule, "createBuiltinMcps" as any).mockReturnValue({})
 
   spyOn(shared, "log" as any).mockImplementation(() => {})
-  spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set(["anthropic/claude-opus-4-5"]))
+  spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set(["anthropic/claude-opus-4-6"]))
   spyOn(shared, "readConnectedProvidersCache" as any).mockReturnValue(null)
 
   spyOn(configDir, "getOpenCodeConfigPaths" as any).mockReturnValue({
@@ -73,7 +73,7 @@ beforeEach(() => {
 
   spyOn(permissionCompat, "migrateAgentConfig" as any).mockImplementation((config: Record<string, unknown>) => config)
 
-  spyOn(modelResolver, "resolveModelWithFallback" as any).mockReturnValue({ model: "anthropic/claude-opus-4-5" })
+  spyOn(modelResolver, "resolveModelWithFallback" as any).mockReturnValue({ model: "anthropic/claude-opus-4-6" })
 })
 
 afterEach(() => {
@@ -123,7 +123,7 @@ describe("Plan agent demote behavior", () => {
       },
     }
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -154,7 +154,7 @@ describe("Plan agent demote behavior", () => {
       },
     }
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
       agent: {
         plan: {
           name: "plan",
@@ -191,7 +191,7 @@ describe("Plan agent demote behavior", () => {
       },
     }
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
       agent: {
         plan: {
           name: "plan",
@@ -228,7 +228,7 @@ describe("Plan agent demote behavior", () => {
       },
     }
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -263,7 +263,7 @@ describe("Agent permission defaults", () => {
     })
     const pluginConfig: OhMyOpenCodeConfig = {}
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -295,7 +295,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.2-codex")
+    expect(config?.model).toBe("openai/gpt-5.3-codex")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -355,7 +355,7 @@ describe("Prometheus category config resolution", () => {
 
     // then - falls back to DEFAULT_CATEGORIES
     expect(config).toBeDefined()
-    expect(config?.model).toBe("openai/gpt-5.2-codex")
+    expect(config?.model).toBe("openai/gpt-5.3-codex")
     expect(config?.variant).toBe("xhigh")
   })
 
@@ -406,7 +406,7 @@ describe("Prometheus direct override priority over category", () => {
       },
     }
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -446,7 +446,7 @@ describe("Prometheus direct override priority over category", () => {
       },
     }
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -487,7 +487,7 @@ describe("Prometheus direct override priority over category", () => {
       },
     }
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -522,7 +522,7 @@ describe("Prometheus direct override priority over category", () => {
       },
     }
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
       agent: {},
     }
     const handler = createConfigHandler({
@@ -560,7 +560,7 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
       },
     }
     const config: Record<string, unknown> = {
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
       agent: {},
     }
     const mockClient = {

@@ -12,7 +12,7 @@ describe("think-mode switcher", () => {
       it("should resolve github-copilot Claude Opus to anthropic config", () => {
         // given a github-copilot provider with Claude Opus model
         const providerID = "github-copilot"
-        const modelID = "claude-opus-4-5"
+        const modelID = "claude-opus-4-6"
 
         // when getting thinking config
         const config = getThinkingConfig(providerID, modelID)
@@ -38,8 +38,8 @@ describe("think-mode switcher", () => {
       })
 
       it("should handle Claude with dots in version number", () => {
-        // given a model ID with dots (claude-opus-4.5)
-        const config = getThinkingConfig("github-copilot", "claude-opus-4.5")
+        // given a model ID with dots (claude-opus-4.6)
+        const config = getThinkingConfig("github-copilot", "claude-opus-4.6")
 
         // then should still return anthropic thinking config
         expect(config).not.toBeNull()
@@ -127,18 +127,18 @@ describe("think-mode switcher", () => {
     describe("getHighVariant with dots vs hyphens", () => {
       it("should handle dots in Claude version numbers", () => {
         // given a Claude model ID with dot format
-        const variant = getHighVariant("claude-opus-4.5")
+        const variant = getHighVariant("claude-opus-4.6")
 
         // then should return high variant with hyphen format
-        expect(variant).toBe("claude-opus-4-5-high")
+        expect(variant).toBe("claude-opus-4-6-high")
       })
 
       it("should handle hyphens in Claude version numbers", () => {
         // given a Claude model ID with hyphen format
-        const variant = getHighVariant("claude-opus-4-5")
+        const variant = getHighVariant("claude-opus-4-6")
 
         // then should return high variant
-        expect(variant).toBe("claude-opus-4-5-high")
+        expect(variant).toBe("claude-opus-4-6-high")
       })
 
       it("should handle claude-opus-4-6 high variant", () => {
@@ -177,7 +177,7 @@ describe("think-mode switcher", () => {
 
       it("should return null for already-high variants", () => {
         // given model IDs that are already high variants
-        expect(getHighVariant("claude-opus-4-5-high")).toBeNull()
+        expect(getHighVariant("claude-opus-4-6-high")).toBeNull()
         expect(getHighVariant("gpt-5-2-high")).toBeNull()
         expect(getHighVariant("gemini-3-pro-high")).toBeNull()
       })
@@ -193,7 +193,7 @@ describe("think-mode switcher", () => {
   describe("isAlreadyHighVariant", () => {
     it("should detect -high suffix", () => {
       // given model IDs with -high suffix
-      expect(isAlreadyHighVariant("claude-opus-4-5-high")).toBe(true)
+      expect(isAlreadyHighVariant("claude-opus-4-6-high")).toBe(true)
       expect(isAlreadyHighVariant("gpt-5-2-high")).toBe(true)
       expect(isAlreadyHighVariant("gemini-3-pro-high")).toBe(true)
     })
@@ -205,8 +205,8 @@ describe("think-mode switcher", () => {
 
     it("should return false for base models", () => {
       // given base model IDs without -high suffix
-      expect(isAlreadyHighVariant("claude-opus-4-5")).toBe(false)
-      expect(isAlreadyHighVariant("claude-opus-4.5")).toBe(false)
+      expect(isAlreadyHighVariant("claude-opus-4-6")).toBe(false)
+      expect(isAlreadyHighVariant("claude-opus-4.6")).toBe(false)
       expect(isAlreadyHighVariant("gpt-5.2")).toBe(false)
       expect(isAlreadyHighVariant("gemini-3-pro")).toBe(false)
     })
@@ -222,7 +222,7 @@ describe("think-mode switcher", () => {
       it("should return null for already-high variants", () => {
         // given already-high model variants
         expect(
-          getThinkingConfig("anthropic", "claude-opus-4-5-high")
+          getThinkingConfig("anthropic", "claude-opus-4-6-high")
         ).toBeNull()
         expect(getThinkingConfig("openai", "gpt-5-2-high")).toBeNull()
         expect(getThinkingConfig("google", "gemini-3-pro-high")).toBeNull()
@@ -231,7 +231,7 @@ describe("think-mode switcher", () => {
       it("should return null for already-high variants via github-copilot", () => {
         // given already-high model variants via github-copilot
         expect(
-          getThinkingConfig("github-copilot", "claude-opus-4-5-high")
+          getThinkingConfig("github-copilot", "claude-opus-4-6-high")
         ).toBeNull()
         expect(getThinkingConfig("github-copilot", "gpt-5.2-high")).toBeNull()
       })
@@ -258,7 +258,7 @@ describe("think-mode switcher", () => {
   describe("Direct provider configs (backwards compatibility)", () => {
     it("should still work for direct anthropic provider", () => {
       // given direct anthropic provider
-      const config = getThinkingConfig("anthropic", "claude-opus-4-5")
+      const config = getThinkingConfig("anthropic", "claude-opus-4-6")
 
       // then should return anthropic thinking config
       expect(config).not.toBeNull()
@@ -351,10 +351,10 @@ describe("think-mode switcher", () => {
 
       it("should handle prefixes with dots in version numbers", () => {
         // given a model ID with prefix and dots
-        const variant = getHighVariant("vertex_ai/claude-opus-4.5")
+        const variant = getHighVariant("vertex_ai/claude-opus-4.6")
 
         // then should normalize dots and preserve prefix
-        expect(variant).toBe("vertex_ai/claude-opus-4-5-high")
+        expect(variant).toBe("vertex_ai/claude-opus-4-6-high")
       })
 
       it("should handle multiple different prefixes", () => {
@@ -372,7 +372,7 @@ describe("think-mode switcher", () => {
 
       it("should return null for already-high prefixed models", () => {
         // given prefixed model IDs that are already high
-        expect(getHighVariant("vertex_ai/claude-opus-4-5-high")).toBeNull()
+        expect(getHighVariant("vertex_ai/claude-opus-4-6-high")).toBeNull()
         expect(getHighVariant("openai/gpt-5-2-high")).toBeNull()
       })
     })
@@ -380,14 +380,14 @@ describe("think-mode switcher", () => {
     describe("isAlreadyHighVariant with prefixes", () => {
       it("should detect -high suffix in prefixed models", () => {
         // given prefixed model IDs with -high suffix
-        expect(isAlreadyHighVariant("vertex_ai/claude-opus-4-5-high")).toBe(true)
+        expect(isAlreadyHighVariant("vertex_ai/claude-opus-4-6-high")).toBe(true)
         expect(isAlreadyHighVariant("openai/gpt-5-2-high")).toBe(true)
         expect(isAlreadyHighVariant("custom/gemini-3-pro-high")).toBe(true)
       })
 
       it("should return false for prefixed base models", () => {
         // given prefixed base model IDs without -high suffix
-        expect(isAlreadyHighVariant("vertex_ai/claude-opus-4-5")).toBe(false)
+        expect(isAlreadyHighVariant("vertex_ai/claude-opus-4-6")).toBe(false)
         expect(isAlreadyHighVariant("openai/gpt-5-2")).toBe(false)
       })
 
@@ -410,7 +410,7 @@ describe("think-mode switcher", () => {
       it("should work with prefixed models on known providers", () => {
         // given known provider (anthropic) with prefixed model
         // This tests that the base model name is correctly extracted for capability check
-        const config = getThinkingConfig("anthropic", "custom-prefix/claude-opus-4-5")
+        const config = getThinkingConfig("anthropic", "custom-prefix/claude-opus-4-6")
 
         // then should return thinking config (base model is capable)
         expect(config).not.toBeNull()
@@ -419,7 +419,7 @@ describe("think-mode switcher", () => {
 
       it("should return null for prefixed models that are already high", () => {
         // given prefixed already-high model
-        const config = getThinkingConfig("anthropic", "vertex_ai/claude-opus-4-5-high")
+        const config = getThinkingConfig("anthropic", "vertex_ai/claude-opus-4-6-high")
 
         // then should return null
         expect(config).toBeNull()
@@ -452,11 +452,11 @@ describe("think-mode switcher", () => {
 
       it("should not break when switching to high variant in think mode", () => {
         // given think mode switching vertex_ai/claude model to high variant
-        const original = "vertex_ai/claude-opus-4-5"
+        const original = "vertex_ai/claude-opus-4-6"
         const high = getHighVariant(original)
 
         // then the high variant should be valid
-        expect(high).toBe("vertex_ai/claude-opus-4-5-high")
+        expect(high).toBe("vertex_ai/claude-opus-4-6-high")
 
         // #and should be recognized as already high
         expect(isAlreadyHighVariant(high!)).toBe(true)

@@ -194,12 +194,12 @@ You are NOT an interactive assistant. You are an autonomous problem-solver.
 
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   "visual-engineering": { model: "google/gemini-3-pro" },
-  ultrabrain: { model: "openai/gpt-5.2-codex", variant: "xhigh" },
-  deep: { model: "openai/gpt-5.2-codex", variant: "medium" },
+  ultrabrain: { model: "openai/gpt-5.3-codex", variant: "xhigh" },
+  deep: { model: "openai/gpt-5.3-codex", variant: "medium" },
   artistry: { model: "google/gemini-3-pro", variant: "high" },
   quick: { model: "anthropic/claude-haiku-4-5" },
   "unspecified-low": { model: "anthropic/claude-sonnet-4-5" },
-  "unspecified-high": { model: "anthropic/claude-opus-4-5", variant: "max" },
+  "unspecified-high": { model: "anthropic/claude-opus-4-6", variant: "max" },
   writing: { model: "google/gemini-3-flash" },
 }
 
@@ -343,11 +343,11 @@ FOR EVERY TASK, YOU MUST RECOMMEND:
 | Category | Best For | Model |
 |----------|----------|-------|
 | \`visual-engineering\` | Frontend, UI/UX, design, styling, animation | google/gemini-3-pro |
-| \`ultrabrain\` | Complex architecture, deep logical reasoning | openai/gpt-5.2-codex |
+| \`ultrabrain\` | Complex architecture, deep logical reasoning | openai/gpt-5.3-codex |
 | \`artistry\` | Highly creative/artistic tasks, novel ideas | google/gemini-3-pro |
 | \`quick\` | Trivial tasks - single file, typo fixes | anthropic/claude-haiku-4-5 |
 | \`unspecified-low\` | Moderate effort, doesn't fit other categories | anthropic/claude-sonnet-4-5 |
-| \`unspecified-high\` | High effort, doesn't fit other categories | anthropic/claude-opus-4-5 |
+| \`unspecified-high\` | High effort, doesn't fit other categories | anthropic/claude-opus-4-6 |
 | \`writing\` | Documentation, prose, technical writing | google/gemini-3-flash |
 
 ### AVAILABLE SKILLS (ALWAYS EVALUATE ALL)
