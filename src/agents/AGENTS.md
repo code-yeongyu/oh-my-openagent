@@ -13,15 +13,29 @@
 ## STRUCTURE
 ```
 agents/
-├── atlas.ts                    # Master Orchestrator (holds todo list)
+├── atlas/                      # Master Orchestrator (holds todo list)
+│   ├── index.ts
+│   ├── default.ts
+│   ├── gpt.ts
+│   └── utils.ts
 ├── sisyphus.ts                 # Main prompt (SF Bay Area engineer identity)
 ├── hephaestus.ts               # Autonomous Deep Worker (GPT 5.2 Codex, "The Legitimate Craftsman")
-├── sisyphus-junior.ts          # Delegated task executor (category-spawned)
+├── sisyphus-junior/            # Delegated task executor (category-spawned)
+│   ├── index.ts
+│   ├── default.ts
+│   └── gpt.ts
 ├── oracle.ts                   # Strategic advisor (GPT-5.2)
 ├── librarian.ts                # Multi-repo research (GitHub CLI, Context7)
 ├── explore.ts                  # Fast contextual grep (Grok Code Fast)
 ├── multimodal-looker.ts        # Media analyzer (Gemini 3 Flash)
-├── prometheus-prompt.ts        # Planning (Interview/Consultant mode, 1283 lines)
+├── prometheus/                 # Planning (Interview/Consultant mode)
+│   ├── index.ts
+│   ├── plan-template.ts
+│   ├── interview-mode.ts
+│   ├── plan-generation.ts
+│   ├── high-accuracy-mode.ts
+│   ├── identity-constraints.ts
+│   └── behavioral-summary.ts
 ├── metis.ts                    # Pre-planning analysis (Gap detection)
 ├── momus.ts                    # Plan reviewer (Ruthless fault-finding)
 ├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation
