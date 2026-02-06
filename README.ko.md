@@ -176,12 +176,12 @@ Hey please read this readme and tell me why it is different from other agent har
 내 삶도 다르지 않습니다. 돌이켜보면 우리는 이 에이전트들과 그리 다르지 않습니다.
 **맞습니다! LLM 에이전트는 우리와 다르지 않습니다. 훌륭한 도구와 확고한 팀원을 제공하면 우리만큼 훌륭한 코드를 작성하고 똑같이 훌륭하게 작업할 수 있습니다.**
 
-우리의 주요 에이전트를 만나보세요: Sisyphus (Opus 4.5 High). 아래는 Sisyphus가 그 바위를 굴리는 데 사용하는 도구입니다.
+우리의 주요 에이전트를 만나보세요: Sisyphus (Opus 4.6). 아래는 Sisyphus가 그 바위를 굴리는 데 사용하는 도구입니다.
 
 *아래의 모든 것은 사용자 정의 가능합니다. 원하는 것을 가져가세요. 모든 기능은 기본적으로 활성화됩니다. 아무것도 할 필요가 없습니다. 포함되어 있으며, 즉시 작동합니다.*
 
 - Sisyphus의 팀원 (큐레이팅된 에이전트)
-  - Hephaestus: 자율적 딥 워커, 목표 지향 실행 (GPT 5.2 Codex Medium) — *합법적인 장인*
+  - Hephaestus: 자율적 딥 워커, 목표 지향 실행 (GPT 5.3 Codex Medium) — *합법적인 장인*
   - Oracle: 디자인, 디버깅 (GPT 5.2 Medium)
   - Frontend UI/UX Engineer: 프론트엔드 개발 (Gemini 3 Pro)
   - Librarian: 공식 문서, 오픈 소스 구현, 코드베이스 탐색 (Claude Sonnet 4.5)

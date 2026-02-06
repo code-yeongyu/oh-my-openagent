@@ -172,12 +172,12 @@
 我的生活也没有什么不同。回顾过去，我们与这些智能体并没有太大不同。
 **是的！LLM 智能体和我们没有区别。如果你给它们优秀的工具和可靠的队友，它们可以写出和我们一样出色的代码，工作得同样优秀。**
 
-认识我们的主智能体：Sisyphus (Opus 4.5 High)。以下是 Sisyphus 用来继续推动巨石的工具。
+认识我们的主智能体：Sisyphus (Opus 4.6)。以下是 Sisyphus 用来继续推动巨石的工具。
 
 *以下所有内容都是可配置的。按需选取。所有功能默认启用。你不需要做任何事情。开箱即用，电池已包含。*
 
 - Sisyphus 的队友（精选智能体）
-  - Hephaestus：自主深度工作者，目标导向执行（GPT 5.2 Codex Medium）— *合法的工匠*
+  - Hephaestus：自主深度工作者，目标导向执行（GPT 5.3 Codex Medium）— *合法的工匠*
   - Oracle：设计、调试 (GPT 5.2 Medium)
   - Frontend UI/UX Engineer：前端开发 (Gemini 3 Pro)
   - Librarian：官方文档、开源实现、代码库探索 (Claude Sonnet 4.5)

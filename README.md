@@ -175,12 +175,12 @@ In greek mythology, Sisyphus was condemned to roll a boulder up a hill for etern
 My life is no different. Looking back, we are not so different from these agents.
 **Yes! LLM Agents are no different from us. They can write code as brilliant as ours and work just as excellently—if you give them great tools and solid teammates.**
 
-Meet our main agent: Sisyphus (Opus 4.5 High). Below are the tools Sisyphus uses to keep that boulder rolling.
+Meet our main agent: Sisyphus (Opus 4.6). Below are the tools Sisyphus uses to keep that boulder rolling.
 
 *Everything below is customizable. Take what you want. All features are enabled by default. You don't have to do anything. Battery Included, works out of the box.*
 
 - Sisyphus's Teammates (Curated Agents)
-  - Hephaestus: Autonomous deep worker, goal-oriented execution (GPT 5.2 Codex Medium) — *The Legitimate Craftsman*
+  - Hephaestus: Autonomous deep worker, goal-oriented execution (GPT 5.3 Codex Medium) — *The Legitimate Craftsman*
   - Oracle: Design, debugging (GPT 5.2 Medium)
   - Frontend UI/UX Engineer: Frontend development (Gemini 3 Pro)
   - Librarian: Official docs, open source implementations, codebase exploration (Claude Sonnet 4.5)

@@ -111,7 +111,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     console.log()
     console.log(color.bgRed(color.white(color.bold(" CRITICAL WARNING "))))
     console.log()
-    console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.5.")))
+    console.log(color.red(color.bold("  Sisyphus agent is STRONGLY optimized for Claude Opus 4.6.")))
     console.log(color.red("  Without Claude, you may experience significantly degraded performance:"))
     console.log(color.dim("    • Reduced orchestration quality"))
     console.log(color.dim("    • Weaker tool selection and delegation"))

@@ -292,7 +292,7 @@ gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-opencode >/dev/nul
 
 Tell the user of following:
 
-1. **Sisyphus agent strongly recommends Opus 4.5 model. Using other models may result in significantly degraded experience.**
+1. **Sisyphus agent strongly recommends Opus 4.6 model. Using other models may result in significantly degraded experience.**
 
 2. **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. That's it. The agent figures out the rest.
 
