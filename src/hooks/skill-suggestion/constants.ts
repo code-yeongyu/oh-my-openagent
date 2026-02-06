@@ -9,13 +9,7 @@ export const SKILL_SUGGESTIONS: Array<{
   keywords: RegExp
   suggestion: string
 }> = [
-  {
-    skill: "brainstorming",
-    keywords:
-      /\b(create|build|add\s+feature|implement|design|new\s+feature|develop|make\s+a|构建|创建|新功能|設計|作る|開発)\b/i,
-    suggestion:
-      '💡 Detected creative/feature work. Consider invoking `skill("brainstorming")` first to explore requirements and design approaches.',
-  },
+  // NOTE: brainstorming is handled by keyword-detector hook (brainstorm-mode), not here
   {
     skill: "systematic-debugging",
     keywords:
@@ -64,7 +58,7 @@ export const SKILL_SUGGESTIONS: Array<{
  * Skills that should not be suggested if already mentioned in the prompt.
  */
 export const SKILL_MENTION_PATTERNS: Record<string, RegExp> = {
-  brainstorming: /skill\s*\(\s*["']brainstorming["']\s*\)|\/brainstorming/i,
+  // brainstorming handled by keyword-detector hook
   "systematic-debugging": /skill\s*\(\s*["']systematic-debugging["']\s*\)|\/systematic-debugging/i,
   "git-master": /skill\s*\(\s*["']git-master["']\s*\)|\/git-master/i,
   "frontend-ui-ux": /skill\s*\(\s*["']frontend-ui-ux["']\s*\)|\/frontend-ui-ux/i,

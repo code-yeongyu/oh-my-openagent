@@ -1,4 +1,4 @@
-import type { Plugin, ToolDefinition } from "@opencode-ai/plugin";
+import type { Plugin, ToolDefinition, PluginInput } from "@opencode-ai/plugin";
 import {
   createTodoContinuationEnforcer,
   createContextWindowMonitorHook,
@@ -16,6 +16,7 @@ import {
   createBackgroundNotificationHook,
   createAutoUpdateCheckerHook,
   createKeywordDetectorHook,
+  createSkillAutoTriggerHook,
   createAgentUsageReminderHook,
   createAgentSkillReminderHook,
   createNonInteractiveEnvHook,
@@ -268,6 +269,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
   const keywordDetector = isHookEnabled("keyword-detector")
     ? createKeywordDetectorHook(ctx, contextCollector)
+    : null;
+  const skillAutoTrigger = isHookEnabled("skill-auto-trigger" as HookName)
+    ? (
+        createSkillAutoTriggerHook as (
+          ctx: PluginInput,
+          collector: typeof contextCollector,
+        ) => ReturnType<typeof createSkillAutoTriggerHook>
+      )(ctx, contextCollector)
     : null;
   const contextInjectorMessagesTransform =
     createContextInjectorMessagesTransformHook(contextCollector);
@@ -707,6 +716,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       await stopContinuationGuard?.["chat.message"]?.(input);
       await keywordDetector?.["chat.message"]?.(input, output);
+      await skillAutoTrigger?.["chat.message"]?.(input, output);
       await agentSkillReminder?.["chat.message"]?.(input, output);
       await tddGuard?.["chat.message"]?.(input, output);
       await claudeCodeHooks["chat.message"]?.(input, output);

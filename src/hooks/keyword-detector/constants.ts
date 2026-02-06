@@ -91,12 +91,86 @@ export const KEYWORD_DETECTORS: KeywordDetector[] = [
     pattern: ANALYZE_PATTERN,
     message: ANALYZE_MESSAGE,
   },
-  // BRAINSTORM: EN/KO/JP/CN/VN - Triggers brainstorming skill for design work
+  // BRAINSTORM: Exploration/ideation phase - thinking about possibilities
+  // Triggers skill("brainstorming") for requirements exploration
   {
     pattern:
-      /\b(brainstorm|brain\s*storm|ideate|design|architect|plan\s+out|sketch\s+out|draft|propose|prototype|conceptualize|envision|blueprint|whiteboard|spitball)ing?\b|let'?s\s+(build|create|make|develop|implement)|build\s+a|create\s+a|make\s+a|add\s+(a\s+)?(new|feature)|new\s+feature|头脑风暴|脑暴|设计|构思|规划|方案|草拟|브레인스토밍|아이디어|설계|구상|기획|ブレスト|ブレインストーミング|設計|構想|企画|アイデア出し|動腦|腦力激盪|構思|đột phá|ý tưởng|thiết kế|phác thảo/i,
+      /\b(brainstorm|brain\s*storm|ideate|think\s+about|explore|discuss|consider|ponder|mull\s+over|想|思考|探讨|构思|想法|아이디어|생각|ブレスト|ブレインストーミング|考える|アイデア出し|動腦|腦力激盪)\b|let'?s\s+think|what\s+if|how\s+about|what\s+about|怎么样|어떨까|どうかな/i,
     message: `[brainstorm-mode]
-DESIGN MODE ACTIVATED. Invoke skill("brainstorming") for detailed instructions.`,
+EXPLORATION MODE ACTIVATED.
+
+**Skill:** \`skill("brainstorming")\`
+**Purpose:** Explore user intent, requirements and design approaches through collaborative dialogue.
+
+**When to use:**
+- User wants to discuss possibilities before committing
+- Unclear requirements need clarification
+- Multiple approaches should be evaluated
+
+**Workflow:** brainstorming → creating-changes → implementation
+
+Consider invoking \`skill("brainstorming")\` to explore requirements first.`,
+  },
+  // PLAN/DESIGN: Planning phase - ready to write specs
+  // Triggers skill("creating-changes") for design.md and tasks.md
+  {
+    pattern:
+      /\b(plan|design|architect|spec|requirement|blueprint|roadmap|规划|设计|方案|架构|仕様|計画|設計|기획|설계)\b|write\s+a\s+plan|create\s+a\s+design|make\s+a\s+plan|写(个|一个)?计划|做(个|一个)?方案/i,
+    message: `[plan-mode]
+PLANNING MODE ACTIVATED.
+
+**Skill:** \`skill("creating-changes")\`
+**Purpose:** Write design.md and tasks.md with structured task breakdown.
+
+**When to use:**
+- Requirements are clear and ready to be documented
+- Need to create implementation plan with phases
+- Moving from exploration to execution
+
+Consider invoking \`skill("creating-changes")\` to write the design document.`,
+  },
+  // BUILD/CREATE: Implementation requests - need brainstorming first
+  // Suggests brainstorming before jumping to implementation
+  {
+    pattern:
+      /let'?s\s+(build|create|make|develop|implement)|build\s+a|create\s+a|make\s+a|add\s+(a\s+)?(new|feature)|new\s+feature|实现|开发|做一个|만들|作る|開発/i,
+    message: `[brainstorm-mode]
+IMPLEMENTATION REQUEST DETECTED.
+
+Before implementing, consider exploring requirements first.
+
+**Recommended workflow:**
+1. \`skill("brainstorming")\` - Clarify intent and explore approaches
+2. \`skill("creating-changes")\` - Write design and task breakdown
+3. Implementation
+
+Consider invoking \`skill("brainstorming")\` to ensure requirements are clear.`,
+  },
+  // DEBUG/FIX: Bug fixing and debugging - requires systematic approach
+  // Triggers skill("systematic-debugging") for root cause analysis
+  {
+    pattern:
+      /\b(debug|debugging|fix|fixing|bug|bugs|bugfix|error|errors|issue|issues|problem|problems|broken|crash|crashes|failing|failure|not\s+working|doesn't\s+work|won't\s+work|调试|修复|bug|错误|问题|崩溃|不工作|디버그|버그|수정|오류|문제|デバッグ|バグ|修正|エラー|問題|動かない)\b/i,
+    message: `[debug-mode]
+BUG/ERROR DETECTED.
+
+**Skill:** \`skill("systematic-debugging")\`
+**Purpose:** Find root cause BEFORE attempting fixes. Symptom fixes are failure.
+
+**The Iron Law:** NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
+
+**Phase 1 (MANDATORY before any fix):**
+1. Read error messages carefully - they often contain the solution
+2. Reproduce consistently - can you trigger it reliably?
+3. Check recent changes - git diff, new dependencies, config
+4. Gather evidence at component boundaries
+
+**When to use:**
+- Test failures, bugs, unexpected behavior
+- Performance problems, build failures
+- "Just one quick fix" seems obvious (that's when you need this most)
+
+Consider invoking \`skill("systematic-debugging")\` for structured root cause analysis.`,
   },
   // CONSULT-METIS: Complex/ambiguous requests that need pre-planning analysis (Task 10.2)
   {

@@ -1,13 +1,13 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync } from "node:fs"
 import { isAbsolute, relative, resolve } from "node:path"
-import { TASKS_MD_PATTERN, ERROR_MESSAGE, INTERCEPTED_TOOLS, BASH_FILE_CREATION_PATTERNS } from "./constants"
+import { PLANNING_FILE_PATTERNS, ERROR_MESSAGE, INTERCEPTED_TOOLS, BASH_FILE_CREATION_PATTERNS } from "./constants"
 
 export * from "./constants"
 
 type ToolArgs = Record<string, unknown> | undefined
 
-const TASKS_MD_REGEX = toPatternRegex(TASKS_MD_PATTERN)
+const PLANNING_FILE_REGEXES = PLANNING_FILE_PATTERNS.map(toPatternRegex)
 
 function toPatternRegex(pattern: string): RegExp {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&")
@@ -24,12 +24,12 @@ function normalizeRelativePath(filePath: string, workspaceRoot: string): string 
   return rel.replace(/\\/g, "/")
 }
 
-function matchesTasksMdPattern(filePath: string, workspaceRoot: string): boolean {
+function matchesPlanningFilePattern(filePath: string, workspaceRoot: string): boolean {
   const rel = normalizeRelativePath(filePath, workspaceRoot)
   if (!rel) {
     return false
   }
-  return TASKS_MD_REGEX.test(rel)
+  return PLANNING_FILE_REGEXES.some(regex => regex.test(rel))
 }
 
 function extractFilePathsFromBashCommand(command: string): string[] {
@@ -99,7 +99,7 @@ export function createTasksMdCreationGuardHook(ctx: PluginInput) {
         return
       }
 
-      const matchingPaths = filePaths.filter(path => matchesTasksMdPattern(path, ctx.directory))
+      const matchingPaths = filePaths.filter(path => matchesPlanningFilePattern(path, ctx.directory))
       if (matchingPaths.length === 0) {
         return
       }

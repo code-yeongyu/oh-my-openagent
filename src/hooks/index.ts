@@ -46,6 +46,9 @@ export { createFailureCounterHook, type FailureCounterConfig } from "./failure-c
 // Skill Suggestion Hook - suggests relevant skills based on prompt keywords
 export { createSkillSuggestionHook } from "./skill-suggestion";
 
+// Skill Auto-Trigger Hook - dynamically suggests skills based on description keywords
+export { createSkillAutoTriggerHook } from "./skill-auto-trigger";
+
 // Planning Flow Guide Hook - guides Metis → Prometheus → Momus planning flow
 export { createPlanningFlowGuideHook } from "./planning-flow-guide";
 
