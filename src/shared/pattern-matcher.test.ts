@@ -83,10 +83,15 @@ describe("matchesToolMatcher", () => {
 
     test("handles unmatched opening parenthesis", () => {
       expect(() => matchesToolMatcher("test", "test(*")).not.toThrow()
+      expect(matchesToolMatcher("test(foo", "test(*")).toBe(true)
+      expect(matchesToolMatcher("testfoo", "test(*")).toBe(false)
     })
 
     test("handles unmatched closing parenthesis", () => {
       expect(() => matchesToolMatcher("test", "test*)")).not.toThrow()
+      expect(matchesToolMatcher("test)", "test*)")).toBe(true)
+      expect(matchesToolMatcher("testanything)", "test*)")).toBe(true)
+      expect(matchesToolMatcher("foo)", "test*)")).toBe(false)
     })
 
     test("handles square brackets", () => {
@@ -94,24 +99,34 @@ describe("matchesToolMatcher", () => {
       expect(matchesToolMatcher("test[1]", "test[*]")).toBe(true)
     })
 
-    test("handles plus sign", () => {
+    test("handles plus sign as literal", () => {
       expect(() => matchesToolMatcher("test", "test+*")).not.toThrow()
+      expect(matchesToolMatcher("test+value", "test+*")).toBe(true)
+      expect(matchesToolMatcher("testvalue", "test+*")).toBe(false)
     })
 
-    test("handles question mark", () => {
+    test("handles question mark as literal", () => {
       expect(() => matchesToolMatcher("test", "test?*")).not.toThrow()
+      expect(matchesToolMatcher("test?foo", "test?*")).toBe(true)
+      expect(matchesToolMatcher("testfoo", "test?*")).toBe(false)
     })
 
-    test("handles caret", () => {
+    test("handles caret as literal", () => {
       expect(() => matchesToolMatcher("test", "^test*")).not.toThrow()
+      expect(matchesToolMatcher("^test_tool", "^test*")).toBe(true)
+      expect(matchesToolMatcher("test_tool", "^test*")).toBe(false)
     })
 
-    test("handles dollar sign", () => {
+    test("handles dollar sign as literal", () => {
       expect(() => matchesToolMatcher("test", "test$*")).not.toThrow()
+      expect(matchesToolMatcher("test$var", "test$*")).toBe(true)
+      expect(matchesToolMatcher("testvar", "test$*")).toBe(false)
     })
 
-    test("handles curly braces", () => {
+    test("handles curly braces as literal", () => {
       expect(() => matchesToolMatcher("test", "test{*}")).not.toThrow()
+      expect(matchesToolMatcher("test{foo}", "test{*}")).toBe(true)
+      expect(matchesToolMatcher("testfoo", "test{*}")).toBe(false)
     })
 
     test("handles pipe as pattern separator", () => {
@@ -120,8 +135,10 @@ describe("matchesToolMatcher", () => {
       expect(matchesToolMatcher("value", "test|value")).toBe(true)
     })
 
-    test("handles backslash", () => {
+    test("handles backslash as literal", () => {
       expect(() => matchesToolMatcher("test\\path", "test\\*")).not.toThrow()
+      expect(matchesToolMatcher("test\\path", "test\\*")).toBe(true)
+      expect(matchesToolMatcher("testpath", "test\\*")).toBe(false)
     })
 
     test("handles dot", () => {
