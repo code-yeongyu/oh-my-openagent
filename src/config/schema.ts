@@ -34,6 +34,7 @@ export const BuiltinSkillNameSchema = z.enum([
   "agent-browser",
   "frontend-ui-ux",
   "git-master",
+  "dev-browser",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
