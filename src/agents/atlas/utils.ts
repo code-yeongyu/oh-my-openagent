@@ -6,7 +6,7 @@
  */
 
 import type { CategoryConfig } from "../../config/schema"
-import type { AvailableAgent, AvailableSkill } from "../dynamic-agent-prompt-builder"
+import { formatCustomSkillsBlock, type AvailableAgent, type AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../../tools/delegate-task/constants"
 
 export const getCategoryDescription = (name: string, userCategories?: Record<string, CategoryConfig>) =>
@@ -56,21 +56,48 @@ export function buildSkillsSection(skills: AvailableSkill[]): string {
     return ""
   }
 
-  const skillRows = skills.map((s) => {
+  const builtinSkills = skills.filter((s) => s.location === "plugin")
+  const customSkills = skills.filter((s) => s.location !== "plugin")
+
+  const builtinRows = builtinSkills.map((s) => {
     const shortDesc = s.description.split(".")[0] || s.description
     return `| \`${s.name}\` | ${shortDesc} |`
   })
+
+  const customRows = customSkills.map((s) => {
+    const shortDesc = s.description.split(".")[0] || s.description
+    const source = s.location === "project" ? "project" : "user"
+    return `| \`${s.name}\` | ${shortDesc} | ${source} |`
+  })
+
+  const customSkillBlock = formatCustomSkillsBlock(customRows, customSkills, "**")
+
+  let skillsTable: string
+
+  if (customSkills.length > 0 && builtinSkills.length > 0) {
+    skillsTable = `**Built-in Skills:**
+
+| Skill | When to Use |
+|-------|-------------|
+${builtinRows.join("\n")}
+
+${customSkillBlock}`
+  } else if (customSkills.length > 0) {
+    skillsTable = customSkillBlock
+  } else {
+    skillsTable = `| Skill | When to Use |
+|-------|-------------|
+${builtinRows.join("\n")}`
+  }
 
   return `
 #### 3.2.2: Skill Selection (PREPEND TO PROMPT)
 
 **Skills are specialized instructions that guide subagent behavior. Consider them alongside category selection.**
 
-| Skill | When to Use |
-|-------|-------------|
-${skillRows.join("\n")}
+${skillsTable}
 
-**MANDATORY: Evaluate ALL skills for relevance to your task.**
+**MANDATORY: Evaluate ALL skills (built-in AND user-installed) for relevance to your task.**
 
 Read each skill's description and ask: "Does this skill's domain overlap with my task?"
 - If YES: INCLUDE in load_skills=[...]

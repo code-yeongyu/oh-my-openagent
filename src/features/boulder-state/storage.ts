@@ -273,7 +273,8 @@ export function getPlanName(planPath: string): string {
  */
 export function createBoulderState(
   planPath: string,
-  sessionId: string
+  sessionId: string,
+  agent?: string
 ): BoulderState {
   return {
     active_plan: planPath,
@@ -282,6 +283,7 @@ export function createBoulderState(
     plan_name: getPlanName(planPath),
     phase: "idle",
     last_updated: new Date().toISOString(),
+    ...(agent !== undefined ? { agent } : {}),
   }
 }
 

@@ -100,6 +100,8 @@ export interface BoulderState {
   completed_at?: string
   /** Wave execution state for parallel/sequential mode (Task 10.3) */
   wave_execution?: WaveExecutionState
+  /** Agent type to use when resuming (e.g., 'atlas') */
+  agent?: string
 
   // === Fields migrated from .superpowers/status.json ===
   /** Current change name (e.g., feature being worked on) */

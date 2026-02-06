@@ -162,7 +162,7 @@ All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
             if (existingState) {
               clearBoulderState(ctx.directory)
             }
-            const newState = createBoulderState(matchedPlan, sessionId)
+            const newState = createBoulderState(matchedPlan, sessionId, "atlas")
             writeBoulderState(ctx.directory, newState)
             
             contextInfo = `
@@ -249,7 +249,7 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
         } else if (incompletePlans.length === 1) {
           const planPath = incompletePlans[0]
           const progress = getPlanProgress(planPath)
-          const newState = createBoulderState(planPath, sessionId)
+          const newState = createBoulderState(planPath, sessionId, "atlas")
           writeBoulderState(ctx.directory, newState)
 
           contextInfo += `

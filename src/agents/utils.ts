@@ -17,7 +17,7 @@ import { createPrometheusAgent, PROMETHEUS_PROMPT_METADATA } from "./prometheus-
 import { createHephaestusAgent } from "./hephaestus"
 import { createObserverAgent } from "./observer"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable, migrateAgentConfig } from "../shared"
+import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable, isAnyProviderConnected, migrateAgentConfig } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -411,13 +411,13 @@ export async function createBuiltinAgents(
     const hephaestusRequirement = AGENT_MODEL_REQUIREMENTS["hephaestus"]
     const hasHephaestusExplicitConfig = hephaestusOverride !== undefined
 
-    const hasRequiredModel =
-      !hephaestusRequirement?.requiresModel ||
+    const hasRequiredProvider =
+      !hephaestusRequirement?.requiresProvider ||
       hasHephaestusExplicitConfig ||
       isFirstRunNoCache ||
-      isAnyFallbackModelAvailable(hephaestusRequirement.fallbackChain, availableModels)
+      isAnyProviderConnected(hephaestusRequirement.requiresProvider, availableModels)
 
-    if (hasRequiredModel) {
+    if (hasRequiredProvider) {
       let hephaestusResolution = applyModelResolution({
         userModel: hephaestusOverride?.model,
         requirement: hephaestusRequirement,

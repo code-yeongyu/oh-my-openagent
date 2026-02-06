@@ -187,16 +187,23 @@ export async function fetchAvailableModels(
 		if (providerCount === 0) {
 			log("[fetchAvailableModels] provider-models cache empty, falling back to models.json")
 		} else {
-			log("[fetchAvailableModels] using provider-models cache (whitelist-filtered)")
-			
-			for (const [providerId, modelIds] of Object.entries(providerModelsCache.models)) {
-				if (!connectedSet.has(providerId)) {
-					continue
-				}
-				for (const modelId of modelIds) {
+		log("[fetchAvailableModels] using provider-models cache (whitelist-filtered)")
+		
+		for (const [providerId, modelIds] of Object.entries(providerModelsCache.models)) {
+			if (!connectedSet.has(providerId)) {
+				continue
+			}
+			for (const modelItem of modelIds) {
+				// Handle both string[] (legacy) and object[] (with metadata) formats
+				const modelId = typeof modelItem === 'string' 
+					? modelItem 
+					: (modelItem as any)?.id
+				
+				if (modelId) {
 					modelSet.add(`${providerId}/${modelId}`)
 				}
 			}
+		}
 
 			log("[fetchAvailableModels] parsed from provider-models cache", {
 				count: modelSet.size,
@@ -302,6 +309,35 @@ export function isAnyFallbackModelAvailable(
 					model: entry.model,
 					availableCount: availableModels.size,
 				})
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+export function isAnyProviderConnected(
+	providers: string[],
+	availableModels: Set<string>,
+): boolean {
+	if (availableModels.size > 0) {
+		const providerSet = new Set(providers)
+		for (const model of availableModels) {
+			const [provider] = model.split("/")
+			if (providerSet.has(provider)) {
+				log("[isAnyProviderConnected] found model from required provider", { provider, model })
+				return true
+			}
+		}
+	}
+
+	const connectedProviders = readConnectedProvidersCache()
+	if (connectedProviders) {
+		const connectedSet = new Set(connectedProviders)
+		for (const provider of providers) {
+			if (connectedSet.has(provider)) {
+				log("[isAnyProviderConnected] provider connected via cache", { provider })
 				return true
 			}
 		}
