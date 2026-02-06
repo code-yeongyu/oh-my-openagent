@@ -120,7 +120,7 @@ This is an **international open-source project**. To ensure accessibility and ma
 
 ## OVERVIEW
 
-OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3 Flash). 34 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 11 specialized agents, full Claude Code compatibility. "oh-my-zsh" for OpenCode.
+OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemini 3 Flash). 41 lifecycle hooks, 20+ tools (LSP, AST-Grep, delegation), 11 specialized agents, full Claude Code compatibility. "oh-my-zsh" for OpenCode.
 
 ## STRUCTURE
 
@@ -128,7 +128,7 @@ OpenCode plugin: multi-model agent orchestration (Claude Opus 4.5, GPT-5.2, Gemi
 oh-my-opencode/
 ├── src/
 │   ├── agents/        # 11 AI agents - see src/agents/AGENTS.md
-│   ├── hooks/         # 34 lifecycle hooks - see src/hooks/AGENTS.md
+│   ├── hooks/         # 41 lifecycle hooks - see src/hooks/AGENTS.md
 │   ├── tools/         # 20+ tools - see src/tools/AGENTS.md
 │   ├── features/      # Background agents, Claude Code compat - see src/features/AGENTS.md
 │   ├── shared/        # 66 cross-cutting utilities - see src/shared/AGENTS.md
@@ -212,6 +212,9 @@ oh-my-opencode/
 | explore | xai/grok-code-fast-1 | Fast codebase grep (fallback: claude-haiku-4-5 → gpt-5-mini → gpt-5-nano) |
 | multimodal-looker | google/gemini-3-flash | PDF/image analysis |
 | Prometheus | anthropic/claude-opus-4-6 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
+| Metis | anthropic/claude-opus-4-6 | Pre-planning analysis (temp 0.3, fallback: kimi-k2.5 → gpt-5.2) |
+| Momus | openai/gpt-5.2 | Plan validation (temp 0.1, fallback: claude-opus-4-6) |
+| Sisyphus-Junior | anthropic/claude-sonnet-4-5 | Category-spawned executor (temp 0.1) |
 
 ## COMMANDS
 
@@ -233,9 +236,9 @@ bun test               # 100 test files
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/features/builtin-skills/skills.ts` | 1729 | Skill definitions |
+| `src/features/builtin-skills/skills.ts` | 29 | Skill definitions |
 | `src/features/background-agent/manager.ts` | 1418 | Task lifecycle, concurrency |
-| `src/agents/prometheus-prompt.ts` | 1283 | Planning agent prompt |
+| `src/agents/prometheus/` | 1492 | Planning agent prompt |
 | `src/tools/delegate-task/tools.ts` | 1135 | Category-based delegation |
 | `src/hooks/atlas/index.ts` | 757 | Orchestrator hook |
 | `src/index.ts` | 788 | Main plugin entry |

@@ -14,7 +14,7 @@ features/
 │   ├── manager.ts              # Launch → poll → complete
 │   └── concurrency.ts          # Per-provider limits
 ├── builtin-skills/             # Core skills (1729 lines)
-│   └── skills.ts               # playwright, dev-browser, frontend-ui-ux, git-master, typescript-programmer
+│   └── skills.ts               # playwright, agent-browser, frontend-ui-ux, git-master, dev-browser
 ├── builtin-commands/           # ralph-loop, refactor, ulw-loop, init-deep, start-work, cancel-ralph, stop-continuation
 ├── claude-code-agent-loader/   # ~/.claude/agents/*.md
 ├── claude-code-command-loader/ # ~/.claude/commands/*.md
