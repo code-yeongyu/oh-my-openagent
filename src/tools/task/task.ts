@@ -72,13 +72,13 @@ All actions return JSON strings.`,
         case "create":
           return handleCreate(args, config, context)
         case "list":
-          return handleList(args, config)
+          return handleList(args, config, context)
         case "get":
-          return handleGet(args, config)
+          return handleGet(args, config, context)
         case "update":
-          return handleUpdate(args, config)
+          return handleUpdate(args, config, context)
         case "delete":
-          return handleDelete(args, config)
+          return handleDelete(args, config, context)
         default:
           return JSON.stringify({ error: "invalid_action" })
       }
@@ -89,10 +89,10 @@ All actions return JSON strings.`,
 async function handleCreate(
   args: Record<string, unknown>,
   config: Partial<OhMyOpenCodeConfig>,
-  context: { sessionID: string }
+  context: { sessionID: string; directory?: string }
 ): Promise<string> {
   const validatedArgs = TaskCreateInputSchema.parse(args)
-  const taskDir = getTaskDir(config)
+  const taskDir = getTaskDir(config, context.directory)
   const lock = acquireLock(taskDir)
 
   if (!lock.acquired) {
@@ -124,16 +124,17 @@ async function handleCreate(
 
 async function handleList(
   args: Record<string, unknown>,
-  config: Partial<OhMyOpenCodeConfig>
+  config: Partial<OhMyOpenCodeConfig>,
+  context: { sessionID: string; directory?: string }
 ): Promise<string> {
   const validatedArgs = TaskListInputSchema.parse(args)
-  const taskDir = getTaskDir(config)
+  const taskDir = getTaskDir(config, context.directory)
 
   if (!existsSync(taskDir)) {
     return JSON.stringify({ tasks: [] })
   }
 
-  const files = listTaskFiles(config)
+  const files = listTaskFiles(config, context.directory)
   if (files.length === 0) {
     return JSON.stringify({ tasks: [] })
   }
@@ -185,14 +186,15 @@ async function handleList(
 
 async function handleGet(
   args: Record<string, unknown>,
-  config: Partial<OhMyOpenCodeConfig>
+  config: Partial<OhMyOpenCodeConfig>,
+  context: { sessionID: string; directory?: string }
 ): Promise<string> {
   const validatedArgs = TaskGetInputSchema.parse(args)
   const taskId = parseTaskId(validatedArgs.id)
   if (!taskId) {
     return JSON.stringify({ error: "invalid_task_id" })
   }
-  const taskDir = getTaskDir(config)
+  const taskDir = getTaskDir(config, context.directory)
   const taskPath = join(taskDir, `${taskId}.json`)
 
   const task = readJsonSafe(taskPath, TaskObjectSchema)
@@ -202,14 +204,15 @@ async function handleGet(
 
 async function handleUpdate(
   args: Record<string, unknown>,
-  config: Partial<OhMyOpenCodeConfig>
+  config: Partial<OhMyOpenCodeConfig>,
+  context: { sessionID: string; directory?: string }
 ): Promise<string> {
   const validatedArgs = TaskUpdateInputSchema.parse(args)
   const taskId = parseTaskId(validatedArgs.id)
   if (!taskId) {
     return JSON.stringify({ error: "invalid_task_id" })
   }
-  const taskDir = getTaskDir(config)
+  const taskDir = getTaskDir(config, context.directory)
   const lock = acquireLock(taskDir)
 
   if (!lock.acquired) {
@@ -255,14 +258,15 @@ async function handleUpdate(
 
 async function handleDelete(
   args: Record<string, unknown>,
-  config: Partial<OhMyOpenCodeConfig>
+  config: Partial<OhMyOpenCodeConfig>,
+  context: { sessionID: string; directory?: string }
 ): Promise<string> {
   const validatedArgs = TaskDeleteInputSchema.parse(args)
   const taskId = parseTaskId(validatedArgs.id)
   if (!taskId) {
     return JSON.stringify({ error: "invalid_task_id" })
   }
-  const taskDir = getTaskDir(config)
+  const taskDir = getTaskDir(config, context.directory)
   const lock = acquireLock(taskDir)
 
   if (!lock.acquired) {

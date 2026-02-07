@@ -22,6 +22,8 @@ export interface SkillLoadOptions {
   opencodeOnly?: boolean
   /** Pre-merged skills to use instead of discovering */
   skills?: LoadedSkill[]
+  /** Base directory for project-scoped skill resolution */
+  directory?: string
   /** MCP manager for querying skill-embedded MCP servers */
   mcpManager?: SkillMcpManager
   /** Session ID getter for MCP client identification */

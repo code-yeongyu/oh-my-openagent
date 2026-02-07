@@ -5,6 +5,7 @@ import type {
   CommandExecuteBeforeInput,
   CommandExecuteBeforeOutput,
 } from "./types"
+import type { PluginInput } from "@opencode-ai/plugin"
 
 // Import real shared module to avoid mock leaking to other test files
 import * as shared from "../../shared"
@@ -15,6 +16,8 @@ const logMock = spyOn(shared, "log").mockImplementation(() => {})
 
 
 const { createAutoSlashCommandHook } = await import("./index")
+
+const mockCtx = { directory: "/test" } as PluginInput
 
 function createMockInput(sessionID: string, messageID?: string): AutoSlashCommandHookInput {
   return {
@@ -45,7 +48,7 @@ describe("createAutoSlashCommandHook", () => {
   describe("slash command replacement", () => {
     it("should not modify message when command not found", async () => {
       // given a slash command that doesn't exist
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-notfound-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("/nonexistent-command args")
@@ -60,7 +63,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should not modify message for unknown command (feature inactive)", async () => {
       // given unknown slash command
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-tags-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("/some-command")
@@ -75,7 +78,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should not modify for unknown command (no prepending)", async () => {
       // given unknown slash command
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-replace-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("/test-cmd some args")
@@ -92,7 +95,7 @@ describe("createAutoSlashCommandHook", () => {
   describe("no slash command", () => {
     it("should do nothing for regular text", async () => {
       // given regular text without slash
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-regular-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("Just regular text")
@@ -107,7 +110,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should do nothing for slash in middle of text", async () => {
       // given slash in middle
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-middle-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("Please run /commit later")
@@ -124,7 +127,7 @@ describe("createAutoSlashCommandHook", () => {
   describe("excluded commands", () => {
     it("should NOT trigger for ralph-loop command", async () => {
       // given ralph-loop command
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-ralph-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("/ralph-loop do something")
@@ -139,7 +142,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should NOT trigger for cancel-ralph command", async () => {
       // given cancel-ralph command
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-cancel-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("/cancel-ralph")
@@ -156,7 +159,7 @@ describe("createAutoSlashCommandHook", () => {
   describe("already processed", () => {
     it("should skip if auto-slash-command tags already present", async () => {
       // given text with existing tags
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-existing-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput(
@@ -175,7 +178,7 @@ describe("createAutoSlashCommandHook", () => {
   describe("code blocks", () => {
     it("should NOT detect command inside code block", async () => {
       // given command inside code block
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-codeblock-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("```\n/commit\n```")
@@ -192,7 +195,7 @@ describe("createAutoSlashCommandHook", () => {
   describe("edge cases", () => {
     it("should handle empty text", async () => {
       // given empty text
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-empty-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("")
@@ -204,7 +207,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should handle just slash", async () => {
       // given just slash
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-slash-only-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput("/")
@@ -219,7 +222,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should handle command with special characters in args (not found = no modification)", async () => {
       // given command with special characters that doesn't exist
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-special-${Date.now()}`
       const input = createMockInput(sessionID)
       const output = createMockOutput('/execute "test & stuff <tag>"')
@@ -234,7 +237,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should handle multiple text parts (unknown command = no modification)", async () => {
       // given multiple text parts with unknown command
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const sessionID = `test-session-multi-${Date.now()}`
       const input = createMockInput(sessionID)
       const output: AutoSlashCommandHookOutput = {
@@ -271,7 +274,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should not modify output for unknown command", async () => {
       //#given
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const input = createCommandInput("nonexistent-command-xyz")
       const output = createCommandOutput("original text")
       const originalText = output.parts[0].text
@@ -285,7 +288,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should add text part when parts array is empty and command is unknown", async () => {
       //#given
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const input = createCommandInput("nonexistent-command-abc")
       const output = createCommandOutput()
 
@@ -298,7 +301,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should inject template for known builtin commands like ralph-loop", async () => {
       //#given
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const input = createCommandInput("ralph-loop")
       const output = createCommandOutput("original")
 
@@ -312,7 +315,7 @@ describe("createAutoSlashCommandHook", () => {
 
     it("should pass command arguments correctly", async () => {
       //#given
-      const hook = createAutoSlashCommandHook()
+    const hook = createAutoSlashCommandHook(mockCtx)
       const input = createCommandInput("some-command", "arg1 arg2 arg3")
       const output = createCommandOutput("original")
 

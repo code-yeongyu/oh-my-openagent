@@ -64,7 +64,7 @@ function resolveFilePath(from: string, configDir?: string): string {
     return filePath
   }
 
-  const baseDir = configDir || process.cwd()
+  const baseDir = configDir ?? homedir()
   return resolve(baseDir, filePath)
 }
 
@@ -103,7 +103,7 @@ function configEntryToLoaded(
   }
 
   const description = entry.description || fileMetadata.description || ""
-  const resolvedPath = entry.from ? dirname(resolveFilePath(entry.from, configDir)) : configDir || process.cwd()
+  const resolvedPath = entry.from ? dirname(resolveFilePath(entry.from, configDir)) : (configDir ?? homedir())
 
   const wrappedTemplate = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/

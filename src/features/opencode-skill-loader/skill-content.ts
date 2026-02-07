@@ -9,6 +9,7 @@ export interface SkillResolutionOptions {
 	gitMasterConfig?: GitMasterConfig
 	browserProvider?: BrowserAutomationProvider
 	disabledSkills?: Set<string>
+	directory?: string
 }
 
 const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
@@ -18,7 +19,9 @@ function clearSkillCache(): void {
 }
 
 async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSkill[]> {
-	const cacheKey = options?.browserProvider ?? "playwright"
+	const providerKey = options?.browserProvider ?? "playwright"
+	const directoryKey = options?.directory ?? "default"
+	const cacheKey = `${providerKey}:${directoryKey}`
 	const hasDisabledSkills = options?.disabledSkills && options.disabledSkills.size > 0
 
 	// Skip cache if disabledSkills is provided (varies between calls)
@@ -28,7 +31,7 @@ async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSki
 	}
 
 	const [discoveredSkills, builtinSkillDefs] = await Promise.all([
-		discoverSkills({ includeClaudeCodePaths: true }),
+		discoverSkills({ includeClaudeCodePaths: true, directory: options?.directory }),
 		Promise.resolve(
 			createBuiltinSkills({
 				browserProvider: options?.browserProvider,

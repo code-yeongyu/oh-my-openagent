@@ -1,5 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { join } from "path"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { existsSync, readdirSync } from "fs"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 import type { TaskObject, TaskStatus } from "./types"
@@ -22,8 +23,8 @@ Returns tasks excluding completed and deleted statuses by default.
 For each task's blockedBy field, filters to only include unresolved (non-completed) blockers.
 Returns summary format: id, subject, status, owner, blockedBy (not full description).`,
     args: {},
-    execute: async (): Promise<string> => {
-      const taskDir = getTaskDir(config)
+    execute: async (_args, context: ToolContext & { directory: string }): Promise<string> => {
+      const taskDir = getTaskDir(config, context.directory)
 
       if (!existsSync(taskDir)) {
         return JSON.stringify({ tasks: [] })

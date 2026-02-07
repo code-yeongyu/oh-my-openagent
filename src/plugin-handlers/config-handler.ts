@@ -166,9 +166,9 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       discoveredOpencodeProjectSkills,
     ] = await Promise.all([
       includeClaudeSkillsForAwareness ? discoverUserClaudeSkills() : Promise.resolve([]),
-      includeClaudeSkillsForAwareness ? discoverProjectClaudeSkills() : Promise.resolve([]),
+      includeClaudeSkillsForAwareness ? discoverProjectClaudeSkills(ctx.directory) : Promise.resolve([]),
       discoverOpencodeGlobalSkills(),
-      discoverOpencodeProjectSkills(),
+      discoverOpencodeProjectSkills(ctx.directory),
     ]);
 
     const allDiscoveredSkills = [
@@ -204,7 +204,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       ? loadUserAgents()
       : {};
     const projectAgents = (pluginConfig.claude_code?.agents ?? true)
-      ? loadProjectAgents()
+      ? loadProjectAgents(ctx.directory)
       : {};
 
     // Plugin agents: Apply permission migration for compatibility
@@ -471,7 +471,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     };
 
     const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
-      ? await loadMcpConfigs()
+      ? await loadMcpConfigs(ctx.directory)
       : { servers: {} };
 
     config.mcp = {
@@ -499,13 +499,13 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       opencodeProjectSkills,
     ] = await Promise.all([
       includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
-      includeClaudeCommands ? loadProjectCommands() : Promise.resolve({}),
+      includeClaudeCommands ? loadProjectCommands(ctx.directory) : Promise.resolve({}),
       loadOpencodeGlobalCommands(),
-      loadOpencodeProjectCommands(),
+      loadOpencodeProjectCommands(ctx.directory),
       includeClaudeSkills ? loadUserSkills() : Promise.resolve({}),
-      includeClaudeSkills ? loadProjectSkills() : Promise.resolve({}),
+      includeClaudeSkills ? loadProjectSkills(ctx.directory) : Promise.resolve({}),
       loadOpencodeGlobalSkills(),
-      loadOpencodeProjectSkills(),
+      loadOpencodeProjectSkills(ctx.directory),
     ]);
 
     config.command = {

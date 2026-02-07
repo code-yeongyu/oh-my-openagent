@@ -53,7 +53,7 @@ This is the skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         const skill = skills.find(s => s.name === "test-skill")
 
         // then
@@ -89,7 +89,7 @@ This is a simple skill.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         const skill = skills.find(s => s.name === "simple-skill")
 
         // then
@@ -122,7 +122,7 @@ Skill with env vars.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         const skill = skills.find(s => s.name === "env-skill")
 
         // then
@@ -149,7 +149,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         // then - when YAML fails, skill uses directory name as fallback
         const skill = skills.find(s => s.name === "bad-yaml-skill")
 
@@ -186,7 +186,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         const skill = skills.find(s => s.name === "ampcode-skill")
 
         // then
@@ -227,7 +227,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         const skill = skills.find(s => s.name === "priority-skill")
 
         // then - mcp.json should take priority
@@ -259,7 +259,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         const skill = skills.find(s => s.name === "direct-format")
 
         // then
@@ -289,7 +289,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         const skill = skills.find(s => s.name === "space-separated-tools")
 
         // then
@@ -317,7 +317,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         const skill = skills.find(s => s.name === "yaml-inline-array")
 
         // then
@@ -349,7 +349,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         const skill = skills.find(s => s.name === "yaml-multiline-array")
 
         // then
@@ -376,7 +376,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
         const skill = skills.find(s => s.name === "no-allowed-tools")
 
         // then
@@ -442,7 +442,7 @@ claude project body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills()
+        const skills = await discoverSkills({ directory: TEST_DIR })
         const duplicates = skills.filter(s => s.name === "duplicate-skill")
 
         // then
@@ -503,7 +503,7 @@ claude project body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills()
+        const skills = await discoverSkills({ directory: TEST_DIR })
         const matches = skills.filter(s => s.name === "global-over-project")
 
         expect(matches).toHaveLength(1)
@@ -544,7 +544,7 @@ Skill body.
       process.chdir(TEST_DIR)
 
       try {
-        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skills = await discoverSkills({ includeClaudeCodePaths: false, directory: TEST_DIR })
 
         // then
         const names = skills.map(s => s.name)

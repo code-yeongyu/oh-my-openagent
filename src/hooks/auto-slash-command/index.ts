@@ -4,6 +4,7 @@ import {
   findSlashCommandPartIndex,
 } from "./detector"
 import { executeSlashCommand, type ExecutorOptions } from "./executor"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import {
   AUTO_SLASH_COMMAND_TAG_OPEN,
@@ -29,9 +30,10 @@ export interface AutoSlashCommandHookOptions {
   skills?: LoadedSkill[]
 }
 
-export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions) {
+export function createAutoSlashCommandHook(ctx: PluginInput, options?: AutoSlashCommandHookOptions) {
   const executorOptions: ExecutorOptions = {
     skills: options?.skills,
+    directory: ctx.directory,
   }
 
   return {

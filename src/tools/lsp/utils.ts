@@ -79,10 +79,14 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
   ].join("\n")
 }
 
-export async function withLspClient<T>(filePath: string, fn: (client: LSPClient) => Promise<T>): Promise<T> {
+export async function withLspClient<T>(
+  filePath: string,
+  baseDir: string,
+  fn: (client: LSPClient) => Promise<T>
+): Promise<T> {
   const absPath = resolve(filePath)
   const ext = extname(absPath)
-  const result = findServerForExtension(ext)
+  const result = findServerForExtension(ext, baseDir)
 
   if (result.status !== "found") {
     throw new Error(formatServerLookupError(result))

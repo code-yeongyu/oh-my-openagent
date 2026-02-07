@@ -32,18 +32,17 @@ function loadJsonFile<T>(path: string): T | null {
   }
 }
 
-function getConfigPaths(): { project: string; user: string; opencode: string } {
-  const cwd = process.cwd()
+function getConfigPaths(baseDir: string): { project: string; user: string; opencode: string } {
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   return {
-    project: join(cwd, ".opencode", "oh-my-opencode.json"),
+    project: join(baseDir, ".opencode", "oh-my-opencode.json"),
     user: join(configDir, "oh-my-opencode.json"),
     opencode: join(configDir, "opencode.json"),
   }
 }
 
-function loadAllConfigs(): Map<ConfigSource, ConfigJson> {
-  const paths = getConfigPaths()
+function loadAllConfigs(baseDir: string): Map<ConfigSource, ConfigJson> {
+  const paths = getConfigPaths(baseDir)
   const configs = new Map<ConfigSource, ConfigJson>()
 
   const project = loadJsonFile<ConfigJson>(paths.project)
@@ -58,8 +57,8 @@ function loadAllConfigs(): Map<ConfigSource, ConfigJson> {
   return configs
 }
 
-function getMergedServers(): ServerWithSource[] {
-  const configs = loadAllConfigs()
+function getMergedServers(baseDir: string): ServerWithSource[] {
+  const configs = loadAllConfigs(baseDir)
   const servers: ServerWithSource[] = []
   const disabled = new Set<string>()
   const seen = new Set<string>()
@@ -113,11 +112,11 @@ function getMergedServers(): ServerWithSource[] {
   })
 }
 
-export function findServerForExtension(ext: string): ServerLookupResult {
-  const servers = getMergedServers()
+export function findServerForExtension(ext: string, baseDir: string): ServerLookupResult {
+  const servers = getMergedServers(baseDir)
 
   for (const server of servers) {
-    if (server.extensions.includes(ext) && isServerInstalled(server.command)) {
+    if (server.extensions.includes(ext) && isServerInstalled(server.command, baseDir)) {
       return {
         status: "found",
         server: {
@@ -160,7 +159,7 @@ export function getLanguageId(ext: string): string {
   return EXT_TO_LANG[ext] || "plaintext"
 }
 
-export function isServerInstalled(command: string[]): boolean {
+export function isServerInstalled(command: string[], baseDir: string): boolean {
   if (command.length === 0) return false
 
   const cmd = command[0]
@@ -199,11 +198,10 @@ export function isServerInstalled(command: string[]): boolean {
     }
   }
 
-  const cwd = process.cwd()
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   const dataDir = join(getDataDir(), "opencode")
   const additionalBases = [
-    join(cwd, "node_modules", ".bin"),
+    join(baseDir, "node_modules", ".bin"),
     join(configDir, "bin"),
     join(configDir, "node_modules", ".bin"),
     join(dataDir, "bin"),
@@ -225,7 +223,7 @@ export function isServerInstalled(command: string[]): boolean {
   return false
 }
 
-export function getAllServers(): Array<{
+export function getAllServers(baseDir: string): Array<{
   id: string
   installed: boolean
   extensions: string[]
@@ -233,8 +231,8 @@ export function getAllServers(): Array<{
   source: string
   priority: number
 }> {
-  const configs = loadAllConfigs()
-  const servers = getMergedServers()
+  const configs = loadAllConfigs(baseDir)
+  const servers = getMergedServers(baseDir)
   const disabled = new Set<string>()
 
   for (const config of configs.values()) {
@@ -259,7 +257,7 @@ export function getAllServers(): Array<{
     if (seen.has(server.id)) continue
     result.push({
       id: server.id,
-      installed: isServerInstalled(server.command),
+      installed: isServerInstalled(server.command, baseDir),
       extensions: server.extensions,
       disabled: false,
       source: server.source,
@@ -273,7 +271,7 @@ export function getAllServers(): Array<{
     const builtin = BUILTIN_SERVERS[id]
     result.push({
       id,
-      installed: builtin ? isServerInstalled(builtin.command) : false,
+      installed: builtin ? isServerInstalled(builtin.command, baseDir) : false,
       extensions: builtin?.extensions || [],
       disabled: true,
       source: "disabled",
@@ -284,6 +282,6 @@ export function getAllServers(): Array<{
   return result
 }
 
-export function getConfigPaths_(): { project: string; user: string; opencode: string } {
-  return getConfigPaths()
+export function getConfigPaths_(baseDir: string): { project: string; user: string; opencode: string } {
+  return getConfigPaths(baseDir)
 }

@@ -16,20 +16,13 @@ describe("getSystemMcpServerNames", () => {
 
   it("returns empty set when no .mcp.json files exist", async () => {
     // given
-    const originalCwd = process.cwd()
-    process.chdir(TEST_DIR)
+    // when
+    const { getSystemMcpServerNames } = await import("./loader")
+    const names = getSystemMcpServerNames(TEST_DIR)
 
-    try {
-      // when
-      const { getSystemMcpServerNames } = await import("./loader")
-      const names = getSystemMcpServerNames()
-
-      // then
-      expect(names).toBeInstanceOf(Set)
-      expect(names.size).toBe(0)
-    } finally {
-      process.chdir(originalCwd)
-    }
+    // then
+    expect(names).toBeInstanceOf(Set)
+    expect(names.size).toBe(0)
   })
 
   it("returns server names from project .mcp.json", async () => {
@@ -48,21 +41,14 @@ describe("getSystemMcpServerNames", () => {
     }
     writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify(mcpConfig))
 
-    const originalCwd = process.cwd()
-    process.chdir(TEST_DIR)
+    // when
+    const { getSystemMcpServerNames } = await import("./loader")
+    const names = getSystemMcpServerNames(TEST_DIR)
 
-    try {
-      // when
-      const { getSystemMcpServerNames } = await import("./loader")
-      const names = getSystemMcpServerNames()
-
-      // then
-      expect(names.has("playwright")).toBe(true)
-      expect(names.has("sqlite")).toBe(true)
-      expect(names.size).toBe(2)
-    } finally {
-      process.chdir(originalCwd)
-    }
+    // then
+    expect(names.has("playwright")).toBe(true)
+    expect(names.has("sqlite")).toBe(true)
+    expect(names.size).toBe(2)
   })
 
   it("returns server names from .claude/.mcp.json", async () => {
@@ -78,19 +64,12 @@ describe("getSystemMcpServerNames", () => {
     }
     writeFileSync(join(TEST_DIR, ".claude", ".mcp.json"), JSON.stringify(mcpConfig))
 
-    const originalCwd = process.cwd()
-    process.chdir(TEST_DIR)
+    // when
+    const { getSystemMcpServerNames } = await import("./loader")
+    const names = getSystemMcpServerNames(TEST_DIR)
 
-    try {
-      // when
-      const { getSystemMcpServerNames } = await import("./loader")
-      const names = getSystemMcpServerNames()
-
-      // then
-      expect(names.has("memory")).toBe(true)
-    } finally {
-      process.chdir(originalCwd)
-    }
+    // then
+    expect(names.has("memory")).toBe(true)
   })
 
   it("excludes disabled MCP servers", async () => {
@@ -110,20 +89,13 @@ describe("getSystemMcpServerNames", () => {
     }
     writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify(mcpConfig))
 
-    const originalCwd = process.cwd()
-    process.chdir(TEST_DIR)
+    // when
+    const { getSystemMcpServerNames } = await import("./loader")
+    const names = getSystemMcpServerNames(TEST_DIR)
 
-    try {
-      // when
-      const { getSystemMcpServerNames } = await import("./loader")
-      const names = getSystemMcpServerNames()
-
-      // then
-      expect(names.has("playwright")).toBe(false)
-      expect(names.has("active")).toBe(true)
-    } finally {
-      process.chdir(originalCwd)
-    }
+    // then
+    expect(names.has("playwright")).toBe(false)
+    expect(names.has("active")).toBe(true)
   })
 
   it("merges server names from multiple .mcp.json files", async () => {
@@ -144,19 +116,12 @@ describe("getSystemMcpServerNames", () => {
     writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify(projectMcp))
     writeFileSync(join(TEST_DIR, ".claude", ".mcp.json"), JSON.stringify(localMcp))
 
-    const originalCwd = process.cwd()
-    process.chdir(TEST_DIR)
+    // when
+    const { getSystemMcpServerNames } = await import("./loader")
+    const names = getSystemMcpServerNames(TEST_DIR)
 
-    try {
-      // when
-      const { getSystemMcpServerNames } = await import("./loader")
-      const names = getSystemMcpServerNames()
-
-      // then
-      expect(names.has("playwright")).toBe(true)
-      expect(names.has("memory")).toBe(true)
-    } finally {
-      process.chdir(originalCwd)
-    }
+    // then
+    expect(names.has("playwright")).toBe(true)
+    expect(names.has("memory")).toBe(true)
   })
 })

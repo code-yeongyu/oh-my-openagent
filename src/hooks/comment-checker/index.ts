@@ -1,3 +1,4 @@
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { PendingCall } from "./types"
 import { runCommentChecker, getCommentCheckerPath, startBackgroundInit, type HookInput } from "./cli"
 import type { CommentCheckerConfig } from "../../config/schema"
@@ -32,7 +33,8 @@ function cleanupOldPendingCalls(): void {
   }
 }
 
-export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
+export function createCommentCheckerHooks(ctx: PluginInput, config?: CommentCheckerConfig) {
+  const baseDir = ctx.directory
   debugLog("createCommentCheckerHooks called", { config })
 
   if (!cleanupIntervalStarted) {
@@ -128,7 +130,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
         
         // CLI mode only
         debugLog("using CLI:", cliPath)
-        await processWithCli(input, pendingCall, output, cliPath, config?.custom_prompt)
+        await processWithCli(input, pendingCall, output, cliPath, baseDir, config?.custom_prompt)
       } catch (err) {
         debugLog("tool.execute.after failed:", err)
       }
@@ -141,6 +143,7 @@ async function processWithCli(
   pendingCall: PendingCall,
   output: { output: string },
   cliPath: string,
+  baseDir: string,
   customPrompt?: string
 ): Promise<void> {
   debugLog("using CLI mode with path:", cliPath)
@@ -149,7 +152,7 @@ async function processWithCli(
     session_id: pendingCall.sessionID,
     tool_name: pendingCall.tool.charAt(0).toUpperCase() + pendingCall.tool.slice(1),
     transcript_path: "",
-    cwd: process.cwd(),
+    cwd: baseDir,
     hook_event_name: "PostToolUse",
     tool_input: {
       file_path: pendingCall.filePath,

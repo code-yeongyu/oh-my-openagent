@@ -210,8 +210,8 @@ export async function loadUserSkills(): Promise<Record<string, CommandDefinition
   return skillsToRecord(skills)
 }
 
-export async function loadProjectSkills(): Promise<Record<string, CommandDefinition>> {
-  const projectSkillsDir = join(process.cwd(), ".claude", "skills")
+export async function loadProjectSkills(baseDir: string): Promise<Record<string, CommandDefinition>> {
+  const projectSkillsDir = join(baseDir, ".claude", "skills")
   const skills = await loadSkillsFromDir(projectSkillsDir, "project")
   return skillsToRecord(skills)
 }
@@ -223,14 +223,15 @@ export async function loadOpencodeGlobalSkills(): Promise<Record<string, Command
   return skillsToRecord(skills)
 }
 
-export async function loadOpencodeProjectSkills(): Promise<Record<string, CommandDefinition>> {
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "skills")
+export async function loadOpencodeProjectSkills(baseDir: string): Promise<Record<string, CommandDefinition>> {
+  const opencodeProjectDir = join(baseDir, ".opencode", "skills")
   const skills = await loadSkillsFromDir(opencodeProjectDir, "opencode-project")
   return skillsToRecord(skills)
 }
 
 export interface DiscoverSkillsOptions {
   includeClaudeCodePaths?: boolean
+  directory?: string
 }
 
 /**
@@ -250,11 +251,12 @@ function deduplicateSkills(skills: LoadedSkill[]): LoadedSkill[] {
   return result
 }
 
-export async function discoverAllSkills(): Promise<LoadedSkill[]> {
+export async function discoverAllSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
+  const baseDir = options.directory
   const [opencodeProjectSkills, opencodeGlobalSkills, projectSkills, userSkills] = await Promise.all([
-    discoverOpencodeProjectSkills(),
+    baseDir ? discoverOpencodeProjectSkills(baseDir) : Promise.resolve([]),
     discoverOpencodeGlobalSkills(),
-    discoverProjectClaudeSkills(),
+    baseDir ? discoverProjectClaudeSkills(baseDir) : Promise.resolve([]),
     discoverUserClaudeSkills(),
   ])
 
@@ -263,10 +265,10 @@ export async function discoverAllSkills(): Promise<LoadedSkill[]> {
 }
 
 export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
-  const { includeClaudeCodePaths = true } = options
+  const { includeClaudeCodePaths = true, directory } = options
 
   const [opencodeProjectSkills, opencodeGlobalSkills] = await Promise.all([
-    discoverOpencodeProjectSkills(),
+    directory ? discoverOpencodeProjectSkills(directory) : Promise.resolve([]),
     discoverOpencodeGlobalSkills(),
   ])
 
@@ -276,7 +278,7 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
   }
 
   const [projectSkills, userSkills] = await Promise.all([
-    discoverProjectClaudeSkills(),
+    directory ? discoverProjectClaudeSkills(directory) : Promise.resolve([]),
     discoverUserClaudeSkills(),
   ])
 
@@ -294,8 +296,8 @@ export async function discoverUserClaudeSkills(): Promise<LoadedSkill[]> {
   return loadSkillsFromDir(userSkillsDir, "user")
 }
 
-export async function discoverProjectClaudeSkills(): Promise<LoadedSkill[]> {
-  const projectSkillsDir = join(process.cwd(), ".claude", "skills")
+export async function discoverProjectClaudeSkills(baseDir: string): Promise<LoadedSkill[]> {
+  const projectSkillsDir = join(baseDir, ".claude", "skills")
   return loadSkillsFromDir(projectSkillsDir, "project")
 }
 
@@ -305,7 +307,7 @@ export async function discoverOpencodeGlobalSkills(): Promise<LoadedSkill[]> {
   return loadSkillsFromDir(opencodeSkillsDir, "opencode")
 }
 
-export async function discoverOpencodeProjectSkills(): Promise<LoadedSkill[]> {
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "skills")
+export async function discoverOpencodeProjectSkills(baseDir: string): Promise<LoadedSkill[]> {
+  const opencodeProjectDir = join(baseDir, ".opencode", "skills")
   return loadSkillsFromDir(opencodeProjectDir, "opencode-project")
 }

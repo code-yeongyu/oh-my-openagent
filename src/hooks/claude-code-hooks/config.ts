@@ -43,12 +43,12 @@ function normalizeHooksConfig(raw: RawClaudeHooksConfig): ClaudeHooksConfig {
   return result
 }
 
-export function getClaudeSettingsPaths(customPath?: string): string[] {
+export function getClaudeSettingsPaths(baseDir: string, customPath?: string): string[] {
   const claudeConfigDir = getClaudeConfigDir()
   const paths = [
     join(claudeConfigDir, "settings.json"),
-    join(process.cwd(), ".claude", "settings.json"),
-    join(process.cwd(), ".claude", "settings.local.json"),
+    join(baseDir, ".claude", "settings.json"),
+    join(baseDir, ".claude", "settings.local.json"),
   ]
 
   if (customPath && existsSync(customPath)) {
@@ -81,9 +81,10 @@ function mergeHooksConfig(
 }
 
 export async function loadClaudeHooksConfig(
+  baseDir: string,
   customSettingsPath?: string
 ): Promise<ClaudeHooksConfig | null> {
-  const paths = getClaudeSettingsPaths(customSettingsPath)
+  const paths = getClaudeSettingsPaths(baseDir, customSettingsPath)
   let mergedConfig: ClaudeHooksConfig = {}
 
   for (const settingsPath of paths) {

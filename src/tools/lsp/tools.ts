@@ -1,4 +1,4 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin/tool"
 import {
   DEFAULT_MAX_REFERENCES,
   DEFAULT_MAX_SYMBOLS,
@@ -26,6 +26,8 @@ import type {
   WorkspaceEdit,
 } from "./types"
 
+type ToolContextWithDirectory = ToolContext & { directory: string }
+
 export const lsp_goto_definition: ToolDefinition = tool({
   description: "Jump to symbol definition. Find WHERE something is defined.",
   args: {
@@ -33,9 +35,9 @@ export const lsp_goto_definition: ToolDefinition = tool({
     line: tool.schema.number().min(1).describe("1-based"),
     character: tool.schema.number().min(0).describe("0-based"),
   },
-  execute: async (args, context) => {
+  execute: async (args, context: ToolContextWithDirectory) => {
     try {
-      const result = await withLspClient(args.filePath, async (client) => {
+      const result = await withLspClient(args.filePath, context.directory, async (client) => {
         return (await client.definition(args.filePath, args.line, args.character)) as
           | Location
           | Location[]
@@ -71,9 +73,9 @@ export const lsp_find_references: ToolDefinition = tool({
     character: tool.schema.number().min(0).describe("0-based"),
     includeDeclaration: tool.schema.boolean().optional().describe("Include the declaration itself"),
   },
-  execute: async (args, context) => {
+  execute: async (args, context: ToolContextWithDirectory) => {
     try {
-      const result = await withLspClient(args.filePath, async (client) => {
+      const result = await withLspClient(args.filePath, context.directory, async (client) => {
         return (await client.references(args.filePath, args.line, args.character, args.includeDeclaration ?? true)) as
           | Location[]
           | null
@@ -108,7 +110,7 @@ export const lsp_symbols: ToolDefinition = tool({
     query: tool.schema.string().optional().describe("Symbol name to search (required for workspace scope)"),
     limit: tool.schema.number().optional().describe("Max results (default 50)"),
   },
-  execute: async (args, context) => {
+  execute: async (args, context: ToolContextWithDirectory) => {
     try {
       const scope = args.scope ?? "document"
       
@@ -117,7 +119,7 @@ export const lsp_symbols: ToolDefinition = tool({
           return "Error: 'query' is required for workspace scope"
         }
         
-        const result = await withLspClient(args.filePath, async (client) => {
+        const result = await withLspClient(args.filePath, context.directory, async (client) => {
           return (await client.workspaceSymbols(args.query!)) as SymbolInfo[] | null
         })
 
@@ -135,7 +137,7 @@ export const lsp_symbols: ToolDefinition = tool({
         }
         return lines.join("\n")
       } else {
-        const result = await withLspClient(args.filePath, async (client) => {
+        const result = await withLspClient(args.filePath, context.directory, async (client) => {
           return (await client.documentSymbols(args.filePath)) as DocumentSymbol[] | SymbolInfo[] | null
         })
 
@@ -175,9 +177,9 @@ export const lsp_diagnostics: ToolDefinition = tool({
       .optional()
       .describe("Filter by severity level"),
   },
-  execute: async (args, context) => {
+  execute: async (args, context: ToolContextWithDirectory) => {
     try {
-      const result = await withLspClient(args.filePath, async (client) => {
+      const result = await withLspClient(args.filePath, context.directory, async (client) => {
         return (await client.diagnostics(args.filePath)) as { items?: Diagnostic[] } | Diagnostic[] | null
       })
 
@@ -220,9 +222,9 @@ export const lsp_prepare_rename: ToolDefinition = tool({
     line: tool.schema.number().min(1).describe("1-based"),
     character: tool.schema.number().min(0).describe("0-based"),
   },
-  execute: async (args, context) => {
+  execute: async (args, context: ToolContextWithDirectory) => {
     try {
-      const result = await withLspClient(args.filePath, async (client) => {
+      const result = await withLspClient(args.filePath, context.directory, async (client) => {
         return (await client.prepareRename(args.filePath, args.line, args.character)) as
           | PrepareRenameResult
           | PrepareRenameDefaultBehavior
@@ -245,9 +247,9 @@ export const lsp_rename: ToolDefinition = tool({
     character: tool.schema.number().min(0).describe("0-based"),
     newName: tool.schema.string().describe("New symbol name"),
   },
-  execute: async (args, context) => {
+  execute: async (args, context: ToolContextWithDirectory) => {
     try {
-      const edit = await withLspClient(args.filePath, async (client) => {
+      const edit = await withLspClient(args.filePath, context.directory, async (client) => {
         return (await client.rename(args.filePath, args.line, args.character, args.newName)) as WorkspaceEdit | null
       })
       const result = applyWorkspaceEdit(edit)

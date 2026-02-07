@@ -18,7 +18,7 @@ export async function getLspServersInfo(): Promise<LspServerInfo[]> {
   const servers: LspServerInfo[] = []
 
   for (const server of DEFAULT_LSP_SERVERS) {
-    const installed = isServerInstalled([server.binary])
+    const installed = isServerInstalled([server.binary], process.cwd())
     servers.push({
       id: server.id,
       installed,

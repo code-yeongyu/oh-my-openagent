@@ -26,7 +26,7 @@ mock.module("./constants", () => ({
   TOOL_NAME_PREFIX: "session_",
 }))
 
-const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
+const { getAllSessions, getMainSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
   await import("./storage")
 
 const storage = await import("./storage")
@@ -42,6 +42,38 @@ describe("session-manager storage", () => {
     mkdirSync(TEST_SESSION_STORAGE, { recursive: true })
     mkdirSync(TEST_TODO_DIR, { recursive: true })
     mkdirSync(TEST_TRANSCRIPT_DIR, { recursive: true })
+  })
+
+  test("filters main sessions by directory", async () => {
+    // given
+    const projectDirOne = join(TEST_SESSION_STORAGE, "project-one")
+    const projectDirTwo = join(TEST_SESSION_STORAGE, "project-two")
+    mkdirSync(projectDirOne, { recursive: true })
+    mkdirSync(projectDirTwo, { recursive: true })
+
+    writeFileSync(
+      join(projectDirOne, "ses_one.json"),
+      JSON.stringify({
+        id: "ses_one",
+        directory: "/project-one",
+        time: { created: Date.now(), updated: Date.now() },
+      })
+    )
+    writeFileSync(
+      join(projectDirTwo, "ses_two.json"),
+      JSON.stringify({
+        id: "ses_two",
+        directory: "/project-two",
+        time: { created: Date.now(), updated: Date.now() },
+      })
+    )
+
+    // when
+    const sessions = await getMainSessions({ directory: "/project-one" })
+
+    // then
+    expect(sessions).toHaveLength(1)
+    expect(sessions[0]?.directory).toBe("/project-one")
   })
 
   afterEach(() => {

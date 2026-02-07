@@ -73,7 +73,7 @@ async function handleUpdate(
   args: Record<string, unknown>,
   config: Partial<OhMyOpenCodeConfig>,
   ctx: PluginInput | undefined,
-  context: { sessionID: string },
+  context: { sessionID: string; directory?: string },
 ): Promise<string> {
   try {
     const validatedArgs = TaskUpdateInputSchema.parse(args);
@@ -82,7 +82,8 @@ async function handleUpdate(
       return JSON.stringify({ error: "invalid_task_id" });
     }
 
-    const taskDir = getTaskDir(config);
+    const baseDir = ctx?.directory ?? context.directory;
+    const taskDir = getTaskDir(config, baseDir);
     const lock = acquireLock(taskDir);
 
     if (!lock.acquired) {

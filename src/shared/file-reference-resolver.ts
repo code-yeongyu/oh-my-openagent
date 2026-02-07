@@ -51,7 +51,7 @@ function readFileContent(resolvedPath: string): string {
 
 export async function resolveFileReferencesInText(
   text: string,
-  cwd: string = process.cwd(),
+  cwd: string,
   depth: number = 0,
   maxDepth: number = 3
 ): Promise<string> {

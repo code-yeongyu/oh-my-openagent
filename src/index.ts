@@ -173,7 +173,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   }
 
   const commentChecker = isHookEnabled("comment-checker")
-    ? safeCreateHook("comment-checker", () => createCommentCheckerHooks(pluginConfig.comment_checker), { enabled: safeHookEnabled })
+    ? safeCreateHook("comment-checker", () => createCommentCheckerHooks(ctx, pluginConfig.comment_checker), { enabled: safeHookEnabled })
     : null;
   const toolOutputTruncator = isHookEnabled("tool-output-truncator")
     ? safeCreateHook("tool-output-truncator", () => createToolOutputTruncatorHook(ctx, {
@@ -407,7 +407,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const browserProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
-  const systemMcpNames = getSystemMcpServerNames();
+  const systemMcpNames = getSystemMcpServerNames(ctx.directory);
   const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills }).filter((skill) => {
       if (skill.mcpConfig) {
         for (const mcpName of Object.keys(skill.mcpConfig)) {
@@ -422,8 +422,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     await Promise.all([
       includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
       discoverOpencodeGlobalSkills(),
-      includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
-      discoverOpencodeProjectSkills(),
+      includeClaudeSkills ? discoverProjectClaudeSkills(ctx.directory) : Promise.resolve([]),
+      discoverOpencodeProjectSkills(ctx.directory),
     ]);
   const mergedSkills = mergeSkills(
     builtinSkills,
@@ -432,6 +432,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     globalSkills,
     projectSkills,
     opencodeProjectSkills,
+    { configDir: ctx.directory },
   );
 
   function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
@@ -502,7 +503,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     mcpManager: skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,
-    disabledSkills
+    disabledSkills,
+    directory: ctx.directory,
   });
   const skillMcpTool = createSkillMcpTool({
     manager: skillMcpManager,
@@ -510,14 +512,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     getSessionID: getSessionIDForMcp,
   });
 
-  const commands = discoverCommandsSync();
+  const commands = discoverCommandsSync(ctx.directory);
   const slashcommandTool = createSlashcommandTool({
     commands,
     skills: mergedSkills,
+    directory: ctx.directory,
   });
 
   const autoSlashCommand = isHookEnabled("auto-slash-command")
-    ? safeCreateHook("auto-slash-command", () => createAutoSlashCommandHook({ skills: mergedSkills }), { enabled: safeHookEnabled })
+    ? safeCreateHook("auto-slash-command", () => createAutoSlashCommandHook(ctx, { skills: mergedSkills }), { enabled: safeHookEnabled })
     : null;
 
   const configHandler = createConfigHandler({

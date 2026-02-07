@@ -1,4 +1,4 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin/tool"
 import {
   SESSION_LIST_DESCRIPTION,
   SESSION_READ_DESCRIPTION,
@@ -32,11 +32,11 @@ export const session_list: ToolDefinition = tool({
     limit: tool.schema.number().optional().describe("Maximum number of sessions to return"),
     from_date: tool.schema.string().optional().describe("Filter sessions from this date (ISO 8601 format)"),
     to_date: tool.schema.string().optional().describe("Filter sessions until this date (ISO 8601 format)"),
-    project_path: tool.schema.string().optional().describe("Filter sessions by project path (default: current working directory)"),
+    project_path: tool.schema.string().optional().describe("Filter sessions by project path (default: current session directory)"),
   },
-  execute: async (args: SessionListArgs, _context) => {
+  execute: async (args: SessionListArgs, context: ToolContext & { directory: string }) => {
     try {
-      const directory = args.project_path ?? process.cwd()
+      const directory = args.project_path ?? context.directory
       let sessions = await getMainSessions({ directory })
       let sessionIDs = sessions.map((s) => s.id)
 

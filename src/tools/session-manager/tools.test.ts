@@ -48,13 +48,13 @@ describe("session-manager tools", () => {
     expect(typeof result).toBe("string")
   })
 
-  test("session_list uses process.cwd() as default project_path", async () => {
+  test("session_list uses context directory as default project_path", async () => {
     // given - no project_path provided
 
     // when
     const result = await session_list.execute({}, mockContext)
 
-    // then - should not throw and return string (uses process.cwd() internally)
+    // then - should not throw and return string (uses context.directory internally)
     expect(typeof result).toBe("string")
   })
 

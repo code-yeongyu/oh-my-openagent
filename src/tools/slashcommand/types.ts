@@ -25,4 +25,6 @@ export interface SlashcommandToolOptions {
   commands?: CommandInfo[]
   /** Pre-loaded skills (skip discovery if provided) */
   skills?: LoadedSkill[]
+  /** Base directory for project-scoped command discovery */
+  directory?: string
 }

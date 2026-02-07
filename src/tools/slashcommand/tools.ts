@@ -1,4 +1,4 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin"
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { join, basename, dirname } from "path"
 import { parseFrontmatter, resolveCommandsInText, resolveFileReferencesInText, sanitizeModelField, getOpenCodeConfigDir } from "../../shared"
@@ -8,6 +8,8 @@ import { getClaudeConfigDir } from "../../shared"
 import { discoverAllSkills, type LoadedSkill } from "../../features/opencode-skill-loader"
 import { loadBuiltinCommands } from "../../features/builtin-commands"
 import type { CommandScope, CommandMetadata, CommandInfo, SlashcommandToolOptions } from "./types"
+
+type ToolContextWithDirectory = ToolContext & { directory?: string }
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
   if (!existsSync(commandsDir)) {
@@ -52,17 +54,21 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
   return commands
 }
 
-export function discoverCommandsSync(): CommandInfo[] {
+export function discoverCommandsSync(baseDir?: string): CommandInfo[] {
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
-  const projectCommandsDir = join(process.cwd(), ".claude", "commands")
+  const projectCommandsDir = baseDir ? join(baseDir, ".claude", "commands") : null
   const opencodeGlobalDir = join(configDir, "command")
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "command")
+  const opencodeProjectDir = baseDir ? join(baseDir, ".opencode", "command") : null
 
   const userCommands = discoverCommandsFromDir(userCommandsDir, "user")
   const opencodeGlobalCommands = discoverCommandsFromDir(opencodeGlobalDir, "opencode")
-  const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
-  const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
+  const projectCommands = projectCommandsDir
+    ? discoverCommandsFromDir(projectCommandsDir, "project")
+    : []
+  const opencodeProjectCommands = opencodeProjectDir
+    ? discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
+    : []
 
   const builtinCommandsMap = loadBuiltinCommands()
   const builtinCommands: CommandInfo[] = Object.values(builtinCommandsMap).map(cmd => ({
@@ -100,7 +106,11 @@ function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
   }
 }
 
-async function formatLoadedCommand(cmd: CommandInfo, userMessage?: string): Promise<string> {
+async function formatLoadedCommand(
+  cmd: CommandInfo,
+  baseDir: string | undefined,
+  userMessage?: string
+): Promise<string> {
   const sections: string[] = []
 
   sections.push(`# /${cmd.name} Command\n`)
@@ -138,7 +148,10 @@ async function formatLoadedCommand(cmd: CommandInfo, userMessage?: string): Prom
     content = await cmd.lazyContentLoader.load()
   }
 
-  const commandDir = cmd.path ? dirname(cmd.path) : process.cwd()
+  const commandDir = cmd.path ? dirname(cmd.path) : baseDir
+  if (!commandDir) {
+    throw new Error(`Command "${cmd.name}" requires a base directory to resolve file references.`)
+  }
   const withFileRefs = await resolveFileReferencesInText(content, commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
   
@@ -200,21 +213,23 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
   let cachedCommands: CommandInfo[] | null = options.commands ?? null
   let cachedSkills: LoadedSkill[] | null = options.skills ?? null
   let cachedDescription: string | null = null
+  const baseDir = options.directory
 
-  const getCommands = (): CommandInfo[] => {
+  const getCommands = (context?: { directory?: string }): CommandInfo[] => {
     if (cachedCommands) return cachedCommands
-    cachedCommands = discoverCommandsSync()
+    const resolvedBaseDir = baseDir ?? context?.directory
+    cachedCommands = discoverCommandsSync(resolvedBaseDir)
     return cachedCommands
   }
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     if (cachedSkills) return cachedSkills
-    cachedSkills = await discoverAllSkills()
+    cachedSkills = await discoverAllSkills(baseDir ? { directory: baseDir } : undefined)
     return cachedSkills
   }
 
-  const getAllItems = async (): Promise<CommandInfo[]> => {
-    const commands = getCommands()
+  const getAllItems = async (context?: { directory?: string }): Promise<CommandInfo[]> => {
+    const commands = getCommands(context)
     const skills = await getSkills()
     return [...commands, ...skills.map(skillToCommandInfo)]
   }
@@ -252,8 +267,9 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
         ),
     },
 
-    async execute(args) {
-      const allItems = await getAllItems()
+    async execute(args, context?: ToolContextWithDirectory) {
+      const resolvedBaseDir = baseDir ?? context?.directory
+      const allItems = await getAllItems(context)
 
       if (!args.command) {
         return formatCommandList(allItems) + "\n\nProvide a command or skill name to execute."
@@ -266,7 +282,7 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
       )
 
       if (exactMatch) {
-        return await formatLoadedCommand(exactMatch, args.user_message)
+        return await formatLoadedCommand(exactMatch, resolvedBaseDir, args.user_message)
       }
 
       const partialMatches = allItems.filter((cmd) =>

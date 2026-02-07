@@ -19,6 +19,7 @@ const TEST_CONTEXT = {
   sessionID: TEST_SESSION_ID,
   messageID: "test-message-123",
   agent: "test-agent",
+  directory: process.cwd(),
   abort: TEST_ABORT_CONTROLLER.signal,
 }
 

@@ -44,7 +44,7 @@ describe("getTaskDir", () => {
     const expectedListId = sanitizePathSegment(basename(process.cwd()))
 
     //#when
-    const result = getTaskDir(config)
+    const result = getTaskDir(config, process.cwd())
 
     //#then
     expect(result).toBe(join(configDir, "tasks", expectedListId))
@@ -56,7 +56,7 @@ describe("getTaskDir", () => {
     const configDir = getOpenCodeConfigDir({ binary: "opencode" })
 
     //#when
-    const result = getTaskDir()
+    const result = getTaskDir({}, process.cwd())
 
     //#then
     expect(result).toBe(join(configDir, "tasks", "custom-list-id"))
@@ -69,7 +69,7 @@ describe("getTaskDir", () => {
     const expectedListId = sanitizePathSegment(basename(process.cwd()))
 
     //#when
-    const result = getTaskDir()
+    const result = getTaskDir({}, process.cwd())
 
     //#then
     expect(result).toBe(join(configDir, "tasks", expectedListId))
@@ -87,7 +87,7 @@ describe("getTaskDir", () => {
     }
 
     //#when
-    const result = getTaskDir(config)
+    const result = getTaskDir(config, process.cwd())
 
     //#then
     expect(result).toBe("/tmp/custom-task-path")
@@ -105,7 +105,7 @@ describe("getTaskDir", () => {
     }
 
     //#when
-    const result = getTaskDir(config)
+    const result = getTaskDir(config, process.cwd())
 
     //#then
     expect(result).toBe(join(process.cwd(), ".custom/tasks"))
@@ -136,7 +136,7 @@ describe("resolveTaskListId", () => {
     process.env.ULTRAWORK_TASK_LIST_ID = "custom-list"
 
     //#when
-    const result = resolveTaskListId()
+    const result = resolveTaskListId({}, process.cwd())
 
     //#then
     expect(result).toBe("custom-list")
@@ -147,7 +147,7 @@ describe("resolveTaskListId", () => {
     process.env.ULTRAWORK_TASK_LIST_ID = "custom list/id"
 
     //#when
-    const result = resolveTaskListId()
+    const result = resolveTaskListId({}, process.cwd())
 
     //#then
     expect(result).toBe("custom-list-id")
@@ -159,7 +159,7 @@ describe("resolveTaskListId", () => {
     const expected = sanitizePathSegment(basename(process.cwd()))
 
     //#when
-    const result = resolveTaskListId()
+    const result = resolveTaskListId({}, process.cwd())
 
     //#then
     expect(result).toBe(expected)
@@ -206,7 +206,7 @@ describe("listTaskFiles", () => {
     }
 
     //#when
-    const result = listTaskFiles(config)
+    const result = listTaskFiles(config, process.cwd())
 
     //#then
     expect(result).toEqual([])
@@ -222,7 +222,7 @@ describe("listTaskFiles", () => {
     writeFileSync(join(TEST_DIR_ABS, "other.json"), "{}", "utf-8")
 
     //#when
-    const result = listTaskFiles(config)
+    const result = listTaskFiles(config, process.cwd())
 
     //#then
     expect(result).toEqual([])
@@ -241,7 +241,7 @@ describe("listTaskFiles", () => {
     writeFileSync(join(TEST_DIR_ABS, "notes.md"), "# notes", "utf-8")
 
     //#when
-    const result = listTaskFiles(config)
+    const result = listTaskFiles(config, process.cwd())
 
     //#then
     expect(result).toHaveLength(2)
@@ -259,7 +259,7 @@ describe("listTaskFiles", () => {
     writeFileSync(join(TEST_DIR_ABS, "T-test-id.json"), "{}", "utf-8")
 
     //#when
-    const result = listTaskFiles(config)
+    const result = listTaskFiles(config, process.cwd())
 
     //#then
     expect(result[0]).toBe("T-test-id")

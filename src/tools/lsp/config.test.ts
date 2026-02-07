@@ -65,11 +65,11 @@ describe("isServerInstalled", () => {
     const pathSep = process.platform === "win32" ? ";" : ":"
     process.env.PATH = `${tempDir}${pathSep}${process.env.PATH || ""}`
 
-    expect(isServerInstalled([binName])).toBe(true)
+    expect(isServerInstalled([binName], tempDir)).toBe(true)
   })
 
   test("returns false for missing executable", () => {
-    expect(isServerInstalled(["non-existent-server"])).toBe(false)
+    expect(isServerInstalled(["non-existent-server"], tempDir)).toBe(false)
   })
 
   if (process.platform === "win32") {
@@ -81,7 +81,7 @@ describe("isServerInstalled", () => {
        delete process.env.PATH
        process.env.Path = tempDir
 
-       expect(isServerInstalled([binName])).toBe(true)
+       expect(isServerInstalled([binName], tempDir)).toBe(true)
     })
 
     test("Windows: respects PATHEXT", () => {
@@ -92,7 +92,7 @@ describe("isServerInstalled", () => {
        process.env.PATH = tempDir
        process.env.PATHEXT = ".COM;.EXE"
 
-       expect(isServerInstalled([binName])).toBe(true)
+       expect(isServerInstalled([binName], tempDir)).toBe(true)
     })
     
     test("Windows: ensures default extensions are checked even if PATHEXT is missing", () => {
@@ -103,7 +103,7 @@ describe("isServerInstalled", () => {
        process.env.PATH = tempDir
        delete process.env.PATHEXT
 
-       expect(isServerInstalled([binName])).toBe(true)
+       expect(isServerInstalled([binName], tempDir)).toBe(true)
     })
 
     test("Windows: ensures default extensions are checked even if PATHEXT does not include them", () => {
@@ -114,7 +114,7 @@ describe("isServerInstalled", () => {
         process.env.PATH = tempDir
         process.env.PATHEXT = ".COM"
  
-        expect(isServerInstalled([binName])).toBe(true)
+        expect(isServerInstalled([binName], tempDir)).toBe(true)
      })
   } else {
       test("Non-Windows: does not use windows extensions", () => {
@@ -124,7 +124,7 @@ describe("isServerInstalled", () => {
           
           process.env.PATH = tempDir
           
-          expect(isServerInstalled([binName])).toBe(false)
+          expect(isServerInstalled([binName], tempDir)).toBe(false)
       })
   }
 })

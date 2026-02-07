@@ -47,8 +47,8 @@ export function createClaudeCodeHooksHook(
         return
       }
 
-      const claudeConfig = await loadClaudeHooksConfig()
-      const extendedConfig = await loadPluginExtendedConfig()
+      const claudeConfig = await loadClaudeHooksConfig(ctx.directory)
+      const extendedConfig = await loadPluginExtendedConfig(ctx.directory)
 
       const preCompactCtx: PreCompactContext = {
         sessionId: input.sessionID,
@@ -86,8 +86,8 @@ export function createClaudeCodeHooksHook(
         return
       }
 
-      const claudeConfig = await loadClaudeHooksConfig()
-      const extendedConfig = await loadPluginExtendedConfig()
+      const claudeConfig = await loadClaudeHooksConfig(ctx.directory)
+      const extendedConfig = await loadPluginExtendedConfig(ctx.directory)
 
       const textParts = output.parts.filter((p) => p.type === "text" && p.text)
       const prompt = textParts.map((p) => p.text ?? "").join("\n")
@@ -199,8 +199,8 @@ export function createClaudeCodeHooksHook(
         log("todowrite: parsed todos string to array", { sessionID: input.sessionID })
       }
 
-      const claudeConfig = await loadClaudeHooksConfig()
-      const extendedConfig = await loadPluginExtendedConfig()
+      const claudeConfig = await loadClaudeHooksConfig(ctx.directory)
+      const extendedConfig = await loadPluginExtendedConfig(ctx.directory)
 
       appendTranscriptEntry(input.sessionID, {
         type: "tool_use",
@@ -251,8 +251,8 @@ export function createClaudeCodeHooksHook(
         return
       }
 
-      const claudeConfig = await loadClaudeHooksConfig()
-      const extendedConfig = await loadPluginExtendedConfig()
+      const claudeConfig = await loadClaudeHooksConfig(ctx.directory)
+      const extendedConfig = await loadPluginExtendedConfig(ctx.directory)
 
       const cachedInput = getToolInput(input.sessionID, input.tool, input.callID) || {}
 
@@ -363,8 +363,8 @@ export function createClaudeCodeHooksHook(
 
         if (!sessionID) return
 
-        const claudeConfig = await loadClaudeHooksConfig()
-        const extendedConfig = await loadPluginExtendedConfig()
+        const claudeConfig = await loadClaudeHooksConfig(ctx.directory)
+        const extendedConfig = await loadPluginExtendedConfig(ctx.directory)
 
         const errorStateBefore = sessionErrorState.get(sessionID)
         const endedWithErrorBefore = errorStateBefore?.hasError === true

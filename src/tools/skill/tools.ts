@@ -133,7 +133,10 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     if (options.skills) return options.skills
     if (cachedSkills) return cachedSkills
-    cachedSkills = await getAllSkills({disabledSkills: options?.disabledSkills})
+    cachedSkills = await getAllSkills({
+      disabledSkills: options?.disabledSkills,
+      directory: options?.directory,
+    })
     return cachedSkills
   }
 
@@ -163,7 +166,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     args: {
       name: tool.schema.string().describe("The skill identifier from available_skills (e.g., 'code-review')"),
     },
-    async execute(args: SkillArgs, ctx?: { agent?: string }) {
+    async execute(args: SkillArgs, ctx?: { agent?: string; directory?: string }) {
       const skills = await getSkills()
       const skill = skills.find(s => s.name === args.name)
 
@@ -182,7 +185,11 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         body = injectGitMasterConfig(body, options.gitMasterConfig)
       }
 
-      const dir = skill.path ? dirname(skill.path) : skill.resolvedPath || process.cwd()
+      const baseDir = ctx?.directory ?? options?.directory
+      const dir = skill.path ? dirname(skill.path) : (skill.resolvedPath || baseDir)
+      if (!dir) {
+        throw new Error(`Skill "${skill.name}" requires a base directory to resolve file references.`)
+      }
 
       const output = [
         `## Skill: ${skill.name}`,

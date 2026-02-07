@@ -1,5 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { join } from "path"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 import type { TaskGetInput } from "./types"
 import { TaskGetInputSchema, TaskObjectSchema } from "./types"
@@ -22,7 +23,10 @@ Returns null if the task does not exist or the file is invalid.`,
     args: {
       id: tool.schema.string().describe("Task ID to retrieve (format: T-{uuid})"),
     },
-    execute: async (args: Record<string, unknown>): Promise<string> => {
+    execute: async (
+      args: Record<string, unknown>,
+      context: ToolContext & { directory: string }
+    ): Promise<string> => {
       try {
         const validatedArgs = TaskGetInputSchema.parse(args)
         const taskId = parseTaskId(validatedArgs.id)
@@ -31,7 +35,7 @@ Returns null if the task does not exist or the file is invalid.`,
           return JSON.stringify({ error: "invalid_task_id" })
         }
 
-        const taskDir = getTaskDir(config)
+        const taskDir = getTaskDir(config, context.directory)
         const taskPath = join(taskDir, `${taskId}.json`)
 
          const task = readJsonSafe(taskPath, TaskObjectSchema)

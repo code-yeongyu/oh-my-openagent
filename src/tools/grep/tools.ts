@@ -1,4 +1,4 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin/tool"
 import { runRg } from "./cli"
 import { formatGrepResult } from "./utils"
 
@@ -20,11 +20,10 @@ export const grep: ToolDefinition = tool({
       .optional()
       .describe("The directory to search in. Defaults to the current working directory."),
   },
-  execute: async (args) => {
+  execute: async (args, context: ToolContext & { directory: string }) => {
     try {
       const globs = args.include ? [args.include] : undefined
-      // Use process.cwd() as the default search path when no path is provided
-      const searchPath = args.path ?? process.cwd()
+      const searchPath = args.path ?? context.directory
       const paths = [searchPath]
 
       const result = await runRg({
