@@ -211,20 +211,20 @@ export async function executeSyncContinuation(
         : undefined
     }
 
-    await client.session.prompt({
-      path: { id: args.session_id! },
-      body: {
-        ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
-        ...(resumeModel !== undefined ? { model: resumeModel } : {}),
-          tools: {
-            ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
-            task: false,
-            call_omo_agent: true,
-            question: false,
-          },
-        parts: [{ type: "text", text: args.prompt }],
-      },
-    })
+     await (client.session as any).promptAsync({
+       path: { id: args.session_id! },
+       body: {
+         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
+         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
+           tools: {
+             ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
+             task: false,
+             call_omo_agent: true,
+             question: false,
+           },
+         parts: [{ type: "text", text: args.prompt }],
+       },
+     })
   } catch (promptError) {
     if (toastManager) {
       toastManager.removeTask(taskId)

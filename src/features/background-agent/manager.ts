@@ -310,7 +310,7 @@ export class BackgroundManager {
       promptLength: input.prompt.length,
     })
 
-    // Use prompt() instead of promptAsync() to properly initialize agent loop (fire-and-forget)
+    // Fire-and-forget prompt via promptAsync (no response body needed)
     // Include model if caller provided one (e.g., from Sisyphus category configs)
     // IMPORTANT: variant must be a top-level field in the body, NOT nested inside model
     // OpenCode's PromptInput schema expects: { model: { providerID, modelID }, variant: "max" }
@@ -571,7 +571,7 @@ export class BackgroundManager {
       promptLength: input.prompt.length,
     })
 
-    // Use prompt() instead of promptAsync() to properly initialize agent loop
+    // Fire-and-forget prompt via promptAsync (no response body needed)
     // Include model if task has one (preserved from original launch with category config)
     // variant must be top-level in body, not nested inside model (OpenCode PromptInput schema)
     const resumeModel = existingTask.model
@@ -579,7 +579,7 @@ export class BackgroundManager {
       : undefined
     const resumeVariant = existingTask.model?.variant
 
-    this.client.session.prompt({
+    this.client.session.promptAsync({
       path: { id: existingTask.sessionID },
       body: {
         agent: existingTask.agent,
@@ -1198,7 +1198,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     })
 
     try {
-      await this.client.session.prompt({
+      await this.client.session.promptAsync({
         path: { id: task.parentSessionID },
         body: {
           noReply: !allComplete,
