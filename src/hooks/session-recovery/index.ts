@@ -75,7 +75,7 @@ function extractResumeConfig(userMessage: MessageData | undefined, sessionID: st
 
 async function resumeSession(client: Client, config: ResumeConfig): Promise<boolean> {
   try {
-    await client.session.prompt({
+    await client.session.promptAsync({
       path: { id: config.sessionID },
       body: {
         parts: [{ type: "text", text: RECOVERY_RESUME_TEXT }],
@@ -185,7 +185,7 @@ async function recoverToolResultMissing(
   }))
 
   try {
-    await client.session.prompt({
+    await client.session.promptAsync({
       path: { id: sessionID },
       // @ts-expect-error - SDK types may not include tool_result parts
       body: { parts: toolResultParts },

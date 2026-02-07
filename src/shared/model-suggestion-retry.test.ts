@@ -212,9 +212,9 @@ describe("parseModelSuggestion", () => {
 
 describe("promptWithModelSuggestionRetry", () => {
   it("should succeed on first try without retry", async () => {
-    // given a client where prompt succeeds
+    // given a client where promptAsync succeeds
     const promptMock = mock(() => Promise.resolve())
-    const client = { session: { prompt: promptMock } }
+    const client = { session: { promptAsync: promptMock } }
 
     // when calling promptWithModelSuggestionRetry
     await promptWithModelSuggestionRetry(client as any, {
@@ -225,21 +225,158 @@ describe("promptWithModelSuggestionRetry", () => {
       },
     })
 
-    // then should call prompt exactly once
+    // then should call promptAsync exactly once
     expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
-  it("should retry with suggestion on model-not-found error", async () => {
-    // given a client that fails first with model-not-found, then succeeds
-    const promptMock = mock()
-      .mockRejectedValueOnce({
-        name: "ProviderModelNotFoundError",
-        data: {
-          providerID: "anthropic",
-          modelID: "claude-sonet-4",
-          suggestions: ["claude-sonnet-4"],
+  it("should throw error from promptAsync directly on model-not-found error", async () => {
+    // given a client that fails with model-not-found error
+    const promptMock = mock().mockRejectedValueOnce({
+      name: "ProviderModelNotFoundError",
+      data: {
+        providerID: "anthropic",
+        modelID: "claude-sonet-4",
+        suggestions: ["claude-sonnet-4"],
+      },
+    })
+    const client = { session: { promptAsync: promptMock } }
+
+    // when calling promptWithModelSuggestionRetry
+    // then should throw the error without retrying
+    await expect(
+      promptWithModelSuggestionRetry(client as any, {
+        path: { id: "session-1" },
+        body: {
+          agent: "explore",
+          parts: [{ type: "text", text: "hello" }],
+          model: { providerID: "anthropic", modelID: "claude-sonet-4" },
         },
       })
+    ).rejects.toThrow()
+
+    // and should call promptAsync only once
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("should throw original error when no suggestion available", async () => {
+    // given a client that fails with a non-model-not-found error
+    const originalError = new Error("Connection refused")
+    const promptMock = mock().mockRejectedValueOnce(originalError)
+    const client = { session: { promptAsync: promptMock } }
+
+    // when calling promptWithModelSuggestionRetry
+    // then should throw the original error
+    await expect(
+      promptWithModelSuggestionRetry(client as any, {
+        path: { id: "session-1" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        },
+      })
+    ).rejects.toThrow("Connection refused")
+
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("should throw error from promptAsync directly", async () => {
+    // given a client that fails with an error
+    const error = new Error("Still not found")
+    const promptMock = mock().mockRejectedValueOnce(error)
+    const client = { session: { promptAsync: promptMock } }
+
+    // when calling promptWithModelSuggestionRetry
+    // then should throw the error
+    await expect(
+      promptWithModelSuggestionRetry(client as any, {
+        path: { id: "session-1" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        },
+      })
+    ).rejects.toThrow("Still not found")
+
+    // and should call promptAsync only once
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("should pass all body fields through to promptAsync", async () => {
+    // given a client where promptAsync succeeds
+    const promptMock = mock().mockResolvedValueOnce(undefined)
+    const client = { session: { promptAsync: promptMock } }
+
+    // when calling with additional body fields
+    await promptWithModelSuggestionRetry(client as any, {
+      path: { id: "session-1" },
+      body: {
+        agent: "explore",
+        system: "You are a helpful agent",
+        tools: { task: false },
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        variant: "max",
+      },
+    })
+
+    // then call should pass all fields through unchanged
+    const call = promptMock.mock.calls[0][0]
+    expect(call.body.agent).toBe("explore")
+    expect(call.body.system).toBe("You are a helpful agent")
+    expect(call.body.tools).toEqual({ task: false })
+    expect(call.body.variant).toBe("max")
+    expect(call.body.model).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4",
+    })
+  })
+
+  it("should throw string error message from promptAsync", async () => {
+    // given a client that fails with a string error
+    const promptMock = mock().mockRejectedValueOnce(
+      new Error("Model not found: anthropic/claude-sonet-4. Did you mean: claude-sonnet-4?")
+    )
+    const client = { session: { promptAsync: promptMock } }
+
+    // when calling promptWithModelSuggestionRetry
+    // then should throw the error
+    await expect(
+      promptWithModelSuggestionRetry(client as any, {
+        path: { id: "session-1" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        },
+      })
+    ).rejects.toThrow()
+
+    // and should call promptAsync only once
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("should throw error when no model in original request", async () => {
+    // given a client that fails with an error
+    const modelNotFoundError = new Error(
+      "Model not found: anthropic/claude-sonet-4. Did you mean: claude-sonnet-4?"
+    )
+    const promptMock = mock().mockRejectedValueOnce(modelNotFoundError)
+    const client = { session: { promptAsync: promptMock } }
+
+    // when calling without model in body
+    // then should throw the error
+    await expect(
+      promptWithModelSuggestionRetry(client as any, {
+        path: { id: "session-1" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+        },
+      })
+    ).rejects.toThrow()
+
+    // and should call promptAsync only once
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+})
       .mockResolvedValueOnce(undefined)
     const client = { session: { prompt: promptMock } }
 
