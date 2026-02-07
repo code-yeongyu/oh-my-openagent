@@ -20,7 +20,7 @@ interface RawClaudeHooksConfig {
 function normalizeHookMatcher(raw: RawHookMatcher): HookMatcher {
   return {
     matcher: raw.matcher ?? raw.pattern ?? "*",
-    hooks: raw.hooks,
+    hooks: Array.isArray(raw.hooks) ? raw.hooks : [],
   }
 }
 
