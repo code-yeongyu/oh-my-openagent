@@ -584,6 +584,33 @@ export async function executeSyncTask(
     })
 
     try {
+      // Validate agent exists before calling prompt to prevent OpenCode crash
+      // OpenCode throws "undefined is not an object (evaluating 'agent.name')" if agent not found
+      const agentsResult = await client.app.agents().catch(() => null)
+      if (agentsResult) {
+        type AgentInfo = { name: string; mode?: string }
+        const agents = (agentsResult as { data?: AgentInfo[] }).data ?? agentsResult as unknown as AgentInfo[]
+        const agentExists = agents.some(
+          (a) => a.name.toLowerCase() === agentToUse.toLowerCase()
+        )
+        if (!agentExists) {
+          if (toastManager && taskId !== undefined) {
+            toastManager.removeTask(taskId)
+          }
+          const availableAgents = agents.map((a) => a.name).sort().join(", ")
+          return formatDetailedError(
+            new Error(`Agent "${agentToUse}" not found. Available agents: ${availableAgents}`),
+            {
+              operation: "Validate agent before prompt",
+              args,
+              sessionID,
+              agent: agentToUse,
+              category: args.category,
+            }
+          )
+        }
+      }
+
       const allowDelegateTask = isPlanAgent(agentToUse)
       await promptWithModelSuggestionRetry(client, {
         path: { id: sessionID },
