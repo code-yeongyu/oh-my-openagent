@@ -736,34 +736,47 @@ export class BackgroundManager {
       if (!info || typeof info.id !== "string") return
       const sessionID = info.id
 
-      const task = this.findBySession(sessionID)
-      if (!task) return
-
-      if (task.status === "running") {
-        task.status = "cancelled"
-        task.completedAt = new Date()
-        task.error = "Session deleted"
+      const tasksToCancel = new Map<string, BackgroundTask>()
+      const directTask = this.findBySession(sessionID)
+      if (directTask) {
+        tasksToCancel.set(directTask.id, directTask)
+      }
+      for (const descendant of this.getAllDescendantTasks(sessionID)) {
+        tasksToCancel.set(descendant.id, descendant)
       }
 
-       if (task.concurrencyKey) {
-         this.concurrencyManager.release(task.concurrencyKey)
-         task.concurrencyKey = undefined
-       }
-      const existingTimer = this.completionTimers.get(task.id)
-      if (existingTimer) {
-        clearTimeout(existingTimer)
-        this.completionTimers.delete(task.id)
-      }
+      if (tasksToCancel.size === 0) return
 
-      const idleTimer = this.idleDeferralTimers.get(task.id)
-      if (idleTimer) {
-        clearTimeout(idleTimer)
-        this.idleDeferralTimers.delete(task.id)
+      for (const task of tasksToCancel.values()) {
+        if (task.status === "running" || task.status === "pending") {
+          void this.cancelTask(task.id, {
+            source: "session.deleted",
+            reason: "Session deleted",
+            skipNotification: true,
+          }).catch(err => {
+            log("[background-agent] Failed to cancel task on session.deleted:", { taskId: task.id, error: err })
+          })
+        }
+
+        const existingTimer = this.completionTimers.get(task.id)
+        if (existingTimer) {
+          clearTimeout(existingTimer)
+          this.completionTimers.delete(task.id)
+        }
+
+        const idleTimer = this.idleDeferralTimers.get(task.id)
+        if (idleTimer) {
+          clearTimeout(idleTimer)
+          this.idleDeferralTimers.delete(task.id)
+        }
+
+        this.cleanupPendingByParent(task)
+        this.tasks.delete(task.id)
+        this.clearNotificationsForTask(task.id)
+        if (task.sessionID) {
+          subagentSessions.delete(task.sessionID)
+        }
       }
-      this.cleanupPendingByParent(task)
-      this.tasks.delete(task.id)
-      this.clearNotificationsForTask(task.id)
-      subagentSessions.delete(sessionID)
     }
   }
 
