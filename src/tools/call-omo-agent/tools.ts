@@ -220,7 +220,7 @@ Original error: ${createResult.error}`
   log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
 
    try {
-     await ctx.client.session.promptAsync({
+     await (ctx.client.session as any).promptAsync({
        path: { id: sessionID },
        body: {
          agent: args.subagent_type,
