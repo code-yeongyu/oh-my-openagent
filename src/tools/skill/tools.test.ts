@@ -99,6 +99,20 @@ describe("skill tool - synchronous description", () => {
     // then
     expect(tool.description).toContain("No skills are currently available")
   })
+
+  it("can skip prewarming description for faster startup and populate after execute", async () => {
+    // given
+    const loadedSkills = [createMockSkill("test-skill")]
+
+    // when
+    const tool = createSkillTool({ skills: loadedSkills, prewarmDescription: false })
+
+    // then
+    expect(tool.description).not.toContain("<available_skills>")
+    await tool.execute({ name: "test-skill" }, mockContext)
+    expect(tool.description).toContain("<available_skills>")
+    expect(tool.description).toContain("test-skill")
+  })
 })
 
 describe("skill tool - agent restriction", () => {

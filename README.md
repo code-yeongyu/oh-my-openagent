@@ -324,6 +324,7 @@ See the full [Configuration Documentation](docs/configurations.md) for detailed 
 - **Hooks**: 25+ built-in hooks, all configurable via `disabled_hooks`
 - **MCPs**: Built-in websearch (Exa), context7 (docs), grep_app (GitHub search)
 - **LSP**: Full LSP support with refactoring tools
+- **Performance**: Fast startup modes (skills/commands caching, deferred tmux checks, lazy tool descriptions)
 - **Experimental**: Aggressive truncation, auto-resume, and more
 
 

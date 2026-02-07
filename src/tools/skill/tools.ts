@@ -40,6 +40,13 @@ function formatSkillsXml(skills: SkillInfo[]): string {
   return `\n\n<available_skills>\n${skillsXml}\n</available_skills>`
 }
 
+function buildDescriptionFromSkills(skills: LoadedSkill[]): string {
+  const skillInfos = skills.map(loadedSkillToInfo)
+  return skillInfos.length === 0
+    ? TOOL_DESCRIPTION_NO_SKILLS
+    : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+}
+
 async function extractSkillBody(skill: LoadedSkill): Promise<string> {
   if (skill.lazyContent) {
     const fullTemplate = await skill.lazyContent.load()
@@ -129,31 +136,45 @@ async function formatMcpCapabilities(
 export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition {
   let cachedSkills: LoadedSkill[] | null = null
   let cachedDescription: string | null = null
+  const shouldPrewarmDescription = options.prewarmDescription !== false
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
-    if (options.skills) return options.skills
     if (cachedSkills) return cachedSkills
-    cachedSkills = await getAllSkills({disabledSkills: options?.disabledSkills})
+
+    const mergeDiscovered = options.mergeDiscoveredSkills === true
+    if (options.skills && !mergeDiscovered) {
+      cachedSkills = options.skills
+      return cachedSkills
+    }
+
+    const baseSkills = options.skills ?? []
+    const discovered = await getAllSkills({
+      disabledSkills: options?.disabledSkills,
+      includeClaudeCodePaths: options.opencodeOnly ? false : true,
+    })
+    const combined = [...baseSkills, ...discovered]
+
+    // Prefer baseSkills ordering (config overrides) and dedupe by name.
+    const seen = new Set<string>()
+    cachedSkills = combined.filter((s) => {
+      if (seen.has(s.name)) return false
+      seen.add(s.name)
+      return true
+    })
     return cachedSkills
   }
 
   const getDescription = async (): Promise<string> => {
     if (cachedDescription) return cachedDescription
     const skills = await getSkills()
-    const skillInfos = skills.map(loadedSkillToInfo)
-    cachedDescription = skillInfos.length === 0
-      ? TOOL_DESCRIPTION_NO_SKILLS
-      : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+    cachedDescription = buildDescriptionFromSkills(skills)
     return cachedDescription
   }
 
-  if (options.skills) {
-    const skillInfos = options.skills.map(loadedSkillToInfo)
-    cachedDescription = skillInfos.length === 0
-      ? TOOL_DESCRIPTION_NO_SKILLS
-      : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
-  } else {
-    getDescription()
+  if (options.skills && shouldPrewarmDescription) {
+    cachedDescription = buildDescriptionFromSkills(options.skills)
+  } else if (!options.skills && shouldPrewarmDescription) {
+    void getDescription()
   }
 
   return tool({
@@ -165,6 +186,9 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     },
     async execute(args: SkillArgs, ctx?: { agent?: string }) {
       const skills = await getSkills()
+      if (!cachedDescription || options.mergeDiscoveredSkills === true) {
+        cachedDescription = buildDescriptionFromSkills(skills)
+      }
       const skill = skills.find(s => s.name === args.name)
 
       if (!skill) {

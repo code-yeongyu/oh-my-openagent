@@ -58,9 +58,10 @@ import {
   discoverOpencodeProjectSkills,
   mergeSkills,
 } from "./features/opencode-skill-loader";
-import type { SkillScope } from "./features/opencode-skill-loader/types";
+import type { SkillScope, LoadedSkill } from "./features/opencode-skill-loader/types";
 import { createBuiltinSkills } from "./features/builtin-skills";
 import { getSystemMcpServerNames } from "./features/claude-code-mcp-loader";
+import type { CommandInfo } from "./tools/slashcommand";
 import {
   setMainSession,
   getMainSessionID,
@@ -99,6 +100,7 @@ import { clearBoulderState } from "./features/boulder-state";
 import { type HookName } from "./config";
 import {
   log,
+  createPerfLogger,
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
   resetMessageCursor,
@@ -108,21 +110,45 @@ import {
   OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
   injectServerAuthIntoClient,
 } from "./shared";
+import { loadBuiltinCommands } from "./features/builtin-commands";
 import { filterDisabledTools } from "./shared/disabled-tools";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
 import { consumeToolMetadata } from "./features/tool-metadata-store";
+import {
+  readSkillIndexCache,
+  refreshSkillIndexCacheInBackground,
+  skillIndexToLoadedSkills,
+  writeSkillIndexCache,
+} from "./features/opencode-skill-loader/skill-index-cache";
+import {
+  commandIndexToCommandInfos,
+  readCommandIndexCache,
+  refreshCommandIndexCacheInBackground,
+  writeCommandIndexCache,
+} from "./tools/slashcommand/command-index-cache";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
+  const perf = createPerfLogger();
+  const tTotal = perf.mark();
+
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   });
   injectServerAuthIntoClient(ctx.client);
-  // Start background tmux check immediately
-  startTmuxCheck();
-
+  const tConfigLoad = perf.mark();
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
+  perf.measure("startup.config_load", tConfigLoad);
+
+  const performanceConfig = pluginConfig.performance;
+  const startupSkillsMode = performanceConfig?.startup_skills ?? "eager";
+  const startupCommandsMode = performanceConfig?.startup_commands ?? "eager";
+  const cacheTtlMs = performanceConfig?.cache_ttl_ms ?? 30 * 60 * 1000;
+  const cacheRefreshDelayMs =
+    performanceConfig?.cache_refresh_delay_ms ?? 2000;
+  const prewarmToolDescriptions =
+    performanceConfig?.prewarm_tool_descriptions ?? true;
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
 
   const firstMessageVariantGate = createFirstMessageVariantGate();
@@ -134,6 +160,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     main_pane_min_width: pluginConfig.tmux?.main_pane_min_width ?? 120,
     agent_pane_min_width: pluginConfig.tmux?.agent_pane_min_width ?? 40,
   } as const;
+  const tmuxCheckMode = performanceConfig?.tmux_check ?? "lazy";
+  if (tmuxCheckMode === "eager" || tmuxConfig.enabled) {
+    startTmuxCheck();
+  }
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
 
   const modelCacheState = createModelCacheState();
@@ -416,13 +446,68 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
   );
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false;
-  const [userSkills, globalSkills, projectSkills, opencodeProjectSkills] =
-    await Promise.all([
-      includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
-      discoverOpencodeGlobalSkills(),
-      includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
-      discoverOpencodeProjectSkills(),
-    ]);
+  let skillCacheHit = false;
+  let userSkills: LoadedSkill[] = [];
+  let globalSkills: LoadedSkill[] = [];
+  let projectSkills: LoadedSkill[] = [];
+  let opencodeProjectSkills: LoadedSkill[] = [];
+
+  if (startupSkillsMode === "eager") {
+    const tSkills = perf.mark();
+    [userSkills, globalSkills, projectSkills, opencodeProjectSkills] =
+      await Promise.all([
+        includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
+        discoverOpencodeGlobalSkills(),
+        includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
+        discoverOpencodeProjectSkills(),
+      ]);
+    perf.measure("startup.skill_discovery", tSkills, {
+      mode: "eager",
+      includeClaudeSkills,
+    });
+
+    // Warm the cache in the background so switching to `cached` later is instant.
+    setTimeout(() => {
+      void (async () => {
+        const existing = await readSkillIndexCache({ ttlMs: cacheTtlMs });
+        if (existing && !existing.stale) return;
+        await writeSkillIndexCache([
+          ...userSkills,
+          ...globalSkills,
+          ...projectSkills,
+          ...opencodeProjectSkills,
+        ]);
+      })().catch(() => {});
+    }, cacheRefreshDelayMs);
+  } else if (startupSkillsMode === "cached") {
+    const tSkillCache = perf.mark();
+    const cached = await readSkillIndexCache({ ttlMs: cacheTtlMs });
+    skillCacheHit = Boolean(cached);
+    perf.measure("startup.skill_cache_read", tSkillCache, {
+      hit: Boolean(cached),
+      stale: cached?.stale ?? null,
+    });
+
+    if (cached) {
+      const cachedSkills = skillIndexToLoadedSkills(cached.cache.skills);
+      userSkills = cachedSkills.filter((s) => s.scope === "user");
+      globalSkills = cachedSkills.filter((s) => s.scope === "opencode");
+      projectSkills = cachedSkills.filter((s) => s.scope === "project");
+      opencodeProjectSkills = cachedSkills.filter(
+        (s) => s.scope === "opencode-project",
+      );
+    }
+
+    if (!includeClaudeSkills) {
+      userSkills = [];
+      projectSkills = [];
+    }
+
+    refreshSkillIndexCacheInBackground({
+      ttlMs: cacheTtlMs,
+      delayMs: cacheRefreshDelayMs,
+    });
+  }
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
@@ -495,27 +580,139 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const skillMcpManager = new SkillMcpManager();
   const getSessionIDForMcp = () => getMainSessionID() || "";
+  const shouldMergeDiscoveredSkills =
+    startupSkillsMode === "lazy" || (startupSkillsMode === "cached" && !skillCacheHit);
   const skillTool = createSkillTool({
     skills: mergedSkills,
+    mergeDiscoveredSkills: shouldMergeDiscoveredSkills,
+    opencodeOnly: pluginConfig.claude_code?.skills === false,
     mcpManager: skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,
-    disabledSkills
+    disabledSkills,
+    prewarmDescription: prewarmToolDescriptions,
   });
+  let mergedSkillsOnDemandPromise: Promise<LoadedSkill[]> | null = null;
+  const getLoadedSkillsForMcp = () => {
+    if (!shouldMergeDiscoveredSkills) return mergedSkills;
+    if (!mergedSkillsOnDemandPromise) {
+      mergedSkillsOnDemandPromise = (async () => {
+        const discovered = await Promise.all([
+          includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
+          discoverOpencodeGlobalSkills(),
+          includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
+          discoverOpencodeProjectSkills(),
+        ]).then(([u, g, p, op]) =>
+          mergeSkills(builtinSkills, pluginConfig.skills, u, g, p, op),
+        );
+
+        const combined = [...mergedSkills, ...discovered];
+        const seen = new Set<string>();
+        return combined.filter((s) => {
+          if (seen.has(s.name)) return false;
+          seen.add(s.name);
+          return true;
+        });
+      })();
+    }
+    return mergedSkillsOnDemandPromise;
+  };
   const skillMcpTool = createSkillMcpTool({
     manager: skillMcpManager,
-    getLoadedSkills: () => mergedSkills,
+    getLoadedSkills: getLoadedSkillsForMcp,
     getSessionID: getSessionIDForMcp,
   });
 
-  const commands = discoverCommandsSync();
+  const builtinCommandsMap = loadBuiltinCommands(pluginConfig.disabled_commands);
+  const builtinCommandInfos: CommandInfo[] = Object.values(builtinCommandsMap).map((cmd) => ({
+    name: cmd.name,
+    metadata: {
+      name: cmd.name,
+      description: cmd.description || "",
+      model: cmd.model,
+      agent: cmd.agent,
+      subtask: cmd.subtask,
+    },
+    content: cmd.template,
+    scope: "builtin" as const,
+  }));
+
+  let commandCacheHit = false;
+  const tCommandsResolve = perf.mark();
+  let commands: CommandInfo[] = builtinCommandInfos;
+  if (startupCommandsMode === "eager") {
+    commands = discoverCommandsSync();
+
+    // Warm the cache in the background so switching to `cached` later is instant.
+    setTimeout(() => {
+      void (async () => {
+        const existing = await readCommandIndexCache({ ttlMs: cacheTtlMs });
+        if (existing && !existing.stale) return;
+
+        const entries = commands
+          .filter((c): c is CommandInfo & { path: string } => Boolean(c.path) && c.scope !== "builtin")
+          .map((c) => ({
+            name: c.name,
+            scope: c.scope,
+            path: c.path,
+            metadata: c.metadata,
+          }));
+
+        await writeCommandIndexCache(entries);
+      })().catch(() => {});
+    }, cacheRefreshDelayMs);
+  } else if (startupCommandsMode === "cached") {
+    const cached = await readCommandIndexCache({ ttlMs: cacheTtlMs });
+    commandCacheHit = Boolean(cached);
+    if (cached) {
+      const cachedCommands = commandIndexToCommandInfos(cached.cache.commands);
+      commands = [...builtinCommandInfos, ...cachedCommands];
+    } else {
+      commands = discoverCommandsSync();
+
+      // Cache miss: we already did the expensive discovery, so write the index without re-discovering.
+      setTimeout(() => {
+        void (async () => {
+          const entries = commands
+            .filter((c): c is CommandInfo & { path: string } => Boolean(c.path) && c.scope !== "builtin")
+            .map((c) => ({
+              name: c.name,
+              scope: c.scope,
+              path: c.path,
+              metadata: c.metadata,
+            }));
+          await writeCommandIndexCache(entries);
+        })().catch(() => {});
+      }, cacheRefreshDelayMs);
+    }
+    if (cached) {
+      refreshCommandIndexCacheInBackground({
+        ttlMs: cacheTtlMs,
+        delayMs: cacheRefreshDelayMs,
+      });
+    }
+  }
+  perf.measure("startup.command_discovery", tCommandsResolve, {
+    mode: startupCommandsMode,
+    cacheHit: commandCacheHit,
+    count: commands.length,
+  });
+
+  const shouldMergeDiscoveredCommands = startupCommandsMode === "lazy";
   const slashcommandTool = createSlashcommandTool({
     commands,
     skills: mergedSkills,
+    mergeDiscoveredCommands: shouldMergeDiscoveredCommands,
+    mergeDiscoveredSkills: shouldMergeDiscoveredSkills,
+    prewarmDescription: prewarmToolDescriptions,
   });
 
+  const autoSlashCommandSkills =
+    startupSkillsMode === "eager" || (startupSkillsMode === "cached" && skillCacheHit)
+      ? mergedSkills
+      : undefined;
   const autoSlashCommand = isHookEnabled("auto-slash-command")
-    ? createAutoSlashCommandHook({ skills: mergedSkills })
+    ? createAutoSlashCommandHook({ skills: autoSlashCommandSkills })
     : null;
 
   const configHandler = createConfigHandler({
@@ -551,6 +748,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     allTools,
     pluginConfig.disabled_tools,
   );
+
+  perf.measure("startup.total", tTotal, {
+    startupSkillsMode,
+    startupCommandsMode,
+    prewarmToolDescriptions,
+    tmuxEnabled: tmuxConfig.enabled,
+  });
 
   return {
     tool: filteredTools,

@@ -25,4 +25,13 @@ export interface SlashcommandToolOptions {
   commands?: CommandInfo[]
   /** Pre-loaded skills (skip discovery if provided) */
   skills?: LoadedSkill[]
+  /** When true, merge discovered commands into the provided `commands` list on-demand. */
+  mergeDiscoveredCommands?: boolean
+  /** When true, merge discovered skills into the provided `skills` list on-demand. */
+  mergeDiscoveredSkills?: boolean
+  /**
+   * When false, skip startup precomputation of tool description.
+   * Useful for fast startup modes where discovery is deferred.
+   */
+  prewarmDescription?: boolean
 }

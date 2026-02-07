@@ -587,6 +587,38 @@ opencode --port 4096
 
 For more details, see the [OpenCode Server documentation](https://opencode.ai/docs/server/).
 
+## Performance (Fast Startup)
+
+Oh My OpenCode does a lot of filesystem discovery at startup (skills, commands, tmux detection). On large setups, this can add noticeable startup latency. The `performance` block lets you trade completeness for startup speed.
+
+**Example: faster startup**
+
+```json
+{
+  "performance": {
+    "startup_skills": "cached",
+    "startup_commands": "cached",
+    "tmux_check": "lazy",
+    "cache_ttl_ms": 1800000,
+    "cache_refresh_delay_ms": 2000,
+    "prewarm_tool_descriptions": false
+  }
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `startup_skills` | `eager` | `eager` discovers all skills at startup; `cached` reads from disk cache and refreshes in background; `lazy` discovers on-demand. |
+| `startup_commands` | `eager` | Same as `startup_skills`, but for slash commands. |
+| `tmux_check` | `lazy` | `eager` runs tmux detection during plugin init; `lazy` defers until tmux features are enabled/used. |
+| `cache_ttl_ms` | `1800000` | Cache max age (ms) used by `cached` startup modes. |
+| `cache_refresh_delay_ms` | `2000` | Delay before background cache refresh begins (ms). |
+| `prewarm_tool_descriptions` | `true` | When `false`, tool descriptions stay prefix-only until first execute (faster startup). |
+
+### Profiling Startup
+
+Set `OMO_PROFILE=1` (or `true`) to log startup phase timings to `oh-my-opencode.log` in your system temp directory.
+
 ## Git Master
 
 Configure git-master skill behavior:
