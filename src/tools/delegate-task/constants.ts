@@ -4,6 +4,7 @@ import type {
    AvailableSkill,
  } from "../../agents/dynamic-agent-prompt-builder"
 import { truncateDescription } from "../../shared/truncate-description"
+import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 
 export const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
 You are working on VISUAL/UI tasks.
@@ -74,7 +75,7 @@ Approach:
 </Category_Context>
 
 <Caller_Warning>
-THIS CATEGORY USES A LESS CAPABLE MODEL (claude-haiku-4-5).
+THIS CATEGORY USES A LESS CAPABLE MODEL.
 
 The model executing this task has LIMITED reasoning capacity. Your prompt MUST be:
 
@@ -125,7 +126,7 @@ This is NOT a default choice - it's for genuinely unclassifiable moderate-effort
 </Category_Context>
 
 <Caller_Warning>
-THIS CATEGORY USES A MID-TIER MODEL (claude-sonnet-4-6).
+THIS CATEGORY USES A MID-TIER MODEL.
 
 **PROVIDE CLEAR STRUCTURE:**
 1. MUST DO: Enumerate required actions explicitly
@@ -207,16 +208,25 @@ You are NOT an interactive assistant. You are an autonomous problem-solver.
 
 
 
-export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
-  "visual-engineering": { model: "google/gemini-3.1-pro", variant: "high" },
-  ultrabrain: { model: "openai/gpt-5.3-codex", variant: "xhigh" },
-  deep: { model: "openai/gpt-5.3-codex", variant: "medium" },
-  artistry: { model: "google/gemini-3.1-pro", variant: "high" },
-  quick: { model: "anthropic/claude-haiku-4-5" },
-  "unspecified-low": { model: "anthropic/claude-sonnet-4-6" },
-  "unspecified-high": { model: "anthropic/claude-opus-4-6", variant: "max" },
-  writing: { model: "kimi-for-coding/k2p5" },
+/**
+ * Derive default category model from the first entry of its fallback chain.
+ * CATEGORY_MODEL_REQUIREMENTS is the single source of truth for model assignments.
+ */
+function deriveCategoryDefaults(): Record<string, CategoryConfig> {
+  const result: Record<string, CategoryConfig> = {}
+  for (const [category, req] of Object.entries(CATEGORY_MODEL_REQUIREMENTS)) {
+    const first = req.fallbackChain[0]
+    if (!first) continue
+    const model = `${first.providers[0]}/${first.model}`
+    result[category] = {
+      model,
+      ...(first.variant ? { variant: first.variant } : {}),
+    }
+  }
+  return result
 }
+
+export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = deriveCategoryDefaults()
 
 export const CATEGORY_PROMPT_APPENDS: Record<string, string> = {
   "visual-engineering": VISUAL_CATEGORY_PROMPT_APPEND,
