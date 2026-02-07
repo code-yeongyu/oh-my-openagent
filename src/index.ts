@@ -35,6 +35,7 @@ import {
   createSubagentQuestionBlockerHook,
   createStopContinuationGuardHook,
   createCompactionContextInjector,
+  createCompactionTodoPreserverHook,
   createUnstableAgentBabysitterHook,
   createPreemptiveCompactionHook,
   createTasksTodowriteDisablerHook,
@@ -354,6 +355,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const compactionContextInjector = isHookEnabled("compaction-context-injector")
     ? safeCreateHook("compaction-context-injector", () => createCompactionContextInjector(), { enabled: safeHookEnabled })
+    : null;
+
+  const compactionTodoPreserver = isHookEnabled("compaction-todo-preserver")
+    ? safeCreateHook("compaction-todo-preserver", () => createCompactionTodoPreserverHook(ctx), { enabled: safeHookEnabled })
     : null;
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
@@ -730,6 +735,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
       await stopContinuationGuard?.event(input);
+      await compactionTodoPreserver?.event(input);
       await atlasHook?.handler(input);
 
       const { event } = input;
@@ -945,6 +951,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       _input: { sessionID: string },
       output: { context: string[] },
     ): Promise<void> => {
+      await compactionTodoPreserver?.capture(_input.sessionID);
       if (!compactionContextInjector) {
         return;
       }
