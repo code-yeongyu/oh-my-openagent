@@ -69,11 +69,21 @@ program
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-d, --directory <path>", "Working directory")
   .option("-t, --timeout <ms>", "Timeout in milliseconds (default: 30 minutes)", parseInt)
+  .option("-p, --port <port>", "Server port (attaches if port already in use)", parseInt)
+  .option("--attach <url>", "Attach to existing opencode server URL")
+  .option("--on-complete <command>", "Shell command to run after completion")
+  .option("--json", "Output structured JSON result to stdout")
+  .option("--session-id <id>", "Resume existing session instead of creating new one")
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode run "Fix the bug in index.ts"
   $ bunx oh-my-opencode run --agent Sisyphus "Implement feature X"
   $ bunx oh-my-opencode run --timeout 3600000 "Large refactoring task"
+  $ bunx oh-my-opencode run --port 4321 "Fix the bug"
+  $ bunx oh-my-opencode run --attach http://127.0.0.1:4321 "Fix the bug"
+  $ bunx oh-my-opencode run --json "Fix the bug" | jq .sessionId
+  $ bunx oh-my-opencode run --on-complete "notify-send Done" "Fix the bug"
+  $ bunx oh-my-opencode run --session-id ses_abc123 "Continue the work"
 
 Agent resolution order:
   1) --agent flag
@@ -89,11 +99,20 @@ Unlike 'opencode run', this command waits until:
   - All child sessions (background tasks) are idle
 `)
   .action(async (message: string, options) => {
+    if (options.port && options.attach) {
+      console.error("Error: --port and --attach are mutually exclusive")
+      process.exit(1)
+    }
     const runOptions: RunOptions = {
       message,
       agent: options.agent,
       directory: options.directory,
       timeout: options.timeout,
+      port: options.port,
+      attach: options.attach,
+      onComplete: options.onComplete,
+      json: options.json ?? false,
+      sessionId: options.sessionId,
     }
     const exitCode = await run(runOptions)
     process.exit(exitCode)
