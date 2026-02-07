@@ -56,4 +56,17 @@ describe("createCompactionContextInjector", () => {
       expect(prompt).toContain("Files already verified")
     })
   })
+
+  it("restricts constraints to explicit verbatim statements", async () => {
+    //#given
+    const injector = createCompactionContextInjector()
+
+    //#when
+    const prompt = injector()
+
+    //#then
+    expect(prompt).toContain("Explicit Constraints (Verbatim Only)")
+    expect(prompt).toContain("Do NOT invent")
+    expect(prompt).toContain("Quote constraints verbatim")
+  })
 })

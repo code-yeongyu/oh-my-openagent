@@ -35,6 +35,7 @@ export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
 export { createSubagentQuestionBlockerHook } from "./subagent-question-blocker";
 export { createStopContinuationGuardHook, type StopContinuationGuard } from "./stop-continuation-guard";
 export { createCompactionContextInjector } from "./compaction-context-injector";
+export { createCompactionTodoPreserverHook } from "./compaction-todo-preserver";
 export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
 export { createPreemptiveCompactionHook } from "./preemptive-compaction";
 export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
