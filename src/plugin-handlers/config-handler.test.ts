@@ -642,3 +642,123 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     fetchSpy.mockRestore?.()
   })
 })
+
+describe("config-handler plugin loading error boundary (#1559)", () => {
+  test("returns empty defaults when loadAllPluginComponents throws", async () => {
+    //#given
+    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
+    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockRejectedValue(new Error("crash"))
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    expect(config.agent).toBeDefined()
+  })
+
+  test("returns empty defaults when loadAllPluginComponents times out", async () => {
+    //#given
+    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
+    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockImplementation(
+      () => new Promise(() => {})
+    )
+    const pluginConfig: OhMyOpenCodeConfig = {
+      experimental: { plugin_load_timeout_ms: 100 },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    expect(config.agent).toBeDefined()
+  }, 5000)
+
+  test("logs error when loadAllPluginComponents fails", async () => {
+    //#given
+    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
+    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockRejectedValue(new Error("crash"))
+    const logSpy = shared.log as ReturnType<typeof spyOn>
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const logCalls = logSpy.mock.calls.map((c: unknown[]) => c[0])
+    const hasPluginFailureLog = logCalls.some(
+      (msg: string) => typeof msg === "string" && msg.includes("Plugin loading failed")
+    )
+    expect(hasPluginFailureLog).toBe(true)
+  })
+
+  test("passes through plugin data on successful load (identity test)", async () => {
+    //#given
+    ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
+    spyOn(pluginLoader, "loadAllPluginComponents" as any).mockResolvedValue({
+      commands: { "test-cmd": { description: "test", template: "test" } },
+      skills: {},
+      agents: {},
+      mcpServers: {},
+      hooksConfigs: [],
+      plugins: [{ name: "test-plugin", version: "1.0.0" }],
+      errors: [],
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const commands = config.command as Record<string, unknown>
+    expect(commands["test-cmd"]).toBeDefined()
+  })
+})

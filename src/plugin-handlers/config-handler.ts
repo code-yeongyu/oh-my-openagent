@@ -25,7 +25,7 @@ import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
-import { log, fetchAvailableModels, readConnectedProvidersCache, resolveModelPipeline } from "../shared";
+import { log, fetchAvailableModels, readConnectedProvidersCache, resolveModelPipeline, addConfigLoadError } from "../shared";
 import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { AGENT_NAME_MAP } from "../shared/migration";
@@ -104,19 +104,44 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       }
     }
 
-    const pluginComponents = (pluginConfig.claude_code?.plugins ?? true)
-      ? await loadAllPluginComponents({
-          enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
-        })
-      : {
-          commands: {},
-          skills: {},
-          agents: {},
-          mcpServers: {},
-          hooksConfigs: [],
-          plugins: [],
-          errors: [],
-        };
+    const emptyPluginDefaults = {
+      commands: {},
+      skills: {},
+      agents: {},
+      mcpServers: {},
+      hooksConfigs: [] as { hooks?: Record<string, unknown> }[],
+      plugins: [] as { name: string; version: string }[],
+      errors: [] as { pluginKey: string; installPath: string; error: string }[],
+    };
+
+    let pluginComponents: typeof emptyPluginDefaults;
+    const pluginsEnabled = pluginConfig.claude_code?.plugins ?? true;
+
+    if (pluginsEnabled) {
+      const timeoutMs = pluginConfig.experimental?.plugin_load_timeout_ms ?? 10000;
+      try {
+        let timeoutId: ReturnType<typeof setTimeout>;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error(`Plugin loading timed out after ${timeoutMs}ms`)),
+            timeoutMs,
+          );
+        });
+        pluginComponents = await Promise.race([
+          loadAllPluginComponents({
+            enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+          }),
+          timeoutPromise,
+        ]).finally(() => clearTimeout(timeoutId));
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        log("[config-handler] Plugin loading failed", { error: errorMessage });
+        addConfigLoadError({ path: "plugin-loading", error: errorMessage });
+        pluginComponents = emptyPluginDefaults;
+      }
+    } else {
+      pluginComponents = emptyPluginDefaults;
+    }
 
     if (pluginComponents.plugins.length > 0) {
       log(`Loaded ${pluginComponents.plugins.length} Claude Code plugins`, {
