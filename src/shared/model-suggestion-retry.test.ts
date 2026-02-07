@@ -1,5 +1,5 @@
 import { describe, it, expect, mock } from "bun:test"
-import { parseModelSuggestion, promptWithModelSuggestionRetry } from "./model-suggestion-retry"
+import { parseModelSuggestion, promptWithModelSuggestionRetry, promptSyncWithModelSuggestionRetry } from "./model-suggestion-retry"
 
 describe("parseModelSuggestion", () => {
   describe("structured NamedError format", () => {
@@ -375,5 +375,130 @@ describe("promptWithModelSuggestionRetry", () => {
 
     // and should call promptAsync only once
     expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("promptSyncWithModelSuggestionRetry", () => {
+  it("should use synchronous prompt (not promptAsync)", async () => {
+    // given a client with both prompt and promptAsync
+    const promptMock = mock(() => Promise.resolve())
+    const promptAsyncMock = mock(() => Promise.resolve())
+    const client = { session: { prompt: promptMock, promptAsync: promptAsyncMock } }
+
+    // when calling promptSyncWithModelSuggestionRetry
+    await promptSyncWithModelSuggestionRetry(client as any, {
+      path: { id: "session-1" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+      },
+    })
+
+    // then should call prompt (sync), NOT promptAsync
+    expect(promptMock).toHaveBeenCalledTimes(1)
+    expect(promptAsyncMock).toHaveBeenCalledTimes(0)
+  })
+
+  it("should retry with suggested model on ProviderModelNotFoundError", async () => {
+    // given a client that fails first with model-not-found, then succeeds
+    const promptMock = mock()
+      .mockRejectedValueOnce({
+        name: "ProviderModelNotFoundError",
+        data: {
+          providerID: "anthropic",
+          modelID: "claude-sonet-4",
+          suggestions: ["claude-sonnet-4"],
+        },
+      })
+      .mockResolvedValueOnce(undefined)
+    const client = { session: { prompt: promptMock } }
+
+    // when calling promptSyncWithModelSuggestionRetry
+    await promptSyncWithModelSuggestionRetry(client as any, {
+      path: { id: "session-1" },
+      body: {
+        parts: [{ type: "text", text: "hello" }],
+        model: { providerID: "anthropic", modelID: "claude-sonet-4" },
+      },
+    })
+
+    // then should call prompt twice (original + retry with suggestion)
+    expect(promptMock).toHaveBeenCalledTimes(2)
+    const retryCall = promptMock.mock.calls[1][0]
+    expect(retryCall.body.model).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4",
+    })
+  })
+
+  it("should throw original error when no suggestion available", async () => {
+    // given a client that fails with a non-model error
+    const originalError = new Error("Connection refused")
+    const promptMock = mock().mockRejectedValueOnce(originalError)
+    const client = { session: { prompt: promptMock } }
+
+    // when calling promptSyncWithModelSuggestionRetry
+    // then should throw the original error
+    await expect(
+      promptSyncWithModelSuggestionRetry(client as any, {
+        path: { id: "session-1" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        },
+      })
+    ).rejects.toThrow("Connection refused")
+
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("should throw when model-not-found but no model in original request", async () => {
+    // given a client that fails with model error but no model in body
+    const promptMock = mock().mockRejectedValueOnce({
+      name: "ProviderModelNotFoundError",
+      data: {
+        providerID: "anthropic",
+        modelID: "claude-sonet-4",
+        suggestions: ["claude-sonnet-4"],
+      },
+    })
+    const client = { session: { prompt: promptMock } }
+
+    // when calling without model in body
+    // then should throw (cannot retry without original model)
+    await expect(
+      promptSyncWithModelSuggestionRetry(client as any, {
+        path: { id: "session-1" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+        },
+      })
+    ).rejects.toThrow()
+
+    expect(promptMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("should pass all body fields through to prompt", async () => {
+    // given a client where prompt succeeds
+    const promptMock = mock().mockResolvedValueOnce(undefined)
+    const client = { session: { prompt: promptMock } }
+
+    // when calling with additional body fields
+    await promptSyncWithModelSuggestionRetry(client as any, {
+      path: { id: "session-1" },
+      body: {
+        agent: "multimodal-looker",
+        tools: { task: false },
+        parts: [{ type: "text", text: "analyze" }],
+        model: { providerID: "google", modelID: "gemini-3-flash" },
+        variant: "max",
+      },
+    })
+
+    // then call should pass all fields through unchanged
+    const call = promptMock.mock.calls[0][0]
+    expect(call.body.agent).toBe("multimodal-looker")
+    expect(call.body.tools).toEqual({ task: false })
+    expect(call.body.variant).toBe("max")
   })
 })
