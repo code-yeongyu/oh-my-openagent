@@ -2,6 +2,7 @@ import { describe, expect, test, spyOn, beforeEach, afterEach, mock } from "bun:
 import { resolveModel, resolveModelWithFallback, type ModelResolutionInput, type ExtendedModelResolutionInput, type ModelResolutionResult, type ModelSource } from "./model-resolver"
 import * as logger from "./logger"
 import * as connectedProvidersCache from "./connected-providers-cache"
+import * as modelAvailability from "./model-availability"
 
 describe("resolveModel", () => {
   describe("priority chain", () => {
@@ -264,6 +265,16 @@ describe("resolveModelWithFallback", () => {
   })
 
   describe("Step 3: Provider fallback chain", () => {
+    let providerModelsSpy: ReturnType<typeof spyOn>
+
+    beforeEach(() => {
+      providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
+    })
+
+    afterEach(() => {
+      providerModelsSpy.mockRestore()
+    })
+
     test("tries providers in order within entry and returns first match", () => {
       // given
       const input: ExtendedModelResolutionInput = {
@@ -470,6 +481,19 @@ describe("resolveModelWithFallback", () => {
   })
 
   describe("Step 4: System default fallback (no availability match)", () => {
+    let providerModelsSpy: ReturnType<typeof spyOn>
+    let configuredProvidersSpy: ReturnType<typeof spyOn>
+
+    beforeEach(() => {
+      providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
+      configuredProvidersSpy = spyOn(modelAvailability, "readConfiguredProviders").mockReturnValue(null)
+    })
+
+    afterEach(() => {
+      providerModelsSpy.mockRestore()
+      configuredProvidersSpy.mockRestore()
+    })
+
     test("returns system default when no availability match found in fallback chain", () => {
       // given
       const input: ExtendedModelResolutionInput = {
@@ -511,6 +535,7 @@ describe("resolveModelWithFallback", () => {
     test("uses connected provider from fallback when availableModels empty but cache exists", () => {
       // given - model cache missing but connected-providers cache exists
       const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["openai", "google"])
+      providerModelsSpy.mockReturnValue(null)
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
           { providers: ["anthropic", "openai"], model: "claude-opus-4-5" },
@@ -525,6 +550,52 @@ describe("resolveModelWithFallback", () => {
       // then - should use connected provider (openai) from fallback chain
       expect(result!.model).toBe("openai/claude-opus-4-5")
       expect(result!.source).toBe("provider-fallback")
+      cacheSpy.mockRestore()
+    })
+
+    test("falls through to system default when provider-models cache is empty", () => {
+      // given - connected providers exist but cache has no models
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["opencode"])
+      providerModelsSpy.mockReturnValue({
+        models: {},
+        connected: ["opencode"],
+        updatedAt: "2026-02-07T00:00:00.000Z",
+      })
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["opencode"], model: "claude-haiku-4-5" },
+        ],
+        availableModels: new Set(),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+
+      // then - should skip connected provider fallback
+      expect(result!.model).toBe("google/gemini-3-pro")
+      expect(result!.source).toBe("system-default")
+      cacheSpy.mockRestore()
+    })
+
+    test("skips providers not present in config", () => {
+      // given - connected providers include opencode, but config does not
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["opencode"])
+      configuredProvidersSpy.mockReturnValue(new Set(["openai"]))
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["opencode"], model: "claude-haiku-4-5" },
+        ],
+        availableModels: new Set(),
+        systemDefaultModel: "google/gemini-3-pro",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+
+      // then - opencode should be filtered out
+      expect(result!.model).toBe("google/gemini-3-pro")
+      expect(result!.source).toBe("system-default")
       cacheSpy.mockRestore()
     })
 

@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { log } from "./logger"
 import { getOpenCodeCacheDir } from "./data-path"
+import { getOpenCodeConfigPaths } from "./opencode-config-dir"
+import { detectConfigFile, readJsoncFile } from "./jsonc-parser"
 import { readProviderModelsCache, hasProviderModelsCache, readConnectedProvidersCache } from "./connected-providers-cache"
 
 /**
@@ -29,6 +31,21 @@ function normalizeModelName(name: string): string {
 		.toLowerCase()
 		.replace(/claude-(opus|sonnet|haiku)-4-5/g, "claude-$1-4.5")
 		.replace(/claude-(opus|sonnet|haiku)-4\.5/g, "claude-$1-4.5")
+}
+
+export function readConfiguredProviders(): Set<string> | null {
+	const paths = getOpenCodeConfigPaths({ binary: "opencode" })
+	const basePath = paths.configJson.replace(/\.json$/, "")
+	const detected = detectConfigFile(basePath)
+	if (detected.format === "none") return null
+
+	const config = readJsoncFile<Record<string, unknown>>(detected.path)
+	const provider = config?.provider
+	if (!provider || typeof provider !== "object") return null
+
+	const keys = Object.keys(provider as Record<string, unknown>)
+	if (keys.length === 0) return null
+	return new Set(keys)
 }
 
 export function fuzzyMatchModel(
@@ -139,6 +156,7 @@ export async function fetchAvailableModels(
 ): Promise<Set<string>> {
 	let connectedProviders = options?.connectedProviders ?? null
 	let connectedProvidersUnknown = connectedProviders === null
+	const configuredProviders = readConfiguredProviders()
 
 	log("[fetchAvailableModels] CALLED", { 
 		connectedProvidersUnknown,
@@ -177,7 +195,13 @@ export async function fetchAvailableModels(
 		return new Set<string>()
 	}
 
-	const connectedProvidersList = connectedProviders ?? []
+	let connectedProvidersList = connectedProviders ?? []
+	if (configuredProviders) {
+		connectedProvidersList = connectedProvidersList.filter((provider) => configuredProviders.has(provider))
+		log("[fetchAvailableModels] filtered connected providers by config", {
+			providerCount: connectedProvidersList.length,
+		})
+	}
 	const connectedSet = new Set(connectedProvidersList)
 	const modelSet = new Set<string>()
 

@@ -25,13 +25,13 @@ describe("parseModelSuggestion", () => {
       })
     })
 
-    it("should return null when suggestions array is empty", () => {
+    it("should return null when suggestions array is empty and no alternate exists", () => {
       // given a NamedError with empty suggestions
       const error = {
         name: "ProviderModelNotFoundError",
         data: {
-          providerID: "anthropic",
-          modelID: "claude-sonet-4",
+          providerID: "openai",
+          modelID: "gpt-5",
           suggestions: [],
         },
       }
@@ -41,6 +41,28 @@ describe("parseModelSuggestion", () => {
 
       // then should return null
       expect(result).toBeNull()
+    })
+
+    it("should return alternate claude model when suggestions array is empty", () => {
+      // given a NamedError with empty suggestions but a claude 4-5 model
+      const error = {
+        name: "ProviderModelNotFoundError",
+        data: {
+          providerID: "opencode",
+          modelID: "claude-haiku-4-5",
+          suggestions: [],
+        },
+      }
+
+      // when parsing the error
+      const result = parseModelSuggestion(error)
+
+      // then should return a 4.5 suggestion
+      expect(result).toEqual({
+        providerID: "opencode",
+        modelID: "claude-haiku-4-5",
+        suggestion: "claude-haiku-4.5",
+      })
     })
 
     it("should return null when suggestions field is missing", () => {

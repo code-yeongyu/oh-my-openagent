@@ -733,20 +733,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await projectContextInjector?.["chat.message"]?.(input, output);
       await prContextInjector?.["chat.message"]?.(input, output);
 
-      if (!hasConnectedProvidersCache()) {
-        ctx.client.tui
-          .showToast({
-            body: {
-              title: "⚠️ Provider Cache Missing",
-              message:
-                "Model filtering disabled. RESTART OpenCode to enable full functionality.",
-              variant: "warning" as const,
-              duration: 6000,
-            },
-          })
-          .catch(() => {});
-      }
-
       if (ralphLoop) {
         const parts = (
           output as { parts?: Array<{ type: string; text?: string }> }

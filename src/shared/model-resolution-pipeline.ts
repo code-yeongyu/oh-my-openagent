@@ -1,6 +1,6 @@
 import { log } from "./logger"
-import { readConnectedProvidersCache } from "./connected-providers-cache"
-import { fuzzyMatchModel } from "./model-availability"
+import { readConnectedProvidersCache, readProviderModelsCache } from "./connected-providers-cache"
+import { fuzzyMatchModel, readConfiguredProviders } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
 
 export type ModelResolutionRequest = {
@@ -98,8 +98,20 @@ export function resolveModelPipeline(
 
   if (fallbackChain && fallbackChain.length > 0) {
     if (availableModels.size === 0) {
-      const connectedProviders = readConnectedProvidersCache()
-      const connectedSet = connectedProviders ? new Set(connectedProviders) : null
+      let connectedProviders = readConnectedProvidersCache()
+      const configuredProviders = readConfiguredProviders()
+      if (configuredProviders && connectedProviders) {
+        connectedProviders = connectedProviders.filter((provider) => configuredProviders.has(provider))
+        log("Model fallback chain filtered connected providers by config", {
+          providerCount: connectedProviders.length,
+        })
+      }
+      let connectedSet = connectedProviders ? new Set(connectedProviders) : null
+      const providerModelsCache = readProviderModelsCache()
+      if (providerModelsCache && Object.keys(providerModelsCache.models).length === 0) {
+        log("Model fallback chain skipped (empty provider-models cache) - falling through to system default")
+        connectedSet = null
+      }
 
       if (connectedSet === null) {
         log("Model fallback chain skipped (no connected providers cache) - falling through to system default")

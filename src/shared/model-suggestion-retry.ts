@@ -9,6 +9,14 @@ export interface ModelSuggestionInfo {
   suggestion: string
 }
 
+function getAlternateClaudeModel(modelID: string): string | null {
+  const toDot = modelID.replace(/claude-(opus|sonnet|haiku)-4-5/g, "claude-$1-4.5")
+  if (toDot !== modelID) return toDot
+  const toDash = modelID.replace(/claude-(opus|sonnet|haiku)-4\.5/g, "claude-$1-4-5")
+  if (toDash !== modelID) return toDash
+  return null
+}
+
 function extractMessage(error: unknown): string {
   if (typeof error === "string") return error
   if (error instanceof Error) return error.message
@@ -32,12 +40,22 @@ export function parseModelSuggestion(error: unknown): ModelSuggestionInfo | null
 
     if (errObj.name === "ProviderModelNotFoundError" && typeof errObj.data === "object" && errObj.data !== null) {
       const data = errObj.data as Record<string, unknown>
+      const providerID = String(data.providerID ?? "")
+      const modelID = String(data.modelID ?? "")
       const suggestions = data.suggestions
       if (Array.isArray(suggestions) && suggestions.length > 0 && typeof suggestions[0] === "string") {
         return {
-          providerID: String(data.providerID ?? ""),
-          modelID: String(data.modelID ?? ""),
+          providerID,
+          modelID,
           suggestion: suggestions[0],
+        }
+      }
+      const alternate = getAlternateClaudeModel(modelID)
+      if (alternate) {
+        return {
+          providerID,
+          modelID,
+          suggestion: alternate,
         }
       }
       return null

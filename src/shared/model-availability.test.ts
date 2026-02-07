@@ -7,15 +7,23 @@ import { fetchAvailableModels, fuzzyMatchModel, getConnectedProviders, __resetMo
 describe("fetchAvailableModels", () => {
   let tempDir: string
   let originalXdgCache: string | undefined
+  let originalConfigDir: string | undefined
 
   beforeEach(() => {
     __resetModelCache()
     tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
     originalXdgCache = process.env.XDG_CACHE_HOME
     process.env.XDG_CACHE_HOME = tempDir
+    originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+    process.env.OPENCODE_CONFIG_DIR = tempDir
   })
 
   afterEach(() => {
+    if (originalConfigDir !== undefined) {
+      process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+    } else {
+      delete process.env.OPENCODE_CONFIG_DIR
+    }
     if (originalXdgCache !== undefined) {
       process.env.XDG_CACHE_HOME = originalXdgCache
     } else {
@@ -435,15 +443,23 @@ describe("getConnectedProviders", () => {
 describe("fetchAvailableModels with connected providers filtering", () => {
 	let tempDir: string
 	let originalXdgCache: string | undefined
+	let originalConfigDir: string | undefined
 
 	beforeEach(() => {
 		__resetModelCache()
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
 		originalXdgCache = process.env.XDG_CACHE_HOME
 		process.env.XDG_CACHE_HOME = tempDir
+		originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+		process.env.OPENCODE_CONFIG_DIR = tempDir
 	})
 
 	afterEach(() => {
+		if (originalConfigDir !== undefined) {
+			process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+		} else {
+			delete process.env.OPENCODE_CONFIG_DIR
+		}
 		if (originalXdgCache !== undefined) {
 			process.env.XDG_CACHE_HOME = originalXdgCache
 		} else {
@@ -602,15 +618,23 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 describe("fetchAvailableModels with provider-models cache (whitelist-filtered)", () => {
 	let tempDir: string
 	let originalXdgCache: string | undefined
+	let originalConfigDir: string | undefined
 
 	beforeEach(() => {
 		__resetModelCache()
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
 		originalXdgCache = process.env.XDG_CACHE_HOME
 		process.env.XDG_CACHE_HOME = tempDir
+		originalConfigDir = process.env.OPENCODE_CONFIG_DIR
+		process.env.OPENCODE_CONFIG_DIR = tempDir
 	})
 
 	afterEach(() => {
+		if (originalConfigDir !== undefined) {
+			process.env.OPENCODE_CONFIG_DIR = originalConfigDir
+		} else {
+			delete process.env.OPENCODE_CONFIG_DIR
+		}
 		if (originalXdgCache !== undefined) {
 			process.env.XDG_CACHE_HOME = originalXdgCache
 		} else {
