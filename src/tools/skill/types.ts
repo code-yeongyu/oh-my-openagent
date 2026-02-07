@@ -29,4 +29,11 @@ export interface SkillLoadOptions {
   /** Git master configuration for watermark/co-author settings */
   gitMasterConfig?: GitMasterConfig
   disabledSkills?: Set<string>
+  /** When true, merge discovered filesystem skills into the provided `skills` list on-demand. */
+  mergeDiscoveredSkills?: boolean
+  /**
+   * When false, skip startup precomputation of tool description.
+   * Useful for fast startup modes where discovery is deferred.
+   */
+  prewarmDescription?: boolean
 }

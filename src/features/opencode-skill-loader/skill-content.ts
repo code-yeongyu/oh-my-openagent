@@ -9,6 +9,8 @@ export interface SkillResolutionOptions {
 	gitMasterConfig?: GitMasterConfig
 	browserProvider?: BrowserAutomationProvider
 	disabledSkills?: Set<string>
+	/** When false, exclude Claude Code legacy paths (~/.claude, .claude/) */
+	includeClaudeCodePaths?: boolean
 }
 
 const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
@@ -18,21 +20,22 @@ function clearSkillCache(): void {
 }
 
 async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSkill[]> {
-	const cacheKey = options?.browserProvider ?? "playwright"
-	const hasDisabledSkills = options?.disabledSkills && options.disabledSkills.size > 0
+		const includeClaudeCodePaths = options?.includeClaudeCodePaths ?? true
+		const cacheKey = `${options?.browserProvider ?? "playwright"}:${includeClaudeCodePaths ? "claude" : "opencode"}`
+		const hasDisabledSkills = options?.disabledSkills && options.disabledSkills.size > 0
 
-	// Skip cache if disabledSkills is provided (varies between calls)
-	if (!hasDisabledSkills) {
-		const cached = cachedSkillsByProvider.get(cacheKey)
+		// Skip cache if disabledSkills is provided (varies between calls)
+		if (!hasDisabledSkills) {
+			const cached = cachedSkillsByProvider.get(cacheKey)
 		if (cached) return cached
 	}
 
-	const [discoveredSkills, builtinSkillDefs] = await Promise.all([
-		discoverSkills({ includeClaudeCodePaths: true }),
-		Promise.resolve(
-			createBuiltinSkills({
-				browserProvider: options?.browserProvider,
-				disabledSkills: options?.disabledSkills,
+		const [discoveredSkills, builtinSkillDefs] = await Promise.all([
+			discoverSkills({ includeClaudeCodePaths }),
+			Promise.resolve(
+				createBuiltinSkills({
+					browserProvider: options?.browserProvider,
+					disabledSkills: options?.disabledSkills,
 			})
 		),
 	])

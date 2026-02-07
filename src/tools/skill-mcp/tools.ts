@@ -6,7 +6,7 @@ import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 
 interface SkillMcpToolOptions {
   manager: SkillMcpManager
-  getLoadedSkills: () => LoadedSkill[]
+  getLoadedSkills: () => LoadedSkill[] | Promise<LoadedSkill[]>
   getSessionID: () => string
 }
 
@@ -128,7 +128,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
     },
     async execute(args: SkillMcpArgs) {
       const operation = validateOperationParams(args)
-      const skills = getLoadedSkills()
+      const skills = await getLoadedSkills()
       const found = findMcpServer(args.mcp_name, skills)
 
       if (!found) {

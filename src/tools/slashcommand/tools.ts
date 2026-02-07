@@ -200,16 +200,51 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
   let cachedCommands: CommandInfo[] | null = options.commands ?? null
   let cachedSkills: LoadedSkill[] | null = options.skills ?? null
   let cachedDescription: string | null = null
+  const shouldPrewarmDescription = options.prewarmDescription !== false
+  let commandsMerged = false
+  let skillsMerged = false
 
   const getCommands = (): CommandInfo[] => {
-    if (cachedCommands) return cachedCommands
+    const mergeDiscovered = options.mergeDiscoveredCommands === true
+    if (cachedCommands) {
+      if (!mergeDiscovered || commandsMerged) return cachedCommands
+      const discovered = discoverCommandsSync()
+      const combined = [...cachedCommands, ...discovered]
+      const seen = new Set<string>()
+      cachedCommands = combined.filter((c) => {
+        const key = c.name.toLowerCase()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      commandsMerged = true
+      return cachedCommands
+    }
+
     cachedCommands = discoverCommandsSync()
+    commandsMerged = true
     return cachedCommands
   }
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
-    if (cachedSkills) return cachedSkills
+    const mergeDiscovered = options.mergeDiscoveredSkills === true
+    if (cachedSkills) {
+      if (!mergeDiscovered || skillsMerged) return cachedSkills
+      const discovered = await discoverAllSkills()
+      const combined = [...cachedSkills, ...discovered]
+      const seen = new Set<string>()
+      cachedSkills = combined.filter((s) => {
+        const key = s.name.toLowerCase()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      skillsMerged = true
+      return cachedSkills
+    }
+
     cachedSkills = await discoverAllSkills()
+    skillsMerged = true
     return cachedSkills
   }
 
@@ -226,11 +261,11 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
     return cachedDescription
   }
 
-  if (options.commands !== undefined && options.skills !== undefined) {
+  if (options.commands !== undefined && options.skills !== undefined && shouldPrewarmDescription) {
     const allItems = [...options.commands, ...options.skills.map(skillToCommandInfo)]
     cachedDescription = buildDescriptionFromItems(allItems)
-  } else {
-    buildDescription()
+  } else if (shouldPrewarmDescription) {
+    void buildDescription()
   }
 
   return tool({
@@ -254,6 +289,13 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
 
     async execute(args) {
       const allItems = await getAllItems()
+      if (
+        !cachedDescription ||
+        options.mergeDiscoveredCommands === true ||
+        options.mergeDiscoveredSkills === true
+      ) {
+        cachedDescription = buildDescriptionFromItems(allItems)
+      }
 
       if (!args.command) {
         return formatCommandList(allItems) + "\n\nProvide a command or skill name to execute."

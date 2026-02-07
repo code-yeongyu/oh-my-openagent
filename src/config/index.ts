@@ -11,6 +11,8 @@ export {
   RalphLoopConfigSchema,
   TmuxConfigSchema,
   TmuxLayoutSchema,
+  PerformanceConfigSchema,
+  PerformanceStartupModeSchema,
 } from "./schema"
 
 export type {
@@ -27,6 +29,8 @@ export type {
   RalphLoopConfig,
   TmuxConfig,
   TmuxLayout,
+  PerformanceConfig,
+  PerformanceStartupMode,
   SisyphusConfig,
   SisyphusTasksConfig,
 } from "./schema"

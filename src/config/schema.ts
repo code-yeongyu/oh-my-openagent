@@ -380,6 +380,42 @@ export const TmuxConfigSchema = z.object({
   agent_pane_min_width: z.number().min(20).default(40),
 })
 
+export const PerformanceStartupModeSchema = z.enum(["eager", "cached", "lazy"])
+
+export const PerformanceConfigSchema = z.object({
+  /**
+   * How aggressively to resolve skills at plugin startup.
+   * - eager: Discover all skills at startup (current behavior).
+   * - cached: Use disk cache when available; refresh in background.
+   * - lazy: Do not discover skills at startup; resolve on-demand.
+   */
+  startup_skills: PerformanceStartupModeSchema.default("eager"),
+
+  /**
+   * How aggressively to discover commands at plugin startup.
+   * - eager: Discover all commands at startup (current behavior).
+   * - cached: Use disk cache when available; refresh in background.
+   * - lazy: Do not discover commands at startup; resolve on-demand.
+   */
+  startup_commands: PerformanceStartupModeSchema.default("eager"),
+
+  /**
+   * Whether to run tmux discovery early during startup.
+   * - eager: Start tmux path detection during plugin init.
+   * - lazy: Only detect tmux when tmux features are used.
+   */
+  tmux_check: z.enum(["eager", "lazy"]).default("lazy"),
+
+  /** Cache max age in ms (used by cached startup modes). */
+  cache_ttl_ms: z.number().min(1000).default(30 * 60 * 1000),
+
+  /** Delay before background cache refresh begins (cached mode). */
+  cache_refresh_delay_ms: z.number().min(0).default(2000),
+
+  /** Precompute tool descriptions during startup (may add latency). */
+  prewarm_tool_descriptions: z.boolean().default(true),
+})
+
 export const SisyphusTasksConfigSchema = z.object({
   /** Absolute or relative storage path override. When set, bypasses global config dir. */
   storage_path: z.string().optional(),
@@ -421,6 +457,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
+  performance: PerformanceConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
 })
 
@@ -451,6 +488,8 @@ export type WebsearchProvider = z.infer<typeof WebsearchProviderSchema>
 export type WebsearchConfig = z.infer<typeof WebsearchConfigSchema>
 export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
+export type PerformanceStartupMode = z.infer<typeof PerformanceStartupModeSchema>
+export type PerformanceConfig = z.infer<typeof PerformanceConfigSchema>
 export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>
 export type SisyphusConfig = z.infer<typeof SisyphusConfigSchema>
 
