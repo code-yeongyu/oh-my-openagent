@@ -1,28 +1,41 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { SkillTriggerCache, SkillTrigger, CachedSkillTrigger } from "./types"
-import { SCOPE_PRIORITY, HOOK_NAME } from "./types"
+import { HOOK_NAME } from "./types"
 import { saveCache } from "./cache-storage"
-import { hashDescription } from "./cache-checker"
-import { buildExtractionPrompt, parseAIResponse, batchSkills } from "./trigger-extractor"
-import { log, promptWithModelSuggestionRetry } from "../../shared"
+import { buildExtractionPrompt, parseAIResponse, batchSkills, buildCachedTriggers } from "./trigger-extractor"
+import { buildTriggerRegex } from "./keyword-extractor"
+import {
+  log,
+  promptWithModelSuggestionRetry,
+  fetchAvailableModels,
+  resolveModelWithFallback,
+  CATEGORY_MODEL_REQUIREMENTS
+} from "../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
 /**
- * Model configuration for AI extraction.
- * Uses a fast, cheap model for keyword extraction.
- */
-const EXTRACTION_MODEL = {
-  providerID: "anthropic",
-  modelID: "claude-haiku-4-5"
-}
-
-/**
  * Polling configuration for AI response.
  */
-const POLL_INTERVAL_MS = 500
-const MAX_POLL_TIME_MS = 30000
+const POLL_INTERVAL_MS = 1000
+const MAX_POLL_TIME_MS = 120000
+
+type ProviderModelSelection = {
+  providerID: string
+  modelID: string
+}
+
+function parseProviderModel(model: string): ProviderModelSelection | null {
+  const [providerID, ...modelParts] = model.split("/")
+  if (!providerID || modelParts.length === 0) {
+    return null
+  }
+  return {
+    providerID,
+    modelID: modelParts.join("/")
+  }
+}
 
 /**
  * Builds SkillTrigger array from cached data.
@@ -33,11 +46,12 @@ function buildTriggersFromCache(cache: SkillTriggerCache, skills: LoadedSkill[])
   for (const skill of skills) {
     const cached = cache.skills[skill.name]
     if (!cached) continue
-    const pattern = cached.triggers.map(t => `\\b${t}\\b`).join('|')
+    const regex = buildTriggerRegex(cached.triggers)
+    if (!regex) continue
     triggers.push({
       skillName: skill.name,
-      description: skill.definition?.description || '',
-      keywords: new RegExp(pattern, 'i'),
+      description: skill.definition?.description || "",
+      keywords: regex,
       priority: cached.priority,
       scope: cached.scope
     })
@@ -51,8 +65,7 @@ function buildTriggersFromCache(cache: SkillTriggerCache, skills: LoadedSkill[])
  */
 async function pollForResponse(
   client: OpencodeClient,
-  sessionID: string,
-  directory: string
+  sessionID: string
 ): Promise<string> {
   const startTime = Date.now()
   
@@ -60,32 +73,52 @@ async function pollForResponse(
     await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
     
     try {
-      // Use session.messages API (not message.list)
-      const messagesResult = await (client.session as unknown as {
-        messages: (opts: { path: { id: string }; query?: { directory?: string } }) => Promise<unknown>
-      }).messages({
-        path: { id: sessionID },
-        query: { directory }
+      // Use session.messages API - same pattern as other parts of codebase
+      const messagesResult = await client.session.messages({
+        path: { id: sessionID }
       })
       
-      if (!messagesResult) {
+      const messagesPayload = Array.isArray(messagesResult)
+        ? messagesResult
+        : (messagesResult as { data?: unknown })?.data
+      const messagesData = Array.isArray(messagesPayload)
+        ? messagesPayload
+        : (messagesPayload as { messages?: unknown })?.messages
+      if (!Array.isArray(messagesData)) {
         continue
       }
       
       // Find the last assistant message
-      const messages = messagesResult as Array<{
+      const messages = messagesData as Array<{
         role?: string
-        parts?: Array<{ type: string; text?: string }>
+        parts?: Array<{ type: string; text?: string; output?: string; thinking?: string }>
+        info?: { role?: string }
       }>
       
-      const assistantMessages = messages.filter(m => m.role === "assistant")
+      const assistantMessages = messages.filter(
+        (m) => (m.role ?? m.info?.role) === "assistant" || (m.role ?? m.info?.role) === "tool"
+      )
       if (assistantMessages.length === 0) {
         continue
       }
       
       const lastAssistant = assistantMessages[assistantMessages.length - 1]
-      const textParts = lastAssistant.parts?.filter(p => p.type === "text" && p.text) || []
-      const responseText = textParts.map(p => p.text).join("")
+      const responseText = (lastAssistant.parts || [])
+        .map((part) => {
+          if ((part.type === "text" || part.type === "reasoning") && typeof part.text === "string") {
+            return part.text
+          }
+          if (part.type === "tool_result") {
+            const content = (part as { content?: unknown }).content
+            if (typeof content === "string") return content
+            if (Array.isArray(content)) return content.join("\n")
+          }
+          if (typeof part.output === "string" && part.output.trim()) return part.output
+          if (typeof part.thinking === "string" && part.thinking.trim()) return part.thinking
+          return ""
+        })
+        .filter((value) => value.trim().length > 0)
+        .join("\n")
       
       // Check if response looks complete (has JSON structure)
       if (responseText.includes("{") && responseText.includes("}")) {
@@ -109,13 +142,34 @@ async function pollForResponse(
  */
 export async function extractTriggersWithAI(
   ctx: PluginInput,
-  skills: LoadedSkill[]
+  skills: LoadedSkill[],
+  parentSessionID: string
 ): Promise<Record<string, string[]>> {
   const prompt = buildExtractionPrompt(skills)
+  const availableModels = await fetchAvailableModels(ctx.client)
+  const resolvedModel = resolveModelWithFallback({
+    fallbackChain: CATEGORY_MODEL_REQUIREMENTS.quick.fallbackChain,
+    availableModels
+  })
+  const extractionModel = resolvedModel
+    ? parseProviderModel(resolvedModel.model)
+    : null
+
+  if (resolvedModel) {
+    log(`[${HOOK_NAME}] Resolved extraction model`, {
+      model: resolvedModel.model,
+      source: resolvedModel.source
+    })
+  }
+
+  if (!extractionModel) {
+    log(`[${HOOK_NAME}] No extraction model resolved, omitting model override`)
+  }
   
   // Create temporary session for extraction
   const createResult = await ctx.client.session.create({
     body: {
+      parentID: parentSessionID,
       title: "[skill-auto-trigger] AI Extraction",
       permission: [
         { permission: "question", action: "deny" as const, pattern: "*" }
@@ -132,17 +186,78 @@ export async function extractTriggersWithAI(
   
   try {
     // Send extraction prompt
-    await promptWithModelSuggestionRetry(ctx.client, {
-      path: { id: sessionID },
-      body: {
-        model: EXTRACTION_MODEL,
-        parts: [{ type: "text", text: prompt }],
-        tools: {} // No tools needed for extraction
-      }
+    const promptBody: Record<string, unknown> = {
+      parts: [{ type: "text", text: prompt }],
+      agent: "sisyphus-junior"
+    }
+    if (extractionModel) {
+      promptBody.model = extractionModel
+    }
+    log("[skill-auto-trigger] Sending extraction prompt", {
+      sessionID,
+      batchSize: skills.length
     })
+    let promptSent = false
+    try {
+      await promptWithModelSuggestionRetry(ctx.client, {
+        path: { id: sessionID },
+        body: {
+          ...promptBody
+        } as Record<string, unknown>,
+        query: { directory: ctx.directory }
+      })
+      promptSent = true
+    } catch (err) {
+      const errorMessage = String(err)
+      if (!extractionModel) {
+        if (errorMessage.includes("Unexpected EOF")) {
+          log("[skill-auto-trigger] Prompt error but continuing to poll", {
+            sessionID,
+            error: errorMessage
+          })
+          promptSent = true
+        } else {
+          throw err
+        }
+      } else {
+        log("[skill-auto-trigger] Prompt failed with model override, retrying without model", {
+          sessionID,
+          error: errorMessage
+        })
+
+        const fallbackBody: { parts: Array<{ type: "text"; text: string }>; agent: string } = {
+          parts: [{ type: "text", text: prompt }],
+          agent: "sisyphus-junior"
+        }
+
+        try {
+          await ctx.client.session.prompt({
+            path: { id: sessionID },
+            body: fallbackBody,
+            query: { directory: ctx.directory }
+          })
+          promptSent = true
+        } catch (fallbackErr) {
+          const fallbackMessage = String(fallbackErr)
+          if (fallbackMessage.includes("Unexpected EOF")) {
+            log("[skill-auto-trigger] Prompt error after fallback, continuing to poll", {
+              sessionID,
+              error: fallbackMessage
+            })
+            promptSent = true
+          } else {
+            throw fallbackErr
+          }
+        }
+      }
+    }
     
     // Poll for response
-    const responseText = await pollForResponse(ctx.client, sessionID, ctx.directory)
+    if (!promptSent) {
+      throw new Error("Extraction prompt was not sent")
+    }
+
+    const responseText = await pollForResponse(ctx.client, sessionID)
     
     // Parse AI response
     return parseAIResponse(responseText)
@@ -169,29 +284,20 @@ export async function extractTriggersWithAI(
 export async function triggerBackgroundExtraction(
   ctx: PluginInput,
   skills: LoadedSkill[],
-  currentCache: SkillTriggerCache
+  currentCache: SkillTriggerCache,
+  parentSessionID: string,
+  extractFn: typeof extractTriggersWithAI = extractTriggersWithAI
 ): Promise<SkillTrigger[]> {
   const batches = batchSkills(skills)
   const newCacheSkills: Record<string, CachedSkillTrigger> = { ...currentCache.skills }
   
   for (const batch of batches) {
     try {
-      const extracted = await extractTriggersWithAI(ctx, batch)
-      
-      // Merge to cache
-      for (const skill of batch) {
-        const description = skill.definition?.description
-        if (!description) continue
-        const triggers = extracted[skill.name]
-        if (!triggers || triggers.length === 0) continue
-        
-        const scope = skill.scope as "builtin" | "opencode-project" | "opencode" | "user" | "project" | "config"
-        newCacheSkills[skill.name] = {
-          hash: hashDescription(description),
-          triggers,
-          priority: SCOPE_PRIORITY[scope] ?? 0,
-          scope
-        }
+      const extracted = await extractFn(ctx, batch, parentSessionID)
+      const batchCache = buildCachedTriggers(batch, extracted)
+
+      for (const [skillName, cached] of Object.entries(batchCache)) {
+        newCacheSkills[skillName] = cached
       }
       
       log(`[${HOOK_NAME}] Extracted triggers for batch of ${batch.length} skills`)
