@@ -121,7 +121,6 @@ describe("executeOnCompleteHook", () => {
 
   it("command failure logs warning but does not throw", async () => {
     // given
-    const consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {})
     const spawnSpy = spyOn(Bun, "spawn").mockReturnValue(createProc(1))
 
     try {
@@ -144,13 +143,11 @@ describe("executeOnCompleteHook", () => {
       expect(warningCall).toBeDefined()
     } finally {
       spawnSpy.mockRestore()
-      consoleErrorSpy.mockRestore()
     }
   })
 
   it("spawn error logs warning but does not throw", async () => {
     // given
-    const consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {})
     const spawnError = new Error("Command not found")
     const spawnSpy = spyOn(Bun, "spawn").mockImplementation(() => {
       throw spawnError
@@ -177,7 +174,6 @@ describe("executeOnCompleteHook", () => {
       expect(errorCalls.length).toBeGreaterThan(0)
     } finally {
       spawnSpy.mockRestore()
-      consoleErrorSpy.mockRestore()
     }
   })
 })
