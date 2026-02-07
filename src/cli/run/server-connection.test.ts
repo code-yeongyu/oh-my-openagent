@@ -1,5 +1,7 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
 
+const originalConsole = globalThis.console
+
 const mockServerClose = mock(() => {})
 const mockCreateOpencode = mock(() =>
   Promise.resolve({
@@ -34,6 +36,10 @@ describe("createServerConnection", () => {
     mockServerClose.mockClear()
     mockConsoleLog.mockClear()
     globalThis.console = { ...console, log: mockConsoleLog } as typeof console
+  })
+
+  afterEach(() => {
+    globalThis.console = originalConsole
   })
 
   it("attach mode returns client with no-op cleanup", async () => {
