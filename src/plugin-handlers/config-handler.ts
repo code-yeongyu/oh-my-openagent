@@ -120,15 +120,19 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     if (pluginsEnabled) {
       const timeoutMs = pluginConfig.experimental?.plugin_load_timeout_ms ?? 10000;
       try {
-        const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Plugin loading timed out after ${timeoutMs}ms`)), timeoutMs)
-        );
+        let timeoutId: ReturnType<typeof setTimeout>;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error(`Plugin loading timed out after ${timeoutMs}ms`)),
+            timeoutMs,
+          );
+        });
         pluginComponents = await Promise.race([
           loadAllPluginComponents({
             enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
           }),
           timeoutPromise,
-        ]);
+        ]).finally(() => clearTimeout(timeoutId));
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         log("[config-handler] Plugin loading failed", { error: errorMessage });
