@@ -25,6 +25,15 @@ type BabysitterContext = {
         }
         query?: { directory?: string }
       }) => Promise<unknown>
+      promptAsync: (args: {
+        path: { id: string }
+        body: {
+          parts: Array<{ type: "text"; text: string }>
+          agent?: string
+          model?: { providerID: string; modelID: string }
+        }
+        query?: { directory?: string }
+      }) => Promise<unknown>
     }
   }
 }
@@ -218,7 +227,7 @@ export function createUnstableAgentBabysitterHook(ctx: BabysitterContext, option
       const { agent, model } = await resolveMainSessionTarget(ctx, mainSessionID)
 
       try {
-        await ctx.client.session.prompt({
+        await ctx.client.session.promptAsync({
           path: { id: mainSessionID },
           body: {
             ...(agent ? { agent } : {}),
