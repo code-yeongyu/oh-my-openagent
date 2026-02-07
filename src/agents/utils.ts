@@ -304,7 +304,7 @@ export async function createBuiltinAgents(
      const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 
     const resolution = applyModelResolution({
-      uiSelectedModel: (isPrimaryAgent && !override?.model) ? uiSelectedModel : undefined,
+      uiSelectedModel: isPrimaryAgent ? uiSelectedModel : undefined,
       userModel: override?.model,
       requirement,
       availableModels,
@@ -356,7 +356,7 @@ export async function createBuiltinAgents(
 
    if (!disabledAgents.includes("sisyphus") && meetsSisyphusAnyModelRequirement) {
     let sisyphusResolution = applyModelResolution({
-      uiSelectedModel: sisyphusOverride?.model ? undefined : uiSelectedModel,
+      uiSelectedModel,
       userModel: sisyphusOverride?.model,
       requirement: sisyphusRequirement,
       availableModels,
@@ -454,7 +454,7 @@ export async function createBuiltinAgents(
       const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
 
       const atlasResolution = applyModelResolution({
-        uiSelectedModel: orchestratorOverride?.model ? undefined : uiSelectedModel,
+        uiSelectedModel,
         userModel: orchestratorOverride?.model,
         requirement: atlasRequirement,
         availableModels,

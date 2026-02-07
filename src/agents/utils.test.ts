@@ -79,72 +79,6 @@ describe("createBuiltinAgents with model overrides", () => {
     }
   })
 
-  test("user config model takes priority over uiSelectedModel for sisyphus", async () => {
-    // #given
-    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-5"])
-    )
-    const uiSelectedModel = "openai/gpt-5.2"
-    const overrides = {
-      sisyphus: { model: "google/antigravity-claude-opus-4-5-thinking" },
-    }
-
-    try {
-      // #when
-      const agents = await createBuiltinAgents(
-        [],
-        overrides,
-        undefined,
-        TEST_DEFAULT_MODEL,
-        undefined,
-        undefined,
-        [],
-        undefined,
-        undefined,
-        uiSelectedModel
-      )
-
-      // #then
-      expect(agents.sisyphus).toBeDefined()
-      expect(agents.sisyphus.model).toBe("google/antigravity-claude-opus-4-5-thinking")
-    } finally {
-      fetchSpy.mockRestore()
-    }
-  })
-
-  test("user config model takes priority over uiSelectedModel for atlas", async () => {
-    // #given
-    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-5"])
-    )
-    const uiSelectedModel = "openai/gpt-5.2"
-    const overrides = {
-      atlas: { model: "google/antigravity-claude-opus-4-5-thinking" },
-    }
-
-    try {
-      // #when
-      const agents = await createBuiltinAgents(
-        [],
-        overrides,
-        undefined,
-        TEST_DEFAULT_MODEL,
-        undefined,
-        undefined,
-        [],
-        undefined,
-        undefined,
-        uiSelectedModel
-      )
-
-      // #then
-      expect(agents.atlas).toBeDefined()
-      expect(agents.atlas.model).toBe("google/antigravity-claude-opus-4-5-thinking")
-    } finally {
-      fetchSpy.mockRestore()
-    }
-  })
-
   test("Sisyphus is created on first run when no availableModels or cache exist", async () => {
     // #given
     const systemDefaultModel = "anthropic/claude-opus-4-6"
@@ -483,58 +417,6 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
 
       // #then
       expect(agents.sisyphus).toBeUndefined()
-    } finally {
-      fetchSpy.mockRestore()
-      cacheSpy.mockRestore()
-    }
-  })
-
-  test("sisyphus uses user-configured plugin model even when not in cache or fallback chain", async () => {
-    // #given - user configures a model from a plugin provider (like antigravity)
-    // that is NOT in the availableModels cache and NOT in the fallback chain
-    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2"])
-    )
-    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(
-      ["openai"]
-    )
-    const overrides = {
-      sisyphus: { model: "google/antigravity-claude-opus-4-5-thinking" },
-    }
-
-    try {
-      // #when
-      const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
-
-      // #then
-      expect(agents.sisyphus).toBeDefined()
-      expect(agents.sisyphus.model).toBe("google/antigravity-claude-opus-4-5-thinking")
-    } finally {
-      fetchSpy.mockRestore()
-      cacheSpy.mockRestore()
-    }
-  })
-
-  test("sisyphus uses user-configured plugin model when availableModels is empty but cache exists", async () => {
-    // #given - connected providers cache exists but models cache is empty
-    // This reproduces the exact scenario where provider-models.json has models: {}
-    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set()
-    )
-    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(
-      ["google", "openai", "opencode"]
-    )
-    const overrides = {
-      sisyphus: { model: "google/antigravity-claude-opus-4-5-thinking" },
-    }
-
-    try {
-      // #when
-      const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
-
-      // #then
-      expect(agents.sisyphus).toBeDefined()
-      expect(agents.sisyphus.model).toBe("google/antigravity-claude-opus-4-5-thinking")
     } finally {
       fetchSpy.mockRestore()
       cacheSpy.mockRestore()
