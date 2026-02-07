@@ -3,8 +3,31 @@ import type { RunResult } from "./types"
 import { createJsonOutputManager } from "./json-output"
 import { resolveSession } from "./session-resolver"
 import { executeOnCompleteHook } from "./on-complete-hook"
-import { createServerConnection } from "./server-connection"
 import type { OpencodeClient } from "./types"
+
+const mockServerClose = mock(() => {})
+const mockCreateOpencode = mock(() =>
+  Promise.resolve({
+    client: { session: {} },
+    server: { url: "http://127.0.0.1:9999", close: mockServerClose },
+  })
+)
+const mockCreateOpencodeClient = mock(() => ({ session: {} }))
+const mockIsPortAvailable = mock(() => Promise.resolve(true))
+const mockGetAvailableServerPort = mock(() => Promise.resolve({ port: 9999, wasAutoSelected: false }))
+
+mock.module("@opencode-ai/sdk", () => ({
+  createOpencode: mockCreateOpencode,
+  createOpencodeClient: mockCreateOpencodeClient,
+}))
+
+mock.module("../../shared/port-utils", () => ({
+  isPortAvailable: mockIsPortAvailable,
+  getAvailableServerPort: mockGetAvailableServerPort,
+  DEFAULT_SERVER_PORT: 4096,
+}))
+
+const { createServerConnection } = await import("./server-connection")
 
 interface MockWriteStream {
   write: (chunk: string) => boolean
@@ -228,6 +251,9 @@ describe("integration: server connection", () => {
 
   beforeEach(() => {
     consoleSpy = spyOn(console, "log").mockImplementation(() => {})
+    mockCreateOpencode.mockClear()
+    mockCreateOpencodeClient.mockClear()
+    mockServerClose.mockClear()
   })
 
   afterEach(() => {
@@ -245,11 +271,13 @@ describe("integration: server connection", () => {
     // then
     expect(result.client).toBeDefined()
     expect(result.cleanup).toBeDefined()
+    expect(mockCreateOpencodeClient).toHaveBeenCalledWith({ baseUrl: attachUrl })
     result.cleanup()
+    expect(mockServerClose).not.toHaveBeenCalled()
   })
 
   it("port with available port starts server", async () => {
-    // given - assuming port is available
+    // given
     const signal = new AbortController().signal
     const port = 9999
 
@@ -259,6 +287,8 @@ describe("integration: server connection", () => {
     // then
     expect(result.client).toBeDefined()
     expect(result.cleanup).toBeDefined()
+    expect(mockCreateOpencode).toHaveBeenCalled()
     result.cleanup()
+    expect(mockServerClose).toHaveBeenCalled()
   })
 })
