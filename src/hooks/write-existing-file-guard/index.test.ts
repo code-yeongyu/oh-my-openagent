@@ -198,9 +198,89 @@ describe("createWriteExistingFileGuardHook", () => {
         //#when
         const result = differentHook["tool.execute.before"]?.(input as any, output as any)
 
+       //#then
+       await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
+     })
+
+    describe(".sisyphus/*.md exception", () => {
+      test("allows write to existing .sisyphus/plans/plan.md", async () => {
+        //#given
+        const sisyphusDir = path.join(tempDir, ".sisyphus", "plans")
+        fs.mkdirSync(sisyphusDir, { recursive: true })
+        const planFile = path.join(sisyphusDir, "plan.md")
+        fs.writeFileSync(planFile, "# Existing Plan")
+        const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
+        const output = { args: { filePath: planFile, content: "# Updated Plan" } }
+
+        //#when
+        const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+        //#then
+        await expect(result).resolves.toBeUndefined()
+      })
+
+      test("allows write to existing .sisyphus/notes.md", async () => {
+        //#given
+        const sisyphusDir = path.join(tempDir, ".sisyphus")
+        fs.mkdirSync(sisyphusDir, { recursive: true })
+        const notesFile = path.join(sisyphusDir, "notes.md")
+        fs.writeFileSync(notesFile, "# Notes")
+        const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
+        const output = { args: { filePath: notesFile, content: "# Updated Notes" } }
+
+        //#when
+        const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+        //#then
+        await expect(result).resolves.toBeUndefined()
+      })
+
+      test("allows write to existing .sisyphus/*.md using relative path", async () => {
+        //#given
+        const sisyphusDir = path.join(tempDir, ".sisyphus")
+        fs.mkdirSync(sisyphusDir, { recursive: true })
+        const planFile = path.join(sisyphusDir, "plan.md")
+        fs.writeFileSync(planFile, "# Plan")
+        const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
+        const output = { args: { filePath: ".sisyphus/plan.md", content: "# Updated" } }
+
+        //#when
+        const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+        //#then
+        await expect(result).resolves.toBeUndefined()
+      })
+
+      test("blocks write to existing .sisyphus/file.txt (non-markdown)", async () => {
+        //#given
+        const sisyphusDir = path.join(tempDir, ".sisyphus")
+        fs.mkdirSync(sisyphusDir, { recursive: true })
+        const textFile = path.join(sisyphusDir, "file.txt")
+        fs.writeFileSync(textFile, "content")
+        const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
+        const output = { args: { filePath: textFile, content: "new content" } }
+
+        //#when
+        const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+        //#then
+        await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
+      })
+
+      test("blocks write to existing regular file (not in .sisyphus)", async () => {
+        //#given
+        const regularFile = path.join(tempDir, "regular.md")
+        fs.writeFileSync(regularFile, "# Regular")
+        const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
+        const output = { args: { filePath: regularFile, content: "# Updated" } }
+
+        //#when
+        const result = hook["tool.execute.before"]?.(input as any, output as any)
+
         //#then
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
       })
     })
-  })
+   })
+})
 })
