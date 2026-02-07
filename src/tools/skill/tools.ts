@@ -40,6 +40,13 @@ function formatSkillsXml(skills: SkillInfo[]): string {
   return `\n\n<available_skills>\n${skillsXml}\n</available_skills>`
 }
 
+function buildDescriptionFromSkills(skills: LoadedSkill[]): string {
+  const skillInfos = skills.map(loadedSkillToInfo)
+  return skillInfos.length === 0
+    ? TOOL_DESCRIPTION_NO_SKILLS
+    : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+}
+
 async function extractSkillBody(skill: LoadedSkill): Promise<string> {
   if (skill.lazyContent) {
     const fullTemplate = await skill.lazyContent.load()
@@ -160,18 +167,12 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   const getDescription = async (): Promise<string> => {
     if (cachedDescription) return cachedDescription
     const skills = await getSkills()
-    const skillInfos = skills.map(loadedSkillToInfo)
-    cachedDescription = skillInfos.length === 0
-      ? TOOL_DESCRIPTION_NO_SKILLS
-      : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+    cachedDescription = buildDescriptionFromSkills(skills)
     return cachedDescription
   }
 
   if (options.skills && shouldPrewarmDescription) {
-    const skillInfos = options.skills.map(loadedSkillToInfo)
-    cachedDescription = skillInfos.length === 0
-      ? TOOL_DESCRIPTION_NO_SKILLS
-      : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+    cachedDescription = buildDescriptionFromSkills(options.skills)
   } else if (!options.skills && shouldPrewarmDescription) {
     void getDescription()
   }
@@ -186,10 +187,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     async execute(args: SkillArgs, ctx?: { agent?: string }) {
       const skills = await getSkills()
       if (!cachedDescription || options.mergeDiscoveredSkills === true) {
-        const skillInfos = skills.map(loadedSkillToInfo)
-        cachedDescription = skillInfos.length === 0
-          ? TOOL_DESCRIPTION_NO_SKILLS
-          : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+        cachedDescription = buildDescriptionFromSkills(skills)
       }
       const skill = skills.find(s => s.name === args.name)
 

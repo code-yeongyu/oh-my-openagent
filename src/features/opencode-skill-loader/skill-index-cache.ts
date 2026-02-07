@@ -3,6 +3,7 @@ import { dirname, join } from "node:path"
 import { getOmoOpenCodeCacheDir } from "../../shared/data-path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import type { LoadedSkill, LazyContentLoader, SkillMetadata, SkillScope } from "./types"
+import { wrapSkillTemplate } from "./skill-template"
 import {
   discoverOpencodeGlobalSkills,
   discoverOpencodeProjectSkills,
@@ -115,17 +116,7 @@ function createSkillLazyContentLoader(entry: SkillIndexEntry): LazyContentLoader
         const raw = await fs.readFile(entry.path!, "utf-8")
         const { body } = parseFrontmatter<SkillMetadata>(raw)
         const baseDir = entry.resolvedPath ?? dirname(entry.path!)
-
-        const templateContent = `<skill-instruction>
-Base directory for this skill: ${baseDir}/
-File references (@path) in this skill are relative to this directory.
-
-${body.trim()}
-</skill-instruction>
-
-<user-request>
-$ARGUMENTS
-</user-request>`
+        const templateContent = wrapSkillTemplate(baseDir, body)
 
         loader.loaded = true
         loader.content = templateContent

@@ -9,6 +9,7 @@ import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkill, LazyContentLoader } from "./types"
 import type { SkillMcpConfig } from "../skill-mcp-manager/types"
+import { wrapSkillTemplate } from "./skill-template"
 
 function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpConfig | undefined {
   const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/)
@@ -84,16 +85,7 @@ async function loadSkillFromPath(
     const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
     const formattedDescription = `(${scope} - Skill) ${originalDescription}`
 
-    const templateContent = `<skill-instruction>
-Base directory for this skill: ${resolvedPath}/
-File references (@path) in this skill are relative to this directory.
-
-${body.trim()}
-</skill-instruction>
-
-<user-request>
-$ARGUMENTS
-</user-request>`
+    const templateContent = wrapSkillTemplate(resolvedPath, body)
 
     // RATIONALE: We read the file eagerly to ensure atomic consistency between
     // metadata and body. We maintain the LazyContentLoader interface for
