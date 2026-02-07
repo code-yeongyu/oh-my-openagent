@@ -1018,6 +1018,40 @@ describe("migrateConfigFile with backup", () => {
     expect(agents.oracle.category).toBe("ultrabrain")
   })
 
+  test("does not write or create backups for experimental.task_system", () => {
+    //#given: Config with experimental.task_system enabled
+    const testConfigPath = "/tmp/test-config-task-system.json"
+    const rawConfig: Record<string, unknown> = {
+      experimental: { task_system: true },
+    }
+
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
+    cleanupPaths.push(testConfigPath)
+
+    const dir = path.dirname(testConfigPath)
+    const basename = path.basename(testConfigPath)
+    const existingFiles = fs.readdirSync(dir)
+    const existingBackups = existingFiles.filter((f) => f.startsWith(`${basename}.bak.`))
+    existingBackups.forEach((f) => {
+      const backupPath = path.join(dir, f)
+      try {
+        fs.unlinkSync(backupPath)
+        cleanupPaths.splice(cleanupPaths.indexOf(backupPath), 1)
+      } catch {
+      }
+    })
+
+    //#when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    //#then: No write or backup should occur
+    expect(needsWrite).toBe(false)
+
+    const files = fs.readdirSync(dir)
+    const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
+    expect(backupFiles.length).toBe(0)
+  })
+
   test("does not write when no migration needed", () => {
      // given: Config with no migrations needed
      const testConfigPath = "/tmp/test-config-no-migration.json"
