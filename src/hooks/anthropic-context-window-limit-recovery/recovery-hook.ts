@@ -3,6 +3,7 @@ import type { AutoCompactState, ParsedTokenLimitError } from "./types"
 import type { ExperimentalConfig } from "../../config"
 import { parseAnthropicTokenLimitError } from "./parser"
 import { executeCompact, getLastAssistant } from "./executor"
+import { attemptDeduplicationRecovery } from "./deduplication-recovery"
 import { log } from "../../shared/logger"
 
 export interface AnthropicContextWindowLimitRecoveryOptions {
@@ -56,6 +57,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
         autoCompactState.errorDataBySession.set(sessionID, parsed)
 
         if (autoCompactState.compactionInProgress.has(sessionID)) {
+          await attemptDeduplicationRecovery(sessionID, parsed, experimental)
           return
         }
 
