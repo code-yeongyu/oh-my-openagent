@@ -211,7 +211,7 @@ export async function executeSyncContinuation(
         : undefined
     }
 
-     await client.session.promptAsync({
+     await (client.session as any).promptAsync({
        path: { id: args.session_id! },
        body: {
          ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
