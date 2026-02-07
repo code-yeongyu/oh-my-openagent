@@ -21,9 +21,9 @@ describe("truncateDescription", () => {
     const result = truncateDescription(description)
 
     // then
-    expect(result.length).toBe(123) // 120 + "..."
+    expect(result.length).toBe(120) // 117 chars + "..."
     expect(result).toEndWith("...")
-    expect(result).toBe(description.slice(0, 120) + "...")
+    expect(result).toBe(description.slice(0, 117) + "...")
   })
 
   it("respects custom max length parameter", () => {
@@ -35,9 +35,9 @@ describe("truncateDescription", () => {
     const result = truncateDescription(description, maxLength)
 
     // then
-    expect(result.length).toBe(53) // 50 + "..."
+    expect(result.length).toBe(50) // 47 chars + "..."
     expect(result).toEndWith("...")
-    expect(result).toBe(description.slice(0, 50) + "...")
+    expect(result).toBe(description.slice(0, 47) + "...")
   })
 
   it("handles empty string", () => {
@@ -71,7 +71,7 @@ describe("truncateDescription", () => {
     const result = truncateDescription(description)
 
     // then
-    expect(result.length).toBe(123) // 120 + "..."
+    expect(result.length).toBe(120)
     expect(result).toContain("First sentence. Second sentence.")
     expect(result).toEndWith("...")
   })
@@ -84,7 +84,7 @@ describe("truncateDescription", () => {
     const result = truncateDescription(description)
 
     // then
-    expect(result.length).toBe(123) // 120 + "..."
+    expect(result.length).toBe(120)
     expect(result).toStartWith("Check out https://example.com")
     expect(result).toEndWith("...")
   })
@@ -97,7 +97,7 @@ describe("truncateDescription", () => {
     const result = truncateDescription(description)
 
     // then
-    expect(result.length).toBe(123) // 120 + "..."
+    expect(result.length).toBe(120)
     expect(result).toStartWith("Version 1.2.3")
     expect(result).toEndWith("...")
   })
