@@ -2,6 +2,7 @@ import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { CachedSkillTrigger } from "./types"
 import { SCOPE_PRIORITY } from "./types"
 import { hashDescription } from "./cache-checker"
+import { mergeFallbackTriggers } from "./trigger-fallbacks"
 
 const BATCH_SIZE = 15
 
@@ -14,6 +15,8 @@ export function buildExtractionPrompt(skills: LoadedSkill[]): string {
     .join("\n")
 
   return `Extract trigger keywords. Return 3-8 keywords per skill.
+Include both English and Simplified Chinese keywords when possible.
+If the description already contains other languages (e.g. Japanese/Korean), keep 1-2 keywords in that language.
 Output ONLY valid JSON: {"skill-name": ["keyword1", ...], ...}
 
 Skills:
@@ -29,7 +32,13 @@ export function parseAIResponse(response: string): Record<string, string[]> {
     const result: Record<string, string[]> = {}
     for (const [key, value] of Object.entries(parsed)) {
       if (Array.isArray(value) && value.every(v => typeof v === "string")) {
-        result[key] = value as string[]
+        const cleaned = (value as string[])
+          .map((item) => item.trim())
+          .filter((item) => item.length > 0)
+        const unique = [...new Set(cleaned)]
+        if (unique.length > 0) {
+          result[key] = unique
+        }
       }
     }
     return result
@@ -46,8 +55,8 @@ export function buildCachedTriggers(
   for (const skill of skills) {
     const description = skill.definition?.description
     if (!description) continue
-    const triggers = extractedTriggers[skill.name]
-    if (!triggers || triggers.length === 0) continue
+    const triggers = mergeFallbackTriggers(skill.name, extractedTriggers[skill.name] ?? [])
+    if (triggers.length === 0) continue
     const scope = skill.scope as "builtin" | "opencode-project" | "opencode" | "user" | "project" | "config"
     result[skill.name] = {
       hash: hashDescription(description),

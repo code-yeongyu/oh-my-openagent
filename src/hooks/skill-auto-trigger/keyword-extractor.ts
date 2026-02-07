@@ -26,7 +26,38 @@ const MIN_WORD_LENGTH = 3
 /**
  * Maximum number of keywords to extract per description.
  */
-const MAX_KEYWORDS = 5
+const MAX_KEYWORDS = 8
+
+const WORD_BOUNDARY_TRIGGER = /^[A-Za-z0-9_]+(?:[ -][A-Za-z0-9_]+)*$/
+const CJK_RE = new RegExp("[\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uac00-\\ud7af]{2,}", "g")
+
+function hasNonAsciiChar(value: string): boolean {
+  for (let i = 0; i < value.length; i += 1) {
+    if (value.charCodeAt(i) > 127) {
+      return true
+    }
+  }
+  return false
+}
+
+export function buildTriggerRegex(triggers: string[]): RegExp | null {
+  const cleaned = triggers
+    .map((trigger) => trigger.trim())
+    .filter((trigger) => trigger.length > 0)
+
+  if (cleaned.length === 0) {
+    return null
+  }
+
+  const uniqueTriggers = [...new Set(cleaned)]
+  const patternParts = uniqueTriggers.map((trigger) => {
+    const escaped = escapeRegExp(trigger)
+    const useBoundary = !hasNonAsciiChar(trigger) && WORD_BOUNDARY_TRIGGER.test(trigger)
+    return useBoundary ? `\\b${escaped}\\b` : escaped
+  })
+
+  return new RegExp(patternParts.join("|"), "i")
+}
 
 /**
  * Extracts meaningful keywords from a skill description.
@@ -58,16 +89,14 @@ export function extractKeywordsFromDescription(description: string): RegExp | nu
       !/^\d+$/.test(word)  // Filter out pure numbers
     )
 
-  // Deduplicate and take top N keywords
-  const uniqueKeywords = [...new Set(words)].slice(0, MAX_KEYWORDS)
+  const cjkTokens = cleanedDescription.match(CJK_RE) ?? []
+  const uniqueKeywords = [...new Set([...cjkTokens, ...words])].slice(0, MAX_KEYWORDS)
 
   if (uniqueKeywords.length === 0) {
     return null
   }
 
-  // Build RegExp: \b(word1|word2|word3)\b with case-insensitive flag
-  const pattern = `\\b(${uniqueKeywords.join("|")})\\b`
-  return new RegExp(pattern, "i")
+  return buildTriggerRegex(uniqueKeywords)
 }
 
 /**
