@@ -314,6 +314,44 @@ describe("resolveMultipleSkillsAsync", () => {
 		expect(gitMasterContent).toContain("Co-authored-by: Sisyphus")
 	})
 
+	it("should inject custom string footer when commit_footer is a string", async () => {
+		// given: git-master skill with custom string footer
+		const skillNames = ["git-master"]
+		const customFooter = "Custom footer from my team"
+		const options = {
+			gitMasterConfig: {
+				commit_footer: customFooter,
+				include_co_authored_by: false,
+			},
+		}
+
+		// when: resolving with custom footer config
+		const result = await resolveMultipleSkillsAsync(skillNames, options)
+
+		// then: custom footer is injected instead of default
+		const gitMasterContent = result.resolved.get("git-master")
+		expect(gitMasterContent).toContain(customFooter)
+		expect(gitMasterContent).not.toContain("Ultraworked with [Sisyphus]")
+	})
+
+	it("should use default Sisyphus footer when commit_footer is boolean true", async () => {
+		// given: git-master skill with boolean true footer
+		const skillNames = ["git-master"]
+		const options = {
+			gitMasterConfig: {
+				commit_footer: true,
+				include_co_authored_by: false,
+			},
+		}
+
+		// when: resolving with boolean true footer config
+		const result = await resolveMultipleSkillsAsync(skillNames, options)
+
+		// then: default Sisyphus footer is injected
+		const gitMasterContent = result.resolved.get("git-master")
+		expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
+	})
+
 	it("should handle empty array", async () => {
 		// given: empty skill names
 		const skillNames: string[] = []
