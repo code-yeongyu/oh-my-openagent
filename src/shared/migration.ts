@@ -116,23 +116,45 @@ export function migrateAgentNames(agents: Record<string, unknown>): { migrated: 
   return { migrated, changed }
 }
 
-export function migrateModelVersions(configs: Record<string, unknown>): { migrated: Record<string, unknown>; changed: boolean } {
+/**
+ * Generate a consistent migration key for tracking applied migrations.
+ */
+function migrationKey(oldModel: string, newModel: string): string {
+  return `model-version:${oldModel}->${newModel}`
+}
+
+export function migrateModelVersions(
+  configs: Record<string, unknown>,
+  appliedMigrations?: Set<string>,
+): { migrated: Record<string, unknown>; changed: boolean; newMigrations: string[] } {
   const migrated: Record<string, unknown> = {}
   let changed = false
+  const newMigrations: string[] = []
 
   for (const [key, value] of Object.entries(configs)) {
     if (value && typeof value === "object" && !Array.isArray(value)) {
       const config = value as Record<string, unknown>
       if (typeof config.model === "string" && MODEL_VERSION_MAP[config.model]) {
-        migrated[key] = { ...config, model: MODEL_VERSION_MAP[config.model] }
+        const oldModel = config.model
+        const newModel = MODEL_VERSION_MAP[oldModel]
+        const mKey = migrationKey(oldModel, newModel)
+
+        // Skip if this migration was already applied (user may have reverted)
+        if (appliedMigrations?.has(mKey)) {
+          migrated[key] = value
+          continue
+        }
+
+        migrated[key] = { ...config, model: newModel }
         changed = true
+        newMigrations.push(mKey)
         continue
       }
     }
     migrated[key] = value
   }
 
-  return { migrated, changed }
+  return { migrated, changed, newMigrations }
 }
 
 export function migrateHookNames(hooks: string[]): { migrated: string[]; changed: boolean; removed: string[] } {
@@ -201,6 +223,12 @@ export function shouldDeleteAgentConfig(
 export function migrateConfigFile(configPath: string, rawConfig: Record<string, unknown>): boolean {
   let needsWrite = false
 
+  // Load previously applied migrations
+  const existingMigrations = Array.isArray(rawConfig._migrations)
+    ? new Set(rawConfig._migrations as string[])
+    : new Set<string>()
+  const allNewMigrations: string[] = []
+
   if (rawConfig.agents && typeof rawConfig.agents === "object") {
     const { migrated, changed } = migrateAgentNames(rawConfig.agents as Record<string, unknown>)
     if (changed) {
@@ -209,24 +237,40 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     }
   }
 
-  // Migrate model versions in agents
+  // Migrate model versions in agents (skip already-applied migrations)
   if (rawConfig.agents && typeof rawConfig.agents === "object") {
-    const { migrated, changed } = migrateModelVersions(rawConfig.agents as Record<string, unknown>)
+    const { migrated, changed, newMigrations } = migrateModelVersions(
+      rawConfig.agents as Record<string, unknown>,
+      existingMigrations,
+    )
     if (changed) {
       rawConfig.agents = migrated
       needsWrite = true
       log(`Migrated model versions in agents config`)
     }
+    allNewMigrations.push(...newMigrations)
   }
 
-  // Migrate model versions in categories
+  // Migrate model versions in categories (skip already-applied migrations)
   if (rawConfig.categories && typeof rawConfig.categories === "object") {
-    const { migrated, changed } = migrateModelVersions(rawConfig.categories as Record<string, unknown>)
+    const { migrated, changed, newMigrations } = migrateModelVersions(
+      rawConfig.categories as Record<string, unknown>,
+      existingMigrations,
+    )
     if (changed) {
       rawConfig.categories = migrated
       needsWrite = true
       log(`Migrated model versions in categories config`)
     }
+    allNewMigrations.push(...newMigrations)
+  }
+
+  // Record newly applied migrations
+  if (allNewMigrations.length > 0) {
+    const updatedMigrations = Array.from(existingMigrations)
+    updatedMigrations.push(...allNewMigrations)
+    rawConfig._migrations = updatedMigrations
+    needsWrite = true
   }
 
   if (rawConfig.omo_agent) {
