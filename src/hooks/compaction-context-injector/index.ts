@@ -29,11 +29,11 @@ When summarizing this session, you MUST include the following sections in your s
 - **External References**: Documentation URLs, library APIs, or external resources being consulted
 - **State & Variables**: Important variable names, configuration values, or runtime state relevant to ongoing work
 
-## 6. MUST NOT Do (Critical Constraints)
-- Things that were explicitly forbidden
-- Approaches that failed and should not be retried
-- User's explicit restrictions or preferences
-- Anti-patterns identified during the session
+## 6. Explicit Constraints (Verbatim Only)
+- Include ONLY constraints explicitly stated by the user or in existing AGENTS.md context
+- Quote constraints verbatim (do not paraphrase)
+- Do NOT invent, add, or modify constraints
+- If no explicit constraints exist, write "None"
 
 ## 7. Agent Verification State (Critical for Reviewers)
 - **Current Agent**: What agent is running (momus, oracle, etc.)
