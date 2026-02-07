@@ -13,18 +13,23 @@ interface StoredToolPart {
   }
 }
 
-const OPENCODE_STORAGE = getOpenCodeStorageDir()
-const MESSAGE_STORAGE = join(OPENCODE_STORAGE, "message")
-const PART_STORAGE = join(OPENCODE_STORAGE, "part")
+function getMessageStorage(): string {
+  return join(getOpenCodeStorageDir(), "message")
+}
+
+function getPartStorage(): string {
+  return join(getOpenCodeStorageDir(), "part")
+}
 
 function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
+  const messageStorage = getMessageStorage()
+  if (!existsSync(messageStorage)) return null
 
-  const directPath = join(MESSAGE_STORAGE, sessionID)
+  const directPath = join(messageStorage, sessionID)
   if (existsSync(directPath)) return directPath
 
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
+  for (const dir of readdirSync(messageStorage)) {
+    const sessionPath = join(messageStorage, dir, sessionID)
     if (existsSync(sessionPath)) return sessionPath
   }
 
@@ -56,7 +61,7 @@ export function truncateToolOutputsByCallId(
   let truncatedCount = 0
 
   for (const messageID of messageIds) {
-    const partDir = join(PART_STORAGE, messageID)
+    const partDir = join(getPartStorage(), messageID)
     if (!existsSync(partDir)) continue
 
     for (const file of readdirSync(partDir)) {
