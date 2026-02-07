@@ -29,7 +29,7 @@ describe("gh cli check", () => {
 
     it("returns gh cli info structure", async () => {
       const spawnSpy = spyOn(Bun, "spawn").mockImplementation((cmd) => {
-        if (Array.isArray(cmd) && cmd[0] === "which" && cmd[1] === "gh") {
+        if (Array.isArray(cmd) && (cmd[0] === "which" || cmd[0] === "where") && cmd[1] === "gh") {
           return createProc({ stdout: "/usr/bin/gh\n" })
         }
 
