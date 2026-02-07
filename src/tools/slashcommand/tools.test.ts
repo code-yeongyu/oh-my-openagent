@@ -86,4 +86,20 @@ describe("slashcommand tool - synchronous description", () => {
     expect(tool.description).toContain("user_message")
     expect(tool.description).toContain("command='publish' user_message='patch'")
   })
+
+  it("can skip prewarming description for faster startup and populate after execute", async () => {
+    // given
+    const commands = [createMockCommand("commit", "Create a git commit")]
+    const skills = [createMockSkill("playwright", "Browser automation via Playwright MCP")]
+
+    // when
+    const tool = createSlashcommandTool({ commands, skills, prewarmDescription: false })
+
+    // then
+    expect(tool.description).not.toContain("<available_skills>")
+    await tool.execute({ command: "" })
+    expect(tool.description).toContain("<available_skills>")
+    expect(tool.description).toContain("commit")
+    expect(tool.description).toContain("playwright")
+  })
 })
