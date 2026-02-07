@@ -20,9 +20,9 @@ export function createJsonOutputManager(
   const originalWrite = stdout.write.bind(stdout)
 
   function redirectToStderr(): void {
-    stdout.write = function (chunk: string): boolean {
-      return stderr.write(chunk)
-    }
+    stdout.write = function (...args: Parameters<NodeJS.WriteStream["write"]>): boolean {
+      return (stderr.write as Function).apply(stderr, args)
+    } as NodeJS.WriteStream["write"]
   }
 
   function restore(): void {
