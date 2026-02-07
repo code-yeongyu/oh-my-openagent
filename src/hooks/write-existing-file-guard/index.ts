@@ -20,6 +20,15 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
       const resolvedPath = isAbsolute(filePath) ? filePath : resolve(ctx.directory, filePath)
 
       if (existsSync(resolvedPath)) {
+        const isSisyphusMarkdown = resolvedPath.replace(/\\/g, "/").includes("/.sisyphus/") && filePath.endsWith(".md")
+        if (isSisyphusMarkdown) {
+          log("[write-existing-file-guard] Allowing .sisyphus/*.md overwrite", {
+            sessionID: input.sessionID,
+            filePath,
+          })
+          return
+        }
+
         log("[write-existing-file-guard] Blocking write to existing file", {
           sessionID: input.sessionID,
           filePath,
