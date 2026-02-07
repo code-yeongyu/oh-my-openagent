@@ -1,3 +1,4 @@
+import type { PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { CLI_LANGUAGES } from "./constants"
 import { runSg } from "./cli"
@@ -34,80 +35,83 @@ function getEmptyResultHint(pattern: string, lang: CliLanguage): string | null {
   return null
 }
 
-export const ast_grep_search: ToolDefinition = tool({
-  description:
-    "Search code patterns across filesystem using AST-aware matching. Supports 25 languages. " +
-    "Use meta-variables: $VAR (single node), $$$ (multiple nodes). " +
-    "IMPORTANT: Patterns must be complete AST nodes (valid code). " +
-    "For functions, include params and body: 'export async function $NAME($$$) { $$$ }' not 'export async function $NAME'. " +
-    "Examples: 'console.log($MSG)', 'def $FUNC($$$):', 'async function $NAME($$$)'",
-  args: {
-    pattern: tool.schema.string().describe("AST pattern with meta-variables ($VAR, $$$). Must be complete AST node."),
-    lang: tool.schema.enum(CLI_LANGUAGES).describe("Target language"),
-    paths: tool.schema.array(tool.schema.string()).optional().describe("Paths to search (default: ['.'])"),
-    globs: tool.schema.array(tool.schema.string()).optional().describe("Include/exclude globs (prefix ! to exclude)"),
-    context: tool.schema.number().optional().describe("Context lines around match"),
-  },
-  execute: async (args, context) => {
-    try {
-      const result = await runSg({
-        pattern: args.pattern,
-        lang: args.lang as CliLanguage,
-        paths: args.paths,
-        globs: args.globs,
-        context: args.context,
-      })
+export function createAstGrepTools(ctx: PluginInput): Record<string, ToolDefinition> {
+  const ast_grep_search: ToolDefinition = tool({
+    description:
+      "Search code patterns across filesystem using AST-aware matching. Supports 25 languages. " +
+      "Use meta-variables: $VAR (single node), $$$ (multiple nodes). " +
+      "IMPORTANT: Patterns must be complete AST nodes (valid code). " +
+      "For functions, include params and body: 'export async function $NAME($$$) { $$$ }' not 'export async function $NAME'. " +
+      "Examples: 'console.log($MSG)', 'def $FUNC($$$):', 'async function $NAME($$$)'",
+    args: {
+      pattern: tool.schema.string().describe("AST pattern with meta-variables ($VAR, $$$). Must be complete AST node."),
+      lang: tool.schema.enum(CLI_LANGUAGES).describe("Target language"),
+      paths: tool.schema.array(tool.schema.string()).optional().describe("Paths to search (default: ['.'])"),
+      globs: tool.schema.array(tool.schema.string()).optional().describe("Include/exclude globs (prefix ! to exclude)"),
+      context: tool.schema.number().optional().describe("Context lines around match"),
+    },
+    execute: async (args, context) => {
+      try {
+        const result = await runSg({
+          pattern: args.pattern,
+          lang: args.lang as CliLanguage,
+          paths: args.paths ?? [ctx.directory],
+          globs: args.globs,
+          context: args.context,
+        })
 
-      let output = formatSearchResult(result)
+        let output = formatSearchResult(result)
 
-      if (result.matches.length === 0 && !result.error) {
-        const hint = getEmptyResultHint(args.pattern, args.lang as CliLanguage)
-        if (hint) {
-          output += `\n\n${hint}`
+        if (result.matches.length === 0 && !result.error) {
+          const hint = getEmptyResultHint(args.pattern, args.lang as CliLanguage)
+          if (hint) {
+            output += `\n\n${hint}`
+          }
         }
+
+        await showOutputToUser(context, output)
+        return output
+      } catch (e) {
+        const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+        await showOutputToUser(context, output)
+        return output
       }
+    },
+  })
 
-      await showOutputToUser(context, output)
-      return output
-    } catch (e) {
-      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      await showOutputToUser(context, output)
-      return output
-    }
-  },
-})
+  const ast_grep_replace: ToolDefinition = tool({
+    description:
+      "Replace code patterns across filesystem with AST-aware rewriting. " +
+      "Dry-run by default. Use meta-variables in rewrite to preserve matched content. " +
+      "Example: pattern='console.log($MSG)' rewrite='logger.info($MSG)'",
+    args: {
+      pattern: tool.schema.string().describe("AST pattern to match"),
+      rewrite: tool.schema.string().describe("Replacement pattern (can use $VAR from pattern)"),
+      lang: tool.schema.enum(CLI_LANGUAGES).describe("Target language"),
+      paths: tool.schema.array(tool.schema.string()).optional().describe("Paths to search"),
+      globs: tool.schema.array(tool.schema.string()).optional().describe("Include/exclude globs"),
+      dryRun: tool.schema.boolean().optional().describe("Preview changes without applying (default: true)"),
+    },
+    execute: async (args, context) => {
+      try {
+        const result = await runSg({
+          pattern: args.pattern,
+          rewrite: args.rewrite,
+          lang: args.lang as CliLanguage,
+          paths: args.paths ?? [ctx.directory],
+          globs: args.globs,
+          updateAll: args.dryRun === false,
+        })
+        const output = formatReplaceResult(result, args.dryRun !== false)
+        await showOutputToUser(context, output)
+        return output
+      } catch (e) {
+        const output = `Error: ${e instanceof Error ? e.message : String(e)}`
+        await showOutputToUser(context, output)
+        return output
+      }
+    },
+  })
 
-export const ast_grep_replace: ToolDefinition = tool({
-  description:
-    "Replace code patterns across filesystem with AST-aware rewriting. " +
-    "Dry-run by default. Use meta-variables in rewrite to preserve matched content. " +
-    "Example: pattern='console.log($MSG)' rewrite='logger.info($MSG)'",
-  args: {
-    pattern: tool.schema.string().describe("AST pattern to match"),
-    rewrite: tool.schema.string().describe("Replacement pattern (can use $VAR from pattern)"),
-    lang: tool.schema.enum(CLI_LANGUAGES).describe("Target language"),
-    paths: tool.schema.array(tool.schema.string()).optional().describe("Paths to search"),
-    globs: tool.schema.array(tool.schema.string()).optional().describe("Include/exclude globs"),
-    dryRun: tool.schema.boolean().optional().describe("Preview changes without applying (default: true)"),
-  },
-  execute: async (args, context) => {
-    try {
-      const result = await runSg({
-        pattern: args.pattern,
-        rewrite: args.rewrite,
-        lang: args.lang as CliLanguage,
-        paths: args.paths,
-        globs: args.globs,
-        updateAll: args.dryRun === false,
-      })
-      const output = formatReplaceResult(result, args.dryRun !== false)
-      await showOutputToUser(context, output)
-      return output
-    } catch (e) {
-      const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      await showOutputToUser(context, output)
-      return output
-    }
-  },
-})
-
+  return { ast_grep_search, ast_grep_replace }
+}
