@@ -120,11 +120,13 @@ import {
   readSkillIndexCache,
   refreshSkillIndexCacheInBackground,
   skillIndexToLoadedSkills,
+  writeSkillIndexCache,
 } from "./features/opencode-skill-loader/skill-index-cache";
 import {
   commandIndexToCommandInfos,
   readCommandIndexCache,
   refreshCommandIndexCacheInBackground,
+  writeCommandIndexCache,
 } from "./tools/slashcommand/command-index-cache";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
@@ -463,6 +465,20 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       mode: "eager",
       includeClaudeSkills,
     });
+
+    // Warm the cache in the background so switching to `cached` later is instant.
+    setTimeout(() => {
+      void (async () => {
+        const existing = await readSkillIndexCache({ ttlMs: cacheTtlMs });
+        if (existing && !existing.stale) return;
+        await writeSkillIndexCache([
+          ...userSkills,
+          ...globalSkills,
+          ...projectSkills,
+          ...opencodeProjectSkills,
+        ]);
+      })().catch(() => {});
+    }, cacheRefreshDelayMs);
   } else if (startupSkillsMode === "cached") {
     const tSkillCache = perf.mark();
     const cached = await readSkillIndexCache({ ttlMs: cacheTtlMs });
@@ -626,6 +642,25 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   let commands: CommandInfo[] = builtinCommandInfos;
   if (startupCommandsMode === "eager") {
     commands = discoverCommandsSync();
+
+    // Warm the cache in the background so switching to `cached` later is instant.
+    setTimeout(() => {
+      void (async () => {
+        const existing = await readCommandIndexCache({ ttlMs: cacheTtlMs });
+        if (existing && !existing.stale) return;
+
+        const entries = commands
+          .filter((c): c is CommandInfo & { path: string } => Boolean(c.path) && c.scope !== "builtin")
+          .map((c) => ({
+            name: c.name,
+            scope: c.scope,
+            path: c.path,
+            metadata: c.metadata,
+          }));
+
+        await writeCommandIndexCache(entries);
+      })().catch(() => {});
+    }, cacheRefreshDelayMs);
   } else if (startupCommandsMode === "cached") {
     const cached = await readCommandIndexCache({ ttlMs: cacheTtlMs });
     commandCacheHit = Boolean(cached);
@@ -634,11 +669,28 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       commands = [...builtinCommandInfos, ...cachedCommands];
     } else {
       commands = discoverCommandsSync();
+
+      // Cache miss: we already did the expensive discovery, so write the index without re-discovering.
+      setTimeout(() => {
+        void (async () => {
+          const entries = commands
+            .filter((c): c is CommandInfo & { path: string } => Boolean(c.path) && c.scope !== "builtin")
+            .map((c) => ({
+              name: c.name,
+              scope: c.scope,
+              path: c.path,
+              metadata: c.metadata,
+            }));
+          await writeCommandIndexCache(entries);
+        })().catch(() => {});
+      }, cacheRefreshDelayMs);
     }
-    refreshCommandIndexCacheInBackground({
-      ttlMs: cacheTtlMs,
-      delayMs: cacheRefreshDelayMs,
-    });
+    if (cached) {
+      refreshCommandIndexCacheInBackground({
+        ttlMs: cacheTtlMs,
+        delayMs: cacheRefreshDelayMs,
+      });
+    }
   }
   perf.measure("startup.command_discovery", tCommandsResolve, {
     mode: startupCommandsMode,
