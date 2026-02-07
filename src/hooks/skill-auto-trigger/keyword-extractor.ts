@@ -29,7 +29,7 @@ const MIN_WORD_LENGTH = 3
 const MAX_KEYWORDS = 8
 
 const WORD_BOUNDARY_TRIGGER = /^[A-Za-z0-9_]+(?:[ -][A-Za-z0-9_]+)*$/
-const CJK_RE = new RegExp("[\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uac00-\\ud7af]{2,}", "g")
+const CJK_RE = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]{2,}/g
 
 function hasNonAsciiChar(value: string): boolean {
   for (let i = 0; i < value.length; i += 1) {
