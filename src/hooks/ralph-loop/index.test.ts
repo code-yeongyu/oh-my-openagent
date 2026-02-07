@@ -24,6 +24,13 @@ describe("ralph-loop", () => {
             })
             return {}
           },
+          promptAsync: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
+            promptCalls.push({
+              sessionID: opts.path.id,
+              text: opts.body.parts[0].text,
+            })
+            return {}
+          },
           messages: async (opts: { path: { id: string } }) => {
             messagesCalls.push({ sessionID: opts.path.id })
             return { data: mockSessionMessages }
