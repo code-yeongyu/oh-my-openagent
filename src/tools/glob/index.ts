@@ -1,3 +1,1 @@
-import { glob } from "./tools"
-
-export { glob }
+export { createGlobTools } from "./tools"

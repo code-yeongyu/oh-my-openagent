@@ -86,6 +86,10 @@ import {
   createTaskGetTool,
   createTaskList,
   createTaskUpdateTool,
+  createGrepTools,
+  createGlobTools,
+  createAstGrepTools,
+  createSessionManagerTools,
 } from "./tools";
 import {
   CATEGORY_DESCRIPTIONS,
@@ -542,6 +546,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const allTools: Record<string, ToolDefinition> = {
     ...builtinTools,
+    ...createGrepTools(ctx),
+    ...createGlobTools(ctx),
+    ...createAstGrepTools(ctx),
+    ...createSessionManagerTools(ctx),
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
     ...(lookAt ? { look_at: lookAt } : {}),
