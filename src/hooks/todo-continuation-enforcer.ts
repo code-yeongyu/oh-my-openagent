@@ -245,7 +245,7 @@ ${todoList}`
     try {
       log(`[${HOOK_NAME}] Injecting continuation`, { sessionID, agent: agentName, model, incompleteCount: freshIncompleteCount })
 
-      await ctx.client.session.prompt({
+      await ctx.client.session.promptAsync({
         path: { id: sessionID },
         body: {
           agent: agentName,
