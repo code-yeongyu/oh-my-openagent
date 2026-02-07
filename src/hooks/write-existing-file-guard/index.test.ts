@@ -267,6 +267,25 @@ describe("createWriteExistingFileGuardHook", () => {
         await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
       })
 
+      test("blocks write when .sisyphus is in parent path but not under ctx.directory", async () => {
+        //#given
+        const fakeSisyphusParent = path.join(os.tmpdir(), ".sisyphus", "evil-project")
+        fs.mkdirSync(fakeSisyphusParent, { recursive: true })
+        const evilFile = path.join(fakeSisyphusParent, "plan.md")
+        fs.writeFileSync(evilFile, "# Evil Plan")
+        const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
+        const output = { args: { filePath: evilFile, content: "# Hacked" } }
+
+        //#when
+        const result = hook["tool.execute.before"]?.(input as any, output as any)
+
+        //#then
+        await expect(result).rejects.toThrow("File already exists. Use edit tool instead.")
+
+        // cleanup
+        fs.rmSync(path.join(os.tmpdir(), ".sisyphus"), { recursive: true, force: true })
+      })
+
       test("blocks write to existing regular file (not in .sisyphus)", async () => {
         //#given
         const regularFile = path.join(tempDir, "regular.md")
