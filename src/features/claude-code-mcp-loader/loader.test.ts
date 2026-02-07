@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync } from "fs"
 import { join } from "path"
-import { tmpdir, homedir } from "os"
+import { tmpdir } from "os"
 
 const TEST_DIR = join(tmpdir(), "mcp-loader-test-" + Date.now())
 
@@ -160,36 +160,36 @@ describe("getSystemMcpServerNames", () => {
      }
    })
 
-   it("reads user-level MCP config from ~/.claude.json", async () => {
-     // given
-     const userConfigPath = join(homedir(), ".claude.json")
-     const userMcpConfig = {
-       mcpServers: {
-         "user-server": {
-           command: "npx",
-           args: ["user-mcp-server"],
-         },
-       },
-     }
-     
-     // Create user config if it doesn't exist
-     const originalCwd = process.cwd()
-     process.chdir(TEST_DIR)
-     
-     try {
-       // Write user config temporarily
-       writeFileSync(userConfigPath, JSON.stringify(userMcpConfig))
+    it("reads user-level MCP config from ~/.claude.json", async () => {
+      // given
+      const userConfigPath = join(TEST_DIR, ".claude.json")
+      const userMcpConfig = {
+        mcpServers: {
+          "user-server": {
+            command: "npx",
+            args: ["user-mcp-server"],
+          },
+        },
+      }
 
-       // when
-       const { getSystemMcpServerNames } = await import("./loader")
-       const names = getSystemMcpServerNames()
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
 
-       // then
-       expect(names.has("user-server")).toBe(true)
-     } finally {
-       process.chdir(originalCwd)
-       // Clean up user config
-       rmSync(userConfigPath, { force: true })
-     }
-   })
+      try {
+        mock.module("os", () => ({
+          homedir: () => TEST_DIR,
+          tmpdir,
+        }))
+
+        writeFileSync(userConfigPath, JSON.stringify(userMcpConfig))
+
+        const { getSystemMcpServerNames } = await import("./loader")
+        const names = getSystemMcpServerNames()
+
+        expect(names.has("user-server")).toBe(true)
+      } finally {
+        process.chdir(originalCwd)
+        rmSync(userConfigPath, { force: true })
+      }
+    })
 })
