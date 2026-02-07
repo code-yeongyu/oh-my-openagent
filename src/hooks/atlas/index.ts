@@ -399,6 +399,7 @@ const CONTINUATION_COOLDOWN_MS = 5000
 export interface AtlasHookOptions {
   directory: string
   backgroundManager?: BackgroundManager
+  isContinuationStopped?: (sessionID: string) => boolean
 }
 
 function isAbortError(error: unknown): boolean {
@@ -570,6 +571,11 @@ export function createAtlasHook(
 
         if (!boulderState) {
           log(`[${HOOK_NAME}] No active boulder`, { sessionID })
+          return
+        }
+
+        if (options?.isContinuationStopped?.(sessionID)) {
+          log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
           return
         }
 
