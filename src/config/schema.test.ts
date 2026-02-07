@@ -6,6 +6,7 @@ import {
   BuiltinCategoryNameSchema,
   CategoryConfigSchema,
   ExperimentalConfigSchema,
+  GitMasterConfigSchema,
   OhMyOpenCodeConfigSchema,
 } from "./schema"
 
