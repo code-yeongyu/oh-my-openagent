@@ -427,3 +427,33 @@ describe("resolveMultipleSkills with browserProvider", () => {
 		expect(result.notFound).toContain("agent-browser")
 	})
 })
+
+describe("resolveMultipleSkillsAsync with browserProvider filtering", () => {
+	it("should exclude discovered agent-browser when browserProvider is playwright", async () => {
+		// given: playwright is the selected browserProvider (default)
+		const skillNames = ["playwright", "git-master"]
+		const options = { browserProvider: "playwright" as const }
+
+		// when: resolving multiple skills
+		const result = await resolveMultipleSkillsAsync(skillNames, options)
+
+		// then: playwright resolved, agent-browser would be excluded if discovered
+		expect(result.resolved.has("playwright")).toBe(true)
+		expect(result.resolved.has("git-master")).toBe(true)
+		expect(result.notFound).not.toContain("playwright")
+	})
+
+	it("should exclude discovered playwright when browserProvider is agent-browser", async () => {
+		// given: agent-browser is the selected browserProvider
+		const skillNames = ["agent-browser", "git-master"]
+		const options = { browserProvider: "agent-browser" as const }
+
+		// when: resolving multiple skills
+		const result = await resolveMultipleSkillsAsync(skillNames, options)
+
+		// then: agent-browser resolved, playwright would be excluded if discovered
+		expect(result.resolved.has("agent-browser")).toBe(true)
+		expect(result.resolved.has("git-master")).toBe(true)
+		expect(result.notFound).not.toContain("agent-browser")
+	})
+})
