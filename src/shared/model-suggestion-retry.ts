@@ -88,3 +88,42 @@ export async function promptWithModelSuggestionRetry(
   // model errors happen asynchronously server-side and cannot be caught here
   await client.session.promptAsync(args as Parameters<typeof client.session.promptAsync>[0])
 }
+
+/**
+ * Synchronous variant of promptWithModelSuggestionRetry.
+ *
+ * Uses `session.prompt` (blocking HTTP call that waits for the LLM response)
+ * instead of `promptAsync` (fire-and-forget HTTP 204).
+ *
+ * Required by callers that need the response to be available immediately after
+ * the call returns — e.g. look_at, which reads session messages right away.
+ */
+export async function promptSyncWithModelSuggestionRetry(
+  client: Client,
+  args: PromptArgs,
+): Promise<void> {
+  try {
+    await client.session.prompt(args as Parameters<typeof client.session.prompt>[0])
+  } catch (error) {
+    const suggestion = parseModelSuggestion(error)
+    if (!suggestion || !args.body.model) {
+      throw error
+    }
+
+    log("[model-suggestion-retry] Model not found, retrying with suggestion", {
+      original: `${suggestion.providerID}/${suggestion.modelID}`,
+      suggested: suggestion.suggestion,
+    })
+
+    await client.session.prompt({
+      ...args,
+      body: {
+        ...args.body,
+        model: {
+          providerID: suggestion.providerID,
+          modelID: suggestion.suggestion,
+        },
+      },
+    } as Parameters<typeof client.session.prompt>[0])
+  }
+}

@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
-import { log, promptWithModelSuggestionRetry } from "../../shared"
+import { log, promptSyncWithModelSuggestionRetry } from "../../shared"
 
 interface LookAtArgsWithAlias extends LookAtArgs {
   path?: string
@@ -223,7 +223,7 @@ Original error: ${createResult.error}`
 
       log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
       try {
-        await promptWithModelSuggestionRetry(ctx.client, {
+        await promptSyncWithModelSuggestionRetry(ctx.client, {
           path: { id: sessionID },
           body: {
             agent: MULTIMODAL_LOOKER_AGENT,
