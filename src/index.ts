@@ -387,10 +387,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
                 }
                 return [];
               },
-              prompt: async (args) => {
-                await ctx.client.session.prompt(args);
-              },
-            },
+               prompt: async (args) => {
+                 await ctx.client.session.promptAsync(args);
+               },
+               promptAsync: async (args) => {
+                 await ctx.client.session.promptAsync(args);
+               },
+             },
           },
         },
         {

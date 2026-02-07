@@ -484,7 +484,7 @@ export function createAtlasHook(
           : undefined
       }
 
-        await ctx.client.session.prompt({
+        await ctx.client.session.promptAsync({
           path: { id: sessionID },
           body: {
              agent: agent ?? "atlas",
