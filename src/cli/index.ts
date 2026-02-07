@@ -64,8 +64,10 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   })
 
 program
-  .command("run <message>")
-  .description("Run opencode with todo/background task completion enforcement")
+   .command("run <message>")
+   .allowUnknownOption()
+   .passThroughOptions()
+   .description("Run opencode with todo/background task completion enforcement")
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-d, --directory <path>", "Working directory")
   .option("-t, --timeout <ms>", "Timeout in milliseconds (default: 30 minutes)", parseInt)
