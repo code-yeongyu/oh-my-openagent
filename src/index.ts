@@ -335,7 +335,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   );
 
   const atlasHook = isHookEnabled("atlas")
-    ? safeCreateHook("atlas", () => createAtlasHook(ctx, { directory: ctx.directory, backgroundManager }), { enabled: safeHookEnabled })
+    ? safeCreateHook("atlas", () => createAtlasHook(ctx, { 
+        directory: ctx.directory, 
+        backgroundManager,
+        isContinuationStopped: (sessionID: string) => stopContinuationGuard?.isStopped(sessionID) ?? false,
+      }), { enabled: safeHookEnabled })
     : null;
 
   initTaskToastManager(ctx.client);
