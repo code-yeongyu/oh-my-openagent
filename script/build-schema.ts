@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
-import * as z from "zod"
-import { zodToJsonSchema } from "zod-to-json-schema"
+import { z } from "zod"
 import { OhMyOpenCodeConfigSchema } from "../src/config/schema"
 
 const SCHEMA_OUTPUT_PATH = "assets/oh-my-opencode.schema.json"
@@ -8,8 +7,9 @@ const SCHEMA_OUTPUT_PATH = "assets/oh-my-opencode.schema.json"
 async function main() {
   console.log("Generating JSON Schema...")
 
-  const jsonSchema = zodToJsonSchema(OhMyOpenCodeConfigSchema, {
-    target: "draft7",
+  const jsonSchema = z.toJSONSchema(OhMyOpenCodeConfigSchema, {
+    io: "input",
+    target: "draft-7",
   })
 
   const finalSchema = {
