@@ -1,4 +1,4 @@
-import { describe, it, expect, spyOn, beforeEach } from "bun:test"
+import { describe, it, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import { executeOnCompleteHook } from "./on-complete-hook"
 
 describe("executeOnCompleteHook", () => {
@@ -9,8 +9,14 @@ describe("executeOnCompleteHook", () => {
     } as unknown as ReturnType<typeof Bun.spawn>
   }
 
+  let consoleErrorSpy: ReturnType<typeof spyOn<typeof console, "error">>
+
   beforeEach(() => {
-    spyOn(console, "error").mockImplementation(() => {})
+    consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore()
   })
 
   it("executes command with correct env vars", async () => {
