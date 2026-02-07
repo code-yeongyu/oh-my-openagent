@@ -664,3 +664,72 @@ describe("ExperimentalConfigSchema feature flags", () => {
     }
   })
 })
+
+describe("GitMasterConfigSchema", () => {
+  test("accepts boolean true for commit_footer", () => {
+    //#given
+    const config = { commit_footer: true }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(true)
+    }
+  })
+
+  test("accepts boolean false for commit_footer", () => {
+    //#given
+    const config = { commit_footer: false }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(false)
+    }
+  })
+
+  test("accepts string value for commit_footer", () => {
+    //#given
+    const config = { commit_footer: "Custom footer text" }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe("Custom footer text")
+    }
+  })
+
+  test("defaults commit_footer to true when not provided", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(true)
+    }
+  })
+
+  test("rejects number for commit_footer", () => {
+    //#given
+    const config = { commit_footer: 123 }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+})
