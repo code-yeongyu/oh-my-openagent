@@ -1,0 +1,151 @@
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+
+  "auto_update": true,
+
+  "disabled_mcps": [],
+  "disabled_agents": [],
+  "disabled_skills": [],
+  "disabled_hooks": [],
+  "disabled_commands": [],
+
+  "categories": {
+    "visual-engineering": {
+      "model": "google/gemini-3-pro"
+    },
+    "ultrabrain": {
+      "model": "openai/gpt-5.2-codex",
+      "variant": "xhigh"
+    },
+    "artistry": {
+      "model": "google/gemini-3-pro",
+      "variant": "max"
+    },
+    "quick": {
+      "model": "anthropic/claude-haiku-4-5"
+    },
+    "unspecified-low": {
+      "model": "anthropic/claude-sonnet-4-5"
+    },
+    "unspecified-high": {
+      "model": "anthropic/claude-opus-4-5",
+      "variant": "max"
+    },
+    "writing": {
+      "model": "google/gemini-3-flash"
+    }
+  },
+
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-5",
+      "color": "#00CED1"
+    },
+    "oracle": {
+      "model": "openai/gpt-5.2",
+      "temperature": 0.1
+    },
+    "librarian": {
+      "model": "zai-coding-plan/glm-4.7",
+      "temperature": 0.1
+    },
+    "explore": {
+      "model": "anthropic/claude-haiku-4-5",
+      "temperature": 0.1
+    },
+    "multimodal-looker": {
+      "model": "google/gemini-3-flash",
+      "temperature": 0.1
+    },
+    "prometheus": {
+      "model": "anthropic/claude-opus-4-5"
+    },
+    "metis": {
+      "model": "anthropic/claude-opus-4-5",
+      "temperature": 0.3
+    },
+    "momus": {
+      "model": "openai/gpt-5.2",
+      "temperature": 0.1
+    },
+    "atlas": {
+      "model": "anthropic/claude-sonnet-4-5",
+      "temperature": 0.1,
+      "color": "#10B981"
+    }
+  },
+
+  "claude_code": {
+    "mcp": true,
+    "commands": true,
+    "skills": true,
+    "agents": true,
+    "hooks": true,
+    "plugins": true
+  },
+
+  "sisyphus_agent": {
+    "disabled": false,
+    "default_builder_enabled": true,
+    "planner_enabled": true,
+    "replace_plan": false
+  },
+
+  "background_task": {
+    "staleTimeoutMs": 180000
+  },
+
+  "ralph_loop": {
+    "enabled": false,
+    "default_max_iterations": 100
+  },
+
+  "git_master": {
+    "commit_footer": true,
+    "include_co_authored_by": true
+  },
+
+  "notification": {
+    "force_enable": false
+  },
+
+  "experimental": {
+    "aggressive_truncation": false,
+    "auto_resume": false,
+    "truncate_all_tool_outputs": false,
+    "dynamic_context_pruning": {
+      "enabled": false,
+      "notification": "detailed",
+      "turn_protection": {
+        "enabled": true,
+        "turns": 3
+      },
+      "protected_tools": [
+        "task",
+        "todowrite",
+        "todoread",
+        "lsp_rename",
+        "session_read",
+        "session_write",
+        "session_search"
+      ],
+      "strategies": {
+        "deduplication": {
+          "enabled": true
+        },
+        "supersede_writes": {
+          "enabled": true,
+          "aggressive": false
+        },
+        "purge_errors": {
+          "enabled": true,
+          "turns": 5
+        }
+      }
+    }
+  },
+
+  "skills": [],
+
+  "comment_checker": {}
+}

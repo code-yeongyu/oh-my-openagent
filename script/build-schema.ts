@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
-import * as z from "zod"
-import { zodToJsonSchema } from "zod-to-json-schema"
+import { z } from "zod"
 import { OhMyOpenCodeConfigSchema } from "../src/config/schema"
 
 const SCHEMA_OUTPUT_PATH = "assets/oh-my-opencode.schema.json"
@@ -8,12 +7,13 @@ const SCHEMA_OUTPUT_PATH = "assets/oh-my-opencode.schema.json"
 async function main() {
   console.log("Generating JSON Schema...")
 
-  const jsonSchema = zodToJsonSchema(OhMyOpenCodeConfigSchema, {
-    target: "draft7",
+  const jsonSchema = z.toJSONSchema(OhMyOpenCodeConfigSchema, {
+    unrepresentable: "any",
+    override: (_ctx) => undefined,
   })
 
   const finalSchema = {
-    $schema: "http://json-schema.org/draft-07/schema#",
+    $schema: "https://json-schema.org/draft/2020-12/schema",
     $id: "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
     title: "Oh My OpenCode Configuration",
     description: "Configuration schema for oh-my-opencode plugin",
