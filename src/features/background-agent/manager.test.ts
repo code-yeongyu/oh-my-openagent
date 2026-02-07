@@ -171,6 +171,7 @@ function createBackgroundManager(): BackgroundManager {
   const client = {
     session: {
       prompt: async () => ({}),
+      promptAsync: async () => ({}),
       abort: async () => ({}),
     },
   }
@@ -880,12 +881,14 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
   test("should skip notification when parent session is aborted", async () => {
     //#given
     let promptCalled = false
+    const promptMock = async () => {
+      promptCalled = true
+      return {}
+    }
     const client = {
       session: {
-        prompt: async () => {
-          promptCalled = true
-          return {}
-        },
+        prompt: promptMock,
+        promptAsync: promptMock,
         abort: async () => ({}),
         messages: async () => {
           const error = new Error("User aborted")
@@ -922,14 +925,16 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
   test("should swallow aborted error from prompt", async () => {
     //#given
     let promptCalled = false
+    const promptMock = async () => {
+      promptCalled = true
+      const error = new Error("User aborted")
+      error.name = "MessageAbortedError"
+      throw error
+    }
     const client = {
       session: {
-        prompt: async () => {
-          promptCalled = true
-          const error = new Error("User aborted")
-          error.name = "MessageAbortedError"
-          throw error
-        },
+        prompt: promptMock,
+        promptAsync: promptMock,
         abort: async () => ({}),
         messages: async () => ({ data: [] }),
       },
@@ -1054,19 +1059,20 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
   })
 
-  test("should abort session on completion", async () => {
-    // #given
-    const abortedSessionIDs: string[] = []
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async (args: { path: { id: string } }) => {
-          abortedSessionIDs.push(args.path.id)
-          return {}
-        },
-        messages: async () => ({ data: [] }),
-      },
-    }
+   test("should abort session on completion", async () => {
+     // #given
+     const abortedSessionIDs: string[] = []
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async (args: { path: { id: string } }) => {
+           abortedSessionIDs.push(args.path.id)
+           return {}
+         },
+         messages: async () => ({ data: [] }),
+       },
+     }
     manager.shutdown()
     manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
     stubNotifyParentSession(manager)
@@ -1196,24 +1202,26 @@ describe("BackgroundManager.resume concurrency key", () => {
 })
 
 describe("BackgroundManager.resume model persistence", () => {
-  let manager: BackgroundManager
-  let promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }>
+   let manager: BackgroundManager
+   let promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }>
 
-  beforeEach(() => {
-    // given
-    promptCalls = []
-    const client = {
-      session: {
-        prompt: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
-          promptCalls.push(args)
-          return {}
-        },
-        abort: async () => ({}),
-      },
-    }
-    manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
-    stubNotifyParentSession(manager)
-  })
+   beforeEach(() => {
+     // given
+     promptCalls = []
+     const promptMock = async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+       promptCalls.push(args)
+       return {}
+     }
+     const client = {
+       session: {
+         prompt: promptMock,
+         promptAsync: promptMock,
+         abort: async () => ({}),
+       },
+     }
+     manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+     stubNotifyParentSession(manager)
+   })
 
   afterEach(() => {
     manager.shutdown()
@@ -1311,19 +1319,20 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   let manager: BackgroundManager
   let mockClient: ReturnType<typeof createMockClient>
 
-  function createMockClient() {
-    return {
-      session: {
-        create: async () => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
-        get: async () => ({ data: { directory: "/test/dir" } }),
-        prompt: async () => ({}),
-        messages: async () => ({ data: [] }),
-        todo: async () => ({ data: [] }),
-        status: async () => ({ data: {} }),
-        abort: async () => ({}),
-      },
-    }
-  }
+   function createMockClient() {
+     return {
+       session: {
+         create: async () => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+         get: async () => ({ data: { directory: "/test/dir" } }),
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         messages: async () => ({ data: [] }),
+         todo: async () => ({ data: [] }),
+         status: async () => ({ data: {} }),
+         abort: async () => ({}),
+       },
+     }
+   }
 
   beforeEach(() => {
     // given
@@ -1871,13 +1880,14 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 })
 
 describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
-  test("should NOT interrupt task running less than 30 seconds (min runtime guard)", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
-    }
+   test("should NOT interrupt task running less than 30 seconds (min runtime guard)", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
 
     const task: BackgroundTask = {
@@ -1903,12 +1913,13 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("running")
   })
 
-  test("should NOT interrupt task with recent lastUpdate", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
+   test("should NOT interrupt task with recent lastUpdate", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
 
@@ -1935,11 +1946,12 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("running")
   })
 
-  test("should interrupt task with stale lastUpdate (> 3min)", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
+   test("should interrupt task with stale lastUpdate (> 3min)", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
@@ -1971,10 +1983,11 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.completedAt).toBeDefined()
   })
 
-  test("should respect custom staleTimeoutMs config", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
+   test("should respect custom staleTimeoutMs config", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
         abort: async () => ({}),
       },
     }
@@ -2005,13 +2018,14 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("Stale timeout")
   })
 
-  test("should release concurrency before abort", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
-    }
+   test("should release concurrency before abort", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
     stubNotifyParentSession(manager)
 
@@ -2040,13 +2054,14 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("cancelled")
   })
 
-  test("should handle multiple stale tasks in same poll cycle", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
-    }
+   test("should handle multiple stale tasks in same poll cycle", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
     stubNotifyParentSession(manager)
 
@@ -2091,13 +2106,14 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task2.status).toBe("cancelled")
   })
 
-  test("should use default timeout when config not provided", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
-    }
+   test("should use default timeout when config not provided", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
     stubNotifyParentSession(manager)
 
@@ -2126,18 +2142,19 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 })
 
 describe("BackgroundManager.shutdown session abort", () => {
-  test("should call session.abort for all running tasks during shutdown", () => {
-    // given
-    const abortedSessionIDs: string[] = []
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async (args: { path: { id: string } }) => {
-          abortedSessionIDs.push(args.path.id)
-          return {}
-        },
-      },
-    }
+   test("should call session.abort for all running tasks during shutdown", () => {
+     // given
+     const abortedSessionIDs: string[] = []
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async (args: { path: { id: string } }) => {
+           abortedSessionIDs.push(args.path.id)
+           return {}
+         },
+       },
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
 
     const task1: BackgroundTask = {
@@ -2175,18 +2192,19 @@ describe("BackgroundManager.shutdown session abort", () => {
     expect(abortedSessionIDs).toHaveLength(2)
   })
 
-  test("should not call session.abort for completed or cancelled tasks", () => {
-    // given
-    const abortedSessionIDs: string[] = []
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async (args: { path: { id: string } }) => {
-          abortedSessionIDs.push(args.path.id)
-          return {}
-        },
-      },
-    }
+   test("should not call session.abort for completed or cancelled tasks", () => {
+     // given
+     const abortedSessionIDs: string[] = []
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async (args: { path: { id: string } }) => {
+           abortedSessionIDs.push(args.path.id)
+           return {}
+         },
+       },
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
 
     const completedTask: BackgroundTask = {
@@ -2235,15 +2253,16 @@ describe("BackgroundManager.shutdown session abort", () => {
     expect(abortedSessionIDs).toHaveLength(0)
   })
 
-  test("should call onShutdown callback during shutdown", () => {
-    // given
-    let shutdownCalled = false
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
-    }
+   test("should call onShutdown callback during shutdown", () => {
+     // given
+     let shutdownCalled = false
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
     const manager = new BackgroundManager(
       { client, directory: tmpdir() } as unknown as PluginInput,
       undefined,
@@ -2261,14 +2280,15 @@ describe("BackgroundManager.shutdown session abort", () => {
     expect(shutdownCalled).toBe(true)
   })
 
-  test("should not throw when onShutdown callback throws", () => {
-    // given
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
-    }
+   test("should not throw when onShutdown callback throws", () => {
+     // given
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
     const manager = new BackgroundManager(
       { client, directory: tmpdir() } as unknown as PluginInput,
       undefined,
@@ -2509,19 +2529,20 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
     const realDateNow = Date.now
     const baseNow = realDateNow()
 
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-        messages: async (args: { path: { id: string } }) => {
-          messagesCalls.push(args.path.id)
-          return {
-            data: [
-              {
-                info: { role: "assistant" },
-                parts: [{ type: "text", text: "ok" }],
-              },
-            ],
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+         messages: async (args: { path: { id: string } }) => {
+           messagesCalls.push(args.path.id)
+           return {
+             data: [
+               {
+                 info: { role: "assistant" },
+                 parts: [{ type: "text", text: "ok" }],
+               },
+             ],
           }
         },
         todo: async () => ({ data: [] }),
@@ -2566,23 +2587,24 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
   })
 
   test("should not defer when session.idle fires after MIN_IDLE_TIME_MS", async () => {
-    //#given - a running task started more than MIN_IDLE_TIME_MS ago
-    const sessionID = "session-late-idle"
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-        messages: async () => ({
-          data: [
-            {
-              info: { role: "assistant" },
-              parts: [{ type: "text", text: "ok" }],
-            },
-          ],
-        }),
-        todo: async () => ({ data: [] }),
-      },
-    }
+     //#given - a running task started more than MIN_IDLE_TIME_MS ago
+     const sessionID = "session-late-idle"
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+         messages: async () => ({
+           data: [
+             {
+               info: { role: "assistant" },
+               parts: [{ type: "text", text: "ok" }],
+             },
+           ],
+         }),
+         todo: async () => ({ data: [] }),
+       },
+     }
 
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
     stubNotifyParentSession(manager)
@@ -2618,20 +2640,21 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
     const realDateNow = Date.now
     const baseNow = realDateNow()
 
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-        messages: async () => {
-          messagesCallCount += 1
-          return {
-            data: [
-              {
-                info: { role: "assistant" },
-                parts: [{ type: "text", text: "ok" }],
-              },
-            ],
-          }
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+         messages: async () => {
+           messagesCallCount += 1
+           return {
+             data: [
+               {
+                 info: { role: "assistant" },
+                 parts: [{ type: "text", text: "ok" }],
+               },
+             ],
+           }
         },
         todo: async () => ({ data: [] }),
       },
