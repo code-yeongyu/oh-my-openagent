@@ -2284,6 +2284,69 @@ describe("BackgroundManager.shutdown session abort", () => {
   })
 })
 
+describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
+  test("should cancel descendant tasks when parent session is deleted", () => {
+    // given
+    const manager = createBackgroundManager()
+    const parentSessionID = "session-parent"
+    const childTask = createMockTask({
+      id: "task-child",
+      sessionID: "session-child",
+      parentSessionID,
+      status: "running",
+    })
+    const siblingTask = createMockTask({
+      id: "task-sibling",
+      sessionID: "session-sibling",
+      parentSessionID,
+      status: "running",
+    })
+    const grandchildTask = createMockTask({
+      id: "task-grandchild",
+      sessionID: "session-grandchild",
+      parentSessionID: "session-child",
+      status: "pending",
+      startedAt: undefined,
+      queuedAt: new Date(),
+    })
+    const unrelatedTask = createMockTask({
+      id: "task-unrelated",
+      sessionID: "session-unrelated",
+      parentSessionID: "other-parent",
+      status: "running",
+    })
+
+    const taskMap = getTaskMap(manager)
+    taskMap.set(childTask.id, childTask)
+    taskMap.set(siblingTask.id, siblingTask)
+    taskMap.set(grandchildTask.id, grandchildTask)
+    taskMap.set(unrelatedTask.id, unrelatedTask)
+
+    const pendingByParent = getPendingByParent(manager)
+    pendingByParent.set(parentSessionID, new Set([childTask.id, siblingTask.id]))
+    pendingByParent.set("session-child", new Set([grandchildTask.id]))
+
+    // when
+    manager.handleEvent({
+      type: "session.deleted",
+      properties: { info: { id: parentSessionID } },
+    })
+
+    // then
+    expect(taskMap.has(childTask.id)).toBe(false)
+    expect(taskMap.has(siblingTask.id)).toBe(false)
+    expect(taskMap.has(grandchildTask.id)).toBe(false)
+    expect(taskMap.has(unrelatedTask.id)).toBe(true)
+    expect(childTask.status).toBe("cancelled")
+    expect(siblingTask.status).toBe("cancelled")
+    expect(grandchildTask.status).toBe("cancelled")
+    expect(pendingByParent.get(parentSessionID)).toBeUndefined()
+    expect(pendingByParent.get("session-child")).toBeUndefined()
+
+    manager.shutdown()
+  })
+})
+
 describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
   function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
     return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
