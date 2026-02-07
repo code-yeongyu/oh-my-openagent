@@ -175,7 +175,7 @@ export function createClaudeCodeHooksHook(
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown> }
     ): Promise<void> => {
-      if (input.tool === "todowrite" && typeof output.args.todos === "string") {
+      if (input.tool.trim() === "todowrite" && typeof output.args.todos === "string") {
         let parsed: unknown
         try {
           parsed = JSON.parse(output.args.todos)
