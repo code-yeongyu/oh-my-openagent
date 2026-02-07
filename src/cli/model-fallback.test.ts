@@ -376,7 +376,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-5")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
     })
 
     test("Sisyphus is created when multiple fallback providers are available", () => {
@@ -393,7 +393,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-5")
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
     })
 
     test("Sisyphus is omitted when no fallback provider is available (OpenAI not in chain)", () => {
@@ -409,7 +409,7 @@ describe("generateModelConfig", () => {
   })
 
   describe("Hephaestus agent special cases", () => {
-    test("Hephaestus is created when OpenAI is available (has gpt-5.2-codex)", () => {
+    test("Hephaestus is created when OpenAI is available (openai provider connected)", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -417,11 +417,11 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.2-codex")
+      expect(result.agents?.hephaestus?.model).toBe("openai/gpt-5.3-codex")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus is created when Copilot is available (has gpt-5.2-codex)", () => {
+    test("Hephaestus is created when Copilot is available (github-copilot provider connected)", () => {
       // #given
       const config = createConfig({ hasCopilot: true })
 
@@ -429,11 +429,11 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("github-copilot/gpt-5.2-codex")
+      expect(result.agents?.hephaestus?.model).toBe("github-copilot/gpt-5.3-codex")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus is created when OpenCode Zen is available (has gpt-5.2-codex)", () => {
+    test("Hephaestus is created when OpenCode Zen is available (opencode provider connected)", () => {
       // #given
       const config = createConfig({ hasOpencodeZen: true })
 
@@ -441,11 +441,11 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.2-codex")
+      expect(result.agents?.hephaestus?.model).toBe("opencode/gpt-5.3-codex")
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus is omitted when only Claude is available (no gpt-5.2-codex)", () => {
+    test("Hephaestus is omitted when only Claude is available (no required provider connected)", () => {
       // #given
       const config = createConfig({ hasClaude: true })
 
@@ -456,7 +456,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.hephaestus).toBeUndefined()
     })
 
-    test("Hephaestus is omitted when only Gemini is available (no gpt-5.2-codex)", () => {
+    test("Hephaestus is omitted when only Gemini is available (no required provider connected)", () => {
       // #given
       const config = createConfig({ hasGemini: true })
 
@@ -467,7 +467,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.hephaestus).toBeUndefined()
     })
 
-    test("Hephaestus is omitted when only ZAI is available (no gpt-5.2-codex)", () => {
+    test("Hephaestus is omitted when only ZAI is available (no required provider connected)", () => {
       // #given
       const config = createConfig({ hasZaiCodingPlan: true })
 

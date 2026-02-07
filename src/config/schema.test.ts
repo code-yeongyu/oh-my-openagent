@@ -5,6 +5,8 @@ import {
   BrowserAutomationProviderSchema,
   BuiltinCategoryNameSchema,
   CategoryConfigSchema,
+  ExperimentalConfigSchema,
+  GitMasterConfigSchema,
   OhMyOpenCodeConfigSchema,
 } from "./schema"
 
@@ -604,5 +606,130 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
     // then
     expect(result.success).toBe(true)
     expect(result.data?.browser_automation_engine).toBeUndefined()
+  })
+})
+
+describe("ExperimentalConfigSchema feature flags", () => {
+  test("accepts plugin_load_timeout_ms as number", () => {
+    //#given
+    const config = { plugin_load_timeout_ms: 5000 }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.plugin_load_timeout_ms).toBe(5000)
+    }
+  })
+
+  test("rejects plugin_load_timeout_ms below 1000", () => {
+    //#given
+    const config = { plugin_load_timeout_ms: 500 }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("accepts safe_hook_creation as boolean", () => {
+    //#given
+    const config = { safe_hook_creation: false }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.safe_hook_creation).toBe(false)
+    }
+  })
+
+  test("both fields are optional", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.plugin_load_timeout_ms).toBeUndefined()
+      expect(result.data.safe_hook_creation).toBeUndefined()
+    }
+  })
+})
+
+describe("GitMasterConfigSchema", () => {
+  test("accepts boolean true for commit_footer", () => {
+    //#given
+    const config = { commit_footer: true }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(true)
+    }
+  })
+
+  test("accepts boolean false for commit_footer", () => {
+    //#given
+    const config = { commit_footer: false }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(false)
+    }
+  })
+
+  test("accepts string value for commit_footer", () => {
+    //#given
+    const config = { commit_footer: "Custom footer text" }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe("Custom footer text")
+    }
+  })
+
+  test("defaults commit_footer to true when not provided", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(true)
+    }
+  })
+
+  test("rejects number for commit_footer", () => {
+    //#given
+    const config = { commit_footer: 123 }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
   })
 })

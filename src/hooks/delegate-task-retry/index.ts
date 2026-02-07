@@ -45,7 +45,7 @@ export const DELEGATE_TASK_ERROR_PATTERNS: DelegateTaskErrorPattern[] = [
   {
     pattern: "Cannot call primary agent",
     errorType: "primary_agent",
-    fixHint: "Primary agents cannot be called via delegate_task. Use a subagent like 'explore', 'oracle', or 'librarian'",
+    fixHint: "Primary agents cannot be called via task. Use a subagent like 'explore', 'oracle', or 'librarian'",
   },
   {
     pattern: "Skills not found",
@@ -85,11 +85,11 @@ export function buildRetryGuidance(errorInfo: DetectedError): string {
   )
 
   if (!pattern) {
-    return `[delegate_task ERROR] Fix the error and retry with correct parameters.`
+    return `[task ERROR] Fix the error and retry with correct parameters.`
   }
 
   let guidance = `
-[delegate_task CALL FAILED - IMMEDIATE RETRY REQUIRED]
+[task CALL FAILED - IMMEDIATE RETRY REQUIRED]
 
 **Error Type**: ${errorInfo.errorType}
 **Fix**: ${pattern.fixHint}
@@ -101,11 +101,11 @@ export function buildRetryGuidance(errorInfo: DetectedError): string {
   }
 
   guidance += `
-**Action**: Retry delegate_task NOW with corrected parameters.
+**Action**: Retry task NOW with corrected parameters.
 
 Example of CORRECT call:
 \`\`\`
-delegate_task(
+task(
   description="Task description",
   prompt="Detailed prompt...",
   category="unspecified-low",  // OR subagent_type="explore"
@@ -124,7 +124,7 @@ export function createDelegateTaskRetryHook(_ctx: PluginInput) {
       input: { tool: string; sessionID: string; callID: string },
       output: { title: string; output: string; metadata: unknown }
     ) => {
-      if (input.tool.toLowerCase() !== "delegate_task") return
+      if (input.tool.toLowerCase() !== "task") return
 
       const errorInfo = detectDelegateTaskError(output.output)
       if (errorInfo) {

@@ -9,7 +9,7 @@ Instead of delegating everything to a single AI agent, it's far more efficient t
 - **Category**: "What kind of work is this?" (determines model, temperature, prompt mindset)
 - **Skill**: "What tools and knowledge are needed?" (injects specialized knowledge, MCP tools, workflows)
 
-By combining these two concepts, you can generate optimal agents through `delegate_task`.
+By combining these two concepts, you can generate optimal agents through `task`.
 
 ---
 
@@ -22,20 +22,20 @@ A Category is an agent configuration preset optimized for specific domains.
 | Category | Default Model | Use Cases |
 |----------|---------------|-----------|
 | `visual-engineering` | `google/gemini-3-pro` | Frontend, UI/UX, design, styling, animation |
-| `ultrabrain` | `openai/gpt-5.2-codex` (xhigh) | Deep logical reasoning, complex architecture decisions requiring extensive analysis |
-| `deep` | `openai/gpt-5.2-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
+| `ultrabrain` | `openai/gpt-5.3-codex` (xhigh) | Deep logical reasoning, complex architecture decisions requiring extensive analysis |
+| `deep` | `openai/gpt-5.3-codex` (medium) | Goal-oriented autonomous problem-solving. Thorough research before action. For hairy problems requiring deep understanding. |
 | `artistry` | `google/gemini-3-pro` (max) | Highly creative/artistic tasks, novel ideas |
 | `quick` | `anthropic/claude-haiku-4-5` | Trivial tasks - single file changes, typo fixes, simple modifications |
 | `unspecified-low` | `anthropic/claude-sonnet-4-5` | Tasks that don't fit other categories, low effort required |
-| `unspecified-high` | `anthropic/claude-opus-4-5` (max) | Tasks that don't fit other categories, high effort required |
+| `unspecified-high` | `anthropic/claude-opus-4-6` (max) | Tasks that don't fit other categories, high effort required |
 | `writing` | `google/gemini-3-flash` | Documentation, prose, technical writing |
 
 ### Usage
 
-Specify the `category` parameter when invoking the `delegate_task` tool.
+Specify the `category` parameter when invoking the `task` tool.
 
 ```typescript
-delegate_task(
+task(
   category="visual-engineering",
   prompt="Add a responsive chart component to the dashboard page"
 )
@@ -74,7 +74,7 @@ A Skill is a mechanism that injects **specialized knowledge (Context)** and **to
 Add desired skill names to the `load_skills` array.
 
 ```typescript
-delegate_task(
+task(
   category="quick",
   load_skills=["git-master"],
   prompt="Commit current changes. Follow commit message style."
@@ -126,7 +126,7 @@ You can create powerful specialized agents by combining Categories and Skills.
 
 ---
 
-## 5. delegate_task Prompt Guide
+## 5. task Prompt Guide
 
 When delegating, **clear and specific** prompts are essential. Include these 7 elements:
 
@@ -158,8 +158,8 @@ You can fine-tune categories in `oh-my-opencode.json`.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `description` | string | Human-readable description of the category's purpose. Shown in delegate_task prompt. |
-| `model` | string | AI model ID to use (e.g., `anthropic/claude-opus-4-5`) |
+| `description` | string | Human-readable description of the category's purpose. Shown in task prompt. |
+| `model` | string | AI model ID to use (e.g., `anthropic/claude-opus-4-6`) |
 | `variant` | string | Model variant (e.g., `max`, `xhigh`) |
 | `temperature` | number | Creativity level (0.0 ~ 2.0). Lower is more deterministic. |
 | `top_p` | number | Nucleus sampling parameter (0.0 ~ 1.0) |
@@ -191,7 +191,7 @@ You can fine-tune categories in `oh-my-opencode.json`.
 
     // 3. Configure thinking model and restrict tools
     "deep-reasoning": {
-      "model": "anthropic/claude-opus-4-5",
+      "model": "anthropic/claude-opus-4-6",
       "thinking": {
         "type": "enabled",
         "budgetTokens": 32000

@@ -1,4 +1,5 @@
 import type { Plugin, ToolDefinition } from "@opencode-ai/plugin";
+import type { AvailableSkill } from "./agents/dynamic-agent-prompt-builder";
 import {
   createTodoContinuationEnforcer,
   createContextWindowMonitorHook,
@@ -35,11 +36,13 @@ import {
   createSubagentQuestionBlockerHook,
   createStopContinuationGuardHook,
   createCompactionContextInjector,
+  createCompactionTodoPreserverHook,
   createUnstableAgentBabysitterHook,
   createPreemptiveCompactionHook,
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
 } from "./hooks";
+import { createAnthropicEffortHook } from "./hooks/anthropic-effort";
 import {
   contextCollector,
   createContextInjectorMessagesTransformHook,
@@ -57,6 +60,7 @@ import {
   discoverOpencodeProjectSkills,
   mergeSkills,
 } from "./features/opencode-skill-loader";
+import type { SkillScope } from "./features/opencode-skill-loader/types";
 import { createBuiltinSkills } from "./features/builtin-skills";
 import { getSystemMcpServerNames } from "./features/claude-code-mcp-loader";
 import {
@@ -84,7 +88,15 @@ import {
   createTaskGetTool,
   createTaskList,
   createTaskUpdateTool,
+  createGrepTools,
+  createGlobTools,
+  createAstGrepTools,
+  createSessionManagerTools,
 } from "./tools";
+import {
+  CATEGORY_DESCRIPTIONS,
+  DEFAULT_CATEGORIES,
+} from "./tools/delegate-task/constants";
 import { BackgroundManager } from "./features/background-agent";
 import { SkillMcpManager } from "./features/skill-mcp-manager";
 import { initTaskToastManager } from "./features/task-toast-manager";
@@ -102,9 +114,12 @@ import {
   OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
   injectServerAuthIntoClient,
 } from "./shared";
+import { filterDisabledTools } from "./shared/disabled-tools";
+import { safeCreateHook } from "./shared/safe-create-hook";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
+import { consumeToolMetadata } from "./features/tool-metadata-store";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
@@ -116,6 +131,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
+
   const firstMessageVariantGate = createFirstMessageVariantGate();
 
   const tmuxConfig = {
@@ -126,21 +142,22 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     agent_pane_min_width: pluginConfig.tmux?.agent_pane_min_width ?? 40,
   } as const;
   const isHookEnabled = (hookName: HookName) => !disabledHooks.has(hookName);
+  const safeHookEnabled = pluginConfig.experimental?.safe_hook_creation ?? true;
 
   const modelCacheState = createModelCacheState();
 
   const contextWindowMonitor = isHookEnabled("context-window-monitor")
-    ? createContextWindowMonitorHook(ctx)
+    ? safeCreateHook("context-window-monitor", () => createContextWindowMonitorHook(ctx), { enabled: safeHookEnabled })
     : null;
   const preemptiveCompaction =
     isHookEnabled("preemptive-compaction") &&
     pluginConfig.experimental?.preemptive_compaction
-      ? createPreemptiveCompactionHook(ctx)
+      ? safeCreateHook("preemptive-compaction", () => createPreemptiveCompactionHook(ctx), { enabled: safeHookEnabled })
       : null;
   const sessionRecovery = isHookEnabled("session-recovery")
-    ? createSessionRecoveryHook(ctx, {
+    ? safeCreateHook("session-recovery", () => createSessionRecoveryHook(ctx, {
         experimental: pluginConfig.experimental,
-      })
+      }), { enabled: safeHookEnabled })
     : null;
 
   // Check for conflicting notification plugins before creating session-notification
@@ -157,17 +174,17 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         allPlugins: externalNotifier.allPlugins,
       });
     } else {
-      sessionNotification = createSessionNotification(ctx);
+      sessionNotification = safeCreateHook("session-notification", () => createSessionNotification(ctx), { enabled: safeHookEnabled });
     }
   }
 
   const commentChecker = isHookEnabled("comment-checker")
-    ? createCommentCheckerHooks(pluginConfig.comment_checker)
+    ? safeCreateHook("comment-checker", () => createCommentCheckerHooks(pluginConfig.comment_checker), { enabled: safeHookEnabled })
     : null;
   const toolOutputTruncator = isHookEnabled("tool-output-truncator")
-    ? createToolOutputTruncatorHook(ctx, {
+    ? safeCreateHook("tool-output-truncator", () => createToolOutputTruncatorHook(ctx, {
         experimental: pluginConfig.experimental,
-      })
+      }), { enabled: safeHookEnabled })
     : null;
   // Check for native OpenCode AGENTS.md injection support before creating hook
   let directoryAgentsInjector = null;
@@ -186,18 +203,18 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         },
       );
     } else {
-      directoryAgentsInjector = createDirectoryAgentsInjectorHook(ctx);
+      directoryAgentsInjector = safeCreateHook("directory-agents-injector", () => createDirectoryAgentsInjectorHook(ctx), { enabled: safeHookEnabled });
     }
   }
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
-    ? createDirectoryReadmeInjectorHook(ctx)
+    ? safeCreateHook("directory-readme-injector", () => createDirectoryReadmeInjectorHook(ctx), { enabled: safeHookEnabled })
     : null;
   const emptyTaskResponseDetector = isHookEnabled(
     "empty-task-response-detector",
   )
-    ? createEmptyTaskResponseDetectorHook(ctx)
+    ? safeCreateHook("empty-task-response-detector", () => createEmptyTaskResponseDetectorHook(ctx), { enabled: safeHookEnabled })
     : null;
-  const thinkMode = isHookEnabled("think-mode") ? createThinkModeHook() : null;
+  const thinkMode = isHookEnabled("think-mode") ? safeCreateHook("think-mode", () => createThinkModeHook(), { enabled: safeHookEnabled }) : null;
   const claudeCodeHooks = createClaudeCodeHooksHook(
     ctx,
     {
@@ -210,48 +227,46 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const anthropicContextWindowLimitRecovery = isHookEnabled(
     "anthropic-context-window-limit-recovery",
   )
-    ? createAnthropicContextWindowLimitRecoveryHook(ctx, {
+    ? safeCreateHook("anthropic-context-window-limit-recovery", () => createAnthropicContextWindowLimitRecoveryHook(ctx, {
         experimental: pluginConfig.experimental,
-      })
+      }), { enabled: safeHookEnabled })
     : null;
   const rulesInjector = isHookEnabled("rules-injector")
-    ? createRulesInjectorHook(ctx)
+    ? safeCreateHook("rules-injector", () => createRulesInjectorHook(ctx), { enabled: safeHookEnabled })
     : null;
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
-    ? createAutoUpdateCheckerHook(ctx, {
+    ? safeCreateHook("auto-update-checker", () => createAutoUpdateCheckerHook(ctx, {
         showStartupToast: isHookEnabled("startup-toast"),
         isSisyphusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
         autoUpdate: pluginConfig.auto_update ?? true,
-      })
+      }), { enabled: safeHookEnabled })
     : null;
   const keywordDetector = isHookEnabled("keyword-detector")
-    ? createKeywordDetectorHook(ctx, contextCollector)
+    ? safeCreateHook("keyword-detector", () => createKeywordDetectorHook(ctx, contextCollector), { enabled: safeHookEnabled })
     : null;
   const contextInjectorMessagesTransform =
     createContextInjectorMessagesTransformHook(contextCollector);
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
-    ? createAgentUsageReminderHook(ctx)
+    ? safeCreateHook("agent-usage-reminder", () => createAgentUsageReminderHook(ctx), { enabled: safeHookEnabled })
     : null;
   const nonInteractiveEnv = isHookEnabled("non-interactive-env")
-    ? createNonInteractiveEnvHook(ctx)
+    ? safeCreateHook("non-interactive-env", () => createNonInteractiveEnvHook(ctx), { enabled: safeHookEnabled })
     : null;
   const interactiveBashSession = isHookEnabled("interactive-bash-session")
-    ? createInteractiveBashSessionHook(ctx)
+    ? safeCreateHook("interactive-bash-session", () => createInteractiveBashSessionHook(ctx), { enabled: safeHookEnabled })
     : null;
 
   const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
-    ? createThinkingBlockValidatorHook()
+    ? safeCreateHook("thinking-block-validator", () => createThinkingBlockValidatorHook(), { enabled: safeHookEnabled })
     : null;
 
-  const categorySkillReminder = isHookEnabled("category-skill-reminder")
-    ? createCategorySkillReminderHook(ctx)
-    : null;
+  let categorySkillReminder: ReturnType<typeof createCategorySkillReminderHook> | null = null;
 
   const ralphLoop = isHookEnabled("ralph-loop")
-    ? createRalphLoopHook(ctx, {
+    ? safeCreateHook("ralph-loop", () => createRalphLoopHook(ctx, {
         config: pluginConfig.ralph_loop,
         checkSessionExists: async (sessionId) => sessionExists(sessionId),
-      })
+      }), { enabled: safeHookEnabled })
     : null;
 
   const reviewLoop = isHookEnabled("review-loop")
@@ -262,38 +277,42 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     : null;
 
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
-    ? createEditErrorRecoveryHook(ctx)
+    ? safeCreateHook("edit-error-recovery", () => createEditErrorRecoveryHook(ctx), { enabled: safeHookEnabled })
     : null;
 
   const delegateTaskRetry = isHookEnabled("delegate-task-retry")
-    ? createDelegateTaskRetryHook(ctx)
+    ? safeCreateHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx), { enabled: safeHookEnabled })
     : null;
 
   const startWork = isHookEnabled("start-work")
-    ? createStartWorkHook(ctx)
+    ? safeCreateHook("start-work", () => createStartWorkHook(ctx), { enabled: safeHookEnabled })
     : null;
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
-    ? createPrometheusMdOnlyHook(ctx)
+    ? safeCreateHook("prometheus-md-only", () => createPrometheusMdOnlyHook(ctx), { enabled: safeHookEnabled })
     : null;
 
   const sisyphusJuniorNotepad = isHookEnabled("sisyphus-junior-notepad")
-    ? createSisyphusJuniorNotepadHook(ctx)
+    ? safeCreateHook("sisyphus-junior-notepad", () => createSisyphusJuniorNotepadHook(ctx), { enabled: safeHookEnabled })
     : null;
 
   const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")
-    ? createTasksTodowriteDisablerHook({
+    ? safeCreateHook("tasks-todowrite-disabler", () => createTasksTodowriteDisablerHook({
         experimental: pluginConfig.experimental,
-      })
+      }), { enabled: safeHookEnabled })
     : null;
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook();
   const subagentQuestionBlocker = createSubagentQuestionBlockerHook();
   const writeExistingFileGuard = isHookEnabled("write-existing-file-guard")
-    ? createWriteExistingFileGuardHook(ctx)
+    ? safeCreateHook("write-existing-file-guard", () => createWriteExistingFileGuardHook(ctx), { enabled: safeHookEnabled })
     : null;
 
   const taskResumeInfo = createTaskResumeInfoHook();
+
+  const anthropicEffort = isHookEnabled("anthropic-effort")
+    ? safeCreateHook("anthropic-effort", () => createAnthropicEffortHook(), { enabled: safeHookEnabled })
+    : null;
 
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig);
 
@@ -329,28 +348,36 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   );
 
   const atlasHook = isHookEnabled("atlas")
-    ? createAtlasHook(ctx, { directory: ctx.directory, backgroundManager })
+    ? safeCreateHook("atlas", () => createAtlasHook(ctx, { 
+        directory: ctx.directory, 
+        backgroundManager,
+        isContinuationStopped: (sessionID: string) => stopContinuationGuard?.isStopped(sessionID) ?? false,
+      }), { enabled: safeHookEnabled })
     : null;
 
   initTaskToastManager(ctx.client);
 
   const stopContinuationGuard = isHookEnabled("stop-continuation-guard")
-    ? createStopContinuationGuardHook(ctx)
+    ? safeCreateHook("stop-continuation-guard", () => createStopContinuationGuardHook(ctx), { enabled: safeHookEnabled })
     : null;
 
   const compactionContextInjector = isHookEnabled("compaction-context-injector")
-    ? createCompactionContextInjector()
+    ? safeCreateHook("compaction-context-injector", () => createCompactionContextInjector(), { enabled: safeHookEnabled })
+    : null;
+
+  const compactionTodoPreserver = isHookEnabled("compaction-todo-preserver")
+    ? safeCreateHook("compaction-todo-preserver", () => createCompactionTodoPreserverHook(ctx), { enabled: safeHookEnabled })
     : null;
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
-    ? createTodoContinuationEnforcer(ctx, {
+    ? safeCreateHook("todo-continuation-enforcer", () => createTodoContinuationEnforcer(ctx, {
         backgroundManager,
         isContinuationStopped: stopContinuationGuard?.isStopped,
-      })
+      }), { enabled: safeHookEnabled })
     : null;
 
   const unstableAgentBabysitter = isHookEnabled("unstable-agent-babysitter")
-    ? createUnstableAgentBabysitterHook(
+    ? safeCreateHook("unstable-agent-babysitter", () => createUnstableAgentBabysitterHook(
         {
           directory: ctx.directory,
           client: {
@@ -378,7 +405,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           backgroundManager,
           config: pluginConfig.babysitting,
         },
-      )
+      ), { enabled: safeHookEnabled })
     : null;
 
   if (sessionRecovery && todoContinuationEnforcer) {
@@ -389,7 +416,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   }
 
   const backgroundNotificationHook = isHookEnabled("background-notification")
-    ? createBackgroundNotificationHook(backgroundManager)
+    ? safeCreateHook("background-notification", () => createBackgroundNotificationHook(backgroundManager), { enabled: safeHookEnabled })
     : null;
   const backgroundTools = createBackgroundTools(backgroundManager, ctx.client);
 
@@ -401,33 +428,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const browserProvider =
     pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
-  const delegateTask = createDelegateTask({
-    manager: backgroundManager,
-    client: ctx.client,
-    directory: ctx.directory,
-    userCategories: pluginConfig.categories,
-    gitMasterConfig: pluginConfig.git_master,
-    sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
-    browserProvider,
-    disabledSkills,
-    onSyncSessionCreated: async (event) => {
-      log("[index] onSyncSessionCreated callback", {
-        sessionID: event.sessionID,
-        parentID: event.parentID,
-        title: event.title,
-      });
-      await tmuxSessionManager.onSessionCreated({
-        type: "session.created",
-        properties: {
-          info: {
-            id: event.sessionID,
-            parentID: event.parentID,
-            title: event.title,
-          },
-        },
-      });
-    },
-  });
   const systemMcpNames = getSystemMcpServerNames();
   const builtinSkills = createBuiltinSkills({ browserProvider, disabledSkills }).filter((skill) => {
       if (skill.mcpConfig) {
@@ -454,6 +454,68 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     projectSkills,
     opencodeProjectSkills,
   );
+
+  function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
+    if (scope === "user" || scope === "opencode") return "user";
+    if (scope === "project" || scope === "opencode-project") return "project";
+    return "plugin";
+  }
+
+  const availableSkills: AvailableSkill[] = mergedSkills.map((skill) => ({
+    name: skill.name,
+    description: skill.definition.description ?? "",
+    location: mapScopeToLocation(skill.scope),
+  }));
+
+  const mergedCategories = pluginConfig.categories
+    ? { ...DEFAULT_CATEGORIES, ...pluginConfig.categories }
+    : DEFAULT_CATEGORIES;
+
+  const availableCategories = Object.entries(mergedCategories).map(
+    ([name, categoryConfig]) => ({
+      name,
+      description:
+        pluginConfig.categories?.[name]?.description
+          ?? CATEGORY_DESCRIPTIONS[name]
+          ?? "General tasks",
+      model: categoryConfig.model,
+    }),
+  );
+
+  const delegateTask = createDelegateTask({
+    manager: backgroundManager,
+    client: ctx.client,
+    directory: ctx.directory,
+    userCategories: pluginConfig.categories,
+    gitMasterConfig: pluginConfig.git_master,
+    sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
+    browserProvider,
+    disabledSkills,
+    availableCategories,
+    availableSkills,
+    onSyncSessionCreated: async (event) => {
+      log("[index] onSyncSessionCreated callback", {
+        sessionID: event.sessionID,
+        parentID: event.parentID,
+        title: event.title,
+      });
+      await tmuxSessionManager.onSessionCreated({
+        type: "session.created",
+        properties: {
+          info: {
+            id: event.sessionID,
+            parentID: event.parentID,
+            title: event.title,
+          },
+        },
+      });
+    },
+  });
+
+  categorySkillReminder = isHookEnabled("category-skill-reminder")
+    ? safeCreateHook("category-skill-reminder", () => createCategorySkillReminderHook(ctx, availableSkills), { enabled: safeHookEnabled })
+    : null;
+
   const skillMcpManager = new SkillMcpManager();
   const getSessionIDForMcp = () => getMainSessionID() || "";
   const skillTool = createSkillTool({
@@ -476,7 +538,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   });
 
   const autoSlashCommand = isHookEnabled("auto-slash-command")
-    ? createAutoSlashCommandHook({ skills: mergedSkills })
+    ? safeCreateHook("auto-slash-command", () => createAutoSlashCommandHook({ skills: mergedSkills }), { enabled: safeHookEnabled })
     : null;
 
   const configHandler = createConfigHandler({
@@ -495,18 +557,52 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
     : {};
 
+  const allTools: Record<string, ToolDefinition> = {
+    ...builtinTools,
+    ...createGrepTools(ctx),
+    ...createGlobTools(ctx),
+    ...createAstGrepTools(ctx),
+    ...createSessionManagerTools(ctx),
+    ...backgroundTools,
+    call_omo_agent: callOmoAgent,
+    ...(lookAt ? { look_at: lookAt } : {}),
+      task: delegateTask,
+    skill: skillTool,
+    skill_mcp: skillMcpTool,
+    slashcommand: slashcommandTool,
+    interactive_bash,
+    ...taskToolsRecord,
+  };
+
+  const filteredTools: Record<string, ToolDefinition> = filterDisabledTools(
+    allTools,
+    pluginConfig.disabled_tools,
+  );
+
   return {
-    tool: {
-      ...builtinTools,
-      ...backgroundTools,
-      call_omo_agent: callOmoAgent,
-      ...(lookAt ? { look_at: lookAt } : {}),
-      delegate_task: delegateTask,
-      skill: skillTool,
-      skill_mcp: skillMcpTool,
-      slashcommand: slashcommandTool,
-      interactive_bash,
-      ...taskToolsRecord,
+    tool: filteredTools,
+
+    "chat.params": async (
+      input: {
+        sessionID: string
+        agent: string
+        model: Record<string, unknown>
+        provider: Record<string, unknown>
+        message: Record<string, unknown>
+      },
+      output: {
+        temperature: number
+        topP: number
+        topK: number
+        options: Record<string, unknown>
+      },
+    ) => {
+      const model = input.model as { providerID: string; modelID: string }
+      const message = input.message as { variant?: string }
+      await anthropicEffort?.["chat.params"]?.(
+        { ...input, agent: { name: input.agent }, model, provider: input.provider as { id: string }, message },
+        output,
+      );
     },
 
     "chat.message": async (input, output) => {
@@ -541,7 +637,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       await stopContinuationGuard?.["chat.message"]?.(input);
       await keywordDetector?.["chat.message"]?.(input, output);
-      await claudeCodeHooks["chat.message"]?.(input, output);
+      await claudeCodeHooks?.["chat.message"]?.(input, output);
       await autoSlashCommand?.["chat.message"]?.(input, output);
       await startWork?.["chat.message"]?.(input, output);
 
@@ -661,7 +757,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
     event: async (input) => {
       await autoUpdateChecker?.event(input);
-      await claudeCodeHooks.event(input);
+      await claudeCodeHooks?.event?.(input);
       await backgroundNotificationHook?.event(input);
       await sessionNotification?.(input);
       await todoContinuationEnforcer?.handler(input);
@@ -678,6 +774,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await ralphLoop?.event(input);
       await reviewLoop?.event(input);
       await stopContinuationGuard?.event(input);
+      await compactionTodoPreserver?.event(input);
       await atlasHook?.handler(input);
 
       const { event } = input;
@@ -762,10 +859,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.before": async (input, output) => {
-      await subagentQuestionBlocker["tool.execute.before"]?.(input, output);
+      await subagentQuestionBlocker?.["tool.execute.before"]?.(input, output);
       await writeExistingFileGuard?.["tool.execute.before"]?.(input, output);
-      await questionLabelTruncator["tool.execute.before"]?.(input, output);
-      await claudeCodeHooks["tool.execute.before"](input, output);
+      await questionLabelTruncator?.["tool.execute.before"]?.(input, output);
+      await claudeCodeHooks?.["tool.execute.before"]?.(input, output);
       await nonInteractiveEnv?.["tool.execute.before"](input, output);
       await commentChecker?.["tool.execute.before"]?.(input, output);
       await directoryAgentsInjector?.["tool.execute.before"]?.(input, output);
@@ -778,16 +875,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
-        const subagentType = args.subagent_type as string;
-        const isExploreOrLibrarian = ["explore", "librarian"].some(
-          (name) => name.toLowerCase() === (subagentType ?? "").toLowerCase(),
-        );
-
-        args.tools = {
-          ...(args.tools as Record<string, boolean> | undefined),
-          delegate_task: false,
-          ...(isExploreOrLibrarian ? { call_omo_agent: false } : {}),
-        };
+        const category = typeof args.category === "string" ? args.category : undefined;
+        const subagentType = typeof args.subagent_type === "string" ? args.subagent_type : undefined;
+        if (category && !subagentType) {
+          args.subagent_type = "sisyphus-junior";
+        }
       }
 
       if (ralphLoop && input.tool === "slashcommand") {
@@ -878,7 +970,20 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       if (!output) {
         return;
       }
-      await claudeCodeHooks["tool.execute.after"](input, output);
+
+      // Restore metadata that fromPlugin() overwrites with { truncated, outputPath }.
+      // This must run FIRST, before any hook reads output.metadata.
+      const stored = consumeToolMetadata(input.sessionID, input.callID)
+      if (stored) {
+        if (stored.title) {
+          output.title = stored.title
+        }
+        if (stored.metadata) {
+          output.metadata = { ...output.metadata, ...stored.metadata }
+        }
+      }
+
+      await claudeCodeHooks?.["tool.execute.after"]?.(input, output);
       await toolOutputTruncator?.["tool.execute.after"](input, output);
       await preemptiveCompaction?.["tool.execute.after"](input, output);
       await contextWindowMonitor?.["tool.execute.after"](input, output);
@@ -893,20 +998,18 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await editErrorRecovery?.["tool.execute.after"](input, output);
       await delegateTaskRetry?.["tool.execute.after"](input, output);
       await atlasHook?.["tool.execute.after"]?.(input, output);
-      await taskResumeInfo["tool.execute.after"](input, output);
+      await taskResumeInfo?.["tool.execute.after"]?.(input, output);
     },
 
-    "experimental.session.compacting": async (input: { sessionID: string }) => {
+    "experimental.session.compacting": async (
+      _input: { sessionID: string },
+      output: { context: string[] },
+    ): Promise<void> => {
+      await compactionTodoPreserver?.capture(_input.sessionID);
       if (!compactionContextInjector) {
         return;
       }
-      await compactionContextInjector({
-        sessionID: input.sessionID,
-        providerID: "anthropic",
-        modelID: "claude-opus-4-5",
-        usageRatio: 0.8,
-        directory: ctx.directory,
-      });
+      output.context.push(compactionContextInjector());
     },
   };
 };

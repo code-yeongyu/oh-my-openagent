@@ -1,4 +1,9 @@
 import type { CategoryConfig } from "../../config/schema"
+import type {
+   AvailableCategory,
+   AvailableSkill,
+ } from "../../agents/dynamic-agent-prompt-builder"
+import { truncateDescription } from "../../shared/truncate-description"
 
 export const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
 You are working on VISUAL/UI tasks.
@@ -194,12 +199,12 @@ You are NOT an interactive assistant. You are an autonomous problem-solver.
 
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   "visual-engineering": { model: "google/gemini-3-pro" },
-  ultrabrain: { model: "openai/gpt-5.2-codex", variant: "xhigh" },
-  deep: { model: "openai/gpt-5.2-codex", variant: "medium" },
+  ultrabrain: { model: "openai/gpt-5.3-codex", variant: "xhigh" },
+  deep: { model: "openai/gpt-5.3-codex", variant: "medium" },
   artistry: { model: "google/gemini-3-pro", variant: "high" },
   quick: { model: "anthropic/claude-haiku-4-5" },
   "unspecified-low": { model: "anthropic/claude-sonnet-4-5" },
-  "unspecified-high": { model: "anthropic/claude-opus-4-5", variant: "max" },
+  "unspecified-high": { model: "anthropic/claude-opus-4-6", variant: "max" },
   writing: { model: "google/gemini-3-flash" },
 }
 
@@ -231,7 +236,7 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
  * then summarize user requirements and clarify uncertainties before proceeding.
  * Also MANDATES dependency graphs, parallel execution analysis, and category+skill recommendations.
  */
-export const PLAN_AGENT_SYSTEM_PREPEND = `<system>
+export const PLAN_AGENT_SYSTEM_PREPEND_STATIC_BEFORE_SKILLS = `<system>
 BEFORE you begin planning, you MUST first understand the user's request deeply.
 
 MANDATORY CONTEXT GATHERING PROTOCOL:
@@ -337,39 +342,9 @@ WHY THIS MATTERS:
 FOR EVERY TASK, YOU MUST RECOMMEND:
 1. Which CATEGORY to use for delegation
 2. Which SKILLS to load for the delegated agent
+`
 
-### AVAILABLE CATEGORIES
-
-| Category | Best For | Model |
-|----------|----------|-------|
-| \`visual-engineering\` | Frontend, UI/UX, design, styling, animation | google/gemini-3-pro |
-| \`ultrabrain\` | Complex architecture, deep logical reasoning | openai/gpt-5.2-codex |
-| \`artistry\` | Highly creative/artistic tasks, novel ideas | google/gemini-3-pro |
-| \`quick\` | Trivial tasks - single file, typo fixes | anthropic/claude-haiku-4-5 |
-| \`unspecified-low\` | Moderate effort, doesn't fit other categories | anthropic/claude-sonnet-4-5 |
-| \`unspecified-high\` | High effort, doesn't fit other categories | anthropic/claude-opus-4-5 |
-| \`writing\` | Documentation, prose, technical writing | google/gemini-3-flash |
-
-### AVAILABLE SKILLS (ALWAYS EVALUATE ALL)
-
-Skills inject specialized expertise into the delegated agent.
-YOU MUST evaluate EVERY skill and justify inclusions/omissions.
-
-| Skill | Domain |
-|-------|--------|
-| \`agent-browser\` | Browser automation, web testing |
-| \`frontend-ui-ux\` | Stunning UI/UX design |
-| \`git-master\` | Atomic commits, git operations |
-| \`dev-browser\` | Persistent browser state automation |
-| \`typescript-programmer\` | Production TypeScript code |
-| \`python-programmer\` | Production Python code |
-| \`svelte-programmer\` | Svelte components |
-| \`golang-tui-programmer\` | Go TUI with Charmbracelet |
-| \`python-debugger\` | Interactive Python debugging |
-| \`data-scientist\` | DuckDB/Polars data processing |
-| \`prompt-engineer\` | AI prompt optimization |
-
-### REQUIRED OUTPUT FORMAT
+export const PLAN_AGENT_SYSTEM_PREPEND_STATIC_AFTER_SKILLS = `### REQUIRED OUTPUT FORMAT
 
 For EACH task, include a recommendation block:
 
@@ -485,13 +460,13 @@ YOU MUST END YOUR RESPONSE WITH THIS SECTION.
 
 1. **Wave 1**: Fire these tasks IN PARALLEL (no dependencies)
    \`\`\`
-   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task 1: ...")
-   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task N: ...")
+   task(category="...", load_skills=[...], run_in_background=false, prompt="Task 1: ...")
+   task(category="...", load_skills=[...], run_in_background=false, prompt="Task N: ...")
    \`\`\`
 
 2. **Wave 2**: After Wave 1 completes, fire next wave IN PARALLEL
    \`\`\`
-   delegate_task(category="...", load_skills=[...], run_in_background=false, prompt="Task 2: ...")
+   task(category="...", load_skills=[...], run_in_background=false, prompt="Task 2: ...")
    \`\`\`
 
 3. Continue until all waves complete
@@ -502,11 +477,62 @@ YOU MUST END YOUR RESPONSE WITH THIS SECTION.
 WHY THIS FORMAT IS MANDATORY:
 - Caller can directly copy TODO items
 - Wave grouping enables parallel execution
-- Each task has clear delegate_task parameters
+- Each task has clear task parameters
 - QA criteria ensure verifiable completion
 </FINAL_OUTPUT_FOR_CALLER>
 
 `
+
+function renderPlanAgentCategoryRows(categories: AvailableCategory[]): string[] {
+  const sorted = [...categories].sort((a, b) => a.name.localeCompare(b.name))
+  return sorted.map((category) => {
+    const bestFor = category.description || category.name
+    const model = category.model || ""
+    return `| \`${category.name}\` | ${bestFor} | ${model} |`
+  })
+}
+
+function renderPlanAgentSkillRows(skills: AvailableSkill[]): string[] {
+   const sorted = [...skills].sort((a, b) => a.name.localeCompare(b.name))
+   return sorted.map((skill) => {
+     const domain = truncateDescription(skill.description).trim() || skill.name
+     return `| \`${skill.name}\` | ${domain} |`
+   })
+ }
+
+export function buildPlanAgentSkillsSection(
+  categories: AvailableCategory[] = [],
+  skills: AvailableSkill[] = []
+): string {
+  const categoryRows = renderPlanAgentCategoryRows(categories)
+  const skillRows = renderPlanAgentSkillRows(skills)
+
+  return `### AVAILABLE CATEGORIES
+
+| Category | Best For | Model |
+|----------|----------|-------|
+${categoryRows.join("\n")}
+
+### AVAILABLE SKILLS (ALWAYS EVALUATE ALL)
+
+Skills inject specialized expertise into the delegated agent.
+YOU MUST evaluate EVERY skill and justify inclusions/omissions.
+
+| Skill | Domain |
+|-------|--------|
+${skillRows.join("\n")}`
+}
+
+export function buildPlanAgentSystemPrepend(
+  categories: AvailableCategory[] = [],
+  skills: AvailableSkill[] = []
+): string {
+  return [
+    PLAN_AGENT_SYSTEM_PREPEND_STATIC_BEFORE_SKILLS,
+    buildPlanAgentSkillsSection(categories, skills),
+    PLAN_AGENT_SYSTEM_PREPEND_STATIC_AFTER_SKILLS,
+  ].join("\n\n")
+}
 
 /**
  * List of agent names that should be treated as plan agents.
@@ -524,4 +550,3 @@ export function isPlanAgent(agentName: string | undefined): boolean {
   const lowerName = agentName.toLowerCase().trim()
   return PLAN_AGENT_NAMES.some(name => lowerName === name || lowerName.includes(name))
 }
-

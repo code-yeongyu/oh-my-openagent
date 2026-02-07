@@ -9,12 +9,14 @@
 ## STRUCTURE
 ```
 shared/
-├── tmux/                  # Tmux TUI integration (types, utils, constants)
+├── tmux/                  # Tmux TUI integration (types, utils 312 lines, constants)
 ├── logger.ts              # File-based logging (/tmp/oh-my-opencode.log) - 53 imports
 ├── dynamic-truncator.ts   # Token-aware context window management (194 lines)
 ├── model-resolver.ts      # 3-step resolution (Override → Fallback → Default)
 ├── model-requirements.ts  # Agent/category model fallback chains (162 lines)
-├── model-availability.ts  # Provider model fetching & fuzzy matching (154 lines)
+├── model-availability.ts  # Provider model fetching & fuzzy matching (357 lines)
+├── model-sanitizer.ts     # Model name sanitization
+├── model-suggestion-retry.ts # Model suggestion on failure
 ├── jsonc-parser.ts        # JSONC parsing with comment support
 ├── frontmatter.ts         # YAML frontmatter extraction (JSON_SCHEMA only) - 9 imports
 ├── data-path.ts           # XDG-compliant storage resolution
@@ -22,16 +24,26 @@ shared/
 ├── claude-config-dir.ts   # ~/.claude resolution - 9 imports
 ├── migration.ts           # Legacy config migration logic (231 lines)
 ├── opencode-version.ts    # Semantic version comparison
-├── permission-compat.ts   # Agent tool restriction enforcement
-├── system-directive.ts    # Unified system message prefix & types
+├── permission-compat.ts   # Agent tool restriction enforcement - 6 imports
+├── system-directive.ts    # Unified system message prefix & types - 8 imports
 ├── session-utils.ts       # Session cursor, orchestrator detection
+├── session-cursor.ts      # Session message cursor tracking
 ├── shell-env.ts           # Cross-platform shell environment
 ├── agent-variant.ts       # Agent variant from config
 ├── zip-extractor.ts       # Binary/Resource ZIP extraction
 ├── deep-merge.ts          # Recursive object merging (proto-pollution safe, MAX_DEPTH=50)
 ├── case-insensitive.ts    # Case-insensitive object lookups
-├── session-cursor.ts      # Session message cursor tracking
 ├── command-executor.ts    # Shell command execution (225 lines)
+├── snake-case.ts          # Case conversion utilities
+├── tool-name.ts           # Tool naming conventions
+├── pattern-matcher.ts     # Pattern matching utilities
+├── port-utils.ts          # Port management
+├── file-utils.ts          # File operation utilities
+├── file-reference-resolver.ts # File reference resolution
+├── connected-providers-cache.ts # Provider caching
+├── external-plugin-detector.ts  # Plugin detection
+├── first-message-variant.ts     # Message variant types
+├── opencode-server-auth.ts      # Authentication utilities
 └── index.ts               # Barrel export for all utilities
 ```
 

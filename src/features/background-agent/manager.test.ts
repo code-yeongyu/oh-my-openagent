@@ -1,8 +1,9 @@
-import { describe, test, expect, beforeEach } from "bun:test"
-import { afterEach } from "bun:test"
+declare const require: (name: string) => any
+const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTask, ResumeInput } from "./types"
+import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
 import { ConcurrencyManager } from "./concurrency"
 
@@ -783,7 +784,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     }
     const currentMessage: CurrentMessage = {
       agent: "sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-5" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
     }
 
     // when
@@ -791,7 +792,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
 
     // then - uses currentMessage values, not task.parentModel/parentAgent
     expect(promptBody.agent).toBe("sisyphus")
-    expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-5" })
+    expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
   })
 
   test("should fallback to parentAgent when currentMessage.agent is undefined", async () => {
@@ -997,7 +998,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
 
   test("should release concurrency and clear key on completion", async () => {
     // given
-    const concurrencyKey = "anthropic/claude-opus-4-5"
+    const concurrencyKey = "anthropic/claude-opus-4-6"
     const concurrencyManager = getConcurrencyManager(manager)
     await concurrencyManager.acquire(concurrencyKey)
 
@@ -1026,7 +1027,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
 
   test("should prevent double completion and double release", async () => {
     // given
-    const concurrencyKey = "anthropic/claude-opus-4-5"
+    const concurrencyKey = "anthropic/claude-opus-4-6"
     const concurrencyManager = getConcurrencyManager(manager)
     await concurrencyManager.acquire(concurrencyKey)
 
@@ -1088,6 +1089,34 @@ describe("BackgroundManager.tryCompleteTask", () => {
     // #then
     expect(abortedSessionIDs).toEqual(["session-1"])
   })
+
+  test("should clean pendingByParent even when notifyParentSession throws", async () => {
+    // given
+    ;(manager as unknown as { notifyParentSession: () => Promise<void> }).notifyParentSession = async () => {
+      throw new Error("notify failed")
+    }
+
+    const task: BackgroundTask = {
+      id: "task-pending-cleanup",
+      sessionID: "session-pending-cleanup",
+      parentSessionID: "parent-pending-cleanup",
+      parentMessageID: "msg-1",
+      description: "pending cleanup task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionID, new Set([task.id]))
+
+    // when
+    await tryCompleteTaskForTest(manager, task)
+
+    // then
+    expect(task.status).toBe("completed")
+    expect(getPendingByParent(manager).get(task.parentSessionID)).toBeUndefined()
+  })
 })
 
 describe("BackgroundManager.trackTask", () => {
@@ -1110,7 +1139,7 @@ describe("BackgroundManager.trackTask", () => {
       sessionID: "session-1",
       parentSessionID: "parent-session",
       description: "external task",
-      agent: "delegate_task",
+      agent: "task",
       concurrencyKey: "external-key",
     }
 
@@ -1145,7 +1174,7 @@ describe("BackgroundManager.resume concurrency key", () => {
       sessionID: "session-1",
       parentSessionID: "parent-session",
       description: "external task",
-      agent: "delegate_task",
+      agent: "task",
       concurrencyKey: "external-key",
     })
 
@@ -1657,7 +1686,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         description: "Task 1",
         prompt: "Do something",
         agent: "test-agent",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-5" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
         parentSessionID: "parent-session",
         parentMessageID: "parent-message",
       }
@@ -2255,6 +2284,69 @@ describe("BackgroundManager.shutdown session abort", () => {
   })
 })
 
+describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
+  test("should cancel descendant tasks when parent session is deleted", () => {
+    // given
+    const manager = createBackgroundManager()
+    const parentSessionID = "session-parent"
+    const childTask = createMockTask({
+      id: "task-child",
+      sessionID: "session-child",
+      parentSessionID,
+      status: "running",
+    })
+    const siblingTask = createMockTask({
+      id: "task-sibling",
+      sessionID: "session-sibling",
+      parentSessionID,
+      status: "running",
+    })
+    const grandchildTask = createMockTask({
+      id: "task-grandchild",
+      sessionID: "session-grandchild",
+      parentSessionID: "session-child",
+      status: "pending",
+      startedAt: undefined,
+      queuedAt: new Date(),
+    })
+    const unrelatedTask = createMockTask({
+      id: "task-unrelated",
+      sessionID: "session-unrelated",
+      parentSessionID: "other-parent",
+      status: "running",
+    })
+
+    const taskMap = getTaskMap(manager)
+    taskMap.set(childTask.id, childTask)
+    taskMap.set(siblingTask.id, siblingTask)
+    taskMap.set(grandchildTask.id, grandchildTask)
+    taskMap.set(unrelatedTask.id, unrelatedTask)
+
+    const pendingByParent = getPendingByParent(manager)
+    pendingByParent.set(parentSessionID, new Set([childTask.id, siblingTask.id]))
+    pendingByParent.set("session-child", new Set([grandchildTask.id]))
+
+    // when
+    manager.handleEvent({
+      type: "session.deleted",
+      properties: { info: { id: parentSessionID } },
+    })
+
+    // then
+    expect(taskMap.has(childTask.id)).toBe(false)
+    expect(taskMap.has(siblingTask.id)).toBe(false)
+    expect(taskMap.has(grandchildTask.id)).toBe(false)
+    expect(taskMap.has(unrelatedTask.id)).toBe(true)
+    expect(childTask.status).toBe("cancelled")
+    expect(siblingTask.status).toBe("cancelled")
+    expect(grandchildTask.status).toBe("cancelled")
+    expect(pendingByParent.get(parentSessionID)).toBeUndefined()
+    expect(pendingByParent.get("session-child")).toBeUndefined()
+
+    manager.shutdown()
+  })
+})
+
 describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
   function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
     return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
@@ -2406,5 +2498,181 @@ describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
     // then
     const completionTimers = getCompletionTimers(manager)
     expect(completionTimers.size).toBe(0)
+  })
+})
+
+describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
+  test("should defer and retry when session.idle fires before MIN_IDLE_TIME_MS", async () => {
+    //#given - a running task started less than MIN_IDLE_TIME_MS ago
+    const sessionID = "session-early-idle"
+    const messagesCalls: string[] = []
+    const realDateNow = Date.now
+    const baseNow = realDateNow()
+
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        abort: async () => ({}),
+        messages: async (args: { path: { id: string } }) => {
+          messagesCalls.push(args.path.id)
+          return {
+            data: [
+              {
+                info: { role: "assistant" },
+                parts: [{ type: "text", text: "ok" }],
+              },
+            ],
+          }
+        },
+        todo: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
+
+    const remainingMs = 1200
+    const task: BackgroundTask = {
+      id: "task-early-idle",
+      sessionID,
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "early idle task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(baseNow),
+    }
+
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - session.idle fires
+    try {
+      Date.now = () => baseNow + (MIN_IDLE_TIME_MS - 100)
+      manager.handleEvent({ type: "session.idle", properties: { sessionID } })
+
+      // Advance time so deferred callback (if any) sees elapsed >= MIN_IDLE_TIME_MS
+      Date.now = () => baseNow + (MIN_IDLE_TIME_MS + 10)
+
+      //#then - idle should be deferred (not dropped), and task should eventually complete
+      expect(task.status).toBe("running")
+      await new Promise((resolve) => setTimeout(resolve, 220))
+      expect(task.status).toBe("completed")
+      expect(messagesCalls).toEqual([sessionID])
+    } finally {
+      Date.now = realDateNow
+      manager.shutdown()
+    }
+  })
+
+  test("should not defer when session.idle fires after MIN_IDLE_TIME_MS", async () => {
+    //#given - a running task started more than MIN_IDLE_TIME_MS ago
+    const sessionID = "session-late-idle"
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant" },
+              parts: [{ type: "text", text: "ok" }],
+            },
+          ],
+        }),
+        todo: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-late-idle",
+      sessionID,
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "late idle task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(Date.now() - (MIN_IDLE_TIME_MS + 10)),
+    }
+
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    manager.handleEvent({ type: "session.idle", properties: { sessionID } })
+
+    //#then - should be processed immediately
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(task.status).toBe("completed")
+
+    manager.shutdown()
+  })
+
+  test("should not process deferred idle if task already completed by other means", async () => {
+    //#given - a running task
+    const sessionID = "session-deferred-noop"
+    let messagesCallCount = 0
+    const realDateNow = Date.now
+    const baseNow = realDateNow()
+
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => {
+          messagesCallCount += 1
+          return {
+            data: [
+              {
+                info: { role: "assistant" },
+                parts: [{ type: "text", text: "ok" }],
+              },
+            ],
+          }
+        },
+        todo: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
+
+    const remainingMs = 120
+    const task: BackgroundTask = {
+      id: "task-deferred-noop",
+      sessionID,
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "deferred noop task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(baseNow),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - session.idle fires early, then task completes via another path before defer timer
+    try {
+      Date.now = () => baseNow + (MIN_IDLE_TIME_MS - remainingMs)
+      manager.handleEvent({ type: "session.idle", properties: { sessionID } })
+      expect(messagesCallCount).toBe(0)
+
+      await tryCompleteTaskForTest(manager, task)
+      expect(task.status).toBe("completed")
+
+      // Advance time so deferred callback (if any) sees elapsed >= MIN_IDLE_TIME_MS
+      Date.now = () => baseNow + (MIN_IDLE_TIME_MS + 10)
+
+      //#then - deferred callback should be a no-op
+      await new Promise((resolve) => setTimeout(resolve, remainingMs + 80))
+      expect(task.status).toBe("completed")
+      expect(messagesCallCount).toBe(0)
+    } finally {
+      Date.now = realDateNow
+      manager.shutdown()
+    }
   })
 })

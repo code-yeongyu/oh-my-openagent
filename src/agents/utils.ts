@@ -11,7 +11,7 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable, migrateAgentConfig } from "../shared"
+import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable, isAnyProviderConnected, migrateAgentConfig } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -304,7 +304,7 @@ export async function createBuiltinAgents(
      const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 
     const resolution = applyModelResolution({
-      uiSelectedModel: isPrimaryAgent ? uiSelectedModel : undefined,
+      uiSelectedModel: (isPrimaryAgent && !override?.model) ? uiSelectedModel : undefined,
       userModel: override?.model,
       requirement,
       availableModels,
@@ -356,7 +356,7 @@ export async function createBuiltinAgents(
 
    if (!disabledAgents.includes("sisyphus") && meetsSisyphusAnyModelRequirement) {
     let sisyphusResolution = applyModelResolution({
-      uiSelectedModel,
+      uiSelectedModel: sisyphusOverride?.model ? undefined : uiSelectedModel,
       userModel: sisyphusOverride?.model,
       requirement: sisyphusRequirement,
       availableModels,
@@ -394,13 +394,13 @@ export async function createBuiltinAgents(
     const hephaestusRequirement = AGENT_MODEL_REQUIREMENTS["hephaestus"]
     const hasHephaestusExplicitConfig = hephaestusOverride !== undefined
 
-    const hasRequiredModel =
-      !hephaestusRequirement?.requiresModel ||
+    const hasRequiredProvider =
+      !hephaestusRequirement?.requiresProvider ||
       hasHephaestusExplicitConfig ||
       isFirstRunNoCache ||
-      isAnyFallbackModelAvailable(hephaestusRequirement.fallbackChain, availableModels)
+      isAnyProviderConnected(hephaestusRequirement.requiresProvider, availableModels)
 
-    if (hasRequiredModel) {
+    if (hasRequiredProvider) {
       let hephaestusResolution = applyModelResolution({
         userModel: hephaestusOverride?.model,
         requirement: hephaestusRequirement,
@@ -454,7 +454,7 @@ export async function createBuiltinAgents(
       const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
 
       const atlasResolution = applyModelResolution({
-        uiSelectedModel,
+        uiSelectedModel: orchestratorOverride?.model ? undefined : uiSelectedModel,
         userModel: orchestratorOverride?.model,
         requirement: atlasRequirement,
         availableModels,
