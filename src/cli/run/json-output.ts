@@ -20,8 +20,18 @@ export function createJsonOutputManager(
   const originalWrite = stdout.write.bind(stdout)
 
   function redirectToStderr(): void {
-    stdout.write = function (...args: Parameters<NodeJS.WriteStream["write"]>): boolean {
-      return (stderr.write as Function).apply(stderr, args)
+    stdout.write = function (
+      chunk: Uint8Array | string,
+      encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
+      callback?: (error?: Error | null) => void
+    ): boolean {
+      if (typeof encodingOrCallback === "function") {
+        return stderr.write(chunk, encodingOrCallback)
+      }
+      if (encodingOrCallback !== undefined) {
+        return stderr.write(chunk, encodingOrCallback, callback)
+      }
+      return stderr.write(chunk)
     } as NodeJS.WriteStream["write"]
   }
 
