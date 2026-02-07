@@ -8,21 +8,22 @@
 import type { CategoryConfig } from "../../config/schema"
 import { formatCustomSkillsBlock, type AvailableAgent, type AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../../tools/delegate-task/constants"
+import { truncateDescription } from "../../shared/truncate-description"
 
 export const getCategoryDescription = (name: string, userCategories?: Record<string, CategoryConfig>) =>
   userCategories?.[name]?.description ?? CATEGORY_DESCRIPTIONS[name] ?? "General tasks"
 
 export function buildAgentSelectionSection(agents: AvailableAgent[]): string {
-  if (agents.length === 0) {
-    return `##### Option B: Use AGENT directly (for specialized experts)
+   if (agents.length === 0) {
+     return `##### Option B: Use AGENT directly (for specialized experts)
 
-No agents available.`
-  }
+ No agents available.`
+   }
 
-  const rows = agents.map((a) => {
-    const shortDesc = a.description.split(".")[0] || a.description
-    return `| \`${a.name}\` | ${shortDesc} |`
-  })
+   const rows = agents.map((a) => {
+     const shortDesc = truncateDescription(a.description)
+     return `| \`${a.name}\` | ${shortDesc} |`
+   })
 
   return `##### Option B: Use AGENT directly (for specialized experts)
 
@@ -59,16 +60,16 @@ export function buildSkillsSection(skills: AvailableSkill[]): string {
   const builtinSkills = skills.filter((s) => s.location === "plugin")
   const customSkills = skills.filter((s) => s.location !== "plugin")
 
-  const builtinRows = builtinSkills.map((s) => {
-    const shortDesc = s.description.split(".")[0] || s.description
-    return `| \`${s.name}\` | ${shortDesc} |`
-  })
+   const builtinRows = builtinSkills.map((s) => {
+     const shortDesc = truncateDescription(s.description)
+     return `| \`${s.name}\` | ${shortDesc} |`
+   })
 
-  const customRows = customSkills.map((s) => {
-    const shortDesc = s.description.split(".")[0] || s.description
-    const source = s.location === "project" ? "project" : "user"
-    return `| \`${s.name}\` | ${shortDesc} | ${source} |`
-  })
+   const customRows = customSkills.map((s) => {
+     const shortDesc = truncateDescription(s.description)
+     const source = s.location === "project" ? "project" : "user"
+     return `| \`${s.name}\` | ${shortDesc} | ${source} |`
+   })
 
   const customSkillBlock = formatCustomSkillsBlock(customRows, customSkills, "**")
 
@@ -121,10 +122,10 @@ export function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: R
     `| ${getCategoryDescription(name, userCategories)} | \`category="${name}", load_skills=[...]\` |`
   )
 
-  const agentRows = agents.map((a) => {
-    const shortDesc = a.description.split(".")[0] || a.description
-    return `| ${shortDesc} | \`agent="${a.name}"\` |`
-  })
+   const agentRows = agents.map((a) => {
+     const shortDesc = truncateDescription(a.description)
+     return `| ${shortDesc} | \`agent="${a.name}"\` |`
+   })
 
   return `##### Decision Matrix
 

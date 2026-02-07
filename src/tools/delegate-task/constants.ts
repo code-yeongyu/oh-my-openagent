@@ -1,8 +1,9 @@
 import type { CategoryConfig } from "../../config/schema"
 import type {
-  AvailableCategory,
-  AvailableSkill,
-} from "../../agents/dynamic-agent-prompt-builder"
+   AvailableCategory,
+   AvailableSkill,
+ } from "../../agents/dynamic-agent-prompt-builder"
+import { truncateDescription } from "../../shared/truncate-description"
 
 export const VISUAL_CATEGORY_PROMPT_APPEND = `<Category_Context>
 You are working on VISUAL/UI tasks.
@@ -492,13 +493,12 @@ function renderPlanAgentCategoryRows(categories: AvailableCategory[]): string[] 
 }
 
 function renderPlanAgentSkillRows(skills: AvailableSkill[]): string[] {
-  const sorted = [...skills].sort((a, b) => a.name.localeCompare(b.name))
-  return sorted.map((skill) => {
-    const firstSentence = skill.description.split(".")[0] || skill.description
-    const domain = firstSentence.trim() || skill.name
-    return `| \`${skill.name}\` | ${domain} |`
-  })
-}
+   const sorted = [...skills].sort((a, b) => a.name.localeCompare(b.name))
+   return sorted.map((skill) => {
+     const domain = truncateDescription(skill.description).trim() || skill.name
+     return `| \`${skill.name}\` | ${domain} |`
+   })
+ }
 
 export function buildPlanAgentSkillsSection(
   categories: AvailableCategory[] = [],
