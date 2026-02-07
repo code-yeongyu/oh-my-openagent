@@ -44,9 +44,16 @@ export async function executeUserPromptSubmitHooks(
     return { block: false, modifiedParts, messages }
   }
 
+  // Check if hook tags are in the current user input only (not in injected context)
+  // by checking only the text parts that were provided in this message
+  const userInputText = ctx.parts
+    .filter((p) => p.type === "text" && p.text)
+    .map((p) => p.text ?? "")
+    .join("\n")
+
   if (
-    ctx.prompt.includes(USER_PROMPT_SUBMIT_TAG_OPEN) &&
-    ctx.prompt.includes(USER_PROMPT_SUBMIT_TAG_CLOSE)
+    userInputText.includes(USER_PROMPT_SUBMIT_TAG_OPEN) &&
+    userInputText.includes(USER_PROMPT_SUBMIT_TAG_CLOSE)
   ) {
     return { block: false, modifiedParts, messages }
   }
