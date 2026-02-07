@@ -34,6 +34,7 @@ describe("atlas hook", () => {
       client: {
         session: {
           prompt: promptMock,
+          promptAsync: promptMock,
         },
       },
       _promptMock: promptMock,
