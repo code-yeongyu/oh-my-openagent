@@ -74,11 +74,12 @@ export async function executePreToolUseHooks(
   let firstHookName: string | undefined
   const inputLines = buildInputLines(ctx.toolInput)
 
-  for (const matcher of matchers) {
-    for (const hook of matcher.hooks) {
-      if (hook.type !== "command") continue
+   for (const matcher of matchers) {
+     if (!matcher.hooks || matcher.hooks.length === 0) continue
+     for (const hook of matcher.hooks) {
+       if (hook.type !== "command") continue
 
-      if (isHookCommandDisabled("PreToolUse", hook.command, extendedConfig ?? null)) {
+       if (isHookCommandDisabled("PreToolUse", hook.command, extendedConfig ?? null)) {
         log("PreToolUse hook command skipped (disabled by config)", { command: hook.command, toolName: ctx.toolName })
         continue
       }
