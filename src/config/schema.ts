@@ -426,6 +426,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
+  /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
+  _migrations: z.array(z.string()).optional(),
 })
 
 export type OhMyOpenCodeConfig = z.infer<typeof OhMyOpenCodeConfigSchema>
