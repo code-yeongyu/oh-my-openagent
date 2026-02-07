@@ -192,4 +192,57 @@ describe("getSystemMcpServerNames", () => {
         rmSync(userConfigPath, { force: true })
       }
     })
+
+    it("reads both ~/.claude.json and ~/.claude/.mcp.json for user scope", async () => {
+      // given: simulate both user-level config files
+      const userClaudeJson = join(TEST_DIR, ".claude.json")
+      const claudeDir = join(TEST_DIR, ".claude")
+      const claudeDirMcpJson = join(claudeDir, ".mcp.json")
+
+      mkdirSync(claudeDir, { recursive: true })
+
+      // ~/.claude.json has server-a
+      writeFileSync(userClaudeJson, JSON.stringify({
+        mcpServers: {
+          "server-from-claude-json": {
+            command: "npx",
+            args: ["server-a"],
+          },
+        },
+      }))
+
+      // ~/.claude/.mcp.json has server-b (CLI-managed)
+      writeFileSync(claudeDirMcpJson, JSON.stringify({
+        mcpServers: {
+          "server-from-mcp-json": {
+            command: "npx",
+            args: ["server-b"],
+          },
+        },
+      }))
+
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        mock.module("os", () => ({
+          homedir: () => TEST_DIR,
+          tmpdir,
+        }))
+
+        // Also mock getClaudeConfigDir to point to our test .claude dir
+        mock.module("../../shared", () => ({
+          getClaudeConfigDir: () => claudeDir,
+        }))
+
+        const { getSystemMcpServerNames } = await import("./loader")
+        const names = getSystemMcpServerNames()
+
+        // Both sources should be merged
+        expect(names.has("server-from-claude-json")).toBe(true)
+        expect(names.has("server-from-mcp-json")).toBe(true)
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
 })
