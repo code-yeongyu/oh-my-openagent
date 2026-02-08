@@ -173,14 +173,16 @@ export function assignNextColor(config: TeamConfig): string {
 
 export function deleteTeamData(teamName: string): void {
   assertValidTeamName(teamName)
-  const teamDir = getTeamDir(teamName)
-  const taskDir = getTeamTaskDir(teamName)
+  withTeamLock(teamName, () => {
+    const teamDir = getTeamDir(teamName)
+    const taskDir = getTeamTaskDir(teamName)
 
-  if (existsSync(teamDir)) {
-    rmSync(teamDir, { recursive: true, force: true })
-  }
+    if (existsSync(teamDir)) {
+      rmSync(teamDir, { recursive: true, force: true })
+    }
 
-  if (existsSync(taskDir)) {
-    rmSync(taskDir, { recursive: true, force: true })
-  }
+    if (existsSync(taskDir)) {
+      rmSync(taskDir, { recursive: true, force: true })
+    }
+  })
 }
