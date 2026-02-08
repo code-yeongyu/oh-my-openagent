@@ -27,6 +27,7 @@ export const BuiltinAgentNameSchema = z.enum([
   "multimodal-looker",
   "metis",
   "momus",
+  "devils-advocate",
   "atlas",
 ])
 
@@ -48,6 +49,7 @@ export const OverridableAgentNameSchema = z.enum([
   "prometheus",
   "metis",
   "momus",
+  "devils-advocate",
   "oracle",
   "librarian",
   "explore",
@@ -161,6 +163,7 @@ export const AgentOverridesSchema = z.object({
   prometheus: AgentOverrideConfigSchema.optional(),
   metis: AgentOverrideConfigSchema.optional(),
   momus: AgentOverrideConfigSchema.optional(),
+  "devils-advocate": AgentOverrideConfigSchema.optional(),
   oracle: AgentOverrideConfigSchema.optional(),
   librarian: AgentOverrideConfigSchema.optional(),
   explore: AgentOverrideConfigSchema.optional(),
