@@ -14,7 +14,7 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
 import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithModelSuggestionRetry, promptSyncWithModelSuggestionRetry } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
-import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
+import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 
@@ -40,6 +40,8 @@ export interface ExecutorContext {
   manager: BackgroundManager
   client: OpencodeClient
   directory: string
+  connectedProvidersOverride?: string[] | null
+  availableModelsOverride?: Set<string>
   userCategories?: CategoriesConfig
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
@@ -727,10 +729,15 @@ export async function resolveCategoryExecution(
 ): Promise<CategoryResolutionResult> {
   const { client, userCategories, sisyphusJuniorModel } = executorCtx
 
-  const connectedProviders = readConnectedProvidersCache()
-  const availableModels = await fetchAvailableModels(client, {
-    connectedProviders: connectedProviders ?? undefined,
-  })
+  const connectedProviders = executorCtx.connectedProvidersOverride !== undefined
+    ? executorCtx.connectedProvidersOverride
+    : connectedProvidersCache.readConnectedProvidersCache()
+
+  const availableModels = executorCtx.availableModelsOverride !== undefined
+    ? executorCtx.availableModelsOverride
+    : await fetchAvailableModels(client, {
+        connectedProviders: connectedProviders ?? undefined,
+      })
 
   const resolved = resolveCategoryConfig(args.category!, {
     userCategories,
@@ -775,7 +782,7 @@ export async function resolveCategoryExecution(
         userModel: explicitCategoryModel ?? overrideModel,
         categoryDefaultModel: resolved.model,
       },
-      constraints: { availableModels },
+       constraints: { availableModels, connectedProviders },
       policy: {
         fallbackChain: requirement.fallbackChain,
         systemDefaultModel,
@@ -941,26 +948,31 @@ Create the work plan directly - that's your job as the planning agent.`,
     const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentNameLower]
 
     if (agentOverride?.model || agentRequirement) {
-      const connectedProviders = readConnectedProvidersCache()
-      const availableModels = await fetchAvailableModels(client, {
-        connectedProviders: connectedProviders ?? undefined,
-      })
+      const connectedProviders = executorCtx.connectedProvidersOverride !== undefined
+        ? executorCtx.connectedProvidersOverride
+        : connectedProvidersCache.readConnectedProvidersCache()
+
+      const availableModels = executorCtx.availableModelsOverride !== undefined
+        ? executorCtx.availableModelsOverride
+        : await fetchAvailableModels(client, {
+            connectedProviders: connectedProviders ?? undefined,
+          })
 
       const matchedAgentModelStr = matchedAgent.model
         ? `${matchedAgent.model.providerID}/${matchedAgent.model.modelID}`
         : undefined
 
-      const resolution = resolveModelPipeline({
-        intent: {
-          userModel: agentOverride?.model,
-          categoryDefaultModel: matchedAgentModelStr,
-        },
-        constraints: { availableModels },
-        policy: {
-          fallbackChain: agentRequirement?.fallbackChain,
-          systemDefaultModel: undefined,
-        },
-      })
+       const resolution = resolveModelPipeline({
+         intent: {
+           userModel: agentOverride?.model,
+           categoryDefaultModel: matchedAgentModelStr,
+         },
+         constraints: { availableModels, connectedProviders },
+         policy: {
+           fallbackChain: agentRequirement?.fallbackChain,
+           systemDefaultModel: undefined,
+         },
+       })
 
       if (resolution) {
         const parsed = parseModelString(resolution.model)
