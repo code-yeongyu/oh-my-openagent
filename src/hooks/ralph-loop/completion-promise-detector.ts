@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "node:fs"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
+import { withTimeout } from "./with-timeout"
 
 interface OpenCodeSessionMessage {
 	info?: { role?: string }
@@ -54,37 +55,43 @@ export async function detectCompletionInSessionMessages(
 	},
 ): Promise<boolean> {
 	try {
-		const response = await Promise.race([
+		const response = await withTimeout(
 			ctx.client.session.messages({
 				path: { id: options.sessionID },
 				query: { directory: options.directory },
 			}),
-			new Promise<never>((_, reject) =>
-				setTimeout(() => reject(new Error("API timeout")), options.apiTimeoutMs),
-			),
-		])
+			options.apiTimeoutMs,
+		)
 
 		const messages = (response as { data?: unknown[] }).data ?? []
 		if (!Array.isArray(messages)) return false
 
-		const assistantMessages = (messages as OpenCodeSessionMessage[]).filter(
-			(msg) => msg.info?.role === "assistant",
-		)
-		const lastAssistant = assistantMessages[assistantMessages.length - 1]
-		if (!lastAssistant?.parts) return false
+		const assistantMessages = (messages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
+		if (assistantMessages.length === 0) return false
 
 		const pattern = buildPromisePattern(options.promise)
-		const responseText = lastAssistant.parts
-			.filter((p) => p.type === "text")
-			.map((p) => p.text ?? "")
-			.join("\n")
+		const recentAssistants = assistantMessages.slice(-3)
+		for (const assistant of recentAssistants) {
+			if (!assistant.parts) continue
 
-		return pattern.test(responseText)
+			const responseText = assistant.parts
+				.filter((p) => p.type === "text" || p.type === "reasoning")
+				.map((p) => p.text ?? "")
+				.join("\n")
+
+			if (pattern.test(responseText)) {
+				return true
+			}
+		}
+
+		return false
 	} catch (err) {
-		log(`[${HOOK_NAME}] Session messages check failed`, {
-			sessionID: options.sessionID,
-			error: String(err),
-		})
+		setTimeout(() => {
+			log(`[${HOOK_NAME}] Session messages check failed`, {
+				sessionID: options.sessionID,
+				error: String(err),
+			})
+		}, 0)
 		return false
 	}
 }

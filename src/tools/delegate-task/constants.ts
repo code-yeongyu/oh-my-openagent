@@ -535,18 +535,35 @@ export function buildPlanAgentSystemPrepend(
 }
 
 /**
- * List of agent names that should be treated as plan agents.
+ * List of agent names that should be treated as plan agents (receive plan system prompt).
  * Case-insensitive matching is used.
  */
-export const PLAN_AGENT_NAMES = ["plan", "prometheus", "planner"]
+export const PLAN_AGENT_NAMES = ["plan"]
 
 /**
- * Check if the given agent name is a plan agent.
- * @param agentName - The agent name to check
- * @returns true if the agent is a plan agent
+ * Check if the given agent name is a plan agent (receives plan system prompt).
  */
 export function isPlanAgent(agentName: string | undefined): boolean {
   if (!agentName) return false
   const lowerName = agentName.toLowerCase().trim()
   return PLAN_AGENT_NAMES.some(name => lowerName === name || lowerName.includes(name))
+}
+
+/**
+ * Plan family: plan + prometheus. Shares mutual delegation blocking and task tool permission.
+ * Does NOT share system prompt (only isPlanAgent controls that).
+ */
+export const PLAN_FAMILY_NAMES = ["plan", "prometheus"]
+
+/**
+ * Check if the given agent belongs to the plan family (blocking + task permission).
+ */
+export function isPlanFamily(category: string): boolean
+export function isPlanFamily(category: string | undefined): boolean
+export function isPlanFamily(category: string | undefined): boolean {
+  if (!category) return false
+  const lowerCategory = category.toLowerCase().trim()
+  return PLAN_FAMILY_NAMES.some(
+    (name) => lowerCategory === name || lowerCategory.includes(name)
+  )
 }

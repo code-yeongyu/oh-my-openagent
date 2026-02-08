@@ -1,15 +1,20 @@
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
-import { isPlanAgent } from "./constants"
+import { isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
+import { parseModelString } from "./model-string-parser"
+import { resolveModelPipeline } from "../../shared"
+import { fetchAvailableModels } from "../../shared/model-availability"
+import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
+import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
   categoryExamples: string
-): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string } | undefined; error?: string }> {
-  const { client } = executorCtx
+): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; error?: string }> {
+  const { client, agentOverrides } = executorCtx
 
   if (!args.subagent_type?.trim()) {
     return { agentToUse: "", categoryModel: undefined, error: `Agent name cannot be empty.` }
@@ -27,18 +32,18 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
     }
   }
 
-  if (isPlanAgent(agentName) && isPlanAgent(parentAgent)) {
+  if (isPlanFamily(agentName) && isPlanFamily(parentAgent)) {
     return {
       agentToUse: "",
       categoryModel: undefined,
-    error: `You are prometheus. You cannot delegate to prometheus via task.
+    error: `You are a plan-family agent (plan/prometheus). You cannot delegate to other plan-family agents via task.
 
 Create the work plan directly - that's your job as the planning agent.`,
     }
   }
 
   let agentToUse = agentName
-  let categoryModel: { providerID: string; modelID: string } | undefined
+  let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
 
   try {
     const agentsResult = await client.app.agents()
@@ -76,7 +81,41 @@ Create the work plan directly - that's your job as the planning agent.`,
 
     agentToUse = matchedAgent.name
 
-    if (matchedAgent.model) {
+    const agentNameLower = agentToUse.toLowerCase()
+    const agentOverride = agentOverrides?.[agentNameLower as keyof typeof agentOverrides]
+      ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentNameLower)?.[1] : undefined)
+    const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentNameLower]
+
+    if (agentOverride?.model || agentRequirement) {
+      const connectedProviders = readConnectedProvidersCache()
+      const availableModels = await fetchAvailableModels(client, {
+        connectedProviders: connectedProviders ?? undefined,
+      })
+
+      const matchedAgentModelStr = matchedAgent.model
+        ? `${matchedAgent.model.providerID}/${matchedAgent.model.modelID}`
+        : undefined
+
+      const resolution = resolveModelPipeline({
+        intent: {
+          userModel: agentOverride?.model,
+          categoryDefaultModel: matchedAgentModelStr,
+        },
+        constraints: { availableModels },
+        policy: {
+          fallbackChain: agentRequirement?.fallbackChain,
+          systemDefaultModel: undefined,
+        },
+      })
+
+      if (resolution) {
+        const parsed = parseModelString(resolution.model)
+        if (parsed) {
+          const variantToUse = agentOverride?.variant ?? resolution.variant
+          categoryModel = variantToUse ? { ...parsed, variant: variantToUse } : parsed
+        }
+      }
+    } else if (matchedAgent.model) {
       categoryModel = matchedAgent.model
     }
   } catch {

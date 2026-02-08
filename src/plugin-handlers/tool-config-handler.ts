@@ -7,6 +7,10 @@ export function applyToolConfig(params: {
   pluginConfig: OhMyOpenCodeConfig;
   agentResult: Record<string, unknown>;
 }): void {
+  const denyTodoTools = params.pluginConfig.experimental?.task_system
+    ? { todowrite: "deny", todoread: "deny" }
+    : {}
+
   params.config.tools = {
     ...(params.config.tools as Record<string, unknown>),
     "grep_app_*": false,
@@ -39,6 +43,7 @@ export function applyToolConfig(params: {
       call_omo_agent: "deny",
       "task_*": "allow",
       teammate: "allow",
+      ...denyTodoTools,
     };
   }
   if (params.agentResult.sisyphus) {
@@ -50,6 +55,7 @@ export function applyToolConfig(params: {
       question: questionPermission,
       "task_*": "allow",
       teammate: "allow",
+      ...denyTodoTools,
     };
   }
   if (params.agentResult.hephaestus) {
@@ -59,6 +65,7 @@ export function applyToolConfig(params: {
       call_omo_agent: "deny",
       task: "allow",
       question: questionPermission,
+      ...denyTodoTools,
     };
   }
   if (params.agentResult["prometheus"]) {
@@ -70,6 +77,7 @@ export function applyToolConfig(params: {
       question: questionPermission,
       "task_*": "allow",
       teammate: "allow",
+      ...denyTodoTools,
     };
   }
   if (params.agentResult["sisyphus-junior"]) {
@@ -79,6 +87,7 @@ export function applyToolConfig(params: {
       task: "allow",
       "task_*": "allow",
       teammate: "allow",
+      ...denyTodoTools,
     };
   }
 

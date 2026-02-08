@@ -1,5 +1,5 @@
 import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
+import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides } from "../../config/schema"
 import type { OpencodeClient } from "./types"
 
 export interface ExecutorContext {
@@ -10,6 +10,7 @@ export interface ExecutorContext {
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
+  agentOverrides?: AgentOverrides
   onSyncSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
 }
 
@@ -25,9 +26,10 @@ export interface SessionMessage {
     role?: string
     time?: { created?: number }
     agent?: string
-    model?: { providerID: string; modelID: string }
+    model?: { providerID: string; modelID: string; variant?: string }
     modelID?: string
     providerID?: string
+    variant?: string
   }
   parts?: Array<{ type?: string; text?: string }>
 }
