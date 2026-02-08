@@ -32,6 +32,7 @@ import { AGENT_NAME_MAP } from "../shared/migration";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus";
 import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
+import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 import type { ModelCacheState } from "../plugin-state";
 import type { CategoryConfig } from "../config/schema";
 
@@ -385,8 +386,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         : {};
 
       const planDemoteConfig = shouldDemotePlan
-           ? { mode: "subagent" as const
-          }
+        ? buildPlanDemoteConfig(
+            agentConfig["prometheus"] as Record<string, unknown> | undefined,
+            pluginConfig.agents?.plan as Record<string, unknown> | undefined,
+          )
         : undefined;
 
       config.agent = {
