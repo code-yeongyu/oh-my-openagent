@@ -89,6 +89,7 @@ export class BackgroundManager {
   private processingKeys: Set<string> = new Set()
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private notificationQueueByParent: Map<string, Promise<void>> = new Map()
 
   constructor(
     ctx: PluginInput,
@@ -358,7 +359,7 @@ export class BackgroundManager {
 
         this.markForNotification(existingTask)
         this.cleanupPendingByParent(existingTask)
-        this.notifyParentSession(existingTask).catch(err => {
+        this.enqueueNotificationForParent(existingTask.parentSessionID, () => this.notifyParentSession(existingTask)).catch(err => {
           log("[background-agent] Failed to notify on error:", err)
         })
       }
@@ -615,7 +616,7 @@ export class BackgroundManager {
 
       this.markForNotification(existingTask)
       this.cleanupPendingByParent(existingTask)
-      this.notifyParentSession(existingTask).catch(err => {
+      this.enqueueNotificationForParent(existingTask.parentSessionID, () => this.notifyParentSession(existingTask)).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
       })
     })
@@ -949,7 +950,7 @@ export class BackgroundManager {
     this.markForNotification(task)
 
     try {
-      await this.notifyParentSession(task)
+      await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
       log(`[background-agent] Task cancelled via ${source}:`, task.id)
     } catch (err) {
       log("[background-agent] Error in notifyParentSession for cancelled task:", { taskId: task.id, error: err })
@@ -1084,7 +1085,7 @@ export class BackgroundManager {
     }
 
     try {
-      await this.notifyParentSession(task)
+      await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
       log(`[background-agent] Task completed via ${source}:`, task.id)
     } catch (err) {
       log("[background-agent] Error in notifyParentSession:", { taskId: task.id, error: err })
@@ -1114,15 +1115,18 @@ export class BackgroundManager {
 
     // Update pending tracking and check if all tasks complete
     const pendingSet = this.pendingByParent.get(task.parentSessionID)
+    let allComplete = false
+    let remainingCount = 0
     if (pendingSet) {
       pendingSet.delete(task.id)
-      if (pendingSet.size === 0) {
+      remainingCount = pendingSet.size
+      allComplete = remainingCount === 0
+      if (allComplete) {
         this.pendingByParent.delete(task.parentSessionID)
       }
+    } else {
+      allComplete = true
     }
-
-    const allComplete = !pendingSet || pendingSet.size === 0
-    const remainingCount = pendingSet?.size ?? 0
 
     const statusText = task.status === "completed" ? "COMPLETED" : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
@@ -1378,7 +1382,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
 
       try {
-        await this.notifyParentSession(task)
+        await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
       } catch (err) {
         log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
       }
@@ -1572,11 +1576,36 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.tasks.clear()
     this.notifications.clear()
     this.pendingByParent.clear()
+    this.notificationQueueByParent.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
     this.unregisterProcessCleanup()
     log("[background-agent] Shutdown complete")
 
+  }
+
+  private enqueueNotificationForParent(
+    parentSessionID: string | undefined,
+    operation: () => Promise<void>
+  ): Promise<void> {
+    if (!parentSessionID) {
+      return operation()
+    }
+
+    const previous = this.notificationQueueByParent.get(parentSessionID) ?? Promise.resolve()
+    const current = previous
+      .catch(() => {})
+      .then(operation)
+
+    this.notificationQueueByParent.set(parentSessionID, current)
+
+    void current.finally(() => {
+      if (this.notificationQueueByParent.get(parentSessionID) === current) {
+        this.notificationQueueByParent.delete(parentSessionID)
+      }
+    }).catch(() => {})
+
+    return current
   }
 }
 
