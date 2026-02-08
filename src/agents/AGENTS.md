@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-11 AI agents for multi-model orchestration. Each agent has factory function + metadata + fallback chains.
+32 files containing AI agents and utilities for multi-model orchestration. Each agent has factory function + metadata + fallback chains.
 
 **Primary Agents** (respect UI model selection):
 - Sisyphus, Atlas, Prometheus
