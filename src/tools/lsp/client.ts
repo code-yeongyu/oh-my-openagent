@@ -221,6 +221,7 @@ interface ManagedClient {
   refCount: number
   initPromise?: Promise<void>
   isInitializing: boolean
+  initializingSince?: number
 }
 
 class LSPServerManager {
@@ -228,6 +229,7 @@ class LSPServerManager {
   private clients = new Map<string, ManagedClient>()
   private cleanupInterval: ReturnType<typeof setInterval> | null = null
   private readonly IDLE_TIMEOUT = 5 * 60 * 1000
+  private readonly INIT_TIMEOUT = 60 * 1000
 
   private constructor() {
     this.startCleanupTimer()
@@ -310,16 +312,42 @@ class LSPServerManager {
 
     let managed = this.clients.get(key)
     if (managed) {
+      const now = Date.now()
+      if (managed.isInitializing && managed.initializingSince !== undefined && now - managed.initializingSince >= this.INIT_TIMEOUT) {
+        // Stale init can permanently block subsequent calls (e.g., LSP process hang)
+        try {
+          await managed.client.stop()
+        } catch {}
+        this.clients.delete(key)
+        managed = undefined
+      }
+    }
+
+    if (managed) {
       if (managed.initPromise) {
-        await managed.initPromise
+        try {
+          await managed.initPromise
+        } catch {
+          // Failed init should not keep the key blocked forever.
+          try {
+            await managed.client.stop()
+          } catch {}
+          this.clients.delete(key)
+          managed = undefined
+        }
       }
-      if (managed.client.isAlive()) {
-        managed.refCount++
-        managed.lastUsedAt = Date.now()
-        return managed.client
+
+      if (managed) {
+        if (managed.client.isAlive()) {
+          managed.refCount++
+          managed.lastUsedAt = Date.now()
+          return managed.client
+        }
+        try {
+          await managed.client.stop()
+        } catch {}
+        this.clients.delete(key)
       }
-      await managed.client.stop()
-      this.clients.delete(key)
     }
 
     const client = new LSPClient(root, server)
@@ -328,19 +356,30 @@ class LSPServerManager {
       await client.initialize()
     })()
 
+    const initStartedAt = Date.now()
     this.clients.set(key, {
       client,
-      lastUsedAt: Date.now(),
+      lastUsedAt: initStartedAt,
       refCount: 1,
       initPromise,
       isInitializing: true,
+      initializingSince: initStartedAt,
     })
 
-    await initPromise
+    try {
+      await initPromise
+    } catch (error) {
+      this.clients.delete(key)
+      try {
+        await client.stop()
+      } catch {}
+      throw error
+    }
     const m = this.clients.get(key)
     if (m) {
       m.initPromise = undefined
       m.isInitializing = false
+      m.initializingSince = undefined
     }
 
     return client
@@ -356,21 +395,30 @@ class LSPServerManager {
       await client.initialize()
     })()
 
+    const initStartedAt = Date.now()
     this.clients.set(key, {
       client,
-      lastUsedAt: Date.now(),
+      lastUsedAt: initStartedAt,
       refCount: 0,
       initPromise,
       isInitializing: true,
+      initializingSince: initStartedAt,
     })
 
-    initPromise.then(() => {
-      const m = this.clients.get(key)
-      if (m) {
-        m.initPromise = undefined
-        m.isInitializing = false
-      }
-    })
+    initPromise
+      .then(() => {
+        const m = this.clients.get(key)
+        if (m) {
+          m.initPromise = undefined
+          m.isInitializing = false
+          m.initializingSince = undefined
+        }
+      })
+      .catch(() => {
+        // Warmup failures must not permanently block future initialization.
+        this.clients.delete(key)
+        void client.stop().catch(() => {})
+      })
   }
 
   releaseClient(root: string, serverId: string): void {
