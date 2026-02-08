@@ -101,7 +101,7 @@ export function createForceKillTeammateTool(manager: BackgroundManager): ToolDef
   })
 }
 
-export function createProcessShutdownTool(): ToolDefinition {
+export function createProcessShutdownTool(manager: BackgroundManager): ToolDefinition {
   return tool({
     description: "Finalize an approved shutdown by removing teammate and resetting owned tasks.",
     args: {
@@ -129,6 +129,7 @@ export function createProcessShutdownTool(): ToolDefinition {
           return JSON.stringify({ error: "teammate_not_found" })
         }
 
+        await cancelTeammateRun(manager, member)
         writeTeamConfig(input.team_name, removeTeammate(config, input.agent_name))
         resetOwnerTasks(input.team_name, input.agent_name)
 

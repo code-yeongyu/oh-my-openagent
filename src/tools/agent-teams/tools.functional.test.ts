@@ -101,9 +101,9 @@ function createFailingLaunchManager(): { manager: BackgroundManager; cancelCalls
   return { manager, cancelCalls }
 }
 
-function createContext(): TestToolContext {
+function createContext(sessionID = "ses-main"): TestToolContext {
   return {
-    sessionID: "ses-main",
+    sessionID,
     messageID: "msg-main",
     agent: "sisyphus",
     abort: new AbortController().signal,
@@ -359,8 +359,21 @@ describe("agent-teams tools functional", () => {
       context,
     ) as { owner?: string }
 
+    const leadInbox = await executeJsonTool(
+      tools,
+      "read_inbox",
+      {
+        team_name: "core",
+        agent_name: "team-lead",
+        unread_only: true,
+        mark_as_read: false,
+      },
+      context,
+    ) as Array<{ summary?: string; text: string }>
+
     //#then
     expect(updated.owner).toBe("team-lead")
+    expect(leadInbox.some((message) => message.summary === "task_assignment")).toBe(true)
   })
 
   test("spawn_teammate + send_message + force_kill_teammate execute end-to-end", async () => {
@@ -431,7 +444,7 @@ describe("agent-teams tools functional", () => {
     ) as { error?: string }
 
     //#then
-    expect(invalidSender.error).toBe("invalid_sender")
+    expect(invalidSender.error).toBe("sender_context_mismatch")
 
     //#given
     const createdTask = await executeJsonTool(
@@ -499,6 +512,56 @@ describe("agent-teams tools functional", () => {
     expect(taskAfterKill.status).toBe("pending")
   })
 
+  test("process_shutdown_approved cancels and removes teammate", async () => {
+    //#given
+    const { manager, cancelCalls } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+      },
+      leadContext,
+    )
+
+    //#when
+    const shutdownResult = await executeJsonTool(
+      tools,
+      "process_shutdown_approved",
+      {
+        team_name: "core",
+        agent_name: "worker_1",
+      },
+      leadContext,
+    ) as { success: boolean }
+
+    //#then
+    expect(shutdownResult.success).toBe(true)
+    expect(cancelCalls).toHaveLength(1)
+    expect(cancelCalls[0].taskId).toBe("bg-1")
+    expect(cancelCalls[0].options).toEqual(
+      expect.objectContaining({
+        source: "team_force_kill",
+        abortSession: true,
+        skipNotification: true,
+      }),
+    )
+
+    //#when
+    const configAfterShutdown = await executeJsonTool(tools, "read_config", { team_name: "core" }, leadContext) as {
+      members: Array<{ name: string }>
+    }
+
+    //#then
+    expect(configAfterShutdown.members.some((member) => member.name === "worker_1")).toBe(false)
+  })
+
   test("rolls back teammate and cancels background task when launch fails", async () => {
     //#given
     const { manager, cancelCalls } = createFailingLaunchManager()
@@ -537,6 +600,7 @@ describe("agent-teams tools functional", () => {
         skipNotification: true,
       }),
     )
+    expect(existsSync(getTeamInboxPath("core", "worker_1"))).toBe(false)
   })
 
   test("returns explicit error on invalid model override format", async () => {
@@ -591,5 +655,60 @@ describe("agent-teams tools functional", () => {
 
     //#then
     expect(result.error).toBe("team_not_found")
+  })
+
+  test("binds sender to calling context and rejects sender spoofing", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext()
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+      },
+      leadContext,
+    )
+
+    const teammateContext = createContext("ses-worker-1")
+
+    //#when
+    const spoofed = await executeJsonTool(
+      tools,
+      "send_message",
+      {
+        team_name: "core",
+        type: "message",
+        sender: "team-lead",
+        recipient: "worker_1",
+        summary: "spoof",
+        content: "I am lead",
+      },
+      teammateContext,
+    ) as { error?: string }
+
+    //#then
+    expect(spoofed.error).toBe("sender_context_mismatch")
+
+    //#when
+    const validFromContext = await executeJsonTool(
+      tools,
+      "send_message",
+      {
+        team_name: "core",
+        type: "message",
+        recipient: "team-lead",
+        summary: "update",
+        content: "status from worker",
+      },
+      teammateContext,
+    ) as { success?: boolean }
+
+    //#then
+    expect(validFromContext.success).toBe(true)
   })
 })

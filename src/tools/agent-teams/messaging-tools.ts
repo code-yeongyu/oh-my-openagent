@@ -5,6 +5,7 @@ import { getTeamMember, listTeammates, readTeamConfigOrThrow } from "./team-conf
 import { validateAgentNameOrLead, validateTeamName } from "./name-validation"
 import { resumeTeammateWithMessage } from "./teammate-runtime"
 import {
+  TeamConfig,
   TeamReadInboxInputSchema,
   TeamSendMessageInputSchema,
   TeamToolContext,
@@ -13,6 +14,15 @@ import {
 
 function nowIso(): string {
   return new Date().toISOString()
+}
+
+function resolveSenderFromContext(config: TeamConfig, context: TeamToolContext): string | null {
+  if (context.sessionID === config.leadSessionId) {
+    return "team-lead"
+  }
+
+  const matchedMember = config.members.find((member) => isTeammateMember(member) && member.sessionID === context.sessionID)
+  return matchedMember?.name ?? null
 }
 
 export function createSendMessageTool(manager: BackgroundManager): ToolDefinition {
@@ -35,12 +45,21 @@ export function createSendMessageTool(manager: BackgroundManager): ToolDefinitio
         if (teamError) {
           return JSON.stringify({ error: teamError })
         }
-        const sender = input.sender ?? "team-lead"
-        const senderError = validateAgentNameOrLead(sender)
+        const requestedSender = input.sender
+        const senderError = requestedSender ? validateAgentNameOrLead(requestedSender) : null
         if (senderError) {
           return JSON.stringify({ error: senderError })
         }
         const config = readTeamConfigOrThrow(input.team_name)
+        const actor = resolveSenderFromContext(config, context)
+        if (!actor) {
+          return JSON.stringify({ error: "unauthorized_sender_session" })
+        }
+        if (requestedSender && requestedSender !== actor) {
+          return JSON.stringify({ error: "sender_context_mismatch" })
+        }
+        const sender = requestedSender ?? actor
+
         const memberNames = new Set(config.members.map((member) => member.name))
         if (sender !== "team-lead" && !memberNames.has(sender)) {
           return JSON.stringify({ error: "invalid_sender" })
@@ -92,12 +111,12 @@ export function createSendMessageTool(manager: BackgroundManager): ToolDefinitio
           const requestId = buildShutdownRequestId(input.recipient)
           sendStructuredInboxMessage(
             input.team_name,
-            "team-lead",
+            sender,
             input.recipient,
             {
               type: "shutdown_request",
               requestId,
-              from: "team-lead",
+              from: sender,
               reason: input.content ?? "",
               timestamp: nowIso(),
             },

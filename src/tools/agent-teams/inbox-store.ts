@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readFileSync, unlinkSync } from "node:fs"
 import { z } from "zod"
 import { acquireLock, ensureDir, writeJsonAtomic } from "../../features/claude-tasks/storage"
 import { getTeamInboxDir, getTeamInboxPath } from "./paths"
@@ -90,6 +90,17 @@ export function appendInboxMessage(teamName: string, agentName: string, message:
     const messages = readInboxMessages(teamName, agentName)
     messages.push(TeamInboxMessageSchema.parse(message))
     writeInboxMessages(teamName, agentName, messages)
+  })
+}
+
+export function clearInbox(teamName: string, agentName: string): void {
+  assertValidTeamName(teamName)
+  assertValidInboxAgentName(agentName)
+  withInboxLock(teamName, () => {
+    const path = getTeamInboxPath(teamName, agentName)
+    if (existsSync(path)) {
+      unlinkSync(path)
+    }
   })
 }
 

@@ -1,6 +1,6 @@
 import type { BackgroundManager } from "../../features/background-agent"
-import { ensureInbox, sendPlainInboxMessage } from "./inbox-store"
-import { assignNextColor, getTeamMember, readTeamConfigOrThrow, removeTeammate, upsertTeammate, writeTeamConfig } from "./team-config-store"
+import { clearInbox, ensureInbox, sendPlainInboxMessage } from "./inbox-store"
+import { assignNextColor, getTeamMember, removeTeammate, updateTeamConfig, upsertTeammate } from "./team-config-store"
 import type { TeamTeammateMember, TeamToolContext } from "./types"
 
 function parseModel(model: string | undefined): { providerID: string; modelID: string } | undefined {
@@ -60,29 +60,36 @@ export interface SpawnTeammateParams {
 }
 
 export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTeammateMember> {
-  const config = readTeamConfigOrThrow(params.teamName)
+  let teammate: TeamTeammateMember | undefined
   let launchedTaskID: string | undefined
 
-  if (getTeamMember(config, params.name)) {
-    throw new Error("teammate_already_exists")
+  updateTeamConfig(params.teamName, (current) => {
+    if (getTeamMember(current, params.name)) {
+      throw new Error("teammate_already_exists")
+    }
+
+    teammate = {
+      agentId: `${params.name}@${params.teamName}`,
+      name: params.name,
+      agentType: params.subagentType,
+      model: params.model ?? "native",
+      prompt: params.prompt,
+      color: assignNextColor(current),
+      planModeRequired: params.planModeRequired,
+      joinedAt: Date.now(),
+      cwd: process.cwd(),
+      subscriptions: [],
+      backendType: "native",
+      isActive: false,
+    }
+
+    return upsertTeammate(current, teammate)
+  })
+
+  if (!teammate) {
+    throw new Error("teammate_create_failed")
   }
 
-  const teammate: TeamTeammateMember = {
-    agentId: `${params.name}@${params.teamName}`,
-    name: params.name,
-    agentType: params.subagentType,
-    model: params.model ?? "native",
-    prompt: params.prompt,
-    color: assignNextColor(config),
-    planModeRequired: params.planModeRequired,
-    joinedAt: Date.now(),
-    cwd: process.cwd(),
-    subscriptions: [],
-    backendType: "native",
-    isActive: false,
-  }
-
-  writeTeamConfig(params.teamName, upsertTeammate(config, teammate))
   ensureInbox(params.teamName, params.name)
   sendPlainInboxMessage(params.teamName, "team-lead", params.name, params.prompt, "initial_prompt", teammate.color)
 
@@ -125,8 +132,7 @@ export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTe
       sessionID,
     }
 
-    const current = readTeamConfigOrThrow(params.teamName)
-    writeTeamConfig(params.teamName, upsertTeammate(current, nextMember))
+    updateTeamConfig(params.teamName, (current) => upsertTeammate(current, nextMember))
     return nextMember
   } catch (error) {
     if (launchedTaskID) {
@@ -138,9 +144,8 @@ export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTe
         })
         .catch(() => undefined)
     }
-
-    const rollback = readTeamConfigOrThrow(params.teamName)
-    writeTeamConfig(params.teamName, removeTeammate(rollback, params.name))
+    updateTeamConfig(params.teamName, (current) => removeTeammate(current, params.name))
+    clearInbox(params.teamName, params.name)
     throw error
   }
 }

@@ -19,6 +19,6 @@ export function createAgentTeamsTools(manager: BackgroundManager): Record<string
     team_task_list: createTeamTaskListTool(),
     team_task_get: createTeamTaskGetTool(),
     force_kill_teammate: createForceKillTeammateTool(manager),
-    process_shutdown_approved: createProcessShutdownTool(),
+    process_shutdown_approved: createProcessShutdownTool(manager),
   }
 }

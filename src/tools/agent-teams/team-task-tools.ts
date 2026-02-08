@@ -1,7 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { sendStructuredInboxMessage } from "./inbox-store"
 import { readTeamConfigOrThrow } from "./team-config-store"
-import { validateAgentName, validateTaskId, validateTeamName } from "./name-validation"
+import { validateAgentNameOrLead, validateTaskId, validateTeamName } from "./name-validation"
 import {
   TeamTaskCreateInputSchema,
   TeamTaskGetInputSchema,
@@ -117,7 +117,7 @@ export function notifyOwnerAssignment(teamName: string, task: TeamTask): void {
     return
   }
 
-  if (validateAgentName(task.owner)) {
+  if (validateAgentNameOrLead(task.owner)) {
     return
   }
 

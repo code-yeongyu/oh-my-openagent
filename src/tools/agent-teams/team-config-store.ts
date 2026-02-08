@@ -127,6 +127,20 @@ export function writeTeamConfig(teamName: string, config: TeamConfig): TeamConfi
   })
 }
 
+export function updateTeamConfig(teamName: string, updater: (config: TeamConfig) => TeamConfig): TeamConfig {
+  assertValidTeamName(teamName)
+  return withTeamLock(teamName, () => {
+    const current = readJsonSafe(getTeamConfigPath(teamName), TeamConfigSchema)
+    if (!current) {
+      throw new Error("team_not_found")
+    }
+
+    const next = TeamConfigSchema.parse(updater(current))
+    writeJsonAtomic(getTeamConfigPath(teamName), next)
+    return next
+  })
+}
+
 export function listTeammates(config: TeamConfig): TeamTeammateMember[] {
   return config.members.filter(isTeammateMember)
 }
