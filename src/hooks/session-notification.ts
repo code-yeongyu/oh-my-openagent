@@ -8,11 +8,15 @@ import {
   sendNotification,
   playSound,
   hasIncompleteTodos,
+  cleanupOldSessions,
 } from "./session-notification-platform"
+import { extractProjectName, resolveMessageFormat } from "./session-notification-format"
 
 interface SessionNotificationConfig {
   title?: string
   message?: string
+  /** Custom message format with {project} and {cwd} template variables */
+  message_format?: string
   playSound?: boolean
   soundPath?: string
   /** Delay in ms before sending notification to confirm session is still idle (default: 1500) */
@@ -35,6 +39,7 @@ export function createSessionNotification(
   const mergedConfig = {
     title: "OpenCode",
     message: "Agent is ready for input",
+    message_format: "{project} \u2014 Agent is ready for input",
     playSound: false,
     soundPath: defaultSoundPath,
     idleConfirmationDelay: 1500,
@@ -51,24 +56,14 @@ export function createSessionNotification(
   // Track sessions currently executing notification (prevents duplicate execution)
   const executingNotifications = new Set<string>()
 
-  function cleanupOldSessions() {
-    const maxSessions = mergedConfig.maxTrackedSessions
-    if (notifiedSessions.size > maxSessions) {
-      const sessionsToRemove = Array.from(notifiedSessions).slice(0, notifiedSessions.size - maxSessions)
-      sessionsToRemove.forEach(id => notifiedSessions.delete(id))
-    }
-    if (sessionActivitySinceIdle.size > maxSessions) {
-      const sessionsToRemove = Array.from(sessionActivitySinceIdle).slice(0, sessionActivitySinceIdle.size - maxSessions)
-      sessionsToRemove.forEach(id => sessionActivitySinceIdle.delete(id))
-    }
-    if (notificationVersions.size > maxSessions) {
-      const sessionsToRemove = Array.from(notificationVersions.keys()).slice(0, notificationVersions.size - maxSessions)
-      sessionsToRemove.forEach(id => notificationVersions.delete(id))
-    }
-    if (executingNotifications.size > maxSessions) {
-      const sessionsToRemove = Array.from(executingNotifications).slice(0, executingNotifications.size - maxSessions)
-      sessionsToRemove.forEach(id => executingNotifications.delete(id))
-    }
+  function cleanupTrackedSessions() {
+    cleanupOldSessions(
+      mergedConfig.maxTrackedSessions,
+      notifiedSessions,
+      sessionActivitySinceIdle,
+      notificationVersions,
+      executingNotifications,
+    )
   }
 
   function cancelPendingNotification(sessionID: string) {
@@ -132,7 +127,12 @@ export function createSessionNotification(
 
       notifiedSessions.add(sessionID)
 
-      await sendNotification(ctx, currentPlatform, mergedConfig.title, mergedConfig.message)
+      const project = extractProjectName(ctx.directory)
+      const resolvedMessage = resolveMessageFormat(
+        mergedConfig.message_format,
+        { project, cwd: ctx.directory }
+      )
+      await sendNotification(ctx, currentPlatform, mergedConfig.title, resolvedMessage)
 
       if (mergedConfig.playSound && mergedConfig.soundPath) {
         await playSound(ctx, currentPlatform, mergedConfig.soundPath)
@@ -185,9 +185,9 @@ export function createSessionNotification(
         executeNotification(sessionID, currentVersion)
       }, mergedConfig.idleConfirmationDelay)
 
-      pendingTimers.set(sessionID, timer)
-      cleanupOldSessions()
-      return
+       pendingTimers.set(sessionID, timer)
+       cleanupTrackedSessions()
+       return
     }
 
     if (event.type === "message.updated") {

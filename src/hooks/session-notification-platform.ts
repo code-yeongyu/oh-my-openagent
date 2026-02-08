@@ -123,3 +123,21 @@ export async function hasIncompleteTodos(ctx: PluginInput, sessionID: string): P
     return false
   }
 }
+
+/**
+ * Cleans up old sessions from tracking sets when they exceed maxSessions limit.
+ */
+export function cleanupOldSessions(
+  maxSessions: number,
+  ...sets: (Set<string> | Map<string, unknown>)[]
+) {
+  for (const collection of sets) {
+    if (collection.size > maxSessions) {
+      const keys = collection instanceof Map
+        ? Array.from(collection.keys())
+        : Array.from(collection)
+      const toRemove = keys.slice(0, collection.size - maxSessions)
+      toRemove.forEach(id => collection.delete(id))
+    }
+  }
+}
