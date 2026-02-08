@@ -21,6 +21,9 @@ function createMockPluginInput(options: {
         prompt: async (input: unknown) => {
           promptCalls.push({ input })
         },
+        promptAsync: async (input: unknown) => {
+          promptCalls.push({ input })
+        },
       },
     },
   }
