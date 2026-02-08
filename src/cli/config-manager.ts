@@ -1,10 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from "node:fs"
-import {
-  parseJsonc,
-  getOpenCodeConfigPaths,
-  type OpenCodeBinaryType,
-  type OpenCodeConfigPaths,
-} from "../shared"
+import { parseJsonc, getOpenCodeConfigPaths } from "../shared"
+import type {
+  OpenCodeBinaryType,
+  OpenCodeConfigPaths,
+} from "../shared/opencode-config-dir-types"
 import type { ConfigMergeResult, DetectedConfig, InstallConfig } from "./types"
 import { generateModelConfig } from "./model-fallback"
 
@@ -45,10 +44,6 @@ function getConfigJson(): string {
 
 function getConfigJsonc(): string {
   return getConfigContext().paths.configJsonc
-}
-
-function getPackageJson(): string {
-  return getConfigContext().paths.packageJson
 }
 
 function getOmoConfig(): string {
@@ -177,11 +172,6 @@ interface ParseConfigResult {
 
 function isEmptyOrWhitespace(content: string): boolean {
   return content.trim().length === 0
-}
-
-function parseConfig(path: string, _isJsonc: boolean): OpenCodeConfig | null {
-  const result = parseConfigWithError(path)
-  return result.config
 }
 
 function parseConfigWithError(path: string): ParseConfigResult {
