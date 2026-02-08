@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-25+ tools across 8 categories. Two patterns: Direct ToolDefinition (static) and Factory Function (context-dependent).
+113 tools across 8 categories. Two patterns: Direct ToolDefinition (static) and Factory Function (context-dependent).
 
 **Categories**: LSP (6), AST-Grep (2), Search (2), Session (4), Task (4), Agent delegation (2), Background (2), Skill (3), System (2)
 

@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-CLI entry: `bunx oh-my-opencode`. 5 commands with Commander.js + @clack/prompts TUI.
+CLI entry: `bunx oh-my-opencode`. 70 CLI utilities and commands with Commander.js + @clack/prompts TUI.
 
 **Commands**: install (interactive setup), doctor (14 health checks), run (session launcher), get-local-version, mcp-oauth
 
