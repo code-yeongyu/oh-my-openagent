@@ -943,3 +943,108 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     expect(commands["test-cmd"]).toBeDefined()
   })
 })
+
+describe("per-agent todowrite/todoread deny when task_system enabled", () => {
+  const PRIMARY_AGENTS = ["sisyphus", "hephaestus", "atlas", "prometheus", "sisyphus-junior"]
+
+  test("denies todowrite and todoread for primary agents when task_system is enabled", async () => {
+    //#given
+    spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
+      atlas: { name: "atlas", prompt: "test", mode: "primary" },
+      prometheus: { name: "prometheus", prompt: "test", mode: "primary" },
+      "sisyphus-junior": { name: "sisyphus-junior", prompt: "test", mode: "subagent" },
+      oracle: { name: "oracle", prompt: "test", mode: "subagent" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      experimental: { task_system: true },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
+    for (const agentName of PRIMARY_AGENTS) {
+      expect(agentResult[agentName]?.permission?.todowrite).toBe("deny")
+      expect(agentResult[agentName]?.permission?.todoread).toBe("deny")
+    }
+  })
+
+  test("does not deny todowrite/todoread when task_system is disabled", async () => {
+    //#given
+    spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      experimental: { task_system: false },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
+    expect(agentResult.sisyphus?.permission?.todowrite).toBeUndefined()
+    expect(agentResult.sisyphus?.permission?.todoread).toBeUndefined()
+    expect(agentResult.hephaestus?.permission?.todowrite).toBeUndefined()
+    expect(agentResult.hephaestus?.permission?.todoread).toBeUndefined()
+  })
+
+  test("does not deny todowrite/todoread when task_system is undefined", async () => {
+    //#given
+    spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
+    expect(agentResult.sisyphus?.permission?.todowrite).toBeUndefined()
+    expect(agentResult.sisyphus?.permission?.todoread).toBeUndefined()
+  })
+})
