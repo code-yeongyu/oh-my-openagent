@@ -2841,8 +2841,8 @@ describe("sisyphus-task", () => {
       })
     }, { timeout: 20000 })
 
-    test("agent without model does not override categoryModel", async () => {
-      // given - agent registered without model field
+    test("agent without model resolves via fallback chain", async () => {
+      // given - agent registered without model field, fallback chain should resolve
       const { createDelegateTask } = require("./tools")
       let promptBody: any
 
@@ -2857,7 +2857,7 @@ describe("sisyphus-task", () => {
          app: {
            agents: async () => ({
              data: [
-               { name: "explore", mode: "subagent" }, // no model field
+               { name: "explore", mode: "subagent" },
              ],
            }),
          },
@@ -2898,8 +2898,205 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - no model should be passed to session.prompt
-      expect(promptBody.model).toBeUndefined()
+      // then - model should be resolved via AGENT_MODEL_REQUIREMENTS fallback chain
+      expect(promptBody.model).toBeDefined()
+    }, { timeout: 20000 })
+
+    test("agentOverrides model takes priority over matchedAgent.model (#1357)", async () => {
+      // given - user configured oracle to use a specific model in oh-my-opencode.json
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+
+       const promptMock = async (input: any) => {
+         promptBody = input.body
+         return { data: {} }
+       }
+
+       const mockClient = {
+         app: {
+           agents: async () => ({
+             data: [
+               { name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+             ],
+           }),
+         },
+         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+         session: {
+           get: async () => ({ data: { directory: "/project" } }),
+           create: async () => ({ data: { id: "ses_override_model" } }),
+           prompt: promptMock,
+           promptAsync: promptMock,
+           messages: async () => ({
+             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+           }),
+           status: async () => ({ data: { "ses_override_model": { type: "idle" } } }),
+         },
+       }
+
+       const tool = createDelegateTask({
+         manager: mockManager,
+         client: mockClient,
+         agentOverrides: {
+           oracle: { model: "anthropic/claude-opus-4-6" },
+         },
+       })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - delegating to oracle via subagent_type with user override
+      await tool.execute(
+        {
+          description: "Consult oracle with override",
+          prompt: "Review architecture",
+          subagent_type: "oracle",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then - user-configured model should take priority over matchedAgent.model
+      expect(promptBody.model).toEqual({
+        providerID: "anthropic",
+        modelID: "claude-opus-4-6",
+      })
+    }, { timeout: 20000 })
+
+    test("agentOverrides variant is applied when model is overridden (#1357)", async () => {
+      // given - user configured oracle with model and variant
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+
+       const promptMock = async (input: any) => {
+         promptBody = input.body
+         return { data: {} }
+       }
+
+       const mockClient = {
+         app: {
+           agents: async () => ({
+             data: [
+               { name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+             ],
+           }),
+         },
+         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+         session: {
+           get: async () => ({ data: { directory: "/project" } }),
+           create: async () => ({ data: { id: "ses_variant_test" } }),
+           prompt: promptMock,
+           promptAsync: promptMock,
+           messages: async () => ({
+             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+           }),
+           status: async () => ({ data: { "ses_variant_test": { type: "idle" } } }),
+         },
+       }
+
+       const tool = createDelegateTask({
+         manager: mockManager,
+         client: mockClient,
+         agentOverrides: {
+           oracle: { model: "anthropic/claude-opus-4-6", variant: "max" },
+         },
+       })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - delegating to oracle via subagent_type with variant override
+      await tool.execute(
+        {
+          description: "Consult oracle with variant",
+          prompt: "Review architecture",
+          subagent_type: "oracle",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then - user-configured variant should be applied
+      expect(promptBody.variant).toBe("max")
+    }, { timeout: 20000 })
+
+    test("fallback chain resolves model when no override and no matchedAgent.model (#1357)", async () => {
+      // given - agent registered without model, no override, but AGENT_MODEL_REQUIREMENTS has fallback
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+
+       const promptMock = async (input: any) => {
+         promptBody = input.body
+         return { data: {} }
+       }
+
+       const mockClient = {
+         app: {
+           agents: async () => ({
+             data: [
+               { name: "oracle", mode: "subagent" }, // no model field
+             ],
+           }),
+         },
+         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+         session: {
+           get: async () => ({ data: { directory: "/project" } }),
+           create: async () => ({ data: { id: "ses_fallback_test" } }),
+           prompt: promptMock,
+           promptAsync: promptMock,
+           messages: async () => ({
+             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }],
+           }),
+           status: async () => ({ data: { "ses_fallback_test": { type: "idle" } } }),
+         },
+       }
+
+       const tool = createDelegateTask({
+         manager: mockManager,
+         client: mockClient,
+         // no agentOverrides
+       })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - delegating to oracle with no override and no matchedAgent model
+      await tool.execute(
+        {
+          description: "Consult oracle with fallback",
+          prompt: "Review architecture",
+          subagent_type: "oracle",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then - should resolve via AGENT_MODEL_REQUIREMENTS fallback chain for oracle
+      // oracle fallback chain: gpt-5.2 (openai) > gemini-3-pro (google) > claude-opus-4-6 (anthropic)
+      // Since openai is in connectedProviders, should resolve to openai/gpt-5.2
+      expect(promptBody.model).toBeDefined()
+      expect(promptBody.model.providerID).toBe("openai")
+      expect(promptBody.model.modelID).toContain("gpt-5.2")
     }, { timeout: 20000 })
   })
 
