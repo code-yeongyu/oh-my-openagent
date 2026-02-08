@@ -115,10 +115,26 @@ export const TeamSpawnInputSchema = z.object({
   plan_mode_required: z.boolean().optional(),
 })
 
+function normalizeTeamRecipient(recipient: string): string {
+  const trimmed = recipient.trim()
+  const atIndex = trimmed.indexOf("@")
+  if (atIndex <= 0) {
+    return trimmed
+  }
+
+  return trimmed.slice(0, atIndex)
+}
+
 export const TeamSendMessageInputSchema = z.object({
   team_name: z.string(),
   type: TeamSendMessageTypeSchema,
-  recipient: z.string().optional(),
+  recipient: z.string().optional().transform((value) => {
+    if (value === undefined) {
+      return undefined
+    }
+
+    return normalizeTeamRecipient(value)
+  }),
   content: z.string().optional(),
   summary: z.string().optional(),
   request_id: z.string().optional(),

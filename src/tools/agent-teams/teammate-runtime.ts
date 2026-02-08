@@ -1,25 +1,10 @@
-import type { PluginInput } from "@opencode-ai/plugin"
-import type { CategoriesConfig } from "../../config/schema"
 import type { BackgroundManager } from "../../features/background-agent"
-import { resolveCategoryExecution, resolveParentContext } from "../delegate-task/executor"
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "../delegate-task/types"
 import { clearInbox, ensureInbox, sendPlainInboxMessage } from "./inbox-store"
 import { assignNextColor, getTeamMember, removeTeammate, updateTeamConfig, upsertTeammate } from "./team-config-store"
 import type { TeamTeammateMember, TeamToolContext } from "./types"
-
-function parseModel(model: string | undefined): { providerID: string; modelID: string } | undefined {
-  if (!model) {
-    return undefined
-  }
-  const separatorIndex = model.indexOf("/")
-  if (separatorIndex <= 0 || separatorIndex >= model.length - 1) {
-    throw new Error("invalid_model_override_format")
-  }
-
-  const providerID = model.slice(0, separatorIndex)
-  const modelID = model.slice(separatorIndex + 1)
-  return { providerID, modelID }
-}
+import { resolveTeamParentContext } from "./teammate-parent-context"
+import { buildDeliveryPrompt, buildLaunchPrompt } from "./teammate-prompts"
+import { resolveSpawnExecution, type TeamCategoryContext } from "./teammate-spawn-execution"
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -37,35 +22,6 @@ function resolveLaunchFailureMessage(status: string | undefined, error: string |
   return "teammate_launch_timeout"
 }
 
-function buildLaunchPrompt(
-  teamName: string,
-  teammateName: string,
-  userPrompt: string,
-  categoryPromptAppend?: string,
-): string {
-  const sections = [
-    `You are teammate "${teammateName}" in team "${teamName}".`,
-    `When you need updates, call read_inbox with team_name="${teamName}" and agent_name="${teammateName}".`,
-    "Initial assignment:",
-    userPrompt,
-  ]
-
-  if (categoryPromptAppend) {
-    sections.push("Category guidance:", categoryPromptAppend)
-  }
-
-  return sections.join("\n\n")
-}
-
-function buildDeliveryPrompt(teamName: string, teammateName: string, summary: string, content: string): string {
-  return [
-    `New team message for "${teammateName}" in team "${teamName}".`,
-    `Summary: ${summary}`,
-    "Content:",
-    content,
-  ].join("\n\n")
-}
-
 export interface SpawnTeammateParams {
   teamName: string
   name: string
@@ -76,99 +32,24 @@ export interface SpawnTeammateParams {
   planModeRequired: boolean
   context: TeamToolContext
   manager: BackgroundManager
-  categoryContext?: {
-    client: PluginInput["client"]
-    userCategories?: CategoriesConfig
-    sisyphusJuniorModel?: string
-  }
-}
-
-interface SpawnExecution {
-  agentType: string
-  teammateModel: string
-  launchModel?: { providerID: string; modelID: string; variant?: string }
-  categoryPromptAppend?: string
-}
-
-async function getSystemDefaultModel(client: PluginInput["client"]): Promise<string | undefined> {
-  try {
-    const openCodeConfig = await client.config.get()
-    return (openCodeConfig as { data?: { model?: string } })?.data?.model
-  } catch {
-    return undefined
-  }
-}
-
-async function resolveSpawnExecution(params: SpawnTeammateParams): Promise<SpawnExecution> {
-  if (params.model) {
-    const launchModel = parseModel(params.model)
-    return {
-      agentType: params.subagentType,
-      teammateModel: params.model,
-      ...(launchModel ? { launchModel } : {}),
-    }
-  }
-
-  if (!params.categoryContext?.client) {
-    return {
-      agentType: params.subagentType,
-      teammateModel: "native",
-    }
-  }
-
-  const parentContext = resolveParentContext({
-    sessionID: params.context.sessionID,
-    messageID: params.context.messageID,
-    agent: params.context.agent ?? "sisyphus",
-    abort: new AbortController().signal,
-  } as ToolContextWithMetadata)
-
-  const inheritedModel = parentContext.model
-    ? `${parentContext.model.providerID}/${parentContext.model.modelID}`
-    : undefined
-
-  const systemDefaultModel = await getSystemDefaultModel(params.categoryContext.client)
-
-  const delegateArgs: DelegateTaskArgs = {
-    description: `[team:${params.teamName}] ${params.name}`,
-    prompt: params.prompt,
-    category: params.category,
-    subagent_type: "sisyphus-junior",
-    run_in_background: true,
-    load_skills: [],
-  }
-
-  const resolution = await resolveCategoryExecution(
-    delegateArgs,
-    {
-      manager: params.manager,
-      client: params.categoryContext.client,
-      directory: process.cwd(),
-      userCategories: params.categoryContext.userCategories,
-      sisyphusJuniorModel: params.categoryContext.sisyphusJuniorModel,
-    },
-    inheritedModel,
-    systemDefaultModel,
-  )
-
-  if (resolution.error) {
-    throw new Error(resolution.error)
-  }
-
-  if (!resolution.categoryModel) {
-    throw new Error("category_model_not_resolved")
-  }
-
-  return {
-    agentType: resolution.agentToUse,
-    teammateModel: `${resolution.categoryModel.providerID}/${resolution.categoryModel.modelID}`,
-    launchModel: resolution.categoryModel,
-    categoryPromptAppend: resolution.categoryPromptAppend,
-  }
+  categoryContext?: TeamCategoryContext
 }
 
 export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTeammateMember> {
-  const execution = await resolveSpawnExecution(params)
+  const parentContext = resolveTeamParentContext(params.context)
+  const execution = await resolveSpawnExecution(
+    {
+      teamName: params.teamName,
+      name: params.name,
+      prompt: params.prompt,
+      category: params.category,
+      subagentType: params.subagentType,
+      model: params.model,
+      manager: params.manager,
+      categoryContext: params.categoryContext,
+    },
+    parentContext,
+  )
 
   let teammate: TeamTeammateMember | undefined
   let launchedTaskID: string | undefined
@@ -209,11 +90,12 @@ export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTe
       description: `[team:${params.teamName}] ${params.name}`,
       prompt: buildLaunchPrompt(params.teamName, params.name, params.prompt, execution.categoryPromptAppend),
       agent: execution.agentType,
-      parentSessionID: params.context.sessionID,
-      parentMessageID: params.context.messageID,
+      parentSessionID: parentContext.sessionID,
+      parentMessageID: parentContext.messageID,
+      parentModel: parentContext.model,
       ...(execution.launchModel ? { model: execution.launchModel } : {}),
       ...(params.category ? { category: params.category } : {}),
-      parentAgent: params.context.agent,
+      parentAgent: parentContext.agent,
     })
     launchedTaskID = launched.id
 
@@ -286,13 +168,16 @@ export async function resumeTeammateWithMessage(
     return
   }
 
+  const parentContext = resolveTeamParentContext(context)
+
   try {
     await manager.resume({
       sessionId: teammate.sessionID,
       prompt: buildDeliveryPrompt(teamName, teammate.name, summary, content),
-      parentSessionID: context.sessionID,
-      parentMessageID: context.messageID,
-      parentAgent: context.agent,
+      parentSessionID: parentContext.sessionID,
+      parentMessageID: parentContext.messageID,
+      parentModel: parentContext.model,
+      parentAgent: parentContext.agent,
     })
   } catch {
     return
