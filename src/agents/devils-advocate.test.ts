@@ -1,8 +1,10 @@
+/// <reference types="bun-types" />
+
 import { describe, test, expect } from "bun:test"
 import { createDevilsAdvocateAgent, devilsAdvocatePromptMetadata } from "./devils-advocate"
 
 describe("createDevilsAdvocateAgent", () => {
-  test("returns a subagent with denied write/edit/task/background_task/call_omo_agent permissions", () => {
+  test("returns a subagent with allowlist-based read-only tool permissions", () => {
     // given
     const model = "google/gemini-3-pro"
 
@@ -15,11 +17,17 @@ describe("createDevilsAdvocateAgent", () => {
     expect(agent.temperature).toBe(0.1)
 
     expect(agent.permission).toBeDefined()
-    expect(agent.permission?.write).toBe("deny")
-    expect(agent.permission?.edit).toBe("deny")
-    expect(agent.permission?.task).toBe("deny")
-    expect(agent.permission?.background_task).toBe("deny")
-    expect(agent.permission?.call_omo_agent).toBe("deny")
+
+    expect(agent.permission?.["*"]).toBe("deny")
+    expect(agent.permission?.["read"]).toBe("allow")
+    expect(agent.permission?.["grep"]).toBe("allow")
+    expect(agent.permission?.["glob"]).toBe("allow")
+    expect(agent.permission?.["lsp_diagnostics"]).toBe("allow")
+    expect(agent.permission?.["lsp_symbols"]).toBe("allow")
+    expect(agent.permission?.["lsp_find_references"]).toBe("allow")
+    expect(agent.permission?.["lsp_goto_definition"]).toBe("allow")
+    expect(agent.permission?.["webfetch"]).toBe("allow")
+    expect(agent.permission?.["ast_grep_search"]).toBe("allow")
   })
 
   test("uses reasoningEffort for GPT-family models", () => {

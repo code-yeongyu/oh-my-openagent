@@ -1,9 +1,20 @@
+/// <reference types="bun-types" />
+
 import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
 
 const TEST_DIR = join(tmpdir(), "mcp-loader-test-" + Date.now())
+
+mock.module("os", () => ({
+  homedir: () => TEST_DIR,
+  tmpdir,
+}))
+
+mock.module("../../shared", () => ({
+  getClaudeConfigDir: () => join(TEST_DIR, ".claude"),
+}))
 
 describe("getSystemMcpServerNames", () => {
   beforeEach(() => {
@@ -176,11 +187,6 @@ describe("getSystemMcpServerNames", () => {
       process.chdir(TEST_DIR)
 
       try {
-        mock.module("os", () => ({
-          homedir: () => TEST_DIR,
-          tmpdir,
-        }))
-
         writeFileSync(userConfigPath, JSON.stringify(userMcpConfig))
 
         const { getSystemMcpServerNames } = await import("./loader")
@@ -225,16 +231,6 @@ describe("getSystemMcpServerNames", () => {
       process.chdir(TEST_DIR)
 
       try {
-        mock.module("os", () => ({
-          homedir: () => TEST_DIR,
-          tmpdir,
-        }))
-
-        // Also mock getClaudeConfigDir to point to our test .claude dir
-        mock.module("../../shared", () => ({
-          getClaudeConfigDir: () => claudeDir,
-        }))
-
         const { getSystemMcpServerNames } = await import("./loader")
         const names = getSystemMcpServerNames()
 

@@ -1,3 +1,6 @@
+/// <reference types="bun-types" />
+
+import { afterEach, describe, expect, test } from "bun:test"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
 import type { BackgroundTask } from "../../features/background-agent"
 import { createUnstableAgentBabysitterHook } from "./index"
@@ -19,6 +22,9 @@ function createMockPluginInput(options: {
           data: messagesBySession[path.id] ?? [],
         }),
         prompt: async (input: unknown) => {
+          promptCalls.push({ input })
+        },
+        promptAsync: async (input: unknown) => {
           promptCalls.push({ input })
         },
       },

@@ -68,13 +68,13 @@ agents/
 4. Register in `src/index.ts` initialization.
 
 ## TOOL RESTRICTIONS
-| Agent | Denied Tools |
-|-------|-------------|
+| Agent | Tool Restrictions |
+|-------|-------------------|
 | oracle | write, edit, task, task |
 | librarian | write, edit, task, task, call_omo_agent |
 | explore | write, edit, task, task, call_omo_agent |
 | multimodal-looker | Allowlist: read only |
-| Devil's Advocate | write, edit, task, background_task, call_omo_agent |
+| Devil's Advocate | Allowlist: read, grep, glob, lsp_diagnostics, lsp_symbols, lsp_find_references, lsp_goto_definition, webfetch, ast_grep_search |
 | Sisyphus-Junior | task, task |
 | Atlas | task, call_omo_agent |
 

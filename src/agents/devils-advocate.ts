@@ -1,7 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { createAgentToolAllowlist } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
 
@@ -69,12 +69,16 @@ CRITICAL / RISKY / VIABLE
 </Constraints>`
 
 export function createDevilsAdvocateAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "task",
-    "background_task",
-    "call_omo_agent",
+  const restrictions = createAgentToolAllowlist([
+    "read",
+    "grep",
+    "glob",
+    "lsp_diagnostics",
+    "lsp_symbols",
+    "lsp_find_references",
+    "lsp_goto_definition",
+    "webfetch",
+    "ast_grep_search",
   ])
 
   const base: AgentConfig = {
