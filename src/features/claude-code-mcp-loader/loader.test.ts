@@ -5,9 +5,24 @@ import { tmpdir } from "os"
 
 const TEST_DIR = join(tmpdir(), "mcp-loader-test-" + Date.now())
 
+async function importLoader() {
+  // Avoid cross-file module cache pollution (other tests may import ./loader first).
+  return import(`./loader?test=${Date.now()}-${Math.random()}`)
+}
+
 describe("getSystemMcpServerNames", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })
+
+    // Force user-level MCP paths into TEST_DIR so local machine state
+    // (~/.claude.json, ~/.claude/.mcp.json) can't affect these tests.
+    mock.module("os", () => ({
+      homedir: () => TEST_DIR,
+      tmpdir,
+    }))
+    mock.module("../../shared", () => ({
+      getClaudeConfigDir: () => join(TEST_DIR, ".claude"),
+    }))
   })
 
   afterEach(() => {
@@ -21,7 +36,7 @@ describe("getSystemMcpServerNames", () => {
 
     try {
       // when
-      const { getSystemMcpServerNames } = await import("./loader")
+      const { getSystemMcpServerNames } = await importLoader()
       const names = getSystemMcpServerNames()
 
       // then
@@ -53,7 +68,7 @@ describe("getSystemMcpServerNames", () => {
 
     try {
       // when
-      const { getSystemMcpServerNames } = await import("./loader")
+      const { getSystemMcpServerNames } = await importLoader()
       const names = getSystemMcpServerNames()
 
       // then
@@ -83,7 +98,7 @@ describe("getSystemMcpServerNames", () => {
 
     try {
       // when
-      const { getSystemMcpServerNames } = await import("./loader")
+      const { getSystemMcpServerNames } = await importLoader()
       const names = getSystemMcpServerNames()
 
       // then
@@ -115,7 +130,7 @@ describe("getSystemMcpServerNames", () => {
 
     try {
       // when
-      const { getSystemMcpServerNames } = await import("./loader")
+      const { getSystemMcpServerNames } = await importLoader()
       const names = getSystemMcpServerNames()
 
       // then
@@ -149,8 +164,8 @@ describe("getSystemMcpServerNames", () => {
 
      try {
        // when
-       const { getSystemMcpServerNames } = await import("./loader")
-       const names = getSystemMcpServerNames()
+        const { getSystemMcpServerNames } = await importLoader()
+        const names = getSystemMcpServerNames()
 
        // then
        expect(names.has("playwright")).toBe(true)
@@ -183,7 +198,7 @@ describe("getSystemMcpServerNames", () => {
 
         writeFileSync(userConfigPath, JSON.stringify(userMcpConfig))
 
-        const { getSystemMcpServerNames } = await import("./loader")
+        const { getSystemMcpServerNames } = await importLoader()
         const names = getSystemMcpServerNames()
 
         expect(names.has("user-server")).toBe(true)
@@ -235,7 +250,7 @@ describe("getSystemMcpServerNames", () => {
           getClaudeConfigDir: () => claudeDir,
         }))
 
-        const { getSystemMcpServerNames } = await import("./loader")
+        const { getSystemMcpServerNames } = await importLoader()
         const names = getSystemMcpServerNames()
 
         // Both sources should be merged

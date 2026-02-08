@@ -225,6 +225,45 @@ function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   return "plugin"
 }
 
+const CUSTOM_AGENT_PROMPT_METADATA: AgentPromptMetadata = {
+  category: "specialist",
+  cost: "CHEAP",
+  triggers: [],
+}
+
+function normalizeAgentName(name: string): string {
+  return name.trim().toLowerCase()
+}
+
+function toCustomAvailableAgents(
+  customAgentConfigs: Record<string, AgentConfig>,
+  existingAgents: AvailableAgent[],
+  disabledAgents: string[]
+): AvailableAgent[] {
+  const disabled = new Set(disabledAgents.map(normalizeAgentName))
+  const seen = new Set(existingAgents.map((a) => normalizeAgentName(a.name)))
+  const result: AvailableAgent[] = []
+
+  for (const [name, config] of Object.entries(customAgentConfigs)) {
+    const normalizedName = normalizeAgentName(name)
+    if (!normalizedName) continue
+    if (disabled.has(normalizedName)) continue
+    if (seen.has(normalizedName)) continue
+
+    const configRecord = config as Record<string, unknown>
+    if (configRecord.hidden === true) continue
+
+    result.push({
+      name,
+      description: config.description ?? "",
+      metadata: CUSTOM_AGENT_PROMPT_METADATA,
+    })
+    seen.add(normalizedName)
+  }
+
+  return result
+}
+
 export async function createBuiltinAgents(
   disabledAgents: string[] = [],
   agentOverrides: AgentOverrides = {},
@@ -236,7 +275,8 @@ export async function createBuiltinAgents(
   client?: any,
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
-  disabledSkills?: Set<string>
+  disabledSkills?: Set<string>,
+  customAgentConfigsForPrompt: Record<string, AgentConfig> = {}
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
   // IMPORTANT: Do NOT pass client to fetchAvailableModels during plugin initialization.
@@ -343,9 +383,14 @@ export async function createBuiltinAgents(
         metadata,
       })
     }
+   }
+
+  if (Object.keys(customAgentConfigsForPrompt).length > 0) {
+    const customAvailableAgents = toCustomAvailableAgents(customAgentConfigsForPrompt, availableAgents, disabledAgents)
+    availableAgents.push(...customAvailableAgents)
   }
 
-   const sisyphusOverride = agentOverrides["sisyphus"]
+    const sisyphusOverride = agentOverrides["sisyphus"]
    const sisyphusRequirement = AGENT_MODEL_REQUIREMENTS["sisyphus"]
    const hasSisyphusExplicitConfig = sisyphusOverride !== undefined
    const meetsSisyphusAnyModelRequirement =

@@ -25,6 +25,7 @@ import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
+import type { AgentConfig as OpenCodeAgentConfig } from "@opencode-ai/sdk";
 import { log, fetchAvailableModels, readConnectedProvidersCache, resolveModelPipeline, addConfigLoadError } from "../shared";
 import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
@@ -49,6 +50,10 @@ export function resolveCategoryConfig(
 }
 
 const CORE_AGENT_ORDER = ["sisyphus", "hephaestus", "prometheus", "atlas"] as const;
+
+function isOpenCodeAgentConfig(value: unknown): value is OpenCodeAgentConfig {
+  return typeof value === "object" && value !== null
+}
 
 function reorderAgentsByPriority(agents: Record<string, unknown>): Record<string, unknown> {
   const ordered: Record<string, unknown> = {};
@@ -154,7 +159,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
 
     // Migrate disabled_agents from old names to new names
-    const migratedDisabledAgents = (pluginConfig.disabled_agents ?? []).map(agent => {
+    const migratedDisabledAgents = (pluginConfig.disabled_agents ?? []).map((agent: string) => {
       return AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
     }) as typeof pluginConfig.disabled_agents
 
@@ -178,24 +183,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       ...discoveredUserSkills,
     ];
 
-    const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
-    // config.model represents the currently active model in OpenCode (including UI selection)
-    // Pass it as uiSelectedModel so it takes highest priority in model resolution
-    const currentModel = config.model as string | undefined;
-    const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
-    const builtinAgents = await createBuiltinAgents(
-      migratedDisabledAgents,
-      pluginConfig.agents,
-      ctx.directory,
-      undefined, // systemDefaultModel - let fallback chain handle this
-      pluginConfig.categories,
-      pluginConfig.git_master,
-      allDiscoveredSkills,
-      ctx.client,
-      browserProvider,
-      currentModel, // uiSelectedModel - takes highest priority
-      disabledSkills
-    );
+    // Read OpenCode agent config BEFORE oh-my-opencode mutates config.agent
+    const existingAgentConfigs = (config.agent as Record<string, unknown> | undefined) ?? {}
 
     // Claude Code agents: Do NOT apply permission migration
     // Claude Code uses whitelist-based tools format which is semantically different
@@ -214,6 +203,48 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         k,
         v ? migrateAgentConfig(v as Record<string, unknown>) : v,
       ])
+    );
+
+    const customAgentConfigsForPrompt: Record<string, OpenCodeAgentConfig> = {};
+    for (const [name, value] of Object.entries(existingAgentConfigs)) {
+      if (isOpenCodeAgentConfig(value)) {
+        customAgentConfigsForPrompt[name] = value
+      }
+    }
+    for (const [name, value] of Object.entries(userAgents)) {
+      if (isOpenCodeAgentConfig(value)) {
+        customAgentConfigsForPrompt[name] = value
+      }
+    }
+    for (const [name, value] of Object.entries(projectAgents)) {
+      if (isOpenCodeAgentConfig(value)) {
+        customAgentConfigsForPrompt[name] = value
+      }
+    }
+    for (const [name, value] of Object.entries(pluginAgents)) {
+      if (isOpenCodeAgentConfig(value)) {
+        customAgentConfigsForPrompt[name] = value
+      }
+    }
+
+    const browserProvider = pluginConfig.browser_automation_engine?.provider ?? "playwright";
+    // config.model represents the currently active model in OpenCode (including UI selection)
+    // Pass it as uiSelectedModel so it takes highest priority in model resolution
+    const currentModel = config.model as string | undefined;
+    const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
+    const builtinAgents = await createBuiltinAgents(
+      migratedDisabledAgents,
+      pluginConfig.agents,
+      ctx.directory,
+      undefined, // systemDefaultModel - let fallback chain handle this
+      pluginConfig.categories,
+      pluginConfig.git_master,
+      allDiscoveredSkills,
+      ctx.client,
+      browserProvider,
+      currentModel, // uiSelectedModel - takes highest priority
+      disabledSkills,
+      customAgentConfigsForPrompt
     );
 
     const isSisyphusEnabled = pluginConfig.sisyphus_agent?.disabled !== true;
