@@ -23,6 +23,7 @@ import {
   isTeammateMember,
 } from "./types"
 import { validateTeamName } from "./name-validation"
+import { withTeamTaskLock } from "./team-task-store"
 
 function nowMs(): number {
   return Date.now()
@@ -174,15 +175,17 @@ export function assignNextColor(config: TeamConfig): string {
 export function deleteTeamData(teamName: string): void {
   assertValidTeamName(teamName)
   withTeamLock(teamName, () => {
-    const teamDir = getTeamDir(teamName)
-    const taskDir = getTeamTaskDir(teamName)
+    withTeamTaskLock(teamName, () => {
+      const teamDir = getTeamDir(teamName)
+      const taskDir = getTeamTaskDir(teamName)
 
-    if (existsSync(teamDir)) {
-      rmSync(teamDir, { recursive: true, force: true })
-    }
+      if (existsSync(teamDir)) {
+        rmSync(teamDir, { recursive: true, force: true })
+      }
 
-    if (existsSync(taskDir)) {
-      rmSync(taskDir, { recursive: true, force: true })
-    }
+      if (existsSync(taskDir)) {
+        rmSync(taskDir, { recursive: true, force: true })
+      }
+    })
   })
 }

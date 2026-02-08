@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { acquireLock } from "../../features/claude-tasks/storage"
-import { getTeamDir } from "./paths"
+import { getTeamDir, getTeamTaskDir } from "./paths"
 import { createTeamConfig, deleteTeamData, teamExists } from "./team-config-store"
 
 describe("agent-teams team config store", () => {
@@ -40,6 +40,29 @@ describe("agent-teams team config store", () => {
 
     //#when
     lock.release()
+    deleteTeamData("core")
+
+    //#then
+    expect(teamExists("core")).toBe(false)
+  })
+
+  test("deleteTeamData waits for task lock before removing task files", () => {
+    //#given
+    const lock = acquireLock(getTeamTaskDir("core"))
+    expect(lock.acquired).toBe(true)
+
+    try {
+      //#when
+      const deleteWhileLocked = () => deleteTeamData("core")
+
+      //#then
+      expect(deleteWhileLocked).toThrow("team_task_lock_unavailable")
+      expect(teamExists("core")).toBe(true)
+    } finally {
+      lock.release()
+    }
+
+    //#when
     deleteTeamData("core")
 
     //#then
