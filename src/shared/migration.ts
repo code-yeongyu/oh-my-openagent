@@ -168,28 +168,31 @@ export function shouldDeleteAgentConfig(
 }
 
 export function migrateConfigFile(configPath: string, rawConfig: Record<string, unknown>): boolean {
+  const migrations = (rawConfig._migrations ?? {}) as Record<string, boolean>
+  const copy = structuredClone(rawConfig)
+  const updatedMigrations = { ...migrations }
   let needsWrite = false
 
-  if (rawConfig.agents && typeof rawConfig.agents === "object") {
-    const { migrated, changed } = migrateAgentNames(rawConfig.agents as Record<string, unknown>)
+  if (!migrations["agents"] && copy.agents && typeof copy.agents === "object") {
+    const { migrated, changed } = migrateAgentNames(copy.agents as Record<string, unknown>)
     if (changed) {
-      rawConfig.agents = migrated
+      copy.agents = migrated
       needsWrite = true
     }
+    updatedMigrations["agents"] = true
   }
 
-
-
-  if (rawConfig.omo_agent) {
-    rawConfig.sisyphus_agent = rawConfig.omo_agent
-    delete rawConfig.omo_agent
+  if (!migrations["omo_agent"] && copy.omo_agent) {
+    copy.sisyphus_agent = copy.omo_agent
+    delete copy.omo_agent
+    updatedMigrations["omo_agent"] = true
     needsWrite = true
   }
 
-  if (rawConfig.disabled_agents && Array.isArray(rawConfig.disabled_agents)) {
+  if (!migrations["disabled_agents"] && copy.disabled_agents && Array.isArray(copy.disabled_agents)) {
     const migrated: string[] = []
     let changed = false
-    for (const agent of rawConfig.disabled_agents as string[]) {
+    for (const agent of copy.disabled_agents as string[]) {
       const newAgent = AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
       if (newAgent !== agent) {
         changed = true
@@ -197,39 +200,55 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
       migrated.push(newAgent)
     }
     if (changed) {
-      rawConfig.disabled_agents = migrated
+      copy.disabled_agents = migrated
       needsWrite = true
     }
+    updatedMigrations["disabled_agents"] = true
   }
 
-  if (rawConfig.disabled_hooks && Array.isArray(rawConfig.disabled_hooks)) {
-    const { migrated, changed, removed } = migrateHookNames(rawConfig.disabled_hooks as string[])
+  if (!migrations["disabled_hooks"] && copy.disabled_hooks && Array.isArray(copy.disabled_hooks)) {
+    const { migrated, changed, removed } = migrateHookNames(copy.disabled_hooks as string[])
     if (changed) {
-      rawConfig.disabled_hooks = migrated
+      copy.disabled_hooks = migrated
       needsWrite = true
     }
     if (removed.length > 0) {
       log(`Removed obsolete hooks from disabled_hooks: ${removed.join(", ")} (these hooks no longer exist in v3.0.0)`)
     }
+    updatedMigrations["disabled_hooks"] = true
   }
 
-  if (rawConfig.experimental && typeof rawConfig.experimental === "object") {
-    const exp = rawConfig.experimental as Record<string, unknown>
+  if (!migrations["experimental_task_system"] && copy.experimental && typeof copy.experimental === "object") {
+    const exp = copy.experimental as Record<string, unknown>
     if ("task_system" in exp && exp.task_system !== undefined) {
+      updatedMigrations["experimental_task_system"] = true
       needsWrite = true
     }
   }
 
+  const hasNewMigrationKeys = Object.keys(updatedMigrations).length > Object.keys(migrations).length
+  if (hasNewMigrationKeys) {
+    needsWrite = true
+  }
+
   if (needsWrite) {
+    copy._migrations = updatedMigrations
+
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
       const backupPath = `${configPath}.bak.${timestamp}`
       fs.copyFileSync(configPath, backupPath)
 
-      fs.writeFileSync(configPath, JSON.stringify(rawConfig, null, 2) + "\n", "utf-8")
+      fs.writeFileSync(configPath, JSON.stringify(copy, null, 2) + "\n", "utf-8")
       log(`Migrated config file: ${configPath} (backup: ${backupPath})`)
+
+      for (const key of Object.keys(rawConfig)) {
+        delete rawConfig[key]
+      }
+      Object.assign(rawConfig, copy)
     } catch (err) {
       log(`Failed to write migrated config to ${configPath}:`, err)
+      return false
     }
   }
 

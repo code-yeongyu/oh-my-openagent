@@ -302,16 +302,44 @@ describe("migrateHookNames", () => {
 })
 
 describe("migrateConfigFile", () => {
-  const testConfigPath = "/tmp/nonexistent-path-for-test.json"
+  const testConfigPath = "/tmp/test-migrate-config-file.json"
+  const cleanupPaths: string[] = []
+
+  afterEach(() => {
+    ;[testConfigPath, ...cleanupPaths].forEach((p) => {
+      try { fs.unlinkSync(p) } catch {}
+    })
+    cleanupPaths.length = 0
+  })
+
+  function writeTestConfig(rawConfig: Record<string, unknown>) {
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
+    const dir = path.dirname(testConfigPath)
+    const basename = path.basename(testConfigPath)
+    const existing = fs.readdirSync(dir).filter((f) => f.startsWith(`${basename}.bak.`))
+    existing.forEach((f) => cleanupPaths.push(path.join(dir, f)))
+  }
+
+  function collectBackups() {
+    const dir = path.dirname(testConfigPath)
+    const basename = path.basename(testConfigPath)
+    const files = fs.readdirSync(dir).filter((f) => f.startsWith(`${basename}.bak.`))
+    files.forEach((f) => {
+      const p = path.join(dir, f)
+      if (!cleanupPaths.includes(p)) cleanupPaths.push(p)
+    })
+  }
 
   test("migrates omo_agent to sisyphus_agent", () => {
     // given: Config with legacy omo_agent key
     const rawConfig: Record<string, unknown> = {
       omo_agent: { disabled: false },
     }
+    writeTestConfig(rawConfig)
 
     // when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+    collectBackups()
 
     // then: omo_agent should be migrated to sisyphus_agent
     expect(needsWrite).toBe(true)
@@ -327,9 +355,11 @@ describe("migrateConfigFile", () => {
         OmO: { temperature: 0.5 },
       },
     }
+    writeTestConfig(rawConfig)
 
     // when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+    collectBackups()
 
     // then: Agent names should be migrated
     expect(needsWrite).toBe(true)
@@ -342,9 +372,11 @@ describe("migrateConfigFile", () => {
     const rawConfig: Record<string, unknown> = {
       disabled_hooks: ["anthropic-auto-compact", "comment-checker"],
     }
+    writeTestConfig(rawConfig)
 
     // when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+    collectBackups()
 
     // then: Hook names should be migrated
     expect(needsWrite).toBe(true)
@@ -352,8 +384,30 @@ describe("migrateConfigFile", () => {
     expect(rawConfig.disabled_hooks).not.toContain("anthropic-auto-compact")
   })
 
-  test("does not write if no migration needed", () => {
-    // given: Config with current names
+  test("does not write if no migration needed and _migrations already recorded", () => {
+    // given: Config with current names and _migrations already recorded
+    const rawConfig: Record<string, unknown> = {
+      sisyphus_agent: { disabled: false },
+      agents: {
+        sisyphus: { model: "test" },
+      },
+      disabled_hooks: ["anthropic-context-window-limit-recovery"],
+      _migrations: {
+        agents: true,
+        disabled_hooks: true,
+      },
+    }
+    writeTestConfig(rawConfig)
+
+    // when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: No write should be needed
+    expect(needsWrite).toBe(false)
+  })
+
+  test("writes _migrations keys on first run even when data is already current", () => {
+    // given: Config with current names but no _migrations recorded
     const rawConfig: Record<string, unknown> = {
       sisyphus_agent: { disabled: false },
       agents: {
@@ -361,12 +415,16 @@ describe("migrateConfigFile", () => {
       },
       disabled_hooks: ["anthropic-context-window-limit-recovery"],
     }
+    writeTestConfig(rawConfig)
 
-    // when: Migrate config file
+    // when: Migrate config file for the first time
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // then: No write should be needed
-    expect(needsWrite).toBe(false)
+    // then: Write is needed to record _migrations keys
+    expect(needsWrite).toBe(true)
+    const m = rawConfig._migrations as Record<string, boolean>
+    expect(m["agents"]).toBe(true)
+    expect(m["disabled_hooks"]).toBe(true)
   })
 
   test("handles migration of all legacy items together", () => {
@@ -379,9 +437,11 @@ describe("migrateConfigFile", () => {
       },
       disabled_hooks: ["anthropic-auto-compact"],
     }
+    writeTestConfig(rawConfig)
 
     // when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+    collectBackups()
 
     // then: All legacy items should be migrated
     expect(needsWrite).toBe(true)
@@ -658,7 +718,7 @@ describe("migrateConfigFile with backup", () => {
   })
 
   test("preserves model setting without auto-conversion to category", () => {
-    // given: Config with model setting (should NOT be converted to category)
+    // given: Config with model setting and _migrations already recorded
     const testConfigPath = "/tmp/test-config-preserve-model.json"
     const rawConfig: Record<string, unknown> = {
       agents: {
@@ -666,6 +726,7 @@ describe("migrateConfigFile with backup", () => {
         oracle: { model: "openai/gpt-5.2" },
         "my-custom-agent": { model: "google/gemini-3-pro" },
       },
+      _migrations: { agents: true },
     }
 
     fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
@@ -684,13 +745,14 @@ describe("migrateConfigFile with backup", () => {
   })
 
   test("preserves category setting when explicitly set", () => {
-    // given: Config with explicit category setting
+    // given: Config with explicit category setting and _migrations already recorded
     const testConfigPath = "/tmp/test-config-preserve-category.json"
     const rawConfig: Record<string, unknown> = {
       agents: {
         "multimodal-looker": { category: "quick" },
         oracle: { category: "ultrabrain" },
       },
+      _migrations: { agents: true },
     }
 
     fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
@@ -707,16 +769,17 @@ describe("migrateConfigFile with backup", () => {
     expect(agents.oracle.category).toBe("ultrabrain")
   })
 
-  test("does not write when no migration needed", () => {
-     // given: Config with no migrations needed
+  test("does not write when no migration needed and _migrations recorded", () => {
+     // given: Config with _migrations already recorded
      const testConfigPath = "/tmp/test-config-no-migration.json"
      const rawConfig: Record<string, unknown> = {
        agents: {
          sisyphus: { model: "test" },
        },
+       _migrations: { agents: true },
      }
 
-     fs.writeFileSync(testConfigPath, globalThis.JSON.stringify({ agents: { sisyphus: { model: "test" } } }, null, 2))
+     fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
      cleanupPaths.push(testConfigPath)
 
      // Clean up any existing backup files from previous test runs
@@ -744,5 +807,107 @@ describe("migrateConfigFile with backup", () => {
      expect(backupFiles.length).toBe(0)
    })
 
+  test("migration applied once then user downgrades -> downgrade is preserved", () => {
+    // given: Config that was already migrated (has _migrations markers)
+    const testConfigPath = "/tmp/test-config-downgrade.json"
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        omo: { model: "old-model" },
+      },
+      _migrations: {
+        agents: true,
+      },
+    }
+
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
+    cleanupPaths.push(testConfigPath)
+
+    // when: migrateConfigFile runs again on a config with _migrations.agents = true
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: migration is skipped, user's intentional "omo" key is preserved
+    expect(needsWrite).toBe(false)
+    const agents = rawConfig.agents as Record<string, unknown>
+    expect(agents["omo"]).toEqual({ model: "old-model" })
+    expect(agents["sisyphus"]).toBeUndefined()
+  })
+
+  test("file write failure -> in-memory config unchanged", () => {
+    // given: Config needing migration but config path is unwritable
+    const testConfigPath = "/tmp/test-config-write-fail/nonexistent-dir/config.json"
+    const originalAgents = { omo: { model: "test" } }
+    const rawConfig: Record<string, unknown> = {
+      agents: { ...originalAgents },
+    }
+
+    // when: migrateConfigFile runs against an unwritable path
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: returns false and in-memory rawConfig is untouched
+    expect(needsWrite).toBe(false)
+    const agents = rawConfig.agents as Record<string, unknown>
+    expect(agents["omo"]).toEqual({ model: "test" })
+    expect(agents["sisyphus"]).toBeUndefined()
+    expect(rawConfig._migrations).toBeUndefined()
+  })
+
+  test("migration marks key even when data is already current format - prevents re-running", () => {
+    // given: Config with agents in current format but no _migrations recorded
+    const testConfigPath = "/tmp/test-config-already-current.json"
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        sisyphus: { model: "test" },
+      },
+      disabled_hooks: ["anthropic-context-window-limit-recovery"],
+    }
+
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
+    cleanupPaths.push(testConfigPath)
+
+    // when: migrateConfigFile runs — data is current but _migrations is absent
+    migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: _migrations keys should be recorded so they never re-run
+    const migrations = rawConfig._migrations as Record<string, boolean> | undefined
+    expect(migrations).toBeDefined()
+    expect(migrations!["agents"]).toBe(true)
+    expect(migrations!["disabled_hooks"]).toBe(true)
+  })
+
+  test("migration runs once, user adds legacy key, migration does NOT re-run", () => {
+    // given: First run migrates omo -> sisyphus and records _migrations.agents
+    const testConfigPath = "/tmp/test-config-no-rerun.json"
+    const rawConfig1: Record<string, unknown> = {
+      agents: {
+        omo: { model: "test" },
+      },
+    }
+
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig1, null, 2))
+    cleanupPaths.push(testConfigPath)
+
+    migrateConfigFile(testConfigPath, rawConfig1)
+
+    // Verify first migration ran
+    expect((rawConfig1.agents as Record<string, unknown>)["sisyphus"]).toBeDefined()
+    expect((rawConfig1._migrations as Record<string, boolean>)["agents"]).toBe(true)
+
+    // when: User manually edits config back to legacy "omo" key, keeping _migrations
+    const rawConfig2: Record<string, unknown> = {
+      agents: {
+        omo: { model: "deliberately-old" },
+      },
+      _migrations: rawConfig1._migrations,
+    }
+
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig2, null, 2))
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig2)
+
+    // then: migration should NOT re-run, user's intentional downgrade is preserved
+    expect(needsWrite).toBe(false)
+    const agents = rawConfig2.agents as Record<string, unknown>
+    expect(agents["omo"]).toEqual({ model: "deliberately-old" })
+    expect(agents["sisyphus"]).toBeUndefined()
+  })
 
 })
