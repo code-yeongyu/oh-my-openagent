@@ -1008,14 +1008,16 @@ Configure notification behavior for background task completion.
 ```json
 {
   "notification": {
-    "force_enable": true
+    "force_enable": true,
+    "message_format": "{project} — Agent is ready for input"
   }
 }
 ```
 
-| Option         | Default | Description                                                                                   |
-| -------------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `force_enable` | `false` | Force enable session-notification even if external notification plugins are detected. Default: `false`. |
+| Option           | Default                                    | Description                                                                                   |
+| ---------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `force_enable`   | `false`                                    | Force enable session-notification even if external notification plugins are detected. Default: `false`. |
+| `message_format` | `"{project} — Agent is ready for input"` | Custom message format for OS notifications. Supports template variables: `{project}` (folder name) and `{cwd}` (full working directory path). Unrecognized variables are left as-is. |
 
 ## Sisyphus Tasks
 
