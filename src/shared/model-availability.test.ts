@@ -363,6 +363,30 @@ describe("fuzzyMatchModel", () => {
 		const result = fuzzyMatchModel("gpt", available)
 		expect(result).toBeNull()
 	})
+
+	// given claude model with hyphen version separator (anthropic style)
+	// when matching against available models with dot separator (copilot style)
+	// then normalize and match across providers
+	it("should match claude models across providers despite version separator differences", () => {
+		const available = new Set([
+			"github-copilot/claude-opus-4.6",
+			"github-copilot/claude-sonnet-4.5",
+			"github-copilot/claude-haiku-4.5",
+		])
+		expect(fuzzyMatchModel("claude-opus-4-6", available, ["github-copilot"]))
+			.toBe("github-copilot/claude-opus-4.6")
+		expect(fuzzyMatchModel("claude-sonnet-4-5", available, ["github-copilot"]))
+			.toBe("github-copilot/claude-sonnet-4.5")
+	})
+
+	// given non-claude models with hyphens
+	// when matching
+	// then hyphens are not treated as version separators
+	it("should not normalize hyphens in non-claude model names", () => {
+		const available = new Set(["github-copilot/grok-code-fast-1"])
+		expect(fuzzyMatchModel("grok-code-fast-1", available, ["github-copilot"]))
+			.toBe("github-copilot/grok-code-fast-1")
+	})
 })
 
 describe("getConnectedProviders", () => {
