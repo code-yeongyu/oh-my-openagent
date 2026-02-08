@@ -2,7 +2,6 @@ import type { BackgroundTask, LaunchInput } from "./types"
 import type { QueueItem } from "./constants"
 import { log } from "../../shared"
 import { subagentSessions } from "../claude-code-session-state"
-
 export class TaskStateManager {
   readonly tasks: Map<string, BackgroundTask> = new Map()
   readonly notifications: Map<string, BackgroundTask[]> = new Map()
@@ -10,11 +9,9 @@ export class TaskStateManager {
   readonly queuesByKey: Map<string, QueueItem[]> = new Map()
   readonly processingKeys: Set<string> = new Set()
   readonly completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
-
   getTask(id: string): BackgroundTask | undefined {
     return this.tasks.get(id)
   }
-
   findBySession(sessionID: string): BackgroundTask | undefined {
     for (const task of this.tasks.values()) {
       if (task.sessionID === sessionID) {
@@ -23,7 +20,6 @@ export class TaskStateManager {
     }
     return undefined
   }
-
   getTasksByParentSession(sessionID: string): BackgroundTask[] {
     const result: BackgroundTask[] = []
     for (const task of this.tasks.values()) {
@@ -52,7 +48,6 @@ export class TaskStateManager {
   getRunningTasks(): BackgroundTask[] {
     return Array.from(this.tasks.values()).filter(t => t.status === "running")
   }
-
   getCompletedTasks(): BackgroundTask[] {
     return Array.from(this.tasks.values()).filter(t => t.status !== "running")
   }
