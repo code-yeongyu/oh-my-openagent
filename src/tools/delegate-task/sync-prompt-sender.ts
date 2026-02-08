@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs, OpencodeClient } from "./types"
-import { isPlanAgent } from "./constants"
-import { promptWithModelSuggestionRetry } from "../../shared"
+import { isPlanFamily } from "./constants"
+import { promptSyncWithModelSuggestionRetry } from "../../shared"
 import { formatDetailedError } from "./error-formatting"
 
 export async function sendSyncPrompt(
@@ -16,8 +16,8 @@ export async function sendSyncPrompt(
   }
 ): Promise<string | null> {
   try {
-    const allowTask = isPlanAgent(input.agentToUse)
-    await promptWithModelSuggestionRetry(client, {
+    const allowTask = isPlanFamily(input.agentToUse)
+    await promptSyncWithModelSuggestionRetry(client, {
       path: { id: input.sessionID },
       body: {
         agent: input.agentToUse,

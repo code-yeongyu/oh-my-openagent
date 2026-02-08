@@ -88,6 +88,7 @@ export function createToolExecuteBeforeHandler(args: {
       if (command === "stop-continuation" && sessionID) {
         hooks.stopContinuationGuard?.stop(sessionID)
         hooks.todoContinuationEnforcer?.cancelAllCountdowns()
+        hooks.taskContinuationEnforcer?.cancelAllCountdowns()
         hooks.ralphLoop?.cancelLoop(sessionID)
         clearBoulderState(ctx.directory)
         log("[stop-continuation] All continuation mechanisms stopped", {

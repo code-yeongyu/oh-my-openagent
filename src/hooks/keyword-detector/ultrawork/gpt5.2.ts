@@ -73,10 +73,10 @@ Use these when they provide clear value based on the decision framework above:
 
 | Resource | When to Use | How to Use |
 |----------|-------------|------------|
-| explore agent | Need codebase patterns you don't have | \`task(subagent_type="explore", run_in_background=true, ...)\` |
-| librarian agent | External library docs, OSS examples | \`task(subagent_type="librarian", run_in_background=true, ...)\` |
-| oracle agent | Stuck on architecture/debugging after 2+ attempts | \`task(subagent_type="oracle", ...)\` |
-| plan agent | Complex multi-step with dependencies (5+ steps) | \`task(subagent_type="plan", ...)\` |
+| explore agent | Need codebase patterns you don't have | \`task(subagent_type="explore", load_skills=[], run_in_background=true, ...)\` |
+| librarian agent | External library docs, OSS examples | \`task(subagent_type="librarian", load_skills=[], run_in_background=true, ...)\` |
+| oracle agent | Stuck on architecture/debugging after 2+ attempts | \`task(subagent_type="oracle", load_skills=[], ...)\` |
+| plan agent | Complex multi-step with dependencies (5+ steps) | \`task(subagent_type="plan", load_skills=[], ...)\` |
 | task category | Specialized work matching a category | \`task(category="...", load_skills=[...])\` |
 
 <tool_usage_rules>

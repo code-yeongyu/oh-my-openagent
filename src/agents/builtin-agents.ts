@@ -20,6 +20,7 @@ import { collectPendingBuiltinAgents } from "./builtin-agents/general-agents"
 import { maybeCreateSisyphusConfig } from "./builtin-agents/sisyphus-agent"
 import { maybeCreateHephaestusConfig } from "./builtin-agents/hephaestus-agent"
 import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
+import { buildCustomAgentMetadata, parseRegisteredAgentSummaries } from "./custom-agent-summaries"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -59,15 +60,13 @@ export async function createBuiltinAgents(
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
-  client?: any,
+  customAgentSummaries?: unknown,
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
   disabledSkills?: Set<string>
 ): Promise<Record<string, AgentConfig>> {
-  void client
-
   const connectedProviders = readConnectedProvidersCache()
-  // IMPORTANT: Do NOT pass client to fetchAvailableModels during plugin initialization.
+  // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
   // This function is called from config handler, and calling client API causes deadlock.
   // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1301
   const availableModels = await fetchAvailableModels(undefined, {
@@ -104,6 +103,23 @@ export async function createBuiltinAgents(
     availableModels,
     disabledSkills,
   })
+
+  const registeredAgents = parseRegisteredAgentSummaries(customAgentSummaries)
+  const builtinAgentNames = new Set(Object.keys(agentSources).map((name) => name.toLowerCase()))
+  const disabledAgentNames = new Set(disabledAgents.map((name) => name.toLowerCase()))
+
+  for (const agent of registeredAgents) {
+    const lowerName = agent.name.toLowerCase()
+    if (builtinAgentNames.has(lowerName)) continue
+    if (disabledAgentNames.has(lowerName)) continue
+    if (availableAgents.some((availableAgent) => availableAgent.name.toLowerCase() === lowerName)) continue
+
+    availableAgents.push({
+      name: agent.name,
+      description: agent.description,
+      metadata: buildCustomAgentMetadata(agent.name, agent.description),
+    })
+  }
 
   const sisyphusConfig = maybeCreateSisyphusConfig({
     disabledAgents,

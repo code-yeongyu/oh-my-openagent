@@ -2,6 +2,7 @@ export type RecoveryErrorType =
   | "tool_result_missing"
   | "thinking_block_order"
   | "thinking_disabled_violation"
+  | "assistant_prefill_unsupported"
   | null
 
 function getErrorMessage(error: unknown): string {
@@ -40,6 +41,13 @@ export function extractMessageIndex(error: unknown): number | null {
 
 export function detectErrorType(error: unknown): RecoveryErrorType {
   const message = getErrorMessage(error)
+
+  if (
+    message.includes("assistant message prefill") ||
+    message.includes("conversation must end with a user message")
+  ) {
+    return "assistant_prefill_unsupported"
+  }
 
   if (
     message.includes("thinking") &&

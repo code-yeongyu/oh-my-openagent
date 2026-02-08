@@ -13,6 +13,7 @@ import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
+import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
@@ -152,7 +153,12 @@ export async function applyAgentConfig(params: {
       ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
       : {};
 
-    const planDemoteConfig = shouldDemotePlan ? { mode: "subagent" as const } : undefined;
+    const planDemoteConfig = shouldDemotePlan
+      ? buildPlanDemoteConfig(
+          agentConfig["prometheus"] as Record<string, unknown> | undefined,
+          params.pluginConfig.agents?.plan as Record<string, unknown> | undefined,
+        )
+      : undefined;
 
     params.config.agent = {
       ...agentConfig,

@@ -1,8 +1,9 @@
+import { afterEach, describe, expect, test } from "bun:test"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
 import type { BackgroundTask } from "../../features/background-agent"
 import { createUnstableAgentBabysitterHook } from "./index"
 
-const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
+const projectDir = process.cwd()
 
 type BabysitterContext = Parameters<typeof createUnstableAgentBabysitterHook>[0]
 

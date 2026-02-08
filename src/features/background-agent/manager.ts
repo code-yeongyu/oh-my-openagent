@@ -41,6 +41,7 @@ export class BackgroundManager {
   private processingKeys = new Set<string>()
   private completionTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private idleDeferralTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  private notificationQueueByParent = new Map<string, Promise<void>>()
 
   private client: PluginInput["client"]
   private directory: string
@@ -72,7 +73,7 @@ export class BackgroundManager {
   }
 
   async resume(input: ResumeInput): Promise<BackgroundTask> {
-    return resumeBackgroundTask({ input, findBySession: (id) => this.findBySession(id), client: this.client, concurrencyManager: this.concurrencyManager, pendingByParent: this.pendingByParent, startPolling: () => this.startPolling(), markForNotification: (task) => this.markForNotification(task), cleanupPendingByParent: (task) => this.cleanupPendingByParent(task), notifyParentSession: (task) => this.notifyParentSession(task) })
+    return resumeBackgroundTask({ input, findBySession: (id) => this.findBySession(id), client: this.client, concurrencyManager: this.concurrencyManager, pendingByParent: this.pendingByParent, startPolling: () => this.startPolling(), markForNotification: (task) => this.markForNotification(task), cleanupPendingByParent: (task) => this.cleanupPendingByParent(task), notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)) })
   }
 
   getTask(id: string): BackgroundTask | undefined { return this.tasks.get(id) }
@@ -94,7 +95,7 @@ export class BackgroundManager {
   }
 
   async cancelTask(taskId: string, options?: { source?: string; reason?: string; abortSession?: boolean; skipNotification?: boolean }): Promise<boolean> {
-    return cancelBackgroundTask({ taskId, options, tasks: this.tasks, queuesByKey: this.queuesByKey, completionTimers: this.completionTimers, idleDeferralTimers: this.idleDeferralTimers, concurrencyManager: this.concurrencyManager, client: this.client, cleanupPendingByParent: (task) => this.cleanupPendingByParent(task), markForNotification: (task) => this.markForNotification(task), notifyParentSession: (task) => this.notifyParentSession(task) })
+    return cancelBackgroundTask({ taskId, options, tasks: this.tasks, queuesByKey: this.queuesByKey, completionTimers: this.completionTimers, idleDeferralTimers: this.idleDeferralTimers, concurrencyManager: this.concurrencyManager, client: this.client, cleanupPendingByParent: (task) => this.cleanupPendingByParent(task), markForNotification: (task) => this.markForNotification(task), notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)) })
   }
 
   handleEvent(event: { type: string; properties?: Record<string, unknown> }): void {
@@ -102,13 +103,14 @@ export class BackgroundManager {
   }
 
   shutdown(): void {
+    this.notificationQueueByParent.clear()
     shutdownBackgroundManager({ shutdownTriggered: this.shutdownTriggered, stopPolling: () => this.stopPolling(), tasks: this.tasks, client: this.client, onShutdown: this.onShutdown, concurrencyManager: this.concurrencyManager, completionTimers: this.completionTimers, idleDeferralTimers: this.idleDeferralTimers, notifications: this.notifications, pendingByParent: this.pendingByParent, queuesByKey: this.queuesByKey, processingKeys: this.processingKeys, unregisterProcessCleanup: () => this.unregisterProcessCleanup() })
   }
 
   private getConcurrencyKeyFromInput(input: LaunchInput): string { return input.model ? `${input.model.providerID}/${input.model.modelID}` : input.agent }
   private async processKey(key: string): Promise<void> { await processConcurrencyKeyQueue({ key, queuesByKey: this.queuesByKey, processingKeys: this.processingKeys, concurrencyManager: this.concurrencyManager, startTask: (item) => this.startTask(item) }) }
   private async startTask(item: QueueItem): Promise<void> {
-    await startQueuedTask({ item, client: this.client, defaultDirectory: this.directory, tmuxEnabled: this.tmuxEnabled, onSubagentSessionCreated: this.onSubagentSessionCreated, startPolling: () => this.startPolling(), getConcurrencyKeyFromInput: (i) => this.getConcurrencyKeyFromInput(i), concurrencyManager: this.concurrencyManager, findBySession: (id) => this.findBySession(id), markForNotification: (task) => this.markForNotification(task), cleanupPendingByParent: (task) => this.cleanupPendingByParent(task), notifyParentSession: (task) => this.notifyParentSession(task) })
+    await startQueuedTask({ item, client: this.client, defaultDirectory: this.directory, tmuxEnabled: this.tmuxEnabled, onSubagentSessionCreated: this.onSubagentSessionCreated, startPolling: () => this.startPolling(), getConcurrencyKeyFromInput: (i) => this.getConcurrencyKeyFromInput(i), concurrencyManager: this.concurrencyManager, findBySession: (id) => this.findBySession(id), markForNotification: (task) => this.markForNotification(task), cleanupPendingByParent: (task) => this.cleanupPendingByParent(task), notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)) })
   }
 
   private startPolling(): void {
@@ -126,15 +128,36 @@ export class BackgroundManager {
     pruneStaleState({ tasks: this.tasks, notifications: this.notifications, concurrencyManager: this.concurrencyManager, cleanupPendingByParent: (task) => this.cleanupPendingByParent(task), clearNotificationsForTask: (id) => this.clearNotificationsForTask(id) })
   }
   private async checkAndInterruptStaleTasks(): Promise<void> {
-    await checkAndInterruptStaleTasks({ tasks: this.tasks.values(), client: this.client, config: this.config, concurrencyManager: this.concurrencyManager, notifyParentSession: (task) => this.notifyParentSession(task) })
+    await checkAndInterruptStaleTasks({ tasks: this.tasks.values(), client: this.client, config: this.config, concurrencyManager: this.concurrencyManager, notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)) })
   }
 
   private hasRunningTasks(): boolean { return hasRunningTasks(this.tasks.values()) }
   private async tryCompleteTask(task: BackgroundTask, source: string): Promise<boolean> {
-    return tryCompleteBackgroundTask({ task, source, concurrencyManager: this.concurrencyManager, idleDeferralTimers: this.idleDeferralTimers, client: this.client, markForNotification: (t) => this.markForNotification(t), cleanupPendingByParent: (t) => this.cleanupPendingByParent(t), notifyParentSession: (t) => this.notifyParentSession(t) })
+    return tryCompleteBackgroundTask({ task, source, concurrencyManager: this.concurrencyManager, idleDeferralTimers: this.idleDeferralTimers, client: this.client, markForNotification: (t) => this.markForNotification(t), cleanupPendingByParent: (t) => this.cleanupPendingByParent(t), notifyParentSession: (t) => this.enqueueNotificationForParent(t.parentSessionID, () => this.notifyParentSession(t)) })
   }
   private async notifyParentSession(task: BackgroundTask): Promise<void> {
     await notifyParentSessionInternal({ task, tasks: this.tasks, pendingByParent: this.pendingByParent, completionTimers: this.completionTimers, clearNotificationsForTask: (id) => this.clearNotificationsForTask(id), client: this.client })
+  }
+
+  private enqueueNotificationForParent(parentSessionID: string | undefined, operation: () => Promise<void>): Promise<void> {
+    if (!parentSessionID) return operation()
+
+    const previous = this.notificationQueueByParent.get(parentSessionID) ?? Promise.resolve()
+    const current = previous
+      .catch(() => {})
+      .then(operation)
+
+    this.notificationQueueByParent.set(parentSessionID, current)
+
+    void current
+      .finally(() => {
+        if (this.notificationQueueByParent.get(parentSessionID) === current) {
+          this.notificationQueueByParent.delete(parentSessionID)
+        }
+      })
+      .catch(() => {})
+
+    return current
   }
 
   private async validateSessionHasOutput(sessionID: string): Promise<boolean> { return validateSessionHasOutput(this.client, sessionID) }

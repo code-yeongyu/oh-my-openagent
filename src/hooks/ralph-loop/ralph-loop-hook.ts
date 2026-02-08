@@ -16,7 +16,7 @@ export interface RalphLoopHook {
   getState: () => RalphLoopState | null
 }
 
-const DEFAULT_API_TIMEOUT = 3000 as const
+const DEFAULT_API_TIMEOUT = 5000 as const
 
 export function createRalphLoopHook(
   ctx: PluginInput,
