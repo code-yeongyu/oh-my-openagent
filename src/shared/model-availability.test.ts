@@ -1,26 +1,38 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, mock } from "bun:test"
 import { mkdtempSync, writeFileSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
-import { fetchAvailableModels, fuzzyMatchModel, getConnectedProviders, __resetModelCache, isModelAvailable } from "./model-availability"
+import { fuzzyMatchModel, isModelAvailable } from "./model-name-matcher"
+
+let activeCacheHomeDir: string | null = null
+const DEFAULT_CACHE_HOME_DIR = join(tmpdir(), "opencode-test-default-cache")
+
+mock.module("./data-path", () => ({
+  getDataDir: () => activeCacheHomeDir ?? DEFAULT_CACHE_HOME_DIR,
+  getOpenCodeStorageDir: () => join(activeCacheHomeDir ?? DEFAULT_CACHE_HOME_DIR, "opencode", "storage"),
+  getCacheDir: () => activeCacheHomeDir ?? DEFAULT_CACHE_HOME_DIR,
+  getOmoOpenCodeCacheDir: () => join(activeCacheHomeDir ?? DEFAULT_CACHE_HOME_DIR, "oh-my-opencode"),
+  getOpenCodeCacheDir: () => join(activeCacheHomeDir ?? DEFAULT_CACHE_HOME_DIR, "opencode"),
+}))
 
 describe("fetchAvailableModels", () => {
   let tempDir: string
-  let originalXdgCache: string | undefined
+  let fetchAvailableModels: (client?: unknown, options?: { connectedProviders?: string[] | null }) => Promise<Set<string>>
+  let __resetModelCache: () => void
+
+  beforeAll(async () => {
+    ;({ fetchAvailableModels } = await import("./available-models-fetcher"))
+    ;({ __resetModelCache } = await import("./model-cache-availability"))
+  })
 
   beforeEach(() => {
     __resetModelCache()
     tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
-    originalXdgCache = process.env.XDG_CACHE_HOME
-    process.env.XDG_CACHE_HOME = tempDir
+    activeCacheHomeDir = tempDir
   })
 
   afterEach(() => {
-    if (originalXdgCache !== undefined) {
-      process.env.XDG_CACHE_HOME = originalXdgCache
-    } else {
-      delete process.env.XDG_CACHE_HOME
-    }
+    activeCacheHomeDir = null
     rmSync(tempDir, { recursive: true, force: true })
   })
 
