@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 import type { ConfigMergeResult, InstallConfig } from "../types"
 import { getConfigDir } from "./config-context"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
@@ -45,7 +45,23 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
       newConfig.provider = providers
     }
 
-    writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
+    if (format === "jsonc") {
+      const content = readFileSync(path, "utf-8")
+      const providerRegex = /"provider"\s*:\s*\{[\s\S]*?\n  \}/
+      const providerJson = JSON.stringify(newConfig.provider, null, 2)
+        .split("\n")
+        .map((line, i) => (i === 0 ? line : `  ${line}`))
+        .join("\n")
+      if (providerRegex.test(content)) {
+        const newContent = content.replace(providerRegex, `"provider": ${providerJson}`)
+        writeFileSync(path, newContent)
+      } else {
+        const newContent = content.replace(/(\{)/, `$1\n  "provider": ${providerJson},`)
+        writeFileSync(path, newContent)
+      }
+    } else {
+      writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
+    }
     return { success: true, configPath: path }
   } catch (err) {
     return {

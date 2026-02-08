@@ -5,6 +5,7 @@ export function deepMergeRecord<TTarget extends Record<string, unknown>>(
   const result: TTarget = { ...target }
 
   for (const key of Object.keys(source) as Array<keyof TTarget>) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") continue
     const sourceValue = source[key]
     const targetValue = result[key]
 
