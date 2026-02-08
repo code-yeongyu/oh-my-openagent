@@ -1065,8 +1065,8 @@ describe("sisyphus-task", () => {
 
     const mockClient = {
       session: {
-        prompt: async () => ({ data: {} }),
-        promptAsync: promptMock,
+        prompt: promptMock,
+        promptAsync: async () => ({ data: {} }),
         messages: async () => ({
           data: [
             {
@@ -1116,7 +1116,7 @@ describe("sisyphus-task", () => {
       toolContext
     )
 
-    //#then promptAsync should include variant from previous message
+    //#then prompt should include variant from previous message
     expect(promptMock).toHaveBeenCalled()
     const callArgs = promptMock.mock.calls[0][0]
     expect(callArgs.body.variant).toBe("max")
