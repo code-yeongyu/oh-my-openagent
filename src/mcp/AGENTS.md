@@ -5,13 +5,14 @@
 Tier 1 of three-tier MCP system: 3 built-in remote HTTP MCPs.
 
 **Three-Tier System**:
+
 1. **Built-in** (this directory): websearch, context7, grep_app
 2. **Claude Code compat**: `.mcp.json` with `${VAR}` expansion
 3. **Skill-embedded**: YAML frontmatter in skills
 
 ## STRUCTURE
 
-```
+```text
 mcp/
 ├── index.ts        # createBuiltinMcps() factory
 ├── websearch.ts    # Exa AI / Tavily web search
@@ -33,7 +34,7 @@ mcp/
 
 | Provider | URL | Auth | API Key Required |
 |----------|-----|------|------------------|
-| exa (default) | mcp.exa.ai | x-api-key header | No (optional) |
+| exa (default) | mcp.exa.ai | exaApiKey URL param | No (optional) |
 | tavily | mcp.tavily.com | Authorization Bearer | Yes |
 
 ```jsonc

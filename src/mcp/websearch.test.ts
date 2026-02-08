@@ -37,7 +37,7 @@ describe("websearch MCP provider configuration", () => {
     expect(result.type).toBe("remote")
   })
 
-  test("includes x-api-key header when EXA_API_KEY is set", () => {
+  test("includes exaApiKey in URL when EXA_API_KEY is set", () => {
     //#given
     const apiKey = "test-exa-key-12345"
     process.env.EXA_API_KEY = apiKey
@@ -46,7 +46,8 @@ describe("websearch MCP provider configuration", () => {
     const result = createWebsearchConfig()
 
     //#then
-    expect(result.headers).toEqual({ "x-api-key": apiKey })
+    expect(result.url).toContain(`exaApiKey=${apiKey}`)
+    expect(result.url).toContain("mcp.exa.ai")
   })
 
   test("returns Tavily config when provider is 'tavily' and TAVILY_API_KEY set", () => {
@@ -85,7 +86,7 @@ describe("websearch MCP provider configuration", () => {
 
     //#then
     expect(result.url).toContain("mcp.exa.ai")
-    expect(result.headers).toEqual({ "x-api-key": "test-exa-key" })
+    expect(result.url).toContain("exaApiKey=test-exa-key")
   })
 
   test("Tavily config uses Authorization Bearer header format", () => {
@@ -102,7 +103,7 @@ describe("websearch MCP provider configuration", () => {
     expect(result.headers?.Authorization).toBe(`Bearer ${tavilyKey}`)
   })
 
-  test("Exa config has no headers when EXA_API_KEY not set", () => {
+  test("Exa config has no exaApiKey param when EXA_API_KEY not set", () => {
     //#given
     delete process.env.EXA_API_KEY
 
@@ -111,6 +112,6 @@ describe("websearch MCP provider configuration", () => {
 
     //#then
     expect(result.url).toContain("mcp.exa.ai")
-    expect(result.headers).toBeUndefined()
+    expect(result.url).not.toContain("exaApiKey=")
   })
 })
