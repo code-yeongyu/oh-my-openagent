@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Tier 1 of three-tier MCP system: 3 built-in remote HTTP MCPs.
+Tier 1 of three-tier MCP system: 8 built-in remote HTTP MCPs.
 
 **Three-Tier System**:
 1. **Built-in** (this directory): websearch, context7, grep_app
