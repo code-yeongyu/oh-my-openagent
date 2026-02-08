@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test"
-import { resolveSession } from "./session-resolver"
-import type { OpencodeClient } from "./types"
+/// <reference types="bun-types" />
+
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { resolveSession } from "./session-resolver";
+import type { OpencodeClient } from "./types";
 
 const createMockClient = (overrides: {
   getResult?: { error?: unknown; data?: { id: string } }
@@ -58,7 +60,9 @@ describe("resolveSession", () => {
     const result = resolveSession({ client: mockClient, sessionId })
 
     // then
-    await expect(result).rejects.toThrow(`Session not found: ${sessionId}`)
+    await Promise.resolve(
+      expect(result).rejects.toThrow(`Session not found: ${sessionId}`)
+    )
     expect(mockClient.session.get).toHaveBeenCalledWith({
       path: { id: sessionId },
     })
@@ -77,7 +81,12 @@ describe("resolveSession", () => {
     // then
     expect(result).toBe("new-session-id")
     expect(mockClient.session.create).toHaveBeenCalledWith({
-      body: { title: "oh-my-opencode run" },
+      body: {
+        title: "oh-my-opencode run",
+        permission: [
+          { permission: "question", action: "deny", pattern: "*" },
+        ],
+      },
     })
     expect(mockClient.session.get).not.toHaveBeenCalled()
   })
@@ -98,7 +107,12 @@ describe("resolveSession", () => {
     expect(result).toBe("retried-session-id")
     expect(mockClient.session.create).toHaveBeenCalledTimes(2)
     expect(mockClient.session.create).toHaveBeenCalledWith({
-      body: { title: "oh-my-opencode run" },
+      body: {
+        title: "oh-my-opencode run",
+        permission: [
+          { permission: "question", action: "deny", pattern: "*" },
+        ],
+      },
     })
   })
 
@@ -116,7 +130,9 @@ describe("resolveSession", () => {
     const result = resolveSession({ client: mockClient })
 
     // then
-    await expect(result).rejects.toThrow("Failed to create session after all retries")
+    await Promise.resolve(
+      expect(result).rejects.toThrow("Failed to create session after all retries")
+    )
     expect(mockClient.session.create).toHaveBeenCalledTimes(3)
   })
 
@@ -134,7 +150,9 @@ describe("resolveSession", () => {
     const result = resolveSession({ client: mockClient })
 
     // then
-    await expect(result).rejects.toThrow("Failed to create session after all retries")
+    await Promise.resolve(
+      expect(result).rejects.toThrow("Failed to create session after all retries")
+    )
     expect(mockClient.session.create).toHaveBeenCalledTimes(3)
   })
 })
