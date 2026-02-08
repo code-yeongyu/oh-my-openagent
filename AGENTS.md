@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
 **Generated:** 2026-02-08T16:45:00+09:00
-**Commit:** f2b7b75
+**Commit:** edee865f
 **Branch:** dev
 
 ---
@@ -135,8 +135,8 @@ oh-my-opencode/
 │   ├── cli/              # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/              # Built-in MCPs - see src/mcp/AGENTS.md
 │   ├── config/           # Zod schema (schema.ts 455 lines), TypeScript types
-│   ├── plugin-handlers/  # Plugin config loading (config-handler.ts 501 lines)
-│   ├── index.ts          # Main plugin entry (924 lines)
+│   ├── plugin-handlers/  # Plugin config loading (config-handler.ts 562 lines)
+│   ├── index.ts          # Main plugin entry (999 lines)
 │   ├── plugin-config.ts  # Config loading orchestration
 │   └── plugin-state.ts   # Model cache state
 ├── script/               # build-schema.ts, build-binaries.ts, publish.ts
@@ -170,7 +170,7 @@ oh-my-opencode/
 **Rules:**
 - NEVER write implementation before test
 - NEVER delete failing tests - fix the code
-- Test file: `*.test.ts` alongside source (100+ test files)
+- Test file: `*.test.ts` alongside source (163 test files)
 - BDD comments: `//#given`, `//#when`, `//#then`
 
 ## CONVENTIONS
@@ -180,7 +180,7 @@ oh-my-opencode/
 - **Build**: `bun build` (ESM) + `tsc --emitDeclarationOnly`
 - **Exports**: Barrel pattern via index.ts
 - **Naming**: kebab-case dirs, `createXXXHook`/`createXXXTool` factories
-- **Testing**: BDD comments, 100+ test files
+- **Testing**: BDD comments, 163 test files
 - **Temperature**: 0.1 for code agents, max 0.3
 
 ## ANTI-PATTERNS
@@ -241,19 +241,22 @@ bun test               # 100+ test files
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/features/background-agent/manager.ts` | 1556 | Task lifecycle, concurrency |
+| `src/features/background-agent/manager.ts` | 1642 | Task lifecycle, concurrency |
 | `src/features/builtin-skills/skills/git-master.ts` | 1107 | Git master skill definition |
-| `src/tools/delegate-task/executor.ts` | 983 | Category-based delegation executor |
-| `src/index.ts` | 924 | Main plugin entry |
-| `src/tools/lsp/client.ts` | 803 | LSP client operations |
-| `src/hooks/atlas/index.ts` | 770 | Orchestrator hook |
-| `src/tools/background-task/tools.ts` | 734 | Background task tools |
+| `src/index.ts` | 999 | Main plugin entry |
+| `src/tools/delegate-task/executor.ts` | 969 | Category-based delegation executor |
+| `src/tools/lsp/client.ts` | 851 | LSP client operations |
+| `src/tools/background-task/tools.ts` | 757 | Background task tools |
+| `src/hooks/atlas/index.ts` | 697 | Orchestrator hook |
 | `src/cli/config-manager.ts` | 667 | JSONC config parsing |
 | `src/features/skill-mcp-manager/manager.ts` | 640 | MCP client lifecycle |
 | `src/features/builtin-commands/templates/refactor.ts` | 619 | Refactor command template |
 | `src/agents/hephaestus.ts` | 618 | Autonomous deep worker agent |
+| `src/agents/utils.ts` | 571 | Agent creation, model fallback resolution |
+| `src/plugin-handlers/config-handler.ts` | 562 | Plugin config loading |
 | `src/tools/delegate-task/constants.ts` | 552 | Delegation constants |
 | `src/cli/install.ts` | 542 | Interactive CLI installer |
+| `src/hooks/task-continuation-enforcer.ts` | 530 | Task completion enforcement |
 | `src/agents/sisyphus.ts` | 530 | Main orchestrator agent |
 
 ## MCP ARCHITECTURE
