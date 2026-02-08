@@ -2140,6 +2140,127 @@ describe("sisyphus-task", () => {
       expect(launchInput.model.providerID).toBe("openai")
       expect(launchInput.model.modelID).toBe("gpt-5.3-codex")
     })
+
+    test("sisyphus-junior model override works with quick category (#1295)", async () => {
+      // given - user configures agents.sisyphus-junior.model but uses quick category
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return {
+            id: "task-1295-quick",
+            sessionID: "ses_1295_quick",
+            description: "Issue 1295 regression",
+            agent: "sisyphus-junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [] },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - using quick category (default: anthropic/claude-haiku-4-5)
+      await tool.execute(
+        {
+          description: "Issue 1295 quick category test",
+          prompt: "Quick task",
+          category: "quick",
+          run_in_background: true,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then - sisyphus-junior override model should be used, not category default
+      expect(launchInput.model.providerID).toBe("anthropic")
+      expect(launchInput.model.modelID).toBe("claude-sonnet-4-5")
+    })
+
+    test("sisyphus-junior model override works with user-defined category (#1295)", async () => {
+      // given - user has a custom category with no model requirement
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return {
+            id: "task-1295-custom",
+            sessionID: "ses_1295_custom",
+            description: "Issue 1295 custom category",
+            agent: "sisyphus-junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [] },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        sisyphusJuniorModel: "openai/gpt-5.2",
+        userCategories: {
+          "my-custom": { temperature: 0.5 },
+        },
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - using custom category with no explicit model
+      await tool.execute(
+        {
+          description: "Custom category with agent model",
+          prompt: "Do something custom",
+          category: "my-custom",
+          run_in_background: true,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      // then - sisyphus-junior override model should be used as fallback
+      expect(launchInput.model.providerID).toBe("openai")
+      expect(launchInput.model.modelID).toBe("gpt-5.2")
+    })
   })
 
   describe("browserProvider propagation", () => {
