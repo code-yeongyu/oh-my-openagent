@@ -1,38 +1,43 @@
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, mock } from "bun:test"
+declare const require: (name: string) => any
+const { describe, it, expect, beforeEach, afterEach, beforeAll } = require("bun:test")
 import { mkdtempSync, writeFileSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
-import { fuzzyMatchModel, isModelAvailable } from "./model-name-matcher"
 
-let activeCacheHomeDir: string | null = null
-const DEFAULT_CACHE_HOME_DIR = join(tmpdir(), "opencode-test-default-cache")
+let __resetModelCache: () => void
+let fetchAvailableModels: (client?: unknown, options?: { connectedProviders?: string[] | null }) => Promise<Set<string>>
+let fuzzyMatchModel: (target: string, available: Set<string>, providers?: string[]) => string | null
+let isModelAvailable: (targetModel: string, availableModels: Set<string>) => boolean
+let getConnectedProviders: (client: unknown) => Promise<string[]>
 
-mock.module("./data-path", () => ({
-  getDataDir: () => activeCacheHomeDir ?? DEFAULT_CACHE_HOME_DIR,
-  getOpenCodeStorageDir: () => join(activeCacheHomeDir ?? DEFAULT_CACHE_HOME_DIR, "opencode", "storage"),
-  getCacheDir: () => activeCacheHomeDir ?? DEFAULT_CACHE_HOME_DIR,
-  getOmoOpenCodeCacheDir: () => join(activeCacheHomeDir ?? DEFAULT_CACHE_HOME_DIR, "oh-my-opencode"),
-  getOpenCodeCacheDir: () => join(activeCacheHomeDir ?? DEFAULT_CACHE_HOME_DIR, "opencode"),
-}))
+beforeAll(async () => {
+  ;({
+    __resetModelCache,
+    fetchAvailableModels,
+    fuzzyMatchModel,
+    isModelAvailable,
+    getConnectedProviders,
+  } = await import("./model-availability"))
+})
 
 describe("fetchAvailableModels", () => {
   let tempDir: string
-  let fetchAvailableModels: (client?: unknown, options?: { connectedProviders?: string[] | null }) => Promise<Set<string>>
-  let __resetModelCache: () => void
+	let originalXdgCache: string | undefined
 
-  beforeAll(async () => {
-    ;({ fetchAvailableModels } = await import("./available-models-fetcher"))
-    ;({ __resetModelCache } = await import("./model-cache-availability"))
-  })
 
   beforeEach(() => {
     __resetModelCache()
     tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
-    activeCacheHomeDir = tempDir
+		originalXdgCache = process.env.XDG_CACHE_HOME
+		process.env.XDG_CACHE_HOME = tempDir
   })
 
   afterEach(() => {
-    activeCacheHomeDir = null
+    if (originalXdgCache !== undefined) {
+			process.env.XDG_CACHE_HOME = originalXdgCache
+		} else {
+			delete process.env.XDG_CACHE_HOME
+		}
     rmSync(tempDir, { recursive: true, force: true })
   })
 
