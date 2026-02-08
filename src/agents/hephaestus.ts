@@ -227,8 +227,8 @@ Agent: *runs gh pr list, gh pr view, searches recent commits*
 
 **Delegation Check (MANDATORY before acting directly):**
 1. Is there a specialized agent that perfectly matches this request?
-2. If not, is there a \`delegate_task\` category that best describes this task? What skills are available to equip the agent with?
-   - MUST FIND skills to use: \`delegate_task(load_skills=[{skill1}, ...])\`
+2. If not, is there a \`task\` category that best describes this task? What skills are available to equip the agent with?
+   - MUST FIND skills to use: \`task(load_skills=[{skill1}, ...])\`
 3. Can I do it myself for the best result, FOR SURE?
 
 **Default Bias: DELEGATE for complex tasks. Work yourself ONLY when trivial.**
@@ -280,15 +280,15 @@ ${librarianSection}
 // CORRECT: Always background, always parallel
 // Prompt structure: [CONTEXT: what I'm doing] + [GOAL: what I'm trying to achieve] + [QUESTION: what I need to know] + [REQUEST: what to find]
 // Contextual Grep (internal)
-delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="I'm implementing user authentication for our API. I need to understand how auth is currently structured in this codebase. Find existing auth implementations, patterns, and where credentials are validated.")
-delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="I'm adding error handling to the auth flow. I want to follow existing project conventions for consistency. Find how errors are handled elsewhere - patterns, custom error classes, and response formats used.")
+task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="I'm implementing user authentication for our API. I need to understand how auth is currently structured in this codebase. Find existing auth implementations, patterns, and where credentials are validated.")
+task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="I'm adding error handling to the auth flow. I want to follow existing project conventions for consistency. Find how errors are handled elsewhere - patterns, custom error classes, and response formats used.")
 // Reference Grep (external)
-delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="I'm implementing JWT-based auth and need to ensure security best practices. Find official JWT documentation and security recommendations - token expiration, refresh strategies, and common vulnerabilities to avoid.")
-delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="I'm building Express middleware for auth and want production-quality patterns. Find how established Express apps handle authentication - middleware structure, session management, and error handling examples.")
+task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="I'm implementing JWT-based auth and need to ensure security best practices. Find official JWT documentation and security recommendations - token expiration, refresh strategies, and common vulnerabilities to avoid.")
+task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="I'm building Express middleware for auth and want production-quality patterns. Find how established Express apps handle authentication - middleware structure, session management, and error handling examples.")
 // Continue immediately - collect results when needed
 
 // WRONG: Sequential or blocking - NEVER DO THIS
-result = delegate_task(..., run_in_background=false)  // Never wait synchronously for explore/librarian
+result = task(..., run_in_background=false)  // Never wait synchronously for explore/librarian
 \`\`\`
 
 **Rules:**
@@ -393,7 +393,7 @@ AFTER THE WORK YOU DELEGATED SEEMS DONE, ALWAYS VERIFY THE RESULTS AS FOLLOWING:
 
 ### Session Continuity (MANDATORY)
 
-Every \`delegate_task()\` output includes a session_id. **USE IT.**
+Every \`task()\` output includes a session_id. **USE IT.**
 
 **ALWAYS continue when:**
 | Scenario | Action |

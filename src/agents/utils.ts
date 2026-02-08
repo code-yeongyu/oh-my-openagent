@@ -11,7 +11,7 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable, migrateAgentConfig, normalizeFallbackModels } from "../shared"
+import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable, isAnyProviderConnected, migrateAgentConfig, normalizeFallbackModels } from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -303,14 +303,14 @@ export async function createBuiltinAgents(
      }
      const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 
-     const resolution = applyModelResolution({
-       uiSelectedModel: isPrimaryAgent ? uiSelectedModel : undefined,
-       userModel: override?.model,
-        userFallbackModels: normalizeFallbackModels(override?.fallback_models),
-       requirement,
-       availableModels,
-       systemDefaultModel,
-     })
+    const resolution = applyModelResolution({
+      uiSelectedModel: (isPrimaryAgent && !override?.model) ? uiSelectedModel : undefined,
+      userModel: override?.model,
+      userFallbackModels: normalizeFallbackModels(override?.fallback_models),
+      requirement,
+      availableModels,
+      systemDefaultModel,
+    })
     if (!resolution) continue
     const { model, variant: resolvedVariant } = resolution
 
@@ -356,14 +356,14 @@ export async function createBuiltinAgents(
      isAnyFallbackModelAvailable(sisyphusRequirement.fallbackChain, availableModels)
 
    if (!disabledAgents.includes("sisyphus") && meetsSisyphusAnyModelRequirement) {
-     let sisyphusResolution = applyModelResolution({
-       uiSelectedModel,
-       userModel: sisyphusOverride?.model,
-        userFallbackModels: normalizeFallbackModels(sisyphusOverride?.fallback_models),
-       requirement: sisyphusRequirement,
-       availableModels,
-       systemDefaultModel,
-     })
+    let sisyphusResolution = applyModelResolution({
+      uiSelectedModel: sisyphusOverride?.model ? undefined : uiSelectedModel,
+      userModel: sisyphusOverride?.model,
+      userFallbackModels: normalizeFallbackModels(sisyphusOverride?.fallback_models),
+      requirement: sisyphusRequirement,
+      availableModels,
+      systemDefaultModel,
+    })
 
     if (isFirstRunNoCache && !sisyphusOverride?.model && !uiSelectedModel) {
       sisyphusResolution = getFirstFallbackModel(sisyphusRequirement)
@@ -396,13 +396,13 @@ export async function createBuiltinAgents(
     const hephaestusRequirement = AGENT_MODEL_REQUIREMENTS["hephaestus"]
     const hasHephaestusExplicitConfig = hephaestusOverride !== undefined
 
-    const hasRequiredModel =
-      !hephaestusRequirement?.requiresModel ||
+    const hasRequiredProvider =
+      !hephaestusRequirement?.requiresProvider ||
       hasHephaestusExplicitConfig ||
       isFirstRunNoCache ||
-      isAnyFallbackModelAvailable(hephaestusRequirement.fallbackChain, availableModels)
+      isAnyProviderConnected(hephaestusRequirement.requiresProvider, availableModels)
 
-    if (hasRequiredModel) {
+    if (hasRequiredProvider) {
       let hephaestusResolution = applyModelResolution({
         userModel: hephaestusOverride?.model,
         userFallbackModels: normalizeFallbackModels(hephaestusOverride?.fallback_models),
@@ -457,15 +457,15 @@ export async function createBuiltinAgents(
      const atlasRequirement = AGENT_MODEL_REQUIREMENTS["atlas"]
     
      const atlasResolution = applyModelResolution({
-       // NOTE: Atlas does NOT use uiSelectedModel - respects its own fallbackChain (k2p5 primary)
+       uiSelectedModel: orchestratorOverride?.model ? undefined : uiSelectedModel,
        userModel: orchestratorOverride?.model,
-        userFallbackModels: normalizeFallbackModels(orchestratorOverride?.fallback_models),
+       userFallbackModels: normalizeFallbackModels(orchestratorOverride?.fallback_models),
        requirement: atlasRequirement,
        availableModels,
        systemDefaultModel,
      })
-    
-    if (atlasResolution) {
+   
+     if (atlasResolution) {
       const { model: atlasModel, variant: atlasResolvedVariant } = atlasResolution
 
       let orchestratorConfig = createAtlasAgent({

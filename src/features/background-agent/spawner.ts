@@ -146,7 +146,6 @@ export async function startTask(
       tools: {
         ...getAgentToolRestrictions(input.agent),
         task: false,
-        delegate_task: false,
         call_omo_agent: true,
         question: false,
       },
@@ -222,7 +221,7 @@ export async function resumeTask(
     : undefined
   const resumeVariant = task.model?.variant
 
-  client.session.prompt({
+  client.session.promptAsync({
     path: { id: task.sessionID },
     body: {
       agent: task.agent,
@@ -231,7 +230,6 @@ export async function resumeTask(
       tools: {
         ...getAgentToolRestrictions(task.agent),
         task: false,
-        delegate_task: false,
         call_omo_agent: true,
         question: false,
       },

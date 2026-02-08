@@ -18,6 +18,7 @@ export function parseModelString(model: string): { providerID: string; modelID: 
  * Get the message directory for a session, checking both direct and nested paths.
  */
 export function getMessageDir(sessionID: string): string | null {
+  if (!sessionID.startsWith("ses_")) return null
   if (!existsSync(MESSAGE_STORAGE)) return null
 
   const directPath = join(MESSAGE_STORAGE, sessionID)

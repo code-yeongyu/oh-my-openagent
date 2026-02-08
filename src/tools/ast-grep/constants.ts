@@ -82,7 +82,7 @@ export function findSgCliPathSync(): string | null {
 
 let resolvedCliPath: string | null = null
 
-export function getSgCliPath(): string {
+export function getSgCliPath(): string | null {
   if (resolvedCliPath !== null) {
     return resolvedCliPath
   }
@@ -93,7 +93,7 @@ export function getSgCliPath(): string {
     return syncPath
   }
 
-  return "sg"
+  return null
 }
 
 export function setSgCliPath(path: string): void {
@@ -186,29 +186,17 @@ export function checkEnvironment(): EnvironmentCheckResult {
   const result: EnvironmentCheckResult = {
     cli: {
       available: false,
-      path: cliPath,
+      path: cliPath ?? "not found",
     },
     napi: {
       available: false,
     },
   }
 
-  if (existsSync(cliPath)) {
+  if (cliPath && existsSync(cliPath)) {
     result.cli.available = true
-  } else if (cliPath === "sg") {
-    try {
-      const { spawnSync } = require("child_process")
-      const whichResult = spawnSync(process.platform === "win32" ? "where" : "which", ["sg"], {
-        encoding: "utf-8",
-        timeout: 5000,
-      })
-      result.cli.available = whichResult.status === 0 && !!whichResult.stdout?.trim()
-      if (!result.cli.available) {
-        result.cli.error = "sg binary not found in PATH"
-      }
-    } catch {
-      result.cli.error = "Failed to check sg availability"
-    }
+  } else if (!cliPath) {
+    result.cli.error = "ast-grep binary not found. Install with: bun add -D @ast-grep/cli"
   } else {
     result.cli.error = `Binary not found: ${cliPath}`
   }

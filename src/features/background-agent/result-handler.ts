@@ -240,7 +240,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
   })
 
   try {
-    await client.session.prompt({
+    await client.session.promptAsync({
       path: { id: task.parentSessionID },
       body: {
         noReply: !allComplete,

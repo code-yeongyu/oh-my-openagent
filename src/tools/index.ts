@@ -10,21 +10,11 @@ import {
 
 export { lspManager }
 
-import {
-  ast_grep_search,
-  ast_grep_replace,
-} from "./ast-grep"
-
-import { grep } from "./grep"
-import { glob } from "./glob"
+export { createAstGrepTools } from "./ast-grep"
+export { createGrepTools } from "./grep"
+export { createGlobTools } from "./glob"
 export { createSlashcommandTool, discoverCommandsSync } from "./slashcommand"
-
-import {
-  session_list,
-  session_read,
-  session_search,
-  session_info,
-} from "./session-manager"
+export { createSessionManagerTools } from "./session-manager"
 
 export { sessionExists } from "./session-manager/storage"
 
@@ -70,12 +60,4 @@ export const builtinTools: Record<string, ToolDefinition> = {
   lsp_diagnostics,
   lsp_prepare_rename,
   lsp_rename,
-  ast_grep_search,
-  ast_grep_replace,
-  grep,
-  glob,
-  session_list,
-  session_read,
-  session_search,
-  session_info,
 }

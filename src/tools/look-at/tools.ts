@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
-import { log, promptWithModelSuggestionRetry } from "../../shared"
+import { log, promptSyncWithModelSuggestionRetry } from "../../shared"
 
 interface LookAtArgsWithAlias extends LookAtArgs {
   path?: string
@@ -223,7 +223,7 @@ Original error: ${createResult.error}`
 
       log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
       try {
-        await promptWithModelSuggestionRetry(ctx.client, {
+        await promptSyncWithModelSuggestionRetry(ctx.client, {
           path: { id: sessionID },
           body: {
             agent: MULTIMODAL_LOOKER_AGENT,
@@ -245,27 +245,7 @@ Original error: ${createResult.error}`
         const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
         log(`[look_at] Prompt error:`, promptError)
 
-        const isJsonParseError = errorMessage.includes("JSON") && (errorMessage.includes("EOF") || errorMessage.includes("parse"))
-        if (isJsonParseError) {
-          return `Error: Failed to analyze ${isBase64Input ? "image" : "file"} - received malformed response from multimodal-looker agent.
-
-This typically occurs when:
-1. The multimodal-looker model is not available or not connected
-2. The model does not support this ${isBase64Input ? "image format" : `file type (${mimeType})`}
-3. The API returned an empty or truncated response
-
-${isBase64Input ? "Source: clipboard/pasted image" : `File: ${args.file_path}`}
-MIME type: ${mimeType}
-
-Try:
-- Ensure a vision-capable model (e.g., gemini-3-flash, gpt-5.2) is available
-- Check provider connections in opencode settings
-${!isBase64Input ? "- For text files like .md, .txt, use the Read tool instead" : ""}
-
-Original error: ${errorMessage}`
-        }
-
-        return `Error: Failed to send prompt to multimodal-looker agent: ${errorMessage}`
+        throw promptError
       }
 
       log(`[look_at] Prompt sent, fetching messages...`)

@@ -10,6 +10,7 @@ import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAG
 import { getSessionAgent } from "../../features/claude-code-session-state"
 
 function getMessageDir(sessionID: string): string | null {
+  if (!sessionID.startsWith("ses_")) return null
   if (!existsSync(MESSAGE_STORAGE)) return null
 
   const directPath = join(MESSAGE_STORAGE, sessionID)
@@ -110,15 +111,31 @@ async function executeBackground(
       parentAgent,
     })
 
-    toolContext.metadata?.({
+    const WAIT_FOR_SESSION_INTERVAL_MS = 50
+    const WAIT_FOR_SESSION_TIMEOUT_MS = 30000
+    const waitStart = Date.now()
+    let sessionId = task.sessionID
+    while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
+      if (toolContext.abort?.aborted) {
+        return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
+      }
+      const updated = manager.getTask(task.id)
+      if (updated?.status === "error" || updated?.status === "cancelled") {
+        return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
+      }
+      await new Promise(resolve => setTimeout(resolve, WAIT_FOR_SESSION_INTERVAL_MS))
+      sessionId = manager.getTask(task.id)?.sessionID
+    }
+
+    await toolContext.metadata?.({
       title: args.description,
-      metadata: { sessionId: task.sessionID },
+      metadata: { sessionId: sessionId ?? "pending" },
     })
 
     return `Background agent task launched successfully.
 
 Task ID: ${task.id}
-Session ID: ${task.sessionID}
+Session ID: ${sessionId ?? "pending"}
 Description: ${task.description}
 Agent: ${task.agent} (subagent)
 Status: ${task.status}
@@ -194,7 +211,7 @@ Original error: ${createResult.error}`
     log(`[call_omo_agent] Created session: ${sessionID}`)
   }
 
-  toolContext.metadata?.({
+  await toolContext.metadata?.({
     title: args.description,
     metadata: { sessionId: sessionID },
   })
@@ -202,19 +219,18 @@ Original error: ${createResult.error}`
   log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
   log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
 
-  try {
-    await ctx.client.session.prompt({
-      path: { id: sessionID },
-      body: {
-        agent: args.subagent_type,
-        tools: {
-          ...getAgentToolRestrictions(args.subagent_type),
-          task: false,
-          delegate_task: false,
-        },
-        parts: [{ type: "text", text: args.prompt }],
-      },
-    })
+   try {
+     await (ctx.client.session as any).promptAsync({
+       path: { id: sessionID },
+       body: {
+         agent: args.subagent_type,
+         tools: {
+           ...getAgentToolRestrictions(args.subagent_type),
+           task: false,
+         },
+         parts: [{ type: "text", text: args.prompt }],
+       },
+     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     log(`[call_omo_agent] Prompt error:`, errorMessage)

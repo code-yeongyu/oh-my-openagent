@@ -1,5 +1,5 @@
 import type { BackgroundManager } from "../../features/background-agent"
-import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
+import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides } from "../../config/schema"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { DelegateTaskArgs, ToolContextWithMetadata, OpencodeClient } from "./types"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS, isPlanAgent } from "./constants"
@@ -12,11 +12,12 @@ import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader
 import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithModelSuggestionRetry, normalizeFallbackModels } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithModelSuggestionRetry, promptSyncWithModelSuggestionRetry, normalizeFallbackModels } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
-import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { storeToolMetadata } from "../../features/tool-metadata-store"
 
 const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
 
@@ -28,6 +29,7 @@ export interface ExecutorContext {
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string
   browserProvider?: BrowserAutomationProvider
+  agentOverrides?: AgentOverrides
   onSyncSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
 }
 
@@ -39,7 +41,7 @@ export interface ParentContext {
 }
 
 interface SessionMessage {
-  info?: { role?: string; time?: { created?: number }; agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
+  info?: { role?: string; time?: { created?: number }; agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string; variant?: string }
   parts?: Array<{ type?: string; text?: string }>
 }
 
@@ -68,7 +70,7 @@ export function resolveParentContext(ctx: ToolContextWithMetadata): ParentContex
   const sessionAgent = getSessionAgent(ctx.sessionID)
   const parentAgent = ctx.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
 
-  log("[delegate_task] parentAgent resolution", {
+  log("[task] parentAgent resolution", {
     sessionID: ctx.sessionID,
     messageDir,
     ctxAgent: ctx.agent,
@@ -112,7 +114,7 @@ export async function executeBackgroundContinuation(
       parentAgent: parentContext.agent,
     })
 
-    ctx.metadata?.({
+    const bgContMeta = {
       title: `Continue: ${task.description}`,
       metadata: {
         prompt: args.prompt,
@@ -123,7 +125,11 @@ export async function executeBackgroundContinuation(
         sessionId: task.sessionID,
         command: args.command,
       },
-    })
+    }
+    await ctx.metadata?.(bgContMeta)
+    if (ctx.callID) {
+      storeToolMetadata(ctx.sessionID, ctx.callID, bgContMeta)
+    }
 
     return `Background task continued.
 
@@ -166,7 +172,7 @@ export async function executeSyncContinuation(
     })
   }
 
-  ctx.metadata?.({
+  const syncContMeta = {
     title: `Continue: ${args.description}`,
     metadata: {
       prompt: args.prompt,
@@ -177,11 +183,16 @@ export async function executeSyncContinuation(
       sync: true,
       command: args.command,
     },
-  })
+  }
+  await ctx.metadata?.(syncContMeta)
+  if (ctx.callID) {
+    storeToolMetadata(ctx.sessionID, ctx.callID, syncContMeta)
+  }
 
   try {
     let resumeAgent: string | undefined
     let resumeModel: { providerID: string; modelID: string } | undefined
+    let resumeVariant: string | undefined
 
     try {
       const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
@@ -191,6 +202,7 @@ export async function executeSyncContinuation(
         if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
           resumeAgent = info.agent
           resumeModel = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+          resumeVariant = info.variant
           break
         }
       }
@@ -201,17 +213,18 @@ export async function executeSyncContinuation(
       resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
         ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
         : undefined
+      resumeVariant = resumeMessage?.model?.variant
     }
 
-    await client.session.prompt({
+    await promptSyncWithModelSuggestionRetry(client, {
       path: { id: args.session_id! },
       body: {
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
+        ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
         tools: {
           ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
           task: false,
-          delegate_task: false,
           call_omo_agent: true,
           question: false,
         },
@@ -224,30 +237,6 @@ export async function executeSyncContinuation(
     }
     const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
     return `Failed to send continuation prompt: ${errorMessage}\n\nSession ID: ${args.session_id}`
-  }
-
-  const timing = getTimingConfig()
-  const pollStart = Date.now()
-  let lastMsgCount = 0
-  let stablePolls = 0
-
-  while (Date.now() - pollStart < 60000) {
-    await new Promise(resolve => setTimeout(resolve, timing.POLL_INTERVAL_MS))
-
-    const elapsed = Date.now() - pollStart
-    if (elapsed < timing.SESSION_CONTINUATION_STABILITY_MS) continue
-
-    const messagesCheck = await client.session.messages({ path: { id: args.session_id! } })
-    const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
-    const currentMsgCount = msgs.length
-
-    if (currentMsgCount > 0 && currentMsgCount === lastMsgCount) {
-      stablePolls++
-      if (stablePolls >= timing.STABILITY_POLLS_REQUIRED) break
-    } else {
-      stablePolls = 0
-      lastMsgCount = currentMsgCount
-    }
   }
 
   const messagesResult = await client.session.messages({
@@ -317,17 +306,17 @@ export async function executeUnstableAgentTask(
       category: args.category,
     })
 
-    const WAIT_FOR_SESSION_INTERVAL_MS = 100
-    const WAIT_FOR_SESSION_TIMEOUT_MS = 30000
+    const timing = getTimingConfig()
     const waitStart = Date.now()
-    while (!task.sessionID && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
+    let sessionID = task.sessionID
+    while (!sessionID && Date.now() - waitStart < timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
       if (ctx.abort?.aborted) {
         return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
       }
-      await new Promise(resolve => setTimeout(resolve, WAIT_FOR_SESSION_INTERVAL_MS))
+      await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
+      const updated = manager.getTask(task.id)
+      sessionID = updated?.sessionID
     }
-
-    const sessionID = task.sessionID
     if (!sessionID) {
       return formatDetailedError(new Error(`Task failed to start within timeout (30s). Task ID: ${task.id}, Status: ${task.status}`), {
         operation: "Launch monitored background task",
@@ -337,7 +326,7 @@ export async function executeUnstableAgentTask(
       })
     }
 
-    ctx.metadata?.({
+    const bgTaskMeta = {
       title: args.description,
       metadata: {
         prompt: args.prompt,
@@ -349,7 +338,11 @@ export async function executeUnstableAgentTask(
         sessionId: sessionID,
         command: args.command,
       },
-    })
+    }
+    await ctx.metadata?.(bgTaskMeta)
+    if (ctx.callID) {
+      storeToolMetadata(ctx.sessionID, ctx.callID, bgTaskMeta)
+    }
 
     const startTime = new Date()
     const timingCfg = getTimingConfig()
@@ -464,12 +457,28 @@ export async function executeBackgroundTask(
       category: args.category,
     })
 
-    //#when - register session category for runtime-fallback hook
-    if (args.category && task.sessionID) {
-      SessionCategoryRegistry.register(task.sessionID, args.category)
+    // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up
+    // `props.metadata.sessionId` and then counting tool parts in that session.
+    // BackgroundManager.launch() returns immediately (pending) before the session exists,
+    // so we must wait briefly for the session to be created to set metadata correctly.
+    const timing = getTimingConfig()
+    const waitStart = Date.now()
+    let sessionId = task.sessionID
+    while (!sessionId && Date.now() - waitStart < timing.WAIT_FOR_SESSION_TIMEOUT_MS) {
+      if (ctx.abort?.aborted) {
+        return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
+      }
+      await new Promise(resolve => setTimeout(resolve, timing.WAIT_FOR_SESSION_INTERVAL_MS))
+      const updated = manager.getTask(task.id)
+      sessionId = updated?.sessionID
     }
 
-    ctx.metadata?.({
+    //#when - register session category for runtime-fallback hook
+    if (args.category && sessionId) {
+      SessionCategoryRegistry.register(sessionId, args.category)
+    }
+
+    const unstableMeta = {
       title: args.description,
       metadata: {
         prompt: args.prompt,
@@ -478,10 +487,14 @@ export async function executeBackgroundTask(
         load_skills: args.load_skills,
         description: args.description,
         run_in_background: args.run_in_background,
-        sessionId: task.sessionID,
+        sessionId: sessionId ?? "pending",
         command: args.command,
       },
-    })
+    }
+    await ctx.metadata?.(unstableMeta)
+    if (ctx.callID) {
+      storeToolMetadata(ctx.sessionID, ctx.callID, unstableMeta)
+    }
 
     return `Background task launched.
 
@@ -493,7 +506,7 @@ Status: ${task.status}
 System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
 
 <task_metadata>
-session_id: ${task.sessionID}
+session_id: ${sessionId}
 </task_metadata>`
   } catch (error) {
     return formatDetailedError(error, {
@@ -553,13 +566,13 @@ export async function executeSyncTask(
     }
 
     if (onSyncSessionCreated) {
-      log("[delegate_task] Invoking onSyncSessionCreated callback", { sessionID, parentID: parentContext.sessionID })
+      log("[task] Invoking onSyncSessionCreated callback", { sessionID, parentID: parentContext.sessionID })
       await onSyncSessionCreated({
         sessionID,
         parentID: parentContext.sessionID,
         title: args.description,
       }).catch((err) => {
-        log("[delegate_task] onSyncSessionCreated callback failed", { error: String(err) })
+      log("[task] onSyncSessionCreated callback failed", { error: String(err) })
       })
       await new Promise(r => setTimeout(r, 200))
     }
@@ -579,7 +592,7 @@ export async function executeSyncTask(
       })
     }
 
-    ctx.metadata?.({
+    const syncTaskMeta = {
       title: args.description,
       metadata: {
         prompt: args.prompt,
@@ -592,18 +605,21 @@ export async function executeSyncTask(
         sync: true,
         command: args.command,
       },
-    })
+    }
+    await ctx.metadata?.(syncTaskMeta)
+    if (ctx.callID) {
+      storeToolMetadata(ctx.sessionID, ctx.callID, syncTaskMeta)
+    }
 
     try {
-      const allowDelegateTask = isPlanAgent(agentToUse)
-      await promptWithModelSuggestionRetry(client, {
+      const allowTask = isPlanAgent(agentToUse)
+      await promptSyncWithModelSuggestionRetry(client, {
         path: { id: sessionID },
         body: {
           agent: agentToUse,
           system: systemContent,
           tools: {
-            task: false,
-            delegate_task: allowDelegateTask,
+            task: allowTask,
             call_omo_agent: true,
             question: false,
           },
@@ -633,70 +649,6 @@ export async function executeSyncTask(
         agent: agentToUse,
         category: args.category,
       })
-    }
-
-    const syncTiming = getTimingConfig()
-    const pollStart = Date.now()
-    let lastMsgCount = 0
-    let stablePolls = 0
-    let pollCount = 0
-
-    log("[delegate_task] Starting poll loop", { sessionID, agentToUse })
-
-    while (Date.now() - pollStart < syncTiming.MAX_POLL_TIME_MS) {
-      if (ctx.abort?.aborted) {
-        log("[delegate_task] Aborted by user", { sessionID })
-        if (toastManager && taskId) toastManager.removeTask(taskId)
-        return `Task aborted.\n\nSession ID: ${sessionID}`
-      }
-
-      await new Promise(resolve => setTimeout(resolve, syncTiming.POLL_INTERVAL_MS))
-      pollCount++
-
-      const statusResult = await client.session.status()
-      const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
-      const sessionStatus = allStatuses[sessionID]
-
-      if (pollCount % 10 === 0) {
-        log("[delegate_task] Poll status", {
-          sessionID,
-          pollCount,
-          elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
-          sessionStatus: sessionStatus?.type ?? "not_in_status",
-          stablePolls,
-          lastMsgCount,
-        })
-      }
-
-      if (sessionStatus && sessionStatus.type !== "idle") {
-        stablePolls = 0
-        lastMsgCount = 0
-        continue
-      }
-
-      const elapsed = Date.now() - pollStart
-      if (elapsed < syncTiming.MIN_STABILITY_TIME_MS) {
-        continue
-      }
-
-      const messagesCheck = await client.session.messages({ path: { id: sessionID } })
-      const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
-      const currentMsgCount = msgs.length
-
-      if (currentMsgCount === lastMsgCount) {
-        stablePolls++
-        if (stablePolls >= syncTiming.STABILITY_POLLS_REQUIRED) {
-          log("[delegate_task] Poll complete - messages stable", { sessionID, pollCount, currentMsgCount })
-          break
-        }
-      } else {
-        stablePolls = 0
-        lastMsgCount = currentMsgCount
-      }
-    }
-
-    if (Date.now() - pollStart >= syncTiming.MAX_POLL_TIME_MS) {
-      log("[delegate_task] Poll timeout reached", { sessionID, pollCount, lastMsgCount, stablePolls })
     }
 
     const messagesResult = await client.session.messages({
@@ -924,8 +876,8 @@ export async function resolveSubagentExecution(
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
   categoryExamples: string
-): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string } | undefined; error?: string }> {
-  const { client } = executorCtx
+): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; error?: string }> {
+  const { client, agentOverrides } = executorCtx
 
   if (!args.subagent_type?.trim()) {
     return { agentToUse: "", categoryModel: undefined, error: `Agent name cannot be empty.` }
@@ -947,14 +899,14 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
     return {
       agentToUse: "",
       categoryModel: undefined,
-      error: `You are prometheus. You cannot delegate to prometheus via delegate_task.
+    error: `You are the plan agent. You cannot delegate to plan via task.
 
 Create the work plan directly - that's your job as the planning agent.`,
     }
   }
 
   let agentToUse = agentName
-  let categoryModel: { providerID: string; modelID: string } | undefined
+  let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
 
   try {
     const agentsResult = await client.app.agents()
@@ -974,7 +926,7 @@ Create the work plan directly - that's your job as the planning agent.`,
         return {
           agentToUse: "",
           categoryModel: undefined,
-          error: `Cannot call primary agent "${isPrimaryAgent.name}" via delegate_task. Primary agents are top-level orchestrators.`,
+    error: `Cannot call primary agent "${isPrimaryAgent.name}" via task. Primary agents are top-level orchestrators.`,
         }
       }
 
@@ -991,7 +943,41 @@ Create the work plan directly - that's your job as the planning agent.`,
 
     agentToUse = matchedAgent.name
 
-    if (matchedAgent.model) {
+    const agentNameLower = agentToUse.toLowerCase()
+    const agentOverride = agentOverrides?.[agentNameLower as keyof typeof agentOverrides]
+      ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentNameLower)?.[1] : undefined)
+    const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentNameLower]
+
+    if (agentOverride?.model || agentRequirement) {
+      const connectedProviders = readConnectedProvidersCache()
+      const availableModels = await fetchAvailableModels(client, {
+        connectedProviders: connectedProviders ?? undefined,
+      })
+
+      const matchedAgentModelStr = matchedAgent.model
+        ? `${matchedAgent.model.providerID}/${matchedAgent.model.modelID}`
+        : undefined
+
+      const resolution = resolveModelPipeline({
+        intent: {
+          userModel: agentOverride?.model,
+          categoryDefaultModel: matchedAgentModelStr,
+        },
+        constraints: { availableModels },
+        policy: {
+          fallbackChain: agentRequirement?.fallbackChain,
+          systemDefaultModel: undefined,
+        },
+      })
+
+      if (resolution) {
+        const parsed = parseModelString(resolution.model)
+        if (parsed) {
+          const variantToUse = agentOverride?.variant ?? resolution.variant
+          categoryModel = variantToUse ? { ...parsed, variant: variantToUse } : parsed
+        }
+      }
+    } else if (matchedAgent.model) {
       categoryModel = matchedAgent.model
     }
   } catch {

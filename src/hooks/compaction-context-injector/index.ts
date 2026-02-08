@@ -1,16 +1,6 @@
-import { injectHookMessage } from "../../features/hook-message-injector"
-import { log } from "../../shared/logger"
 import { createSystemDirective, SystemDirectiveTypes } from "../../shared/system-directive"
 
-export interface SummarizeContext {
-  sessionID: string
-  providerID: string
-  modelID: string
-  usageRatio: number
-  directory: string
-}
-
-const SUMMARIZE_CONTEXT_PROMPT = `${createSystemDirective(SystemDirectiveTypes.COMPACTION_CONTEXT)}
+const COMPACTION_CONTEXT_PROMPT = `${createSystemDirective(SystemDirectiveTypes.COMPACTION_CONTEXT)}
 
 When summarizing this session, you MUST include the following sections in your summary:
 
@@ -39,11 +29,11 @@ When summarizing this session, you MUST include the following sections in your s
 - **External References**: Documentation URLs, library APIs, or external resources being consulted
 - **State & Variables**: Important variable names, configuration values, or runtime state relevant to ongoing work
 
-## 6. MUST NOT Do (Critical Constraints)
-- Things that were explicitly forbidden
-- Approaches that failed and should not be retried
-- User's explicit restrictions or preferences
-- Anti-patterns identified during the session
+## 6. Explicit Constraints (Verbatim Only)
+- Include ONLY constraints explicitly stated by the user or in existing AGENTS.md context
+- Quote constraints verbatim (do not paraphrase)
+- Do NOT invent, add, or modify constraints
+- If no explicit constraints exist, write "None"
 
 ## 7. Agent Verification State (Critical for Reviewers)
 - **Current Agent**: What agent is running (momus, oracle, etc.)
@@ -58,19 +48,5 @@ This context is critical for maintaining continuity after compaction.
 `
 
 export function createCompactionContextInjector() {
-  return async (ctx: SummarizeContext): Promise<void> => {
-    log("[compaction-context-injector] injecting context", { sessionID: ctx.sessionID })
-
-    const success = injectHookMessage(ctx.sessionID, SUMMARIZE_CONTEXT_PROMPT, {
-      agent: "general",
-      model: { providerID: ctx.providerID, modelID: ctx.modelID },
-      path: { cwd: ctx.directory },
-    })
-
-    if (success) {
-      log("[compaction-context-injector] context injected", { sessionID: ctx.sessionID })
-    } else {
-      log("[compaction-context-injector] injection failed", { sessionID: ctx.sessionID })
-    }
-  }
+  return (): string => COMPACTION_CONTEXT_PROMPT
 }

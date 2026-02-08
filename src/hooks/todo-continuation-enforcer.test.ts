@@ -152,6 +152,15 @@ describe("todo-continuation-enforcer", () => {
             })
             return {}
           },
+          promptAsync: async (opts: any) => {
+            promptCalls.push({
+              sessionID: opts.path.id,
+              agent: opts.body.agent,
+              model: opts.body.model,
+              text: opts.body.parts[0].text,
+            })
+            return {}
+          },
         },
         tui: {
           showToast: async (opts: any) => {
@@ -977,32 +986,41 @@ describe("todo-continuation-enforcer", () => {
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
           messages: async () => ({ data: mockMessagesWithAssistant }),
-          prompt: async (opts: any) => {
-            promptCalls.push({
-              sessionID: opts.path.id,
-              agent: opts.body.agent,
-              model: opts.body.model,
-              text: opts.body.parts[0].text,
-            })
-            return {}
-          },
-        },
-        tui: { showToast: async () => ({}) },
-      },
-      directory: "/tmp/test",
-    } as any
+           prompt: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+           promptAsync: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+         },
+         tui: { showToast: async () => ({}) },
+       },
+       directory: "/tmp/test",
+     } as any
 
-    const hook = createTodoContinuationEnforcer(mockInput, {
-      backgroundManager: createMockBackgroundManager(false),
-    })
+     const hook = createTodoContinuationEnforcer(mockInput, {
+       backgroundManager: createMockBackgroundManager(false),
+     })
 
-    // when - session goes idle
-    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
-    await fakeTimers.advanceBy(2500)
+     // when - session goes idle
+     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+     await fakeTimers.advanceBy(2500)
 
-    // then - model should be extracted from assistant message's flat modelID/providerID
-    expect(promptCalls.length).toBe(1)
-    expect(promptCalls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
+     // then - model should be extracted from assistant message's flat modelID/providerID
+     expect(promptCalls.length).toBe(1)
+     expect(promptCalls[0].model).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
   })
 
   // ============================================================
@@ -1028,32 +1046,41 @@ describe("todo-continuation-enforcer", () => {
           todo: async () => ({
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
-          messages: async () => ({ data: mockMessagesWithCompaction }),
-          prompt: async (opts: any) => {
-            promptCalls.push({
-              sessionID: opts.path.id,
-              agent: opts.body.agent,
-              model: opts.body.model,
-              text: opts.body.parts[0].text,
-            })
-            return {}
-          },
-        },
-        tui: { showToast: async () => ({}) },
-      },
-      directory: "/tmp/test",
-    } as any
+           messages: async () => ({ data: mockMessagesWithCompaction }),
+           prompt: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+           promptAsync: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+         },
+         tui: { showToast: async () => ({}) },
+       },
+       directory: "/tmp/test",
+     } as any
 
-    const hook = createTodoContinuationEnforcer(mockInput, {
-      backgroundManager: createMockBackgroundManager(false),
-    })
+     const hook = createTodoContinuationEnforcer(mockInput, {
+       backgroundManager: createMockBackgroundManager(false),
+     })
 
-    // when - session goes idle
-    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
-    await fakeTimers.advanceBy(2500)
+     // when - session goes idle
+     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+     await fakeTimers.advanceBy(2500)
 
-    // then - continuation uses Sisyphus (skipped compaction agent)
-    expect(promptCalls.length).toBe(1)
+     // then - continuation uses Sisyphus (skipped compaction agent)
+     expect(promptCalls.length).toBe(1)
     expect(promptCalls[0].agent).toBe("sisyphus")
   })
 
@@ -1072,32 +1099,41 @@ describe("todo-continuation-enforcer", () => {
           todo: async () => ({
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
-          messages: async () => ({ data: mockMessagesOnlyCompaction }),
-          prompt: async (opts: any) => {
-            promptCalls.push({
-              sessionID: opts.path.id,
-              agent: opts.body.agent,
-              model: opts.body.model,
-              text: opts.body.parts[0].text,
-            })
-            return {}
-          },
-        },
-        tui: { showToast: async () => ({}) },
-      },
-      directory: "/tmp/test",
-    } as any
+           messages: async () => ({ data: mockMessagesOnlyCompaction }),
+           prompt: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+           promptAsync: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+         },
+         tui: { showToast: async () => ({}) },
+       },
+       directory: "/tmp/test",
+     } as any
 
-    const hook = createTodoContinuationEnforcer(mockInput, {})
+     const hook = createTodoContinuationEnforcer(mockInput, {})
 
-    // when - session goes idle
-    await hook.handler({
-      event: { type: "session.idle", properties: { sessionID } },
-    })
+     // when - session goes idle
+     await hook.handler({
+       event: { type: "session.idle", properties: { sessionID } },
+     })
 
-    await fakeTimers.advanceBy(3000)
+     await fakeTimers.advanceBy(3000)
 
-    // then - no continuation (compaction is in default skipAgents)
+     // then - no continuation (compaction is in default skipAgents)
     expect(promptCalls).toHaveLength(0)
   })
 
@@ -1118,32 +1154,41 @@ describe("todo-continuation-enforcer", () => {
           todo: async () => ({
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
-          messages: async () => ({ data: mockMessagesPrometheusCompacted }),
-          prompt: async (opts: any) => {
-            promptCalls.push({
-              sessionID: opts.path.id,
-              agent: opts.body.agent,
-              model: opts.body.model,
-              text: opts.body.parts[0].text,
-            })
-            return {}
-          },
-        },
-        tui: { showToast: async () => ({}) },
-      },
-      directory: "/tmp/test",
-    } as any
+           messages: async () => ({ data: mockMessagesPrometheusCompacted }),
+           prompt: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+           promptAsync: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+         },
+         tui: { showToast: async () => ({}) },
+       },
+       directory: "/tmp/test",
+     } as any
 
-    const hook = createTodoContinuationEnforcer(mockInput, {})
+     const hook = createTodoContinuationEnforcer(mockInput, {})
 
-    // when - session goes idle
-    await hook.handler({
-      event: { type: "session.idle", properties: { sessionID } },
-    })
+     // when - session goes idle
+     await hook.handler({
+       event: { type: "session.idle", properties: { sessionID } },
+     })
 
-    await fakeTimers.advanceBy(3000)
+     await fakeTimers.advanceBy(3000)
 
-    // then - no continuation (prometheus found after filtering compaction, prometheus is in skipAgents)
+     // then - no continuation (prometheus found after filtering compaction, prometheus is in skipAgents)
     expect(promptCalls).toHaveLength(0)
   })
 
@@ -1164,32 +1209,41 @@ describe("todo-continuation-enforcer", () => {
           todo: async () => ({
             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
           }),
-          messages: async () => ({ data: mockMessagesNoAgent }),
-          prompt: async (opts: any) => {
-            promptCalls.push({
-              sessionID: opts.path.id,
-              agent: opts.body.agent,
-              model: opts.body.model,
-              text: opts.body.parts[0].text,
-            })
-            return {}
-          },
-        },
-        tui: { showToast: async () => ({}) },
-      },
-      directory: "/tmp/test",
-    } as any
+           messages: async () => ({ data: mockMessagesNoAgent }),
+           prompt: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+           promptAsync: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+         },
+         tui: { showToast: async () => ({}) },
+       },
+       directory: "/tmp/test",
+     } as any
 
-    const hook = createTodoContinuationEnforcer(mockInput, {
-      skipAgents: [],
-    })
+     const hook = createTodoContinuationEnforcer(mockInput, {
+       skipAgents: [],
+     })
 
-    // when - session goes idle
-    await hook.handler({
-      event: { type: "session.idle", properties: { sessionID } },
-    })
+     // when - session goes idle
+     await hook.handler({
+       event: { type: "session.idle", properties: { sessionID } },
+     })
 
-    await wait(2500)
+     await wait(2500)
 
     // then - continuation injected (no agents to skip)
     expect(promptCalls.length).toBe(1)

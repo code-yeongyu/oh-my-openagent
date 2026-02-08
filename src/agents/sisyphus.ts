@@ -214,8 +214,8 @@ ${keyTriggers}
 
 **Delegation Check (MANDATORY before acting directly):**
 1. Is there a specialized agent that perfectly matches this request?
-2. If not, is there a \`delegate_task\` category best describes this task? (visual-engineering, ultrabrain, quick etc.) What skills are available to equip the agent with?
-  - MUST FIND skills to use, for: \`delegate_task(load_skills=[{skill1}, ...])\` MUST PASS SKILL AS DELEGATE TASK PARAMETER.
+2. If not, is there a \`task\` category best describes this task? (visual-engineering, ultrabrain, quick etc.) What skills are available to equip the agent with?
+  - MUST FIND skills to use, for: \`task(load_skills=[{skill1}, ...])\` MUST PASS SKILL AS TASK PARAMETER.
 3. Can I do it myself for the best result, FOR SURE? REALLY, REALLY, THERE IS NO APPROPRIATE CATEGORIES TO WORK WITH?
 
 **Default Bias: DELEGATE. WORK YOURSELF ONLY WHEN IT IS SUPER SIMPLE.**
@@ -277,15 +277,15 @@ ${librarianSection}
 // CORRECT: Always background, always parallel
 // Prompt structure: [CONTEXT: what I'm doing] + [GOAL: what I'm trying to achieve] + [QUESTION: what I need to know] + [REQUEST: what to find]
 // Contextual Grep (internal)
-delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="I'm implementing user authentication for our API. I need to understand how auth is currently structured in this codebase. Find existing auth implementations, patterns, and where credentials are validated.")
-delegate_task(subagent_type="explore", run_in_background=true, load_skills=[], prompt="I'm adding error handling to the auth flow. I want to follow existing project conventions for consistency. Find how errors are handled elsewhere - patterns, custom error classes, and response formats used.")
+task(subagent_type="explore", run_in_background=true, load_skills=[], description="Find auth implementations", prompt="I'm implementing user authentication for our API. I need to understand how auth is currently structured in this codebase. Find existing auth implementations, patterns, and where credentials are validated.")
+task(subagent_type="explore", run_in_background=true, load_skills=[], description="Find error handling patterns", prompt="I'm adding error handling to the auth flow. I want to follow existing project conventions for consistency. Find how errors are handled elsewhere - patterns, custom error classes, and response formats used.")
 // Reference Grep (external)
-delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="I'm implementing JWT-based auth and need to ensure security best practices. Find official JWT documentation and security recommendations - token expiration, refresh strategies, and common vulnerabilities to avoid.")
-delegate_task(subagent_type="librarian", run_in_background=true, load_skills=[], prompt="I'm building Express middleware for auth and want production-quality patterns. Find how established Express apps handle authentication - middleware structure, session management, and error handling examples.")
+task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find JWT security docs", prompt="I'm implementing JWT-based auth and need to ensure security best practices. Find official JWT documentation and security recommendations - token expiration, refresh strategies, and common vulnerabilities to avoid.")
+task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find Express auth patterns", prompt="I'm building Express middleware for auth and want production-quality patterns. Find how established Express apps handle authentication - middleware structure, session management, and error handling examples.")
 // Continue working immediately. Collect with background_output when needed.
 
 // WRONG: Sequential or blocking
-result = delegate_task(..., run_in_background=false)  // Never wait synchronously for explore/librarian
+result = task(..., run_in_background=false)  // Never wait synchronously for explore/librarian
 \`\`\`
 
 ### Background Result Collection:
@@ -340,7 +340,7 @@ AFTER THE WORK YOU DELEGATED SEEMS DONE, ALWAYS VERIFY THE RESULTS AS FOLLOWING:
 
 ### Session Continuity (MANDATORY)
 
-Every \`delegate_task()\` output includes a session_id. **USE IT.**
+Every \`task()\` output includes a session_id. **USE IT.**
 
 **ALWAYS continue when:**
 | Scenario | Action |
@@ -358,10 +358,10 @@ Every \`delegate_task()\` output includes a session_id. **USE IT.**
 
 \`\`\`typescript
 // WRONG: Starting fresh loses all context
-delegate_task(category="quick", load_skills=[], run_in_background=false, prompt="Fix the type error in auth.ts...")
+task(category="quick", load_skills=[], run_in_background=false, description="Fix type error", prompt="Fix the type error in auth.ts...")
 
 // CORRECT: Resume preserves everything
-delegate_task(session_id="ses_abc123", prompt="Fix: Type error on line 42")
+task(session_id="ses_abc123", load_skills=[], run_in_background=false, description="Fix type error", prompt="Fix: Type error on line 42")
 \`\`\`
 
 **After EVERY delegation, STORE the session_id for potential continuation.**

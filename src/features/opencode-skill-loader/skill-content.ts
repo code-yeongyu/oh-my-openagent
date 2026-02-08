@@ -55,10 +55,23 @@ async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSki
 		mcpConfig: skill.mcpConfig,
 	}))
 
-	const discoveredNames = new Set(discoveredSkills.map((s) => s.name))
+	// Provider-gated skill names that should be filtered based on browserProvider
+	const providerGatedSkillNames = new Set(["agent-browser", "playwright"])
+	const browserProvider = options?.browserProvider ?? "playwright"
+
+	// Filter discovered skills to exclude provider-gated names that don't match the selected provider
+	const filteredDiscoveredSkills = discoveredSkills.filter((skill) => {
+		if (!providerGatedSkillNames.has(skill.name)) {
+			return true
+		}
+		// For provider-gated skills, only include if it matches the selected provider
+		return skill.name === browserProvider
+	})
+
+	const discoveredNames = new Set(filteredDiscoveredSkills.map((s) => s.name))
 	const uniqueBuiltins = builtinSkillsAsLoaded.filter((s) => !discoveredNames.has(s.name))
 
-	let allSkills = [...discoveredSkills, ...uniqueBuiltins]
+	let allSkills = [...filteredDiscoveredSkills, ...uniqueBuiltins]
 
 	// Filter discovered skills by disabledSkills (builtin skills are already filtered by createBuiltinSkills)
 	if (hasDisabledSkills) {
@@ -97,9 +110,10 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 	sections.push(``)
 
 	if (commitFooter) {
+		const footerText = typeof commitFooter === "string" ? commitFooter : "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-opencode)"
 		sections.push(`1. **Footer in commit body:**`)
 		sections.push("```")
-		sections.push(`Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-opencode)`)
+		sections.push(footerText)
 		sections.push("```")
 		sections.push(``)
 	}
@@ -113,14 +127,16 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 	}
 
 	if (commitFooter && includeCoAuthoredBy) {
+		const footerText = typeof commitFooter === "string" ? commitFooter : "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-opencode)"
 		sections.push(`**Example (both enabled):**`)
 		sections.push("```bash")
-		sections.push(`git commit -m "{Commit Message}" -m "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-opencode)" -m "Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>"`)
+		sections.push(`git commit -m "{Commit Message}" -m "${footerText}" -m "Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>"`)
 		sections.push("```")
 	} else if (commitFooter) {
+		const footerText = typeof commitFooter === "string" ? commitFooter : "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-opencode)"
 		sections.push(`**Example:**`)
 		sections.push("```bash")
-		sections.push(`git commit -m "{Commit Message}" -m "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-opencode)"`)
+		sections.push(`git commit -m "{Commit Message}" -m "${footerText}"`)
 		sections.push("```")
 	} else if (includeCoAuthoredBy) {
 		sections.push(`**Example:**`)

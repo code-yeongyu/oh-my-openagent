@@ -1,6 +1,6 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { existsSync } from "fs"
-import { resolve, isAbsolute } from "path"
+import { resolve, isAbsolute, join, normalize, sep } from "path"
 import { log } from "../../shared"
 
 export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
@@ -17,9 +17,19 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
         return
       }
 
-      const resolvedPath = isAbsolute(filePath) ? filePath : resolve(ctx.directory, filePath)
+      const resolvedPath = normalize(isAbsolute(filePath) ? filePath : resolve(ctx.directory, filePath))
 
       if (existsSync(resolvedPath)) {
+        const sisyphusRoot = join(ctx.directory, ".sisyphus") + sep
+        const isSisyphusMarkdown = resolvedPath.startsWith(sisyphusRoot) && resolvedPath.endsWith(".md")
+        if (isSisyphusMarkdown) {
+          log("[write-existing-file-guard] Allowing .sisyphus/*.md overwrite", {
+            sessionID: input.sessionID,
+            filePath,
+          })
+          return
+        }
+
         log("[write-existing-file-guard] Blocking write to existing file", {
           sessionID: input.sessionID,
           filePath,

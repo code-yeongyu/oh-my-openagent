@@ -28,7 +28,7 @@ const MODE: AgentMode = "subagent"
 
 // Core tools that Sisyphus-Junior must NEVER have access to
 // Note: call_omo_agent is ALLOWED so subagents can spawn explore/librarian
-const BLOCKED_TOOLS = ["task", "delegate_task"]
+const BLOCKED_TOOLS = ["task"]
 
 export const SISYPHUS_JUNIOR_DEFAULTS = {
   model: "anthropic/claude-sonnet-4-5",

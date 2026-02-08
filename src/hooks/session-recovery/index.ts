@@ -28,6 +28,7 @@ type RecoveryErrorType =
   | "tool_result_missing"
   | "thinking_block_order"
   | "thinking_disabled_violation"
+  | "assistant_prefill_unsupported"
   | null
 
 interface MessageInfo {
@@ -75,7 +76,7 @@ function extractResumeConfig(userMessage: MessageData | undefined, sessionID: st
 
 async function resumeSession(client: Client, config: ResumeConfig): Promise<boolean> {
   try {
-    await client.session.prompt({
+    await client.session.promptAsync({
       path: { id: config.sessionID },
       body: {
         parts: [{ type: "text", text: RECOVERY_RESUME_TEXT }],
@@ -125,6 +126,13 @@ function extractMessageIndex(error: unknown): number | null {
 
 export function detectErrorType(error: unknown): RecoveryErrorType {
   const message = getErrorMessage(error)
+
+  if (
+    message.includes("assistant message prefill") ||
+    message.includes("conversation must end with a user message")
+  ) {
+    return "assistant_prefill_unsupported"
+  }
 
   // IMPORTANT: Check thinking_block_order BEFORE tool_result_missing
   // because Anthropic's extended thinking error messages contain "tool_use" and "tool_result"
@@ -185,7 +193,7 @@ async function recoverToolResultMissing(
   }))
 
   try {
-    await client.session.prompt({
+    await client.session.promptAsync({
       path: { id: sessionID },
       // @ts-expect-error - SDK types may not include tool_result parts
       body: { parts: toolResultParts },
@@ -375,11 +383,13 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         tool_result_missing: "Tool Crash Recovery",
         thinking_block_order: "Thinking Block Recovery",
         thinking_disabled_violation: "Thinking Strip Recovery",
+        assistant_prefill_unsupported: "Prefill Error Recovery",
       }
       const toastMessages: Record<RecoveryErrorType & string, string> = {
         tool_result_missing: "Injecting cancelled tool results...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
+        assistant_prefill_unsupported: "Sending 'Continue' to recover...",
       }
 
       await ctx.client.tui
@@ -411,6 +421,8 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
           const resumeConfig = extractResumeConfig(lastUser, sessionID)
           await resumeSession(ctx.client, resumeConfig)
         }
+      } else if (errorType === "assistant_prefill_unsupported") {
+        success = true
       }
 
       return success

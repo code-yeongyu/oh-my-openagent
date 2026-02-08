@@ -63,7 +63,7 @@ function getMessageDir(sessionID: string): string | null {
   return null
 }
 
-const TASK_TOOLS = ["delegate_task", "task", "call_omo_agent"]
+const TASK_TOOLS = ["task", "call_omo_agent"]
 
 function getAgentFromMessageFiles(sessionID: string): string | undefined {
   const messageDir = getMessageDir(sessionID)

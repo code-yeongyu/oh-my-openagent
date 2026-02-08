@@ -2,25 +2,25 @@
 
 ## OVERVIEW
 
-CLI entry: `bunx oh-my-opencode`. 4 commands with Commander.js + @clack/prompts TUI.
+CLI entry: `bunx oh-my-opencode`. 5 commands with Commander.js + @clack/prompts TUI.
 
-**Commands**: install (interactive setup), doctor (14 health checks), run (session launcher), get-local-version
+**Commands**: install (interactive setup), doctor (14 health checks), run (session launcher), get-local-version, mcp-oauth
 
 ## STRUCTURE
 
 ```
 cli/
-├── index.ts              # Commander.js entry (4 commands)
+├── index.ts              # Commander.js entry (5 commands)
 ├── install.ts            # Interactive TUI (542 lines)
 ├── config-manager.ts     # JSONC parsing (667 lines)
-├── types.ts              # InstallArgs, InstallConfig
 ├── model-fallback.ts     # Model fallback configuration
+├── types.ts              # InstallArgs, InstallConfig
 ├── doctor/
 │   ├── index.ts          # Doctor entry
 │   ├── runner.ts         # Check orchestration
 │   ├── formatter.ts      # Colored output
 │   ├── constants.ts      # Check IDs, symbols
-│   ├── types.ts          # CheckResult, CheckDefinition (114 lines)
+│   ├── types.ts          # CheckResult, CheckDefinition
 │   └── checks/           # 14 checks, 23 files
 │       ├── version.ts    # OpenCode + plugin version
 │       ├── config.ts     # JSONC validity, Zod
@@ -28,10 +28,11 @@ cli/
 │       ├── dependencies.ts # AST-Grep, Comment Checker
 │       ├── lsp.ts        # LSP connectivity
 │       ├── mcp.ts        # MCP validation
-│       ├── model-resolution.ts # Model resolution check
+│       ├── model-resolution.ts # Model resolution check (323 lines)
 │       └── gh.ts         # GitHub CLI
 ├── run/
-│   └── index.ts          # Session launcher
+│   ├── index.ts          # Session launcher
+│   └── events.ts         # CLI run events (325 lines)
 ├── mcp-oauth/
 │   └── index.ts          # MCP OAuth flow
 └── get-local-version/
@@ -46,6 +47,7 @@ cli/
 | `doctor` | 14 health checks for diagnostics |
 | `run` | Launch session with todo enforcement |
 | `get-local-version` | Version detection and update check |
+| `mcp-oauth` | MCP OAuth authentication flow |
 
 ## DOCTOR CATEGORIES (14 Checks)
 

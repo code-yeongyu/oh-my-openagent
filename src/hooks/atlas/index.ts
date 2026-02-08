@@ -1,5 +1,4 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { execSync } from "node:child_process"
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import {
@@ -12,6 +11,7 @@ import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/ho
 import { log } from "../../shared/logger"
 import { createSystemDirective, SYSTEM_DIRECTIVE_PREFIX, SystemDirectiveTypes } from "../../shared/system-directive"
 import { isCallerOrchestrator, getMessageDir } from "../../shared/session-utils"
+import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
 import type { BackgroundManager } from "../../features/background-agent"
 
 export const HOOK_NAME = "atlas"
@@ -44,7 +44,7 @@ You just performed direct file modifications outside \`.sisyphus/\`.
 **You are an ORCHESTRATOR, not an IMPLEMENTER.**
 
 As an orchestrator, you should:
-- **DELEGATE** implementation work to subagents via \`delegate_task\`
+- **DELEGATE** implementation work to subagents via \`task\`
 - **VERIFY** the work done by subagents
 - **COORDINATE** multiple tasks and ensure completion
 
@@ -54,7 +54,7 @@ You should NOT:
 - Implement features yourself
 
 **If you need to make changes:**
-1. Use \`delegate_task\` to delegate to an appropriate subagent
+1. Use \`task\` to delegate to an appropriate subagent
 2. Provide clear instructions in the prompt
 3. Verify the subagent's work after completion
 
@@ -128,7 +128,7 @@ You (Atlas) are attempting to directly modify a file outside \`.sisyphus/\`.
 **THIS IS FORBIDDEN** (except for VERIFICATION purposes)
 
 As an ORCHESTRATOR, you MUST:
-1. **DELEGATE** all implementation work via \`delegate_task\`
+1. **DELEGATE** all implementation work via \`task\`
 2. **VERIFY** the work done by subagents (reading files is OK)
 3. **COORDINATE** - you orchestrate, you don't implement
 
@@ -146,11 +146,11 @@ As an ORCHESTRATOR, you MUST:
 
 **IF THIS IS FOR VERIFICATION:**
 Proceed if you are verifying subagent work by making a small fix.
-But for any substantial changes, USE \`delegate_task\`.
+But for any substantial changes, USE \`task\`.
 
 **CORRECT APPROACH:**
 \`\`\`
-delegate_task(
+task(
   category="...",
   prompt="[specific single task with clear acceptance criteria]"
 )
@@ -193,7 +193,7 @@ function buildVerificationReminder(sessionId: string): string {
 
 **If ANY verification fails, use this immediately:**
 \`\`\`
-delegate_task(session_id="${sessionId}", prompt="fix: [describe the specific failure]")
+task(session_id="${sessionId}", prompt="fix: [describe the specific failure]")
 \`\`\``
 }
 
@@ -269,113 +269,6 @@ function extractSessionIdFromOutput(output: string): string {
   return match?.[1] ?? "<session_id>"
 }
 
-interface GitFileStat {
-  path: string
-  added: number
-  removed: number
-  status: "modified" | "added" | "deleted"
-}
-
-function getGitDiffStats(directory: string): GitFileStat[] {
-  try {
-    const output = execSync("git diff --numstat HEAD", {
-      cwd: directory,
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim()
-
-    if (!output) return []
-
-    const statusOutput = execSync("git status --porcelain", {
-      cwd: directory,
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim()
-
-    const statusMap = new Map<string, "modified" | "added" | "deleted">()
-    for (const line of statusOutput.split("\n")) {
-      if (!line) continue
-      const status = line.substring(0, 2).trim()
-      const filePath = line.substring(3)
-      if (status === "A" || status === "??") {
-        statusMap.set(filePath, "added")
-      } else if (status === "D") {
-        statusMap.set(filePath, "deleted")
-      } else {
-        statusMap.set(filePath, "modified")
-      }
-    }
-
-    const stats: GitFileStat[] = []
-    for (const line of output.split("\n")) {
-      const parts = line.split("\t")
-      if (parts.length < 3) continue
-
-      const [addedStr, removedStr, path] = parts
-      const added = addedStr === "-" ? 0 : parseInt(addedStr, 10)
-      const removed = removedStr === "-" ? 0 : parseInt(removedStr, 10)
-
-      stats.push({
-        path,
-        added,
-        removed,
-        status: statusMap.get(path) ?? "modified",
-      })
-    }
-
-    return stats
-  } catch {
-    return []
-  }
-}
-
-function formatFileChanges(stats: GitFileStat[], notepadPath?: string): string {
-  if (stats.length === 0) return "[FILE CHANGES SUMMARY]\nNo file changes detected.\n"
-
-  const modified = stats.filter((s) => s.status === "modified")
-  const added = stats.filter((s) => s.status === "added")
-  const deleted = stats.filter((s) => s.status === "deleted")
-
-  const lines: string[] = ["[FILE CHANGES SUMMARY]"]
-
-  if (modified.length > 0) {
-    lines.push("Modified files:")
-    for (const f of modified) {
-      lines.push(`  ${f.path}  (+${f.added}, -${f.removed})`)
-    }
-    lines.push("")
-  }
-
-  if (added.length > 0) {
-    lines.push("Created files:")
-    for (const f of added) {
-      lines.push(`  ${f.path}  (+${f.added})`)
-    }
-    lines.push("")
-  }
-
-  if (deleted.length > 0) {
-    lines.push("Deleted files:")
-    for (const f of deleted) {
-      lines.push(`  ${f.path}  (-${f.removed})`)
-    }
-    lines.push("")
-  }
-
-  if (notepadPath) {
-    const notepadStat = stats.find((s) => s.path.includes("notepad") || s.path.includes(".sisyphus"))
-    if (notepadStat) {
-      lines.push("[NOTEPAD UPDATED]")
-      lines.push(`  ${notepadStat.path}  (+${notepadStat.added})`)
-      lines.push("")
-    }
-  }
-
-  return lines.join("\n")
-}
-
 interface ToolExecuteAfterInput {
   tool: string
   sessionID?: string
@@ -391,6 +284,7 @@ interface ToolExecuteAfterOutput {
 interface SessionState {
   lastEventWasAbortError?: boolean
   lastContinuationInjectedAt?: number
+  promptFailureCount: number
 }
 
 const CONTINUATION_COOLDOWN_MS = 5000
@@ -398,6 +292,7 @@ const CONTINUATION_COOLDOWN_MS = 5000
 export interface AtlasHookOptions {
   directory: string
   backgroundManager?: BackgroundManager
+  isContinuationStopped?: (sessionID: string) => boolean
 }
 
 function isAbortError(error: unknown): boolean {
@@ -432,13 +327,14 @@ export function createAtlasHook(
   function getState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
     if (!state) {
-      state = {}
+      state = { promptFailureCount: 0 }
       sessions.set(sessionID, state)
     }
     return state
   }
 
   async function injectContinuation(sessionID: string, planName: string, remaining: number, total: number, agent?: string): Promise<void> {
+    const state = getState(sessionID)
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
       : false
@@ -481,21 +377,28 @@ export function createAtlasHook(
           : undefined
       }
 
-       await ctx.client.session.prompt({
-         path: { id: sessionID },
-         body: {
-            agent: agent ?? "atlas",
-           ...(model !== undefined ? { model } : {}),
-           parts: [{ type: "text", text: prompt }],
-         },
-         query: { directory: ctx.directory },
-       })
+        await ctx.client.session.promptAsync({
+          path: { id: sessionID },
+          body: {
+             agent: agent ?? "atlas",
+            ...(model !== undefined ? { model } : {}),
+            parts: [{ type: "text", text: prompt }],
+          },
+          query: { directory: ctx.directory },
+        })
 
-      log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
-    } catch (err) {
-      log(`[${HOOK_NAME}] Boulder continuation failed`, { sessionID, error: String(err) })
-    }
-  }
+       state.promptFailureCount = 0
+
+       log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
+     } catch (err) {
+      state.promptFailureCount += 1
+      log(`[${HOOK_NAME}] Boulder continuation failed`, {
+        sessionID,
+        error: String(err),
+        promptFailureCount: state.promptFailureCount,
+      })
+     }
+   }
 
   return {
     handler: async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
@@ -541,6 +444,14 @@ export function createAtlasHook(
           return
         }
 
+        if (state.promptFailureCount >= 2) {
+          log(`[${HOOK_NAME}] Skipped: continuation disabled after repeated prompt failures`, {
+            sessionID,
+            promptFailureCount: state.promptFailureCount,
+          })
+          return
+        }
+
         const hasRunningBgTasks = backgroundManager
           ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
           : false
@@ -553,6 +464,11 @@ export function createAtlasHook(
 
         if (!boulderState) {
           log(`[${HOOK_NAME}] No active boulder`, { sessionID })
+          return
+        }
+
+        if (options?.isContinuationStopped?.(sessionID)) {
+          log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
           return
         }
 
@@ -631,6 +547,17 @@ export function createAtlasHook(
         }
         return
       }
+
+      if (event.type === "session.compacted") {
+        const sessionID = (props?.sessionID ?? (props?.info as { id?: string } | undefined)?.id) as
+          | string
+          | undefined
+        if (sessionID) {
+          sessions.delete(sessionID)
+          log(`[${HOOK_NAME}] Session compacted: cleaned up`, { sessionID })
+        }
+        return
+      }
     },
 
     "tool.execute.before": async (
@@ -660,12 +587,12 @@ export function createAtlasHook(
         return
       }
 
-      // Check delegate_task - inject single-task directive
-      if (input.tool === "delegate_task") {
+      // Check task - inject single-task directive
+      if (input.tool === "task") {
         const prompt = output.args.prompt as string | undefined
         if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
           output.args.prompt = `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt
-          log(`[${HOOK_NAME}] Injected single-task directive to delegate_task`, {
+          log(`[${HOOK_NAME}] Injected single-task directive to task`, {
             sessionID: input.sessionID,
           })
         }
@@ -704,7 +631,7 @@ export function createAtlasHook(
         return
       }
 
-      if (input.tool !== "delegate_task") {
+      if (input.tool !== "task") {
         return
       }
 
@@ -716,8 +643,8 @@ export function createAtlasHook(
       }
       
       if (output.output && typeof output.output === "string") {
-        const gitStats = getGitDiffStats(ctx.directory)
-        const fileChanges = formatFileChanges(gitStats)
+    const gitStats = collectGitDiffStats(ctx.directory)
+    const fileChanges = formatFileChanges(gitStats)
         const subagentSessionId = extractSessionIdFromOutput(output.output)
 
         const boulderState = readBoulderState(ctx.directory)

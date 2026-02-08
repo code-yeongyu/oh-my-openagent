@@ -3,6 +3,10 @@ import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "./constants"
 import { log } from "../../shared"
 import { buildSystemContent } from "./prompt-builder"
+import type {
+  AvailableCategory,
+  AvailableSkill,
+} from "../../agents/dynamic-agent-prompt-builder"
 import {
   resolveSkillContent,
   resolveParentContext,
@@ -25,6 +29,20 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
   const categoryNames = Object.keys(allCategories)
   const categoryExamples = categoryNames.map(k => `'${k}'`).join(", ")
+
+  const availableCategories: AvailableCategory[] = options.availableCategories
+    ?? Object.entries(allCategories).map(([name, categoryConfig]) => {
+      const userDesc = userCategories?.[name]?.description
+      const builtinDesc = CATEGORY_DESCRIPTIONS[name]
+      const description = userDesc || builtinDesc || "General tasks"
+      return {
+        name,
+        description,
+        model: categoryConfig.model,
+      }
+    })
+
+  const availableSkills: AvailableSkill[] = options.availableSkills ?? []
 
   const categoryList = categoryNames.map(name => {
     const userDesc = userCategories?.[name]?.description
@@ -56,7 +74,7 @@ Prompts MUST be in English.`
   return tool({
     description,
     args: {
-      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like [\"playwright\"], [\"git-master\"] for best results."),
+      load_skills: tool.schema.array(tool.schema.string()).default([]).describe("Skill names to inject. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like [\"playwright\"], [\"git-master\"] for best results."),
       description: tool.schema.string().describe("Short task description (3-5 words)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
@@ -68,11 +86,18 @@ Prompts MUST be in English.`
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
 
+      if (args.category && !args.subagent_type) {
+        args.subagent_type = "sisyphus-junior"
+      }
+      await ctx.metadata?.({
+        title: args.description,
+      })
+
       if (args.run_in_background === undefined) {
         throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`)
       }
       if (args.load_skills === undefined) {
-        throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like ["playwright"], ["git-master"] for best results.`)
+        args.load_skills = []
       }
       if (args.load_skills === null) {
         throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills.`)
@@ -98,7 +123,7 @@ Prompts MUST be in English.`
         return executeSyncContinuation(args, ctx, options)
       }
 
-      if (args.category && args.subagent_type) {
+      if (args.category && args.subagent_type && args.subagent_type !== "sisyphus-junior") {
         return `Invalid arguments: Provide EITHER category OR subagent_type, not both.`
       }
 
@@ -139,7 +164,7 @@ Prompts MUST be in English.`
 
         const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 
-        log("[delegate_task] unstable agent detection", {
+        log("[task] unstable agent detection", {
           category: args.category,
           actualModel,
           isUnstableAgent,
@@ -150,7 +175,13 @@ Prompts MUST be in English.`
         })
 
         if (isUnstableAgent && isRunInBackgroundExplicitlyFalse) {
-          const systemContent = buildSystemContent({ skillContent, categoryPromptAppend, agentName: agentToUse })
+          const systemContent = buildSystemContent({
+            skillContent,
+            categoryPromptAppend,
+            agentName: agentToUse,
+            availableCategories,
+            availableSkills,
+          })
           return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
       } else {
@@ -162,7 +193,13 @@ Prompts MUST be in English.`
         categoryModel = resolution.categoryModel
       }
 
-      const systemContent = buildSystemContent({ skillContent, categoryPromptAppend, agentName: agentToUse })
+      const systemContent = buildSystemContent({
+        skillContent,
+        categoryPromptAppend,
+        agentName: agentToUse,
+        availableCategories,
+        availableSkills,
+      })
 
       if (runInBackground) {
         return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent)

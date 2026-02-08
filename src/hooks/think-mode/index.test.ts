@@ -41,7 +41,7 @@ describe("createThinkModeHook integration", () => {
         const hook = createThinkModeHook()
         const input = createMockInput(
           "github-copilot",
-          "claude-opus-4-5",
+          "claude-opus-4-6",
           "Please think deeply about this problem"
         )
 
@@ -50,7 +50,7 @@ describe("createThinkModeHook integration", () => {
 
         // then should upgrade to high variant and inject thinking config
         const message = input.message as MessageWithInjectedProps
-        expect(input.message.model?.modelID).toBe("claude-opus-4-5-high")
+        expect(input.message.model?.modelID).toBe("claude-opus-4-6-high")
         expect(message.thinking).toBeDefined()
         expect((message.thinking as Record<string, unknown>)?.type).toBe(
           "enabled"
@@ -61,11 +61,11 @@ describe("createThinkModeHook integration", () => {
       })
 
       it("should handle github-copilot Claude with dots in version", async () => {
-        // given a github-copilot Claude model with dot format (claude-opus-4.5)
+        // given a github-copilot Claude model with dot format (claude-opus-4.6)
         const hook = createThinkModeHook()
         const input = createMockInput(
           "github-copilot",
-          "claude-opus-4.5",
+          "claude-opus-4.6",
           "ultrathink mode"
         )
 
@@ -74,7 +74,7 @@ describe("createThinkModeHook integration", () => {
 
         // then should upgrade to high variant (hyphen format)
         const message = input.message as MessageWithInjectedProps
-        expect(input.message.model?.modelID).toBe("claude-opus-4-5-high")
+        expect(input.message.model?.modelID).toBe("claude-opus-4-6-high")
         expect(message.thinking).toBeDefined()
       })
 
@@ -179,7 +179,7 @@ describe("createThinkModeHook integration", () => {
         const hook = createThinkModeHook()
         const input = createMockInput(
           "github-copilot",
-          "claude-opus-4-5",
+          "claude-opus-4-6",
           "Just do this task"
         )
         const originalModelID = input.message.model?.modelID
@@ -271,7 +271,7 @@ describe("createThinkModeHook integration", () => {
       const hook = createThinkModeHook()
       const input = createMockInput(
         "github-copilot",
-        "claude-opus-4-5-high",
+        "claude-opus-4-6-high",
         "think deeply"
       )
 
@@ -280,7 +280,7 @@ describe("createThinkModeHook integration", () => {
 
       // then should NOT modify the model (already high)
       const message = input.message as MessageWithInjectedProps
-      expect(input.message.model?.modelID).toBe("claude-opus-4-5-high")
+      expect(input.message.model?.modelID).toBe("claude-opus-4-6-high")
       // No additional thinking config should be injected
       expect(message.thinking).toBeUndefined()
     })
@@ -341,13 +341,13 @@ describe("createThinkModeHook integration", () => {
     it("should handle empty prompt gracefully", async () => {
       // given empty prompt
       const hook = createThinkModeHook()
-      const input = createMockInput("github-copilot", "claude-opus-4-5", "")
+      const input = createMockInput("github-copilot", "claude-opus-4-6", "")
 
       // when the chat.params hook is called
       await hook["chat.params"](input, sessionID)
 
       // then should not upgrade (no think keyword)
-      expect(input.message.model?.modelID).toBe("claude-opus-4-5")
+      expect(input.message.model?.modelID).toBe("claude-opus-4-6")
     })
   })
 

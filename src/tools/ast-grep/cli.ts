@@ -86,10 +86,22 @@ export async function runSg(options: RunOptions): Promise<SgResult> {
 
   let cliPath = getSgCliPath()
 
-  if (!existsSync(cliPath) && cliPath !== "sg") {
+  if (!cliPath || !existsSync(cliPath)) {
     const downloadedPath = await getAstGrepPath()
     if (downloadedPath) {
       cliPath = downloadedPath
+    } else {
+      return {
+        matches: [],
+        totalMatches: 0,
+        truncated: false,
+        error:
+          `ast-grep (sg) binary not found.\n\n` +
+          `Install options:\n` +
+          `  bun add -D @ast-grep/cli\n` +
+          `  cargo install ast-grep --locked\n` +
+          `  brew install ast-grep`,
+      }
     }
   }
 

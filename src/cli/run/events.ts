@@ -65,6 +65,8 @@ export interface EventState {
   currentTool: string | null
   /** Set to true when the main session has produced meaningful work (text, tool call, or tool result) */
   hasReceivedMeaningfulWork: boolean
+  /** Count of assistant messages for the main session */
+  messageCount: number
 }
 
 export function createEventState(): EventState {
@@ -76,6 +78,7 @@ export function createEventState(): EventState {
     lastPartText: "",
     currentTool: null,
     hasReceivedMeaningfulWork: false,
+    messageCount: 0,
   }
 }
 
@@ -266,6 +269,7 @@ function handleMessageUpdated(
   if (props?.info?.role !== "assistant") return
 
   state.hasReceivedMeaningfulWork = true
+  state.messageCount++
 }
 
 function handleToolExecute(

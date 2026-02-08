@@ -14,7 +14,10 @@
 export function isPlannerAgent(agentName?: string): boolean {
   if (!agentName) return false
   const lowerName = agentName.toLowerCase()
-  return lowerName.includes("prometheus") || lowerName.includes("planner") || lowerName === "plan"
+  if (lowerName.includes("prometheus") || lowerName.includes("planner")) return true
+
+  const normalized = lowerName.replace(/[_-]+/g, " ")
+  return /\bplan\b/.test(normalized)
 }
 
 /**
