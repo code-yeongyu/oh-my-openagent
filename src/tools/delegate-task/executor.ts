@@ -39,7 +39,7 @@ export interface ParentContext {
 }
 
 interface SessionMessage {
-  info?: { role?: string; time?: { created?: number }; agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
+  info?: { role?: string; time?: { created?: number }; agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string; variant?: string }
   parts?: Array<{ type?: string; text?: string }>
 }
 
@@ -190,6 +190,7 @@ export async function executeSyncContinuation(
   try {
     let resumeAgent: string | undefined
     let resumeModel: { providerID: string; modelID: string } | undefined
+    let resumeVariant: string | undefined
 
     try {
       const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
@@ -199,6 +200,7 @@ export async function executeSyncContinuation(
         if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
           resumeAgent = info.agent
           resumeModel = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+          resumeVariant = info.variant
           break
         }
       }
@@ -209,22 +211,24 @@ export async function executeSyncContinuation(
       resumeModel = resumeMessage?.model?.providerID && resumeMessage?.model?.modelID
         ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
         : undefined
+      resumeVariant = resumeMessage?.model?.variant
     }
 
-     await promptSyncWithModelSuggestionRetry(client, {
-       path: { id: args.session_id! },
-       body: {
-         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
-         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
-           tools: {
-             ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
-             task: false,
-             call_omo_agent: true,
-             question: false,
-           },
-         parts: [{ type: "text", text: args.prompt }],
-       },
-     })
+    await promptSyncWithModelSuggestionRetry(client, {
+      path: { id: args.session_id! },
+      body: {
+        ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
+        ...(resumeModel !== undefined ? { model: resumeModel } : {}),
+        ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
+        tools: {
+          ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
+          task: false,
+          call_omo_agent: true,
+          question: false,
+        },
+        parts: [{ type: "text", text: args.prompt }],
+      },
+    })
   } catch (promptError) {
     if (toastManager) {
       toastManager.removeTask(taskId)
