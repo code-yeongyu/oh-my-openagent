@@ -61,6 +61,7 @@ todoWrite([
 \`\`\`typescript
 task(
   subagent_type="metis",
+  load_skills=[],
   prompt=\`Review this planning session before I generate the work plan:
 
   **User's Goal**: {summarize what user wants}
