@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { BackgroundManager } from "../features/background-agent"
+import type { BackgroundManager } from "../features/background-agent"
 import { setMainSession, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
 import type { OhMyOpenCodeConfig } from "../config/schema"
 import { TaskObjectSchema } from "../tools/task/types"
@@ -244,7 +244,7 @@ describe("task-continuation-enforcer", () => {
     })
 
     const hook = createTaskContinuationEnforcer(createMockPluginInput(), createConfig(taskDir), {
-      backgroundManager: new BackgroundManager(createMockPluginInput()),
+      backgroundManager: createMockBackgroundManager(false),
     })
 
     // when - session goes idle
