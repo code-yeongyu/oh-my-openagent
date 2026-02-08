@@ -22,11 +22,13 @@ export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
       stderr: "pipe",
     })
 
-    const timeoutPromise = new Promise<"timeout">((resolve) =>
-      setTimeout(() => resolve("timeout"), BUN_INSTALL_TIMEOUT_MS)
-    )
+    let timeoutId: ReturnType<typeof setTimeout>
+    const timeoutPromise = new Promise<"timeout">((resolve) => {
+      timeoutId = setTimeout(() => resolve("timeout"), BUN_INSTALL_TIMEOUT_MS)
+    })
     const exitPromise = proc.exited.then(() => "completed" as const)
     const result = await Promise.race([exitPromise, timeoutPromise])
+    clearTimeout(timeoutId!)
 
     if (result === "timeout") {
       try {

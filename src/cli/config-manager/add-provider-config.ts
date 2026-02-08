@@ -25,10 +25,13 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
     if (format !== "none") {
       const parseResult = parseOpenCodeConfigFileWithError(path)
       if (parseResult.error && !parseResult.config) {
-        existingConfig = {}
-      } else {
-        existingConfig = parseResult.config
+        return {
+          success: false,
+          configPath: path,
+          error: `Failed to parse config file: ${parseResult.error}`,
+        }
       }
+      existingConfig = parseResult.config
     }
 
     const newConfig = { ...(existingConfig ?? {}) }
