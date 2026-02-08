@@ -2,6 +2,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import type { BackgroundManager } from "../../features/background-agent"
 import { buildShutdownRequestId, readInbox, sendPlainInboxMessage, sendStructuredInboxMessage } from "./inbox-store"
 import { getTeamMember, listTeammates, readTeamConfigOrThrow } from "./team-config-store"
+import { validateAgentNameOrLead, validateTeamName } from "./name-validation"
 import { resumeTeammateWithMessage } from "./teammate-runtime"
 import {
   TeamReadInboxInputSchema,
@@ -30,9 +31,20 @@ export function createSendMessageTool(manager: BackgroundManager): ToolDefinitio
     execute: async (args: Record<string, unknown>, context: TeamToolContext): Promise<string> => {
       try {
         const input = TeamSendMessageInputSchema.parse(args)
+        const teamError = validateTeamName(input.team_name)
+        if (teamError) {
+          return JSON.stringify({ error: teamError })
+        }
         const sender = input.sender ?? "team-lead"
+        const senderError = validateAgentNameOrLead(sender)
+        if (senderError) {
+          return JSON.stringify({ error: senderError })
+        }
         const config = readTeamConfigOrThrow(input.team_name)
         const memberNames = new Set(config.members.map((member) => member.name))
+        if (sender !== "team-lead" && !memberNames.has(sender)) {
+          return JSON.stringify({ error: "invalid_sender" })
+        }
 
         if (input.type === "message") {
           if (!input.recipient || !input.summary || !input.content) {
@@ -184,6 +196,16 @@ export function createReadInboxTool(): ToolDefinition {
     execute: async (args: Record<string, unknown>): Promise<string> => {
       try {
         const input = TeamReadInboxInputSchema.parse(args)
+        const teamError = validateTeamName(input.team_name)
+        if (teamError) {
+          return JSON.stringify({ error: teamError })
+        }
+        const agentError = validateAgentNameOrLead(input.agent_name)
+        if (agentError) {
+          return JSON.stringify({ error: agentError })
+        }
+        readTeamConfigOrThrow(input.team_name)
+
         const messages = readInbox(
           input.team_name,
           input.agent_name,

@@ -134,7 +134,7 @@ export function updateTeamTask(teamName: string, taskId: string, patch: TeamTask
       nextTask.activeForm = patch.activeForm
     }
     if (patch.owner !== undefined) {
-      nextTask.owner = patch.owner
+      nextTask.owner = patch.owner === "" ? undefined : patch.owner
     }
 
     const pendingWrites = new Map<string, TeamTask>()

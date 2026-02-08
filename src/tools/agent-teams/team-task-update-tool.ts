@@ -1,6 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { readTeamConfigOrThrow } from "./team-config-store"
-import { validateAgentName, validateTaskId, validateTeamName } from "./name-validation"
+import { validateAgentNameOrLead, validateTaskId, validateTeamName } from "./name-validation"
 import { TeamTaskUpdateInputSchema } from "./types"
 import { updateTeamTask } from "./team-task-update"
 import { notifyOwnerAssignment } from "./team-task-tools"
@@ -31,10 +31,19 @@ export function createTeamTaskUpdateTool(): ToolDefinition {
         if (taskIdError) {
           return JSON.stringify({ error: taskIdError })
         }
+
+        const config = readTeamConfigOrThrow(input.team_name)
+        const memberNames = new Set(config.members.map((member) => member.name))
         if (input.owner !== undefined) {
-          const ownerError = validateAgentName(input.owner)
-          if (ownerError) {
-            return JSON.stringify({ error: ownerError })
+          if (input.owner !== "") {
+            const ownerError = validateAgentNameOrLead(input.owner)
+            if (ownerError) {
+              return JSON.stringify({ error: ownerError })
+            }
+
+            if (!memberNames.has(input.owner)) {
+              return JSON.stringify({ error: "owner_not_in_team" })
+            }
           }
         }
         if (input.add_blocks) {
@@ -53,8 +62,6 @@ export function createTeamTaskUpdateTool(): ToolDefinition {
             }
           }
         }
-        readTeamConfigOrThrow(input.team_name)
-
         const task = updateTeamTask(input.team_name, input.task_id, {
           status: input.status,
           owner: input.owner,

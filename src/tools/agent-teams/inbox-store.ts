@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { z } from "zod"
 import { acquireLock, ensureDir, writeJsonAtomic } from "../../features/claude-tasks/storage"
 import { getTeamInboxDir, getTeamInboxPath } from "./paths"

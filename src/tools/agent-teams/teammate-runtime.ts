@@ -9,7 +9,7 @@ function parseModel(model: string | undefined): { providerID: string; modelID: s
   }
   const [providerID, modelID] = model.split("/", 2)
   if (!providerID || !modelID) {
-    return undefined
+    throw new Error("invalid_model_override_format")
   }
   return { providerID, modelID }
 }
@@ -61,6 +61,7 @@ export interface SpawnTeammateParams {
 
 export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTeammateMember> {
   const config = readTeamConfigOrThrow(params.teamName)
+  let launchedTaskID: string | undefined
 
   if (getTeamMember(config, params.name)) {
     throw new Error("teammate_already_exists")
@@ -96,6 +97,7 @@ export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTe
       ...(resolvedModel ? { model: resolvedModel } : {}),
       parentAgent: params.context.agent,
     })
+    launchedTaskID = launched.id
 
     const start = Date.now()
     let sessionID = launched.sessionID
@@ -127,6 +129,16 @@ export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTe
     writeTeamConfig(params.teamName, upsertTeammate(current, nextMember))
     return nextMember
   } catch (error) {
+    if (launchedTaskID) {
+      await params.manager
+        .cancelTask(launchedTaskID, {
+          source: "team_launch_failed",
+          abortSession: true,
+          skipNotification: true,
+        })
+        .catch(() => undefined)
+    }
+
     const rollback = readTeamConfigOrThrow(params.teamName)
     writeTeamConfig(params.teamName, removeTeammate(rollback, params.name))
     throw error

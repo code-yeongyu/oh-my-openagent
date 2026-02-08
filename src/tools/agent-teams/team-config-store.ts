@@ -51,7 +51,7 @@ function withTeamLock<T>(teamName: string, operation: () => T): T {
   }
 }
 
-function createLeadMember(teamName: string, leadSessionId: string, cwd: string, model: string): TeamLeadMember {
+function createLeadMember(teamName: string, cwd: string, model: string): TeamLeadMember {
   return {
     agentId: `team-lead@${teamName}`,
     name: "team-lead",
@@ -93,7 +93,7 @@ export function createTeamConfig(
     createdAt: nowMs(),
     leadAgentId,
     leadSessionId,
-    members: [createLeadMember(teamName, leadSessionId, cwd, model)],
+    members: [createLeadMember(teamName, cwd, model)],
   }
 
   return withTeamLock(teamName, () => {

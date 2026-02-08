@@ -76,8 +76,10 @@ function createMockManager(): MockManagerHandles {
   return { manager, launchCalls, resumeCalls, cancelCalls }
 }
 
-function createFailingLaunchManager(): BackgroundManager {
-  return {
+function createFailingLaunchManager(): { manager: BackgroundManager; cancelCalls: CancelCall[] } {
+  const cancelCalls: CancelCall[] = []
+
+  const manager = {
     launch: async () => ({ id: "bg-fail" }),
     getTask: () => ({
       id: "bg-fail",
@@ -90,8 +92,13 @@ function createFailingLaunchManager(): BackgroundManager {
       error: "launch failed",
     }),
     resume: async () => ({ id: "resume-unused" }),
-    cancelTask: async () => true,
+    cancelTask: async (taskId: string, options?: unknown) => {
+      cancelCalls.push({ taskId, options })
+      return true
+    },
   } as unknown as BackgroundManager
+
+  return { manager, cancelCalls }
 }
 
 function createContext(): TestToolContext {
@@ -177,6 +184,16 @@ describe("agent-teams tools functional", () => {
     const context = createContext()
 
     await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+      },
+      context,
+    )
 
     //#when
     const createdTask = await executeJsonTool(
@@ -241,6 +258,21 @@ describe("agent-teams tools functional", () => {
     const payload = JSON.parse(assignment!.text) as { type: string; taskId: string }
     expect(payload.type).toBe("task_assignment")
     expect(payload.taskId).toBe(createdTask.id)
+
+    //#when
+    const clearedOwnerTask = await executeJsonTool(
+      tools,
+      "team_task_update",
+      {
+        team_name: "core",
+        task_id: createdTask.id,
+        owner: "",
+      },
+      context,
+    ) as { owner?: string }
+
+    //#then
+    expect(clearedOwnerTask.owner).toBeUndefined()
   })
 
   test("rejects invalid task id input for task_get", async () => {
@@ -261,6 +293,74 @@ describe("agent-teams tools functional", () => {
 
     //#then
     expect(result.error).toBe("task_id_invalid")
+  })
+
+  test("requires owner to be a team member when setting task owner", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+    const createdTask = await executeJsonTool(
+      tools,
+      "team_task_create",
+      {
+        team_name: "core",
+        subject: "Investigate bug",
+        description: "Investigate and report root cause",
+      },
+      context,
+    ) as { id: string }
+
+    //#when
+    const result = await executeJsonTool(
+      tools,
+      "team_task_update",
+      {
+        team_name: "core",
+        task_id: createdTask.id,
+        owner: "ghost_user",
+      },
+      context,
+    ) as { error?: string }
+
+    //#then
+    expect(result.error).toBe("owner_not_in_team")
+  })
+
+  test("allows assigning team-lead as task owner", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+    const createdTask = await executeJsonTool(
+      tools,
+      "team_task_create",
+      {
+        team_name: "core",
+        subject: "Prepare checklist",
+        description: "Prepare release checklist",
+      },
+      context,
+    ) as { id: string }
+
+    //#when
+    const updated = await executeJsonTool(
+      tools,
+      "team_task_update",
+      {
+        team_name: "core",
+        task_id: createdTask.id,
+        owner: "team-lead",
+      },
+      context,
+    ) as { owner?: string }
+
+    //#then
+    expect(updated.owner).toBe("team-lead")
   })
 
   test("spawn_teammate + send_message + force_kill_teammate execute end-to-end", async () => {
@@ -314,6 +414,24 @@ describe("agent-teams tools functional", () => {
     expect(sent.success).toBe(true)
     expect(resumeCalls).toHaveLength(1)
     expect(resumeCalls[0].sessionId).toBe("ses-worker-1")
+
+    //#when
+    const invalidSender = await executeJsonTool(
+      tools,
+      "send_message",
+      {
+        team_name: "core",
+        type: "message",
+        sender: "ghost_user",
+        recipient: "worker_1",
+        summary: "sync",
+        content: "Please update status.",
+      },
+      context,
+    ) as { error?: string }
+
+    //#then
+    expect(invalidSender.error).toBe("invalid_sender")
 
     //#given
     const createdTask = await executeJsonTool(
@@ -381,9 +499,9 @@ describe("agent-teams tools functional", () => {
     expect(taskAfterKill.status).toBe("pending")
   })
 
-  test("rolls back teammate when launch fails", async () => {
+  test("rolls back teammate and cancels background task when launch fails", async () => {
     //#given
-    const manager = createFailingLaunchManager()
+    const { manager, cancelCalls } = createFailingLaunchManager()
     const tools = createAgentTeamsTools(manager)
     const context = createContext()
     await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
@@ -410,5 +528,68 @@ describe("agent-teams tools functional", () => {
 
     //#then
     expect(config.members.map((member) => member.name)).toEqual(["team-lead"])
+    expect(cancelCalls).toHaveLength(1)
+    expect(cancelCalls[0].taskId).toBe("bg-fail")
+    expect(cancelCalls[0].options).toEqual(
+      expect.objectContaining({
+        source: "team_launch_failed",
+        abortSession: true,
+        skipNotification: true,
+      }),
+    )
+  })
+
+  test("returns explicit error on invalid model override format", async () => {
+    //#given
+    const { manager, launchCalls } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+
+    //#when
+    const spawnResult = await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+        model: "invalid-format",
+      },
+      context,
+    ) as { error?: string }
+
+    //#then
+    expect(spawnResult.error).toBe("invalid_model_override_format")
+    expect(launchCalls).toHaveLength(0)
+
+    //#when
+    const config = await executeJsonTool(tools, "read_config", { team_name: "core" }, context) as {
+      members: Array<{ name: string }>
+    }
+
+    //#then
+    expect(config.members.map((member) => member.name)).toEqual(["team-lead"])
+  })
+
+  test("read_inbox returns team_not_found for unknown team", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+
+    //#when
+    const result = await executeJsonTool(
+      tools,
+      "read_inbox",
+      {
+        team_name: "missing_team",
+        agent_name: "team-lead",
+      },
+      context,
+    ) as { error?: string }
+
+    //#then
+    expect(result.error).toBe("team_not_found")
   })
 })
