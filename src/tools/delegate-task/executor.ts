@@ -1,6 +1,6 @@
 export type { ExecutorContext, ParentContext } from "./executor-types"
 
-export { resolveSkillContent } from "./skill-content-resolver"
+export { resolveSkillContent } from "./skill-resolver"
 export { resolveParentContext } from "./parent-context-resolver"
 
 export { executeBackgroundContinuation } from "./background-continuation"
