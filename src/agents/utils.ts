@@ -509,13 +509,13 @@ export async function createBuiltinAgents(
           availableCategories
         )
 
-        hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
-
+        if (!hephaestusOverride?.variant) {
+          hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
+        }
         const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as string | undefined
         if (hepOverrideCategory) {
           hephaestusConfig = applyCategoryOverride(hephaestusConfig, hepOverrideCategory, mergedCategories)
         }
-
         if (directory && hephaestusConfig.prompt) {
           const envContext = createEnvContext()
           hephaestusConfig = { ...hephaestusConfig, prompt: hephaestusConfig.prompt + envContext }
