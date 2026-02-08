@@ -1,7 +1,9 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentPromptMetadata } from "./types"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
+
+const MODE: AgentMode = "subagent"
 
 const DEFAULT_MODEL = "google/gemini-3-pro-preview"
 
@@ -132,12 +134,13 @@ export function createDevilsAdvocateAgent(model: string = DEFAULT_MODEL): AgentC
     "edit",
     "task",
     "background_task",
+    "call_omo_agent",
   ])
 
   const base = {
     description:
       "Relentlessly skeptical critic that stress-tests ideas, plans, and assumptions through systematic adversarial analysis.",
-    mode: "subagent" as const,
+    mode: MODE,
     model,
     temperature: 0.1,
     ...restrictions,
@@ -150,5 +153,7 @@ export function createDevilsAdvocateAgent(model: string = DEFAULT_MODEL): AgentC
 
   return { ...base, thinking: { type: "enabled", budgetTokens: 10000 } } as AgentConfig
 }
+
+createDevilsAdvocateAgent.mode = MODE
 
 export const devilsAdvocateAgent = createDevilsAdvocateAgent()

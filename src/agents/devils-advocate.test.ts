@@ -52,21 +52,16 @@ describe("createDevilsAdvocateAgent", () => {
     // #when
     const agent = createDevilsAdvocateAgent()
 
-    // #then - check that write/edit/task/background_task are restricted
-    // Works with both legacy (tools) and new (permission) format
-    if ("tools" in agent) {
-      const tools = agent.tools as Record<string, boolean>
-      expect(tools.write).toBe(false)
-      expect(tools.edit).toBe(false)
-      expect(tools.task).toBe(false)
-      expect(tools.background_task).toBe(false)
-    } else if ("permission" in agent) {
-      const permission = agent.permission as Record<string, string>
-      expect(permission.write).toBe("deny")
-      expect(permission.edit).toBe("deny")
-      expect(permission.task).toBe("deny")
-      expect(permission.background_task).toBe("deny")
+    // #then
+    if (!("permission" in agent) || agent.permission === undefined) {
+      throw new Error("Expected devils-advocate agent to define permission restrictions")
     }
+
+    expect(agent.permission.write).toBe("deny")
+    expect(agent.permission.edit).toBe("deny")
+    expect(agent.permission.task).toBe("deny")
+    expect(agent.permission.background_task).toBe("deny")
+    expect(agent.permission.call_omo_agent).toBe("deny")
   })
 })
 

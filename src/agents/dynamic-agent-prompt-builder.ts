@@ -334,9 +334,42 @@ ${avoidWhen.map((w) => `- ${w}`).join("\n")}
 
 ### Usage Pattern:
 Briefly announce "Consulting Oracle for [reason]" before invocation.
-
-**Exception**: This is the ONLY case where you announce before acting. For all other work, start immediately without status updates.
 </Oracle_Usage>`
+}
+
+export function buildDevilsAdvocateSection(agents: AvailableAgent[]): string {
+  const devilsAdvocateAgent = agents.find((a) => a.name === "devils-advocate")
+  if (!devilsAdvocateAgent) return ""
+
+  return `<Devils_Advocate_Usage>
+## Devil's Advocate — Adversarial Validation
+
+Use Devil's Advocate to stress-test user-facing changes before implementation.
+
+### WHEN to Invoke (AUTO — user-facing changes):
+
+| Trigger | Action |
+|---------|--------|
+| New user-facing feature | DA FIRST, then implement |
+| New API endpoint exposed to consumers | DA FIRST, then implement |
+| Behavior change to existing feature | DA FIRST, then implement |
+| Work plans / architecture proposals | DA FIRST, then implement |
+
+### WHEN NOT to Invoke:
+
+- Internal refactoring (no user impact)
+- Bug fixes (restoring expected behavior)
+- Tests-only changes
+- Documentation-only changes
+
+### Manual Trigger:
+- Mention: \`@devils-advocate\` (or delegate to \`devils-advocate\` agent)
+
+### Handling Output:
+- CRITICAL: Present findings to user; do not proceed without acknowledgment.
+- RISKY: Proceed only with explicit mitigation.
+- VIABLE: Proceed normally.
+</Devils_Advocate_Usage>`
 }
 
 export function buildHardBlocksSection(): string {
