@@ -13,7 +13,7 @@ import { log } from "../../shared"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeActions, executeAction } from "./action-executor"
-
+import { TmuxPollingManager } from "./polling-manager"
 type OpencodeClient = PluginInput["client"]
 
 interface SessionCreatedEvent {
@@ -57,9 +57,8 @@ export class TmuxSessionManager {
   private sourcePaneId: string | undefined
   private sessions = new Map<string, TrackedSession>()
   private pendingSessions = new Set<string>()
-  private pollInterval?: ReturnType<typeof setInterval>
   private deps: TmuxUtilDeps
-
+  private pollingManager: TmuxPollingManager
   constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
@@ -67,7 +66,11 @@ export class TmuxSessionManager {
     const defaultPort = process.env.OPENCODE_PORT ?? "4096"
     this.serverUrl = ctx.serverUrl?.toString() ?? `http://localhost:${defaultPort}`
     this.sourcePaneId = deps.getCurrentPaneId()
-
+    this.pollingManager = new TmuxPollingManager(
+      this.client,
+      this.sessions,
+      this.closeSessionById.bind(this)
+    )
     log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,
       tmuxConfig: this.tmuxConfig,
@@ -75,7 +78,6 @@ export class TmuxSessionManager {
       sourcePaneId: this.sourcePaneId,
     })
   }
-
   private isEnabled(): boolean {
     return this.tmuxConfig.enabled && this.deps.isInsideTmux()
   }
@@ -239,7 +241,7 @@ export class TmuxSessionManager {
           paneId: result.spawnedPaneId,
           sessionReady,
         })
-        this.startPolling()
+        this.pollingManager.startPolling()
       } else {
         log("[tmux-session-manager] spawn failed", {
           success: result.success,
@@ -278,140 +280,10 @@ export class TmuxSessionManager {
     this.sessions.delete(event.sessionID)
 
     if (this.sessions.size === 0) {
-      this.stopPolling()
+      this.pollingManager.stopPolling()
     }
   }
 
-  private startPolling(): void {
-    if (this.pollInterval) return
-
-    this.pollInterval = setInterval(
-      () => this.pollSessions(),
-      POLL_INTERVAL_BACKGROUND_MS,
-    )
-    log("[tmux-session-manager] polling started")
-  }
-
-  private stopPolling(): void {
-    if (this.pollInterval) {
-      clearInterval(this.pollInterval)
-      this.pollInterval = undefined
-      log("[tmux-session-manager] polling stopped")
-    }
-  }
-
-  private async pollSessions(): Promise<void> {
-    if (this.sessions.size === 0) {
-      this.stopPolling()
-      return
-    }
-
-    try {
-      const statusResult = await this.client.session.status({ path: undefined })
-      const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
-
-      log("[tmux-session-manager] pollSessions", {
-        trackedSessions: Array.from(this.sessions.keys()),
-        allStatusKeys: Object.keys(allStatuses),
-      })
-
-      const now = Date.now()
-      const sessionsToClose: string[] = []
-
-      for (const [sessionId, tracked] of this.sessions.entries()) {
-        const status = allStatuses[sessionId]
-        const isIdle = status?.type === "idle"
-
-        if (status) {
-          tracked.lastSeenAt = new Date(now)
-        }
-
-        const missingSince = !status ? now - tracked.lastSeenAt.getTime() : 0
-        const missingTooLong = missingSince >= SESSION_MISSING_GRACE_MS
-        const isTimedOut = now - tracked.createdAt.getTime() > SESSION_TIMEOUT_MS
-        const elapsedMs = now - tracked.createdAt.getTime()
-
-        // Stability detection: Don't close immediately on idle
-        // Wait for STABLE_POLLS_REQUIRED consecutive polls with same message count
-        let shouldCloseViaStability = false
-
-        if (isIdle && elapsedMs >= MIN_STABILITY_TIME_MS) {
-          // Fetch message count to detect if agent is still producing output
-          try {
-            const messagesResult = await this.client.session.messages({ 
-              path: { id: sessionId } 
-            })
-            const currentMsgCount = Array.isArray(messagesResult.data) 
-              ? messagesResult.data.length 
-              : 0
-
-            if (tracked.lastMessageCount === currentMsgCount) {
-              // Message count unchanged - increment stable polls
-              tracked.stableIdlePolls = (tracked.stableIdlePolls ?? 0) + 1
-              
-              if (tracked.stableIdlePolls >= STABLE_POLLS_REQUIRED) {
-                // Double-check status before closing
-                const recheckResult = await this.client.session.status({ path: undefined })
-                const recheckStatuses = (recheckResult.data ?? {}) as Record<string, { type: string }>
-                const recheckStatus = recheckStatuses[sessionId]
-                
-                if (recheckStatus?.type === "idle") {
-                  shouldCloseViaStability = true
-                } else {
-                  // Status changed - reset stability counter
-                  tracked.stableIdlePolls = 0
-                  log("[tmux-session-manager] stability reached but session not idle on recheck, resetting", {
-                    sessionId,
-                    recheckStatus: recheckStatus?.type,
-                  })
-                }
-              }
-            } else {
-              // New messages - agent is still working, reset stability counter
-              tracked.stableIdlePolls = 0
-            }
-            
-            tracked.lastMessageCount = currentMsgCount
-          } catch (msgErr) {
-            log("[tmux-session-manager] failed to fetch messages for stability check", {
-              sessionId,
-              error: String(msgErr),
-            })
-            // On error, don't close - be conservative
-          }
-        } else if (!isIdle) {
-          // Not idle - reset stability counter
-          tracked.stableIdlePolls = 0
-        }
-
-        log("[tmux-session-manager] session check", {
-          sessionId,
-          statusType: status?.type,
-          isIdle,
-          elapsedMs,
-          stableIdlePolls: tracked.stableIdlePolls,
-          lastMessageCount: tracked.lastMessageCount,
-          missingSince,
-          missingTooLong,
-          isTimedOut,
-          shouldCloseViaStability,
-        })
-
-        // Close if: stability detection confirmed OR missing too long OR timed out
-        // Note: We no longer close immediately on idle - stability detection handles that
-        if (shouldCloseViaStability || missingTooLong || isTimedOut) {
-          sessionsToClose.push(sessionId)
-        }
-      }
-
-      for (const sessionId of sessionsToClose) {
-        log("[tmux-session-manager] closing session due to poll", { sessionId })
-        await this.closeSessionById(sessionId)
-      }
-    } catch (err) {
-      log("[tmux-session-manager] poll error", { error: String(err) })
-    }
-  }
 
   private async closeSessionById(sessionId: string): Promise<void> {
     const tracked = this.sessions.get(sessionId)
@@ -433,7 +305,7 @@ export class TmuxSessionManager {
     this.sessions.delete(sessionId)
 
     if (this.sessions.size === 0) {
-      this.stopPolling()
+      this.pollingManager.stopPolling()
     }
   }
 
@@ -444,7 +316,7 @@ export class TmuxSessionManager {
   }
 
   async cleanup(): Promise<void> {
-    this.stopPolling()
+    this.pollingManager.stopPolling()
 
     if (this.sessions.size > 0) {
       log("[tmux-session-manager] closing all panes", { count: this.sessions.size })
