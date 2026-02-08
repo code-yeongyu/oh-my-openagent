@@ -1,7 +1,11 @@
+/// <reference types="bun-types" />
+
+import { describe, test, expect } from "bun:test"
 import { createBackgroundCancel, createBackgroundOutput } from "./tools"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { BackgroundCancelClient, BackgroundOutputManager, BackgroundOutputClient } from "./tools"
+import { consumeToolMetadata, clearPendingStore } from "../../features/tool-metadata-store"
 
 const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
 
@@ -49,6 +53,59 @@ function createTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
 }
 
 describe("background_output full_session", () => {
+  test("resolves task_id into title metadata", async () => {
+    // #given
+    clearPendingStore()
+
+    const task = createTask({
+      id: "task-1",
+      agent: "explore",
+      description: "Find how task output is rendered",
+      status: "running",
+    })
+    const manager = createMockManager(task)
+    const client = createMockClient({})
+    const tool = createBackgroundOutput(manager, client)
+    const ctxWithCallId = {
+      ...mockContext,
+      callID: "call-1",
+    } as unknown as ToolContext
+
+    // #when
+    await tool.execute({ task_id: "task-1" }, ctxWithCallId)
+
+    // #then
+    const restored = consumeToolMetadata("test-session", "call-1")
+    expect(restored?.title).toBe("explore - Find how task output is rendered")
+  })
+
+  test("shows category instead of agent for sisyphus-junior", async () => {
+    // #given
+    clearPendingStore()
+
+    const task = createTask({
+      id: "task-1",
+      agent: "sisyphus-junior",
+      category: "quick",
+      description: "Fix flaky test",
+      status: "running",
+    })
+    const manager = createMockManager(task)
+    const client = createMockClient({})
+    const tool = createBackgroundOutput(manager, client)
+    const ctxWithCallId = {
+      ...mockContext,
+      callID: "call-1",
+    } as unknown as ToolContext
+
+    // #when
+    await tool.execute({ task_id: "task-1" }, ctxWithCallId)
+
+    // #then
+    const restored = consumeToolMetadata("test-session", "call-1")
+    expect(restored?.title).toBe("quick - Fix flaky test")
+  })
+
   test("includes thinking and tool results when enabled", async () => {
     // #given
     const task = createTask()
