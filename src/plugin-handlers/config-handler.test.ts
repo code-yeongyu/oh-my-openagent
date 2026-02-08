@@ -1,4 +1,4 @@
-/// <reference path="../../node_modules/bun-types/test.d.ts" />
+/// <reference types="bun-types" />
 
 import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import { resolveCategoryConfig, createConfigHandler } from "./config-handler"
