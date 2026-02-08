@@ -19,7 +19,7 @@ export function buildAgent(
   browserProvider?: BrowserAutomationProvider,
   disabledSkills?: Set<string>
 ): AgentConfig {
-  const base = isFactory(source) ? source(model) : source
+  const base = isFactory(source) ? source(model) : { ...source }
   const categoryConfigs: Record<string, CategoryConfig> = categories
     ? { ...DEFAULT_CATEGORIES, ...categories }
     : DEFAULT_CATEGORIES

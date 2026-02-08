@@ -35,10 +35,13 @@ export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMerge
     if (format !== "none") {
       const parseResult = parseOpenCodeConfigFileWithError(path)
       if (parseResult.error && !parseResult.config) {
-        existingConfig = {}
-      } else {
-        existingConfig = parseResult.config
+        return {
+          success: false,
+          configPath: path,
+          error: `Failed to parse config file: ${parseResult.error}`,
+        }
       }
+      existingConfig = parseResult.config
     }
 
     const plugins: string[] = existingConfig?.plugin ?? []
