@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
 import { join } from "path"
 import os from "os"
 
-import { findWorkspaceRoot } from "./utils"
+import { findWorkspaceRoot } from "./lsp-client-wrapper"
 
 describe("lsp utils", () => {
   describe("findWorkspaceRoot", () => {

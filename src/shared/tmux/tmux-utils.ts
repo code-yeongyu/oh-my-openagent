@@ -1,7 +1,7 @@
 import { spawn } from "bun"
 import type { TmuxConfig, TmuxLayout } from "../../config/schema"
 import type { SpawnPaneResult } from "./types"
-import { getTmuxPath } from "../../tools/interactive-bash/utils"
+import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 
 let serverAvailable: boolean | null = null
 let serverCheckUrl: string | null = null
