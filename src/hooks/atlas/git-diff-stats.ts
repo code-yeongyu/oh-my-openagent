@@ -9,15 +9,6 @@ interface GitFileStat {
 
 export function getGitDiffStats(directory: string): GitFileStat[] {
   try {
-    const output = execSync("git diff --numstat HEAD", {
-      cwd: directory,
-      encoding: "utf-8",
-      timeout: 5000,
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim()
-
-    if (!output) return []
-
     const statusOutput = execSync("git status --porcelain", {
       cwd: directory,
       encoding: "utf-8",
@@ -25,12 +16,18 @@ export function getGitDiffStats(directory: string): GitFileStat[] {
       stdio: ["pipe", "pipe", "pipe"],
     }).trim()
 
+    if (!statusOutput) return []
+
     const statusMap = new Map<string, "modified" | "added" | "deleted">()
+    const untrackedFiles: string[] = []
     for (const line of statusOutput.split("\n")) {
       if (!line) continue
       const status = line.substring(0, 2).trim()
       const filePath = line.substring(3)
-      if (status === "A" || status === "??") {
+      if (status === "??") {
+        statusMap.set(filePath, "added")
+        untrackedFiles.push(filePath)
+      } else if (status === "A") {
         statusMap.set(filePath, "added")
       } else if (status === "D") {
         statusMap.set(filePath, "deleted")
@@ -39,21 +36,49 @@ export function getGitDiffStats(directory: string): GitFileStat[] {
       }
     }
 
+    const output = execSync("git diff --numstat HEAD", {
+      cwd: directory,
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim()
+
     const stats: GitFileStat[] = []
-    for (const line of output.split("\n")) {
-      const parts = line.split("\t")
-      if (parts.length < 3) continue
+    const trackedPaths = new Set<string>()
 
-      const [addedStr, removedStr, path] = parts
-      const added = addedStr === "-" ? 0 : parseInt(addedStr, 10)
-      const removed = removedStr === "-" ? 0 : parseInt(removedStr, 10)
+    if (output) {
+      for (const line of output.split("\n")) {
+        const parts = line.split("\t")
+        if (parts.length < 3) continue
 
-      stats.push({
-        path,
-        added,
-        removed,
-        status: statusMap.get(path) ?? "modified",
-      })
+        const [addedStr, removedStr, path] = parts
+        const added = addedStr === "-" ? 0 : parseInt(addedStr, 10)
+        const removed = removedStr === "-" ? 0 : parseInt(removedStr, 10)
+        trackedPaths.add(path)
+
+        stats.push({
+          path,
+          added,
+          removed,
+          status: statusMap.get(path) ?? "modified",
+        })
+      }
+    }
+
+    for (const filePath of untrackedFiles) {
+      if (trackedPaths.has(filePath)) continue
+      try {
+        const content = execSync(`wc -l < "${filePath}"`, {
+          cwd: directory,
+          encoding: "utf-8",
+          timeout: 3000,
+          stdio: ["pipe", "pipe", "pipe"],
+        }).trim()
+        const lineCount = parseInt(content, 10) || 0
+        stats.push({ path: filePath, added: lineCount, removed: 0, status: "added" })
+      } catch {
+        stats.push({ path: filePath, added: 0, removed: 0, status: "added" })
+      }
     }
 
     return stats

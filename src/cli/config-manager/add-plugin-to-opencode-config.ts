@@ -64,7 +64,7 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
         const newContent = content.replace(pluginArrayRegex, `"plugin": [\n    ${formattedPlugins}\n  ]`)
         writeFileSync(path, newContent)
       } else {
-        const newContent = content.replace(/^(\s*\{)/, `$1\n  "plugin": ["${pluginEntry}"],`)
+        const newContent = content.replace(/(\{)/, `$1\n  "plugin": ["${pluginEntry}"],`)
         writeFileSync(path, newContent)
       }
     } else {
