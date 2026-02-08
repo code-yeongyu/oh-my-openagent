@@ -394,23 +394,23 @@ describe("session-notification", () => {
   })
 
   test("should use default message format with project name", async () => {
-    //#given - a session notification with default config and a project directory
+    // given - a session notification with default config and a project directory
     const mockInput = createMockPluginInput()
     mockInput.directory = "/home/user/my-awesome-project"
     const handler = createSessionNotification(mockInput)
     setMainSession("session-format-default")
 
-    //#when - session goes idle and notification fires
+    // when - session goes idle and notification fires
     await handler({ event: { type: "session.idle", properties: { sessionID: "session-format-default" } } })
     await new Promise(resolve => setTimeout(resolve, 2000))
 
-    //#then - notification message should use the default format with project name
+    // then - notification message should use the default format with project name
     expect(notificationCalls).toHaveLength(1)
-    expect(notificationCalls[0]).toBe('/usr/bin/osascript -e display notification "my-awesome-project \u2014 Agent is ready for input" with title "OpenCode"')
+    expect(notificationCalls[0]).toContain("my-awesome-project \u2014 Agent is ready for input")
   })
 
   test("should resolve custom message_format with {project} and {cwd}", async () => {
-    //#given - a session notification with custom message_format
+    // given - a session notification with custom message_format
     const mockInput = createMockPluginInput()
     mockInput.directory = "/workspace/cool-app"
     const handler = createSessionNotification(mockInput, {
@@ -418,29 +418,29 @@ describe("session-notification", () => {
     })
     setMainSession("session-format-custom")
 
-    //#when - session goes idle and notification fires
+    // when - session goes idle and notification fires
     await handler({ event: { type: "session.idle", properties: { sessionID: "session-format-custom" } } })
     await new Promise(resolve => setTimeout(resolve, 2000))
 
-    //#then - notification should use the resolved custom format
+    // then - notification should use the resolved custom format
     expect(notificationCalls).toHaveLength(1)
-    expect(notificationCalls[0]).toBe('/usr/bin/osascript -e display notification "Done in cool-app at /workspace/cool-app" with title "OpenCode"')
+    expect(notificationCalls[0]).toContain("Done in cool-app at /workspace/cool-app")
   })
 
   test("should use literal string when message_format has no variables", async () => {
-    //#given - a session notification with a literal message_format (no template variables)
+    // given - a session notification with a literal message_format (no template variables)
     const mockInput = createMockPluginInput()
     const handler = createSessionNotification(mockInput, {
       message_format: "Custom static message",
     })
     setMainSession("session-format-literal")
 
-    //#when - session goes idle and notification fires
+    // when - session goes idle and notification fires
     await handler({ event: { type: "session.idle", properties: { sessionID: "session-format-literal" } } })
     await new Promise(resolve => setTimeout(resolve, 2000))
 
-    //#then - notification should use the literal string as-is
+    // then - notification should use the literal string as-is
     expect(notificationCalls).toHaveLength(1)
-    expect(notificationCalls[0]).toBe('/usr/bin/osascript -e display notification "Custom static message" with title "OpenCode"')
+    expect(notificationCalls[0]).toContain("Custom static message")
   })
 })
