@@ -26,7 +26,7 @@ export interface DelegateTaskArgs {
 export interface ToolContextWithMetadata {
   sessionID: string
   messageID: string
-  agent: string
+  agent?: string
   abort: AbortSignal
   metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void | Promise<void>
   /**

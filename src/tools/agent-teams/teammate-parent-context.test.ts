@@ -21,4 +21,16 @@ describe("agent-teams teammate parent context", () => {
     expect(parentToolContext.messageID).toBe("msg-main")
     expect(parentToolContext.agent).toBe("sisyphus")
   })
+
+  test("leaves agent undefined if missing in tool context", () => {
+    //#when
+    const parentToolContext = buildTeamParentToolContext({
+      sessionID: "ses-main",
+      messageID: "msg-main",
+      abort: new AbortController().signal,
+    })
+
+    //#then
+    expect(parentToolContext.agent).toBeUndefined()
+  })
 })

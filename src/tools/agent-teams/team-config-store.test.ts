@@ -5,7 +5,14 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { acquireLock } from "../../features/claude-tasks/storage"
 import { getTeamDir, getTeamTaskDir, getTeamsRootDir } from "./paths"
-import { createTeamConfig, deleteTeamData, teamExists } from "./team-config-store"
+import {
+  createTeamConfig,
+  deleteTeamData,
+  readTeamConfigOrThrow,
+  teamExists,
+  upsertTeammate,
+  writeTeamConfig,
+} from "./team-config-store"
 
 describe("agent-teams team config store", () => {
   let originalCwd: string
@@ -31,15 +38,18 @@ describe("agent-teams team config store", () => {
     const lock = acquireLock(getTeamDir("core"))
     expect(lock.acquired).toBe(true)
 
-    //#when
-    const deleteWhileLocked = () => deleteTeamData("core")
+    try {
+      //#when
+      const deleteWhileLocked = () => deleteTeamData("core")
 
-    //#then
-    expect(deleteWhileLocked).toThrow("team_lock_unavailable")
-    expect(teamExists("core")).toBe(true)
+      //#then
+      expect(deleteWhileLocked).toThrow("team_lock_unavailable")
+      expect(teamExists("core")).toBe(true)
+    } finally {
+      //#when
+      lock.release()
+    }
 
-    //#when
-    lock.release()
     deleteTeamData("core")
 
     //#then
@@ -89,6 +99,43 @@ describe("agent-teams team config store", () => {
     //#then
     expect(existsSync(taskDir)).toBe(false)
     expect(existsSync(teamDir)).toBe(true)
+  })
+
+  test("deleteTeamData fails if team has active teammates", () => {
+    //#given
+    const config = readTeamConfigOrThrow("core")
+    const updated = upsertTeammate(config, {
+      agentId: "teammate@core",
+      name: "teammate",
+      agentType: "sisyphus",
+      category: "test",
+      model: "sisyphus",
+      prompt: "test prompt",
+      color: "#000000",
+      planModeRequired: false,
+      joinedAt: Date.now(),
+      cwd: process.cwd(),
+      subscriptions: [],
+      backendType: "native",
+      isActive: true,
+      sessionID: "ses-sub",
+    })
+    writeTeamConfig("core", updated)
+
+    //#when
+    const deleteWithTeammates = () => deleteTeamData("core")
+
+    //#then
+    expect(deleteWithTeammates).toThrow("team_has_active_members")
+    expect(teamExists("core")).toBe(true)
+
+    //#when - cleanup teammate to allow afterEach to succeed
+    const cleared = { ...updated, members: updated.members.filter(m => m.name === "team-lead") }
+    writeTeamConfig("core", cleared)
+    deleteTeamData("core")
+
+    //#then
+    expect(teamExists("core")).toBe(false)
   })
 
 })

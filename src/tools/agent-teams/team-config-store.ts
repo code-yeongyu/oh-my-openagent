@@ -1,10 +1,5 @@
 import { existsSync, rmSync } from "node:fs"
-import {
-  acquireLock,
-  ensureDir,
-  readJsonSafe,
-  writeJsonAtomic,
-} from "../../features/claude-tasks/storage"
+import { acquireLock, ensureDir, readJsonSafe, writeJsonAtomic } from "../../features/claude-tasks/storage"
 import {
   getTeamConfigPath,
   getTeamDir,
@@ -175,6 +170,15 @@ export function assignNextColor(config: TeamConfig): string {
 export function deleteTeamData(teamName: string): void {
   assertValidTeamName(teamName)
   withTeamLock(teamName, () => {
+    const config = readJsonSafe(getTeamConfigPath(teamName), TeamConfigSchema)
+    if (!config) {
+      throw new Error("team_not_found")
+    }
+
+    if (listTeammates(config).length > 0) {
+      throw new Error("team_has_active_members")
+    }
+
     withTeamTaskLock(teamName, () => {
       const teamDir = getTeamDir(teamName)
       const taskDir = getTeamTaskDir(teamName)
