@@ -1123,6 +1123,99 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(task.status).toBe("completed")
     expect(getPendingByParent(manager).get(task.parentSessionID)).toBeUndefined()
   })
+
+  test("should avoid overlapping promptAsync calls when tasks complete concurrently", async () => {
+    // given
+    type PromptAsyncBody = Record<string, unknown> & { noReply?: boolean }
+
+    let resolveMessages: ((value: { data: unknown[] }) => void) | undefined
+    const messagesBarrier = new Promise<{ data: unknown[] }>((resolve) => {
+      resolveMessages = resolve
+    })
+
+    const promptBodies: PromptAsyncBody[] = []
+    let promptInFlight = false
+    let rejectedCount = 0
+    let promptCallCount = 0
+
+    let releaseFirstPrompt: (() => void) | undefined
+    let resolveFirstStarted: (() => void) | undefined
+    const firstStarted = new Promise<void>((resolve) => {
+      resolveFirstStarted = resolve
+    })
+
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => messagesBarrier,
+        promptAsync: async (args: { path: { id: string }; body: PromptAsyncBody }) => {
+          promptBodies.push(args.body)
+
+          if (!promptInFlight) {
+            promptCallCount += 1
+            if (promptCallCount === 1) {
+              promptInFlight = true
+              resolveFirstStarted?.()
+              return await new Promise((resolve) => {
+                releaseFirstPrompt = () => {
+                  promptInFlight = false
+                  resolve({})
+                }
+              })
+            }
+
+            return {}
+          }
+
+          rejectedCount += 1
+          throw new Error("BUSY")
+        },
+      },
+    }
+
+    manager.shutdown()
+    manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+
+    const parentSessionID = "parent-session"
+    const taskA = createMockTask({
+      id: "task-a",
+      sessionID: "session-a",
+      parentSessionID,
+    })
+    const taskB = createMockTask({
+      id: "task-b",
+      sessionID: "session-b",
+      parentSessionID,
+    })
+
+    getTaskMap(manager).set(taskA.id, taskA)
+    getTaskMap(manager).set(taskB.id, taskB)
+    getPendingByParent(manager).set(parentSessionID, new Set([taskA.id, taskB.id]))
+
+    // when
+    const completionA = tryCompleteTaskForTest(manager, taskA)
+    const completionB = tryCompleteTaskForTest(manager, taskB)
+    resolveMessages?.({ data: [] })
+
+    await firstStarted
+
+    // Give the second completion a chance to attempt promptAsync while the first is in-flight.
+    // In the buggy implementation, this triggers an overlap and increments rejectedCount.
+    for (let i = 0; i < 20; i++) {
+      await Promise.resolve()
+      if (rejectedCount > 0) break
+      if (promptBodies.length >= 2) break
+    }
+
+    releaseFirstPrompt?.()
+    await Promise.all([completionA, completionB])
+
+    // then
+    expect(rejectedCount).toBe(0)
+    expect(promptBodies.length).toBe(2)
+    expect(promptBodies.some((b) => b.noReply === false)).toBe(true)
+  })
 })
 
 describe("BackgroundManager.trackTask", () => {
