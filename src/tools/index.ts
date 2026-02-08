@@ -37,6 +37,7 @@ type OpencodeClient = PluginInput["client"]
 export { createCallOmoAgent } from "./call-omo-agent"
 export { createLookAt } from "./look-at"
 export { createDelegateTask } from "./delegate-task"
+export { createAgentTeamsTools } from "./agent-teams"
 export {
   createTaskCreateTool,
   createTaskGetTool,
