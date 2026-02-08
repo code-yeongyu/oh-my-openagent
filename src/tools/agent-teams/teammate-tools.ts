@@ -71,6 +71,14 @@ export function createForceKillTeammateTool(manager: BackgroundManager): ToolDef
     execute: async (args: Record<string, unknown>): Promise<string> => {
       try {
         const input = TeamForceKillInputSchema.parse(args)
+        const teamError = validateTeamName(input.team_name)
+        if (teamError) {
+          return JSON.stringify({ error: teamError })
+        }
+        const agentError = validateAgentName(input.agent_name)
+        if (agentError) {
+          return JSON.stringify({ error: agentError })
+        }
         const config = readTeamConfigOrThrow(input.team_name)
         const member = getTeamMember(config, input.agent_name)
         if (!member || !isTeammateMember(member)) {
@@ -78,7 +86,11 @@ export function createForceKillTeammateTool(manager: BackgroundManager): ToolDef
         }
 
         await cancelTeammateRun(manager, member)
-        writeTeamConfig(input.team_name, removeTeammate(config, input.agent_name))
+        const refreshedConfig = readTeamConfigOrThrow(input.team_name)
+        const refreshedMember = getTeamMember(refreshedConfig, input.agent_name)
+        if (refreshedMember && isTeammateMember(refreshedMember)) {
+          writeTeamConfig(input.team_name, removeTeammate(refreshedConfig, input.agent_name))
+        }
         resetOwnerTasks(input.team_name, input.agent_name)
 
         return JSON.stringify({ success: true, message: `${input.agent_name} stopped` })
@@ -99,8 +111,16 @@ export function createProcessShutdownTool(): ToolDefinition {
     execute: async (args: Record<string, unknown>): Promise<string> => {
       try {
         const input = TeamProcessShutdownInputSchema.parse(args)
+        const teamError = validateTeamName(input.team_name)
+        if (teamError) {
+          return JSON.stringify({ error: teamError })
+        }
         if (input.agent_name === "team-lead") {
           return JSON.stringify({ error: "cannot_shutdown_team_lead" })
+        }
+        const agentError = validateAgentName(input.agent_name)
+        if (agentError) {
+          return JSON.stringify({ error: agentError })
         }
 
         const config = readTeamConfigOrThrow(input.team_name)

@@ -18,6 +18,18 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function resolveLaunchFailureMessage(status: string | undefined, error: string | undefined): string {
+  if (status === "error") {
+    return error ? `teammate_launch_failed:${error}` : "teammate_launch_failed"
+  }
+
+  if (status === "cancelled") {
+    return "teammate_launch_cancelled"
+  }
+
+  return "teammate_launch_timeout"
+}
+
 function buildLaunchPrompt(teamName: string, teammateName: string, userPrompt: string): string {
   return [
     `You are teammate "${teammateName}" in team "${teamName}".`,
@@ -87,17 +99,28 @@ export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTe
 
     const start = Date.now()
     let sessionID = launched.sessionID
+    let latestStatus: string | undefined
+    let latestError: string | undefined
     while (!sessionID && Date.now() - start < 30_000) {
       await delay(50)
       const task = params.manager.getTask(launched.id)
+      latestStatus = task?.status
+      latestError = task?.error
+      if (task?.status === "error" || task?.status === "cancelled") {
+        throw new Error(resolveLaunchFailureMessage(task.status, task.error))
+      }
       sessionID = task?.sessionID
+    }
+
+    if (!sessionID) {
+      throw new Error(resolveLaunchFailureMessage(latestStatus, latestError))
     }
 
     const nextMember: TeamTeammateMember = {
       ...teammate,
       isActive: true,
       backgroundTaskID: launched.id,
-      ...(sessionID ? { sessionID } : {}),
+      sessionID,
     }
 
     const current = readTeamConfigOrThrow(params.teamName)

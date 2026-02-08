@@ -76,6 +76,24 @@ function createMockManager(): MockManagerHandles {
   return { manager, launchCalls, resumeCalls, cancelCalls }
 }
 
+function createFailingLaunchManager(): BackgroundManager {
+  return {
+    launch: async () => ({ id: "bg-fail" }),
+    getTask: () => ({
+      id: "bg-fail",
+      parentSessionID: "ses-main",
+      parentMessageID: "msg-main",
+      description: "failed launch",
+      prompt: "prompt",
+      agent: "sisyphus-junior",
+      status: "error",
+      error: "launch failed",
+    }),
+    resume: async () => ({ id: "resume-unused" }),
+    cancelTask: async () => true,
+  } as unknown as BackgroundManager
+}
+
 function createContext(): TestToolContext {
   return {
     sessionID: "ses-main",
@@ -225,6 +243,26 @@ describe("agent-teams tools functional", () => {
     expect(payload.taskId).toBe(createdTask.id)
   })
 
+  test("rejects invalid task id input for task_get", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+
+    //#when
+    const result = await executeJsonTool(
+      tools,
+      "team_task_get",
+      { team_name: "core", task_id: "../../etc/passwd" },
+      context,
+    ) as { error?: string }
+
+    //#then
+    expect(result.error).toBe("task_id_invalid")
+  })
+
   test("spawn_teammate + send_message + force_kill_teammate execute end-to-end", async () => {
     //#given
     const { manager, launchCalls, resumeCalls, cancelCalls } = createMockManager()
@@ -341,5 +379,36 @@ describe("agent-teams tools functional", () => {
     expect(configAfterKill.members.some((member) => member.name === "worker_1")).toBe(false)
     expect(taskAfterKill.owner).toBeUndefined()
     expect(taskAfterKill.status).toBe("pending")
+  })
+
+  test("rolls back teammate when launch fails", async () => {
+    //#given
+    const manager = createFailingLaunchManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+
+    //#when
+    const spawnResult = await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+      },
+      context,
+    ) as { error?: string }
+
+    //#then
+    expect(spawnResult.error).toBe("teammate_launch_failed:launch failed")
+
+    //#when
+    const config = await executeJsonTool(tools, "read_config", { team_name: "core" }, context) as {
+      members: Array<{ name: string }>
+    }
+
+    //#then
+    expect(config.members.map((member) => member.name)).toEqual(["team-lead"])
   })
 })
