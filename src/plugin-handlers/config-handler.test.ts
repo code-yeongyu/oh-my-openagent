@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import { resolveCategoryConfig, createConfigHandler } from "./config-handler"
 import type { CategoryConfig } from "../config/schema"
@@ -949,7 +951,10 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 
   test("denies todowrite and todoread for primary agents when task_system is enabled", async () => {
     //#given
-    spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
       hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
       atlas: { name: "atlas", prompt: "test", mode: "primary" },
@@ -987,7 +992,10 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 
   test("does not deny todowrite/todoread when task_system is disabled", async () => {
     //#given
-    spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
       hephaestus: { name: "hephaestus", prompt: "test", mode: "primary" },
     })
@@ -1021,7 +1029,10 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 
   test("does not deny todowrite/todoread when task_system is undefined", async () => {
     //#given
-    spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
     })
 
