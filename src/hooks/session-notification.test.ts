@@ -358,4 +358,55 @@ describe("session-notification", () => {
     // then - only one notification should be sent
     expect(notificationCalls).toHaveLength(1)
   })
+
+  test("should use default message format with project name", async () => {
+    //#given - a session notification with default config and a project directory
+    const mockInput = createMockPluginInput()
+    mockInput.directory = "/home/user/my-awesome-project"
+    const handler = createSessionNotification(mockInput)
+    setMainSession("session-format-default")
+
+    //#when - session goes idle and notification fires
+    await handler({ event: { type: "session.idle", properties: { sessionID: "session-format-default" } } })
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    //#then - notification message should contain the project name
+    expect(notificationCalls.length).toBeGreaterThan(0)
+    expect(notificationCalls[0]).toContain("my-awesome-project")
+  })
+
+  test("should resolve custom message_format with {project} and {cwd}", async () => {
+    //#given - a session notification with custom message_format
+    const mockInput = createMockPluginInput()
+    mockInput.directory = "/workspace/cool-app"
+    const handler = createSessionNotification(mockInput, {
+      message_format: "Done in {project} at {cwd}",
+    })
+    setMainSession("session-format-custom")
+
+    //#when - session goes idle and notification fires
+    await handler({ event: { type: "session.idle", properties: { sessionID: "session-format-custom" } } })
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    //#then - notification should use the resolved custom format
+    expect(notificationCalls.length).toBeGreaterThan(0)
+    expect(notificationCalls[0]).toContain("Done in cool-app at /workspace/cool-app")
+  })
+
+  test("should use literal string when message_format has no variables", async () => {
+    //#given - a session notification with a literal message_format (no template variables)
+    const mockInput = createMockPluginInput()
+    const handler = createSessionNotification(mockInput, {
+      message_format: "Custom static message",
+    })
+    setMainSession("session-format-literal")
+
+    //#when - session goes idle and notification fires
+    await handler({ event: { type: "session.idle", properties: { sessionID: "session-format-literal" } } })
+    await new Promise(resolve => setTimeout(resolve, 2000))
+
+    //#then - notification should use the literal string as-is
+    expect(notificationCalls.length).toBeGreaterThan(0)
+    expect(notificationCalls[0]).toContain("Custom static message")
+  })
 })

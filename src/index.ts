@@ -173,7 +173,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         allPlugins: externalNotifier.allPlugins,
       });
     } else {
-      sessionNotification = safeCreateHook("session-notification", () => createSessionNotification(ctx), { enabled: safeHookEnabled });
+      sessionNotification = safeCreateHook("session-notification", () => createSessionNotification(ctx, {
+        message_format: pluginConfig.notification?.message_format,
+      }), { enabled: safeHookEnabled });
     }
   }
 
