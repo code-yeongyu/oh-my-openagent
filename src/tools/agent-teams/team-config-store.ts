@@ -22,12 +22,21 @@ import {
   TeamTeammateMember,
   isTeammateMember,
 } from "./types"
+import { validateTeamName } from "./name-validation"
 
 function nowMs(): number {
   return Date.now()
 }
 
+function assertValidTeamName(teamName: string): void {
+  const validationError = validateTeamName(teamName)
+  if (validationError) {
+    throw new Error(validationError)
+  }
+}
+
 function withTeamLock<T>(teamName: string, operation: () => T): T {
+  assertValidTeamName(teamName)
   const teamDir = getTeamDir(teamName)
   ensureDir(teamDir)
   const lock = acquireLock(teamDir)
@@ -55,6 +64,7 @@ function createLeadMember(teamName: string, leadSessionId: string, cwd: string, 
 }
 
 export function ensureTeamStorageDirs(teamName: string): void {
+  assertValidTeamName(teamName)
   ensureDir(getTeamsRootDir())
   ensureDir(getTeamTasksRootDir())
   ensureDir(getTeamDir(teamName))
@@ -63,6 +73,7 @@ export function ensureTeamStorageDirs(teamName: string): void {
 }
 
 export function teamExists(teamName: string): boolean {
+  assertValidTeamName(teamName)
   return existsSync(getTeamConfigPath(teamName))
 }
 
@@ -75,10 +86,6 @@ export function createTeamConfig(
 ): TeamConfig {
   ensureTeamStorageDirs(teamName)
 
-  if (teamExists(teamName)) {
-    throw new Error("team_already_exists")
-  }
-
   const leadAgentId = `team-lead@${teamName}`
   const config: TeamConfig = {
     name: teamName,
@@ -90,12 +97,16 @@ export function createTeamConfig(
   }
 
   return withTeamLock(teamName, () => {
+    if (teamExists(teamName)) {
+      throw new Error("team_already_exists")
+    }
     writeJsonAtomic(getTeamConfigPath(teamName), TeamConfigSchema.parse(config))
     return config
   })
 }
 
 export function readTeamConfig(teamName: string): TeamConfig | null {
+  assertValidTeamName(teamName)
   return readJsonSafe(getTeamConfigPath(teamName), TeamConfigSchema)
 }
 
@@ -108,6 +119,7 @@ export function readTeamConfigOrThrow(teamName: string): TeamConfig {
 }
 
 export function writeTeamConfig(teamName: string, config: TeamConfig): TeamConfig {
+  assertValidTeamName(teamName)
   return withTeamLock(teamName, () => {
     const validated = TeamConfigSchema.parse(config)
     writeJsonAtomic(getTeamConfigPath(teamName), validated)
@@ -146,6 +158,7 @@ export function assignNextColor(config: TeamConfig): string {
 }
 
 export function deleteTeamData(teamName: string): void {
+  assertValidTeamName(teamName)
   const teamDir = getTeamDir(teamName)
   const taskDir = getTeamTaskDir(teamName)
 
