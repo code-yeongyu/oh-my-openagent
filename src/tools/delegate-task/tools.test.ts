@@ -849,78 +849,151 @@ describe("sisyphus-task", () => {
   })
 
   describe("skills parameter", () => {
-    test("skills parameter is required - throws error when not provided", async () => {
+    test("omitting load_skills defaults to empty array and proceeds without error", async () => {
       // given
       const { createDelegateTask } = require("./tools")
-      
-       const mockManager = { launch: async () => ({}) }
-       const mockClient = {
-         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
-         },
-       }
-       
-       const tool = createDelegateTask({
-         manager: mockManager,
-         client: mockClient,
-       })
-       
-       const toolContext = {
-         sessionID: "parent-session",
-         messageID: "parent-message",
-         agent: "sisyphus",
-         abort: new AbortController().signal,
-       }
-       
-       // when - skills not provided (undefined)
-       // then - should throw error about missing skills
-       await expect(tool.execute(
-         {
-           description: "Test task",
-           prompt: "Do something",
-           category: "ultrabrain",
-           run_in_background: false,
-         },
-         toolContext
-       )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
-    })
+      let promptBody: any
 
-     test("null skills throws error", async () => {
+      const mockManager = { launch: async () => ({}) }
+
+      const promptMock = async (input: any) => {
+        promptBody = input.body
+        return { data: {} }
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_default_skills" } }),
+          prompt: promptMock,
+          promptAsync: promptMock,
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done without skills" }] }]
+          }),
+          status: async () => ({ data: { "ses_default_skills": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - load_skills omitted entirely (simulating LLM forgetting the parameter)
+      const result = await tool.execute(
+        {
+          description: "Test task",
+          prompt: "Do something",
+          category: "ultrabrain",
+          run_in_background: false,
+        },
+        toolContext
+      )
+
+      // then - should proceed normally with default empty skills
+      expect(result).toContain("Done without skills")
+      expect(result).not.toContain("REQUIRED")
+    }, { timeout: 20000 })
+
+    test("providing load_skills explicitly still works", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = {
+        launch: async () => ({
+          id: "task-with-skills",
+          sessionID: "ses_with_skills",
+          description: "Task with skills",
+          agent: "sisyphus-junior",
+          status: "running",
+        }),
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - load_skills explicitly provided
+      const result = await tool.execute(
+        {
+          description: "Task with explicit skills",
+          prompt: "Do something",
+          category: "quick",
+          run_in_background: true,
+          load_skills: ["git-master"],
+        },
+        toolContext
+      )
+
+      // then - should proceed without error
+      expect(result).not.toContain("REQUIRED")
+      expect(result).not.toContain("Invalid arguments")
+    }, { timeout: 10000 })
+
+     test("null load_skills defaults to empty array instead of throwing", async () => {
        // given
        const { createDelegateTask } = require("./tools")
-       
+
+       const promptMock = async (input: any) => ({ data: {} })
+
        const mockManager = { launch: async () => ({}) }
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          session: {
-           create: async () => ({ data: { id: "test-session" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({ data: [] }),
+           get: async () => ({ data: { directory: "/project" } }),
+           create: async () => ({ data: { id: "ses_null_skills" } }),
+           prompt: promptMock,
+           promptAsync: promptMock,
+           messages: async () => ({
+             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done with null skills" }] }]
+           }),
+           status: async () => ({ data: { "ses_null_skills": { type: "idle" } } }),
          },
        }
-       
+
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
        })
-       
+
        const toolContext = {
          sessionID: "parent-session",
          messageID: "parent-message",
          agent: "sisyphus",
          abort: new AbortController().signal,
        }
-       
-       // when - null passed
-       // then - should throw error about null
-       await expect(tool.execute(
+
+       // when - null passed (LLM sometimes sends null instead of [])
+       const result = await tool.execute(
          {
            description: "Test task",
            prompt: "Do something",
@@ -929,8 +1002,12 @@ describe("sisyphus-task", () => {
            load_skills: null,
          },
          toolContext
-       )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
-    })
+       )
+
+       // then - should default to [] and proceed
+       expect(result).toContain("Done with null skills")
+       expect(result).not.toContain("REQUIRED")
+    }, { timeout: 20000 })
 
      test("empty array [] is allowed and proceeds without skill content", async () => {
        // given
