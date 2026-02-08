@@ -213,17 +213,22 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     };
     const configAgent = config.agent as AgentConfig | undefined;
 
+    // Always register sisyphus-junior independently of sisyphus
+    // Categories (visual-engineering, quick, etc.) all use sisyphus-junior,
+    // so it must be available even when sisyphus model resolution fails.
+    // See: https://github.com/code-yeongyu/oh-my-opencode/issues/agent-registration
+    const sisyphusJuniorConfig = createSisyphusJuniorAgentWithOverrides(
+      pluginConfig.agents?.["sisyphus-junior"],
+      config.model as string | undefined
+    );
+
     if (isSisyphusEnabled && builtinAgents.sisyphus) {
       (config as { default_agent?: string }).default_agent = "sisyphus";
 
       const agentConfig: Record<string, unknown> = {
         sisyphus: builtinAgents.sisyphus,
+        "sisyphus-junior": sisyphusJuniorConfig,
       };
-
-      agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
-        pluginConfig.agents?.["sisyphus-junior"],
-        config.model as string | undefined
-      );
 
       if (builderEnabled) {
         const { name: _buildName, ...buildConfigWithoutName } =
@@ -379,6 +384,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     } else {
       config.agent = {
         ...builtinAgents,
+        "sisyphus-junior": sisyphusJuniorConfig,
         ...userAgents,
         ...projectAgents,
         ...pluginAgents,
