@@ -1,6 +1,6 @@
 import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import { getTimingConfig } from "./timing"
-import { log } from "../../shared"
+import { log } from "../../shared/logger"
 
 export async function pollSyncSession(
   ctx: ToolContextWithMetadata,

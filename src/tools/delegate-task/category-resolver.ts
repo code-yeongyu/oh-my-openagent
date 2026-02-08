@@ -5,10 +5,9 @@ import { DEFAULT_CATEGORIES } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
 import { parseModelString } from "./model-string-parser"
-import { fetchAvailableModels } from "../../shared/model-availability"
-import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
-import { resolveModelPipeline } from "../../shared"
+import { getAvailableModelsForDelegateTask } from "./available-models"
+import { resolveModelForDelegateTask } from "./model-selection"
 
 export interface CategoryResolutionResult {
   agentToUse: string
@@ -28,10 +27,7 @@ export async function resolveCategoryExecution(
 ): Promise<CategoryResolutionResult> {
   const { client, userCategories, sisyphusJuniorModel } = executorCtx
 
-  const connectedProviders = readConnectedProvidersCache()
-  const availableModels = await fetchAvailableModels(client, {
-    connectedProviders: connectedProviders ?? undefined,
-  })
+  const availableModels = await getAvailableModelsForDelegateTask(client)
 
   const resolved = resolveCategoryConfig(args.category!, {
     userCategories,
@@ -71,20 +67,16 @@ export async function resolveCategoryExecution(
         : { model: actualModel, type: "system-default", source: "system-default" }
     }
   } else {
-    const resolution = resolveModelPipeline({
-      intent: {
-        userModel: explicitCategoryModel ?? overrideModel,
-        categoryDefaultModel: resolved.model,
-      },
-      constraints: { availableModels },
-      policy: {
-        fallbackChain: requirement.fallbackChain,
-        systemDefaultModel,
-      },
+    const resolution = resolveModelForDelegateTask({
+      userModel: explicitCategoryModel ?? overrideModel,
+      categoryDefaultModel: resolved.model,
+      fallbackChain: requirement.fallbackChain,
+      availableModels,
+      systemDefaultModel,
     })
 
     if (resolution) {
-      const { model: resolvedModel, provenance, variant: resolvedVariant } = resolution
+      const { model: resolvedModel, variant: resolvedVariant } = resolution
       actualModel = resolvedModel
 
       if (!parseModelString(actualModel)) {
@@ -99,20 +91,19 @@ export async function resolveCategoryExecution(
         }
       }
 
-      let type: "user-defined" | "inherited" | "category-default" | "system-default"
-      const source = provenance
-      switch (provenance) {
-        case "override":
-          type = "user-defined"
-          break
-        case "category-default":
-        case "provider-fallback":
-          type = "category-default"
-          break
-        case "system-default":
-          type = "system-default"
-          break
-      }
+      const type: "user-defined" | "inherited" | "category-default" | "system-default" =
+        (explicitCategoryModel || overrideModel)
+          ? "user-defined"
+          : (systemDefaultModel && actualModel === systemDefaultModel)
+              ? "system-default"
+              : "category-default"
+
+      const source: "override" | "category-default" | "system-default" =
+        type === "user-defined"
+          ? "override"
+          : type === "system-default"
+              ? "system-default"
+              : "category-default"
 
       modelInfo = { model: actualModel, type, source }
 

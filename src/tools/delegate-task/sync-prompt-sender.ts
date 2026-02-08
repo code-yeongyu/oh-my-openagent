@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs, OpencodeClient } from "./types"
 import { isPlanFamily } from "./constants"
-import { promptSyncWithModelSuggestionRetry } from "../../shared"
+import { promptSyncWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { formatDetailedError } from "./error-formatting"
 
 export async function sendSyncPrompt(

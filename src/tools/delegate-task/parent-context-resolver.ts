@@ -2,7 +2,8 @@ import type { ToolContextWithMetadata } from "./types"
 import type { ParentContext } from "./executor-types"
 import { findNearestMessageWithFields, findFirstMessageWithAgent } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getMessageDir } from "../../shared"
+import { log } from "../../shared/logger"
+import { getMessageDir } from "../../shared/session-utils"
 
 export function resolveParentContext(ctx: ToolContextWithMetadata): ParentContext {
   const messageDir = getMessageDir(ctx.sessionID)
