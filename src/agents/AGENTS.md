@@ -2,13 +2,13 @@
 
 ## OVERVIEW
 
-11 AI agents for multi-model orchestration. Each agent has factory function + metadata + fallback chains.
+12 AI agents for multi-model orchestration. Each agent has factory function + metadata + fallback chains.
 
 **Primary Agents** (respect UI model selection):
 - Sisyphus, Atlas, Prometheus
 
 **Subagents** (use own fallback chains):
-- Hephaestus, Oracle, Librarian, Explore, Multimodal-Looker, Metis, Momus, Sisyphus-Junior
+- Hephaestus, Oracle, Librarian, Explore, Multimodal-Looker, Metis, Momus, Devil's Advocate, Sisyphus-Junior
 
 ## STRUCTURE
 ```
@@ -36,9 +36,10 @@ agents/
 ├── librarian.ts                # Multi-repo research (328 lines)
 ├── explore.ts                  # Fast contextual grep
 ├── multimodal-looker.ts        # Media analyzer (Gemini 3 Flash)
-├── metis.ts                    # Pre-planning analysis (347 lines)
-├── momus.ts                    # Plan reviewer
-├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation (431 lines)
+ ├── metis.ts                    # Pre-planning analysis (347 lines)
+ ├── momus.ts                    # Plan reviewer
+ ├── devils-advocate.ts           # Adversarial validator
+ ├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation (431 lines)
 ├── types.ts                    # AgentModelConfig, AgentPromptMetadata
 ├── utils.ts                    # createBuiltinAgents(), resolveModelWithFallback() (485 lines)
 └── index.ts                    # builtinAgents export
@@ -57,6 +58,7 @@ agents/
 | Prometheus | anthropic/claude-opus-4-6 | 0.1 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
 | Metis | anthropic/claude-opus-4-6 | 0.3 | Pre-planning analysis (fallback: kimi-k2.5 → gpt-5.2) |
 | Momus | openai/gpt-5.2 | 0.1 | Plan validation (fallback: claude-opus-4-6) |
+| Devil's Advocate | google/gemini-3-pro | 0.1 | Adversarial validation (fallback: gpt-5.2, claude-sonnet-4-5) |
 | Sisyphus-Junior | anthropic/claude-sonnet-4-5 | 0.1 | Category-spawned executor |
 
 ## HOW TO ADD
@@ -72,6 +74,7 @@ agents/
 | librarian | write, edit, task, task, call_omo_agent |
 | explore | write, edit, task, task, call_omo_agent |
 | multimodal-looker | Allowlist: read only |
+| Devil's Advocate | write, edit, task, background_task, call_omo_agent |
 | Sisyphus-Junior | task, task |
 | Atlas | task, call_omo_agent |
 
