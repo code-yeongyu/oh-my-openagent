@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, spyOn } = require("bun:test")
+const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
@@ -1053,6 +1053,75 @@ describe("sisyphus-task", () => {
     // then - should contain actual result, not just "Background task continued"
     expect(result).toContain("This is the continued task result")
     expect(result).not.toContain("Background task continued")
+  }, { timeout: 10000 })
+
+  test("sync continuation preserves variant from previous session message", async () => {
+    //#given a session with a previous message that has variant "max"
+    const { createDelegateTask } = require("./tools")
+
+    const promptMock = mock(async (input: any) => {
+      return { data: {} }
+    })
+
+    const mockClient = {
+      session: {
+        prompt: async () => ({ data: {} }),
+        promptAsync: promptMock,
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                role: "user",
+                agent: "sisyphus-junior",
+                model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+                variant: "max",
+                time: { created: Date.now() },
+              },
+              parts: [{ type: "text", text: "previous message" }],
+            },
+            {
+              info: { role: "assistant", time: { created: Date.now() + 1 } },
+              parts: [{ type: "text", text: "Completed." }],
+            },
+          ],
+        }),
+      },
+      config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+      app: {
+        agents: async () => ({ data: [] }),
+      },
+    }
+
+    const tool = createDelegateTask({
+      manager: { resume: async () => ({ id: "task-var", sessionID: "ses_var_test", description: "Variant test", agent: "sisyphus-junior", status: "running" }) },
+      client: mockClient,
+    })
+
+    const toolContext = {
+      sessionID: "parent-session",
+      messageID: "parent-message",
+      agent: "sisyphus",
+      abort: new AbortController().signal,
+    }
+
+    //#when continuing the session
+    await tool.execute(
+      {
+        description: "Continue with variant",
+        prompt: "Continue the task",
+        session_id: "ses_var_test",
+        run_in_background: false,
+        load_skills: [],
+      },
+      toolContext
+    )
+
+    //#then promptAsync should include variant from previous message
+    expect(promptMock).toHaveBeenCalled()
+    const callArgs = promptMock.mock.calls[0][0]
+    expect(callArgs.body.variant).toBe("max")
+    expect(callArgs.body.agent).toBe("sisyphus-junior")
+    expect(callArgs.body.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
   }, { timeout: 10000 })
 
   test("session_id with background=true should return immediately without waiting", async () => {
