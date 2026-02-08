@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { log } from "./logger"
 import { getOpenCodeCacheDir } from "./data-path"
-import { readProviderModelsCache, hasProviderModelsCache, readConnectedProvidersCache } from "./connected-providers-cache"
+import * as connectedProvidersCache from "./connected-providers-cache"
 
 /**
  * Fuzzy match a target model name against available models
@@ -181,7 +181,7 @@ export async function fetchAvailableModels(
 	const connectedSet = new Set(connectedProvidersList)
 	const modelSet = new Set<string>()
 
-	const providerModelsCache = readProviderModelsCache()
+	const providerModelsCache = connectedProvidersCache.readProviderModelsCache()
 	if (providerModelsCache) {
 		const providerCount = Object.keys(providerModelsCache.models).length
 		if (providerCount === 0) {
@@ -189,7 +189,8 @@ export async function fetchAvailableModels(
 		} else {
 		log("[fetchAvailableModels] using provider-models cache (whitelist-filtered)")
 		
-		for (const [providerId, modelIds] of Object.entries(providerModelsCache.models)) {
+		const modelsByProvider = providerModelsCache.models as Record<string, Array<string | { id?: string }>>
+		for (const [providerId, modelIds] of Object.entries(modelsByProvider)) {
 			if (!connectedSet.has(providerId)) {
 				continue
 			}
@@ -300,7 +301,7 @@ export function isAnyFallbackModelAvailable(
 	// Fallback: check if any provider in the chain is connected
 	// This handles race conditions where availableModels is empty or incomplete
 	// but we know the provider is connected.
-	const connectedProviders = readConnectedProvidersCache()
+	const connectedProviders = connectedProvidersCache.readConnectedProvidersCache()
 	if (connectedProviders) {
 		const connectedSet = new Set(connectedProviders)
 		for (const entry of fallbackChain) {
@@ -332,7 +333,7 @@ export function isAnyProviderConnected(
 		}
 	}
 
-	const connectedProviders = readConnectedProvidersCache()
+	const connectedProviders = connectedProvidersCache.readConnectedProvidersCache()
 	if (connectedProviders) {
 		const connectedSet = new Set(connectedProviders)
 		for (const provider of providers) {
@@ -349,7 +350,7 @@ export function isAnyProviderConnected(
 export function __resetModelCache(): void {}
 
 export function isModelCacheAvailable(): boolean {
-	if (hasProviderModelsCache()) {
+	if (connectedProvidersCache.hasProviderModelsCache()) {
 		return true
 	}
 	const cacheFile = join(getOpenCodeCacheDir(), "models.json")
