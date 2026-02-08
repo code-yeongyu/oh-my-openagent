@@ -258,7 +258,7 @@ describe("session-notification", () => {
     expect(notificationCalls).toHaveLength(0)
   })
 
-  test("should mark session activity on message.updated event", async () => {
+  test("should mark session activity on message.updated with assistant role", async () => {
     // given - main session is set
     const mainSessionID = "main-message"
     setMainSession(mainSessionID)
@@ -268,7 +268,41 @@ describe("session-notification", () => {
       skipIfIncompleteTodos: false,
     })
 
-    // when - session goes idle, then message.updated fires
+    // when - session goes idle, then assistant message.updated fires
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    await hook({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: { sessionID: mainSessionID, role: "assistant", finish: false },
+        },
+      },
+    })
+
+    // Wait for idle delay to pass
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // then - notification should NOT be sent (assistant activity cancelled it)
+    expect(notificationCalls).toHaveLength(0)
+  })
+
+  test("should NOT mark session activity on message.updated with user role", async () => {
+    // given - main session is set
+    const mainSessionID = "main-message-user"
+    setMainSession(mainSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {
+      idleConfirmationDelay: 50,
+      skipIfIncompleteTodos: false,
+    })
+
+    // when - session goes idle, then user message.updated fires
     await hook({
       event: {
         type: "session.idle",
@@ -288,8 +322,8 @@ describe("session-notification", () => {
     // Wait for idle delay to pass
     await new Promise((resolve) => setTimeout(resolve, 100))
 
-    // then - notification should NOT be sent (activity cancelled it)
-    expect(notificationCalls).toHaveLength(0)
+    // then - notification SHOULD be sent (user message.updated does not cancel timer)
+    expect(notificationCalls).toHaveLength(1)
   })
 
   test("should mark session activity on tool.execute.before event", async () => {
@@ -370,9 +404,9 @@ describe("session-notification", () => {
     await handler({ event: { type: "session.idle", properties: { sessionID: "session-format-default" } } })
     await new Promise(resolve => setTimeout(resolve, 2000))
 
-    //#then - notification message should contain the project name
-    expect(notificationCalls.length).toBeGreaterThan(0)
-    expect(notificationCalls[0]).toContain("my-awesome-project")
+    //#then - notification message should use the default format with project name
+    expect(notificationCalls).toHaveLength(1)
+    expect(notificationCalls[0]).toBe('/usr/bin/osascript -e display notification "my-awesome-project \u2014 Agent is ready for input" with title "OpenCode"')
   })
 
   test("should resolve custom message_format with {project} and {cwd}", async () => {
@@ -389,8 +423,8 @@ describe("session-notification", () => {
     await new Promise(resolve => setTimeout(resolve, 2000))
 
     //#then - notification should use the resolved custom format
-    expect(notificationCalls.length).toBeGreaterThan(0)
-    expect(notificationCalls[0]).toContain("Done in cool-app at /workspace/cool-app")
+    expect(notificationCalls).toHaveLength(1)
+    expect(notificationCalls[0]).toBe('/usr/bin/osascript -e display notification "Done in cool-app at /workspace/cool-app" with title "OpenCode"')
   })
 
   test("should use literal string when message_format has no variables", async () => {
@@ -406,7 +440,7 @@ describe("session-notification", () => {
     await new Promise(resolve => setTimeout(resolve, 2000))
 
     //#then - notification should use the literal string as-is
-    expect(notificationCalls.length).toBeGreaterThan(0)
-    expect(notificationCalls[0]).toContain("Custom static message")
+    expect(notificationCalls).toHaveLength(1)
+    expect(notificationCalls[0]).toBe('/usr/bin/osascript -e display notification "Custom static message" with title "OpenCode"')
   })
 })

@@ -1,20 +1,17 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { subagentSessions, getMainSessionID } from "../features/claude-code-session-state"
-import { startBackgroundCheck } from "./session-notification-utils"
+import { startBackgroundCheck, cleanupOldSessions } from "./session-notification-utils"
 import {
-  Platform,
   detectPlatform,
   getDefaultSoundPath,
   sendNotification,
   playSound,
   hasIncompleteTodos,
-  cleanupOldSessions,
 } from "./session-notification-platform"
 import { extractProjectName, resolveMessageFormat } from "./session-notification-format"
 
 interface SessionNotificationConfig {
   title?: string
-  message?: string
   /** Custom message format with {project} and {cwd} template variables */
   message_format?: string
   playSound?: boolean
@@ -38,7 +35,6 @@ export function createSessionNotification(
 
   const mergedConfig = {
     title: "OpenCode",
-    message: "Agent is ready for input",
     message_format: "{project} \u2014 Agent is ready for input",
     playSound: false,
     soundPath: defaultSoundPath,
@@ -85,44 +81,24 @@ export function createSessionNotification(
   }
 
   async function executeNotification(sessionID: string, version: number) {
-    if (executingNotifications.has(sessionID)) {
-      pendingTimers.delete(sessionID)
-      return
-    }
-
-    if (notificationVersions.get(sessionID) !== version) {
-      pendingTimers.delete(sessionID)
-      return
-    }
-
+    if (executingNotifications.has(sessionID)) { pendingTimers.delete(sessionID); return }
+    if (notificationVersions.get(sessionID) !== version) { pendingTimers.delete(sessionID); return }
     if (sessionActivitySinceIdle.has(sessionID)) {
-      sessionActivitySinceIdle.delete(sessionID)
-      pendingTimers.delete(sessionID)
-      return
+      sessionActivitySinceIdle.delete(sessionID); pendingTimers.delete(sessionID); return
     }
-
-    if (notifiedSessions.has(sessionID)) {
-      pendingTimers.delete(sessionID)
-      return
-    }
+    if (notifiedSessions.has(sessionID)) { pendingTimers.delete(sessionID); return }
 
     executingNotifications.add(sessionID)
     try {
       if (mergedConfig.skipIfIncompleteTodos) {
         const hasPendingWork = await hasIncompleteTodos(ctx, sessionID)
-        if (notificationVersions.get(sessionID) !== version) {
-          return
-        }
+        if (notificationVersions.get(sessionID) !== version) return
         if (hasPendingWork) return
       }
 
-      if (notificationVersions.get(sessionID) !== version) {
-        return
-      }
-
+      if (notificationVersions.get(sessionID) !== version) return
       if (sessionActivitySinceIdle.has(sessionID)) {
-        sessionActivitySinceIdle.delete(sessionID)
-        return
+        sessionActivitySinceIdle.delete(sessionID); return
       }
 
       notifiedSessions.add(sessionID)
@@ -168,7 +144,6 @@ export function createSessionNotification(
 
       if (subagentSessions.has(sessionID)) return
 
-      // Only trigger notifications for the main session (not subagent sessions)
       const mainSessionID = getMainSessionID()
       if (mainSessionID && sessionID !== mainSessionID) return
 
@@ -185,15 +160,16 @@ export function createSessionNotification(
         executeNotification(sessionID, currentVersion)
       }, mergedConfig.idleConfirmationDelay)
 
-       pendingTimers.set(sessionID, timer)
-       cleanupTrackedSessions()
-       return
+      pendingTimers.set(sessionID, timer)
+      cleanupTrackedSessions()
+      return
     }
 
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
+      const role = info?.role as string | undefined
       const sessionID = info?.sessionID as string | undefined
-      if (sessionID) {
+      if (sessionID && role === "assistant") {
         markSessionActivity(sessionID)
       }
       return
