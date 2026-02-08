@@ -21,6 +21,42 @@ export interface AgentTeamsSpawnOptions {
   sisyphusJuniorModel?: string
 }
 
+async function shutdownTeammateWithCleanup(
+  manager: BackgroundManager,
+  context: TeamToolContext,
+  teamName: string,
+  agentName: string,
+): Promise<string | null> {
+  const config = readTeamConfigOrThrow(teamName)
+  if (context.sessionID !== config.leadSessionId) {
+    return "unauthorized_lead_session"
+  }
+
+  const member = getTeamMember(config, agentName)
+  if (!member || !isTeammateMember(member)) {
+    return "teammate_not_found"
+  }
+
+  await cancelTeammateRun(manager, member)
+  let removed = false
+
+  updateTeamConfig(teamName, (current) => {
+    const refreshedMember = getTeamMember(current, agentName)
+    if (!refreshedMember || !isTeammateMember(refreshedMember)) {
+      return current
+    }
+    removed = true
+    return removeTeammate(current, agentName)
+  })
+
+  if (removed) {
+    clearInbox(teamName, agentName)
+  }
+
+  resetOwnerTasks(teamName, agentName)
+  return null
+}
+
 export function createSpawnTeammateTool(manager: BackgroundManager, options?: AgentTeamsSpawnOptions): ToolDefinition {
   return tool({
     description: "Spawn a teammate using native internal agent execution.",
@@ -52,6 +88,11 @@ export function createSpawnTeammateTool(manager: BackgroundManager, options?: Ag
 
         if (input.subagent_type && input.subagent_type !== "sisyphus-junior") {
           return JSON.stringify({ error: "category_conflicts_with_subagent_type" })
+        }
+
+        const config = readTeamConfigOrThrow(input.team_name)
+        if (context.sessionID !== config.leadSessionId) {
+          return JSON.stringify({ error: "unauthorized_lead_session" })
         }
 
         const resolvedSubagentType = input.subagent_type ?? "sisyphus-junior"
@@ -107,31 +148,11 @@ export function createForceKillTeammateTool(manager: BackgroundManager): ToolDef
         if (agentError) {
           return JSON.stringify({ error: agentError })
         }
-        const config = readTeamConfigOrThrow(input.team_name)
-        if (context.sessionID !== config.leadSessionId) {
-          return JSON.stringify({ error: "unauthorized_lead_session" })
-        }
-        const member = getTeamMember(config, input.agent_name)
-        if (!member || !isTeammateMember(member)) {
-          return JSON.stringify({ error: "teammate_not_found" })
-        }
 
-        await cancelTeammateRun(manager, member)
-        let removed = false
-        updateTeamConfig(input.team_name, (current) => {
-          const refreshedMember = getTeamMember(current, input.agent_name)
-          if (!refreshedMember || !isTeammateMember(refreshedMember)) {
-            return current
-          }
-          removed = true
-          return removeTeammate(current, input.agent_name)
-        })
-
-        if (removed) {
-          clearInbox(input.team_name, input.agent_name)
+        const shutdownError = await shutdownTeammateWithCleanup(manager, context, input.team_name, input.agent_name)
+        if (shutdownError) {
+          return JSON.stringify({ error: shutdownError })
         }
-
-        resetOwnerTasks(input.team_name, input.agent_name)
 
         return JSON.stringify({ success: true, message: `${input.agent_name} stopped` })
       } catch (error) {
@@ -163,32 +184,10 @@ export function createProcessShutdownTool(manager: BackgroundManager): ToolDefin
           return JSON.stringify({ error: agentError })
         }
 
-        const config = readTeamConfigOrThrow(input.team_name)
-        if (context.sessionID !== config.leadSessionId) {
-          return JSON.stringify({ error: "unauthorized_lead_session" })
+        const shutdownError = await shutdownTeammateWithCleanup(manager, context, input.team_name, input.agent_name)
+        if (shutdownError) {
+          return JSON.stringify({ error: shutdownError })
         }
-        const member = getTeamMember(config, input.agent_name)
-        if (!member || !isTeammateMember(member)) {
-          return JSON.stringify({ error: "teammate_not_found" })
-        }
-
-        await cancelTeammateRun(manager, member)
-        let removed = false
-
-        updateTeamConfig(input.team_name, (current) => {
-          const refreshedMember = getTeamMember(current, input.agent_name)
-          if (!refreshedMember || !isTeammateMember(refreshedMember)) {
-            return current
-          }
-          removed = true
-          return removeTeammate(current, input.agent_name)
-        })
-
-        if (removed) {
-          clearInbox(input.team_name, input.agent_name)
-        }
-
-        resetOwnerTasks(input.team_name, input.agent_name)
 
         return JSON.stringify({ success: true, message: `${input.agent_name} removed` })
       } catch (error) {
