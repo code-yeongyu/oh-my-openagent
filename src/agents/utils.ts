@@ -11,7 +11,18 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable, isAnyProviderConnected, migrateAgentConfig } from "../shared"
+import {
+  deepMerge,
+  fetchAvailableModels,
+  resolveModelPipeline,
+  AGENT_MODEL_REQUIREMENTS,
+  readConnectedProvidersCache,
+  isModelAvailable,
+  isAnyFallbackModelAvailable,
+  isAnyProviderConnected,
+  migrateAgentConfig,
+  truncateDescription,
+} from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -50,6 +61,65 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
 
 function isFactory(source: AgentSource): source is AgentFactory {
   return typeof source === "function"
+}
+
+type RegisteredAgentSummary = {
+  name: string
+  description: string
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function parseRegisteredAgentSummaries(input: unknown): RegisteredAgentSummary[] {
+  if (!Array.isArray(input)) return []
+
+  const result: RegisteredAgentSummary[] = []
+  for (const item of input) {
+    if (!isRecord(item)) continue
+
+    const name = typeof item.name === "string" ? item.name : undefined
+    if (!name) continue
+
+    const hidden = item.hidden
+    if (hidden === true) continue
+
+    const description = typeof item.description === "string" ? item.description : ""
+    result.push({ name, description })
+  }
+
+  return result
+}
+
+async function fetchRegisteredAgentsFromClient(client: unknown): Promise<RegisteredAgentSummary[]> {
+  if (!isRecord(client)) return []
+  const agentObj = client.agent
+  if (!isRecord(agentObj)) return []
+  const listFn = agentObj.list
+  if (typeof listFn !== "function") return []
+
+  try {
+    const response = await listFn.call(agentObj)
+    if (!isRecord(response)) return []
+    return parseRegisteredAgentSummaries(response.data)
+  } catch {
+    return []
+  }
+}
+
+function buildCustomAgentMetadata(agentName: string, description: string): AgentPromptMetadata {
+  const shortDescription = truncateDescription(description).trim()
+  return {
+    category: "specialist",
+    cost: "CHEAP",
+    triggers: [
+      {
+        domain: `Custom agent: ${agentName}`,
+        trigger: shortDescription || "Use when this agent's description matches the task",
+      },
+    ],
+  }
 }
 
 export function buildAgent(
@@ -279,6 +349,10 @@ export async function createBuiltinAgents(
 
   const availableSkills: AvailableSkill[] = [...builtinAvailable, ...discoveredAvailable]
 
+  const registeredAgents = await fetchRegisteredAgentsFromClient(client)
+  const builtinAgentNames = new Set(Object.keys(agentSources).map((n) => n.toLowerCase()))
+  const disabledAgentNames = new Set(disabledAgents.map((n) => n.toLowerCase()))
+
   // Collect general agents first (for availableAgents), but don't add to result yet
   const pendingAgentConfigs: Map<string, AgentConfig> = new Map()
 
@@ -335,14 +409,27 @@ export async function createBuiltinAgents(
     // Store for later - will be added after sisyphus and hephaestus
     pendingAgentConfigs.set(name, config)
 
-    const metadata = agentMetadata[agentName]
-    if (metadata) {
-      availableAgents.push({
-        name: agentName,
-        description: config.description ?? "",
-        metadata,
-      })
-    }
+     const metadata = agentMetadata[agentName]
+     if (metadata) {
+       availableAgents.push({
+         name: agentName,
+         description: config.description ?? "",
+         metadata,
+       })
+     }
+   }
+
+  for (const agent of registeredAgents) {
+    const lowerName = agent.name.toLowerCase()
+    if (builtinAgentNames.has(lowerName)) continue
+    if (disabledAgentNames.has(lowerName)) continue
+    if (availableAgents.some((a) => a.name.toLowerCase() === lowerName)) continue
+
+    availableAgents.push({
+      name: agent.name,
+      description: agent.description,
+      metadata: buildCustomAgentMetadata(agent.name, agent.description),
+    })
   }
 
    const sisyphusOverride = agentOverrides["sisyphus"]
