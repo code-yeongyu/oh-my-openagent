@@ -183,19 +183,40 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     // Pass it as uiSelectedModel so it takes highest priority in model resolution
     const currentModel = config.model as string | undefined;
     const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
-    const builtinAgents = await createBuiltinAgents(
-      migratedDisabledAgents,
-      pluginConfig.agents,
-      ctx.directory,
-      undefined, // systemDefaultModel - let fallback chain handle this
-      pluginConfig.categories,
-      pluginConfig.git_master,
-      allDiscoveredSkills,
-      ctx.client,
-      browserProvider,
-      currentModel, // uiSelectedModel - takes highest priority
-      disabledSkills
-    );
+
+    type AgentConfig = Record<
+      string,
+      Record<string, unknown> | undefined
+    > & {
+      build?: Record<string, unknown>;
+      plan?: Record<string, unknown>;
+      explore?: { tools?: Record<string, unknown> };
+      librarian?: { tools?: Record<string, unknown> };
+      "multimodal-looker"?: { tools?: Record<string, unknown> };
+      atlas?: { tools?: Record<string, unknown> };
+      sisyphus?: { tools?: Record<string, unknown> };
+    };
+    const configAgent = config.agent as AgentConfig | undefined;
+
+    function isRecord(value: unknown): value is Record<string, unknown> {
+      return typeof value === "object" && value !== null;
+    }
+
+    function buildCustomAgentSummaryInput(agents: Record<string, unknown> | undefined): unknown[] {
+      if (!agents) return [];
+
+      const result: unknown[] = [];
+      for (const [name, value] of Object.entries(agents)) {
+        if (!isRecord(value)) continue;
+
+        const description = typeof value.description === "string" ? value.description : "";
+        const hidden = value.hidden === true;
+        const disabled = value.disabled === true || value.enabled === false;
+        result.push({ name, description, hidden, disabled });
+      }
+
+      return result;
+    }
 
     // Claude Code agents: Do NOT apply permission migration
     // Claude Code uses whitelist-based tools format which is semantically different
@@ -216,6 +237,27 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       ])
     );
 
+    const customAgentSummaries = [
+      ...buildCustomAgentSummaryInput(configAgent),
+      ...buildCustomAgentSummaryInput(userAgents),
+      ...buildCustomAgentSummaryInput(projectAgents),
+      ...buildCustomAgentSummaryInput(pluginAgents),
+    ];
+
+    const builtinAgents = await createBuiltinAgents(
+      migratedDisabledAgents,
+      pluginConfig.agents,
+      ctx.directory,
+      undefined, // systemDefaultModel - let fallback chain handle this
+      pluginConfig.categories,
+      pluginConfig.git_master,
+      allDiscoveredSkills,
+      customAgentSummaries,
+      browserProvider,
+      currentModel, // uiSelectedModel - takes highest priority
+      disabledSkills
+    );
+
     const isSisyphusEnabled = pluginConfig.sisyphus_agent?.disabled !== true;
     const builderEnabled =
       pluginConfig.sisyphus_agent?.default_builder_enabled ?? false;
@@ -223,20 +265,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       pluginConfig.sisyphus_agent?.planner_enabled ?? true;
     const replacePlan = pluginConfig.sisyphus_agent?.replace_plan ?? true;
     const shouldDemotePlan = plannerEnabled && replacePlan;
-
-    type AgentConfig = Record<
-      string,
-      Record<string, unknown> | undefined
-    > & {
-      build?: Record<string, unknown>;
-      plan?: Record<string, unknown>;
-      explore?: { tools?: Record<string, unknown> };
-      librarian?: { tools?: Record<string, unknown> };
-      "multimodal-looker"?: { tools?: Record<string, unknown> };
-      atlas?: { tools?: Record<string, unknown> };
-      sisyphus?: { tools?: Record<string, unknown> };
-    };
-    const configAgent = config.agent as AgentConfig | undefined;
 
     if (isSisyphusEnabled && builtinAgents.sisyphus) {
       (config as { default_agent?: string }).default_agent = "sisyphus";

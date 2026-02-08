@@ -68,6 +68,14 @@ type RegisteredAgentSummary = {
   description: string
 }
 
+function sanitizeMarkdownTableCell(value: string): string {
+  return value
+    .replace(/\r?\n/g, " ")
+    .replace(/\|/g, "\\|")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -85,37 +93,28 @@ function parseRegisteredAgentSummaries(input: unknown): RegisteredAgentSummary[]
     const hidden = item.hidden
     if (hidden === true) continue
 
+    const disabled = item.disabled
+    if (disabled === true) continue
+
+    const enabled = item.enabled
+    if (enabled === false) continue
+
     const description = typeof item.description === "string" ? item.description : ""
-    result.push({ name, description })
+    result.push({ name, description: sanitizeMarkdownTableCell(description) })
   }
 
   return result
 }
 
-async function fetchRegisteredAgentsFromClient(client: unknown): Promise<RegisteredAgentSummary[]> {
-  if (!isRecord(client)) return []
-  const agentObj = client.agent
-  if (!isRecord(agentObj)) return []
-  const listFn = agentObj.list
-  if (typeof listFn !== "function") return []
-
-  try {
-    const response = await listFn.call(agentObj)
-    if (!isRecord(response)) return []
-    return parseRegisteredAgentSummaries(response.data)
-  } catch {
-    return []
-  }
-}
-
 function buildCustomAgentMetadata(agentName: string, description: string): AgentPromptMetadata {
-  const shortDescription = truncateDescription(description).trim()
+  const shortDescription = sanitizeMarkdownTableCell(truncateDescription(description))
+  const safeAgentName = sanitizeMarkdownTableCell(agentName)
   return {
     category: "specialist",
     cost: "CHEAP",
     triggers: [
       {
-        domain: `Custom agent: ${agentName}`,
+        domain: `Custom agent: ${safeAgentName}`,
         trigger: shortDescription || "Use when this agent's description matches the task",
       },
     ],
@@ -303,13 +302,13 @@ export async function createBuiltinAgents(
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
-  client?: any,
+  customAgentSummaries?: unknown,
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
   disabledSkills?: Set<string>
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
-  // IMPORTANT: Do NOT pass client to fetchAvailableModels during plugin initialization.
+  // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
   // This function is called from config handler, and calling client API causes deadlock.
   // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1301
   const availableModels = await fetchAvailableModels(undefined, {
@@ -349,7 +348,7 @@ export async function createBuiltinAgents(
 
   const availableSkills: AvailableSkill[] = [...builtinAvailable, ...discoveredAvailable]
 
-  const registeredAgents = await fetchRegisteredAgentsFromClient(client)
+  const registeredAgents = parseRegisteredAgentSummaries(customAgentSummaries)
   const builtinAgentNames = new Set(Object.keys(agentSources).map((n) => n.toLowerCase()))
   const disabledAgentNames = new Set(disabledAgents.map((n) => n.toLowerCase()))
 
