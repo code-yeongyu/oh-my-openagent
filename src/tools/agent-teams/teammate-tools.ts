@@ -1,4 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import type { PluginInput } from "@opencode-ai/plugin"
+import type { CategoriesConfig } from "../../config/schema"
 import type { BackgroundManager } from "../../features/background-agent"
 import { clearInbox } from "./inbox-store"
 import { validateAgentName, validateTeamName } from "./name-validation"
@@ -13,13 +15,20 @@ import { getTeamMember, readTeamConfigOrThrow, removeTeammate, updateTeamConfig 
 import { cancelTeammateRun, spawnTeammate } from "./teammate-runtime"
 import { resetOwnerTasks } from "./team-task-store"
 
-export function createSpawnTeammateTool(manager: BackgroundManager): ToolDefinition {
+export interface AgentTeamsSpawnOptions {
+  client?: PluginInput["client"]
+  userCategories?: CategoriesConfig
+  sisyphusJuniorModel?: string
+}
+
+export function createSpawnTeammateTool(manager: BackgroundManager, options?: AgentTeamsSpawnOptions): ToolDefinition {
   return tool({
     description: "Spawn a teammate using native internal agent execution.",
     args: {
       team_name: tool.schema.string().describe("Team name"),
       name: tool.schema.string().describe("Teammate name"),
       prompt: tool.schema.string().describe("Initial teammate prompt"),
+      category: tool.schema.string().optional().describe("Optional category (spawns sisyphus-junior with category model/prompt)") ,
       subagent_type: tool.schema.string().optional().describe("Agent name to run (default: sisyphus-junior)"),
       model: tool.schema.string().optional().describe("Optional model override in provider/model format"),
       plan_mode_required: tool.schema.boolean().optional().describe("Enable plan mode flag in teammate metadata"),
@@ -37,15 +46,37 @@ export function createSpawnTeammateTool(manager: BackgroundManager): ToolDefinit
           return JSON.stringify({ error: agentError })
         }
 
+        if (input.category && input.subagent_type && input.subagent_type !== "sisyphus-junior") {
+          return JSON.stringify({ error: "category_conflicts_with_subagent_type" })
+        }
+
+        if (input.category && input.model) {
+          return JSON.stringify({ error: "category_conflicts_with_model_override" })
+        }
+
+        if (input.category && !options?.client) {
+          return JSON.stringify({ error: "category_requires_client_context" })
+        }
+
+        const resolvedSubagentType = input.category ? "sisyphus-junior" : input.subagent_type ?? "sisyphus-junior"
+
         const teammate = await spawnTeammate({
           teamName: input.team_name,
           name: input.name,
           prompt: input.prompt,
-          subagentType: input.subagent_type ?? "sisyphus-junior",
+          category: input.category,
+          subagentType: resolvedSubagentType,
           model: input.model,
           planModeRequired: input.plan_mode_required ?? false,
           context,
           manager,
+          categoryContext: options?.client
+            ? {
+                client: options.client,
+                userCategories: options.userCategories,
+                sisyphusJuniorModel: options.sisyphusJuniorModel,
+              }
+            : undefined,
         })
 
         return JSON.stringify({

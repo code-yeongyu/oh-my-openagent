@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import { createAgentTeamsTools } from "./tools"
 import { getTeamDir, getTeamInboxPath, getTeamTaskDir } from "./paths"
@@ -11,12 +12,14 @@ interface LaunchCall {
   description: string
   prompt: string
   agent: string
+  category?: string
   parentSessionID: string
   parentMessageID: string
   parentAgent?: string
   model?: {
     providerID: string
     modelID: string
+    variant?: string
   }
 }
 
@@ -99,6 +102,25 @@ function createFailingLaunchManager(): { manager: BackgroundManager; cancelCalls
   } as unknown as BackgroundManager
 
   return { manager, cancelCalls }
+}
+
+function createCategoryClientMock(): PluginInput["client"] {
+  return {
+    config: {
+      get: async () => ({ data: { model: "openai/gpt-5.3-codex" } }),
+    },
+    provider: {
+      list: async () => ({ data: { connected: ["openai", "anthropic"] } }),
+    },
+    model: {
+      list: async () => ({
+        data: [
+          { provider: "openai", id: "gpt-5.3-codex" },
+          { provider: "anthropic", id: "claude-haiku-4-5" },
+        ],
+      }),
+    },
+  } as unknown as PluginInput["client"]
 }
 
 function createContext(sessionID = "ses-main"): TestToolContext {
@@ -273,6 +295,75 @@ describe("agent-teams tools functional", () => {
 
     //#then
     expect(clearedOwnerTask.owner).toBeUndefined()
+  })
+
+  test("spawns teammate using category resolution like delegate-task", async () => {
+    //#given
+    const { manager, launchCalls } = createMockManager()
+    const tools = createAgentTeamsTools(manager, { client: createCategoryClientMock() })
+    const context = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+
+    //#when
+    const spawned = await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+        category: "quick",
+      },
+      context,
+    ) as { name?: string; error?: string }
+
+    //#then
+    expect(spawned.error).toBeUndefined()
+    expect(spawned.name).toBe("worker_1")
+    expect(launchCalls).toHaveLength(1)
+    expect(launchCalls[0].agent).toBe("sisyphus-junior")
+    expect(launchCalls[0].category).toBe("quick")
+    expect(launchCalls[0].model).toBeDefined()
+    const resolvedModel = launchCalls[0].model!
+    expect(launchCalls[0].prompt).toContain("Category guidance:")
+
+    //#when
+    const config = await executeJsonTool(tools, "read_config", { team_name: "core" }, context) as {
+      members: Array<{ name: string; category?: string; model?: string }>
+    }
+
+    //#then
+    const teammate = config.members.find((member) => member.name === "worker_1")
+    expect(teammate).toBeDefined()
+    expect(teammate?.category).toBe("quick")
+    expect(teammate?.model).toBe(`${resolvedModel.providerID}/${resolvedModel.modelID}`)
+  })
+
+  test("rejects category with incompatible subagent_type", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager, { client: createCategoryClientMock() })
+    const context = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+
+    //#when
+    const result = await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+        category: "quick",
+        subagent_type: "oracle",
+      },
+      context,
+    ) as { error?: string }
+
+    //#then
+    expect(result.error).toBe("category_conflicts_with_subagent_type")
   })
 
   test("rejects invalid task id input for task_get", async () => {
