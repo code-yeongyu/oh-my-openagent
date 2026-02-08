@@ -849,30 +849,19 @@ describe("sisyphus-task", () => {
   })
 
   describe("skills parameter", () => {
-    test("load_skills defaults to empty array when not provided (undefined)", async () => {
+    test("skills parameter is required - throws error when not provided", async () => {
       // given
       const { createDelegateTask } = require("./tools")
-      let promptBody: any
 
       const mockManager = { launch: async () => ({}) }
-
-      const promptMock = async (input: any) => {
-        promptBody = input.body
-        return { data: {} }
-      }
-
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         session: {
-          get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_default_skills" } }),
-          prompt: promptMock,
-          promptAsync: promptMock,
-          messages: async () => ({
-            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-          }),
-          status: async () => ({ data: {} }),
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
         },
       }
 
@@ -888,8 +877,9 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - load_skills not provided (undefined) - should default to []
-      await tool.execute(
+      // when - skills not provided (undefined)
+      // then - should throw error about missing skills
+      await expect(tool.execute(
         {
           description: "Test task",
           prompt: "Do something",
@@ -897,11 +887,8 @@ describe("sisyphus-task", () => {
           run_in_background: false,
         },
         toolContext
-      )
-
-      // then - should proceed without error, prompt should be called
-      expect(promptBody).toBeDefined()
-    }, { timeout: 20000 })
+      )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
+    })
 
      test("null skills throws error", async () => {
        // given
