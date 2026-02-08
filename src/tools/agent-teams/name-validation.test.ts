@@ -1,6 +1,11 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
-import { validateAgentName, validateTeamName } from "./name-validation"
+import {
+  validateAgentName,
+  validateAgentNameOrLead,
+  validateTaskId,
+  validateTeamName,
+} from "./name-validation"
 
 describe("agent-teams name validation", () => {
   test("accepts valid team names", () => {
@@ -54,5 +59,20 @@ describe("agent-teams name validation", () => {
     //#then
     expect(validResult).toBeNull()
     expect(invalidResult).toBe("agent_name_invalid")
+  })
+
+  test("allows team-lead for inbox-compatible validation", () => {
+    //#then
+    expect(validateAgentNameOrLead("team-lead")).toBeNull()
+    expect(validateAgentNameOrLead("worker_1")).toBeNull()
+    expect(validateAgentNameOrLead("worker one")).toBe("agent_name_invalid")
+  })
+
+  test("validates task ids", () => {
+    //#then
+    expect(validateTaskId("T-123")).toBeNull()
+    expect(validateTaskId("")).toBe("task_id_required")
+    expect(validateTaskId("../../etc/passwd")).toBe("task_id_invalid")
+    expect(validateTaskId("a".repeat(129))).toBe("task_id_too_long")
   })
 })

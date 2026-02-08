@@ -27,7 +27,9 @@ export const TeamLeadMemberSchema = z.object({
 export const TeamTeammateMemberSchema = z.object({
   agentId: z.string(),
   name: z.string(),
-  agentType: z.string(),
+  agentType: z.string().refine((value) => value !== "team-lead", {
+    message: "agent_type_reserved",
+  }),
   model: z.string(),
   prompt: z.string(),
   color: z.string(),
