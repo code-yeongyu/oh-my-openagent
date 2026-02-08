@@ -1,7 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "./constants"
-import { log } from "../../shared"
+import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
 import type {
   AvailableCategory,

@@ -3,10 +3,9 @@ import type { ExecutorContext } from "./executor-types"
 import { isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { parseModelString } from "./model-string-parser"
-import { resolveModelPipeline } from "../../shared"
-import { fetchAvailableModels } from "../../shared/model-availability"
-import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { getAvailableModelsForDelegateTask } from "./available-models"
+import { resolveModelForDelegateTask } from "./model-selection"
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
@@ -86,26 +85,19 @@ Create the work plan directly - that's your job as the planning agent.`,
       ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentNameLower)?.[1] : undefined)
     const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentNameLower]
 
-    if (agentOverride?.model || agentRequirement) {
-      const connectedProviders = readConnectedProvidersCache()
-      const availableModels = await fetchAvailableModels(client, {
-        connectedProviders: connectedProviders ?? undefined,
-      })
+    if (agentOverride?.model || agentRequirement || matchedAgent.model) {
+      const availableModels = await getAvailableModelsForDelegateTask(client)
 
       const matchedAgentModelStr = matchedAgent.model
         ? `${matchedAgent.model.providerID}/${matchedAgent.model.modelID}`
         : undefined
 
-      const resolution = resolveModelPipeline({
-        intent: {
-          userModel: agentOverride?.model,
-          categoryDefaultModel: matchedAgentModelStr,
-        },
-        constraints: { availableModels },
-        policy: {
-          fallbackChain: agentRequirement?.fallbackChain,
-          systemDefaultModel: undefined,
-        },
+      const resolution = resolveModelForDelegateTask({
+        userModel: agentOverride?.model,
+        categoryDefaultModel: matchedAgentModelStr,
+        fallbackChain: agentRequirement?.fallbackChain,
+        availableModels,
+        systemDefaultModel: undefined,
       })
 
       if (resolution) {
@@ -115,7 +107,9 @@ Create the work plan directly - that's your job as the planning agent.`,
           categoryModel = variantToUse ? { ...parsed, variant: variantToUse } : parsed
         }
       }
-    } else if (matchedAgent.model) {
+    }
+
+    if (!categoryModel && matchedAgent.model) {
       categoryModel = matchedAgent.model
     }
   } catch {
