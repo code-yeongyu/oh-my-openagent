@@ -10,6 +10,7 @@ export { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
 export { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "./multimodal-looker"
 export { createMetisAgent, METIS_SYSTEM_PROMPT, metisPromptMetadata } from "./metis"
 export { createMomusAgent, MOMUS_SYSTEM_PROMPT, momusPromptMetadata } from "./momus"
+export { createDevilsAdvocateAgent, devilsAdvocatePromptMetadata } from "./devils-advocate"
 export { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 export {
   PROMETHEUS_SYSTEM_PROMPT,
