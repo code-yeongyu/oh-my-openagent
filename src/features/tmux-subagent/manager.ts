@@ -127,6 +127,12 @@ export class TmuxSessionManager {
     return false
   }
 
+  // NOTE: Exposed (via `as any`) for test stability checks.
+  // Actual polling is owned by TmuxPollingManager.
+  private async pollSessions(): Promise<void> {
+    await (this.pollingManager as any).pollSessions()
+  }
+
   async onSessionCreated(event: SessionCreatedEvent): Promise<void> {
     const enabled = this.isEnabled()
     log("[tmux-session-manager] onSessionCreated called", {
