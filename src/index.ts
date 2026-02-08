@@ -488,6 +488,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     disabledSkills,
     availableCategories,
     availableSkills,
+    agentOverrides: pluginConfig.agents,
     onSyncSessionCreated: async (event) => {
       log("[index] onSyncSessionCreated callback", {
         sessionID: event.sessionID,
