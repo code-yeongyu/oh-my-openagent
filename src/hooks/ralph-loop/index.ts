@@ -67,7 +67,7 @@ export interface RalphLoopHook {
   getState: () => RalphLoopState | null
 }
 
-const DEFAULT_API_TIMEOUT = 3000
+const DEFAULT_API_TIMEOUT = 5000
 
 export function createRalphLoopHook(
   ctx: PluginInput,
@@ -79,6 +79,23 @@ export function createRalphLoopHook(
   const getTranscriptPath = options?.getTranscriptPath ?? getDefaultTranscriptPath
   const apiTimeout = options?.apiTimeout ?? DEFAULT_API_TIMEOUT
   const checkSessionExists = options?.checkSessionExists
+
+  async function withTimeout<TData>(promise: Promise<TData>, timeoutMs: number): Promise<TData> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        reject(new Error("API timeout"))
+      }, timeoutMs)
+    })
+
+    try {
+      return await Promise.race([promise, timeoutPromise])
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
+      }
+    }
+  }
 
   function getSessionState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
@@ -126,34 +143,44 @@ export function createRalphLoopHook(
     promise: string
   ): Promise<boolean> {
     try {
-      const response = await Promise.race([
+      const response = await withTimeout(
         ctx.client.session.messages({
           path: { id: sessionID },
           query: { directory: ctx.directory },
         }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("API timeout")), apiTimeout)
-        ),
-      ])
+        apiTimeout
+      )
 
       const messages = (response as { data?: unknown[] }).data ?? []
       if (!Array.isArray(messages)) return false
 
-      const assistantMessages = (messages as OpenCodeSessionMessage[]).filter(
-        (msg) => msg.info?.role === "assistant"
-      )
-      const lastAssistant = assistantMessages[assistantMessages.length - 1]
-      if (!lastAssistant?.parts) return false
+      const assistantMessages = (messages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
+      if (assistantMessages.length === 0) return false
 
       const pattern = new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
-      const responseText = lastAssistant.parts
-        .filter((p) => p.type === "text")
-        .map((p) => p.text ?? "")
-        .join("\n")
 
-      return pattern.test(responseText)
+      const recentAssistants = assistantMessages.slice(-3)
+      for (const assistant of recentAssistants) {
+        if (!assistant.parts) continue
+
+        const responseText = assistant.parts
+          .filter((p) => p.type === "text" || p.type === "reasoning")
+          .map((p) => p.text ?? "")
+          .join("\n")
+
+        if (pattern.test(responseText)) {
+          return true
+        }
+      }
+
+      return false
     } catch (err) {
-      log(`[${HOOK_NAME}] Session messages check failed`, { sessionID, error: String(err) })
+      setTimeout(() => {
+        log(`[${HOOK_NAME}] Session messages check failed`, {
+          sessionID,
+          error: String(err),
+        })
+      }, 0)
       return false
     }
   }
@@ -343,7 +370,10 @@ export function createRalphLoopHook(
         let model: { providerID: string; modelID: string } | undefined
 
         try {
-          const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
+          const messagesResp = await withTimeout(
+            ctx.client.session.messages({ path: { id: sessionID } }),
+            apiTimeout
+          )
           const messages = (messagesResp.data ?? []) as Array<{
             info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
           }>
