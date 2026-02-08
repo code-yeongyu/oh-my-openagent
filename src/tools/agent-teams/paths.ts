@@ -1,10 +1,10 @@
 import { join } from "node:path"
-import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 
+const SISYPHUS_DIR = ".sisyphus"
 const AGENT_TEAMS_DIR = "agent-teams"
 
 export function getAgentTeamsRootDir(): string {
-  return join(getOpenCodeConfigDir({ binary: "opencode" }), AGENT_TEAMS_DIR)
+  return join(process.cwd(), SISYPHUS_DIR, AGENT_TEAMS_DIR)
 }
 
 export function getTeamsRootDir(): string {
