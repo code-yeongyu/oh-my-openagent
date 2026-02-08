@@ -20,6 +20,6 @@ export function resolveMessageFormat(
   vars: { project: string; cwd: string }
 ): string {
   return format
-    .replace("{project}", vars.project)
-    .replace("{cwd}", vars.cwd)
+    .replaceAll("{project}", vars.project)
+    .replaceAll("{cwd}", vars.cwd)
 }

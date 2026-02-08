@@ -1,6 +1,5 @@
 import { spawn } from "bun"
-
-type Platform = "darwin" | "linux" | "win32" | "unsupported"
+import type { Platform } from "./session-notification-platform"
 
 async function findCommand(commandName: string): Promise<string | null> {
   try {
@@ -34,6 +33,21 @@ export const getPowershellPath = createCommandFinder("powershell")
 export const getAfplayPath = createCommandFinder("afplay")
 export const getPaplayPath = createCommandFinder("paplay")
 export const getAplayPath = createCommandFinder("aplay")
+
+export function cleanupOldSessions(
+  maxSessions: number,
+  ...sets: (Set<string> | Map<string, unknown>)[]
+) {
+  for (const collection of sets) {
+    if (collection.size > maxSessions) {
+      const keys = collection instanceof Map
+        ? Array.from(collection.keys())
+        : Array.from(collection)
+      const toRemove = keys.slice(0, collection.size - maxSessions)
+      toRemove.forEach(id => collection.delete(id))
+    }
+  }
+}
 
 export function startBackgroundCheck(platform: Platform): void {
   if (platform === "darwin") {

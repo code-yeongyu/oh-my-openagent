@@ -64,6 +64,18 @@ describe("session-notification-format", () => {
       expect(result).toBe("{unknown} stays")
     })
 
+    test("should replace all occurrences of repeated variables", () => {
+      // given - a format string with repeated {project} placeholders
+      const format = "{project} — {project} is ready"
+      const vars = { project: "my-app", cwd: "/home/user/my-app" }
+
+      // when - resolving the format
+      const result = resolveMessageFormat(format, vars)
+
+      // then - all occurrences should be replaced
+      expect(result).toBe("my-app — my-app is ready")
+    })
+
     test("should handle empty format string", () => {
       // given - an empty format string
       const format = ""
