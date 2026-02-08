@@ -1412,14 +1412,14 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   let manager: BackgroundManager
   let mockClient: ReturnType<typeof createMockClient>
 
-   function createMockClient() {
-     return {
-       session: {
-         create: async () => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
-         get: async () => ({ data: { directory: "/test/dir" } }),
-         prompt: async () => ({}),
-         promptAsync: async () => ({}),
-         messages: async () => ({ data: [] }),
+    function createMockClient() {
+      return {
+        session: {
+          create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          get: async () => ({ data: { directory: "/test/dir" } }),
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+          messages: async () => ({ data: [] }),
          todo: async () => ({ data: [] }),
          status: async () => ({ data: {} }),
          abort: async () => ({}),
@@ -1520,6 +1520,55 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   })
 
   describe("task transitions pending→running when slot available", () => {
+    test("should inherit parent session permission rules (and force deny question)", async () => {
+      // given
+      const createCalls: any[] = []
+      const parentPermission = [
+        { permission: "question", action: "allow" as const, pattern: "*" },
+        { permission: "plan_enter", action: "deny" as const, pattern: "*" },
+      ]
+
+      const customClient = {
+        session: {
+          create: async (args?: any) => {
+            createCalls.push(args)
+            return { data: { id: `ses_${crypto.randomUUID()}` } }
+          },
+          get: async () => ({ data: { directory: "/test/dir", permission: parentPermission } }),
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+          messages: async () => ({ data: [] }),
+          todo: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+          abort: async () => ({}),
+        },
+      }
+      manager.shutdown()
+      manager = new BackgroundManager({ client: customClient, directory: tmpdir() } as unknown as PluginInput, {
+        defaultConcurrency: 5,
+      })
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+
+      // when
+      await manager.launch(input)
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      // then
+      expect(createCalls).toHaveLength(1)
+      const permission = createCalls[0]?.body?.permission
+      expect(permission).toEqual([
+        { permission: "plan_enter", action: "deny", pattern: "*" },
+        { permission: "question", action: "deny", pattern: "*" },
+      ])
+    })
+
     test("should transition first task to running immediately", async () => {
       // given
       const config = { defaultConcurrency: 5 }
