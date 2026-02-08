@@ -103,18 +103,58 @@ export function createRalphLoopHook(
       const lines = content.split("\n").filter(l => l.trim())
 
       for (const line of lines) {
-        try {
-          const entry = JSON.parse(line)
-          if (entry.type === "user") continue
-          if (pattern.test(line)) return true
-        } catch {
-          continue
+        const entry = parseTranscriptEntry(line)
+        if (!entry) continue
+
+        if (entry.type === "user" || entry.type === "tool_use") continue
+
+        if (entry.type === "assistant" && typeof entry.content === "string") {
+          if (pattern.test(entry.content)) return true
+        } else if (entry.type === "tool_result") {
+          const candidates = getToolOutputTextCandidates(entry.tool_output)
+          if (candidates.some(text => pattern.test(text))) return true
         }
       }
       return false
     } catch {
       return false
     }
+  }
+
+  function parseTranscriptEntry(line: string): {
+    type?: string
+    content?: unknown
+    tool_output?: unknown
+  } | null {
+    try {
+      return JSON.parse(line) as {
+        type?: string
+        content?: unknown
+        tool_output?: unknown
+      }
+    } catch {
+      return null
+    }
+  }
+
+  function getToolOutputTextCandidates(toolOutput: unknown): string[] {
+    if (typeof toolOutput === "string") return [toolOutput]
+    if (!isRecord(toolOutput)) return []
+
+    const candidates: string[] = []
+    const output = toolOutput.output
+    const content = toolOutput.content
+    const text = toolOutput.text
+
+    if (typeof output === "string") candidates.push(output)
+    if (typeof content === "string") candidates.push(content)
+    if (typeof text === "string") candidates.push(text)
+
+    return candidates
+  }
+
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value)
   }
 
   function escapeRegex(str: string): string {

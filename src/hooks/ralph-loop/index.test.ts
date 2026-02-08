@@ -798,6 +798,69 @@ Original task: Build something`
       expect(hook.getState()).toBeNull()
     })
 
+    test("should NOT detect completion from tool_use entry containing promise", async () => {
+      // given - transcript contains a tool_use entry with promise in tool_input
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const toolUseEntry = JSON.stringify({
+        type: "tool_use",
+        timestamp: new Date().toISOString(),
+        tool_name: "prompt",
+        tool_input: {
+          text: "When complete, output <promise>DONE</promise>",
+        },
+      })
+      writeFileSync(transcriptPath, toolUseEntry + "\n")
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - loop should CONTINUE (tool_use is not completion output)
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
+    test("should NOT detect completion from tool_result metadata fields", async () => {
+      // given - transcript contains tool_result with promise in metadata, not output
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const toolResultEntry = JSON.stringify({
+        type: "tool_result",
+        timestamp: new Date().toISOString(),
+        tool_name: "write",
+        tool_output: {
+          output: "No completion here",
+          metadata: "Instruction: <promise>DONE</promise>",
+        },
+      })
+      writeFileSync(transcriptPath, toolResultEntry + "\n")
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - loop should CONTINUE (metadata should not count as completion)
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
     test("should check transcript BEFORE API to optimize performance", async () => {
       // given - transcript has completion promise
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
