@@ -1,7 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { z } from "zod"
-import { acquireLock, ensureDir } from "../../features/claude-tasks/storage"
+import { acquireLock, ensureDir, writeJsonAtomic } from "../../features/claude-tasks/storage"
 import { getTeamInboxDir, getTeamInboxPath } from "./paths"
+import { validateAgentNameOrLead, validateTeamName } from "./name-validation"
 import { TeamInboxMessage, TeamInboxMessageSchema } from "./types"
 
 const TeamInboxListSchema = z.array(TeamInboxMessageSchema)
@@ -10,7 +11,22 @@ function nowIso(): string {
   return new Date().toISOString()
 }
 
+function assertValidTeamName(teamName: string): void {
+  const validationError = validateTeamName(teamName)
+  if (validationError) {
+    throw new Error(validationError)
+  }
+}
+
+function assertValidInboxAgentName(agentName: string): void {
+  const validationError = validateAgentNameOrLead(agentName)
+  if (validationError) {
+    throw new Error(validationError)
+  }
+}
+
 function withInboxLock<T>(teamName: string, operation: () => T): T {
+  assertValidTeamName(teamName)
   const inboxDir = getTeamInboxDir(teamName)
   ensureDir(inboxDir)
   const lock = acquireLock(inboxDir)
@@ -36,6 +52,8 @@ function parseInboxFile(content: string): TeamInboxMessage[] {
 }
 
 function readInboxMessages(teamName: string, agentName: string): TeamInboxMessage[] {
+  assertValidTeamName(teamName)
+  assertValidInboxAgentName(agentName)
   const path = getTeamInboxPath(teamName, agentName)
   if (!existsSync(path)) {
     return []
@@ -44,24 +62,30 @@ function readInboxMessages(teamName: string, agentName: string): TeamInboxMessag
 }
 
 function writeInboxMessages(teamName: string, agentName: string, messages: TeamInboxMessage[]): void {
+  assertValidTeamName(teamName)
+  assertValidInboxAgentName(agentName)
   const path = getTeamInboxPath(teamName, agentName)
-  writeFileSync(path, JSON.stringify(messages), "utf-8")
+  writeJsonAtomic(path, messages)
 }
 
 export function ensureInbox(teamName: string, agentName: string): void {
+  assertValidTeamName(teamName)
+  assertValidInboxAgentName(agentName)
   withInboxLock(teamName, () => {
     const path = getTeamInboxPath(teamName, agentName)
     if (!existsSync(path)) {
-      writeFileSync(path, "[]", "utf-8")
+      writeJsonAtomic(path, [])
     }
   })
 }
 
 export function appendInboxMessage(teamName: string, agentName: string, message: TeamInboxMessage): void {
+  assertValidTeamName(teamName)
+  assertValidInboxAgentName(agentName)
   withInboxLock(teamName, () => {
     const path = getTeamInboxPath(teamName, agentName)
     if (!existsSync(path)) {
-      writeFileSync(path, "[]", "utf-8")
+      writeJsonAtomic(path, [])
     }
     const messages = readInboxMessages(teamName, agentName)
     messages.push(TeamInboxMessageSchema.parse(message))
