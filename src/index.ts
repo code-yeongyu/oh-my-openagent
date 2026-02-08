@@ -2,7 +2,6 @@ import type { Plugin, ToolDefinition } from "@opencode-ai/plugin";
 import type { AvailableSkill } from "./agents/dynamic-agent-prompt-builder";
 import {
   createTodoContinuationEnforcer,
-  createTaskContinuationEnforcer,
   createContextWindowMonitorHook,
   createSessionRecoveryHook,
   createSessionNotification,
@@ -404,8 +403,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       ), { enabled: safeHookEnabled })
     : null;
 
-  // sessionRecovery callbacks are setters; compose callbacks so both enforcers are notified.
-
   const backgroundNotificationHook = isHookEnabled("background-notification")
     ? safeCreateHook("background-notification", () => createBackgroundNotificationHook(backgroundManager), { enabled: safeHookEnabled })
     : null;
@@ -541,22 +538,11 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false;
 
-  const taskContinuationEnforcer = isHookEnabled("task-continuation-enforcer") && taskSystemEnabled
-    ? createTaskContinuationEnforcer(ctx, pluginConfig, {
-        backgroundManager,
-        isContinuationStopped: stopContinuationGuard?.isStopped,
-      })
-    : null;
-
-  if (sessionRecovery && (todoContinuationEnforcer || taskContinuationEnforcer)) {
-    sessionRecovery.setOnAbortCallback((sessionID) => {
-      todoContinuationEnforcer?.markRecovering(sessionID);
-      taskContinuationEnforcer?.markRecovering(sessionID);
-    });
-    sessionRecovery.setOnRecoveryCompleteCallback((sessionID) => {
-      todoContinuationEnforcer?.markRecoveryComplete(sessionID);
-      taskContinuationEnforcer?.markRecoveryComplete(sessionID);
-    });
+  if (sessionRecovery && todoContinuationEnforcer) {
+    sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering);
+    sessionRecovery.setOnRecoveryCompleteCallback(
+      todoContinuationEnforcer.markRecoveryComplete,
+    );
   }
 
   const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
@@ -742,7 +728,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await backgroundNotificationHook?.event(input);
       await sessionNotification?.(input);
       await todoContinuationEnforcer?.handler(input);
-      await taskContinuationEnforcer?.handler(input);
       await unstableAgentBabysitter?.event(input);
       await contextWindowMonitor?.event(input);
       await directoryAgentsInjector?.event(input);
@@ -922,7 +907,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         if (command === "stop-continuation" && sessionID) {
           stopContinuationGuard?.stop(sessionID);
           todoContinuationEnforcer?.cancelAllCountdowns();
-          taskContinuationEnforcer?.cancelAllCountdowns();
           ralphLoop?.cancelLoop(sessionID);
           clearBoulderState(ctx.directory);
           log("[stop-continuation] All continuation mechanisms stopped", {
