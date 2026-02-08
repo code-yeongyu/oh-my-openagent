@@ -81,24 +81,41 @@ export function createSessionNotification(
   }
 
   async function executeNotification(sessionID: string, version: number) {
-    if (executingNotifications.has(sessionID)) { pendingTimers.delete(sessionID); return }
-    if (notificationVersions.get(sessionID) !== version) { pendingTimers.delete(sessionID); return }
-    if (sessionActivitySinceIdle.has(sessionID)) {
-      sessionActivitySinceIdle.delete(sessionID); pendingTimers.delete(sessionID); return
+    if (executingNotifications.has(sessionID)) {
+      pendingTimers.delete(sessionID)
+
+      return
     }
-    if (notifiedSessions.has(sessionID)) { pendingTimers.delete(sessionID); return }
+    if (notificationVersions.get(sessionID) !== version) {
+      pendingTimers.delete(sessionID)
+      return
+    }
+    if (sessionActivitySinceIdle.has(sessionID)) {
+      sessionActivitySinceIdle.delete(sessionID)
+      pendingTimers.delete(sessionID)
+      return
+    }
+    if (notifiedSessions.has(sessionID)) {
+      pendingTimers.delete(sessionID)
+      return
+    }
 
     executingNotifications.add(sessionID)
     try {
       if (mergedConfig.skipIfIncompleteTodos) {
         const hasPendingWork = await hasIncompleteTodos(ctx, sessionID)
-        if (notificationVersions.get(sessionID) !== version) return
+        if (notificationVersions.get(sessionID) !== version) {
+          return
+        }
         if (hasPendingWork) return
       }
 
-      if (notificationVersions.get(sessionID) !== version) return
+      if (notificationVersions.get(sessionID) !== version) {
+        return
+      }
       if (sessionActivitySinceIdle.has(sessionID)) {
-        sessionActivitySinceIdle.delete(sessionID); return
+        sessionActivitySinceIdle.delete(sessionID)
+        return
       }
 
       notifiedSessions.add(sessionID)

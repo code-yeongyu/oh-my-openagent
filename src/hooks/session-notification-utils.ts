@@ -1,5 +1,6 @@
 import { spawn } from "bun"
-import type { Platform } from "./session-notification-platform"
+
+export type Platform = "darwin" | "linux" | "win32" | "unsupported"
 
 async function findCommand(commandName: string): Promise<string | null> {
   try {

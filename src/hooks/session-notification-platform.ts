@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { platform } from "os"
+import type { Platform } from "./session-notification-utils"
 import {
   getOsascriptPath,
   getNotifySendPath,
@@ -15,8 +16,6 @@ interface Todo {
   priority: string
   id: string
 }
-
-export type Platform = "darwin" | "linux" | "win32" | "unsupported"
 
 export function detectPlatform(): Platform {
   const p = platform()
@@ -123,5 +122,3 @@ export async function hasIncompleteTodos(ctx: PluginInput, sessionID: string): P
     return false
   }
 }
-
-
