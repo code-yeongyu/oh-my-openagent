@@ -1,5 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { readTeamConfigOrThrow } from "./team-config-store"
+import { validateAgentName, validateTaskId, validateTeamName } from "./name-validation"
 import { TeamTaskUpdateInputSchema } from "./types"
 import { updateTeamTask } from "./team-task-update"
 import { notifyOwnerAssignment } from "./team-task-tools"
@@ -22,6 +23,36 @@ export function createTeamTaskUpdateTool(): ToolDefinition {
     execute: async (args: Record<string, unknown>): Promise<string> => {
       try {
         const input = TeamTaskUpdateInputSchema.parse(args)
+        const teamError = validateTeamName(input.team_name)
+        if (teamError) {
+          return JSON.stringify({ error: teamError })
+        }
+        const taskIdError = validateTaskId(input.task_id)
+        if (taskIdError) {
+          return JSON.stringify({ error: taskIdError })
+        }
+        if (input.owner !== undefined) {
+          const ownerError = validateAgentName(input.owner)
+          if (ownerError) {
+            return JSON.stringify({ error: ownerError })
+          }
+        }
+        if (input.add_blocks) {
+          for (const blockerId of input.add_blocks) {
+            const blockerError = validateTaskId(blockerId)
+            if (blockerError) {
+              return JSON.stringify({ error: blockerError })
+            }
+          }
+        }
+        if (input.add_blocked_by) {
+          for (const dependencyId of input.add_blocked_by) {
+            const dependencyError = validateTaskId(dependencyId)
+            if (dependencyError) {
+              return JSON.stringify({ error: dependencyError })
+            }
+          }
+        }
         readTeamConfigOrThrow(input.team_name)
 
         const task = updateTeamTask(input.team_name, input.task_id, {

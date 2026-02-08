@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, unlinkSync } from "node:fs"
 import { join } from "node:path"
 import { readJsonSafe, writeJsonAtomic } from "../../features/claude-tasks/storage"
+import { validateTaskId, validateTeamName } from "./name-validation"
 import { getTeamTaskDir, getTeamTaskPath } from "./paths"
 import {
   addPendingEdge,
@@ -23,11 +24,40 @@ export interface TeamTaskUpdatePatch {
   metadata?: Record<string, unknown>
 }
 
+function assertValidTeamName(teamName: string): void {
+  const validationError = validateTeamName(teamName)
+  if (validationError) {
+    throw new Error(validationError)
+  }
+}
+
+function assertValidTaskId(taskId: string): void {
+  const validationError = validateTaskId(taskId)
+  if (validationError) {
+    throw new Error(validationError)
+  }
+}
+
 function writeTaskToPath(path: string, task: TeamTask): void {
   writeJsonAtomic(path, TeamTaskSchema.parse(task))
 }
 
 export function updateTeamTask(teamName: string, taskId: string, patch: TeamTaskUpdatePatch): TeamTask {
+  assertValidTeamName(teamName)
+  assertValidTaskId(taskId)
+
+  if (patch.addBlocks) {
+    for (const blockedTaskId of patch.addBlocks) {
+      assertValidTaskId(blockedTaskId)
+    }
+  }
+
+  if (patch.addBlockedBy) {
+    for (const blockerId of patch.addBlockedBy) {
+      assertValidTaskId(blockerId)
+    }
+  }
+
   return withTeamTaskLock(teamName, () => {
     const taskDir = getTeamTaskDir(teamName)
     const taskPath = getTeamTaskPath(teamName, taskId)

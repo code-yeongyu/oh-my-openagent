@@ -1,6 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { sendStructuredInboxMessage } from "./inbox-store"
 import { readTeamConfigOrThrow } from "./team-config-store"
+import { validateAgentName, validateTaskId, validateTeamName } from "./name-validation"
 import {
   TeamTaskCreateInputSchema,
   TeamTaskGetInputSchema,
@@ -32,6 +33,10 @@ export function createTeamTaskCreateTool(): ToolDefinition {
     execute: async (args: Record<string, unknown>): Promise<string> => {
       try {
         const input = TeamTaskCreateInputSchema.parse(args)
+        const teamError = validateTeamName(input.team_name)
+        if (teamError) {
+          return JSON.stringify({ error: teamError })
+        }
         readTeamConfigOrThrow(input.team_name)
 
         const task = createTeamTask(
@@ -59,6 +64,10 @@ export function createTeamTaskListTool(): ToolDefinition {
     execute: async (args: Record<string, unknown>): Promise<string> => {
       try {
         const input = TeamTaskListInputSchema.parse(args)
+        const teamError = validateTeamName(input.team_name)
+        if (teamError) {
+          return JSON.stringify({ error: teamError })
+        }
         readTeamConfigOrThrow(input.team_name)
         return JSON.stringify(listTeamTasks(input.team_name))
       } catch (error) {
@@ -78,6 +87,14 @@ export function createTeamTaskGetTool(): ToolDefinition {
     execute: async (args: Record<string, unknown>): Promise<string> => {
       try {
         const input = TeamTaskGetInputSchema.parse(args)
+        const teamError = validateTeamName(input.team_name)
+        if (teamError) {
+          return JSON.stringify({ error: teamError })
+        }
+        const taskIdError = validateTaskId(input.task_id)
+        if (taskIdError) {
+          return JSON.stringify({ error: taskIdError })
+        }
         readTeamConfigOrThrow(input.team_name)
         const task = readTeamTask(input.team_name, input.task_id)
         if (!task) {
@@ -93,6 +110,14 @@ export function createTeamTaskGetTool(): ToolDefinition {
 
 export function notifyOwnerAssignment(teamName: string, task: TeamTask): void {
   if (!task.owner || task.status === "deleted") {
+    return
+  }
+
+  if (validateTeamName(teamName)) {
+    return
+  }
+
+  if (validateAgentName(task.owner)) {
     return
   }
 
