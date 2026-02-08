@@ -27,6 +27,10 @@ export function applyCategoryOverride(
   if (categoryConfig.top_p !== undefined) result.top_p = categoryConfig.top_p
   if (categoryConfig.maxTokens !== undefined) result.maxTokens = categoryConfig.maxTokens
 
+  if (categoryConfig.prompt_append && typeof result.prompt === "string") {
+    result.prompt = result.prompt + "\n" + categoryConfig.prompt_append
+  }
+
   return result as AgentConfig
 }
 
