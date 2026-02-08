@@ -69,7 +69,8 @@ export async function startQueuedTask(args: {
     body: {
       parentID: input.parentSessionID,
       title: `${input.description} (@${input.agent} subagent)`,
-    },
+      permission: [{ permission: "question", action: "deny" as const, pattern: "*" }],
+    } as any,
     query: {
       directory: parentDirectory,
     },
