@@ -12,6 +12,8 @@ async function selectOrCancel<TValue extends Readonly<string | boolean | number>
   options: Option<TValue>[]
   initialValue: TValue
 }): Promise<TValue | null> {
+  if (!process.stdin.isTTY) return null
+
   const value = await p.select<TValue>({
     message: params.message,
     options: params.options,
