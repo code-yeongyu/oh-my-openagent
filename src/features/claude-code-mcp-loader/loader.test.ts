@@ -8,6 +8,17 @@ const TEST_DIR = join(tmpdir(), "mcp-loader-test-" + Date.now())
 describe("getSystemMcpServerNames", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })
+
+    // Isolate tests from real user environment (e.g., ~/.claude.json).
+    // loader.ts reads user-level config via os.homedir() + getClaudeConfigDir().
+    mock.module("os", () => ({
+      homedir: () => TEST_DIR,
+      tmpdir,
+    }))
+
+    mock.module("../../shared", () => ({
+      getClaudeConfigDir: () => join(TEST_DIR, ".claude"),
+    }))
   })
 
   afterEach(() => {
