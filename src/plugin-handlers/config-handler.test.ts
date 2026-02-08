@@ -600,6 +600,187 @@ describe("Prometheus direct override priority over category", () => {
   })
 })
 
+describe("Plan agent model inheritance from prometheus", () => {
+  test("plan agent inherits all model-related settings from resolved prometheus config", async () => {
+    //#given - prometheus resolves to claude-opus-4-6 with model settings
+    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
+      model: "anthropic/claude-opus-4-6",
+      provenance: "provider-fallback",
+      variant: "max",
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+        replace_plan: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {
+        plan: {
+          name: "plan",
+          mode: "primary",
+          prompt: "original plan prompt",
+        },
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then - plan inherits model and variant from prometheus, but NOT prompt
+    const agents = config.agent as Record<string, { mode?: string; model?: string; variant?: string; prompt?: string }>
+    expect(agents.plan).toBeDefined()
+    expect(agents.plan.mode).toBe("subagent")
+    expect(agents.plan.model).toBe("anthropic/claude-opus-4-6")
+    expect(agents.plan.variant).toBe("max")
+    expect(agents.plan.prompt).toBeUndefined()
+  })
+
+  test("plan agent inherits temperature, reasoningEffort, and other model settings from prometheus", async () => {
+    //#given - prometheus configured with category that has temperature and reasoningEffort
+    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
+      model: "openai/gpt-5.2",
+      provenance: "override",
+      variant: "high",
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+        replace_plan: true,
+      },
+      agents: {
+        prometheus: {
+          model: "openai/gpt-5.2",
+          variant: "high",
+          temperature: 0.3,
+          top_p: 0.9,
+          maxTokens: 16000,
+          reasoningEffort: "high",
+          textVerbosity: "medium",
+          thinking: { type: "enabled", budgetTokens: 8000 },
+        },
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then - plan inherits ALL model-related settings from resolved prometheus
+    const agents = config.agent as Record<string, Record<string, unknown>>
+    expect(agents.plan).toBeDefined()
+    expect(agents.plan.mode).toBe("subagent")
+    expect(agents.plan.model).toBe("openai/gpt-5.2")
+    expect(agents.plan.variant).toBe("high")
+    expect(agents.plan.temperature).toBe(0.3)
+    expect(agents.plan.top_p).toBe(0.9)
+    expect(agents.plan.maxTokens).toBe(16000)
+    expect(agents.plan.reasoningEffort).toBe("high")
+    expect(agents.plan.textVerbosity).toBe("medium")
+    expect(agents.plan.thinking).toEqual({ type: "enabled", budgetTokens: 8000 })
+  })
+
+  test("plan agent user override takes priority over prometheus inherited settings", async () => {
+    //#given - prometheus resolves to opus, but user has plan override for gpt-5.2
+    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
+      model: "anthropic/claude-opus-4-6",
+      provenance: "provider-fallback",
+      variant: "max",
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+        replace_plan: true,
+      },
+      agents: {
+        plan: {
+          model: "openai/gpt-5.2",
+          variant: "high",
+          temperature: 0.5,
+        },
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then - plan uses its own override, not prometheus settings
+    const agents = config.agent as Record<string, Record<string, unknown>>
+    expect(agents.plan.model).toBe("openai/gpt-5.2")
+    expect(agents.plan.variant).toBe("high")
+    expect(agents.plan.temperature).toBe(0.5)
+  })
+
+  test("plan agent does NOT inherit prompt, description, or color from prometheus", async () => {
+    //#given
+    spyOn(shared, "resolveModelPipeline" as any).mockReturnValue({
+      model: "anthropic/claude-opus-4-6",
+      provenance: "provider-fallback",
+      variant: "max",
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        planner_enabled: true,
+        replace_plan: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then - plan has model settings but NOT prompt/description/color
+    const agents = config.agent as Record<string, Record<string, unknown>>
+    expect(agents.plan.model).toBe("anthropic/claude-opus-4-6")
+    expect(agents.plan.prompt).toBeUndefined()
+    expect(agents.plan.description).toBeUndefined()
+    expect(agents.plan.color).toBeUndefined()
+  })
+})
+
 describe("Deadlock prevention - fetchAvailableModels must not receive client", () => {
   test("fetchAvailableModels should be called with undefined client to prevent deadlock during plugin init", async () => {
     // given - This test ensures we don't regress on issue #1301

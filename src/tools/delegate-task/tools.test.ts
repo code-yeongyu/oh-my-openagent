@@ -135,12 +135,12 @@ describe("sisyphus-task", () => {
       expect(result).toBe(true)
     })
 
-    test("returns true for 'prometheus'", () => {
-      // given / #when
+    test("returns false for 'prometheus' (decoupled from plan)", () => {
+      //#given / #when
       const result = isPlanAgent("prometheus")
 
-      // then
-      expect(result).toBe(true)
+      //#then - prometheus is NOT a plan agent
+      expect(result).toBe(false)
     })
 
     test("returns true for 'planner'", () => {
@@ -159,12 +159,12 @@ describe("sisyphus-task", () => {
       expect(result).toBe(true)
     })
 
-    test("returns true for case-insensitive match 'Prometheus'", () => {
-      // given / #when
+    test("returns false for case-insensitive match 'Prometheus' (decoupled from plan)", () => {
+      //#given / #when
       const result = isPlanAgent("Prometheus")
 
-      // then
-      expect(result).toBe(true)
+      //#then - Prometheus is NOT a plan agent
+      expect(result).toBe(false)
     })
 
     test("returns false for 'oracle'", () => {
@@ -199,11 +199,11 @@ describe("sisyphus-task", () => {
       expect(result).toBe(false)
     })
 
-    test("PLAN_AGENT_NAMES contains expected values", () => {
-      // given / #when / #then
+    test("PLAN_AGENT_NAMES contains only plan and planner (not prometheus)", () => {
+      //#given / #when / #then
       expect(PLAN_AGENT_NAMES).toContain("plan")
-      expect(PLAN_AGENT_NAMES).toContain("prometheus")
       expect(PLAN_AGENT_NAMES).toContain("planner")
+      expect(PLAN_AGENT_NAMES).not.toContain("prometheus")
     })
   })
 
@@ -2258,68 +2258,36 @@ describe("sisyphus-task", () => {
       expect(result).toBe(buildPlanAgentSystemPrepend(availableCategories, availableSkills))
     })
 
-    test("prepends plan agent system prompt when agentName is 'prometheus'", () => {
-      // given
+    test("does not prepend plan agent prompt for prometheus agent", () => {
+      //#given - prometheus is NOT a plan agent (decoupled)
       const { buildSystemContent } = require("./tools")
-      const { buildPlanAgentSystemPrepend } = require("./constants")
+      const skillContent = "You are a strategic planner"
 
-      const availableCategories = [
-        {
-          name: "ultrabrain",
-          description: "Complex architecture, deep logical reasoning",
-          model: "openai/gpt-5.3-codex",
-        },
-      ]
-      const availableSkills = [
-        {
-          name: "git-master",
-          description: "Atomic commits, git operations.",
-          location: "plugin",
-        },
-      ]
-
-      // when
+      //#when
       const result = buildSystemContent({
+        skillContent,
         agentName: "prometheus",
-        availableCategories,
-        availableSkills,
       })
 
-      // then
-      expect(result).toContain("<system>")
-      expect(result).toBe(buildPlanAgentSystemPrepend(availableCategories, availableSkills))
+      //#then - prometheus should NOT get plan agent system prepend
+      expect(result).toBe(skillContent)
+      expect(result).not.toContain("MANDATORY CONTEXT GATHERING PROTOCOL")
     })
 
-    test("prepends plan agent system prompt when agentName is 'Prometheus' (case insensitive)", () => {
-      // given
+    test("does not prepend plan agent prompt for Prometheus (case insensitive)", () => {
+      //#given - Prometheus (capitalized) is NOT a plan agent
       const { buildSystemContent } = require("./tools")
-      const { buildPlanAgentSystemPrepend } = require("./constants")
+      const skillContent = "You are a strategic planner"
 
-      const availableCategories = [
-        {
-          name: "quick",
-          description: "Trivial tasks",
-          model: "anthropic/claude-haiku-4-5",
-        },
-      ]
-      const availableSkills = [
-        {
-          name: "dev-browser",
-          description: "Persistent browser state automation.",
-          location: "plugin",
-        },
-      ]
-
-      // when
+      //#when
       const result = buildSystemContent({
+        skillContent,
         agentName: "Prometheus",
-        availableCategories,
-        availableSkills,
       })
 
-      // then
-      expect(result).toContain("<system>")
-      expect(result).toBe(buildPlanAgentSystemPrepend(availableCategories, availableSkills))
+      //#then
+      expect(result).toBe(skillContent)
+      expect(result).not.toContain("MANDATORY CONTEXT GATHERING PROTOCOL")
     })
 
     test("combines plan agent prepend with skill content", () => {
@@ -2565,14 +2533,14 @@ describe("sisyphus-task", () => {
     })
   })
 
-  describe("prometheus self-delegation block", () => {
-    test("prometheus cannot delegate to prometheus - returns error with guidance", async () => {
-      // given - current agent is prometheus
+  describe("plan agent self-delegation block", () => {
+    test("plan agent cannot delegate to plan - returns error with guidance", async () => {
+      //#given - current agent is plan
       const { createDelegateTask } = require("./tools")
       
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+         app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
@@ -2592,44 +2560,44 @@ describe("sisyphus-task", () => {
        const toolContext = {
          sessionID: "parent-session",
          messageID: "parent-message",
-         agent: "prometheus",
+         agent: "plan",
         abort: new AbortController().signal,
       }
       
-      // when - prometheus tries to delegate to prometheus
+      //#when - plan agent tries to delegate to plan
       const result = await tool.execute(
         {
           description: "Test self-delegation block",
           prompt: "Create a plan",
-          subagent_type: "prometheus",
+          subagent_type: "plan",
           run_in_background: false,
           load_skills: [],
         },
         toolContext
       )
       
-      // then - should return error telling prometheus to create plan directly
-      expect(result).toContain("prometheus")
+      //#then - should return error telling plan agent to create plan directly
+      expect(result).toContain("plan agent")
       expect(result).toContain("directly")
     })
 
-    test("non-prometheus agent CAN delegate to prometheus - proceeds normally", async () => {
-      // given - current agent is sisyphus
+    test("prometheus is NOT a plan agent - can delegate to plan normally", async () => {
+      //#given - current agent is prometheus (no longer treated as plan agent)
       const { createDelegateTask } = require("./tools")
       
       const mockManager = { launch: async () => ({}) }
        const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+         app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_prometheus_allowed" } }),
+           create: async () => ({ data: { id: "ses_plan_from_prometheus" } }),
            prompt: async () => ({ data: {} }),
            promptAsync: async () => ({ data: {} }),
            messages: async () => ({
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created successfully" }] }]
            }),
-           status: async () => ({ data: { "ses_prometheus_allowed": { type: "idle" } } }),
+           status: async () => ({ data: { "ses_plan_from_prometheus": { type: "idle" } } }),
          },
        }
        
@@ -2641,34 +2609,34 @@ describe("sisyphus-task", () => {
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "sisyphus",
+        agent: "prometheus",
         abort: new AbortController().signal,
       }
       
-      // when - sisyphus delegates to prometheus
+      //#when - prometheus delegates to plan (should work now)
       const result = await tool.execute(
         {
-          description: "Test prometheus delegation from non-prometheus agent",
+          description: "Test plan delegation from prometheus",
           prompt: "Create a plan",
-          subagent_type: "prometheus",
+          subagent_type: "plan",
           run_in_background: false,
           load_skills: [],
         },
         toolContext
       )
       
-      // then - should proceed normally
+      //#then - should proceed normally (prometheus is not plan agent)
       expect(result).not.toContain("Cannot delegate")
       expect(result).toContain("Plan created successfully")
     }, { timeout: 20000 })
 
-    test("case-insensitive: Prometheus (capitalized) cannot delegate to prometheus", async () => {
-      // given - current agent is Prometheus (capitalized)
+    test("planner agent self-delegation is also blocked", async () => {
+      //#given - current agent is planner
       const { createDelegateTask } = require("./tools")
       
        const mockManager = { launch: async () => ({}) }
        const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+         app: { agents: async () => ({ data: [{ name: "planner", mode: "subagent" }] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
@@ -2688,24 +2656,24 @@ describe("sisyphus-task", () => {
        const toolContext = {
           sessionID: "parent-session",
           messageID: "parent-message",
-          agent: "Prometheus",
+          agent: "planner",
           abort: new AbortController().signal,
         }
         
-        // when - Prometheus tries to delegate to prometheus
+        //#when - planner tries to delegate to plan
         const result = await tool.execute(
           {
-            description: "Test case-insensitive block",
+            description: "Test planner self-delegation block",
             prompt: "Create a plan",
-            subagent_type: "prometheus",
+            subagent_type: "plan",
             run_in_background: false,
             load_skills: [],
           },
           toolContext
         )
       
-      // then - should still return error
-      expect(result).toContain("prometheus")
+      //#then - should return error (planner is a plan agent alias)
+      expect(result).toContain("plan agent")
       expect(result).toContain("directly")
     })
   })
@@ -2903,9 +2871,9 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
   })
 
-  describe("prometheus subagent task permission", () => {
-    test("prometheus subagent should have task permission enabled", async () => {
-      // given - sisyphus delegates to prometheus
+  describe("subagent task permission", () => {
+    test("plan subagent should have task permission enabled", async () => {
+      //#given - sisyphus delegates to plan agent
       const { createDelegateTask } = require("./tools")
       let promptBody: any
       
@@ -2917,17 +2885,17 @@ describe("sisyphus-task", () => {
        }
        
        const mockClient = {
-         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+         app: { agents: async () => ({ data: [{ name: "plan", mode: "subagent" }] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_prometheus_delegate" } }),
+           create: async () => ({ data: { id: "ses_plan_delegate" } }),
            prompt: promptMock,
            promptAsync: promptMock,
            messages: async () => ({
              data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }]
            }),
-           status: async () => ({ data: { "ses_prometheus_delegate": { type: "idle" } } }),
+           status: async () => ({ data: { "ses_plan_delegate": { type: "idle" } } }),
          },
        }
        
@@ -2943,10 +2911,65 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // when - sisyphus delegates to prometheus
+      //#when - sisyphus delegates to plan
       await tool.execute(
         {
-          description: "Test prometheus task permission",
+          description: "Test plan task permission",
+          prompt: "Create a plan",
+          subagent_type: "plan",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+      
+      //#then - plan agent should have task permission
+      expect(promptBody.tools.task).toBe(true)
+    }, { timeout: 20000 })
+
+    test("prometheus subagent should NOT have task permission (decoupled from plan)", async () => {
+      //#given - sisyphus delegates to prometheus (no longer a plan agent)
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+      
+       const mockManager = { launch: async () => ({}) }
+       
+       const promptMock = async (input: any) => {
+         promptBody = input.body
+         return { data: {} }
+       }
+       
+       const mockClient = {
+         app: { agents: async () => ({ data: [{ name: "prometheus", mode: "subagent" }] }) },
+         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+         session: {
+           get: async () => ({ data: { directory: "/project" } }),
+           create: async () => ({ data: { id: "ses_prometheus_no_task" } }),
+           prompt: promptMock,
+           promptAsync: promptMock,
+           messages: async () => ({
+             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }]
+           }),
+           status: async () => ({ data: { "ses_prometheus_no_task": { type: "idle" } } }),
+         },
+       }
+       
+       const tool = createDelegateTask({
+         manager: mockManager,
+         client: mockClient,
+       })
+      
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+      
+      //#when - sisyphus delegates to prometheus
+      await tool.execute(
+        {
+          description: "Test prometheus no task permission",
           prompt: "Create a plan",
           subagent_type: "prometheus",
           run_in_background: false,
@@ -2955,12 +2978,12 @@ describe("sisyphus-task", () => {
         toolContext
       )
       
-      // then - prometheus should have task permission
-      expect(promptBody.tools.task).toBe(true)
+      //#then - prometheus should NOT have task permission (it's not a plan agent)
+      expect(promptBody.tools.task).toBe(false)
     }, { timeout: 20000 })
 
-    test("non-prometheus subagent should NOT have task permission", async () => {
-      // given - sisyphus delegates to oracle (non-prometheus)
+    test("non-plan subagent should NOT have task permission", async () => {
+      //#given - sisyphus delegates to oracle (non-plan)
       const { createDelegateTask } = require("./tools")
       let promptBody: any
       
