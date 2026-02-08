@@ -2,7 +2,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides } from "../../config/schema"
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { DelegateTaskArgs, ToolContextWithMetadata, OpencodeClient } from "./types"
-import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS, isPlanAgent } from "./constants"
+import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS, isPlanFamily } from "./constants"
 import { getTimingConfig } from "./timing"
 import { parseModelString, getMessageDir, formatDuration, formatDetailedError } from "./helpers"
 import { resolveCategoryConfig } from "./categories"
@@ -601,7 +601,7 @@ export async function executeSyncTask(
     }
 
     try {
-      const allowTask = isPlanAgent(agentToUse)
+      const allowTask = isPlanFamily(agentToUse)
       await promptSyncWithModelSuggestionRetry(client, {
         path: { id: sessionID },
         body: {
@@ -876,11 +876,11 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
     }
   }
 
-  if (isPlanAgent(agentName) && isPlanAgent(parentAgent)) {
+  if (isPlanFamily(agentName) && isPlanFamily(parentAgent)) {
     return {
       agentToUse: "",
       categoryModel: undefined,
-    error: `You are the plan agent. You cannot delegate to plan via task.
+    error: `You are a plan-family agent (plan/prometheus). You cannot delegate to other plan-family agents via task.
 
 Create the work plan directly - that's your job as the planning agent.`,
     }
