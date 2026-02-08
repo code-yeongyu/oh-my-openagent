@@ -299,6 +299,133 @@ describe("agent-teams tools functional", () => {
     expect(clearedOwnerTask.owner).toBeUndefined()
   })
 
+  test("task tools reject sessions outside the team", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext("ses-main")
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+
+    const createdTask = await executeJsonTool(
+      tools,
+      "team_task_create",
+      {
+        team_name: "core",
+        subject: "Draft release notes",
+        description: "Prepare release notes for next publish.",
+      },
+      leadContext,
+    ) as { id: string }
+
+    const unknownContext = createContext("ses-unknown")
+
+    //#when
+    const createUnauthorized = await executeJsonTool(
+      tools,
+      "team_task_create",
+      {
+        team_name: "core",
+        subject: "Unauthorized create",
+        description: "Should fail",
+      },
+      unknownContext,
+    ) as { error?: string }
+
+    const listUnauthorized = await executeJsonTool(
+      tools,
+      "team_task_list",
+      { team_name: "core" },
+      unknownContext,
+    ) as { error?: string }
+
+    const getUnauthorized = await executeJsonTool(
+      tools,
+      "team_task_get",
+      { team_name: "core", task_id: createdTask.id },
+      unknownContext,
+    ) as { error?: string }
+
+    const updateUnauthorized = await executeJsonTool(
+      tools,
+      "team_task_update",
+      { team_name: "core", task_id: createdTask.id, status: "in_progress" },
+      unknownContext,
+    ) as { error?: string }
+
+    //#then
+    expect(createUnauthorized.error).toBe("unauthorized_task_session")
+    expect(listUnauthorized.error).toBe("unauthorized_task_session")
+    expect(getUnauthorized.error).toBe("unauthorized_task_session")
+    expect(updateUnauthorized.error).toBe("unauthorized_task_session")
+  })
+
+  test("team_task_update assignment notification sender follows actor session", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext("ses-main")
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+        category: "quick",
+      },
+      leadContext,
+    )
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_2",
+        prompt: "Handle QA",
+        category: "quick",
+      },
+      leadContext,
+    )
+
+    const task = await executeJsonTool(
+      tools,
+      "team_task_create",
+      {
+        team_name: "core",
+        subject: "Validate rollout",
+        description: "Run preflight checks",
+      },
+      leadContext,
+    ) as { id: string }
+
+    //#when
+    const updated = await executeJsonTool(
+      tools,
+      "team_task_update",
+      { team_name: "core", task_id: task.id, owner: "worker_2" },
+      createContext("ses-worker-1"),
+    ) as { owner?: string }
+
+    const workerInbox = await executeJsonTool(
+      tools,
+      "read_inbox",
+      {
+        team_name: "core",
+        agent_name: "worker_2",
+        unread_only: true,
+        mark_as_read: false,
+      },
+      leadContext,
+    ) as Array<{ summary?: string; from: string; text: string }>
+
+    //#then
+    expect(updated.owner).toBe("worker_2")
+    const assignment = workerInbox.find((message) => message.summary === "task_assignment")
+    expect(assignment).toBeDefined()
+    expect(assignment?.from).toBe("worker_1")
+  })
+
   test("spawns teammate using category resolution like delegate-task", async () => {
     //#given
     const { manager, launchCalls } = createMockManager()

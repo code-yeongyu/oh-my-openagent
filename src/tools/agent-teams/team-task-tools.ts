@@ -3,21 +3,34 @@ import { sendStructuredInboxMessage } from "./inbox-store"
 import { readTeamConfigOrThrow } from "./team-config-store"
 import { validateAgentNameOrLead, validateTaskId, validateTeamName } from "./name-validation"
 import {
+  TeamConfig,
   TeamTaskCreateInputSchema,
   TeamTaskGetInputSchema,
   TeamTaskListInputSchema,
   TeamTask,
+  TeamToolContext,
+  isTeammateMember,
 } from "./types"
 import { createTeamTask, listTeamTasks, readTeamTask } from "./team-task-store"
 
-function buildTaskAssignmentPayload(task: TeamTask): Record<string, unknown> {
+function buildTaskAssignmentPayload(task: TeamTask, assignedBy: string): Record<string, unknown> {
   return {
     type: "task_assignment",
     taskId: task.id,
     subject: task.subject,
     description: task.description,
+    assignedBy,
     timestamp: new Date().toISOString(),
   }
+}
+
+export function resolveTaskActorFromContext(config: TeamConfig, context: TeamToolContext): "team-lead" | string | null {
+  if (context.sessionID === config.leadSessionId) {
+    return "team-lead"
+  }
+
+  const matchedMember = config.members.find((member) => isTeammateMember(member) && member.sessionID === context.sessionID)
+  return matchedMember?.name ?? null
 }
 
 export function createTeamTaskCreateTool(): ToolDefinition {
@@ -30,14 +43,18 @@ export function createTeamTaskCreateTool(): ToolDefinition {
       active_form: tool.schema.string().optional().describe("Present-continuous form"),
       metadata: tool.schema.record(tool.schema.string(), tool.schema.unknown()).optional().describe("Task metadata"),
     },
-    execute: async (args: Record<string, unknown>): Promise<string> => {
+    execute: async (args: Record<string, unknown>, context: TeamToolContext): Promise<string> => {
       try {
         const input = TeamTaskCreateInputSchema.parse(args)
         const teamError = validateTeamName(input.team_name)
         if (teamError) {
           return JSON.stringify({ error: teamError })
         }
-        readTeamConfigOrThrow(input.team_name)
+        const config = readTeamConfigOrThrow(input.team_name)
+        const actor = resolveTaskActorFromContext(config, context)
+        if (!actor) {
+          return JSON.stringify({ error: "unauthorized_task_session" })
+        }
 
         const task = createTeamTask(
           input.team_name,
@@ -61,14 +78,18 @@ export function createTeamTaskListTool(): ToolDefinition {
     args: {
       team_name: tool.schema.string().describe("Team name"),
     },
-    execute: async (args: Record<string, unknown>): Promise<string> => {
+    execute: async (args: Record<string, unknown>, context: TeamToolContext): Promise<string> => {
       try {
         const input = TeamTaskListInputSchema.parse(args)
         const teamError = validateTeamName(input.team_name)
         if (teamError) {
           return JSON.stringify({ error: teamError })
         }
-        readTeamConfigOrThrow(input.team_name)
+        const config = readTeamConfigOrThrow(input.team_name)
+        const actor = resolveTaskActorFromContext(config, context)
+        if (!actor) {
+          return JSON.stringify({ error: "unauthorized_task_session" })
+        }
         return JSON.stringify(listTeamTasks(input.team_name))
       } catch (error) {
         return JSON.stringify({ error: error instanceof Error ? error.message : "team_task_list_failed" })
@@ -84,7 +105,7 @@ export function createTeamTaskGetTool(): ToolDefinition {
       team_name: tool.schema.string().describe("Team name"),
       task_id: tool.schema.string().describe("Task id"),
     },
-    execute: async (args: Record<string, unknown>): Promise<string> => {
+    execute: async (args: Record<string, unknown>, context: TeamToolContext): Promise<string> => {
       try {
         const input = TeamTaskGetInputSchema.parse(args)
         const teamError = validateTeamName(input.team_name)
@@ -95,7 +116,11 @@ export function createTeamTaskGetTool(): ToolDefinition {
         if (taskIdError) {
           return JSON.stringify({ error: taskIdError })
         }
-        readTeamConfigOrThrow(input.team_name)
+        const config = readTeamConfigOrThrow(input.team_name)
+        const actor = resolveTaskActorFromContext(config, context)
+        if (!actor) {
+          return JSON.stringify({ error: "unauthorized_task_session" })
+        }
         const task = readTeamTask(input.team_name, input.task_id)
         if (!task) {
           return JSON.stringify({ error: "team_task_not_found" })
@@ -108,7 +133,7 @@ export function createTeamTaskGetTool(): ToolDefinition {
   })
 }
 
-export function notifyOwnerAssignment(teamName: string, task: TeamTask): void {
+export function notifyOwnerAssignment(teamName: string, task: TeamTask, assignedBy: string): void {
   if (!task.owner || task.status === "deleted") {
     return
   }
@@ -121,11 +146,15 @@ export function notifyOwnerAssignment(teamName: string, task: TeamTask): void {
     return
   }
 
+  if (validateAgentNameOrLead(assignedBy)) {
+    return
+  }
+
   sendStructuredInboxMessage(
     teamName,
-    "team-lead",
+    assignedBy,
     task.owner,
-    buildTaskAssignmentPayload(task),
+    buildTaskAssignmentPayload(task, assignedBy),
     "task_assignment",
   )
 }
