@@ -3,12 +3,37 @@ import { getTeamConfigPath } from "./paths"
 import { validateTeamName } from "./name-validation"
 import { ensureInbox } from "./inbox-store"
 import {
+  TeamConfig,
   TeamCreateInputSchema,
   TeamDeleteInputSchema,
   TeamReadConfigInputSchema,
   TeamToolContext,
+  isTeammateMember,
 } from "./types"
 import { createTeamConfig, deleteTeamData, listTeammates, readTeamConfig, readTeamConfigOrThrow } from "./team-config-store"
+
+function resolveReaderFromContext(config: TeamConfig, context: TeamToolContext): "team-lead" | string | null {
+  if (context.sessionID === config.leadSessionId) {
+    return "team-lead"
+  }
+
+  const matchedMember = config.members.find((member) => isTeammateMember(member) && member.sessionID === context.sessionID)
+  return matchedMember?.name ?? null
+}
+
+function toPublicTeamConfig(config: TeamConfig): {
+  team_name: string
+  description: string
+  lead_agent_id: string
+  teammates: Array<{ name: string }>
+} {
+  return {
+    team_name: config.name,
+    description: config.description,
+    lead_agent_id: config.leadAgentId,
+    teammates: listTeammates(config).map((member) => ({ name: member.name })),
+  }
+}
 
 export function createTeamCreateTool(): ToolDefinition {
   return tool({
@@ -82,13 +107,23 @@ export function createTeamReadConfigTool(): ToolDefinition {
     args: {
       team_name: tool.schema.string().describe("Team name"),
     },
-    execute: async (args: Record<string, unknown>): Promise<string> => {
+    execute: async (args: Record<string, unknown>, context: TeamToolContext): Promise<string> => {
       try {
         const input = TeamReadConfigInputSchema.parse(args)
         const config = readTeamConfig(input.team_name)
         if (!config) {
           return JSON.stringify({ error: "team_not_found" })
         }
+
+        const actor = resolveReaderFromContext(config, context)
+        if (!actor) {
+          return JSON.stringify({ error: "unauthorized_reader_session" })
+        }
+
+        if (actor !== "team-lead") {
+          return JSON.stringify(toPublicTeamConfig(config))
+        }
+
         return JSON.stringify(config)
       } catch (error) {
         return JSON.stringify({ error: error instanceof Error ? error.message : "team_read_config_failed" })

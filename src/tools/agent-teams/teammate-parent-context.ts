@@ -8,6 +8,6 @@ export function resolveTeamParentContext(context: TeamToolContext): ParentContex
     sessionID: context.sessionID,
     messageID: context.messageID,
     agent: context.agent ?? "sisyphus",
-    abort: new AbortController().signal,
+    abort: context.abort ?? new AbortController().signal,
   } as ToolContextWithMetadata)
 }

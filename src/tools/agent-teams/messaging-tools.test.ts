@@ -138,6 +138,38 @@ describe("agent-teams messaging tools", () => {
     expect(resumeCalls).toHaveLength(0)
   })
 
+  test("send_message rejects recipient with empty team suffix", async () => {
+    //#given
+    const { manager, resumeCalls } = createManagerWithImmediateResume()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext()
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      { team_name: "core", name: "worker_1", prompt: "Handle release prep", category: "quick" },
+      leadContext,
+    )
+
+    //#when
+    const invalidRecipient = await executeJsonTool(
+      tools,
+      "send_message",
+      {
+        team_name: "core",
+        type: "message",
+        recipient: "worker_1@",
+        summary: "sync",
+        content: "Please update status.",
+      },
+      leadContext,
+    ) as { error?: string }
+
+    //#then
+    expect(invalidRecipient.error).toBe("recipient_team_invalid")
+    expect(resumeCalls).toHaveLength(0)
+  })
+
   test("broadcast schedules teammate resumes without serial await", async () => {
     //#given
     const { manager, resumeCalls, resolveAllResumes } = createManagerWithDeferredResume()

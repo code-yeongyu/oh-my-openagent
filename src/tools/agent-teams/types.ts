@@ -192,6 +192,7 @@ export const TeamProcessShutdownInputSchema = z.object({
 export interface TeamToolContext {
   sessionID: string
   messageID: string
+  abort: AbortSignal
   agent?: string
 }
 

@@ -28,7 +28,10 @@ function validateRecipientTeam(recipient: unknown, teamName: string): string | n
   }
 
   const specifiedTeam = trimmed.slice(atIndex + 1).trim()
-  if (!specifiedTeam || specifiedTeam === teamName) {
+  if (!specifiedTeam) {
+    return "recipient_team_invalid"
+  }
+  if (specifiedTeam === teamName) {
     return null
   }
 
@@ -55,7 +58,10 @@ export function createSendMessageTool(manager: BackgroundManager): ToolDefinitio
       summary: tool.schema.string().optional().describe("Short summary"),
       request_id: tool.schema.string().optional().describe("Protocol request id"),
       approve: tool.schema.boolean().optional().describe("Approval flag"),
-      sender: tool.schema.string().optional().describe("Sender name (default: team-lead)"),
+      sender: tool.schema
+        .string()
+        .optional()
+        .describe("Sender name inferred from calling session; explicit value must match resolved sender."),
     },
     execute: async (args: Record<string, unknown>, context: TeamToolContext): Promise<string> => {
       try {

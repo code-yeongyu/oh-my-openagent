@@ -1032,6 +1032,67 @@ describe("agent-teams tools functional", () => {
     expect(config.leadSessionId).toBe("ses-main")
   })
 
+  test("read_config rejects sessions outside the team", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext("ses-main")
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+
+    //#when
+    const result = await executeJsonTool(
+      tools,
+      "read_config",
+      { team_name: "core" },
+      createContext("ses-unknown"),
+    ) as { error?: string }
+
+    //#then
+    expect(result.error).toBe("unauthorized_reader_session")
+  })
+
+  test("read_config returns sanitized config for teammate sessions", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext("ses-main")
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+        category: "quick",
+      },
+      leadContext,
+    )
+
+    //#when
+    const teammateView = await executeJsonTool(
+      tools,
+      "read_config",
+      { team_name: "core" },
+      createContext("ses-worker-1"),
+    ) as {
+      team_name?: string
+      description?: string
+      lead_agent_id?: string
+      teammates?: Array<{ name: string }>
+      leadSessionId?: string
+      members?: unknown
+    }
+
+    //#then
+    expect(teammateView.team_name).toBe("core")
+    expect(teammateView.description).toBe("")
+    expect(teammateView.lead_agent_id).toBe("team-lead@core")
+    expect(teammateView.teammates).toEqual(expect.arrayContaining([expect.objectContaining({ name: "worker_1" })]))
+    expect("leadSessionId" in teammateView).toBe(false)
+    expect("members" in teammateView).toBe(false)
+  })
+
   test("rejects unknown session claiming team-lead inbox", async () => {
     //#given
     const { manager } = createMockManager()
