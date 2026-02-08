@@ -7,10 +7,13 @@ function parseModel(model: string | undefined): { providerID: string; modelID: s
   if (!model) {
     return undefined
   }
-  const [providerID, modelID] = model.split("/", 2)
-  if (!providerID || !modelID) {
+  const separatorIndex = model.indexOf("/")
+  if (separatorIndex <= 0 || separatorIndex >= model.length - 1) {
     throw new Error("invalid_model_override_format")
   }
+
+  const providerID = model.slice(0, separatorIndex)
+  const modelID = model.slice(separatorIndex + 1)
   return { providerID, modelID }
 }
 

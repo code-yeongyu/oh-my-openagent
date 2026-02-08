@@ -636,6 +636,36 @@ describe("agent-teams tools functional", () => {
     expect(config.members.map((member) => member.name)).toEqual(["team-lead"])
   })
 
+  test("keeps full model id suffix when override contains extra slashes", async () => {
+    //#given
+    const { manager, launchCalls } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+
+    //#when
+    const spawnResult = await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+        model: "openai/gpt-5.3-codex/reasoning",
+      },
+      context,
+    ) as { name?: string; error?: string }
+
+    //#then
+    expect(spawnResult.error).toBeUndefined()
+    expect(spawnResult.name).toBe("worker_1")
+    expect(launchCalls).toHaveLength(1)
+    expect(launchCalls[0].model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5.3-codex/reasoning",
+    })
+  })
+
   test("read_inbox returns team_not_found for unknown team", async () => {
     //#given
     const { manager } = createMockManager()
@@ -704,6 +734,113 @@ describe("agent-teams tools functional", () => {
 
     //#then
     expect(Array.isArray(ownInbox)).toBe(true)
+  })
+
+  test("allows lead session to rotate after restart using team-lead identity", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const originalLead = createContext("ses-main")
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, originalLead)
+
+    const restartedLead = createContext("ses-restarted")
+
+    //#when
+    const sendResult = await executeJsonTool(
+      tools,
+      "send_message",
+      {
+        team_name: "core",
+        type: "message",
+        sender: "team-lead",
+        recipient: "team-lead",
+        summary: "restart",
+        content: "Lead session migrated",
+      },
+      restartedLead,
+    ) as { success?: boolean; error?: string }
+
+    //#then
+    expect(sendResult.error).toBeUndefined()
+    expect(sendResult.success).toBe(true)
+
+    //#when
+    const config = await executeJsonTool(tools, "read_config", { team_name: "core" }, restartedLead) as {
+      leadSessionId: string
+    }
+
+    //#then
+    expect(config.leadSessionId).toBe("ses-restarted")
+  })
+
+  test("clears old inbox when teammate is removed then re-spawned", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "First run",
+      },
+      context,
+    )
+
+    await executeJsonTool(
+      tools,
+      "send_message",
+      {
+        team_name: "core",
+        type: "message",
+        recipient: "worker_1",
+        summary: "legacy",
+        content: "legacy payload",
+      },
+      context,
+    )
+
+    await executeJsonTool(
+      tools,
+      "force_kill_teammate",
+      {
+        team_name: "core",
+        agent_name: "worker_1",
+      },
+      context,
+    )
+
+    //#when
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Second run",
+      },
+      context,
+    )
+
+    const inbox = await executeJsonTool(
+      tools,
+      "read_inbox",
+      {
+        team_name: "core",
+        agent_name: "worker_1",
+        unread_only: true,
+        mark_as_read: false,
+      },
+      context,
+    ) as Array<{ text: string; summary?: string }>
+
+    //#then
+    expect(inbox.some((message) => message.text.includes("legacy payload"))).toBe(false)
+    expect(inbox.some((message) => message.summary === "initial_prompt" && message.text.includes("Second run"))).toBe(true)
   })
 
   test("cannot add pending blockers to already in-progress task without status change", async () => {

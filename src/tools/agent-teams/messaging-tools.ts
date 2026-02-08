@@ -1,7 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import type { BackgroundManager } from "../../features/background-agent"
 import { buildShutdownRequestId, readInbox, sendPlainInboxMessage, sendStructuredInboxMessage } from "./inbox-store"
-import { getTeamMember, listTeammates, readTeamConfigOrThrow } from "./team-config-store"
+import { getTeamMember, listTeammates, readTeamConfigOrThrow, updateTeamConfig } from "./team-config-store"
 import { validateAgentNameOrLead, validateTeamName } from "./name-validation"
 import { resumeTeammateWithMessage } from "./teammate-runtime"
 import {
@@ -23,6 +23,13 @@ function resolveSenderFromContext(config: TeamConfig, context: TeamToolContext):
 
   const matchedMember = config.members.find((member) => isTeammateMember(member) && member.sessionID === context.sessionID)
   return matchedMember?.name ?? null
+}
+
+function claimLeadSession(teamName: string, nextLeadSessionId: string): TeamConfig {
+  return updateTeamConfig(teamName, (current) => ({
+    ...current,
+    leadSessionId: nextLeadSessionId,
+  }))
 }
 
 export function createSendMessageTool(manager: BackgroundManager): ToolDefinition {
@@ -50,8 +57,12 @@ export function createSendMessageTool(manager: BackgroundManager): ToolDefinitio
         if (senderError) {
           return JSON.stringify({ error: senderError })
         }
-        const config = readTeamConfigOrThrow(input.team_name)
-        const actor = resolveSenderFromContext(config, context)
+        let config = readTeamConfigOrThrow(input.team_name)
+        let actor = resolveSenderFromContext(config, context)
+        if (!actor && requestedSender === "team-lead") {
+          config = claimLeadSession(input.team_name, context.sessionID)
+          actor = "team-lead"
+        }
         if (!actor) {
           return JSON.stringify({ error: "unauthorized_sender_session" })
         }
@@ -223,8 +234,12 @@ export function createReadInboxTool(): ToolDefinition {
         if (agentError) {
           return JSON.stringify({ error: agentError })
         }
-        const config = readTeamConfigOrThrow(input.team_name)
-        const actor = resolveSenderFromContext(config, context)
+        let config = readTeamConfigOrThrow(input.team_name)
+        let actor = resolveSenderFromContext(config, context)
+        if (!actor && input.agent_name === "team-lead") {
+          config = claimLeadSession(input.team_name, context.sessionID)
+          actor = "team-lead"
+        }
         if (!actor) {
           return JSON.stringify({ error: "unauthorized_reader_session" })
         }

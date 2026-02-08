@@ -1,5 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import type { BackgroundManager } from "../../features/background-agent"
+import { clearInbox } from "./inbox-store"
 import { validateAgentName, validateTeamName } from "./name-validation"
 import {
   TeamForceKillInputSchema,
@@ -8,7 +9,7 @@ import {
   TeamToolContext,
   isTeammateMember,
 } from "./types"
-import { getTeamMember, readTeamConfigOrThrow, removeTeammate, updateTeamConfig, writeTeamConfig } from "./team-config-store"
+import { getTeamMember, readTeamConfigOrThrow, removeTeammate, updateTeamConfig } from "./team-config-store"
 import { cancelTeammateRun, spawnTeammate } from "./teammate-runtime"
 import { resetOwnerTasks } from "./team-task-store"
 
@@ -86,11 +87,20 @@ export function createForceKillTeammateTool(manager: BackgroundManager): ToolDef
         }
 
         await cancelTeammateRun(manager, member)
-        const refreshedConfig = readTeamConfigOrThrow(input.team_name)
-        const refreshedMember = getTeamMember(refreshedConfig, input.agent_name)
-        if (refreshedMember && isTeammateMember(refreshedMember)) {
-          writeTeamConfig(input.team_name, removeTeammate(refreshedConfig, input.agent_name))
+        let removed = false
+        updateTeamConfig(input.team_name, (current) => {
+          const refreshedMember = getTeamMember(current, input.agent_name)
+          if (!refreshedMember || !isTeammateMember(refreshedMember)) {
+            return current
+          }
+          removed = true
+          return removeTeammate(current, input.agent_name)
+        })
+
+        if (removed) {
+          clearInbox(input.team_name, input.agent_name)
         }
+
         resetOwnerTasks(input.team_name, input.agent_name)
 
         return JSON.stringify({ success: true, message: `${input.agent_name} stopped` })
@@ -130,15 +140,20 @@ export function createProcessShutdownTool(manager: BackgroundManager): ToolDefin
         }
 
         await cancelTeammateRun(manager, member)
+        let removed = false
 
         updateTeamConfig(input.team_name, (current) => {
           const refreshedMember = getTeamMember(current, input.agent_name)
           if (!refreshedMember || !isTeammateMember(refreshedMember)) {
             return current
           }
-
+          removed = true
           return removeTeammate(current, input.agent_name)
         })
+
+        if (removed) {
+          clearInbox(input.team_name, input.agent_name)
+        }
 
         resetOwnerTasks(input.team_name, input.agent_name)
 
