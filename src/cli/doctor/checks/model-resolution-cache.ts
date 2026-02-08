@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { parseJsonc } from "../../../shared"
 import type { AvailableModelsInfo } from "./model-resolution-types"
 
 function getOpenCodeCacheDir(): string {
@@ -18,7 +19,7 @@ export function loadAvailableModelsFromCache(): AvailableModelsInfo {
 
   try {
     const content = readFileSync(cacheFile, "utf-8")
-    const data = JSON.parse(content) as Record<string, { models?: Record<string, unknown> }>
+    const data = parseJsonc<Record<string, { models?: Record<string, unknown> }>>(content)
 
     const providers = Object.keys(data)
     let modelCount = 0
