@@ -1239,6 +1239,14 @@
       "created_at": "2026-02-08T02:34:46Z",
       "repoId": 1108837393,
       "pullRequestNo": 1641
+    },
+    {
+      "name": "JunyeongChoi0",
+      "id": 99778164,
+      "comment_id": 3867461224,
+      "created_at": "2026-02-08T16:02:31Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 1674
     }
   ]
 }
