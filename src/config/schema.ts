@@ -333,6 +333,8 @@ export const BackgroundTaskConfigSchema = z.object({
 export const NotificationConfigSchema = z.object({
   /** Force enable session-notification even if external notification plugins are detected (default: false) */
   force_enable: z.boolean().optional(),
+  /** Custom message format with template variables: {project} (folder name), {cwd} (full path). Default: "{project} — Agent is ready for input" */
+  message_format: z.string().optional(),
 })
 
 export const BabysittingConfigSchema = z.object({
