@@ -8,7 +8,7 @@ import { parseOpenCodeConfigFileWithError, type OpenCodeConfig } from "./parse-o
 
 export async function fetchLatestVersion(packageName: string): Promise<string | null> {
   try {
-    const res = await fetch(`https://registry.npmjs.org/${packageName}/latest`)
+    const res = await fetch(`https://registry.npmjs.org/${encodeURIComponent(packageName)}/latest`)
     if (!res.ok) return null
     const data = (await res.json()) as { version: string }
     return data.version
