@@ -274,13 +274,13 @@ ACCUMULATED WISDOM:
 
 **For exploration (explore/librarian)**: ALWAYS background
 \`\`\`typescript
-task(subagent_type="explore", run_in_background=true, ...)
-task(subagent_type="librarian", run_in_background=true, ...)
+task(subagent_type="explore", load_skills=[], run_in_background=true, ...)
+task(subagent_type="librarian", load_skills=[], run_in_background=true, ...)
 \`\`\`
 
 **For task execution**: NEVER background
 \`\`\`typescript
-task(category="...", run_in_background=false, ...)
+task(category="...", load_skills=[...], run_in_background=false, ...)
 \`\`\`
 
 **Parallel task groups**: Invoke multiple in ONE message
