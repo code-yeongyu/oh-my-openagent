@@ -83,18 +83,20 @@ export function createSessionNotification(
   async function executeNotification(sessionID: string, version: number) {
     if (executingNotifications.has(sessionID)) {
       pendingTimers.delete(sessionID)
-
       return
     }
+
     if (notificationVersions.get(sessionID) !== version) {
       pendingTimers.delete(sessionID)
       return
     }
+
     if (sessionActivitySinceIdle.has(sessionID)) {
       sessionActivitySinceIdle.delete(sessionID)
       pendingTimers.delete(sessionID)
       return
     }
+
     if (notifiedSessions.has(sessionID)) {
       pendingTimers.delete(sessionID)
       return
@@ -113,6 +115,7 @@ export function createSessionNotification(
       if (notificationVersions.get(sessionID) !== version) {
         return
       }
+      
       if (sessionActivitySinceIdle.has(sessionID)) {
         sessionActivitySinceIdle.delete(sessionID)
         return
