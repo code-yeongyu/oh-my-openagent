@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode-linux-arm64",
-  "version": "3.3.2",
+  "version": "3.4.0",
   "description": "Platform-specific binary for oh-my-opencode (linux-arm64)",
   "license": "MIT",
   "repository": {
