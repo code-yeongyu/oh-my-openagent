@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-66 cross-cutting utilities. Import via barrel pattern: `import { log, deepMerge } from "../../shared"`
+88 cross-cutting utilities. Import via barrel pattern: `import { log, deepMerge } from "../../shared"`
 
 **Categories**: Path resolution, Token truncation, Config parsing, Model resolution, System directives, Tool restrictions
 
