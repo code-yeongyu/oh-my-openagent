@@ -132,6 +132,7 @@ export function createRalphLoopEventHandler(
 					sessionID,
 					prompt: buildContinuationPrompt(newState),
 					directory: options.directory,
+					apiTimeoutMs: options.apiTimeoutMs,
 				})
 			} catch (err) {
 				log(`[${HOOK_NAME}] Failed to inject continuation`, {

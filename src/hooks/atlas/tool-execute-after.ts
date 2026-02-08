@@ -2,9 +2,9 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { appendSessionId, getPlanProgress, readBoulderState } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
+import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
 import { HOOK_NAME } from "./hook-name"
 import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
-import { formatFileChanges, getGitDiffStats } from "./git-diff-stats"
 import { isSisyphusPath } from "./sisyphus-path"
 import { extractSessionIdFromOutput } from "./subagent-session-id"
 import { buildOrchestratorReminder, buildStandaloneVerificationReminder } from "./verification-reminders"
@@ -57,7 +57,7 @@ export function createToolExecuteAfterHandler(input: {
     }
 
     if (toolOutput.output && typeof toolOutput.output === "string") {
-      const gitStats = getGitDiffStats(ctx.directory)
+      const gitStats = collectGitDiffStats(ctx.directory)
       const fileChanges = formatFileChanges(gitStats)
       const subagentSessionId = extractSessionIdFromOutput(toolOutput.output)
 

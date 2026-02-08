@@ -4,6 +4,7 @@ import type { PluginContext } from "../types"
 
 import {
   createTodoContinuationEnforcer,
+  createTaskContinuationEnforcer,
   createBackgroundNotificationHook,
   createStopContinuationGuardHook,
   createCompactionContextInjector,
@@ -18,6 +19,7 @@ export type ContinuationHooks = {
   compactionContextInjector: ReturnType<typeof createCompactionContextInjector> | null
   compactionTodoPreserver: ReturnType<typeof createCompactionTodoPreserverHook> | null
   todoContinuationEnforcer: ReturnType<typeof createTodoContinuationEnforcer> | null
+  taskContinuationEnforcer: ReturnType<typeof createTaskContinuationEnforcer> | null
   unstableAgentBabysitter: ReturnType<typeof createUnstableAgentBabysitter> | null
   backgroundNotificationHook: ReturnType<typeof createBackgroundNotificationHook> | null
   atlasHook: ReturnType<typeof createAtlasHook> | null
@@ -68,14 +70,43 @@ export function createContinuationHooks(args: {
         }))
     : null
 
+  const taskContinuationEnforcer = isHookEnabled("task-continuation-enforcer")
+    ? safeHook("task-continuation-enforcer", () =>
+        createTaskContinuationEnforcer(ctx, pluginConfig, {
+          backgroundManager,
+          isContinuationStopped: stopContinuationGuard?.isStopped,
+        }))
+    : null
+
   const unstableAgentBabysitter = isHookEnabled("unstable-agent-babysitter")
     ? safeHook("unstable-agent-babysitter", () =>
         createUnstableAgentBabysitter({ ctx, backgroundManager, pluginConfig }))
     : null
 
-  if (sessionRecovery && todoContinuationEnforcer) {
-    sessionRecovery.setOnAbortCallback(todoContinuationEnforcer.markRecovering)
-    sessionRecovery.setOnRecoveryCompleteCallback(todoContinuationEnforcer.markRecoveryComplete)
+  if (sessionRecovery) {
+    const onAbortCallbacks: Array<(sessionID: string) => void> = []
+    const onRecoveryCompleteCallbacks: Array<(sessionID: string) => void> = []
+
+    if (todoContinuationEnforcer) {
+      onAbortCallbacks.push(todoContinuationEnforcer.markRecovering)
+      onRecoveryCompleteCallbacks.push(todoContinuationEnforcer.markRecoveryComplete)
+    }
+    if (taskContinuationEnforcer) {
+      onAbortCallbacks.push(taskContinuationEnforcer.markRecovering)
+      onRecoveryCompleteCallbacks.push(taskContinuationEnforcer.markRecoveryComplete)
+    }
+
+    if (onAbortCallbacks.length > 0) {
+      sessionRecovery.setOnAbortCallback((sessionID: string) => {
+        for (const callback of onAbortCallbacks) callback(sessionID)
+      })
+    }
+
+    if (onRecoveryCompleteCallbacks.length > 0) {
+      sessionRecovery.setOnRecoveryCompleteCallback((sessionID: string) => {
+        for (const callback of onRecoveryCompleteCallbacks) callback(sessionID)
+      })
+    }
   }
 
   const backgroundNotificationHook = isHookEnabled("background-notification")
@@ -89,6 +120,7 @@ export function createContinuationHooks(args: {
           backgroundManager,
           isContinuationStopped: (sessionID: string) =>
             stopContinuationGuard?.isStopped(sessionID) ?? false,
+          agentOverrides: pluginConfig.agents,
         }))
     : null
 
@@ -97,6 +129,7 @@ export function createContinuationHooks(args: {
     compactionContextInjector,
     compactionTodoPreserver,
     todoContinuationEnforcer,
+    taskContinuationEnforcer,
     unstableAgentBabysitter,
     backgroundNotificationHook,
     atlasHook,

@@ -81,11 +81,13 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         tool_result_missing: "Tool Crash Recovery",
         thinking_block_order: "Thinking Block Recovery",
         thinking_disabled_violation: "Thinking Strip Recovery",
+        "assistant_prefill_unsupported": "Prefill Unsupported",
       }
       const toastMessages: Record<RecoveryErrorType & string, string> = {
         tool_result_missing: "Injecting cancelled tool results...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
+        "assistant_prefill_unsupported": "Prefill not supported; continuing without recovery.",
       }
 
       await ctx.client.tui
@@ -117,6 +119,8 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
           const resumeConfig = extractResumeConfig(lastUser, sessionID)
           await resumeSession(ctx.client, resumeConfig)
         }
+      } else if (errorType === "assistant_prefill_unsupported") {
+        success = true
       }
 
       return success
