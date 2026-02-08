@@ -109,7 +109,7 @@ export const TeamSpawnInputSchema = z.object({
   team_name: z.string(),
   name: z.string(),
   prompt: z.string(),
-  category: z.string().optional(),
+  category: z.string(),
   subagent_type: z.string().optional(),
   model: z.string().optional(),
   plan_mode_required: z.boolean().optional(),

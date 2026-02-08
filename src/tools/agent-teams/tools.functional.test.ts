@@ -363,7 +363,8 @@ describe("agent-teams tools functional", () => {
     ) as { error?: string }
 
     //#then
-    expect(result.error).toBe("category_required")
+    expect(result.error).toBeDefined()
+    expect(result.error).toContain("category")
   })
 
   test("rejects category with incompatible subagent_type", async () => {
@@ -929,6 +930,70 @@ describe("agent-teams tools functional", () => {
 
     //#then
     expect(Array.isArray(ownInbox)).toBe(true)
+  })
+
+  test("read_inbox returns messages with read=true when mark_as_read is enabled", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+        category: "quick",
+      },
+      context,
+    )
+
+    //#when
+    const unreadBefore = await executeJsonTool(
+      tools,
+      "read_inbox",
+      {
+        team_name: "core",
+        agent_name: "worker_1",
+        unread_only: true,
+        mark_as_read: false,
+      },
+      context,
+    ) as Array<{ read: boolean }>
+
+    const markedRead = await executeJsonTool(
+      tools,
+      "read_inbox",
+      {
+        team_name: "core",
+        agent_name: "worker_1",
+        unread_only: true,
+        mark_as_read: true,
+      },
+      context,
+    ) as Array<{ read: boolean }>
+
+    const unreadAfter = await executeJsonTool(
+      tools,
+      "read_inbox",
+      {
+        team_name: "core",
+        agent_name: "worker_1",
+        unread_only: true,
+        mark_as_read: false,
+      },
+      context,
+    ) as Array<{ read: boolean }>
+
+    //#then
+    expect(unreadBefore.length).toBeGreaterThan(0)
+    expect(unreadBefore.every((message) => message.read === false)).toBe(true)
+    expect(markedRead.length).toBeGreaterThan(0)
+    expect(markedRead.every((message) => message.read === true)).toBe(true)
+    expect(unreadAfter).toHaveLength(0)
   })
 
   test("rejects unknown session claiming team-lead identity", async () => {

@@ -246,6 +246,8 @@ export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTe
     updateTeamConfig(params.teamName, (current) => upsertTeammate(current, nextMember))
     return nextMember
   } catch (error) {
+    const originalError = error
+
     if (launchedTaskID) {
       await params.manager
         .cancelTask(launchedTaskID, {
@@ -255,9 +257,20 @@ export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTe
         })
         .catch(() => undefined)
     }
-    updateTeamConfig(params.teamName, (current) => removeTeammate(current, params.name))
-    clearInbox(params.teamName, params.name)
-    throw error
+
+    try {
+      updateTeamConfig(params.teamName, (current) => removeTeammate(current, params.name))
+    } catch (cleanupError) {
+      void cleanupError
+    }
+
+    try {
+      clearInbox(params.teamName, params.name)
+    } catch (cleanupError) {
+      void cleanupError
+    }
+
+    throw originalError
   }
 }
 

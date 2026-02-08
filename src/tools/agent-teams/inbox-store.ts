@@ -144,24 +144,28 @@ export function readInbox(
   return withInboxLock(teamName, () => {
     const messages = readInboxMessages(teamName, agentName)
 
-    const selected = unreadOnly ? messages.filter((message) => !message.read) : [...messages]
+    const selectedIndexes = new Set<number>()
+    const selected = unreadOnly
+      ? messages.filter((message, index) => {
+          if (!message.read) {
+            selectedIndexes.add(index)
+            return true
+          }
+          return false
+        })
+      : messages.map((message, index) => {
+          selectedIndexes.add(index)
+          return message
+        })
 
     if (!markAsRead || selected.length === 0) {
       return selected
     }
 
-    const selectedSet = unreadOnly ? new Set(selected) : null
     let changed = false
 
-    const updated = messages.map((message) => {
-      if (!unreadOnly) {
-        if (!message.read) {
-          changed = true
-        }
-        return { ...message, read: true }
-      }
-
-      if (selectedSet?.has(message)) {
+    const updated = messages.map((message, index) => {
+      if (selectedIndexes.has(index) && !message.read) {
         changed = true
         return { ...message, read: true }
       }
@@ -171,7 +175,7 @@ export function readInbox(
     if (changed) {
       writeInboxMessages(teamName, agentName, updated)
     }
-    return selected
+    return updated.filter((_, index) => selectedIndexes.has(index))
   })
 }
 

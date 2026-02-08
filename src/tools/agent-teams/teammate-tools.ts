@@ -28,7 +28,7 @@ export function createSpawnTeammateTool(manager: BackgroundManager, options?: Ag
       team_name: tool.schema.string().describe("Team name"),
       name: tool.schema.string().describe("Teammate name"),
       prompt: tool.schema.string().describe("Initial teammate prompt"),
-      category: tool.schema.string().optional().describe("Required category for teammate metadata and routing"),
+      category: tool.schema.string().describe("Required category for teammate metadata and routing"),
       subagent_type: tool.schema.string().optional().describe("Agent name to run (default: sisyphus-junior)"),
       model: tool.schema.string().optional().describe("Optional model override in provider/model format"),
       plan_mode_required: tool.schema.boolean().optional().describe("Enable plan mode flag in teammate metadata"),
@@ -46,11 +46,11 @@ export function createSpawnTeammateTool(manager: BackgroundManager, options?: Ag
           return JSON.stringify({ error: agentError })
         }
 
-        if (!input.category || !input.category.trim()) {
+        if (!input.category.trim()) {
           return JSON.stringify({ error: "category_required" })
         }
 
-        if (input.category && input.subagent_type && input.subagent_type !== "sisyphus-junior") {
+        if (input.subagent_type && input.subagent_type !== "sisyphus-junior") {
           return JSON.stringify({ error: "category_conflicts_with_subagent_type" })
         }
 
