@@ -16,6 +16,25 @@ function nowIso(): string {
   return new Date().toISOString()
 }
 
+function validateRecipientTeam(recipient: unknown, teamName: string): string | null {
+  if (typeof recipient !== "string") {
+    return null
+  }
+
+  const trimmed = recipient.trim()
+  const atIndex = trimmed.indexOf("@")
+  if (atIndex <= 0) {
+    return null
+  }
+
+  const specifiedTeam = trimmed.slice(atIndex + 1).trim()
+  if (!specifiedTeam || specifiedTeam === teamName) {
+    return null
+  }
+
+  return "recipient_team_mismatch"
+}
+
 function resolveSenderFromContext(config: TeamConfig, context: TeamToolContext): string | null {
   if (context.sessionID === config.leadSessionId) {
     return "team-lead"
@@ -44,6 +63,10 @@ export function createSendMessageTool(manager: BackgroundManager): ToolDefinitio
         const teamError = validateTeamName(input.team_name)
         if (teamError) {
           return JSON.stringify({ error: teamError })
+        }
+        const recipientTeamError = validateRecipientTeam(args.recipient, input.team_name)
+        if (recipientTeamError) {
+          return JSON.stringify({ error: recipientTeamError })
         }
         const requestedSender = input.sender
         const senderError = requestedSender ? validateAgentNameOrLead(requestedSender) : null
@@ -88,11 +111,16 @@ export function createSendMessageTool(manager: BackgroundManager): ToolDefinitio
           if (!input.summary) {
             return JSON.stringify({ error: "broadcast_requires_summary" })
           }
+          const broadcastSummary = input.summary
           const teammates = listTeammates(config)
           for (const teammate of teammates) {
-            sendPlainInboxMessage(input.team_name, sender, teammate.name, input.content ?? "", input.summary)
-            await resumeTeammateWithMessage(manager, context, input.team_name, teammate, input.summary, input.content ?? "")
+            sendPlainInboxMessage(input.team_name, sender, teammate.name, input.content ?? "", broadcastSummary)
           }
+          await Promise.allSettled(
+            teammates.map((teammate) =>
+              resumeTeammateWithMessage(manager, context, input.team_name, teammate, broadcastSummary, input.content ?? ""),
+            ),
+          )
           return JSON.stringify({ success: true, message: `broadcast_sent:${teammates.length}` })
         }
 

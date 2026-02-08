@@ -52,10 +52,13 @@ export function createTeamDeleteTool(): ToolDefinition {
     args: {
       team_name: tool.schema.string().describe("Team name"),
     },
-    execute: async (args: Record<string, unknown>): Promise<string> => {
+    execute: async (args: Record<string, unknown>, context: TeamToolContext): Promise<string> => {
       try {
         const input = TeamDeleteInputSchema.parse(args)
         const config = readTeamConfigOrThrow(input.team_name)
+        if (context.sessionID !== config.leadSessionId) {
+          return JSON.stringify({ error: "unauthorized_lead_session" })
+        }
         const teammates = listTeammates(config)
         if (teammates.length > 0) {
           return JSON.stringify({
