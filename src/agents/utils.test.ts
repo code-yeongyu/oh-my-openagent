@@ -249,6 +249,56 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.sisyphus.prompt).toContain("frontend-ui-ux")
     expect(agents.sisyphus.prompt).toContain("git-master")
   })
+
+  test("includes custom agents from OpenCode registry in orchestrator prompts", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set([
+        "anthropic/claude-opus-4-6",
+        "kimi-for-coding/k2p5",
+        "opencode/kimi-k2.5-free",
+        "zai-coding-plan/glm-4.7",
+        "opencode/glm-4.7-free",
+        "openai/gpt-5.2",
+      ])
+    )
+
+    const client = {
+      agent: {
+        list: async () => ({
+          data: [
+            {
+              name: "researcher",
+              description: "Research agent for deep analysis",
+              mode: "subagent",
+              hidden: false,
+            },
+          ],
+        }),
+      },
+    }
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents(
+        [],
+        {},
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        client
+      )
+
+      // #then
+      expect(agents.sisyphus.prompt).toContain("researcher")
+      expect(agents.hephaestus.prompt).toContain("researcher")
+      expect(agents.atlas.prompt).toContain("researcher")
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
 })
 
 describe("createBuiltinAgents without systemDefaultModel", () => {
