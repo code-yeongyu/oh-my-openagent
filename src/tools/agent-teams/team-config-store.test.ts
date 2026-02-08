@@ -1,10 +1,10 @@
 /// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { acquireLock } from "../../features/claude-tasks/storage"
-import { getTeamDir, getTeamTaskDir } from "./paths"
+import { getTeamDir, getTeamTaskDir, getTeamsRootDir } from "./paths"
 import { createTeamConfig, deleteTeamData, teamExists } from "./team-config-store"
 
 describe("agent-teams team config store", () => {
@@ -69,21 +69,26 @@ describe("agent-teams team config store", () => {
     expect(teamExists("core")).toBe(false)
   })
 
-  test("deleteTeamData removes task files before team files", () => {
+  test("deleteTeamData removes task files before deleting team directory", () => {
     //#given
-    const sourceUrl = new URL("./team-config-store.ts", import.meta.url)
-    const source = readFileSync(sourceUrl, "utf-8")
-    const deleteFnStart = source.indexOf("export function deleteTeamData")
-    const deleteFnSlice = deleteFnStart >= 0 ? source.slice(deleteFnStart, deleteFnStart + 700) : ""
+    const taskDir = getTeamTaskDir("core")
+    const teamDir = getTeamDir("core")
+    const teamsRootDir = getTeamsRootDir()
+    expect(existsSync(taskDir)).toBe(true)
+    expect(existsSync(teamDir)).toBe(true)
 
     //#when
-    const taskDeleteIndex = deleteFnSlice.indexOf("rmSync(taskDir")
-    const teamDeleteIndex = deleteFnSlice.indexOf("rmSync(teamDir")
+    chmodSync(teamsRootDir, 0o555)
+    try {
+      const deleteWithBlockedTeamParent = () => deleteTeamData("core")
+      expect(deleteWithBlockedTeamParent).toThrow()
+    } finally {
+      chmodSync(teamsRootDir, 0o755)
+    }
 
     //#then
-    expect(deleteFnStart).toBeGreaterThanOrEqual(0)
-    expect(taskDeleteIndex).toBeGreaterThanOrEqual(0)
-    expect(teamDeleteIndex).toBeGreaterThanOrEqual(0)
-    expect(taskDeleteIndex).toBeLessThan(teamDeleteIndex)
+    expect(existsSync(taskDir)).toBe(false)
+    expect(existsSync(teamDir)).toBe(true)
   })
+
 })

@@ -1,14 +1,24 @@
 /// <reference types="bun-types" />
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { buildTeamParentToolContext } from "./teammate-parent-context"
 
 describe("agent-teams teammate parent context", () => {
   test("forwards incoming abort signal to parent context resolver", () => {
     //#given
-    const sourceUrl = new URL("./teammate-parent-context.ts", import.meta.url)
-    const source = readFileSync(sourceUrl, "utf-8")
+    const abortSignal = new AbortController().signal
+
+    //#when
+    const parentToolContext = buildTeamParentToolContext({
+      sessionID: "ses-main",
+      messageID: "msg-main",
+      agent: "sisyphus",
+      abort: abortSignal,
+    })
 
     //#then
-    expect(source.includes("abort: context.abort ?? new AbortController().signal")).toBe(true)
+    expect(parentToolContext.abort).toBe(abortSignal)
+    expect(parentToolContext.sessionID).toBe("ses-main")
+    expect(parentToolContext.messageID).toBe("msg-main")
+    expect(parentToolContext.agent).toBe("sisyphus")
   })
 })

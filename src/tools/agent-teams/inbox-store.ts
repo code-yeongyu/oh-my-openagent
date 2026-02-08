@@ -42,13 +42,20 @@ function withInboxLock<T>(teamName: string, operation: () => T): T {
 }
 
 function parseInboxFile(content: string): TeamInboxMessage[] {
+  let parsed: unknown
+
   try {
-    const parsed = JSON.parse(content)
-    const result = TeamInboxListSchema.safeParse(parsed)
-    return result.success ? result.data : []
+    parsed = JSON.parse(content)
   } catch {
-    return []
+    throw new Error("team_inbox_parse_failed")
   }
+
+  const result = TeamInboxListSchema.safeParse(parsed)
+  if (!result.success) {
+    throw new Error("team_inbox_schema_invalid")
+  }
+
+  return result.data
 }
 
 function readInboxMessages(teamName: string, agentName: string): TeamInboxMessage[] {
