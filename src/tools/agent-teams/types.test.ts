@@ -9,6 +9,7 @@ describe("agent-teams types", () => {
       agentId: "worker@team",
       name: "worker",
       agentType: "team-lead",
+      category: "quick",
       model: "native",
       prompt: "do work",
       color: "blue",

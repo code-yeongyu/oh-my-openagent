@@ -70,7 +70,7 @@ export interface SpawnTeammateParams {
   teamName: string
   name: string
   prompt: string
-  category?: string
+  category: string
   subagentType: string
   model?: string
   planModeRequired: boolean
@@ -100,17 +100,20 @@ async function getSystemDefaultModel(client: PluginInput["client"]): Promise<str
 }
 
 async function resolveSpawnExecution(params: SpawnTeammateParams): Promise<SpawnExecution> {
-  if (!params.category) {
+  if (params.model) {
     const launchModel = parseModel(params.model)
     return {
       agentType: params.subagentType,
-      teammateModel: params.model ?? "native",
+      teammateModel: params.model,
       ...(launchModel ? { launchModel } : {}),
     }
   }
 
   if (!params.categoryContext?.client) {
-    throw new Error("category_requires_client_context")
+    return {
+      agentType: params.subagentType,
+      teammateModel: "native",
+    }
   }
 
   const parentContext = resolveParentContext({
@@ -179,7 +182,7 @@ export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTe
       agentId: `${params.name}@${params.teamName}`,
       name: params.name,
       agentType: execution.agentType,
-      ...(params.category ? { category: params.category } : {}),
+      category: params.category,
       model: execution.teammateModel,
       prompt: params.prompt,
       color: assignNextColor(current),

@@ -28,7 +28,7 @@ export function createSpawnTeammateTool(manager: BackgroundManager, options?: Ag
       team_name: tool.schema.string().describe("Team name"),
       name: tool.schema.string().describe("Teammate name"),
       prompt: tool.schema.string().describe("Initial teammate prompt"),
-      category: tool.schema.string().optional().describe("Optional category (spawns sisyphus-junior with category model/prompt)") ,
+      category: tool.schema.string().optional().describe("Required category for teammate metadata and routing"),
       subagent_type: tool.schema.string().optional().describe("Agent name to run (default: sisyphus-junior)"),
       model: tool.schema.string().optional().describe("Optional model override in provider/model format"),
       plan_mode_required: tool.schema.boolean().optional().describe("Enable plan mode flag in teammate metadata"),
@@ -46,19 +46,15 @@ export function createSpawnTeammateTool(manager: BackgroundManager, options?: Ag
           return JSON.stringify({ error: agentError })
         }
 
+        if (!input.category || !input.category.trim()) {
+          return JSON.stringify({ error: "category_required" })
+        }
+
         if (input.category && input.subagent_type && input.subagent_type !== "sisyphus-junior") {
           return JSON.stringify({ error: "category_conflicts_with_subagent_type" })
         }
 
-        if (input.category && input.model) {
-          return JSON.stringify({ error: "category_conflicts_with_model_override" })
-        }
-
-        if (input.category && !options?.client) {
-          return JSON.stringify({ error: "category_requires_client_context" })
-        }
-
-        const resolvedSubagentType = input.category ? "sisyphus-junior" : input.subagent_type ?? "sisyphus-junior"
+        const resolvedSubagentType = input.subagent_type ?? "sisyphus-junior"
 
         const teammate = await spawnTeammate({
           teamName: input.team_name,
@@ -100,7 +96,7 @@ export function createForceKillTeammateTool(manager: BackgroundManager): ToolDef
       team_name: tool.schema.string().describe("Team name"),
       agent_name: tool.schema.string().describe("Teammate name"),
     },
-    execute: async (args: Record<string, unknown>): Promise<string> => {
+    execute: async (args: Record<string, unknown>, context: TeamToolContext): Promise<string> => {
       try {
         const input = TeamForceKillInputSchema.parse(args)
         const teamError = validateTeamName(input.team_name)
@@ -112,6 +108,9 @@ export function createForceKillTeammateTool(manager: BackgroundManager): ToolDef
           return JSON.stringify({ error: agentError })
         }
         const config = readTeamConfigOrThrow(input.team_name)
+        if (context.sessionID !== config.leadSessionId) {
+          return JSON.stringify({ error: "unauthorized_lead_session" })
+        }
         const member = getTeamMember(config, input.agent_name)
         if (!member || !isTeammateMember(member)) {
           return JSON.stringify({ error: "teammate_not_found" })
@@ -149,7 +148,7 @@ export function createProcessShutdownTool(manager: BackgroundManager): ToolDefin
       team_name: tool.schema.string().describe("Team name"),
       agent_name: tool.schema.string().describe("Teammate name"),
     },
-    execute: async (args: Record<string, unknown>): Promise<string> => {
+    execute: async (args: Record<string, unknown>, context: TeamToolContext): Promise<string> => {
       try {
         const input = TeamProcessShutdownInputSchema.parse(args)
         const teamError = validateTeamName(input.team_name)
@@ -165,6 +164,9 @@ export function createProcessShutdownTool(manager: BackgroundManager): ToolDefin
         }
 
         const config = readTeamConfigOrThrow(input.team_name)
+        if (context.sessionID !== config.leadSessionId) {
+          return JSON.stringify({ error: "unauthorized_lead_session" })
+        }
         const member = getTeamMember(config, input.agent_name)
         if (!member || !isTeammateMember(member)) {
           return JSON.stringify({ error: "teammate_not_found" })

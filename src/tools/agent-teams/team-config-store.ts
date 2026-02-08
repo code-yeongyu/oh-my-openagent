@@ -51,12 +51,12 @@ function withTeamLock<T>(teamName: string, operation: () => T): T {
   }
 }
 
-function createLeadMember(teamName: string, cwd: string, model: string): TeamLeadMember {
+function createLeadMember(teamName: string, cwd: string, leadModel: string): TeamLeadMember {
   return {
     agentId: `team-lead@${teamName}`,
     name: "team-lead",
     agentType: "team-lead",
-    model,
+    model: leadModel,
     joinedAt: nowMs(),
     cwd,
     subscriptions: [],
@@ -82,7 +82,7 @@ export function createTeamConfig(
   description: string,
   leadSessionId: string,
   cwd: string,
-  model: string,
+  leadModel: string,
 ): TeamConfig {
   ensureTeamStorageDirs(teamName)
 
@@ -93,7 +93,7 @@ export function createTeamConfig(
     createdAt: nowMs(),
     leadAgentId,
     leadSessionId,
-    members: [createLeadMember(teamName, cwd, model)],
+    members: [createLeadMember(teamName, cwd, leadModel)],
   }
 
   return withTeamLock(teamName, () => {

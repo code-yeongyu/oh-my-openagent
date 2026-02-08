@@ -181,12 +181,13 @@ describe("agent-teams tools functional", () => {
     //#when
     const config = await executeJsonTool(tools, "read_config", { team_name: "core" }, context) as {
       name: string
-      members: Array<{ name: string }>
+      members: Array<{ name: string; model?: string }>
     }
 
     //#then
     expect(config.name).toBe("core")
     expect(config.members.map((member) => member.name)).toEqual(["team-lead"])
+    expect(config.members[0]?.model).toBe("native/team-lead")
 
     //#when
     const deleted = await executeJsonTool(tools, "team_delete", { team_name: "core" }, context) as {
@@ -213,6 +214,7 @@ describe("agent-teams tools functional", () => {
         team_name: "core",
         name: "worker_1",
         prompt: "Handle release prep",
+        category: "quick",
       },
       context,
     )
@@ -338,6 +340,30 @@ describe("agent-teams tools functional", () => {
     expect(teammate).toBeDefined()
     expect(teammate?.category).toBe("quick")
     expect(teammate?.model).toBe(`${resolvedModel.providerID}/${resolvedModel.modelID}`)
+  })
+
+  test("spawn_teammate requires a category", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+
+    //#when
+    const result = await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+      },
+      context,
+    ) as { error?: string }
+
+    //#then
+    expect(result.error).toBe("category_required")
   })
 
   test("rejects category with incompatible subagent_type", async () => {
@@ -483,6 +509,7 @@ describe("agent-teams tools functional", () => {
         team_name: "core",
         name: "worker_1",
         prompt: "Handle release prep",
+        category: "quick",
       },
       context,
     ) as { name: string; session_id: string; task_id: string }
@@ -617,6 +644,7 @@ describe("agent-teams tools functional", () => {
         team_name: "core",
         name: "worker_1",
         prompt: "Handle release prep",
+        category: "quick",
       },
       leadContext,
     )
@@ -653,6 +681,78 @@ describe("agent-teams tools functional", () => {
     expect(configAfterShutdown.members.some((member) => member.name === "worker_1")).toBe(false)
   })
 
+  test("force_kill_teammate requires lead session authorization", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+        category: "quick",
+      },
+      leadContext,
+    )
+
+    const teammateContext = createContext("ses-worker-1")
+
+    //#when
+    const unauthorized = await executeJsonTool(
+      tools,
+      "force_kill_teammate",
+      {
+        team_name: "core",
+        agent_name: "worker_1",
+      },
+      teammateContext,
+    ) as { error?: string }
+
+    //#then
+    expect(unauthorized.error).toBe("unauthorized_lead_session")
+  })
+
+  test("process_shutdown_approved requires lead session authorization", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+        category: "quick",
+      },
+      leadContext,
+    )
+
+    const teammateContext = createContext("ses-worker-1")
+
+    //#when
+    const unauthorized = await executeJsonTool(
+      tools,
+      "process_shutdown_approved",
+      {
+        team_name: "core",
+        agent_name: "worker_1",
+      },
+      teammateContext,
+    ) as { error?: string }
+
+    //#then
+    expect(unauthorized.error).toBe("unauthorized_lead_session")
+  })
+
   test("rolls back teammate and cancels background task when launch fails", async () => {
     //#given
     const { manager, cancelCalls } = createFailingLaunchManager()
@@ -668,6 +768,7 @@ describe("agent-teams tools functional", () => {
         team_name: "core",
         name: "worker_1",
         prompt: "Handle release prep",
+        category: "quick",
       },
       context,
     ) as { error?: string }
@@ -709,6 +810,7 @@ describe("agent-teams tools functional", () => {
         team_name: "core",
         name: "worker_1",
         prompt: "Handle release prep",
+        category: "quick",
         model: "invalid-format",
       },
       context,
@@ -742,6 +844,7 @@ describe("agent-teams tools functional", () => {
         team_name: "core",
         name: "worker_1",
         prompt: "Handle release prep",
+        category: "quick",
         model: "openai/gpt-5.3-codex/reasoning",
       },
       context,
@@ -792,6 +895,7 @@ describe("agent-teams tools functional", () => {
         team_name: "core",
         name: "worker_1",
         prompt: "Handle release prep",
+        category: "quick",
       },
       leadContext,
     )
@@ -827,14 +931,13 @@ describe("agent-teams tools functional", () => {
     expect(Array.isArray(ownInbox)).toBe(true)
   })
 
-  test("allows lead session to rotate after restart using team-lead identity", async () => {
+  test("rejects unknown session claiming team-lead identity", async () => {
     //#given
     const { manager } = createMockManager()
     const tools = createAgentTeamsTools(manager)
-    const originalLead = createContext("ses-main")
-    await executeJsonTool(tools, "team_create", { team_name: "core" }, originalLead)
-
-    const restartedLead = createContext("ses-restarted")
+    const leadContext = createContext("ses-main")
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+    const unknownContext = createContext("ses-unknown")
 
     //#when
     const sendResult = await executeJsonTool(
@@ -848,20 +951,43 @@ describe("agent-teams tools functional", () => {
         summary: "restart",
         content: "Lead session migrated",
       },
-      restartedLead,
+      unknownContext,
     ) as { success?: boolean; error?: string }
 
     //#then
-    expect(sendResult.error).toBeUndefined()
-    expect(sendResult.success).toBe(true)
+    expect(sendResult.success).toBeUndefined()
+    expect(sendResult.error).toBe("unauthorized_sender_session")
 
     //#when
-    const config = await executeJsonTool(tools, "read_config", { team_name: "core" }, restartedLead) as {
+    const config = await executeJsonTool(tools, "read_config", { team_name: "core" }, leadContext) as {
       leadSessionId: string
     }
 
     //#then
-    expect(config.leadSessionId).toBe("ses-restarted")
+    expect(config.leadSessionId).toBe("ses-main")
+  })
+
+  test("rejects unknown session claiming team-lead inbox", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext("ses-main")
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+    const unknownContext = createContext("ses-unknown")
+
+    //#when
+    const result = await executeJsonTool(
+      tools,
+      "read_inbox",
+      {
+        team_name: "core",
+        agent_name: "team-lead",
+      },
+      unknownContext,
+    ) as { error?: string }
+
+    //#then
+    expect(result.error).toBe("unauthorized_reader_session")
   })
 
   test("clears old inbox when teammate is removed then re-spawned", async () => {
@@ -878,6 +1004,7 @@ describe("agent-teams tools functional", () => {
         team_name: "core",
         name: "worker_1",
         prompt: "First run",
+        category: "quick",
       },
       context,
     )
@@ -913,6 +1040,7 @@ describe("agent-teams tools functional", () => {
         team_name: "core",
         name: "worker_1",
         prompt: "Second run",
+        category: "quick",
       },
       context,
     )
@@ -1004,6 +1132,7 @@ describe("agent-teams tools functional", () => {
         team_name: "core",
         name: "worker_1",
         prompt: "Handle release prep",
+        category: "quick",
       },
       leadContext,
     )

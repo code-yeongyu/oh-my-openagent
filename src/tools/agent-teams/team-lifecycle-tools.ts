@@ -30,7 +30,7 @@ export function createTeamCreateTool(): ToolDefinition {
           input.description ?? "",
           context.sessionID,
           process.cwd(),
-          context.agent ?? "native",
+          "native/team-lead",
         )
         ensureInbox(config.name, "team-lead")
 

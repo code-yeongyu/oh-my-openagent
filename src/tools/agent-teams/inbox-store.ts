@@ -84,10 +84,7 @@ export function appendInboxMessage(teamName: string, agentName: string, message:
   assertValidInboxAgentName(agentName)
   withInboxLock(teamName, () => {
     const path = getTeamInboxPath(teamName, agentName)
-    if (!existsSync(path)) {
-      writeJsonAtomic(path, [])
-    }
-    const messages = readInboxMessages(teamName, agentName)
+    const messages = existsSync(path) ? parseInboxFile(readFileSync(path, "utf-8")) : []
     messages.push(TeamInboxMessageSchema.parse(message))
     writeInboxMessages(teamName, agentName, messages)
   })
@@ -153,18 +150,27 @@ export function readInbox(
       return selected
     }
 
+    const selectedSet = unreadOnly ? new Set(selected) : null
+    let changed = false
+
     const updated = messages.map((message) => {
       if (!unreadOnly) {
+        if (!message.read) {
+          changed = true
+        }
         return { ...message, read: true }
       }
 
-      if (selected.some((selectedMessage) => selectedMessage.timestamp === message.timestamp && selectedMessage.from === message.from && selectedMessage.text === message.text)) {
+      if (selectedSet?.has(message)) {
+        changed = true
         return { ...message, read: true }
       }
       return message
     })
 
-    writeInboxMessages(teamName, agentName, updated)
+    if (changed) {
+      writeInboxMessages(teamName, agentName, updated)
+    }
     return selected
   })
 }
