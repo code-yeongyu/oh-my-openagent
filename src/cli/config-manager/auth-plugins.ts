@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 import type { ConfigMergeResult, InstallConfig } from "../types"
 import { getConfigDir } from "./config-context"
 import { ensureConfigDirectoryExists } from "./ensure-config-directory-exists"
@@ -55,7 +55,27 @@ export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMerge
     }
 
     const newConfig = { ...(existingConfig ?? {}), plugin: plugins }
-    writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
+
+    if (format === "jsonc") {
+      const content = readFileSync(path, "utf-8")
+      const pluginArrayRegex = /"plugin"\s*:\s*\[([\s\S]*?)\]/
+      const match = content.match(pluginArrayRegex)
+
+      if (match) {
+        const formattedPlugins = plugins.map((p) => `"${p}"`).join(",\n    ")
+        const newContent = content.replace(
+          pluginArrayRegex,
+          `"plugin": [\n    ${formattedPlugins}\n  ]`
+        )
+        writeFileSync(path, newContent)
+      } else {
+        const inlinePlugins = plugins.map((p) => `"${p}"`).join(", ")
+        const newContent = content.replace(/(\{)/, `$1\n  "plugin": [${inlinePlugins}],`)
+        writeFileSync(path, newContent)
+      }
+    } else {
+      writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
+    }
     return { success: true, configPath: path }
   } catch (err) {
     return {
