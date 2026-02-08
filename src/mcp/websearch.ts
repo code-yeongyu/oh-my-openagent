@@ -35,9 +35,6 @@ export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig
       ? `https://mcp.exa.ai/mcp?tools=web_search_exa&exaApiKey=${encodeURIComponent(process.env.EXA_API_KEY)}`
       : "https://mcp.exa.ai/mcp?tools=web_search_exa",
     enabled: true,
-    headers: process.env.EXA_API_KEY
-      ? { "x-api-key": process.env.EXA_API_KEY }
-      : undefined,
     oauth: false as const,
   }
 }
