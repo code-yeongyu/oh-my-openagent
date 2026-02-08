@@ -47,13 +47,31 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
 
     if (format === "jsonc") {
       const content = readFileSync(path, "utf-8")
-      const providerRegex = /"provider"\s*:\s*\{[\s\S]*?\n  \}/
       const providerJson = JSON.stringify(newConfig.provider, null, 2)
         .split("\n")
         .map((line, i) => (i === 0 ? line : `  ${line}`))
         .join("\n")
-      if (providerRegex.test(content)) {
-        const newContent = content.replace(providerRegex, `"provider": ${providerJson}`)
+      // Match "provider" key with any indentation and nested brace depth
+      const providerIdx = content.indexOf('"provider"')
+      if (providerIdx !== -1) {
+        const colonIdx = content.indexOf(":", providerIdx + '"provider"'.length)
+        const braceStart = content.indexOf("{", colonIdx)
+        let depth = 0
+        let braceEnd = braceStart
+        for (let i = braceStart; i < content.length; i++) {
+          if (content[i] === "{") depth++
+          else if (content[i] === "}") {
+            depth--
+            if (depth === 0) {
+              braceEnd = i
+              break
+            }
+          }
+        }
+        const newContent =
+          content.slice(0, providerIdx) +
+          `"provider": ${providerJson}` +
+          content.slice(braceEnd + 1)
         writeFileSync(path, newContent)
       } else {
         const newContent = content.replace(/(\{)/, `$1\n  "provider": ${providerJson},`)
