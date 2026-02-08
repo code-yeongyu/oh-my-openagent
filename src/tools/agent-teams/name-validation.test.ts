@@ -71,8 +71,9 @@ describe("agent-teams name validation", () => {
   test("validates task ids", () => {
     //#then
     expect(validateTaskId("T-123")).toBeNull()
+    expect(validateTaskId("123")).toBe("task_id_invalid")
     expect(validateTaskId("")).toBe("task_id_required")
     expect(validateTaskId("../../etc/passwd")).toBe("task_id_invalid")
-    expect(validateTaskId("a".repeat(129))).toBe("task_id_too_long")
+    expect(validateTaskId(`T-${"a".repeat(127)}`)).toBe("task_id_too_long")
   })
 })

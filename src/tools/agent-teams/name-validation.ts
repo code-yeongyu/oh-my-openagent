@@ -1,6 +1,6 @@
 const VALID_NAME_RE = /^[A-Za-z0-9_-]+$/
 const MAX_NAME_LENGTH = 64
-const VALID_TASK_ID_RE = /^[A-Za-z0-9_-]+$/
+const VALID_TASK_ID_RE = /^T-[A-Za-z0-9_-]+$/
 const MAX_TASK_ID_LENGTH = 128
 
 function validateName(value: string, label: "team" | "agent"): string | null {
