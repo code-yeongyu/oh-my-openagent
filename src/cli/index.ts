@@ -19,6 +19,7 @@ program
   .name("oh-my-opencode")
   .description("The ultimate OpenCode plugin - multi-model orchestration, LSP tools, and more")
   .version(VERSION, "-v, --version", "Show version number")
+  .enablePositionalOptions()
 
 program
   .command("install")
