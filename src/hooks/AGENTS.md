@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-40+ lifecycle hooks intercepting/modifying agent behavior across 5 events.
+163 lifecycle hooks intercepting/modifying agent behavior across 5 events.
 
 **Event Types**:
 - `UserPromptSubmit` (`chat.message`) - Can block
