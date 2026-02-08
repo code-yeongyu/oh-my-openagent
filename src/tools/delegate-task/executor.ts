@@ -20,6 +20,22 @@ import { storeToolMetadata } from "../../features/tool-metadata-store"
 
 const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
 
+function resolveToolCallID(ctx: ToolContextWithMetadata): string | undefined {
+  if (typeof ctx.callID === "string" && ctx.callID.trim() !== "") {
+    return ctx.callID
+  }
+
+  if (typeof ctx.callId === "string" && ctx.callId.trim() !== "") {
+    return ctx.callId
+  }
+
+  if (typeof ctx.call_id === "string" && ctx.call_id.trim() !== "") {
+    return ctx.call_id
+  }
+
+  return undefined
+}
+
 export interface ExecutorContext {
   manager: BackgroundManager
   client: OpencodeClient
@@ -126,9 +142,8 @@ export async function executeBackgroundContinuation(
       },
     }
     await ctx.metadata?.(bgContMeta)
-    if (ctx.callID) {
-      storeToolMetadata(ctx.sessionID, ctx.callID, bgContMeta)
-    }
+    const bgContCallID = resolveToolCallID(ctx)
+    if (bgContCallID) storeToolMetadata(ctx.sessionID, bgContCallID, bgContMeta)
 
     return `Background task continued.
 
@@ -184,9 +199,8 @@ export async function executeSyncContinuation(
     },
   }
   await ctx.metadata?.(syncContMeta)
-  if (ctx.callID) {
-    storeToolMetadata(ctx.sessionID, ctx.callID, syncContMeta)
-  }
+  const syncContCallID = resolveToolCallID(ctx)
+  if (syncContCallID) storeToolMetadata(ctx.sessionID, syncContCallID, syncContMeta)
 
   try {
     let resumeAgent: string | undefined
@@ -339,9 +353,8 @@ export async function executeUnstableAgentTask(
       },
     }
     await ctx.metadata?.(bgTaskMeta)
-    if (ctx.callID) {
-      storeToolMetadata(ctx.sessionID, ctx.callID, bgTaskMeta)
-    }
+    const bgTaskCallID = resolveToolCallID(ctx)
+    if (bgTaskCallID) storeToolMetadata(ctx.sessionID, bgTaskCallID, bgTaskMeta)
 
     const startTime = new Date()
     const timingCfg = getTimingConfig()
@@ -486,9 +499,8 @@ export async function executeBackgroundTask(
       },
     }
     await ctx.metadata?.(unstableMeta)
-    if (ctx.callID) {
-      storeToolMetadata(ctx.sessionID, ctx.callID, unstableMeta)
-    }
+    const unstableCallID = resolveToolCallID(ctx)
+    if (unstableCallID) storeToolMetadata(ctx.sessionID, unstableCallID, unstableMeta)
 
     return `Background task launched.
 
@@ -596,9 +608,8 @@ export async function executeSyncTask(
       },
     }
     await ctx.metadata?.(syncTaskMeta)
-    if (ctx.callID) {
-      storeToolMetadata(ctx.sessionID, ctx.callID, syncTaskMeta)
-    }
+    const syncTaskCallID = resolveToolCallID(ctx)
+    if (syncTaskCallID) storeToolMetadata(ctx.sessionID, syncTaskCallID, syncTaskMeta)
 
     try {
       const allowTask = isPlanFamily(agentToUse)
