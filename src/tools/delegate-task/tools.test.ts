@@ -10,6 +10,21 @@ import * as connectedProvidersCache from "../../shared/connected-providers-cache
 
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
+const TEST_CONNECTED_PROVIDERS = ["anthropic", "google", "openai"]
+const TEST_AVAILABLE_MODELS = new Set([
+  "anthropic/claude-opus-4-6",
+  "anthropic/claude-sonnet-4-5",
+  "anthropic/claude-haiku-4-5",
+  "google/gemini-3-pro",
+  "google/gemini-3-flash",
+  "openai/gpt-5.2",
+  "openai/gpt-5.3-codex",
+])
+
+function createTestAvailableModels(): Set<string> {
+  return new Set(TEST_AVAILABLE_MODELS)
+}
+
 describe("sisyphus-task", () => {
   let cacheSpy: ReturnType<typeof spyOn>
   let providerModelsSpy: ReturnType<typeof spyOn>
@@ -271,6 +286,8 @@ describe("sisyphus-task", () => {
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
+         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+         availableModelsOverride: createTestAvailableModels(),
        })
 
        const toolContext = {
@@ -324,6 +341,8 @@ describe("sisyphus-task", () => {
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
+         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+         availableModelsOverride: createTestAvailableModels(),
        })
        
        const toolContext = {
@@ -436,6 +455,8 @@ describe("sisyphus-task", () => {
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
+         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+         availableModelsOverride: createTestAvailableModels(),
        })
 
        const metadataCalls: Array<{ title?: string; metadata?: Record<string, unknown> }> = []
@@ -727,6 +748,8 @@ describe("sisyphus-task", () => {
          userCategories: {
            ultrabrain: { model: "openai/gpt-5.2", variant: "xhigh" },
          },
+         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+         availableModelsOverride: createTestAvailableModels(),
        })
 
       const toolContext = {
@@ -790,6 +813,8 @@ describe("sisyphus-task", () => {
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
+         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+         availableModelsOverride: createTestAvailableModels(),
        })
 
       const toolContext = {
@@ -1950,6 +1975,8 @@ describe("sisyphus-task", () => {
         client: mockClient,
         // userCategories: undefined - use DEFAULT_CATEGORIES only
         // sisyphusJuniorModel: undefined
+        connectedProvidersOverride: null,
+        availableModelsOverride: new Set(),
       })
 
       const toolContext = {
@@ -2013,6 +2040,8 @@ describe("sisyphus-task", () => {
          userCategories: {
            "fallback-test": { model: "anthropic/claude-opus-4-6" },
          },
+         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+         availableModelsOverride: createTestAvailableModels(),
        })
 
       const toolContext = {
@@ -2072,6 +2101,8 @@ describe("sisyphus-task", () => {
         manager: mockManager,
         client: mockClient,
         sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
       })
 
       const toolContext = {
@@ -2135,6 +2166,8 @@ describe("sisyphus-task", () => {
          userCategories: {
            ultrabrain: { model: "openai/gpt-5.3-codex" },
          },
+         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+         availableModelsOverride: createTestAvailableModels(),
        })
 
       const toolContext = {
@@ -2194,6 +2227,8 @@ describe("sisyphus-task", () => {
         manager: mockManager,
         client: mockClient,
         sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
       })
 
       const toolContext = {
@@ -3207,6 +3242,8 @@ describe("sisyphus-task", () => {
          manager: mockManager,
          client: mockClient,
          // no agentOverrides
+         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+         availableModelsOverride: createTestAvailableModels(),
        })
 
       const toolContext = {
