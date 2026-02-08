@@ -30,6 +30,7 @@ describe("sisyphus-task", () => {
   let providerModelsSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
+    mock.restore()
     __resetModelCache()
     clearSkillCache()
     __setTimingConfig({
