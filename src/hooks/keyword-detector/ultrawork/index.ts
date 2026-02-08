@@ -7,13 +7,13 @@
  * 3. Default (Claude, etc.) → default.ts (optimized for Claude series)
  */
 
-export { isPlannerAgent, isGptModel, getUltraworkSource } from "./utils"
-export type { UltraworkSource } from "./utils"
+export { isPlannerAgent, isGptModel, getUltraworkSource } from "./source-detector"
+export type { UltraworkSource } from "./source-detector"
 export { ULTRAWORK_PLANNER_SECTION, getPlannerUltraworkMessage } from "./planner"
 export { ULTRAWORK_GPT_MESSAGE, getGptUltraworkMessage } from "./gpt5.2"
 export { ULTRAWORK_DEFAULT_MESSAGE, getDefaultUltraworkMessage } from "./default"
 
-import { getUltraworkSource } from "./utils"
+import { getUltraworkSource } from "./source-detector"
 import { getPlannerUltraworkMessage } from "./planner"
 import { getGptUltraworkMessage } from "./gpt5.2"
 import { getDefaultUltraworkMessage } from "./default"

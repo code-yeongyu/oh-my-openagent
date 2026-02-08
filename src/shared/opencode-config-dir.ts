@@ -2,21 +2,17 @@ import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
-export type OpenCodeBinaryType = "opencode" | "opencode-desktop"
+import type {
+  OpenCodeBinaryType,
+  OpenCodeConfigDirOptions,
+  OpenCodeConfigPaths,
+} from "./opencode-config-dir-types"
 
-export interface OpenCodeConfigDirOptions {
-  binary: OpenCodeBinaryType
-  version?: string | null
-  checkExisting?: boolean
-}
-
-export interface OpenCodeConfigPaths {
-  configDir: string
-  configJson: string
-  configJsonc: string
-  packageJson: string
-  omoConfig: string
-}
+export type {
+  OpenCodeBinaryType,
+  OpenCodeConfigDirOptions,
+  OpenCodeConfigPaths,
+} from "./opencode-config-dir-types"
 
 export const TAURI_APP_IDENTIFIER = "ai.opencode.desktop"
 export const TAURI_APP_IDENTIFIER_DEV = "ai.opencode.desktop.dev"

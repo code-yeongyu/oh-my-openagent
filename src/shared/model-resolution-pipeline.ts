@@ -1,36 +1,16 @@
 import { log } from "./logger"
 import { readConnectedProvidersCache } from "./connected-providers-cache"
 import { fuzzyMatchModel } from "./model-availability"
-import type { FallbackEntry } from "./model-requirements"
+import type {
+  ModelResolutionRequest,
+  ModelResolutionResult,
+} from "./model-resolution-types"
 
-export type ModelResolutionRequest = {
-  intent?: {
-    uiSelectedModel?: string
-    userModel?: string
-    categoryDefaultModel?: string
-  }
-  constraints: {
-    availableModels: Set<string>
-  }
-  policy?: {
-    fallbackChain?: FallbackEntry[]
-    systemDefaultModel?: string
-  }
-}
-
-export type ModelResolutionProvenance =
-  | "override"
-  | "category-default"
-  | "provider-fallback"
-  | "system-default"
-
-export type ModelResolutionResult = {
-  model: string
-  provenance: ModelResolutionProvenance
-  variant?: string
-  attempted?: string[]
-  reason?: string
-}
+export type {
+  ModelResolutionProvenance,
+  ModelResolutionRequest,
+  ModelResolutionResult,
+} from "./model-resolution-types"
 
 function normalizeModel(model?: string): string | undefined {
   const trimmed = model?.trim()
