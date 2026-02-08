@@ -55,24 +55,28 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
       const providerIdx = content.indexOf('"provider"')
       if (providerIdx !== -1) {
         const colonIdx = content.indexOf(":", providerIdx + '"provider"'.length)
-        const braceStart = content.indexOf("{", colonIdx)
-        let depth = 0
-        let braceEnd = braceStart
-        for (let i = braceStart; i < content.length; i++) {
-          if (content[i] === "{") depth++
-          else if (content[i] === "}") {
-            depth--
-            if (depth === 0) {
-              braceEnd = i
-              break
+        const braceStart = colonIdx !== -1 ? content.indexOf("{", colonIdx) : -1
+        if (braceStart === -1) {
+          writeFileSync(path, JSON.stringify(newConfig, null, 2) + "\n")
+        } else {
+          let depth = 0
+          let braceEnd = braceStart
+          for (let i = braceStart; i < content.length; i++) {
+            if (content[i] === "{") depth++
+            else if (content[i] === "}") {
+              depth--
+              if (depth === 0) {
+                braceEnd = i
+                break
+              }
             }
           }
+          const newContent =
+            content.slice(0, providerIdx) +
+            `"provider": ${providerJson}` +
+            content.slice(braceEnd + 1)
+          writeFileSync(path, newContent)
         }
-        const newContent =
-          content.slice(0, providerIdx) +
-          `"provider": ${providerJson}` +
-          content.slice(braceEnd + 1)
-        writeFileSync(path, newContent)
       } else {
         const newContent = content.replace(/(\{)/, `$1\n  "provider": ${providerJson},`)
         writeFileSync(path, newContent)
