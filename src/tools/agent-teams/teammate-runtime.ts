@@ -90,10 +90,10 @@ export async function spawnTeammate(params: SpawnTeammateParams): Promise<TeamTe
     throw new Error("teammate_create_failed")
   }
 
-  ensureInbox(params.teamName, params.name)
-  sendPlainInboxMessage(params.teamName, "team-lead", params.name, params.prompt, "initial_prompt", teammate.color)
-
   try {
+    ensureInbox(params.teamName, params.name)
+    sendPlainInboxMessage(params.teamName, "team-lead", params.name, params.prompt, "initial_prompt", teammate.color)
+
     const resolvedModel = parseModel(params.model)
     const launched = await params.manager.launch({
       description: `[team:${params.teamName}] ${params.name}`,

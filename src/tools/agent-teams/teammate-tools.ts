@@ -8,7 +8,7 @@ import {
   TeamToolContext,
   isTeammateMember,
 } from "./types"
-import { getTeamMember, readTeamConfigOrThrow, removeTeammate, writeTeamConfig } from "./team-config-store"
+import { getTeamMember, readTeamConfigOrThrow, removeTeammate, updateTeamConfig, writeTeamConfig } from "./team-config-store"
 import { cancelTeammateRun, spawnTeammate } from "./teammate-runtime"
 import { resetOwnerTasks } from "./team-task-store"
 
@@ -130,7 +130,16 @@ export function createProcessShutdownTool(manager: BackgroundManager): ToolDefin
         }
 
         await cancelTeammateRun(manager, member)
-        writeTeamConfig(input.team_name, removeTeammate(config, input.agent_name))
+
+        updateTeamConfig(input.team_name, (current) => {
+          const refreshedMember = getTeamMember(current, input.agent_name)
+          if (!refreshedMember || !isTeammateMember(refreshedMember)) {
+            return current
+          }
+
+          return removeTeammate(current, input.agent_name)
+        })
+
         resetOwnerTasks(input.team_name, input.agent_name)
 
         return JSON.stringify({ success: true, message: `${input.agent_name} removed` })

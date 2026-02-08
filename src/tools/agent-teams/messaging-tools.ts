@@ -212,7 +212,7 @@ export function createReadInboxTool(): ToolDefinition {
       unread_only: tool.schema.boolean().optional().describe("Return only unread messages"),
       mark_as_read: tool.schema.boolean().optional().describe("Mark returned messages as read"),
     },
-    execute: async (args: Record<string, unknown>): Promise<string> => {
+    execute: async (args: Record<string, unknown>, context: TeamToolContext): Promise<string> => {
       try {
         const input = TeamReadInboxInputSchema.parse(args)
         const teamError = validateTeamName(input.team_name)
@@ -223,7 +223,15 @@ export function createReadInboxTool(): ToolDefinition {
         if (agentError) {
           return JSON.stringify({ error: agentError })
         }
-        readTeamConfigOrThrow(input.team_name)
+        const config = readTeamConfigOrThrow(input.team_name)
+        const actor = resolveSenderFromContext(config, context)
+        if (!actor) {
+          return JSON.stringify({ error: "unauthorized_reader_session" })
+        }
+
+        if (actor !== "team-lead" && actor !== input.agent_name) {
+          return JSON.stringify({ error: "unauthorized_reader_session" })
+        }
 
         const messages = readInbox(
           input.team_name,

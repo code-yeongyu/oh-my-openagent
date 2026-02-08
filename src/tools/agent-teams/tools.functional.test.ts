@@ -657,6 +657,112 @@ describe("agent-teams tools functional", () => {
     expect(result.error).toBe("team_not_found")
   })
 
+  test("read_inbox denies cross-member access for non-lead sessions", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const leadContext = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
+    await executeJsonTool(
+      tools,
+      "spawn_teammate",
+      {
+        team_name: "core",
+        name: "worker_1",
+        prompt: "Handle release prep",
+      },
+      leadContext,
+    )
+
+    const teammateContext = createContext("ses-worker-1")
+
+    //#when
+    const unauthorized = await executeJsonTool(
+      tools,
+      "read_inbox",
+      {
+        team_name: "core",
+        agent_name: "team-lead",
+      },
+      teammateContext,
+    ) as { error?: string }
+
+    //#then
+    expect(unauthorized.error).toBe("unauthorized_reader_session")
+
+    //#when
+    const ownInbox = await executeJsonTool(
+      tools,
+      "read_inbox",
+      {
+        team_name: "core",
+        agent_name: "worker_1",
+      },
+      teammateContext,
+    ) as unknown[]
+
+    //#then
+    expect(Array.isArray(ownInbox)).toBe(true)
+  })
+
+  test("cannot add pending blockers to already in-progress task without status change", async () => {
+    //#given
+    const { manager } = createMockManager()
+    const tools = createAgentTeamsTools(manager)
+    const context = createContext()
+
+    await executeJsonTool(tools, "team_create", { team_name: "core" }, context)
+
+    const blocker = await executeJsonTool(
+      tools,
+      "team_task_create",
+      {
+        team_name: "core",
+        subject: "Blocker",
+        description: "Unfinished blocker",
+      },
+      context,
+    ) as { id: string }
+
+    const mainTask = await executeJsonTool(
+      tools,
+      "team_task_create",
+      {
+        team_name: "core",
+        subject: "Main",
+        description: "Main task",
+      },
+      context,
+    ) as { id: string }
+
+    await executeJsonTool(
+      tools,
+      "team_task_update",
+      {
+        team_name: "core",
+        task_id: mainTask.id,
+        status: "in_progress",
+      },
+      context,
+    )
+
+    //#when
+    const result = await executeJsonTool(
+      tools,
+      "team_task_update",
+      {
+        team_name: "core",
+        task_id: mainTask.id,
+        add_blocked_by: [blocker.id],
+      },
+      context,
+    ) as { error?: string }
+
+    //#then
+    expect(result.error).toBe(`blocked_by_incomplete:${blocker.id}:pending`)
+  })
+
   test("binds sender to calling context and rejects sender spoofing", async () => {
     //#given
     const { manager } = createMockManager()

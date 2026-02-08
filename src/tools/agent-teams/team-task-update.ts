@@ -118,8 +118,15 @@ export function updateTeamTask(teamName: string, taskId: string, patch: TeamTask
 
     if (patch.status && patch.status !== "deleted") {
       ensureForwardStatusTransition(currentTask.status, patch.status)
-      const effectiveBlockedBy = Array.from(new Set([...(currentTask.blockedBy ?? []), ...(patch.addBlockedBy ?? [])]))
-      ensureDependenciesCompleted(patch.status, effectiveBlockedBy, readTask)
+    }
+
+    const effectiveStatus = patch.status ?? currentTask.status
+    const effectiveBlockedBy = Array.from(new Set([...(currentTask.blockedBy ?? []), ...(patch.addBlockedBy ?? [])]))
+    const shouldValidateDependencies =
+      (patch.status !== undefined || (patch.addBlockedBy?.length ?? 0) > 0) && effectiveStatus !== "deleted"
+
+    if (shouldValidateDependencies) {
+      ensureDependenciesCompleted(effectiveStatus, effectiveBlockedBy, readTask)
     }
 
     let nextTask: TeamTask = { ...currentTask }
