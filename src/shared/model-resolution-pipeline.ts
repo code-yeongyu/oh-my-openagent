@@ -1,16 +1,37 @@
 import { log } from "./logger"
-import { readConnectedProvidersCache } from "./connected-providers-cache"
+import * as connectedProvidersCache from "./connected-providers-cache"
 import { fuzzyMatchModel } from "./model-availability"
-import type {
-  ModelResolutionRequest,
-  ModelResolutionResult,
-} from "./model-resolution-types"
+import type { FallbackEntry } from "./model-requirements"
 
-export type {
-  ModelResolutionProvenance,
-  ModelResolutionRequest,
-  ModelResolutionResult,
-} from "./model-resolution-types"
+export type ModelResolutionRequest = {
+  intent?: {
+    uiSelectedModel?: string
+    userModel?: string
+    categoryDefaultModel?: string
+  }
+  constraints: {
+    availableModels: Set<string>
+    connectedProviders?: string[] | null
+  }
+  policy?: {
+    fallbackChain?: FallbackEntry[]
+    systemDefaultModel?: string
+  }
+}
+
+export type ModelResolutionProvenance =
+  | "override"
+  | "category-default"
+  | "provider-fallback"
+  | "system-default"
+
+export type ModelResolutionResult = {
+  model: string
+  provenance: ModelResolutionProvenance
+  variant?: string
+  attempted?: string[]
+  reason?: string
+}
 
 function normalizeModel(model?: string): string | undefined {
   const trimmed = model?.trim()
@@ -53,7 +74,7 @@ export function resolveModelPipeline(
         return { model: match, provenance: "category-default", attempted }
       }
     } else {
-      const connectedProviders = readConnectedProvidersCache()
+      const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       if (connectedProviders === null) {
         log("Model resolved via category default (no cache, first run)", {
           model: normalizedCategoryDefault,
@@ -78,7 +99,7 @@ export function resolveModelPipeline(
 
   if (fallbackChain && fallbackChain.length > 0) {
     if (availableModels.size === 0) {
-      const connectedProviders = readConnectedProvidersCache()
+      const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       const connectedSet = connectedProviders ? new Set(connectedProviders) : null
 
       if (connectedSet === null) {
