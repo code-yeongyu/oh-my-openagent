@@ -12,7 +12,7 @@ import { resolveMultipleSkillsAsync } from "../../features/opencode-skill-loader
 import { discoverSkills } from "../../features/opencode-skill-loader"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { subagentSessions, getSessionAgent } from "../../features/claude-code-session-state"
-import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, resolveModelPipeline, promptWithModelSuggestionRetry, promptSyncWithModelSuggestionRetry } from "../../shared"
 import { fetchAvailableModels, isModelAvailable } from "../../shared/model-availability"
 import { readConnectedProvidersCache } from "../../shared/connected-providers-cache"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
@@ -211,7 +211,7 @@ export async function executeSyncContinuation(
         : undefined
     }
 
-     await (client.session as any).promptAsync({
+     await promptSyncWithModelSuggestionRetry(client, {
        path: { id: args.session_id! },
        body: {
          ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
@@ -231,30 +231,6 @@ export async function executeSyncContinuation(
     }
     const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
     return `Failed to send continuation prompt: ${errorMessage}\n\nSession ID: ${args.session_id}`
-  }
-
-  const timing = getTimingConfig()
-  const pollStart = Date.now()
-  let lastMsgCount = 0
-  let stablePolls = 0
-
-  while (Date.now() - pollStart < 60000) {
-    await new Promise(resolve => setTimeout(resolve, timing.POLL_INTERVAL_MS))
-
-    const elapsed = Date.now() - pollStart
-    if (elapsed < timing.SESSION_CONTINUATION_STABILITY_MS) continue
-
-    const messagesCheck = await client.session.messages({ path: { id: args.session_id! } })
-    const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
-    const currentMsgCount = msgs.length
-
-    if (currentMsgCount > 0 && currentMsgCount === lastMsgCount) {
-      stablePolls++
-      if (stablePolls >= timing.STABILITY_POLLS_REQUIRED) break
-    } else {
-      stablePolls = 0
-      lastMsgCount = currentMsgCount
-    }
   }
 
   const messagesResult = await client.session.messages({
@@ -621,7 +597,7 @@ export async function executeSyncTask(
 
     try {
       const allowTask = isPlanAgent(agentToUse)
-      await promptWithModelSuggestionRetry(client, {
+      await promptSyncWithModelSuggestionRetry(client, {
         path: { id: sessionID },
         body: {
           agent: agentToUse,
@@ -657,70 +633,6 @@ export async function executeSyncTask(
         agent: agentToUse,
         category: args.category,
       })
-    }
-
-    const syncTiming = getTimingConfig()
-    const pollStart = Date.now()
-    let lastMsgCount = 0
-    let stablePolls = 0
-    let pollCount = 0
-
-    log("[task] Starting poll loop", { sessionID, agentToUse })
-
-    while (Date.now() - pollStart < syncTiming.MAX_POLL_TIME_MS) {
-      if (ctx.abort?.aborted) {
-        log("[task] Aborted by user", { sessionID })
-        if (toastManager && taskId) toastManager.removeTask(taskId)
-        return `Task aborted.\n\nSession ID: ${sessionID}`
-      }
-
-      await new Promise(resolve => setTimeout(resolve, syncTiming.POLL_INTERVAL_MS))
-      pollCount++
-
-      const statusResult = await client.session.status()
-      const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
-      const sessionStatus = allStatuses[sessionID]
-
-      if (pollCount % 10 === 0) {
-      log("[task] Poll status", {
-          sessionID,
-          pollCount,
-          elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
-          sessionStatus: sessionStatus?.type ?? "not_in_status",
-          stablePolls,
-          lastMsgCount,
-        })
-      }
-
-      if (sessionStatus && sessionStatus.type !== "idle") {
-        stablePolls = 0
-        lastMsgCount = 0
-        continue
-      }
-
-      const elapsed = Date.now() - pollStart
-      if (elapsed < syncTiming.MIN_STABILITY_TIME_MS) {
-        continue
-      }
-
-      const messagesCheck = await client.session.messages({ path: { id: sessionID } })
-      const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
-      const currentMsgCount = msgs.length
-
-      if (currentMsgCount === lastMsgCount) {
-        stablePolls++
-        if (stablePolls >= syncTiming.STABILITY_POLLS_REQUIRED) {
-        log("[task] Poll complete - messages stable", { sessionID, pollCount, currentMsgCount })
-          break
-        }
-      } else {
-        stablePolls = 0
-        lastMsgCount = currentMsgCount
-      }
-    }
-
-    if (Date.now() - pollStart >= syncTiming.MAX_POLL_TIME_MS) {
-    log("[task] Poll timeout reached", { sessionID, pollCount, lastMsgCount, stablePolls })
     }
 
     const messagesResult = await client.session.messages({
@@ -963,7 +875,7 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
     return {
       agentToUse: "",
       categoryModel: undefined,
-    error: `You are prometheus. You cannot delegate to prometheus via task.
+    error: `You are the plan agent. You cannot delegate to plan via task.
 
 Create the work plan directly - that's your job as the planning agent.`,
     }
