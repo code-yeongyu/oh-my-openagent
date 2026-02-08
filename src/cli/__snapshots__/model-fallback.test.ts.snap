@@ -7,6 +7,9 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
     "atlas": {
       "model": "opencode/glm-4.7-free",
     },
+    "devils-advocate": {
+      "model": "opencode/glm-4.7-free",
+    },
     "explore": {
       "model": "opencode/glm-4.7-free",
     },
@@ -66,6 +69,9 @@ exports[`generateModelConfig single native provider uses Claude models when only
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
+      "model": "anthropic/claude-sonnet-4-5",
+    },
+    "devils-advocate": {
       "model": "anthropic/claude-sonnet-4-5",
     },
     "explore": {
@@ -130,6 +136,9 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
     },
+    "devils-advocate": {
+      "model": "anthropic/claude-sonnet-4-5",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -192,6 +201,10 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
   "agents": {
     "atlas": {
       "model": "openai/gpt-5.2",
+    },
+    "devils-advocate": {
+      "model": "openai/gpt-5.2",
+      "variant": "medium",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -260,6 +273,10 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
     "atlas": {
       "model": "openai/gpt-5.2",
     },
+    "devils-advocate": {
+      "model": "openai/gpt-5.2",
+      "variant": "medium",
+    },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
@@ -327,6 +344,9 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     "atlas": {
       "model": "google/gemini-3-pro",
     },
+    "devils-advocate": {
+      "model": "google/gemini-3-pro",
+    },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
@@ -385,6 +405,9 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
+      "model": "google/gemini-3-pro",
+    },
+    "devils-advocate": {
       "model": "google/gemini-3-pro",
     },
     "explore": {
@@ -446,6 +469,9 @@ exports[`generateModelConfig all native providers uses preferred models from fal
   "agents": {
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
+    },
+    "devils-advocate": {
+      "model": "google/gemini-3-pro",
     },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
@@ -519,6 +545,9 @@ exports[`generateModelConfig all native providers uses preferred models with isM
   "agents": {
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
+    },
+    "devils-advocate": {
+      "model": "google/gemini-3-pro",
     },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
@@ -594,6 +623,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
+    "devils-advocate": {
+      "model": "opencode/gemini-3-pro",
+    },
     "explore": {
       "model": "opencode/claude-haiku-4-5",
     },
@@ -666,6 +698,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
   "agents": {
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
+    },
+    "devils-advocate": {
+      "model": "opencode/gemini-3-pro",
     },
     "explore": {
       "model": "opencode/claude-haiku-4-5",
@@ -741,6 +776,9 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "atlas": {
       "model": "github-copilot/claude-sonnet-4.5",
     },
+    "devils-advocate": {
+      "model": "github-copilot/gemini-3-pro-preview",
+    },
     "explore": {
       "model": "github-copilot/gpt-5-mini",
     },
@@ -813,6 +851,9 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
   "agents": {
     "atlas": {
       "model": "github-copilot/claude-sonnet-4.5",
+    },
+    "devils-advocate": {
+      "model": "github-copilot/gemini-3-pro-preview",
     },
     "explore": {
       "model": "github-copilot/gpt-5-mini",
@@ -888,6 +929,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     "atlas": {
       "model": "opencode/glm-4.7-free",
     },
+    "devils-advocate": {
+      "model": "opencode/glm-4.7-free",
+    },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
@@ -941,6 +985,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "devils-advocate": {
       "model": "opencode/glm-4.7-free",
     },
     "explore": {
@@ -997,6 +1044,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
   "agents": {
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
+    },
+    "devils-advocate": {
+      "model": "opencode/gemini-3-pro",
     },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1071,6 +1121,9 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "atlas": {
       "model": "github-copilot/claude-sonnet-4.5",
     },
+    "devils-advocate": {
+      "model": "github-copilot/gemini-3-pro-preview",
+    },
     "explore": {
       "model": "github-copilot/gpt-5-mini",
     },
@@ -1144,6 +1197,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
     },
+    "devils-advocate": {
+      "model": "anthropic/claude-sonnet-4-5",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -1205,6 +1261,9 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
   "agents": {
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
+    },
+    "devils-advocate": {
+      "model": "google/gemini-3-pro",
     },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1270,6 +1329,9 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
   "agents": {
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
+    },
+    "devils-advocate": {
+      "model": "github-copilot/gemini-3-pro-preview",
     },
     "explore": {
       "model": "opencode/claude-haiku-4-5",
@@ -1344,6 +1406,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
+    "devils-advocate": {
+      "model": "google/gemini-3-pro",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -1416,6 +1481,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
   "agents": {
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
+    },
+    "devils-advocate": {
+      "model": "google/gemini-3-pro",
     },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
