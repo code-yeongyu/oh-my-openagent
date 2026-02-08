@@ -104,7 +104,7 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 | Architecture decision needed | MUST call plan agent |
 
 \`\`\`
-task(subagent_type="plan", prompt="<gathered context + user request>")
+task(subagent_type="plan", load_skills=[], prompt="<gathered context + user request>")
 \`\`\`
 
 **WHY PLAN AGENT IS MANDATORY:**
@@ -119,9 +119,9 @@ task(subagent_type="plan", prompt="<gathered context + user request>")
 
 | Scenario | Action |
 |----------|--------|
-| Plan agent asks clarifying questions | \`task(session_id="{returned_session_id}", prompt="<your answer>")\` |
-| Need to refine the plan | \`task(session_id="{returned_session_id}", prompt="Please adjust: <feedback>")\` |
-| Plan needs more detail | \`task(session_id="{returned_session_id}", prompt="Add more detail to Task N")\` |
+| Plan agent asks clarifying questions | \`task(session_id="{returned_session_id}", load_skills=[], prompt="<your answer>")\` |
+| Need to refine the plan | \`task(session_id="{returned_session_id}", load_skills=[], prompt="Please adjust: <feedback>")\` |
+| Plan needs more detail | \`task(session_id="{returned_session_id}", load_skills=[], prompt="Add more detail to Task N")\` |
 
 **WHY SESSION_ID IS CRITICAL:**
 - Plan agent retains FULL conversation context
@@ -131,10 +131,10 @@ task(subagent_type="plan", prompt="<gathered context + user request>")
 
 \`\`\`
 // WRONG: Starting fresh loses all context
-task(subagent_type="plan", prompt="Here's more info...")
+task(subagent_type="plan", load_skills=[], prompt="Here's more info...")
 
 // CORRECT: Resume preserves everything
-task(session_id="ses_abc123", prompt="Here's my answer to your question: ...")
+task(session_id="ses_abc123", load_skills=[], prompt="Here's my answer to your question: ...")
 \`\`\`
 
 **FAILURE TO CALL PLAN AGENT = INCOMPLETE WORK.**
@@ -147,10 +147,10 @@ task(session_id="ses_abc123", prompt="Here's my answer to your question: ...")
 
 | Task Type | Action | Why |
 |-----------|--------|-----|
-| Codebase exploration | task(subagent_type="explore", run_in_background=true) | Parallel, context-efficient |
-| Documentation lookup | task(subagent_type="librarian", run_in_background=true) | Specialized knowledge |
-| Planning | task(subagent_type="plan") | Parallel task graph + structured TODO list |
-| Hard problem (conventional) | task(subagent_type="oracle") | Architecture, debugging, complex logic |
+| Codebase exploration | task(subagent_type="explore", load_skills=[], run_in_background=true) | Parallel, context-efficient |
+| Documentation lookup | task(subagent_type="librarian", load_skills=[], run_in_background=true) | Specialized knowledge |
+| Planning | task(subagent_type="plan", load_skills=[]) | Parallel task graph + structured TODO list |
+| Hard problem (conventional) | task(subagent_type="oracle", load_skills=[]) | Architecture, debugging, complex logic |
 | Hard problem (non-conventional) | task(category="artistry", load_skills=[...]) | Different approach needed |
 | Implementation | task(category="...", load_skills=[...]) | Domain-optimized models |
 
