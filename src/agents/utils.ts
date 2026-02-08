@@ -11,7 +11,18 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
-import { deepMerge, fetchAvailableModels, resolveModelPipeline, AGENT_MODEL_REQUIREMENTS, readConnectedProvidersCache, isModelAvailable, isAnyFallbackModelAvailable, isAnyProviderConnected, migrateAgentConfig } from "../shared"
+import {
+  deepMerge,
+  fetchAvailableModels,
+  resolveModelPipeline,
+  AGENT_MODEL_REQUIREMENTS,
+  readConnectedProvidersCache,
+  isModelAvailable,
+  isAnyFallbackModelAvailable,
+  isAnyProviderConnected,
+  migrateAgentConfig,
+  truncateDescription,
+} from "../shared"
 import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -50,6 +61,64 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
 
 function isFactory(source: AgentSource): source is AgentFactory {
   return typeof source === "function"
+}
+
+type RegisteredAgentSummary = {
+  name: string
+  description: string
+}
+
+function sanitizeMarkdownTableCell(value: string): string {
+  return value
+    .replace(/\r?\n/g, " ")
+    .replace(/\|/g, "\\|")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function parseRegisteredAgentSummaries(input: unknown): RegisteredAgentSummary[] {
+  if (!Array.isArray(input)) return []
+
+  const result: RegisteredAgentSummary[] = []
+  for (const item of input) {
+    if (!isRecord(item)) continue
+
+    const name = typeof item.name === "string" ? item.name : undefined
+    if (!name) continue
+
+    const hidden = item.hidden
+    if (hidden === true) continue
+
+    const disabled = item.disabled
+    if (disabled === true) continue
+
+    const enabled = item.enabled
+    if (enabled === false) continue
+
+    const description = typeof item.description === "string" ? item.description : ""
+    result.push({ name, description: sanitizeMarkdownTableCell(description) })
+  }
+
+  return result
+}
+
+function buildCustomAgentMetadata(agentName: string, description: string): AgentPromptMetadata {
+  const shortDescription = sanitizeMarkdownTableCell(truncateDescription(description))
+  const safeAgentName = sanitizeMarkdownTableCell(agentName)
+  return {
+    category: "specialist",
+    cost: "CHEAP",
+    triggers: [
+      {
+        domain: `Custom agent: ${safeAgentName}`,
+        trigger: shortDescription || "Use when this agent's description matches the task",
+      },
+    ],
+  }
 }
 
 export function buildAgent(
@@ -233,13 +302,13 @@ export async function createBuiltinAgents(
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
   discoveredSkills: LoadedSkill[] = [],
-  client?: any,
+  customAgentSummaries?: unknown,
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
   disabledSkills?: Set<string>
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
-  // IMPORTANT: Do NOT pass client to fetchAvailableModels during plugin initialization.
+  // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
   // This function is called from config handler, and calling client API causes deadlock.
   // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1301
   const availableModels = await fetchAvailableModels(undefined, {
@@ -278,6 +347,10 @@ export async function createBuiltinAgents(
     }))
 
   const availableSkills: AvailableSkill[] = [...builtinAvailable, ...discoveredAvailable]
+
+  const registeredAgents = parseRegisteredAgentSummaries(customAgentSummaries)
+  const builtinAgentNames = new Set(Object.keys(agentSources).map((n) => n.toLowerCase()))
+  const disabledAgentNames = new Set(disabledAgents.map((n) => n.toLowerCase()))
 
   // Collect general agents first (for availableAgents), but don't add to result yet
   const pendingAgentConfigs: Map<string, AgentConfig> = new Map()
@@ -335,14 +408,27 @@ export async function createBuiltinAgents(
     // Store for later - will be added after sisyphus and hephaestus
     pendingAgentConfigs.set(name, config)
 
-    const metadata = agentMetadata[agentName]
-    if (metadata) {
-      availableAgents.push({
-        name: agentName,
-        description: config.description ?? "",
-        metadata,
-      })
-    }
+     const metadata = agentMetadata[agentName]
+     if (metadata) {
+       availableAgents.push({
+         name: agentName,
+         description: config.description ?? "",
+         metadata,
+       })
+     }
+   }
+
+  for (const agent of registeredAgents) {
+    const lowerName = agent.name.toLowerCase()
+    if (builtinAgentNames.has(lowerName)) continue
+    if (disabledAgentNames.has(lowerName)) continue
+    if (availableAgents.some((a) => a.name.toLowerCase() === lowerName)) continue
+
+    availableAgents.push({
+      name: agent.name,
+      description: agent.description,
+      metadata: buildCustomAgentMetadata(agent.name, agent.description),
+    })
   }
 
    const sisyphusOverride = agentOverrides["sisyphus"]
