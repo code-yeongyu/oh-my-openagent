@@ -101,6 +101,7 @@ describe("agent-teams delegation consistency", () => {
       sessionID: "ses-main",
       messageID: "msg-main",
       abort: new AbortController().signal,
+      agent: "sisyphus",
     }
 
     await executeJsonTool(tools, "team_create", { team_name: "core" }, leadContext)
