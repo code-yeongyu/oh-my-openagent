@@ -71,6 +71,7 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
 
   state.hasReceivedMeaningfulWork = true
   state.messageCount++
+  state.lastPartText = ""
 }
 
 export function handleToolExecute(ctx: RunContext, payload: EventPayload, state: EventState): void {

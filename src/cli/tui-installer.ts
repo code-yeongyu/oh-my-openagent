@@ -14,6 +14,11 @@ import { detectedToInitialValues, formatConfigSummary, SYMBOLS } from "./install
 import { promptInstallConfig } from "./tui-install-prompts"
 
 export async function runTuiInstaller(args: InstallArgs, version: string): Promise<number> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    console.error("Error: Interactive installer requires a TTY. Use --non-interactive or set environment variables directly.")
+    return 1
+  }
+
   const detected = detectCurrentConfig()
   const isUpdate = detected.isInstalled
 
