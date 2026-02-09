@@ -61,9 +61,25 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
         } else {
           let depth = 0
           let braceEnd = braceStart
+          let inString = false
+          let escape = false
           for (let i = braceStart; i < content.length; i++) {
-            if (content[i] === "{") depth++
-            else if (content[i] === "}") {
+            const ch = content[i]
+            if (escape) {
+              escape = false
+              continue
+            }
+            if (ch === "\\") {
+              escape = true
+              continue
+            }
+            if (ch === '"') {
+              inString = !inString
+              continue
+            }
+            if (inString) continue
+            if (ch === "{") depth++
+            else if (ch === "}") {
               depth--
               if (depth === 0) {
                 braceEnd = i
