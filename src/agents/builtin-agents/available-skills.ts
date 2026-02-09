@@ -24,7 +24,7 @@ export function buildAvailableSkills(
   }))
 
   const discoveredAvailable: AvailableSkill[] = discoveredSkills
-    .filter(s => !builtinSkillNames.has(s.name))
+    .filter(s => !builtinSkillNames.has(s.name) && !disabledSkills?.has(s.name))
     .map((skill) => ({
       name: skill.name,
       description: skill.definition.description ?? "",

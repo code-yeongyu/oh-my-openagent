@@ -2,6 +2,7 @@ import {
   findPluginEntry,
   getCachedVersion,
   getLatestVersion,
+  getLocalDevVersion,
   isLocalDevMode,
 } from "../../hooks/auto-update-checker/checker"
 
@@ -15,7 +16,7 @@ export async function getLocalVersion(
 
   try {
     if (isLocalDevMode(directory)) {
-      const currentVersion = getCachedVersion()
+      const currentVersion = getLocalDevVersion(directory) ?? getCachedVersion()
       const info: VersionInfo = {
         currentVersion,
         latestVersion: null,
