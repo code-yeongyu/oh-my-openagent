@@ -4,6 +4,7 @@ import type { FallbackState, FallbackResult, RuntimeFallbackHook, RuntimeFallbac
 import { DEFAULT_CONFIG, RETRYABLE_ERROR_PATTERNS, HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { normalizeFallbackModels } from "../../shared/model-resolver"
 
 function createFallbackState(originalModel: string): FallbackState {
   return {
@@ -74,12 +75,6 @@ function isRetryableError(error: unknown, retryOnErrors: number[]): boolean {
   return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(message))
 }
 
-function normalizeFallbackModels(models: string | string[] | undefined): string[] {
-  if (!models) return []
-  const list = Array.isArray(models) ? models : [models]
-  return list.filter((m): m is string => typeof m === "string" && m.length > 0)
-}
-
 function getFallbackModelsForSession(
   sessionID: string,
   agent: string | undefined,
@@ -92,7 +87,7 @@ function getFallbackModelsForSession(
   if (sessionCategory && pluginConfig.categories?.[sessionCategory]) {
     const categoryConfig = pluginConfig.categories[sessionCategory]
     if (categoryConfig?.fallback_models) {
-      return normalizeFallbackModels(categoryConfig.fallback_models)
+      return normalizeFallbackModels(categoryConfig.fallback_models) ?? []
     }
   }
 
