@@ -29,4 +29,6 @@ export type {
   TmuxLayout,
   SisyphusConfig,
   SisyphusTasksConfig,
+  RuntimeFallbackConfig,
+  FallbackModels,
 } from "./schema"

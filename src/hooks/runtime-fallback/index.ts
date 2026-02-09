@@ -131,7 +131,7 @@ function getFallbackModelsForSession(
     "multimodal-looker",
   ]
   const agentPattern = new RegExp(
-    `(?:^|[^a-zA-Z0-9_-])(${AGENT_NAMES.map((a) => a.replace(/-/g, "\\-")).join("|")})(?:$|[^a-zA-Z0-9_-])`,
+    `\\b(${AGENT_NAMES.map((a) => a.replace(/-/g, "\\-")).join("|")})\\b`,
     "i",
   )
   const sessionAgentMatch = sessionID.match(agentPattern)

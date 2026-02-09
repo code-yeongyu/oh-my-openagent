@@ -5,6 +5,7 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { createSyncSession } from "./sync-session-creator"
@@ -124,6 +125,7 @@ export async function executeSyncTask(
     }
 
     subagentSessions.delete(sessionID)
+    SessionCategoryRegistry.remove(sessionID)
 
     return `Task completed in ${duration}.
 
@@ -142,6 +144,7 @@ session_id: ${sessionID}
     }
     if (syncSessionID) {
       subagentSessions.delete(syncSessionID)
+      SessionCategoryRegistry.remove(syncSessionID)
     }
     return formatDetailedError(error, {
       operation: "Execute task",

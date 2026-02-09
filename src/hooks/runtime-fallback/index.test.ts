@@ -522,9 +522,22 @@ describe("runtime-fallback", () => {
   })
 
   describe("fallback models configuration", () => {
+    function createMockPluginConfigWithAgentFallback(agentName: string, fallbackModels: string[]): OhMyOpenCodeConfig {
+      return {
+        agents: {
+          [agentName]: {
+            fallback_models: fallbackModels,
+          },
+        },
+      }
+    }
+
     test("should use agent-level fallback_models", async () => {
       const input = createMockPluginInput()
-      const hook = createRuntimeFallbackHook(input, { config: createMockConfig() })
+      const hook = createRuntimeFallbackHook(input, {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithAgentFallback("oracle", ["openai/gpt-5.2", "google/gemini-3-pro"]),
+      })
       const sessionID = "test-agent-fallback"
 
       //#given - agent with custom fallback models
@@ -543,13 +556,17 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#then - should use oracle's fallback models
-      const fallbackLog = logCalls.find((c) => c.msg.includes("No fallback models configured") || c.msg.includes("Fallback triggered"))
+      //#then - should prepare fallback to openai/gpt-5.2
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
       expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({ from: "anthropic/claude-opus-4-5", to: "openai/gpt-5.2" })
     })
 
     test("should detect agent from sessionID pattern", async () => {
-      const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithAgentFallback("sisyphus", ["openai/gpt-5.2"]),
+      })
       const sessionID = "sisyphus-session-123"
 
       await hook.event({
@@ -566,8 +583,10 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
-      expect(errorLog?.data).toMatchObject({ sessionID })
+      //#then - should detect sisyphus from sessionID and use its fallback
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({ to: "openai/gpt-5.2" })
     })
   })
 
