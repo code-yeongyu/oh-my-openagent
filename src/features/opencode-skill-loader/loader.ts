@@ -4,6 +4,7 @@ import yaml from "js-yaml"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { resolveSymlinkAsync, isMarkdownFile } from "../../shared/file-utils"
+import { resolveSkillPathReferences } from "../../shared/skill-path-resolver"
 import { getClaudeConfigDir } from "../../shared"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
@@ -84,11 +85,12 @@ async function loadSkillFromPath(
     const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
     const formattedDescription = `(${scope} - Skill) ${originalDescription}`
 
+    const resolvedBody = resolveSkillPathReferences(body.trim(), resolvedPath)
     const templateContent = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/
 File references (@path) in this skill are relative to this directory.
 
-${body.trim()}
+${resolvedBody}
 </skill-instruction>
 
 <user-request>

@@ -5,6 +5,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { isMarkdownFile, resolveSymlink } from "../../shared/file-utils"
+import { resolveSkillPathReferences } from "../../shared/skill-path-resolver"
 import { log } from "../../shared/logger"
 import { expandEnvVarsInObject } from "../claude-code-mcp-loader/env-expander"
 import { transformMcpServer } from "../claude-code-mcp-loader/transformer"
@@ -297,11 +298,12 @@ export function loadPluginSkillsAsCommands(
         const originalDescription = data.description || ""
         const formattedDescription = `(plugin: ${plugin.name} - Skill) ${originalDescription}`
 
+        const resolvedBody = resolveSkillPathReferences(body.trim(), resolvedPath)
         const wrappedTemplate = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/
 File references (@path) in this skill are relative to this directory.
 
-${body.trim()}
+${resolvedBody}
 </skill-instruction>
 
 <user-request>

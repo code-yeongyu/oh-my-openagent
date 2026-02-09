@@ -8,6 +8,7 @@ import { homedir } from "os"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { deepMerge } from "../../shared/deep-merge"
+import { resolveSkillPathReferences } from "../../shared/skill-path-resolver"
 
 function parseAllowedToolsFromMetadata(allowedTools: string | string[] | undefined): string[] | undefined {
   if (!allowedTools) return undefined
@@ -105,11 +106,12 @@ function configEntryToLoaded(
   const description = entry.description || fileMetadata.description || ""
   const resolvedPath = entry.from ? dirname(resolveFilePath(entry.from, configDir)) : configDir || process.cwd()
 
+  const resolvedTemplate = resolveSkillPathReferences(template.trim(), resolvedPath)
   const wrappedTemplate = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/
 File references (@path) in this skill are relative to this directory.
 
-${template.trim()}
+${resolvedTemplate}
 </skill-instruction>
 
 <user-request>
