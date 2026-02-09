@@ -7,6 +7,9 @@ const execSyncMock = mock(() => {
 })
 
 const execFileSyncMock = mock((file: string, args: string[], _opts: { cwd?: string }) => {
+  if (file === "wc") {
+    return "  10 new-file.ts\n"
+  }
   if (file !== "git") throw new Error(`unexpected file: ${file}`)
   const subcommand = args[0]
 
@@ -42,7 +45,7 @@ describe("collectGitDiffStats", () => {
 
     //#then
     expect(execSyncMock).not.toHaveBeenCalled()
-    expect(execFileSyncMock).toHaveBeenCalledTimes(3)
+    expect(execFileSyncMock).toHaveBeenCalledTimes(4)
 
     const [firstCallFile, firstCallArgs, firstCallOpts] = execFileSyncMock.mock
       .calls[0]! as unknown as [string, string[], { cwd?: string }]
@@ -65,6 +68,12 @@ describe("collectGitDiffStats", () => {
     expect(thirdCallOpts.cwd).toBe(directory)
     expect(thirdCallArgs.join(" ")).not.toContain(directory)
 
+    const [fourthCallFile, fourthCallArgs, fourthCallOpts] = execFileSyncMock.mock
+      .calls[3]! as unknown as [string, string[], { cwd?: string }]
+    expect(fourthCallFile).toBe("wc")
+    expect(fourthCallArgs).toEqual(["-l", "--", "new-file.ts"])
+    expect(fourthCallOpts.cwd).toBe(directory)
+
     expect(result).toEqual([
       {
         path: "file.ts",
@@ -74,7 +83,7 @@ describe("collectGitDiffStats", () => {
       },
       {
         path: "new-file.ts",
-        added: 0,
+        added: 10,
         removed: 0,
         status: "added",
       },
