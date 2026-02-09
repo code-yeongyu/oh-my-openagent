@@ -3,7 +3,7 @@ import color from "picocolors"
 import type { AgentOverrideConfig } from "../../config/schema"
 import type { ConfigEditorState, AgentName, BashPermissionValue, BashCommand } from "./types"
 import { AGENT_NAMES, BASH_COMMANDS } from "./types"
-import { getAvailableModels } from "./models"
+import { selectModelWithCacheLoader } from "./ui-utils"
 
 type ExtendedAgentConfig = AgentOverrideConfig & { fallback_model?: string }
 
@@ -77,17 +77,10 @@ async function editAgentField(
   }
 
   if (field === "model") {
-    const modelOptions = getAvailableModels().map((m) => ({ value: m, label: m }))
-
-    const model = await p.select({
-      message: `Select model for "${agentName}":`,
-      options: [
-        ...modelOptions,
-        { value: "__custom__", label: "Custom model..." },
-        { value: "__clear__", label: "Clear model" },
-      ],
-      initialValue: agent.model,
-    })
+    const model = await selectModelWithCacheLoader(
+      `Select model for "${agentName}":`,
+      agent.model
+    )
 
     if (p.isCancel(model)) return false
 
@@ -102,7 +95,7 @@ async function editAgentField(
       if (p.isCancel(custom)) return false
       finalModel = custom
     } else {
-      finalModel = model
+      finalModel = model as string
     }
 
     if (!state.config.agents) state.config.agents = {}
@@ -153,17 +146,10 @@ async function editAgentField(
   }
 
   if (field === "fallback_model") {
-    const modelOptions = getAvailableModels().map((m) => ({ value: m, label: m }))
-
-    const model = await p.select({
-      message: `Select fallback model for "${agentName}":`,
-      options: [
-        ...modelOptions,
-        { value: "__custom__", label: "Custom model..." },
-        { value: "__clear__", label: "Clear fallback model" },
-      ],
-      initialValue: agent.fallback_model,
-    })
+    const model = await selectModelWithCacheLoader(
+      `Select fallback model for "${agentName}":`,
+      agent.fallback_model
+    )
 
     if (p.isCancel(model)) return false
 
@@ -178,7 +164,7 @@ async function editAgentField(
       if (p.isCancel(custom)) return false
       finalFallback = custom
     } else {
-      finalFallback = model
+      finalFallback = model as string
     }
 
     if (!state.config.agents) state.config.agents = {}

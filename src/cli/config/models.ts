@@ -1,32 +1,38 @@
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { homedir } from "node:os"
-import { AVAILABLE_MODELS } from "./types"
+import { getOpenCodeCacheDir } from "../../shared/data-path"
 
-function getCacheDir(): string {
-  // Try to use shared function if possible, otherwise simple fallback
-  // ~/.cache/opencode on Linux/Mac
-  return join(homedir(), ".cache", "opencode")
-}
+export type ProviderMap = Record<string, string[]>
 
-function loadModelsFromCache(): string[] {
-  const cacheDir = getCacheDir()
+export function getModelsByProvider(): ProviderMap {
+  const cacheDir = getOpenCodeCacheDir()
   const modelsJsonPath = join(cacheDir, "models.json")
-  const providerModelsJsonPath = join(cacheDir, "provider-models.json")
+  
+  const result: ProviderMap = {}
 
-  let models: string[] = []
-
-  // Try provider-models.json first (newer format)
-  if (existsSync(providerModelsJsonPath)) {
+  if (existsSync(modelsJsonPath)) {
     try {
-      const content = readFileSync(providerModelsJsonPath, "utf-8")
+      const content = readFileSync(modelsJsonPath, "utf-8")
       const data = JSON.parse(content)
-      // Format: { "provider": ["model1", "model2"] }
+
       if (typeof data === "object" && data !== null) {
-        for (const [provider, providerModels] of Object.entries(data)) {
-          if (Array.isArray(providerModels)) {
-            for (const model of providerModels) {
-              models.push(`${provider}/${model}`)
+        // Handle array format (legacy)
+        if (Array.isArray(data)) {
+           for (const item of data) {
+             if (item.provider && item.id) {
+               if (!result[item.provider]) result[item.provider] = []
+               result[item.provider].push(item.id)
+             }
+           }
+        } 
+        // Handle provider map format
+        else {
+          for (const [providerId, providerData] of Object.entries(data)) {
+            if (providerData && typeof providerData === 'object' && 'models' in providerData) {
+              const modelsMap = (providerData as any).models
+              if (modelsMap && typeof modelsMap === 'object') {
+                result[providerId] = Object.keys(modelsMap).sort()
+              }
             }
           }
         }
@@ -35,35 +41,17 @@ function loadModelsFromCache(): string[] {
       // ignore
     }
   }
-
-  // Try models.json fallback (legacy format or simple list)
-  if (models.length === 0 && existsSync(modelsJsonPath)) {
-    try {
-      const content = readFileSync(modelsJsonPath, "utf-8")
-      const data = JSON.parse(content)
-      
-      // If it's an array of model objects from API
-      if (Array.isArray(data)) {
-        for (const item of data) {
-          if (item.provider && item.id) {
-            models.push(`${item.provider}/${item.id}`)
-          }
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-
-  return models
+  
+  return result
 }
 
-export function getAvailableModels(): string[] {
-  const cached = loadModelsFromCache()
-  if (cached.length > 0) {
-    // Merge with static known models to be safe, but unique
-    return Array.from(new Set([...cached, ...AVAILABLE_MODELS])).sort()
+export function getAllCachedModels(): string[] {
+  const map = getModelsByProvider()
+  const list: string[] = []
+  for (const [provider, models] of Object.entries(map)) {
+    for (const model of models) {
+      list.push(`${provider}/${model}`)
+    }
   }
-  
-  return [...AVAILABLE_MODELS]
+  return list.sort()
 }

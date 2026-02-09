@@ -2,7 +2,8 @@ import * as p from "@clack/prompts"
 import color from "picocolors"
 import type { AgentOverrideConfig } from "../../config/schema"
 import type { ConfigEditorState, BashPermissionValue } from "./types"
-import { AGENT_NAMES, AVAILABLE_MODELS } from "./types"
+import { AGENT_NAMES } from "./types"
+import { selectModelWithCacheLoader } from "./ui-utils"
 
 type ExtendedAgentConfig = AgentOverrideConfig & { fallback_model?: string }
 
@@ -11,16 +12,9 @@ function getAgentsRecord(state: ConfigEditorState): Record<string, ExtendedAgent
 }
 
 async function setModelForAllAgents(state: ConfigEditorState): Promise<void> {
-  const model = await p.select({
-    message: "Select model to set for ALL agents:",
-    options: [
-      ...AVAILABLE_MODELS.map((m) => ({ value: m, label: m })),
-      { value: "__custom__", label: "Custom model..." },
-      { value: "__back__", label: "Back" },
-    ],
-  })
+  const model = await selectModelWithCacheLoader("Select model to set for ALL agents:")
 
-  if (p.isCancel(model) || model === "__back__") return
+  if (p.isCancel(model)) return
 
   let finalModel: string
   if (model === "__custom__") {
@@ -33,8 +27,13 @@ async function setModelForAllAgents(state: ConfigEditorState): Promise<void> {
     })
     if (p.isCancel(custom)) return
     finalModel = custom.trim()
+  } else if (model === "__clear__") {
+    // Handling clear if supported, or just ignore. 
+    // Usually bulk set to specific model.
+    // Let's assume user wants to set a specific model.
+    return
   } else {
-    finalModel = model
+    finalModel = model as string
   }
 
   const confirm = await p.confirm({
@@ -63,16 +62,9 @@ async function setModelForAllAgents(state: ConfigEditorState): Promise<void> {
 }
 
 async function setFallbackForAllAgents(state: ConfigEditorState): Promise<void> {
-  const model = await p.select({
-    message: "Select fallback model to set for ALL agents:",
-    options: [
-      ...AVAILABLE_MODELS.map((m) => ({ value: m, label: m })),
-      { value: "__custom__", label: "Custom model..." },
-      { value: "__back__", label: "Back" },
-    ],
-  })
+  const model = await selectModelWithCacheLoader("Select fallback model to set for ALL agents:")
 
-  if (p.isCancel(model) || model === "__back__") return
+  if (p.isCancel(model)) return
 
   let finalModel: string
   if (model === "__custom__") {
@@ -85,8 +77,10 @@ async function setFallbackForAllAgents(state: ConfigEditorState): Promise<void> 
     })
     if (p.isCancel(custom)) return
     finalModel = custom.trim()
+  } else if (model === "__clear__") {
+    return
   } else {
-    finalModel = model
+    finalModel = model as string
   }
 
   const confirm = await p.confirm({

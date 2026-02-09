@@ -2,8 +2,7 @@ import * as p from "@clack/prompts"
 import color from "picocolors"
 import type { CategoryConfig } from "../../config/schema"
 import type { ConfigEditorState } from "./types"
-import { AVAILABLE_MODELS } from "./types"
-import { getAvailableModels } from "./models"
+import { selectModelWithCacheLoader } from "./ui-utils"
 
 type MutableCategories = Record<string, CategoryConfig>
 
@@ -56,17 +55,10 @@ async function editCategory(
   }
 
   if (field === "model") {
-    const modelOptions = getAvailableModels().map((m) => ({ value: m, label: m }))
-
-    const model = await p.select({
-      message: `Select model for category "${categoryName}":`,
-      options: [
-        ...modelOptions,
-        { value: "__custom__", label: "Custom model..." },
-        { value: "__clear__", label: "Clear model" },
-      ],
-      initialValue: category.model,
-    })
+    const model = await selectModelWithCacheLoader(
+      `Select model for category "${categoryName}":`,
+      category.model
+    )
 
     if (p.isCancel(model)) return false
 
@@ -81,7 +73,7 @@ async function editCategory(
       if (p.isCancel(custom)) return false
       finalModel = custom
     } else {
-      finalModel = model
+      finalModel = model as string
     }
 
     if (!state.config.categories) state.config.categories = {}
