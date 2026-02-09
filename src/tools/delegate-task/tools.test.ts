@@ -316,8 +316,74 @@ describe("sisyphus-task", () => {
        // when
        await tool.execute(args, toolContext)
 
-      // then
+       // then
+       expect(args.subagent_type).toBe("sisyphus-junior")
+    }, { timeout: 10000 })
+
+    test("category overrides subagent_type and still maps to sisyphus-junior", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = {
+        launch: async () => ({
+          id: "task-override",
+          status: "pending",
+          description: "Override test",
+          agent: "sisyphus-junior",
+          sessionID: "test-session",
+        }),
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      const args: {
+        description: string
+        prompt: string
+        category: string
+        subagent_type: string
+        run_in_background: boolean
+        load_skills: string[]
+      } = {
+        description: "Override test",
+        prompt: "Do something",
+        category: "quick",
+        subagent_type: "oracle",
+        run_in_background: true,
+        load_skills: [],
+      }
+
+      //#when
+      const result = await tool.execute(args, toolContext)
+
+      //#then
       expect(args.subagent_type).toBe("sisyphus-junior")
+      expect(result).toContain("Background task launched")
     }, { timeout: 10000 })
 
     test("proceeds without error when systemDefaultModel is undefined", async () => {
