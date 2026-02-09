@@ -38,7 +38,7 @@ export function parseRegisteredAgentSummaries(input: unknown): RegisteredAgentSu
     if (enabled === false) continue
 
     const description = typeof item.description === "string" ? item.description : ""
-    result.push({ name, description: sanitizeMarkdownTableCell(description) })
+    result.push({ name: sanitizeMarkdownTableCell(name), description: sanitizeMarkdownTableCell(description) })
   }
 
   return result
