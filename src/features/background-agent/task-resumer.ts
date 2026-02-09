@@ -48,7 +48,11 @@ export async function resumeBackgroundTask(args: {
     return existingTask
   }
 
-  const concurrencyKey = existingTask.concurrencyGroup ?? existingTask.agent
+  const concurrencyKey =
+    existingTask.concurrencyGroup ??
+    (existingTask.model
+      ? `${existingTask.model.providerID}/${existingTask.model.modelID}`
+      : existingTask.agent)
   await concurrencyManager.acquire(concurrencyKey)
   existingTask.concurrencyKey = concurrencyKey
   existingTask.concurrencyGroup = concurrencyKey
