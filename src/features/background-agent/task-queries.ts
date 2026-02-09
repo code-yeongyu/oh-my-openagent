@@ -44,7 +44,7 @@ export function getRunningTasks(tasks: Iterable<BackgroundTask>): BackgroundTask
   return Array.from(tasks).filter((t) => t.status === "running")
 }
 
-export function getCompletedTasks(tasks: Iterable<BackgroundTask>): BackgroundTask[] {
+export function getNonRunningTasks(tasks: Iterable<BackgroundTask>): BackgroundTask[] {
   return Array.from(tasks).filter((t) => t.status !== "running")
 }
 

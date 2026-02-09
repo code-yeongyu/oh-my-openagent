@@ -48,7 +48,7 @@ export class TaskStateManager {
   getRunningTasks(): BackgroundTask[] {
     return Array.from(this.tasks.values()).filter(t => t.status === "running")
   }
-  getCompletedTasks(): BackgroundTask[] {
+  getNonRunningTasks(): BackgroundTask[] {
     return Array.from(this.tasks.values()).filter(t => t.status !== "running")
   }
 

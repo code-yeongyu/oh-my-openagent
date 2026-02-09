@@ -1044,9 +1044,9 @@ export class BackgroundManager {
   }
 
   /**
-   * Get all completed tasks still in memory (for compaction hook)
+   * Get all non-running tasks still in memory (for compaction hook)
    */
-  getCompletedTasks(): BackgroundTask[] {
+  getNonRunningTasks(): BackgroundTask[] {
     return Array.from(this.tasks.values()).filter(t => t.status !== "running")
   }
 
