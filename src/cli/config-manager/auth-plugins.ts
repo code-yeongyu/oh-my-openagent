@@ -44,7 +44,8 @@ export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMerge
       existingConfig = parseResult.config
     }
 
-    const plugins: string[] = existingConfig?.plugin ?? []
+    const rawPlugins = existingConfig?.plugin
+    const plugins: string[] = Array.isArray(rawPlugins) ? rawPlugins : []
 
     if (config.hasGemini) {
       const version = await fetchLatestVersion("opencode-antigravity-auth")
