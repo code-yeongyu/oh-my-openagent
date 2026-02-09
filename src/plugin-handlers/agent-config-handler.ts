@@ -101,9 +101,11 @@ export async function applyAgentConfig(params: {
       sisyphus: builtinAgents.sisyphus,
     };
 
+    const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
     agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
       params.pluginConfig.agents?.["sisyphus-junior"],
       undefined,
+      useTaskSystem,
     );
 
     if (builderEnabled) {

@@ -200,6 +200,46 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     })
   })
 
+  describe("useTaskSystem integration", () => {
+    test("useTaskSystem=true produces Task_Discipline prompt for Claude", () => {
+      //#given
+      const override = { model: "anthropic/claude-sonnet-4-5" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
+
+      //#then
+      expect(result.prompt).toContain("TaskCreate")
+      expect(result.prompt).toContain("TaskUpdate")
+      expect(result.prompt).not.toContain("todowrite")
+    })
+
+    test("useTaskSystem=true produces task_discipline_spec prompt for GPT", () => {
+      //#given
+      const override = { model: "openai/gpt-5.2" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
+
+      //#then
+      expect(result.prompt).toContain("<task_discipline_spec>")
+      expect(result.prompt).toContain("TaskCreate")
+      expect(result.prompt).not.toContain("<todo_discipline_spec>")
+    })
+
+    test("useTaskSystem=false (default) produces Todo_Discipline prompt", () => {
+      //#given
+      const override = {}
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      //#then
+      expect(result.prompt).toContain("todowrite")
+      expect(result.prompt).not.toContain("TaskCreate")
+    })
+  })
+
   describe("prompt composition", () => {
     test("base prompt contains discipline constraints", () => {
       // given
