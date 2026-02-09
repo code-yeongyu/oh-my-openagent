@@ -6,6 +6,7 @@ import { dirname, isAbsolute, resolve } from "path"
 import { homedir } from "os"
 import { parseFrontmatter } from "../../../shared/frontmatter"
 import { sanitizeModelField } from "../../../shared/model-sanitizer"
+import { resolveSkillPathReferences } from "../../../shared/skill-path-resolver"
 import { parseAllowedTools } from "../allowed-tools-parser"
 
 function resolveFilePath(from: string, configDir?: string): string {
@@ -66,11 +67,12 @@ export function configEntryToLoadedSkill(
     ? dirname(resolveFilePath(entry.from, configDir))
     : configDir || process.cwd()
 
+  const resolvedTemplate = resolveSkillPathReferences(template.trim(), resolvedPath)
   const wrappedTemplate = `<skill-instruction>
 Base directory for this skill: ${resolvedPath}/
 File references (@path) in this skill are relative to this directory.
 
-${template.trim()}
+${resolvedTemplate}
 </skill-instruction>
 
 <user-request>
