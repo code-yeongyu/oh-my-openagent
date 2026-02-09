@@ -12,8 +12,6 @@ export function collectGitDiffStats(directory: string): GitFileStat[] {
       stdio: ["pipe", "pipe", "pipe"],
     }).trim()
 
-    if (!diffOutput) return []
-
     const statusOutput = execFileSync("git", ["status", "--porcelain"], {
       cwd: directory,
       encoding: "utf-8",
@@ -21,8 +19,27 @@ export function collectGitDiffStats(directory: string): GitFileStat[] {
       stdio: ["pipe", "pipe", "pipe"],
     }).trim()
 
+    const untrackedOutput = execFileSync("git", ["ls-files", "--others", "--exclude-standard"], {
+      cwd: directory,
+      encoding: "utf-8",
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    }).trim()
+
+    const untrackedNumstat = untrackedOutput
+      ? untrackedOutput
+          .split("\n")
+          .filter(Boolean)
+          .map((filePath) => `0\t0\t${filePath}`)
+          .join("\n")
+      : ""
+
+    const combinedNumstat = [diffOutput, untrackedNumstat].filter(Boolean).join("\n").trim()
+
+    if (!combinedNumstat) return []
+
     const statusMap = parseGitStatusPorcelain(statusOutput)
-    return parseGitDiffNumstat(diffOutput, statusMap)
+    return parseGitDiffNumstat(combinedNumstat, statusMap)
   } catch {
     return []
   }
