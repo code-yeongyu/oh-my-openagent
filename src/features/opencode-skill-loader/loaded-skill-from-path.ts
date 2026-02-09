@@ -2,6 +2,7 @@ import { promises as fs } from "fs"
 import { basename } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
+import { resolveSkillPathReferences } from "../../shared/skill-path-resolver"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import { parseAllowedTools } from "./allowed-tools-parser"
 import { loadMcpJsonFromDir, parseSkillMcpConfigFromFrontmatter } from "./skill-mcp-config"
@@ -30,7 +31,8 @@ export async function loadSkillFromPath(options: {
     const isOpencodeSource = options.scope === "opencode" || options.scope === "opencode-project"
     const formattedDescription = `(${options.scope} - Skill) ${originalDescription}`
 
-    const templateContent = `<skill-instruction>\nBase directory for this skill: ${options.resolvedPath}/\nFile references (@path) in this skill are relative to this directory.\n\n${body.trim()}\n</skill-instruction>\n\n<user-request>\n$ARGUMENTS\n</user-request>`
+    const resolvedBody = resolveSkillPathReferences(body.trim(), options.resolvedPath)
+    const templateContent = `<skill-instruction>\nBase directory for this skill: ${options.resolvedPath}/\nFile references (@path) in this skill are relative to this directory.\n\n${resolvedBody}\n</skill-instruction>\n\n<user-request>\n$ARGUMENTS\n</user-request>`
 
     const eagerLoader: LazyContentLoader = {
       loaded: true,
