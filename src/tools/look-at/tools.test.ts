@@ -111,10 +111,10 @@ describe("look-at tool", () => {
   })
 
   describe("createLookAt error handling", () => {
-    // given JSON parse error occurs in session.promptAsync
+    // given JSON parse error occurs in session.prompt
     // when LookAt tool executed
-    // then error propagates (band-aid removed since root cause fixed by promptAsync migration)
-    test("propagates JSON parse error from session.promptAsync", async () => {
+    // then error is caught and messages are still fetched
+    test("catches JSON parse error and returns assistant message if available", async () => {
       const throwingMock = async () => {
         throw new Error("JSON Parse error: Unexpected EOF")
       }
@@ -122,6 +122,50 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_test_json_error" } }),
+          prompt: throwingMock,
+          promptAsync: throwingMock,
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analysis result" }] },
+            ],
+          }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext: ToolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
+      }
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze image" },
+        toolContext,
+      )
+      expect(result).toBe("analysis result")
+    })
+
+    // given JSON parse error occurs and no messages available
+    // when LookAt tool executed
+    // then returns error string (not throw)
+    test("catches JSON parse error and returns error when no messages", async () => {
+      const throwingMock = async () => {
+        throw new Error("JSON Parse error: Unexpected EOF")
+      }
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_test_json_no_msg" } }),
           prompt: throwingMock,
           promptAsync: throwingMock,
           messages: async () => ({ data: [] }),
@@ -144,15 +188,62 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      await expect(
-        tool.execute({ file_path: "/test/file.png", goal: "analyze image" }, toolContext)
-      ).rejects.toThrow("JSON Parse error: Unexpected EOF")
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze image" },
+        toolContext,
+      )
+      expect(result).toContain("Error")
+      expect(result).toContain("multimodal-looker")
     })
 
-    // given generic error occurs in session.promptAsync
+    // given empty object error {} thrown (the actual production bug)
     // when LookAt tool executed
-    // then error propagates
-    test("propagates generic prompt error", async () => {
+    // then error is caught gracefully, not re-thrown
+    test("catches empty object error from session.prompt", async () => {
+      const throwingMock = async () => {
+        throw {}
+      }
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_test_empty_obj" } }),
+          prompt: throwingMock,
+          promptAsync: throwingMock,
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "got it" }] },
+            ],
+          }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext: ToolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
+      }
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze" },
+        toolContext,
+      )
+      expect(result).toBe("got it")
+    })
+
+    // given generic network error
+    // when LookAt tool executed
+    // then error is caught and returns error string when no messages
+    test("catches generic prompt error and returns error string", async () => {
       const throwingMock = async () => {
         throw new Error("Network connection failed")
       }
@@ -182,9 +273,12 @@ describe("look-at tool", () => {
         ask: async () => {},
       }
 
-      await expect(
-        tool.execute({ file_path: "/test/file.pdf", goal: "extract text" }, toolContext)
-      ).rejects.toThrow("Network connection failed")
+      const result = await tool.execute(
+        { file_path: "/test/file.pdf", goal: "extract text" },
+        toolContext,
+      )
+      expect(result).toContain("Error")
+      expect(result).toContain("multimodal-looker")
     })
   })
 

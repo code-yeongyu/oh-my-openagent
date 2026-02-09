@@ -126,12 +126,10 @@ Original error: ${createResult.error}`
           },
         })
       } catch (promptError) {
-        log(`[look_at] Prompt error:`, promptError)
-
-        throw promptError
+        log(`[look_at] Prompt error (ignored, will still fetch messages):`, promptError)
       }
 
-      log(`[look_at] Prompt sent, fetching messages...`)
+      log(`[look_at] Fetching messages from session ${sessionID}...`)
 
       const messagesResult = await ctx.client.session.messages({
         path: { id: sessionID },
