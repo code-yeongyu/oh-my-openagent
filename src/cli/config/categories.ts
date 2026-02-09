@@ -3,6 +3,7 @@ import color from "picocolors"
 import type { CategoryConfig } from "../../config/schema"
 import type { ConfigEditorState } from "./types"
 import { AVAILABLE_MODELS } from "./types"
+import { getAvailableModels } from "./models"
 
 type MutableCategories = Record<string, CategoryConfig>
 
@@ -55,10 +56,12 @@ async function editCategory(
   }
 
   if (field === "model") {
+    const modelOptions = getAvailableModels().map((m) => ({ value: m, label: m }))
+
     const model = await p.select({
       message: `Select model for category "${categoryName}":`,
       options: [
-        ...AVAILABLE_MODELS.map((m) => ({ value: m, label: m })),
+        ...modelOptions,
         { value: "__custom__", label: "Custom model..." },
         { value: "__clear__", label: "Clear model" },
       ],
