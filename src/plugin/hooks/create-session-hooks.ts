@@ -179,9 +179,11 @@ export function createSessionHooks(args: {
 
   const runtimeFallback = isHookEnabled("runtime-fallback")
     ? safeHook("runtime-fallback", () =>
-        createRuntimeFallbackHook(ctx, { config: pluginConfig.runtime_fallback }))
+        createRuntimeFallbackHook(ctx, {
+          config: pluginConfig.runtime_fallback,
+          pluginConfig,
+        }))
     : null
-
   return {
     contextWindowMonitor,
     preemptiveCompaction,
