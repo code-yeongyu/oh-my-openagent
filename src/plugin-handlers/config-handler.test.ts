@@ -1059,3 +1059,75 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     expect(agentResult.sisyphus?.permission?.todoread).toBeUndefined()
   })
 })
+
+describe("MCP enabled:false preservation", () => {
+  test("preserves user's enabled:false when .mcp.json servers overwrite same MCP name", async () => {
+    //#given - user has an MCP set to enabled:false in opencode config
+    ;(mcpLoader.loadMcpConfigs as any).mockRestore?.()
+    spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({
+      servers: {
+        "my-mcp": { command: "npx", args: ["-y", "my-mcp"], enabled: true },
+      },
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+      mcp: {
+        "my-mcp": { command: "npx", args: ["-y", "my-mcp"], enabled: false },
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then - user's enabled:false must be preserved despite .mcp.json overwrite
+    const mcpConfig = config.mcp as Record<string, { enabled?: boolean }>
+    expect(mcpConfig["my-mcp"]).toBeDefined()
+    expect(mcpConfig["my-mcp"].enabled).toBe(false)
+  })
+
+  test("does not alter MCPs the user has not explicitly disabled", async () => {
+    //#given - user has one MCP disabled, another enabled by default
+    ;(mcpLoader.loadMcpConfigs as any).mockRestore?.()
+    spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({
+      servers: {
+        "disabled-mcp": { command: "npx", args: ["-y", "disabled-mcp"], enabled: true },
+        "normal-mcp": { command: "npx", args: ["-y", "normal-mcp"], enabled: true },
+      },
+    })
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+      mcp: {
+        "disabled-mcp": { command: "npx", args: ["-y", "disabled-mcp"], enabled: false },
+        "normal-mcp": { command: "npx", args: ["-y", "normal-mcp"] },
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then - disabled-mcp stays disabled, normal-mcp remains enabled from .mcp.json
+    const mcpConfig = config.mcp as Record<string, { enabled?: boolean }>
+    expect(mcpConfig["disabled-mcp"].enabled).toBe(false)
+    expect(mcpConfig["normal-mcp"].enabled).toBe(true)
+  })
+})
