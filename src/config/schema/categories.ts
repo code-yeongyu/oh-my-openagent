@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { FallbackModelsSchema } from "./runtime-fallback"
 
 export const CategoryConfigSchema = z.object({
   /** Human-readable description of the category's purpose. Shown in task prompt. */
@@ -20,6 +21,8 @@ export const CategoryConfigSchema = z.object({
   prompt_append: z.string().optional(),
   /** Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini/minimax models. */
   is_unstable_agent: z.boolean().optional(),
+  /** Fallback models for runtime switching on API errors. Single string or array of model strings. */
+  fallback_models: FallbackModelsSchema.optional(),
 })
 
 export const BuiltinCategoryNameSchema = z.enum([

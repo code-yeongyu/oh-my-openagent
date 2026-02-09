@@ -714,6 +714,63 @@ Configure concurrency limits for background agent tasks. This controls how many 
 - Allow more concurrent tasks for fast/cheap models (e.g., Gemini Flash)
 - Respect provider rate limits by setting provider-level caps
 
+## Runtime Fallback
+
+Automatically switch to backup models when the primary model encounters transient API errors (rate limits, overload, etc.). This keeps conversations running without manual intervention.
+
+```json
+{
+  "runtime_fallback": {
+    "enabled": true,
+    "retry_on_errors": [429, 503, 529],
+    "max_fallback_attempts": 3,
+    "cooldown_seconds": 60,
+    "notify_on_fallback": true
+  }
+}
+```
+
+| Option                  | Default           | Description                                                                 |
+| ----------------------- | ----------------- | --------------------------------------------------------------------------- |
+| `enabled`               | `true`            | Enable runtime fallback                                                     |
+| `retry_on_errors`       | `[429, 503, 529]` | HTTP status codes that trigger fallback (rate limit, service unavailable)   |
+| `max_fallback_attempts` | `3`               | Maximum fallback attempts per session (1-10)                                |
+| `cooldown_seconds`      | `60`              | Cooldown in seconds before retrying a failed model                          |
+| `notify_on_fallback`    | `true`            | Show toast notification when switching to a fallback model                  |
+
+### How It Works
+
+1. When an API error matching `retry_on_errors` occurs, the hook intercepts it
+2. The next request automatically uses the next available model from `fallback_models`
+3. Failed models enter a cooldown period before being retried
+4. Toast notification (optional) informs you of the model switch
+
+### Configuring Fallback Models
+
+Define `fallback_models` at the agent or category level:
+
+```json
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-5",
+      "fallback_models": ["openai/gpt-5.2", "google/gemini-3-pro"]
+    }
+  },
+  "categories": {
+    "ultrabrain": {
+      "model": "openai/gpt-5.2-codex",
+      "fallback_models": ["anthropic/claude-opus-4-5", "google/gemini-3-pro"]
+    }
+  }
+}
+```
+
+When the primary model fails:
+1. First fallback: `openai/gpt-5.2`
+2. Second fallback: `google/gemini-3-pro`
+3. After `max_fallback_attempts`, returns to primary model
+
 ## Categories
 
 Categories enable domain-specific task delegation via the `task` tool. Each category applies runtime presets (model, temperature, prompt additions) when calling the `Sisyphus-Junior` agent.

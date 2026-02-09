@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { AgentPermissionSchema } from "./internal/permission"
+import { FallbackModelsSchema } from "./runtime-fallback"
 
 export const AgentOverrideConfigSchema = z.object({
   /** @deprecated Use `category` instead. Model is inherited from category defaults. */
@@ -37,6 +38,8 @@ export const AgentOverrideConfigSchema = z.object({
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   /** Provider-specific options. Passed directly to OpenCode SDK. */
   providerOptions: z.record(z.string(), z.unknown()).optional(),
+  /** Fallback models for runtime switching on API errors. Single string or array of model strings. */
+  fallback_models: FallbackModelsSchema.optional(),
 })
 
 export const AgentOverridesSchema = z.object({
