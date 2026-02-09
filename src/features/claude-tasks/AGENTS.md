@@ -8,12 +8,13 @@ Claude Code compatible task schema and storage. Provides core task management ut
 
 ```
 claude-tasks/
-├── types.ts          # Task schema (Zod)
-├── types.test.ts     # Schema validation tests (8 tests)
-├── storage.ts        # File operations
-├── storage.test.ts   # Storage tests (14 tests)
-├── todo-sync.ts      # Task → Todo synchronization
-└── index.ts          # Barrel exports
+├── types.ts               # Task schema (Zod)
+├── types.test.ts          # Schema validation tests (8 tests)
+├── storage.ts             # File operations
+├── storage.test.ts        # Storage tests (30 tests, 543 lines)
+├── session-storage.ts     # Session-scoped task storage
+├── session-storage.test.ts
+└── index.ts               # Barrel exports
 ```
 
 ## TASK SCHEMA
@@ -31,9 +32,6 @@ interface Task {
   blockedBy: string[]       // Task IDs blocking this task (was: dependsOn)
   owner?: string            // Agent name
   metadata?: Record<string, unknown>
-  repoURL?: string          // oh-my-opencode specific
-  parentID?: string         // oh-my-opencode specific
-  threadID: string          // oh-my-opencode specific
 }
 ```
 
@@ -42,14 +40,6 @@ interface Task {
 - `blockedBy` (was `dependsOn`)
 - `blocks` (new field)
 - `activeForm` (new field)
-
-## TODO SYNC
-
-Task system includes sync layer (`todo-sync.ts`) that automatically mirrors task state to the project's Todo system.
-
-- **Creation**: `task_create` adds corresponding Todo item
-- **Updates**: `task_update` reflects in Todo list
-- **Completion**: `completed` status marks Todo item done
 
 ## STORAGE UTILITIES
 
@@ -60,6 +50,11 @@ Task system includes sync layer (`todo-sync.ts`) that automatically mirrors task
 | `readJsonSafe(path, schema)` | Parse + validate, returns null on failure |
 | `writeJsonAtomic(path, data)` | Atomic write via temp file + rename |
 | `acquireLock(dirPath)` | File-based lock with 30s stale threshold |
+| `generateTaskId()` | Generates `T-{uuid}` task ID |
+| `listTaskFiles(config)` | Lists all task IDs in storage |
+| `getSessionTaskDir(config, sessionID)` | Returns session-scoped task directory |
+| `listSessionTaskFiles(config, sessionID)` | Lists tasks for specific session |
+| `findTaskAcrossSessions(config, taskId)` | Locates task in any session directory |
 
 ## ANTI-PATTERNS
 

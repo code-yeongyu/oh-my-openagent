@@ -2,9 +2,9 @@
 
 ## OVERVIEW
 
-113 tools across 8 categories. Two patterns: Direct ToolDefinition (static) and Factory Function (context-dependent).
+25+ tools across 14 directories. Two patterns: Direct ToolDefinition (static) and Factory Function (context-dependent).
 
-**Categories**: LSP (6), AST-Grep (2), Search (2), Session (4), Task (4), Agent delegation (2), Background (2), Skill (3), System (2)
+**Categories**: LSP (6), AST-Grep (2), Search (2), Session (4), Task (4), Agent delegation (1), Background (2), Skill (2), System (2), MCP (1), Command (1)
 
 ## STRUCTURE
 
@@ -15,20 +15,20 @@ tools/
 │   ├── tools.ts      # ToolDefinition or factory
 │   ├── types.ts      # Zod schemas
 │   └── constants.ts  # Fixed values
-├── lsp/              # 6 tools: definition, references, symbols, diagnostics, rename (client.ts 803 lines)
+├── lsp/              # 6 tools: goto_definition, find_references, symbols, diagnostics, prepare_rename, rename
 ├── ast-grep/         # 2 tools: search, replace (25 languages)
-├── delegate-task/    # Category-based routing (executor.ts 983 lines, constants.ts 552 lines)
+├── delegate-task/    # Category routing (constants.ts 569 lines, tools.test.ts 3582 lines)
 ├── task/             # 4 tools: create, get, list, update (Claude Code compatible)
 ├── session-manager/  # 4 tools: list, read, search, info
-├── grep/             # Custom grep with timeout (60s, 10MB)
+├── grep/             # Custom grep (60s timeout, 10MB limit)
 ├── glob/             # 60s timeout, 100 file limit
 ├── interactive-bash/ # Tmux session management
-├── look-at/          # Multimodal PDF/image (307 lines)
+├── look-at/          # Multimodal PDF/image analysis
 ├── skill/            # Skill execution
 ├── skill-mcp/        # Skill MCP operations
 ├── slashcommand/     # Slash command dispatch
-├── call-omo-agent/   # Direct agent invocation (358 lines)
-└── background-task/  # background_output, background_cancel (734 lines)
+├── call-omo-agent/   # Direct agent invocation
+└── background-task/  # background_output, background_cancel
 ```
 
 ## TOOL CATEGORIES
@@ -39,10 +39,11 @@ tools/
 | Search | ast_grep_search, ast_grep_replace, grep, glob | Direct |
 | Session | session_list, session_read, session_search, session_info | Direct |
 | Task | task_create, task_get, task_list, task_update | Factory |
-| Agent | task, call_omo_agent | Factory |
+| Agent | call_omo_agent | Factory |
 | Background | background_output, background_cancel | Factory |
 | System | interactive_bash, look_at | Mixed |
-| Skill | skill, skill_mcp, slashcommand | Factory |
+| Skill | skill, skill_mcp | Factory |
+| Command | slashcommand | Factory |
 
 ## TASK TOOLS
 

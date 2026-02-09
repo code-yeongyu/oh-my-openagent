@@ -2,38 +2,38 @@
 
 ## OVERVIEW
 
-Main plugin entry point and orchestration layer. 1000+ lines of plugin initialization, hook registration, tool composition, and lifecycle management.
+Main plugin entry point and orchestration layer. Plugin initialization, hook registration, tool composition, and lifecycle management.
 
 **Core Responsibilities:**
-- Plugin initialization and configuration loading
-- 40+ lifecycle hooks orchestration  
-- 25+ tools composition and filtering
-- Background agent management
-- Session state coordination
-- MCP server lifecycle
-- Tmux integration
-- Claude Code compatibility layer
+- Plugin initialization via `OhMyOpenCodePlugin()` factory
+- Hook registration: `createCoreHooks()`, `createContinuationHooks()`, `createSkillHooks()`
+- Tool composition with filtering
+- Background agent management via `BackgroundManager`
+- MCP lifecycle via `SkillMcpManager`
 
 ## STRUCTURE
 ```
 src/
-├── index.ts                          # Main plugin entry (1000 lines) - orchestration layer
-├── index.compaction-model-agnostic.static.test.ts  # Compaction hook tests
-├── agents/                           # 11 AI agents (16 files)
-├── cli/                              # CLI commands (9 files) 
-├── config/                           # Schema validation (3 files)
-├── features/                         # Background features (20+ files)
-├── hooks/                            # 40+ lifecycle hooks (14 files)
-├── mcp/                              # MCP server configs (7 files)
-├── plugin-handlers/                  # Config loading (3 files)
-├── shared/                           # Utilities (70 files)
-└── tools/                            # 25+ tools (15 files)
+├── index.ts                          # Main plugin entry (999 lines)
+├── create-hooks.ts                   # Hook coordination: core, continuation, skill
+├── plugin-config.ts                  # Config loading orchestration
+├── plugin-state.ts                   # Model cache state
+├── agents/                           # 11 AI agents (20 files) - see agents/AGENTS.md
+├── cli/                              # CLI installer, doctor (100+ files) - see cli/AGENTS.md
+├── config/                           # Zod schema (21 files) - see config/AGENTS.md
+├── features/                         # Background agents, skills, commands (17 dirs) - see features/AGENTS.md
+├── hooks/                            # 40+ lifecycle hooks (30+ dirs) - see hooks/AGENTS.md
+├── mcp/                              # Built-in MCPs (8 files) - see mcp/AGENTS.md
+├── plugin/                           # Plugin SDK types
+├── plugin-handlers/                  # Plugin config loading (5 files) - see plugin-handlers/AGENTS.md
+├── shared/                           # Cross-cutting utilities (84 files) - see shared/AGENTS.md
+└── tools/                            # 25+ tools (14 dirs) - see tools/AGENTS.md
 ```
 
 ## KEY COMPONENTS
 
 **Plugin Initialization:**
-- `OhMyOpenCodePlugin()`: Main plugin factory (lines 124-841)
+- `OhMyOpenCodePlugin()`: Main plugin factory
 - Configuration loading via `loadPluginConfig()`
 - Hook registration with safe creation patterns
 - Tool composition and disabled tool filtering
@@ -49,13 +49,7 @@ src/
 - Tool filtering based on agent permissions and user config
 - Metadata restoration for tool outputs
 
-**Integration Points:**
-- Claude Code compatibility hooks and commands
-- OpenCode SDK client interactions
-- Session state persistence and recovery
-- Model variant resolution and application
-
-## HOOK REGISTRATION PATTERNS
+## HOOK REGISTRATION
 
 **Safe Hook Creation:**
 ```typescript
@@ -68,61 +62,27 @@ const hook = isHookEnabled("hook-name")
 - **Session Management**: recovery, notification, compaction
 - **Continuation**: todo/task enforcers, stop guards
 - **Context**: injection, rules, directory content
-- **Tool Enhancement**: output truncation, error recovery, validation
+- **Tool Enhancement**: output truncation, error recovery
 - **Agent Coordination**: usage reminders, babysitting, delegation
 
 ## TOOL COMPOSITION
 
-**Core Tools:**
 ```typescript
 const allTools: Record<string, ToolDefinition> = {
-  ...builtinTools,           // Basic file/session operations
-  ...createGrepTools(ctx),   // Content search
-  ...createAstGrepTools(ctx), // AST-aware refactoring
-  task: delegateTask,        // Agent delegation
-  skill: skillTool,          // Skill execution
-  // ... 20+ more tools
+  ...builtinTools,
+  ...createGrepTools(ctx),
+  ...createAstGrepTools(ctx),
+  task: delegateTask,
+  skill: skillTool,
 };
 ```
 
-**Tool Filtering:**
-- Agent permission-based restrictions
-- User-configured disabled tools
-- Dynamic tool availability based on session state
+**Filtering:** Agent permissions, user `disabled_tools`, session state.
 
-## SESSION LIFECYCLE
+## LIFECYCLE FLOW
 
-**Session Events:**
-- `session.created`: Initialize session state, tmux setup
-- `session.deleted`: Cleanup resources, clear caches
-- `message.updated`: Update agent assignments
-- `session.error`: Trigger recovery mechanisms
-
-**Continuation Flow:**
 1. User message triggers agent selection
 2. Model/variant resolution applied
 3. Tools execute with hook interception
 4. Continuation enforcers monitor completion
 5. Session compaction preserves context
-
-## CONFIGURATION INTEGRATION
-
-**Plugin Config Loading:**
-- Project + user config merging
-- Schema validation via Zod
-- Migration support for legacy configs
-- Dynamic feature enablement
-
-**Runtime Configuration:**
-- Hook enablement based on `disabled_hooks`
-- Tool filtering via `disabled_tools`
-- Agent overrides and category definitions
-- Experimental feature toggles
-
-## ANTI-PATTERNS
-
-- **Direct hook exports**: All hooks created via factories for testability
-- **Global state pollution**: Session-scoped state management
-- **Synchronous blocking**: Async-first architecture with background coordination
-- **Tight coupling**: Plugin components communicate via events, not direct calls
-- **Memory leaks**: Proper cleanup on session deletion and plugin unload

@@ -1,7 +1,7 @@
 # PROJECT KNOWLEDGE BASE
 
-**Generated:** 2026-02-08T16:45:00+09:00
-**Commit:** edee865f
+**Generated:** 2026-02-09T14:16:00+09:00
+**Commit:** f22f14d9
 **Branch:** dev
 
 ---
@@ -131,16 +131,18 @@ oh-my-opencode/
 │   ├── hooks/            # 40+ lifecycle hooks - see src/hooks/AGENTS.md
 │   ├── tools/            # 25+ tools - see src/tools/AGENTS.md
 │   ├── features/         # Background agents, skills, Claude Code compat - see src/features/AGENTS.md
-│   ├── shared/           # 66 cross-cutting utilities - see src/shared/AGENTS.md
+│   ├── shared/           # 88 cross-cutting utilities - see src/shared/AGENTS.md
 │   ├── cli/              # CLI installer, doctor - see src/cli/AGENTS.md
 │   ├── mcp/              # Built-in MCPs - see src/mcp/AGENTS.md
-│   ├── config/           # Zod schema (schema.ts 455 lines), TypeScript types
-│   ├── plugin-handlers/  # Plugin config loading (config-handler.ts 562 lines)
+│   ├── config/           # Zod schema (schema.ts 455 lines) - see src/config/AGENTS.md
+│   ├── plugin-handlers/  # Plugin config loading - see src/plugin-handlers/AGENTS.md
+│   ├── plugin/           # Plugin SDK types
 │   ├── index.ts          # Main plugin entry (999 lines)
+│   ├── create-hooks.ts   # Hook creation coordination (core, continuation, skill)
 │   ├── plugin-config.ts  # Config loading orchestration
 │   └── plugin-state.ts   # Model cache state
-├── script/               # build-schema.ts, build-binaries.ts, publish.ts
-├── packages/             # 11 platform-specific binaries
+├── script/               # build-schema.ts, build-binaries.ts, publish.ts, generate-changelog.ts
+├── packages/             # 11 platform-specific binaries (darwin-*, linux-*, windows-*)
 └── dist/                 # Build output (ESM + .d.ts)
 ```
 
@@ -148,17 +150,18 @@ oh-my-opencode/
 
 | Task | Location | Notes |
 |------|----------|-------|
-| Add agent | `src/agents/` | Create .ts with factory, add to `agentSources` in utils.ts |
-| Add hook | `src/hooks/` | Create dir with `createXXXHook()`, register in index.ts |
+| Add agent | `src/agents/` | Create .ts with factory, add to `agentSources` in builtin-agents.ts |
+| Add hook | `src/hooks/` | Create dir with `createXXXHook()`, register in create-hooks.ts |
 | Add tool | `src/tools/` | Dir with index/types/constants/tools.ts |
 | Add MCP | `src/mcp/` | Create config, add to `createBuiltinMcps()` |
 | Add skill | `src/features/builtin-skills/` | Create dir with SKILL.md |
 | Add command | `src/features/builtin-commands/` | Add template + register in commands.ts |
 | Config schema | `src/config/schema.ts` | Zod schema, run `bun run build:schema` |
 | Plugin config | `src/plugin-handlers/config-handler.ts` | JSONC loading, merging, migration |
-| Background agents | `src/features/background-agent/` | manager.ts (1556 lines) |
-| Orchestrator | `src/hooks/atlas/` | Main orchestration hook (770 lines) |
-| Delegation | `src/tools/delegate-task/` | Category routing (executor.ts 983 lines) |
+| Background agents | `src/features/background-agent/` | manager.ts (1646 lines) |
+| Orchestrator | `src/hooks/atlas/` | Main orchestration hook |
+| Delegation | `src/tools/delegate-task/` | Category routing (constants.ts 569 lines) |
+| Task system | `src/features/claude-tasks/` | Task schema, storage, todo sync |
 
 ## TDD (Test-Driven Development)
 
@@ -170,7 +173,7 @@ oh-my-opencode/
 **Rules:**
 - NEVER write implementation before test
 - NEVER delete failing tests - fix the code
-- Test file: `*.test.ts` alongside source (163 test files)
+- Test file: `*.test.ts` alongside source (163+ test files)
 - BDD comments: `//#given`, `//#when`, `//#then`
 
 ## CONVENTIONS
@@ -180,7 +183,7 @@ oh-my-opencode/
 - **Build**: `bun build` (ESM) + `tsc --emitDeclarationOnly`
 - **Exports**: Barrel pattern via index.ts
 - **Naming**: kebab-case dirs, `createXXXHook`/`createXXXTool` factories
-- **Testing**: BDD comments, 163 test files
+- **Testing**: BDD comments, 163+ test files, 115k+ lines TypeScript
 - **Temperature**: 0.1 for code agents, max 0.3
 
 ## ANTI-PATTERNS
@@ -227,7 +230,7 @@ oh-my-opencode/
 bun run typecheck      # Type check
 bun run build          # ESM + declarations + schema
 bun run rebuild        # Clean + Build
-bun test               # 100+ test files
+bun test               # 163+ test files
 ```
 
 ## DEPLOYMENT
@@ -241,23 +244,18 @@ bun test               # 100+ test files
 
 | File | Lines | Description |
 |------|-------|-------------|
-| `src/features/background-agent/manager.ts` | 1642 | Task lifecycle, concurrency |
-| `src/features/builtin-skills/skills/git-master.ts` | 1107 | Git master skill definition |
+| `src/features/background-agent/manager.ts` | 1646 | Task lifecycle, concurrency |
+| `src/features/builtin-skills/skills/git-master.ts` | 1111 | Git master skill definition |
 | `src/index.ts` | 999 | Main plugin entry |
-| `src/tools/delegate-task/executor.ts` | 969 | Category-based delegation executor |
-| `src/tools/lsp/client.ts` | 851 | LSP client operations |
-| `src/tools/background-task/tools.ts` | 757 | Background task tools |
-| `src/hooks/atlas/index.ts` | 697 | Orchestrator hook |
-| `src/cli/config-manager.ts` | 667 | JSONC config parsing |
-| `src/features/skill-mcp-manager/manager.ts` | 640 | MCP client lifecycle |
-| `src/features/builtin-commands/templates/refactor.ts` | 619 | Refactor command template |
+| `src/tools/delegate-task/tools.test.ts` | 3582 | Delegation tool tests |
+| `src/features/background-agent/manager.test.ts` | 2843 | Background manager tests |
+| `src/hooks/atlas/index.test.ts` | 1182 | Atlas hook tests |
 | `src/agents/hephaestus.ts` | 618 | Autonomous deep worker agent |
-| `src/agents/utils.ts` | 571 | Agent creation, model fallback resolution |
-| `src/plugin-handlers/config-handler.ts` | 562 | Plugin config loading |
-| `src/tools/delegate-task/constants.ts` | 552 | Delegation constants |
-| `src/cli/install.ts` | 542 | Interactive CLI installer |
-| `src/hooks/task-continuation-enforcer.ts` | 530 | Task completion enforcement |
+| `src/features/builtin-commands/templates/refactor.ts` | 619 | Refactor command template |
+| `src/tools/delegate-task/constants.ts` | 569 | Category routing configs |
 | `src/agents/sisyphus.ts` | 530 | Main orchestrator agent |
+| `src/agents/utils.ts` | 571 | Agent creation, model fallback resolution |
+| `src/plugin-handlers/config-handler.ts` | 563 | Plugin config loading |
 
 ## MCP ARCHITECTURE
 
