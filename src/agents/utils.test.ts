@@ -1,5 +1,7 @@
+/// <reference types="bun-types" />
+
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
-import { createBuiltinAgents } from "./utils"
+import { createBuiltinAgents } from "./builtin-agents"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
@@ -759,7 +761,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
 })
 
 describe("buildAgent with category and skills", () => {
-  const { buildAgent } = require("./utils")
+  const { buildAgent } = require("./agent-builder")
   const TEST_MODEL = "anthropic/claude-opus-4-6"
 
   beforeEach(() => {

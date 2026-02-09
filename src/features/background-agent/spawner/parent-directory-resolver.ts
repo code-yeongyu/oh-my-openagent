@@ -10,7 +10,7 @@ export async function resolveParentDirectory(options: {
 
   const parentSession = await client.session
     .get({ path: { id: parentSessionID } })
-    .catch((error) => {
+    .catch((error: unknown) => {
       log(`[background-agent] Failed to get parent session: ${error}`)
       return null
     })

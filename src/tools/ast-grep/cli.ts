@@ -1,64 +1,31 @@
 import { spawn } from "bun"
 import { existsSync } from "fs"
 import {
-  getSgCliPath,
-  setSgCliPath,
-  findSgCliPathSync,
-  DEFAULT_TIMEOUT_MS,
-  DEFAULT_MAX_OUTPUT_BYTES,
-  DEFAULT_MAX_MATCHES,
+	getSgCliPath,
+	DEFAULT_TIMEOUT_MS,
 } from "./constants"
 import { ensureAstGrepBinary } from "./downloader"
-import type { CliMatch, CliLanguage, SgResult } from "./types"
+import type { CliLanguage, SgResult } from "./types"
+
+import { getAstGrepPath } from "./cli-binary-path-resolution"
+import { collectProcessOutputWithTimeout } from "./process-output-timeout"
+import { createSgResultFromStdout } from "./sg-compact-json-output"
+
+export {
+	ensureCliAvailable,
+	getAstGrepPath,
+	isCliAvailable,
+	startBackgroundInit,
+} from "./cli-binary-path-resolution"
 
 export interface RunOptions {
-  pattern: string
-  lang: CliLanguage
-  paths?: string[]
-  globs?: string[]
-  rewrite?: string
-  context?: number
-  updateAll?: boolean
-}
-
-let resolvedCliPath: string | null = null
-let initPromise: Promise<string | null> | null = null
-
-export async function getAstGrepPath(): Promise<string | null> {
-  if (resolvedCliPath !== null && existsSync(resolvedCliPath)) {
-    return resolvedCliPath
-  }
-
-  if (initPromise) {
-    return initPromise
-  }
-
-  initPromise = (async () => {
-    const syncPath = findSgCliPathSync()
-    if (syncPath && existsSync(syncPath)) {
-      resolvedCliPath = syncPath
-      setSgCliPath(syncPath)
-      return syncPath
-    }
-
-    const downloadedPath = await ensureAstGrepBinary()
-    if (downloadedPath) {
-      resolvedCliPath = downloadedPath
-      setSgCliPath(downloadedPath)
-      return downloadedPath
-    }
-
-    return null
-  })()
-
-  return initPromise
-}
-
-export function startBackgroundInit(): void {
-  if (!initPromise) {
-    initPromise = getAstGrepPath()
-    initPromise.catch(() => {})
-  }
+	pattern: string
+	lang: CliLanguage
+	paths?: string[]
+	globs?: string[]
+	rewrite?: string
+	context?: number
+	updateAll?: boolean
 }
 
 export async function runSg(options: RunOptions): Promise<SgResult> {
@@ -107,51 +74,44 @@ export async function runSg(options: RunOptions): Promise<SgResult> {
 
   const timeout = DEFAULT_TIMEOUT_MS
 
-  const proc = spawn([cliPath, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-  })
+	const proc = spawn([cliPath, ...args], {
+		stdout: "pipe",
+		stderr: "pipe",
+	})
 
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    const id = setTimeout(() => {
-      proc.kill()
-      reject(new Error(`Search timeout after ${timeout}ms`))
-    }, timeout)
-    proc.exited.then(() => clearTimeout(id))
-  })
+	let stdout: string
+	let stderr: string
+	let exitCode: number
 
-  let stdout: string
-  let stderr: string
-  let exitCode: number
+	try {
+		const output = await collectProcessOutputWithTimeout(proc, timeout)
+		stdout = output.stdout
+		stderr = output.stderr
+		exitCode = output.exitCode
+	} catch (error) {
+		if (error instanceof Error && error.message.includes("timeout")) {
+			return {
+				matches: [],
+				totalMatches: 0,
+				truncated: true,
+				truncatedReason: "timeout",
+				error: error.message,
+			}
+		}
 
-  try {
-    stdout = await Promise.race([new Response(proc.stdout).text(), timeoutPromise])
-    stderr = await new Response(proc.stderr).text()
-    exitCode = await proc.exited
-  } catch (e) {
-    const error = e as Error
-    if (error.message?.includes("timeout")) {
-      return {
-        matches: [],
-        totalMatches: 0,
-        truncated: true,
-        truncatedReason: "timeout",
-        error: error.message,
-      }
-    }
+		const errorMessage = error instanceof Error ? error.message : String(error)
+		const errorCode =
+			typeof error === "object" && error !== null && "code" in error
+				? (error as { code?: unknown }).code
+				: undefined
+		const isNoEntry =
+			errorCode === "ENOENT" || errorMessage.includes("ENOENT") || errorMessage.includes("not found")
 
-    const nodeError = e as NodeJS.ErrnoException
-    if (
-      nodeError.code === "ENOENT" ||
-      nodeError.message?.includes("ENOENT") ||
-      nodeError.message?.includes("not found")
-    ) {
-      const downloadedPath = await ensureAstGrepBinary()
-      if (downloadedPath) {
-        resolvedCliPath = downloadedPath
-        setSgCliPath(downloadedPath)
-        return runSg(options)
-      } else {
+		if (isNoEntry) {
+			const downloadedPath = await ensureAstGrepBinary()
+			if (downloadedPath) {
+				return runSg(options)
+			} else {
         return {
           matches: [],
           totalMatches: 0,
@@ -166,13 +126,13 @@ export async function runSg(options: RunOptions): Promise<SgResult> {
       }
     }
 
-    return {
-      matches: [],
-      totalMatches: 0,
-      truncated: false,
-      error: `Failed to spawn ast-grep: ${error.message}`,
-    }
-  }
+		return {
+			matches: [],
+			totalMatches: 0,
+			truncated: false,
+			error: `Failed to spawn ast-grep: ${errorMessage}`,
+		}
+	}
 
   if (exitCode !== 0 && stdout.trim() === "") {
     if (stderr.includes("No files found")) {
@@ -184,59 +144,5 @@ export async function runSg(options: RunOptions): Promise<SgResult> {
     return { matches: [], totalMatches: 0, truncated: false }
   }
 
-  if (!stdout.trim()) {
-    return { matches: [], totalMatches: 0, truncated: false }
-  }
-
-  const outputTruncated = stdout.length >= DEFAULT_MAX_OUTPUT_BYTES
-  const outputToProcess = outputTruncated ? stdout.substring(0, DEFAULT_MAX_OUTPUT_BYTES) : stdout
-
-  let matches: CliMatch[] = []
-  try {
-    matches = JSON.parse(outputToProcess) as CliMatch[]
-  } catch {
-    if (outputTruncated) {
-      try {
-        const lastValidIndex = outputToProcess.lastIndexOf("}")
-        if (lastValidIndex > 0) {
-          const bracketIndex = outputToProcess.lastIndexOf("},", lastValidIndex)
-          if (bracketIndex > 0) {
-            const truncatedJson = outputToProcess.substring(0, bracketIndex + 1) + "]"
-            matches = JSON.parse(truncatedJson) as CliMatch[]
-          }
-        }
-      } catch {
-        return {
-          matches: [],
-          totalMatches: 0,
-          truncated: true,
-          truncatedReason: "max_output_bytes",
-          error: "Output too large and could not be parsed",
-        }
-      }
-    } else {
-      return { matches: [], totalMatches: 0, truncated: false }
-    }
-  }
-
-  const totalMatches = matches.length
-  const matchesTruncated = totalMatches > DEFAULT_MAX_MATCHES
-  const finalMatches = matchesTruncated ? matches.slice(0, DEFAULT_MAX_MATCHES) : matches
-
-  return {
-    matches: finalMatches,
-    totalMatches,
-    truncated: outputTruncated || matchesTruncated,
-    truncatedReason: outputTruncated ? "max_output_bytes" : matchesTruncated ? "max_matches" : undefined,
-  }
-}
-
-export function isCliAvailable(): boolean {
-  const path = findSgCliPathSync()
-  return path !== null && existsSync(path)
-}
-
-export async function ensureCliAvailable(): Promise<boolean> {
-  const path = await getAstGrepPath()
-  return path !== null && existsSync(path)
+  return createSgResultFromStdout(stdout)
 }

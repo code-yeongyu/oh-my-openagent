@@ -1,5 +1,5 @@
 export * from "./types"
-export { createBuiltinAgents } from "./utils"
+export { createBuiltinAgents } from "./builtin-agents"
 export type { AvailableAgent, AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-builder"
 export { createSisyphusAgent } from "./sisyphus"
 export { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
