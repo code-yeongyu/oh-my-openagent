@@ -11,7 +11,7 @@ import { pollForCompletion } from "./poll-for-completion"
 
 export { resolveRunAgent }
 
-const DEFAULT_TIMEOUT_MS = 0
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
 
 export async function run(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLI_RUN_MODE = "true"
