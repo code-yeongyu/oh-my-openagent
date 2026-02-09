@@ -25,16 +25,7 @@ export async function pollForCompletion(
   while (!abortController.signal.aborted) {
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
 
-    if (!eventState.mainSessionIdle) {
-      consecutiveCompleteChecks = 0
-      continue
-    }
-
-    if (eventState.currentTool !== null) {
-      consecutiveCompleteChecks = 0
-      continue
-    }
-
+    // ERROR CHECK FIRST — errors must not be masked by other gates
     if (eventState.mainSessionError) {
       console.error(
         pc.red(`\n\nSession ended with error: ${eventState.lastError}`)
@@ -43,6 +34,16 @@ export async function pollForCompletion(
         pc.yellow("Check if todos were completed before the error.")
       )
       return 1
+    }
+
+    if (!eventState.mainSessionIdle) {
+      consecutiveCompleteChecks = 0
+      continue
+    }
+
+    if (eventState.currentTool !== null) {
+      consecutiveCompleteChecks = 0
+      continue
     }
 
     if (!eventState.hasReceivedMeaningfulWork) {
