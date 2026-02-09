@@ -459,7 +459,7 @@ describe("ralph-loop", () => {
       })
       hook.startLoop("session-123", "Build something", { completionPromise: "COMPLETE" })
 
-      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "Task done <promise>COMPLETE</promise>" } }) + "\n")
+      writeFileSync(transcriptPath, JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "Task done\n<promise>COMPLETE</promise>" } }) + "\n")
 
       // when - session goes idle (transcriptPath now derived from sessionID via getTranscriptPath)
       await hook.event({
@@ -479,7 +479,7 @@ describe("ralph-loop", () => {
       // given - active loop with assistant message containing completion promise
       mockSessionMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task.\n<promise>API_DONE</promise>" }] },
       ]
       const hook = createRalphLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
@@ -502,6 +502,30 @@ describe("ralph-loop", () => {
       // then - messages API was called with correct session ID
       expect(messagesCalls.length).toBe(1)
       expect(messagesCalls[0].sessionID).toBe("session-123")
+    })
+
+    test("should NOT detect completion from instruction-like assistant message via API", async () => {
+      // given - last assistant message references promise as instruction, not completion
+      mockSessionMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "When fully complete, output <promise>DONE</promise>" }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - loop should CONTINUE (instruction text is not completion)
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
     })
 
     test("should handle multiple iterations correctly", async () => {
@@ -593,7 +617,7 @@ describe("ralph-loop", () => {
       // given - multiple assistant messages, only first has completion promise
       mockSessionMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "Start task" }] },
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "I'll work on it. <promise>DONE</promise>" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "I'll work on it.\n<promise>DONE</promise>" }] },
         { info: { role: "user" }, parts: [{ type: "text", text: "Continue" }] },
         { info: { role: "assistant" }, parts: [{ type: "text", text: "Working on more features..." }] },
       ]
@@ -618,7 +642,7 @@ describe("ralph-loop", () => {
         { info: { role: "user" }, parts: [{ type: "text", text: "Start task" }] },
         { info: { role: "assistant" }, parts: [{ type: "text", text: "Starting work..." }] },
         { info: { role: "user" }, parts: [{ type: "text", text: "Continue" }] },
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "Task complete! <promise>DONE</promise>" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "Task complete!\n<promise>DONE</promise>" }] },
       ]
       const hook = createRalphLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
@@ -775,7 +799,7 @@ Original task: Build something`
         timestamp: new Date().toISOString(),
         tool_name: "write",
         tool_input: {},
-        tool_output: { output: "Task complete! <promise>DONE</promise>" },
+        tool_output: { output: "Task complete!\n<promise>DONE</promise>" },
       })
       writeFileSync(transcriptPath, toolResultEntry + "\n")
 
@@ -796,6 +820,34 @@ Original task: Build something`
       expect(promptCalls.length).toBe(0)
       expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
       expect(hook.getState()).toBeNull()
+    })
+
+    test("should NOT detect completion from assistant instruction in transcript", async () => {
+      // given - transcript contains assistant instruction text mentioning promise
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const assistantEntry = JSON.stringify({
+        type: "assistant",
+        timestamp: new Date().toISOString(),
+        content: "When fully complete, output <promise>DONE</promise>",
+      })
+      writeFileSync(transcriptPath, assistantEntry + "\n")
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - loop should CONTINUE (instruction text is not completion)
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
     })
 
     test("should NOT detect completion from tool_use entry containing promise", async () => {

@@ -3,7 +3,7 @@ export const RALPH_LOOP_TEMPLATE = `You are starting a Ralph Loop - a self-refer
 ## How Ralph Loop Works
 
 1. You will work on the task continuously
-2. When you believe the task is FULLY complete, output: \`<promise>{{COMPLETION_PROMISE}}</promise>\`
+2. When you believe the task is FULLY complete, output the promise tag on its own line as the FINAL line of your response: \`<promise>{{COMPLETION_PROMISE}}</promise>\`
 3. If you don't output the promise, the loop will automatically inject another prompt to continue
 4. Maximum iterations: Configurable (default 100)
 
@@ -11,6 +11,7 @@ export const RALPH_LOOP_TEMPLATE = `You are starting a Ralph Loop - a self-refer
 
 - Focus on completing the task fully, not partially
 - Don't output the completion promise until the task is truly done
+- Don't mention the promise tag anywhere else
 - Each iteration should make meaningful progress toward the goal
 - If stuck, try different approaches
 - Use todos to track your progress

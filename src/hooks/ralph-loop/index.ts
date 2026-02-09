@@ -50,7 +50,9 @@ Your previous attempt did not output the completion promise. Continue working on
 IMPORTANT:
 - Review your progress so far
 - Continue from where you left off  
-- When FULLY complete, output: <promise>{{PROMISE}}</promise>
+- When FULLY complete, output the promise tag on its own line as the FINAL line of your response:
+  <promise>{{PROMISE}}</promise>
+- Do not mention the promise tag anywhere else
 - Do not stop until the task is truly done
 
 Original task:
@@ -99,7 +101,7 @@ export function createRalphLoopHook(
       if (!existsSync(transcriptPath)) return false
 
       const content = readFileSync(transcriptPath, "utf-8")
-      const pattern = new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
+      const pattern = buildCompletionLinePattern(promise)
       const lines = content.split("\n").filter(l => l.trim())
 
       for (const line of lines) {
@@ -109,10 +111,10 @@ export function createRalphLoopHook(
         if (entry.type === "user" || entry.type === "tool_use") continue
 
         if (entry.type === "assistant" && typeof entry.content === "string") {
-          if (pattern.test(entry.content)) return true
+          if (detectCompletionInText(entry.content, pattern)) return true
         } else if (entry.type === "tool_result") {
           const candidates = getToolOutputTextCandidates(entry.tool_output)
-          if (candidates.some(text => pattern.test(text))) return true
+          if (candidates.some(text => detectCompletionInText(text, pattern))) return true
         }
       }
       return false
@@ -135,6 +137,41 @@ export function createRalphLoopHook(
     } catch {
       return null
     }
+  }
+
+  function detectCompletionInText(text: string, pattern: RegExp): boolean {
+    const lastLine = getLastNonEmptyLineOutsideCodeFences(text)
+    if (!lastLine) return false
+    return pattern.test(lastLine)
+  }
+
+  function getLastNonEmptyLineOutsideCodeFences(text: string): string | null {
+    const lines = text.split(/\r?\n/)
+    let inFence = false
+    let lastLine: string | null = null
+
+    for (const line of lines) {
+      if (isFenceLine(line)) {
+        inFence = !inFence
+        continue
+      }
+
+      if (inFence) continue
+
+      if (line.trim()) {
+        lastLine = line
+      }
+    }
+
+    return lastLine
+  }
+
+  function isFenceLine(line: string): boolean {
+    return /^\s*```/.test(line)
+  }
+
+  function buildCompletionLinePattern(promise: string): RegExp {
+    return new RegExp(`^\\s*<promise>\\s*${escapeRegex(promise)}\\s*</promise>\\s*$`, "i")
   }
 
   function getToolOutputTextCandidates(toolOutput: unknown): string[] {
@@ -185,13 +222,13 @@ export function createRalphLoopHook(
       const lastAssistant = assistantMessages[assistantMessages.length - 1]
       if (!lastAssistant?.parts) return false
 
-      const pattern = new RegExp(`<promise>\\s*${escapeRegex(promise)}\\s*</promise>`, "is")
+      const pattern = buildCompletionLinePattern(promise)
       const responseText = lastAssistant.parts
         .filter((p) => p.type === "text")
         .map((p) => p.text ?? "")
         .join("\n")
 
-      return pattern.test(responseText)
+      return detectCompletionInText(responseText, pattern)
     } catch (err) {
       log(`[${HOOK_NAME}] Session messages check failed`, { sessionID, error: String(err) })
       return false
