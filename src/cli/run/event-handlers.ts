@@ -26,8 +26,12 @@ export function handleSessionStatus(ctx: RunContext, payload: EventPayload, stat
   if (payload.type !== "session.status") return
 
   const props = payload.properties as SessionStatusProps | undefined
-  if (props?.sessionID === ctx.sessionID && props?.status?.type === "busy") {
+  if (props?.sessionID !== ctx.sessionID) return
+
+  if (props?.status?.type === "busy") {
     state.mainSessionIdle = false
+  } else if (props?.status?.type === "idle") {
+    state.mainSessionIdle = true
   }
 }
 
