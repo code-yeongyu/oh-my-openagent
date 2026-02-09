@@ -9,7 +9,7 @@ export function buildBackgroundTaskNotificationText(args: {
 }): string {
   const { task, duration, allComplete, remainingCount, completedTasks } = args
   const statusText =
-    task.status === "completed" ? "COMPLETED" : task.status === "error" ? "ERROR" : "CANCELLED"
+    task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : task.status === "error" ? "ERROR" : "CANCELLED"
   const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
 
   if (allComplete) {
