@@ -121,7 +121,7 @@ export async function resumeBackgroundTask(args: {
     },
   }).catch((error) => {
     log("[background-agent] resume prompt error:", error)
-    existingTask.status = "error"
+    existingTask.status = "interrupt"
     const errorMessage = error instanceof Error ? error.message : String(error)
     existingTask.error = errorMessage
     existingTask.completedAt = new Date()
