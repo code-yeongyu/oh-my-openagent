@@ -19,7 +19,6 @@ export { createSessionManagerTools } from "./session-manager"
 export { sessionExists } from "./session-manager/storage"
 
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
-export { createSkillTool } from "./skill"
 export { createSkillMcpTool } from "./skill-mcp"
 
 import {
