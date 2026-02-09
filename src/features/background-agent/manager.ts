@@ -343,7 +343,7 @@ export class BackgroundManager {
       log("[background-agent] promptAsync error:", error)
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
-        existingTask.status = "error"
+        existingTask.status = "interrupt"
         const errorMessage = error instanceof Error ? error.message : String(error)
         if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
           existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
@@ -600,7 +600,7 @@ export class BackgroundManager {
       },
     }).catch((error) => {
       log("[background-agent] resume prompt error:", error)
-      existingTask.status = "error"
+      existingTask.status = "interrupt"
       const errorMessage = error instanceof Error ? error.message : String(error)
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
@@ -1132,7 +1132,7 @@ export class BackgroundManager {
       allComplete = true
     }
 
-    const statusText = task.status === "completed" ? "COMPLETED" : "CANCELLED"
+    const statusText = task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
     
     let notification: string

@@ -164,7 +164,7 @@ export async function startQueuedTask(args: {
     const existingTask = findBySession(sessionID)
     if (!existingTask) return
 
-    existingTask.status = "error"
+    existingTask.status = "interrupt"
     const errorMessage = error instanceof Error ? error.message : String(error)
     if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
       existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
