@@ -61,7 +61,7 @@ agents/
 
 ## HOW TO ADD
 1. Create `src/agents/my-agent.ts` exporting factory + metadata.
-2. Add to `agentSources` in `src/agents/utils.ts`.
+2. Add to `agentSources` in `src/agents/builtin-agents.ts`.
 3. Update `AgentNameSchema` in `src/config/schema.ts`.
 4. Register in `src/index.ts` initialization.
 

@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRg } from "./cli"
-import { formatGrepResult } from "./utils"
+import { formatGrepResult } from "./result-formatter"
 
 export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition> {
   const grep: ToolDefinition = tool({

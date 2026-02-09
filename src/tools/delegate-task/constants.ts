@@ -558,8 +558,12 @@ export const PLAN_FAMILY_NAMES = ["plan", "prometheus"]
 /**
  * Check if the given agent belongs to the plan family (blocking + task permission).
  */
-export function isPlanFamily(agentName: string | undefined): boolean {
-  if (!agentName) return false
-  const lowerName = agentName.toLowerCase().trim()
-  return PLAN_FAMILY_NAMES.some(name => lowerName === name || lowerName.includes(name))
+export function isPlanFamily(category: string): boolean
+export function isPlanFamily(category: string | undefined): boolean
+export function isPlanFamily(category: string | undefined): boolean {
+  if (!category) return false
+  const lowerCategory = category.toLowerCase().trim()
+  return PLAN_FAMILY_NAMES.some(
+    (name) => lowerCategory === name || lowerCategory.includes(name)
+  )
 }

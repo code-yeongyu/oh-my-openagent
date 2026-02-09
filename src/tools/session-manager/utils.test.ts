@@ -6,7 +6,7 @@ import {
   formatSearchResults,
   filterSessionsByDate,
   searchInSession,
-} from "./utils"
+} from "./session-formatter"
 import type { SessionInfo, SessionMessage, SearchResult } from "./types"
 
 describe("session-manager utils", () => {
