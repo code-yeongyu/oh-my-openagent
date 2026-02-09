@@ -1,3 +1,4 @@
+import { setTimeout } from "timers/promises"
 import type { OnSubagentSessionCreated } from "../constants"
 import { TMUX_CALLBACK_DELAY_MS } from "../constants"
 import { log } from "../../../shared"
@@ -30,10 +31,10 @@ export async function maybeInvokeTmuxCallback(options: {
     sessionID,
     parentID,
     title,
-  }).catch((error) => {
+  }).catch((error: unknown) => {
     log("[background-agent] Failed to spawn tmux pane:", error)
   })
 
   log("[background-agent] tmux callback completed, waiting")
-  await new Promise<void>((resolve) => setTimeout(resolve, TMUX_CALLBACK_DELAY_MS))
+  await setTimeout(TMUX_CALLBACK_DELAY_MS)
 }

@@ -25,7 +25,7 @@ export async function createBackgroundSession(options: {
         directory: parentDirectory,
       },
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       concurrencyManager.release(concurrencyKey)
       throw error
     })

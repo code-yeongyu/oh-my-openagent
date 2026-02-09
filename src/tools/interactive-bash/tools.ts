@@ -1,6 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { BLOCKED_TMUX_SUBCOMMANDS, DEFAULT_TIMEOUT_MS, INTERACTIVE_BASH_DESCRIPTION } from "./constants"
-import { getCachedTmuxPath } from "./utils"
+import { getCachedTmuxPath } from "./tmux-path-resolver"
 
 /**
  * Quote-aware command tokenizer with escape handling

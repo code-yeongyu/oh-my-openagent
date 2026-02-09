@@ -2,7 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { CLI_LANGUAGES } from "./constants"
 import { runSg } from "./cli"
-import { formatSearchResult, formatReplaceResult } from "./utils"
+import { formatSearchResult, formatReplaceResult } from "./result-formatter"
 import type { CliLanguage } from "./types"
 
 async function showOutputToUser(context: unknown, output: string): Promise<void> {

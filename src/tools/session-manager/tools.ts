@@ -14,7 +14,7 @@ import {
   formatSessionMessages,
   formatSearchResults,
   searchInSession,
-} from "./utils"
+} from "./session-formatter"
 import type { SessionListArgs, SessionReadArgs, SessionSearchArgs, SessionInfoArgs, SearchResult } from "./types"
 
 const SEARCH_TIMEOUT_MS = 60_000
