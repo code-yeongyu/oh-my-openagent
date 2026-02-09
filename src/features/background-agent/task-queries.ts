@@ -45,7 +45,7 @@ export function getRunningTasks(tasks: Iterable<BackgroundTask>): BackgroundTask
 }
 
 export function getCompletedTasks(tasks: Iterable<BackgroundTask>): BackgroundTask[] {
-  return Array.from(tasks).filter((t) => t.status === "completed")
+  return Array.from(tasks).filter((t) => t.status !== "running")
 }
 
 export function hasRunningTasks(tasks: Iterable<BackgroundTask>): boolean {
