@@ -86,7 +86,13 @@ Prompts MUST be in English.`
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
 
-      if (args.category && !args.subagent_type) {
+      if (args.category) {
+        if (args.subagent_type && args.subagent_type !== "sisyphus-junior") {
+          log("[task] category provided - overriding subagent_type to sisyphus-junior", {
+            category: args.category,
+            subagent_type: args.subagent_type,
+          })
+        }
         args.subagent_type = "sisyphus-junior"
       }
       await ctx.metadata?.({
@@ -121,10 +127,6 @@ Prompts MUST be in English.`
           return executeBackgroundContinuation(args, ctx, options, parentContext)
         }
         return executeSyncContinuation(args, ctx, options)
-      }
-
-      if (args.category && args.subagent_type && args.subagent_type !== "sisyphus-junior") {
-        return `Invalid arguments: Provide EITHER category OR subagent_type, not both.`
       }
 
       if (!args.category && !args.subagent_type) {
