@@ -93,10 +93,10 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           return await formatTaskResult(task, client)
         }
 
-        // Error or cancelled: return status immediately
-        if (task.status === "error" || task.status === "cancelled") {
-          return formatTaskStatus(task)
-        }
+         // Error or cancelled: return status immediately
+         if (task.status === "error" || task.status === "cancelled" || task.status === "interrupt") {
+           return formatTaskStatus(task)
+         }
 
         // Non-blocking and still running: return status
         if (!shouldBlock) {
@@ -118,9 +118,9 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             return await formatTaskResult(currentTask, client)
           }
 
-          if (currentTask.status === "error" || currentTask.status === "cancelled") {
-            return formatTaskStatus(currentTask)
-          }
+           if (currentTask.status === "error" || currentTask.status === "cancelled" || currentTask.status === "interrupt") {
+             return formatTaskStatus(currentTask)
+           }
         }
 
         // Timeout exceeded: return current status

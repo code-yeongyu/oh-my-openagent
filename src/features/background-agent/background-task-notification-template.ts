@@ -1,6 +1,6 @@
 import type { BackgroundTask } from "./types"
 
-export type BackgroundTaskNotificationStatus = "COMPLETED" | "CANCELLED"
+export type BackgroundTaskNotificationStatus = "COMPLETED" | "CANCELLED" | "INTERRUPTED"
 
 export function buildBackgroundTaskNotificationText(input: {
   task: BackgroundTask

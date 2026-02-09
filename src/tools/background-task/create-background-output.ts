@@ -92,7 +92,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           return await formatTaskResult(task, client)
         }
 
-        if (task.status === "error" || task.status === "cancelled") {
+        if (task.status === "error" || task.status === "cancelled" || task.status === "interrupt") {
           return formatTaskStatus(task)
         }
 
@@ -113,9 +113,9 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             return await formatTaskResult(currentTask, client)
           }
 
-          if (currentTask.status === "error" || currentTask.status === "cancelled") {
-            return formatTaskStatus(currentTask)
-          }
+           if (currentTask.status === "error" || currentTask.status === "cancelled" || currentTask.status === "interrupt") {
+             return formatTaskStatus(currentTask)
+           }
         }
 
         const finalTask = manager.getTask(args.task_id)
