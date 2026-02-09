@@ -1,3 +1,6 @@
+import { join } from "node:path"
+
+import { getOpenCodeCacheDir } from "../../../shared"
 import type { AvailableModelsInfo, ModelResolutionInfo, OmoConfig } from "./model-resolution-types"
 import { formatModelWithVariant, getCategoryEffectiveVariant, getEffectiveVariant } from "./model-resolution-variant"
 
@@ -7,6 +10,7 @@ export function buildModelResolutionDetails(options: {
   config: OmoConfig
 }): string[] {
   const details: string[] = []
+  const cacheFile = join(getOpenCodeCacheDir(), "models.json")
 
   details.push("═══ Available Models (from cache) ═══")
   details.push("")
@@ -16,7 +20,7 @@ export function buildModelResolutionDetails(options: {
       `  Sample: ${options.available.providers.slice(0, 6).join(", ")}${options.available.providers.length > 6 ? "..." : ""}`
     )
     details.push(`  Total models: ${options.available.modelCount}`)
-    details.push(`  Cache: ~/.cache/opencode/models.json`)
+    details.push(`  Cache: ${cacheFile}`)
     details.push(`  ℹ Runtime: only connected providers used`)
     details.push(`  Refresh: opencode models --refresh`)
   } else {
