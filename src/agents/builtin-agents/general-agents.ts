@@ -5,7 +5,7 @@ import type { BrowserAutomationProvider } from "../../config/schema"
 import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
 import { buildAgent, isFactory } from "../agent-builder"
-import { applyCategoryOverride, applyOverrides } from "./agent-overrides"
+import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyModelResolution } from "./model-resolution"
 
@@ -77,12 +77,6 @@ export function collectPendingBuiltinAgents(input: {
     // Apply resolved variant from model fallback chain
     if (resolvedVariant) {
       config = { ...config, variant: resolvedVariant }
-    }
-
-    // Expand override.category into concrete properties (higher priority than factory/resolved)
-    const overrideCategory = (override as Record<string, unknown> | undefined)?.category as string | undefined
-    if (overrideCategory) {
-      config = applyCategoryOverride(config, overrideCategory, mergedCategories)
     }
 
     if (agentName === "librarian") {
