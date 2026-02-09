@@ -216,4 +216,51 @@ describe("pollForCompletion", () => {
     //#then - should NOT have exited with 0 (tool blocked it, then aborted)
     expect(result).toBe(130)
   })
+
+  it("returns 1 when session errors while not idle (error not masked by idle gate)", async () => {
+    //#given - mainSessionIdle=false, mainSessionError=true, lastError="crash"
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = false
+    eventState.mainSessionError = true
+    eventState.lastError = "crash"
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+
+    //#when - pollForCompletion runs
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 3,
+    })
+
+    //#then - returns 1 (not 130/timeout), error message printed
+    expect(result).toBe(1)
+    const errorCalls = (console.error as ReturnType<typeof mock>).mock.calls
+    expect(errorCalls.some((call) => call[0]?.includes("Session ended with error"))).toBe(true)
+  })
+
+  it("returns 1 when session errors while tool is active (error not masked by tool gate)", async () => {
+    //#given - mainSessionIdle=true, currentTool="bash", mainSessionError=true
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.currentTool = "bash"
+    eventState.mainSessionError = true
+    eventState.lastError = "error during tool"
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 3,
+    })
+
+    //#then - returns 1
+    expect(result).toBe(1)
+  })
 })
