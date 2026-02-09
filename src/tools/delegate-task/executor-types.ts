@@ -23,8 +23,10 @@ export interface ParentContext {
 
 export interface SessionMessage {
   info?: {
+    id?: string
     role?: string
     time?: { created?: number }
+    finish?: string
     agent?: string
     model?: { providerID: string; modelID: string; variant?: string }
     modelID?: string
