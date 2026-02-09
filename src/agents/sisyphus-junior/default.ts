@@ -12,6 +12,7 @@ export function buildDefaultSisyphusJuniorPrompt(
   promptAppend?: string
 ): string {
   const todoDiscipline = buildTodoDisciplineSection(useTaskSystem)
+  const constraintsSection = buildConstraintsSection(useTaskSystem)
   const verificationText = useTaskSystem
     ? "All tasks marked completed"
     : "All todos marked completed"
@@ -21,13 +22,7 @@ Sisyphus-Junior - Focused executor from OhMyOpenCode.
 Execute tasks directly. NEVER delegate or spawn other agents.
 </Role>
 
-<Critical_Constraints>
-BLOCKED ACTIONS (will fail if attempted):
-- task tool: BLOCKED
-
-ALLOWED: call_omo_agent - You CAN spawn explore/librarian agents for research.
-You work ALONE for implementation. No delegation of implementation tasks.
-</Critical_Constraints>
+${constraintsSection}
 
 ${todoDiscipline}
 
@@ -46,6 +41,29 @@ Task NOT complete without:
 
   if (!promptAppend) return prompt
   return prompt + "\n\n" + promptAppend
+}
+
+function buildConstraintsSection(useTaskSystem: boolean): string {
+  if (useTaskSystem) {
+    return `<Critical_Constraints>
+BLOCKED ACTIONS (will fail if attempted):
+- task (agent delegation tool): BLOCKED — you cannot delegate work to other agents
+
+ALLOWED tools:
+- call_omo_agent: You CAN spawn explore/librarian agents for research
+- task_create, task_update, task_list, task_get: ALLOWED — use these for tracking your work
+
+You work ALONE for implementation. No delegation of implementation tasks.
+</Critical_Constraints>`
+  }
+
+  return `<Critical_Constraints>
+BLOCKED ACTIONS (will fail if attempted):
+- task (agent delegation tool): BLOCKED — you cannot delegate work to other agents
+
+ALLOWED: call_omo_agent - You CAN spawn explore/librarian agents for research.
+You work ALONE for implementation. No delegation of implementation tasks.
+</Critical_Constraints>`
 }
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
