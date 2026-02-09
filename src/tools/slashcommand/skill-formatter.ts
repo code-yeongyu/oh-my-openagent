@@ -4,6 +4,7 @@ import { extractSkillTemplate } from "../../features/opencode-skill-loader/skill
 import { injectGitMasterConfig as injectGitMasterConfigOriginal } from "../../features/opencode-skill-loader/skill-content"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
+import type { GitMasterConfig } from "../../config/schema/git-master"
 
 export async function extractSkillBody(skill: LoadedSkill): Promise<string> {
   if (skill.lazyContent) {
@@ -97,11 +98,11 @@ export async function formatSkillOutput(
   skill: LoadedSkill,
   mcpManager?: SkillMcpManager,
   getSessionID?: () => string,
-  gitMasterConfig?: any
+  gitMasterConfig?: GitMasterConfig
 ): Promise<string> {
   let body = await extractSkillBody(skill)
 
-  if (skill.name === "git-master" && gitMasterConfig) {
+  if (skill.name === "git-master") {
     body = injectGitMasterConfigOriginal(body, gitMasterConfig)
   }
 
