@@ -5,9 +5,11 @@ import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { getMessageDir } from "../../shared/session-utils"
-import { promptSyncWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
+import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
+import { pollSyncSession } from "./sync-session-poller"
+import { fetchSyncResult } from "./sync-result-fetcher"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
@@ -45,11 +47,11 @@ export async function executeSyncContinuation(
     storeToolMetadata(ctx.sessionID, ctx.callID, syncContMeta)
   }
 
-  try {
-    let resumeAgent: string | undefined
-    let resumeModel: { providerID: string; modelID: string } | undefined
-    let resumeVariant: string | undefined
+  let resumeAgent: string | undefined
+  let resumeModel: { providerID: string; modelID: string } | undefined
+  let resumeVariant: string | undefined
 
+  try {
     try {
       const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
       const messages = (messagesResp.data ?? []) as SessionMessage[]
@@ -74,7 +76,7 @@ export async function executeSyncContinuation(
 
     const allowTask = isPlanFamily(resumeAgent)
 
-    await promptSyncWithModelSuggestionRetry(client, {
+    await promptWithModelSuggestionRetry(client, {
       path: { id: args.session_id! },
       body: {
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
@@ -97,40 +99,35 @@ export async function executeSyncContinuation(
     return `Failed to send continuation prompt: ${errorMessage}\n\nSession ID: ${args.session_id}`
   }
 
-  const messagesResult = await client.session.messages({
-    path: { id: args.session_id! },
+  const pollError = await pollSyncSession(ctx, client, {
+    sessionID: args.session_id!,
+    agentToUse: resumeAgent ?? "continue",
+    toastManager,
+    taskId,
   })
+  if (pollError) {
+    return pollError
+  }
 
-  if (messagesResult.error) {
+  const result = await fetchSyncResult(client, args.session_id!)
+  if (!result.ok) {
     if (toastManager) {
       toastManager.removeTask(taskId)
     }
-    return `Error fetching result: ${messagesResult.error}\n\nSession ID: ${args.session_id}`
+    return result.error
   }
-
-  const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as SessionMessage[]
-  const assistantMessages = messages
-    .filter((m) => m.info?.role === "assistant")
-    .sort((a, b) => (b.info?.time?.created ?? 0) - (a.info?.time?.created ?? 0))
-  const lastMessage = assistantMessages[0]
 
   if (toastManager) {
     toastManager.removeTask(taskId)
   }
 
-  if (!lastMessage) {
-    return `No assistant response found.\n\nSession ID: ${args.session_id}`
-  }
-
-  const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-  const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
   const duration = formatDuration(startTime)
 
   return `Task continued and completed in ${duration}.
 
 ---
 
-${textContent || "(No text output)"}
+${result.textContent || "(No text output)"}
 
 <task_metadata>
 session_id: ${args.session_id}

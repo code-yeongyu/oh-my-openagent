@@ -1,6 +1,26 @@
 import type { ToolContextWithMetadata, OpencodeClient } from "./types"
+import type { SessionMessage } from "./executor-types"
 import { getTimingConfig } from "./timing"
 import { log } from "../../shared/logger"
+
+const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
+
+export function isSessionComplete(messages: SessionMessage[]): boolean {
+  let lastUser: SessionMessage | undefined
+  let lastAssistant: SessionMessage | undefined
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (!lastAssistant && msg.info?.role === "assistant") lastAssistant = msg
+    if (!lastUser && msg.info?.role === "user") lastUser = msg
+    if (lastUser && lastAssistant) break
+  }
+
+  if (!lastAssistant?.info?.finish) return false
+  if (NON_TERMINAL_FINISH_REASONS.has(lastAssistant.info.finish)) return false
+  if (!lastUser?.info?.id || !lastAssistant?.info?.id) return false
+  return lastUser.info.id < lastAssistant.info.id
+}
 
 export async function pollSyncSession(
   ctx: ToolContextWithMetadata,
@@ -14,8 +34,6 @@ export async function pollSyncSession(
 ): Promise<string | null> {
   const syncTiming = getTimingConfig()
   const pollStart = Date.now()
-  let lastMsgCount = 0
-  let stablePolls = 0
   let pollCount = 0
 
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse })
@@ -35,45 +53,29 @@ export async function pollSyncSession(
     const sessionStatus = allStatuses[input.sessionID]
 
     if (pollCount % 10 === 0) {
-    log("[task] Poll status", {
+      log("[task] Poll status", {
         sessionID: input.sessionID,
         pollCount,
         elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
         sessionStatus: sessionStatus?.type ?? "not_in_status",
-        stablePolls,
-        lastMsgCount,
       })
     }
 
     if (sessionStatus && sessionStatus.type !== "idle") {
-      stablePolls = 0
-      lastMsgCount = 0
       continue
     }
 
-    const elapsed = Date.now() - pollStart
-    if (elapsed < syncTiming.MIN_STABILITY_TIME_MS) {
-      continue
-    }
+    const messagesResult = await client.session.messages({ path: { id: input.sessionID } })
+    const msgs = ((messagesResult as { data?: unknown }).data ?? messagesResult) as SessionMessage[]
 
-    const messagesCheck = await client.session.messages({ path: { id: input.sessionID } })
-    const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
-    const currentMsgCount = msgs.length
-
-    if (currentMsgCount === lastMsgCount) {
-      stablePolls++
-      if (stablePolls >= syncTiming.STABILITY_POLLS_REQUIRED) {
-      log("[task] Poll complete - messages stable", { sessionID: input.sessionID, pollCount, currentMsgCount })
-        break
-      }
-    } else {
-      stablePolls = 0
-      lastMsgCount = currentMsgCount
+    if (isSessionComplete(msgs)) {
+      log("[task] Poll complete - terminal finish detected", { sessionID: input.sessionID, pollCount })
+      break
     }
   }
 
   if (Date.now() - pollStart >= syncTiming.MAX_POLL_TIME_MS) {
-  log("[task] Poll timeout reached", { sessionID: input.sessionID, pollCount, lastMsgCount, stablePolls })
+    log("[task] Poll timeout reached", { sessionID: input.sessionID, pollCount })
   }
 
   return null
