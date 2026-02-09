@@ -1073,11 +1073,16 @@ describe("sisyphus-task", () => {
          messages: async () => ({
            data: [
              {
-               info: { role: "assistant", time: { created: Date.now() } },
+               info: { id: "msg_001", role: "user", time: { created: Date.now() } },
+               parts: [{ type: "text", text: "Continue the task" }],
+             },
+             {
+               info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
                parts: [{ type: "text", text: "This is the continued task result" }],
              },
            ],
          }),
+         status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
        },
        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
        app: {
@@ -1125,11 +1130,12 @@ describe("sisyphus-task", () => {
     const mockClient = {
       session: {
         prompt: promptMock,
-        promptAsync: async () => ({ data: {} }),
+        promptAsync: promptMock,
         messages: async () => ({
           data: [
             {
               info: {
+                id: "msg_001",
                 role: "user",
                 agent: "sisyphus-junior",
                 model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
@@ -1139,11 +1145,12 @@ describe("sisyphus-task", () => {
               parts: [{ type: "text", text: "previous message" }],
             },
             {
-              info: { role: "assistant", time: { created: Date.now() + 1 } },
+              info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
               parts: [{ type: "text", text: "Completed." }],
             },
           ],
         }),
+        status: async () => ({ data: { "ses_var_test": { type: "idle" } } }),
       },
       config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
       app: {
@@ -1316,7 +1323,11 @@ describe("sisyphus-task", () => {
            messages: async () => ({
              data: [
                {
-                 info: { role: "assistant", time: { created: Date.now() } },
+                 info: { id: "msg_001", role: "user", time: { created: Date.now() } },
+                 parts: [{ type: "text", text: "Do something" }],
+               },
+               {
+                 info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
                  parts: [{ type: "text", text: "Sync task completed successfully" }],
                },
              ],
