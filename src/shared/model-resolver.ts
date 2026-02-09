@@ -73,3 +73,13 @@ export function resolveModelWithFallback(
 		variant: resolved.variant,
 	}
 }
+
+/**
+ * Normalizes fallback_models config (which can be string or string[]) to string[]
+ * Centralized helper to avoid duplicated normalization logic
+ */
+export function normalizeFallbackModels(models: string | string[] | undefined): string[] | undefined {
+	if (!models) return undefined
+	if (typeof models === "string") return [models]
+	return models
+}
