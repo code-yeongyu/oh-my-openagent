@@ -150,6 +150,7 @@ session_id: ${sessionID}
   } finally {
     if (syncSessionID) {
       subagentSessions.delete(syncSessionID)
+      SessionCategoryRegistry.remove(syncSessionID)
     }
   }
 }

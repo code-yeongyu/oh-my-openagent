@@ -115,7 +115,26 @@ function getFallbackModelsForSession(
     if (result) return result
   }
 
-  const sessionAgentMatch = sessionID.match(/\b(sisyphus|oracle|librarian|explore|prometheus|atlas|metis|momus|hephaestus|sisyphus-junior|build|plan|multimodal-looker)\b/i)
+  const AGENT_NAMES = [
+    "sisyphus",
+    "oracle",
+    "librarian",
+    "explore",
+    "prometheus",
+    "atlas",
+    "metis",
+    "momus",
+    "hephaestus",
+    "sisyphus-junior",
+    "build",
+    "plan",
+    "multimodal-looker",
+  ]
+  const agentPattern = new RegExp(
+    `(?:^|[^a-zA-Z0-9_-])(${AGENT_NAMES.map((a) => a.replace(/-/g, "\\-")).join("|")})(?:$|[^a-zA-Z0-9_-])`,
+    "i",
+  )
+  const sessionAgentMatch = sessionID.match(agentPattern)
   if (sessionAgentMatch) {
     const detectedAgent = sessionAgentMatch[1].toLowerCase()
     const result = tryGetFallbackFromAgent(detectedAgent)
