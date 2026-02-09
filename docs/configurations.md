@@ -887,7 +887,6 @@ Each category supports: `model`, `fallback_models`, `temperature`, `top_p`, `max
 
 ### Additional Category Options
 
-<<<<<<< HEAD
 | Option              | Type         | Default | Description                                                                                         |
 | ------------------- | ------------ | ------- | --------------------------------------------------------------------------------------------------- |
 | `fallback_models`   | string/array | -       | Fallback models for runtime switching on API errors. Single string or array of model strings.      |
