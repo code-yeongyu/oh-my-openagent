@@ -94,7 +94,10 @@ export async function pollRunningTasks(args: {
         continue
       }
 
-      const messages = asSessionMessages((messagesResult as { data?: unknown }).data)
+      const messagesPayload = Array.isArray(messagesResult)
+        ? messagesResult
+        : (messagesResult as { data?: unknown }).data
+      const messages = asSessionMessages(messagesPayload)
       const assistantMsgs = messages.filter((m) => m.info?.role === "assistant")
 
       let toolCalls = 0

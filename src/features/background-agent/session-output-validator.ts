@@ -55,7 +55,8 @@ export async function validateSessionHasOutput(
       path: { id: sessionID },
     })
 
-    const messagesRaw = "data" in response ? response.data : []
+    const messagesRaw =
+      isObject(response) && "data" in response ? (response as { data?: unknown }).data : response
     const messages = Array.isArray(messagesRaw) ? messagesRaw : []
 
     const hasAssistantOrToolMessage = messages.some((message) => {

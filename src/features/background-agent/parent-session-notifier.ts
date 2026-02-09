@@ -13,7 +13,7 @@ export async function notifyParentSession(
 ): Promise<void> {
   const { client, state } = ctx
 
-  const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
+  const duration = formatDuration(task.startedAt ?? task.completedAt ?? new Date(), task.completedAt)
   log("[background-agent] notifyParentSession called for task:", task.id)
 
   const toastManager = getTaskToastManager()
