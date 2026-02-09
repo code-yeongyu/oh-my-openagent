@@ -7,9 +7,6 @@ const execSyncMock = mock(() => {
 })
 
 const execFileSyncMock = mock((file: string, args: string[], _opts: { cwd?: string }) => {
-  if (file === "wc") {
-    return "  10 new-file.ts\n"
-  }
   if (file !== "git") throw new Error(`unexpected file: ${file}`)
   const subcommand = args[0]
 
@@ -28,9 +25,17 @@ const execFileSyncMock = mock((file: string, args: string[], _opts: { cwd?: stri
   throw new Error(`unexpected args: ${args.join(" ")}`)
 })
 
+const readFileSyncMock = mock((_path: string, _encoding: string) => {
+  return "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\n"
+})
+
 mock.module("node:child_process", () => ({
   execSync: execSyncMock,
   execFileSync: execFileSyncMock,
+}))
+
+mock.module("node:fs", () => ({
+  readFileSync: readFileSyncMock,
 }))
 
 const { collectGitDiffStats } = await import("./collect-git-diff-stats")
@@ -45,7 +50,7 @@ describe("collectGitDiffStats", () => {
 
     //#then
     expect(execSyncMock).not.toHaveBeenCalled()
-    expect(execFileSyncMock).toHaveBeenCalledTimes(4)
+    expect(execFileSyncMock).toHaveBeenCalledTimes(3)
 
     const [firstCallFile, firstCallArgs, firstCallOpts] = execFileSyncMock.mock
       .calls[0]! as unknown as [string, string[], { cwd?: string }]
@@ -68,11 +73,7 @@ describe("collectGitDiffStats", () => {
     expect(thirdCallOpts.cwd).toBe(directory)
     expect(thirdCallArgs.join(" ")).not.toContain(directory)
 
-    const [fourthCallFile, fourthCallArgs, fourthCallOpts] = execFileSyncMock.mock
-      .calls[3]! as unknown as [string, string[], { cwd?: string }]
-    expect(fourthCallFile).toBe("wc")
-    expect(fourthCallArgs).toEqual(["-l", "--", "new-file.ts"])
-    expect(fourthCallOpts.cwd).toBe(directory)
+    expect(readFileSyncMock).toHaveBeenCalled()
 
     expect(result).toEqual([
       {

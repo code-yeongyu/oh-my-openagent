@@ -1,4 +1,6 @@
 import { execFileSync } from "node:child_process"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { parseGitStatusPorcelain } from "./parse-status-porcelain"
 import { parseGitDiffNumstat } from "./parse-diff-numstat"
 import type { GitFileStat } from "./types"
@@ -32,17 +34,8 @@ export function collectGitDiffStats(directory: string): GitFileStat[] {
           .filter(Boolean)
           .map((filePath) => {
             try {
-              const wcOutput = execFileSync("wc", ["-l", "--", filePath], {
-                cwd: directory,
-                encoding: "utf-8",
-                timeout: 5000,
-                stdio: ["pipe", "pipe", "pipe"],
-              }).trim()
-
-              const [lineCountToken] = wcOutput.split(/\s+/)
-              const lineCount = Number(lineCountToken)
-              if (!Number.isFinite(lineCount)) return `0\t0\t${filePath}`
-
+              const content = readFileSync(join(directory, filePath), "utf-8")
+              const lineCount = content.split("\n").length - (content.endsWith("\n") ? 1 : 0)
               return `${lineCount}\t0\t${filePath}`
             } catch {
               return `0\t0\t${filePath}`
