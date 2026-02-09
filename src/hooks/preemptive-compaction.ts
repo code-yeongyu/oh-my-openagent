@@ -1,10 +1,17 @@
 const DEFAULT_ACTUAL_LIMIT = 200_000
+const OPUS_4_6_LIMIT = 1_000_000
 
 const ANTHROPIC_ACTUAL_LIMIT =
   process.env.ANTHROPIC_1M_CONTEXT === "true" ||
   process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
     ? 1_000_000
     : DEFAULT_ACTUAL_LIMIT
+
+/** Claude Opus 4.6 supports 1M context regardless of what models.dev reports for the direct Anthropic provider */
+function isOpus46(modelID: string | undefined): boolean {
+  if (!modelID) return false
+  return modelID.includes("opus-4-6") || modelID.includes("opus-4.6")
+}
 
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
 
@@ -61,8 +68,9 @@ export function createPreemptiveCompactionHook(ctx: PluginInput) {
       if (assistantMessages.length === 0) return
 
       const lastAssistant = assistantMessages[assistantMessages.length - 1]
-      const actualLimit =
-        lastAssistant.providerID === "anthropic"
+      const actualLimit = isOpus46(lastAssistant.modelID)
+        ? OPUS_4_6_LIMIT
+        : lastAssistant.providerID === "anthropic"
           ? ANTHROPIC_ACTUAL_LIMIT
           : DEFAULT_ACTUAL_LIMIT
 

@@ -2,12 +2,18 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
 const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
+const OPUS_4_6_LIMIT = 1_000_000
 const ANTHROPIC_ACTUAL_LIMIT =
   process.env.ANTHROPIC_1M_CONTEXT === "true" ||
   process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
     ? 1_000_000
     : 200_000
 const CONTEXT_WARNING_THRESHOLD = 0.70
+
+function isOpus46(modelID: string | undefined): boolean {
+  if (!modelID) return false
+  return modelID.includes("opus-4-6") || modelID.includes("opus-4.6")
+}
 
 const CONTEXT_REMINDER = `${createSystemDirective(SystemDirectiveTypes.CONTEXT_WINDOW_MONITOR)}
 
@@ -18,6 +24,7 @@ Complete your work thoroughly and methodically.`
 interface AssistantMessageInfo {
   role: "assistant"
   providerID: string
+  modelID?: string
   tokens: {
     input: number
     output: number
@@ -57,12 +64,11 @@ export function createContextWindowMonitorHook(ctx: PluginInput) {
       const lastAssistant = assistantMessages[assistantMessages.length - 1]
       if (lastAssistant.providerID !== "anthropic") return
 
-      // Use only the last assistant message's input tokens
-      // This reflects the ACTUAL current context window usage (post-compaction)
       const lastTokens = lastAssistant.tokens
       const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
 
-      const actualUsagePercentage = totalInputTokens / ANTHROPIC_ACTUAL_LIMIT
+      const actualLimit = isOpus46(lastAssistant.modelID) ? OPUS_4_6_LIMIT : ANTHROPIC_ACTUAL_LIMIT
+      const actualUsagePercentage = totalInputTokens / actualLimit
 
       if (actualUsagePercentage < CONTEXT_WARNING_THRESHOLD) return
 
