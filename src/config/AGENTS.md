@@ -1,5 +1,5 @@
-**Generated:** 2026-02-08T16:45:00+09:00
-**Commit:** f2b7b759
+**Generated:** 2026-02-09T14:16:00+09:00
+**Commit:** f22f14d9
 **Branch:** dev
 
 ## OVERVIEW
@@ -7,33 +7,27 @@
 Zod schema definitions for plugin configuration. 455+ lines of type-safe config validation with JSONC support, multi-level inheritance, and comprehensive agent/category overrides.
 
 ## STRUCTURE
+
 ```
 config/
-├── schema.ts              # Main Zod schema (455 lines) - agents, categories, experimental features
-├── schema.test.ts         # Schema validation tests (17909 lines)
-└── index.ts               # Barrel export
+├── schema/               # Schema components (21 files)
+│   ├── index.ts          # Main schema composition
+│   └── [module].ts       # Agent names, overrides, categories, hooks, etc.
+├── schema.ts             # Main Zod schema (455 lines)
+├── schema.test.ts        # Schema validation tests (735 lines)
+├── types.ts              # TypeScript types
+└── index.ts              # Barrel export
 ```
 
 ## SCHEMA COMPONENTS
 
-**Agent Configuration:**
-- `AgentOverrideConfigSchema`: Model, variant, temperature, permissions, tools
-- `AgentOverridesSchema`: Per-agent overrides (sisyphus, hephaestus, prometheus, etc.)
-- `AgentPermissionSchema`: Tool access control (edit, bash, webfetch, task)
+**Agent Config:** `AgentOverrideConfigSchema`, `AgentOverridesSchema`, `AgentPermissionSchema`
 
-**Category Configuration:**
-- `CategoryConfigSchema`: Model defaults, thinking budgets, tool restrictions
-- `CategoriesConfigSchema`: Named categories (visual-engineering, ultrabrain, deep, etc.)
+**Category Config:** `CategoryConfigSchema`, `CategoriesConfigSchema` (visual-engineering, ultrabrain, deep)
 
-**Experimental Features:**
-- `ExperimentalConfigSchema`: Dynamic context pruning, task system, plugin timeouts
-- `DynamicContextPruningConfigSchema`: Intelligent context management
+**Experimental:** `ExperimentalConfigSchema`, `DynamicContextPruningConfigSchema`
 
-**Built-in Enums:**
-- `AgentNameSchema`: sisyphus, hephaestus, prometheus, oracle, librarian, explore, multimodal-looker, metis, momus, atlas
-- `HookNameSchema`: 100+ hook names for lifecycle management
-- `BuiltinCommandNameSchema`: init-deep, ralph-loop, refactor, start-work
-- `BuiltinSkillNameSchema`: playwright, agent-browser, git-master
+**Built-in Enums:** `AgentNameSchema` (11 agents), `HookNameSchema` (100+ hooks), `BuiltinCommandNameSchema`, `BuiltinSkillNameSchema`
 
 ## CONFIGURATION HIERARCHY
 

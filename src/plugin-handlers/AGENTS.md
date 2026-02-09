@@ -1,5 +1,5 @@
-**Generated:** 2026-02-08T16:45:00+09:00
-**Commit:** f2b7b759
+**Generated:** 2026-02-09T14:16:00+09:00
+**Commit:** f22f14d9
 **Branch:** dev
 
 ## OVERVIEW
@@ -10,7 +10,7 @@ Plugin component loading and configuration orchestration. 500+ lines of config m
 ```
 plugin-handlers/
 ├── config-handler.ts       # Main config orchestrator (563 lines) - agent/skill/command loading
-├── config-handler.test.ts  # Config handler tests (34426 lines)
+├── config-handler.test.ts  # Config handler tests (1061 lines)
 ├── plan-model-inheritance.ts # Plan agent model inheritance logic (657 lines)
 ├── plan-model-inheritance.test.ts # Inheritance tests (3696 lines)
 └── index.ts               # Barrel export
@@ -62,7 +62,7 @@ User Config → Migration → Merging → Validation → Agent Creation → Perm
 
 ## TESTING COVERAGE
 
-- **Config Handler**: 34426 lines of tests
+- **Config Handler**: 1061 lines of tests
 - **Plan Inheritance**: 3696 lines of tests
 - **Migration Logic**: Legacy compatibility verification
 - **Parallel Loading**: Timeout and error handling

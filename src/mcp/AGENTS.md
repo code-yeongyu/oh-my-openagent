@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Tier 1 of three-tier MCP system: 8 built-in remote HTTP MCPs.
+Tier 1 of three-tier MCP system: 3 built-in remote HTTP MCPs.
 
 **Three-Tier System**:
 1. **Built-in** (this directory): websearch, context7, grep_app
@@ -25,7 +25,7 @@ mcp/
 
 | Name | URL | Purpose | Auth |
 |------|-----|---------|------|
-| websearch | mcp.exa.ai / mcp.tavily.com | Real-time web search | EXA_API_KEY / TAVILY_API_KEY |
+| websearch | mcp.exa.ai/mcp?tools=web_search_exa or mcp.tavily.com/mcp/ | Real-time web search | EXA_API_KEY (optional) / TAVILY_API_KEY (required) |
 | context7 | mcp.context7.com/mcp | Library docs | CONTEXT7_API_KEY (optional) |
 | grep_app | mcp.grep.app | GitHub code search | None |
 
@@ -33,8 +33,8 @@ mcp/
 
 | Provider | URL | Auth | API Key Required |
 |----------|-----|------|------------------|
-| exa (default) | mcp.exa.ai | x-api-key header | No (optional) |
-| tavily | mcp.tavily.com | Authorization Bearer | Yes |
+| exa (default) | mcp.exa.ai/mcp?tools=web_search_exa | query param | No (optional) |
+| tavily | mcp.tavily.com/mcp/ | Authorization Bearer | Yes |
 
 ```jsonc
 {
@@ -58,9 +58,9 @@ export const mcp_name = {
 
 ## HOW TO ADD
 
-1. Create `src/mcp/my-mcp.ts`
-2. Add to `allBuiltinMcps` in `index.ts`
-3. Add to `McpNameSchema` in `types.ts`
+1. Create `src/mcp/my-mcp.ts` with MCP config object
+2. Add conditional check in `createBuiltinMcps()` in `index.ts`
+3. Add name to `McpNameSchema` in `types.ts`
 
 ## NOTES
 

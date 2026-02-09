@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-CLI entry: `bunx oh-my-opencode`. 70 CLI utilities and commands with Commander.js + @clack/prompts TUI.
+CLI entry: `bunx oh-my-opencode`. 107 CLI utilities with Commander.js + @clack/prompts TUI.
 
 **Commands**: install (interactive setup), doctor (14 health checks), run (session launcher), get-local-version, mcp-oauth
 
@@ -10,33 +10,22 @@ CLI entry: `bunx oh-my-opencode`. 70 CLI utilities and commands with Commander.j
 
 ```
 cli/
-├── index.ts              # Commander.js entry (5 commands)
-├── install.ts            # Interactive TUI (542 lines)
-├── config-manager.ts     # JSONC parsing (667 lines)
-├── model-fallback.ts     # Model fallback configuration
-├── types.ts              # InstallArgs, InstallConfig
+├── index.ts                 # Commander.js entry (5 commands)
+├── install.ts               # TTY routing to TUI or CLI installer
+├── cli-installer.ts         # Non-interactive installer (164 lines)
+├── tui-installer.ts         # Interactive TUI with @clack/prompts (140 lines)
+├── config-manager/          # Config management utilities (17 files)
+├── model-fallback.ts        # Model fallback configuration
+├── model-fallback.test.ts   # Fallback tests (523 lines)
 ├── doctor/
-│   ├── index.ts          # Doctor entry
-│   ├── runner.ts         # Check orchestration
-│   ├── formatter.ts      # Colored output
-│   ├── constants.ts      # Check IDs, symbols
-│   ├── types.ts          # CheckResult, CheckDefinition
-│   └── checks/           # 14 checks, 23 files
-│       ├── version.ts    # OpenCode + plugin version
-│       ├── config.ts     # JSONC validity, Zod
-│       ├── auth.ts       # Anthropic, OpenAI, Google
-│       ├── dependencies.ts # AST-Grep, Comment Checker
-│       ├── lsp.ts        # LSP connectivity
-│       ├── mcp.ts        # MCP validation
-│       ├── model-resolution.ts # Model resolution check (323 lines)
-│       └── gh.ts         # GitHub CLI
-├── run/
-│   ├── index.ts          # Session launcher
-│   └── events.ts         # CLI run events (325 lines)
-├── mcp-oauth/
-│   └── index.ts          # MCP OAuth flow
-└── get-local-version/
-    └── index.ts          # Version detection
+│   ├── runner.ts            # Check orchestration
+│   ├── formatter.ts         # Colored output
+│   └── checks/              # 29 files with individual checks
+├── run/                     # Session launcher (24 files)
+│   ├── events.ts            # CLI run events
+│   └── runner.ts            # Run orchestration
+├── mcp-oauth/               # OAuth flow
+└── get-local-version/       # Version detection
 ```
 
 ## COMMANDS
@@ -70,11 +59,11 @@ cli/
 
 - **@clack/prompts**: `select()`, `spinner()`, `intro()`, `outro()`
 - **picocolors**: Terminal colors for status and headers
-- **Symbols**: ✓ (pass), ✗ (fail), ⚠ (warn), ℹ (info)
+- **Symbols**: check (pass), cross (fail), warning (warn), info (info)
 
 ## ANTI-PATTERNS
 
 - **Blocking in non-TTY**: Always check `process.stdout.isTTY`
 - **Direct JSON.parse**: Use `parseJsonc()` from shared utils
 - **Silent failures**: Return `warn` or `fail` in doctor instead of throwing
-- **Hardcoded paths**: Use `getOpenCodeConfigPaths()` from `config-manager.ts`
+- **Hardcoded paths**: Use `getOpenCodeConfigPaths()` from `config-manager`
