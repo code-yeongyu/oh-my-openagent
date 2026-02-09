@@ -65,7 +65,7 @@ export function createToolExecuteAfterHandler(input: {
       if (boulderState) {
         const progress = getPlanProgress(boulderState.active_plan)
 
-        if (toolInput.sessionID && !boulderState.session_ids.includes(toolInput.sessionID)) {
+        if (toolInput.sessionID && !boulderState.session_ids?.includes(toolInput.sessionID)) {
           appendSessionId(ctx.directory, toolInput.sessionID)
           log(`[${HOOK_NAME}] Appended session to boulder`, {
             sessionID: toolInput.sessionID,
