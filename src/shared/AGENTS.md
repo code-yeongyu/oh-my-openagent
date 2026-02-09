@@ -9,20 +9,21 @@
 ## STRUCTURE
 ```
 shared/
-├── tmux/                  # Tmux TUI integration (types, utils 312 lines, constants)
+├── git-worktree/          # Git worktree operations (311 lines)
+├── tmux/                  # Tmux TUI integration (227 lines)
 ├── logger.ts              # File-based logging (/tmp/oh-my-opencode.log) - 53 imports
-├── dynamic-truncator.ts   # Token-aware context window management (194 lines)
+├── dynamic-truncator.ts   # Token-aware context window management (201 lines)
 ├── model-resolver.ts      # 3-step resolution (Override → Fallback → Default)
-├── model-requirements.ts  # Agent/category model fallback chains (162 lines)
-├── model-availability.ts  # Provider model fetching & fuzzy matching (357 lines)
+├── model-requirements.ts  # Agent/category model fallback chains (160 lines)
+├── model-availability.ts  # Provider model fetching & fuzzy matching (358 lines)
 ├── model-sanitizer.ts     # Model name sanitization
 ├── model-suggestion-retry.ts # Model suggestion on failure
 ├── jsonc-parser.ts        # JSONC parsing with comment support
 ├── frontmatter.ts         # YAML frontmatter extraction (JSON_SCHEMA only) - 9 imports
 ├── data-path.ts           # XDG-compliant storage resolution
-├── opencode-config-dir.ts # ~/.config/opencode resolution (143 lines) - 9 imports
+├── opencode-config-dir.ts # ~/.config/opencode resolution (138 lines) - 9 imports
 ├── claude-config-dir.ts   # ~/.claude resolution - 9 imports
-├── migration.ts           # Legacy config migration logic (231 lines)
+├── migration.ts           # Legacy config migration logic (341 lines across dir)
 ├── opencode-version.ts    # Semantic version comparison
 ├── permission-compat.ts   # Agent tool restriction enforcement - 6 imports
 ├── system-directive.ts    # Unified system message prefix & types - 8 imports
@@ -32,8 +33,7 @@ shared/
 ├── agent-variant.ts       # Agent variant from config
 ├── zip-extractor.ts       # Binary/Resource ZIP extraction
 ├── deep-merge.ts          # Recursive object merging (proto-pollution safe, MAX_DEPTH=50)
-├── case-insensitive.ts    # Case-insensitive object lookups
-├── command-executor.ts    # Shell command execution (225 lines)
+├── command-executor.ts    # Shell command execution (213 lines across dir)
 ├── snake-case.ts          # Case conversion utilities
 ├── tool-name.ts           # Tool naming conventions
 ├── pattern-matcher.ts     # Pattern matching utilities

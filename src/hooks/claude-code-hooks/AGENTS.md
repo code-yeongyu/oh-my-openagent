@@ -9,18 +9,22 @@ Full Claude Code `settings.json` hook compatibility layer. Intercepts OpenCode e
 ## STRUCTURE
 ```
 claude-code-hooks/
-├── index.ts              # Main factory (421 lines)
-├── config.ts             # Loads ~/.claude/settings.json
-├── config-loader.ts      # Extended config (disabledHooks)
-├── pre-tool-use.ts       # PreToolUse executor
-├── post-tool-use.ts      # PostToolUse executor
+├── index.ts              # Barrel export
+├── claude-code-hooks-hook.ts  # Main factory
+├── config.ts             # Claude settings.json loader
+├── config-loader.ts      # Extended plugin config
+├── pre-tool-use.ts       # PreToolUse hook executor
+├── post-tool-use.ts      # PostToolUse hook executor
 ├── user-prompt-submit.ts # UserPromptSubmit executor
-├── stop.ts               # Stop hook executor (with active state tracking)
+├── stop.ts               # Stop hook executor
 ├── pre-compact.ts        # PreCompact executor
 ├── transcript.ts         # Tool use recording
 ├── tool-input-cache.ts   # Pre→post input caching
 ├── todo.ts               # Todo integration
-└── types.ts              # Hook & IO type definitions
+├── session-hook-state.ts # Active state tracking
+├── types.ts              # Hook & IO type definitions
+├── plugin-config.ts      # Default config constants
+└── handlers/             # Event handlers (5 files)
 ```
 
 ## HOOK LIFECYCLE

@@ -14,46 +14,48 @@
 ## STRUCTURE
 ```
 hooks/
-├── atlas/                      # Main orchestration (770 lines)
-├── anthropic-context-window-limit-recovery/ # Auto-summarize
-├── todo-continuation-enforcer.ts # Force TODO completion (517 lines)
-├── ralph-loop/                 # Self-referential dev loop (428 lines)
-├── claude-code-hooks/          # settings.json compat layer - see AGENTS.md
-├── comment-checker/            # Prevents AI slop
-├── auto-slash-command/         # Detects /command patterns
-├── rules-injector/             # Conditional rules
-├── directory-agents-injector/  # Auto-injects AGENTS.md
-├── directory-readme-injector/  # Auto-injects README.md
-├── edit-error-recovery/        # Recovers from failures
-├── thinking-block-validator/   # Ensures valid <thinking>
-├── context-window-monitor.ts   # Reminds of headroom
-├── session-recovery/           # Auto-recovers from crashes (436 lines)
-├── session-notification.ts     # Session event notifications (337 lines)
-├── think-mode/                 # Dynamic thinking budget
-├── keyword-detector/           # ultrawork/search/analyze modes
-├── background-notification/    # OS notification
-├── prometheus-md-only/         # Planner read-only mode
-├── agent-usage-reminder/       # Specialized agent hints
-├── auto-update-checker/        # Plugin update check (304 lines)
-├── tool-output-truncator.ts    # Prevents context bloat
-├── compaction-context-injector/ # Injects context on compaction
-├── delegate-task-retry/        # Retries failed delegations
-├── interactive-bash-session/   # Tmux session management
-├── non-interactive-env/        # Non-TTY environment handling
-├── start-work/                 # Sisyphus work session starter
-├── task-resume-info/           # Resume info for cancelled tasks
-├── question-label-truncator/   # Auto-truncates question labels
-├── category-skill-reminder/    # Reminds of category skills
-├── empty-task-response-detector.ts # Detects empty responses
-├── sisyphus-junior-notepad/    # Sisyphus Junior notepad
-├── stop-continuation-guard/    # Guards stop continuation
-├── subagent-question-blocker/  # Blocks subagent questions
-├── task-reminder/              # Task progress reminders
-├── tasks-todowrite-disabler/   # Disables TodoWrite when task system active
-├── unstable-agent-babysitter/  # Monitors unstable agent behavior
-├── write-existing-file-guard/  # Guards against overwriting existing files
-├── preemptive-compaction.ts    # Preemptive context compaction
-└── index.ts                    # Hook aggregation + registration
+├── agent-usage-reminder/         # Specialized agent hints (212 lines)
+├── anthropic-context-window-limit-recovery/ # Auto-summarize on limit (2232 lines)
+├── anthropic-effort/             # Anthropic effort level management (272 lines)
+├── atlas/                        # Main orchestration hook (1976 lines)
+├── auto-slash-command/           # Detects /command patterns (1134 lines)
+├── auto-update-checker/          # Plugin update check (1140 lines)
+├── background-notification/      # OS notifications (33 lines)
+├── category-skill-reminder/      # Reminds of category skills (597 lines)
+├── claude-code-hooks/            # settings.json compat - see AGENTS.md (2110 lines)
+├── comment-checker/              # Prevents AI slop comments (710 lines)
+├── compaction-context-injector/  # Injects context on compaction (128 lines)
+├── compaction-todo-preserver/    # Preserves todos during compaction (203 lines)
+├── context-window-monitor.ts     # Reminds of headroom (99 lines)
+├── delegate-task-retry/          # Retries failed delegations (266 lines)
+├── directory-agents-injector/    # Auto-injects AGENTS.md (195 lines)
+├── directory-readme-injector/    # Auto-injects README.md (190 lines)
+├── edit-error-recovery/          # Recovers from edit failures (188 lines)
+├── empty-task-response-detector.ts # Detects empty responses (27 lines)
+├── index.ts                      # Hook aggregation + registration (46 lines)
+├── interactive-bash-session/     # Tmux session management (695 lines)
+├── keyword-detector/             # ultrawork/search/analyze modes (1665 lines)
+├── non-interactive-env/          # Non-TTY environment handling (483 lines)
+├── preemptive-compaction.ts      # Preemptive context compaction (108 lines)
+├── prometheus-md-only/           # Planner read-only mode (955 lines)
+├── question-label-truncator/     # Auto-truncates question labels (199 lines)
+├── ralph-loop/                   # Self-referential dev loop (1687 lines)
+├── rules-injector/               # Conditional rules injection (1604 lines)
+├── session-notification.ts       # Session event notifications (108 lines)
+├── session-recovery/             # Auto-recovers from crashes (1279 lines)
+├── sisyphus-junior-notepad/      # Sisyphus Junior notepad (76 lines)
+├── start-work/                   # Sisyphus work session starter (648 lines)
+├── stop-continuation-guard/      # Guards stop continuation (214 lines)
+├── subagent-question-blocker/    # Blocks subagent questions (112 lines)
+├── task-reminder/                # Task progress reminders (210 lines)
+├── task-resume-info/             # Resume info for cancelled tasks (39 lines)
+├── tasks-todowrite-disabler/     # Disables TodoWrite when tasks active (202 lines)
+├── think-mode/                   # Dynamic thinking budget (1365 lines)
+├── thinking-block-validator/     # Ensures valid <thinking> blocks (169 lines)
+├── todo-continuation-enforcer/   # Force TODO completion (2061 lines)
+├── tool-output-truncator.ts      # Prevents context bloat (62 lines)
+├── unstable-agent-babysitter/    # Monitors unstable agent behavior (451 lines)
+└── write-existing-file-guard/    # Guards against overwriting files (356 lines)
 ```
 
 ## HOOK EVENTS
