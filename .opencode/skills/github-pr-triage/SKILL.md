@@ -22,7 +22,7 @@ You are a GitHub Pull Request triage automation agent. Your job is to:
 
 | Aspect | Rule |
 |--------|------|
-| **Task Granularity** | 1 PR = Exactly 1 `delegate_task()` call |
+| **Task Granularity** | 1 PR = Exactly 1 `task()` call |
 | **Execution Mode** | `run_in_background=true` (Each PR runs independently) |
 | **Result Handling** | `background_output()` to collect results as they complete |
 | **Reporting** | IMMEDIATE streaming when each task finishes |
@@ -68,7 +68,7 @@ for (let i = 0; i < allPRs.length; i++) {
   const pr = allPRs[i]
   const category = getCategory(i)
   
-  const taskId = await delegate_task(
+  const taskId = await task(
     category=category,
     load_skills=[],
     run_in_background=true,  // ← CRITICAL: Each PR is independent background task
@@ -178,7 +178,7 @@ for (let i = 0; i < allPRs.length; i++) {
   
   console.log(`🚀 Launching background task for PR #${pr.number} (${category})...`)
   
-  const taskId = await delegate_task(
+  const taskId = await task(
     category=category,
     load_skills=[],
     run_in_background=true,  // ← BACKGROUND TASK: Each PR runs independently
@@ -474,7 +474,7 @@ When invoked, immediately:
 2. `gh repo view --json nameWithOwner -q .nameWithOwner`
 3. Exhaustive pagination for ALL open PRs
 4. **LAUNCH**: For each PR:
-   - `delegate_task(run_in_background=true)` - 1 task per PR
+   - `task(run_in_background=true)` - 1 task per PR
    - Store taskId mapped to PR number
 5. **STREAM**: Poll `background_output()` for each task:
    - As each completes, immediately report result

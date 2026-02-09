@@ -129,6 +129,63 @@ describe("detectErrorType", () => {
     })
   })
 
+  describe("assistant_prefill_unsupported errors", () => {
+    it("should detect assistant message prefill error from direct message", () => {
+      //#given an error about assistant message prefill not being supported
+      const error = {
+        message: "This model does not support assistant message prefill. The conversation must end with a user message.",
+      }
+
+      //#when detectErrorType is called
+      const result = detectErrorType(error)
+
+      //#then should return assistant_prefill_unsupported
+      expect(result).toBe("assistant_prefill_unsupported")
+    })
+
+    it("should detect assistant message prefill error from nested error object", () => {
+      //#given an Anthropic API error with nested structure matching the real error format
+      const error = {
+        error: {
+          type: "invalid_request_error",
+          message: "This model does not support assistant message prefill. The conversation must end with a user message.",
+        },
+      }
+
+      //#when detectErrorType is called
+      const result = detectErrorType(error)
+
+      //#then should return assistant_prefill_unsupported
+      expect(result).toBe("assistant_prefill_unsupported")
+    })
+
+    it("should detect error with only 'conversation must end with a user message' fragment", () => {
+      //#given an error containing only the user message requirement
+      const error = {
+        message: "The conversation must end with a user message.",
+      }
+
+      //#when detectErrorType is called
+      const result = detectErrorType(error)
+
+      //#then should return assistant_prefill_unsupported
+      expect(result).toBe("assistant_prefill_unsupported")
+    })
+
+    it("should detect error with only 'assistant message prefill' fragment", () => {
+      //#given an error containing only the prefill mention
+      const error = {
+        message: "This model does not support assistant message prefill.",
+      }
+
+      //#when detectErrorType is called
+      const result = detectErrorType(error)
+
+      //#then should return assistant_prefill_unsupported
+      expect(result).toBe("assistant_prefill_unsupported")
+    })
+  })
+
   describe("unrecognized errors", () => {
     it("should return null for unrecognized error patterns", () => {
       // given an unrelated error

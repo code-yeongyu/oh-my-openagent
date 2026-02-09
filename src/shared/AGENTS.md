@@ -2,46 +2,60 @@
 
 ## OVERVIEW
 
-55 cross-cutting utilities. Import via barrel pattern: `import { log, deepMerge } from "../../shared"`
+88 cross-cutting utilities. Import via barrel pattern: `import { log, deepMerge } from "../../shared"`
 
 **Categories**: Path resolution, Token truncation, Config parsing, Model resolution, System directives, Tool restrictions
 
 ## STRUCTURE
 ```
 shared/
-├── tmux/                  # Tmux TUI integration (types, utils, constants)
-├── logger.ts              # File-based logging (/tmp/oh-my-opencode.log)
-├── dynamic-truncator.ts   # Token-aware context window management (194 lines)
+├── git-worktree/          # Git worktree operations (311 lines)
+├── tmux/                  # Tmux TUI integration (227 lines)
+├── logger.ts              # File-based logging (/tmp/oh-my-opencode.log) - 53 imports
+├── dynamic-truncator.ts   # Token-aware context window management (201 lines)
 ├── model-resolver.ts      # 3-step resolution (Override → Fallback → Default)
-├── model-requirements.ts  # Agent/category model fallback chains (162 lines)
-├── model-availability.ts  # Provider model fetching & fuzzy matching (154 lines)
+├── model-requirements.ts  # Agent/category model fallback chains (160 lines)
+├── model-availability.ts  # Provider model fetching & fuzzy matching (358 lines)
+├── model-sanitizer.ts     # Model name sanitization
+├── model-suggestion-retry.ts # Model suggestion on failure
 ├── jsonc-parser.ts        # JSONC parsing with comment support
-├── frontmatter.ts         # YAML frontmatter extraction (JSON_SCHEMA only)
+├── frontmatter.ts         # YAML frontmatter extraction (JSON_SCHEMA only) - 9 imports
 ├── data-path.ts           # XDG-compliant storage resolution
-├── opencode-config-dir.ts # ~/.config/opencode resolution (143 lines)
-├── claude-config-dir.ts   # ~/.claude resolution
-├── migration.ts           # Legacy config migration logic (231 lines)
+├── opencode-config-dir.ts # ~/.config/opencode resolution (138 lines) - 9 imports
+├── claude-config-dir.ts   # ~/.claude resolution - 9 imports
+├── migration.ts           # Legacy config migration logic (341 lines across dir)
 ├── opencode-version.ts    # Semantic version comparison
-├── permission-compat.ts   # Agent tool restriction enforcement
-├── system-directive.ts    # Unified system message prefix & types
+├── permission-compat.ts   # Agent tool restriction enforcement - 6 imports
+├── system-directive.ts    # Unified system message prefix & types - 8 imports
 ├── session-utils.ts       # Session cursor, orchestrator detection
+├── session-cursor.ts      # Session message cursor tracking
 ├── shell-env.ts           # Cross-platform shell environment
 ├── agent-variant.ts       # Agent variant from config
 ├── zip-extractor.ts       # Binary/Resource ZIP extraction
 ├── deep-merge.ts          # Recursive object merging (proto-pollution safe, MAX_DEPTH=50)
-├── case-insensitive.ts    # Case-insensitive object lookups
-├── session-cursor.ts      # Session message cursor tracking
-├── command-executor.ts    # Shell command execution (225 lines)
+├── command-executor.ts    # Shell command execution (213 lines across dir)
+├── snake-case.ts          # Case conversion utilities
+├── tool-name.ts           # Tool naming conventions
+├── pattern-matcher.ts     # Pattern matching utilities
+├── port-utils.ts          # Port management
+├── file-utils.ts          # File operation utilities
+├── file-reference-resolver.ts # File reference resolution
+├── connected-providers-cache.ts # Provider caching
+├── external-plugin-detector.ts  # Plugin detection
+├── first-message-variant.ts     # Message variant types
+├── opencode-server-auth.ts      # Authentication utilities
 └── index.ts               # Barrel export for all utilities
 ```
 
 ## MOST IMPORTED
-| Utility | Users | Purpose |
-|---------|-------|---------|
-| logger.ts | 16+ | Background task visibility |
-| system-directive.ts | 8+ | Message filtering |
-| opencode-config-dir.ts | 8+ | Path resolution |
-| permission-compat.ts | 6+ | Tool restrictions |
+| Utility | Imports | Purpose |
+|---------|---------|---------|
+| logger.ts | 53 | Background task visibility |
+| opencode-config-dir.ts | 9 | Path resolution |
+| claude-config-dir.ts | 9 | Path resolution |
+| frontmatter.ts | 9 | YAML parsing |
+| system-directive.ts | 8 | Message filtering |
+| permission-compat.ts | 6 | Tool restrictions |
 
 ## WHEN TO USE
 | Task | Utility |

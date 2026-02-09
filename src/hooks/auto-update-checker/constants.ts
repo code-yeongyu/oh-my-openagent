@@ -16,12 +16,6 @@ function getCacheDir(): string {
 
 export const CACHE_DIR = getCacheDir()
 export const VERSION_FILE = path.join(CACHE_DIR, "version")
-export const INSTALLED_PACKAGE_JSON = path.join(
-  CACHE_DIR,
-  "node_modules",
-  PACKAGE_NAME,
-  "package.json"
-)
 
 export function getWindowsAppdataDir(): string | null {
   if (process.platform !== "win32") return null
@@ -31,3 +25,10 @@ export function getWindowsAppdataDir(): string | null {
 export const USER_CONFIG_DIR = getOpenCodeConfigDir({ binary: "opencode" })
 export const USER_OPENCODE_CONFIG = path.join(USER_CONFIG_DIR, "opencode.json")
 export const USER_OPENCODE_CONFIG_JSONC = path.join(USER_CONFIG_DIR, "opencode.jsonc")
+
+export const INSTALLED_PACKAGE_JSON = path.join(
+  USER_CONFIG_DIR,
+  "node_modules",
+  PACKAGE_NAME,
+  "package.json"
+)

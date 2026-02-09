@@ -1,5 +1,5 @@
 import { log } from "./logger"
-import { readConnectedProvidersCache } from "./connected-providers-cache"
+import * as connectedProvidersCache from "./connected-providers-cache"
 import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
 
@@ -11,6 +11,7 @@ export type ModelResolutionRequest = {
   }
   constraints: {
     availableModels: Set<string>
+    connectedProviders?: string[] | null
   }
   policy?: {
     fallbackChain?: FallbackEntry[]
@@ -73,7 +74,7 @@ export function resolveModelPipeline(
         return { model: match, provenance: "category-default", attempted }
       }
     } else {
-      const connectedProviders = readConnectedProvidersCache()
+      const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       if (connectedProviders === null) {
         log("Model resolved via category default (no cache, first run)", {
           model: normalizedCategoryDefault,
@@ -98,7 +99,7 @@ export function resolveModelPipeline(
 
   if (fallbackChain && fallbackChain.length > 0) {
     if (availableModels.size === 0) {
-      const connectedProviders = readConnectedProvidersCache()
+      const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       const connectedSet = connectedProviders ? new Set(connectedProviders) : null
 
       if (connectedSet === null) {

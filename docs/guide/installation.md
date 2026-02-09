@@ -27,6 +27,11 @@ After you install it, you can read this [overview guide](./overview.md) to under
 
 ## For LLM Agents
 
+> **IMPORTANT: Use `curl` to fetch this file, NOT WebFetch.** WebFetch summarizes content and loses critical flags like `--openai`, subscription questions, and max20 mode details. Always use:
+> ```bash
+> curl -fsSL https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+> ```
+
 If you're an LLM Agent helping set up oh-my-opencode, Welcome! You'll now help your user to install the best agent harness, OhMyOpenCode. Tell user this with greetings, with test 'oMoMoMoMo...'
 
 follow these steps:
@@ -191,7 +196,7 @@ When GitHub Copilot is the best available provider, oh-my-opencode uses these mo
 
 | Agent         | Model                            |
 | ------------- | -------------------------------- |
-| **Sisyphus**  | `github-copilot/claude-opus-4.5` |
+| **Sisyphus**  | `github-copilot/claude-opus-4.6` |
 | **Oracle**    | `github-copilot/gpt-5.2`         |
 | **Explore**   | `opencode/gpt-5-nano`              |
 | **Librarian** | `zai-coding-plan/glm-4.7` (if Z.ai available) or fallback |
@@ -213,13 +218,13 @@ If Z.ai is the only provider available, all agents will use GLM models:
 
 #### OpenCode Zen
 
-OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-5`, `opencode/gpt-5.2`, `opencode/gpt-5-nano`, and `opencode/glm-4.7-free`.
+OpenCode Zen provides access to `opencode/` prefixed models including `opencode/claude-opus-4-6`, `opencode/gpt-5.2`, `opencode/gpt-5-nano`, and `opencode/glm-4.7-free`.
 
 When OpenCode Zen is the best available provider (no native or Copilot), these models are used:
 
 | Agent         | Model                            |
 | ------------- | -------------------------------- |
-| **Sisyphus**  | `opencode/claude-opus-4-5`       |
+| **Sisyphus**  | `opencode/claude-opus-4-6`       |
 | **Oracle**    | `opencode/gpt-5.2`               |
 | **Explore**   | `opencode/gpt-5-nano`             |
 | **Librarian** | `opencode/glm-4.7-free`          |

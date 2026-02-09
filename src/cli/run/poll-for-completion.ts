@@ -1,0 +1,66 @@
+import pc from "picocolors"
+import type { RunContext } from "./types"
+import type { EventState } from "./events"
+import { checkCompletionConditions } from "./completion"
+
+const DEFAULT_POLL_INTERVAL_MS = 500
+const DEFAULT_REQUIRED_CONSECUTIVE = 3
+
+export interface PollOptions {
+  pollIntervalMs?: number
+  requiredConsecutive?: number
+}
+
+export async function pollForCompletion(
+  ctx: RunContext,
+  eventState: EventState,
+  abortController: AbortController,
+  options: PollOptions = {}
+): Promise<number> {
+  const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
+  const requiredConsecutive =
+    options.requiredConsecutive ?? DEFAULT_REQUIRED_CONSECUTIVE
+  let consecutiveCompleteChecks = 0
+
+  while (!abortController.signal.aborted) {
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+
+    if (!eventState.mainSessionIdle) {
+      consecutiveCompleteChecks = 0
+      continue
+    }
+
+    if (eventState.currentTool !== null) {
+      consecutiveCompleteChecks = 0
+      continue
+    }
+
+    if (eventState.mainSessionError) {
+      console.error(
+        pc.red(`\n\nSession ended with error: ${eventState.lastError}`)
+      )
+      console.error(
+        pc.yellow("Check if todos were completed before the error.")
+      )
+      return 1
+    }
+
+    if (!eventState.hasReceivedMeaningfulWork) {
+      consecutiveCompleteChecks = 0
+      continue
+    }
+
+    const shouldExit = await checkCompletionConditions(ctx)
+    if (shouldExit) {
+      consecutiveCompleteChecks++
+      if (consecutiveCompleteChecks >= requiredConsecutive) {
+        console.log(pc.green("\n\nAll tasks completed."))
+        return 0
+      }
+    } else {
+      consecutiveCompleteChecks = 0
+    }
+  }
+
+  return 130
+}

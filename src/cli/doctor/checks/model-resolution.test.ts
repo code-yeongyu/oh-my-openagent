@@ -14,9 +14,8 @@ describe("model-resolution check", () => {
       // then: Should have agent entries
       const sisyphus = info.agents.find((a) => a.name === "sisyphus")
       expect(sisyphus).toBeDefined()
-      expect(sisyphus!.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-5")
+      expect(sisyphus!.requirement.fallbackChain[0]?.model).toBe("claude-opus-4-6")
       expect(sisyphus!.requirement.fallbackChain[0]?.providers).toContain("anthropic")
-      expect(sisyphus!.requirement.fallbackChain[0]?.providers).toContain("github-copilot")
     })
 
     it("returns category requirements with provider chains", async () => {
@@ -43,7 +42,7 @@ describe("model-resolution check", () => {
       // given: User has override for oracle agent
       const mockConfig = {
         agents: {
-          oracle: { model: "anthropic/claude-opus-4-5" },
+          oracle: { model: "anthropic/claude-opus-4-6" },
         },
       }
 
@@ -52,8 +51,8 @@ describe("model-resolution check", () => {
       // then: Oracle should show the override
       const oracle = info.agents.find((a) => a.name === "oracle")
       expect(oracle).toBeDefined()
-      expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-5")
-      expect(oracle!.effectiveResolution).toBe("User override: anthropic/claude-opus-4-5")
+      expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-6")
+      expect(oracle!.effectiveResolution).toBe("User override: anthropic/claude-opus-4-6")
     })
 
     it("shows user override for category when configured", async () => {
@@ -89,6 +88,46 @@ describe("model-resolution check", () => {
       expect(sisyphus!.userOverride).toBeUndefined()
       expect(sisyphus!.effectiveResolution).toContain("Provider fallback:")
       expect(sisyphus!.effectiveResolution).toContain("anthropic")
+    })
+
+    it("captures user variant for agent when configured", async () => {
+      const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      //#given User has model with variant override for oracle agent
+      const mockConfig = {
+        agents: {
+          oracle: { model: "openai/gpt-5.2", variant: "xhigh" },
+        },
+      }
+
+      //#when getting resolution info with config
+      const info = getModelResolutionInfoWithOverrides(mockConfig)
+
+      //#then Oracle should have userVariant set
+      const oracle = info.agents.find((a) => a.name === "oracle")
+      expect(oracle).toBeDefined()
+      expect(oracle!.userOverride).toBe("openai/gpt-5.2")
+      expect(oracle!.userVariant).toBe("xhigh")
+    })
+
+    it("captures user variant for category when configured", async () => {
+      const { getModelResolutionInfoWithOverrides } = await import("./model-resolution")
+
+      //#given User has model with variant override for visual-engineering category
+      const mockConfig = {
+        categories: {
+          "visual-engineering": { model: "google/gemini-3-flash-preview", variant: "high" },
+        },
+      }
+
+      //#when getting resolution info with config
+      const info = getModelResolutionInfoWithOverrides(mockConfig)
+
+      //#then visual-engineering should have userVariant set
+      const visual = info.categories.find((c) => c.name === "visual-engineering")
+      expect(visual).toBeDefined()
+      expect(visual!.userOverride).toBe("google/gemini-3-flash-preview")
+      expect(visual!.userVariant).toBe("high")
     })
   })
 
