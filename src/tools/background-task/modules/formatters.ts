@@ -302,6 +302,8 @@ export async function formatFullSession(
         lines.push(`[thinking] ${truncateText(part.thinking, thinkingMaxChars)}`)
       } else if (part.type === "reasoning" && part.text) {
         lines.push(`[thinking] ${truncateText(part.text, thinkingMaxChars)}`)
+      } else if (part.type === "reasoning.encrypted" && part.text) {
+        lines.push(`[thinking] ${truncateText(part.text, thinkingMaxChars)}`)
       } else if (part.type === "tool_result") {
         const toolTexts = extractToolResultText(part)
         for (const toolText of toolTexts) {

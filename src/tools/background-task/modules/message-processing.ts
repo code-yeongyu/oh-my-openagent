@@ -62,7 +62,7 @@ export function extractToolResultText(part: FullSessionMessagePart): string[] {
 
   if (Array.isArray(part.content)) {
     const blocks = part.content
-      .filter((block) => (block.type === "text" || block.type === "reasoning") && block.text)
+      .filter((block) => (block.type === "text" || block.type === "reasoning" || block.type === "reasoning.encrypted") && block.text)
       .map((block) => block.text as string)
     if (blocks.length > 0) return blocks
   }
