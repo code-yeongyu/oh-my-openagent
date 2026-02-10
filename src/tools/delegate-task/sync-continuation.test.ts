@@ -34,15 +34,6 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     spyOn(toastManager, "removeTask").mockImplementation((id: string) => {
       removeTaskCalls.push(id)
     })
-
-    //#given - mock other dependencies
-    mock.module("./sync-session-poller.ts", () => ({
-      pollSyncSession: async () => null,
-    }))
-
-    mock.module("./sync-result-fetcher.ts", () => ({
-      fetchSyncResult: async () => ({ ok: true, textContent: "Result" }),
-    }))
   })
 
   afterEach(() => {
@@ -51,18 +42,12 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     __resetTimingConfig()
 
 		mock.restore()
+
 		resetToastManager?.()
 		resetToastManager = null
   })
 
   test("removes toast when fetchSyncResult throws", async () => {
-    //#given - mock fetchSyncResult to throw an error
-    mock.module("./sync-result-fetcher.ts", () => ({
-      fetchSyncResult: async () => {
-        throw new Error("Network error")
-      },
-    }))
-
     const mockClient = {
       session: {
         messages: async () => ({
@@ -82,6 +67,13 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => {
+        throw new Error("Network error")
+      },
+    }
 
     const mockCtx = {
       sessionID: "parent-session",
@@ -105,7 +97,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     let error: any = null
     let result: string | null = null
     try {
-      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
     } catch (e) {
       error = e
     }
@@ -118,13 +110,6 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
   })
 
   test("removes toast when pollSyncSession throws", async () => {
-    //#given - mock pollSyncSession to throw an error
-    mock.module("./sync-session-poller.ts", () => ({
-      pollSyncSession: async () => {
-        throw new Error("Poll error")
-      },
-    }))
-
     const mockClient = {
       session: {
         messages: async () => ({
@@ -144,6 +129,13 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => {
+        throw new Error("Poll error")
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
 
     const mockCtx = {
       sessionID: "parent-session",
@@ -167,7 +159,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     let error: any = null
     let result: string | null = null
     try {
-      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
     } catch (e) {
       error = e
     }
@@ -206,6 +198,11 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     const { executeSyncContinuation } = require("./sync-continuation")
 
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
     const mockCtx = {
       sessionID: "parent-session",
       callID: "call-123",
@@ -225,7 +222,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation completes successfully
-    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
 
     //#then - toast should be removed exactly once
     expect(removeTaskCalls.length).toBe(1)
@@ -235,16 +232,6 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
   })
 
   test("removes toast when abort happens", async () => {
-    //#given - mock pollSyncSession to detect abort and remove toast
-    mock.module("./sync-session-poller.ts", () => ({
-      pollSyncSession: async (ctx: any, client: any, input: any) => {
-        if (input.toastManager && input.taskId) {
-          input.toastManager.removeTask(input.taskId)
-        }
-        return "Task aborted.\n\nSession ID: ses_test_12345678"
-      },
-    }))
-
     //#given - create a context with abort signal
     const controller = new AbortController()
     controller.abort()
@@ -269,6 +256,16 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     const { executeSyncContinuation } = require("./sync-continuation")
 
+    const deps = {
+      pollSyncSession: async (_ctx: any, _client: any, input: any) => {
+        if (input.toastManager && input.taskId) {
+          input.toastManager.removeTask(input.taskId)
+        }
+        return "Task aborted.\n\nSession ID: ses_test_12345678"
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
     const mockCtx = {
       sessionID: "parent-session",
       callID: "call-123",
@@ -289,7 +286,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
 
     //#when - executeSyncContinuation with abort signal
-    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
 
     //#then - removeTask should be called at least once (poller and finally may both call it)
     expect(removeTaskCalls.length).toBeGreaterThanOrEqual(1)
@@ -322,6 +319,11 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
     const { executeSyncContinuation } = require("./sync-continuation")
 
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
     const mockCtx = {
       sessionID: "parent-session",
       callID: "call-123",
@@ -344,7 +346,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     let error: any = null
     let result: string | null = null
     try {
-      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
     } catch (e) {
       error = e
     }

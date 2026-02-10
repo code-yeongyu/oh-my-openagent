@@ -8,13 +8,13 @@ import { getMessageDir } from "../../shared/session-utils"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
-import { pollSyncSession } from "./sync-session-poller"
-import { fetchSyncResult } from "./sync-result-fetcher"
+import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
   ctx: ToolContextWithMetadata,
-  executorCtx: ExecutorContext
+  executorCtx: ExecutorContext,
+  deps: SyncContinuationDeps = syncContinuationDeps
 ): Promise<string> {
   const { client } = executorCtx
   const toastManager = getTaskToastManager()
@@ -102,7 +102,7 @@ export async function executeSyncContinuation(
    }
 
     try {
-      const pollError = await pollSyncSession(ctx, client, {
+      const pollError = await deps.pollSyncSession(ctx, client, {
         sessionID: args.session_id!,
         agentToUse: resumeAgent ?? "continue",
         toastManager,
@@ -113,10 +113,10 @@ export async function executeSyncContinuation(
         return pollError
       }
 
-      const result = await fetchSyncResult(client, args.session_id!, anchorMessageCount)
-     if (!result.ok) {
-       return result.error
-     }
+      const result = await deps.fetchSyncResult(client, args.session_id!, anchorMessageCount)
+      if (!result.ok) {
+        return result.error
+      }
 
      const duration = formatDuration(startTime)
 
