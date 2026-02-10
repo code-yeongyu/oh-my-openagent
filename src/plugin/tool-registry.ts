@@ -25,6 +25,7 @@ import {
   createTaskGetTool,
   createTaskList,
   createTaskUpdateTool,
+  createAgentTeamsTools,
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
@@ -131,6 +132,11 @@ export function createToolRegistry(args: {
     skill_mcp: skillMcpTool,
     slashcommand: slashcommandTool,
     interactive_bash,
+    ...createAgentTeamsTools(managers.backgroundManager, {
+      client: ctx.client,
+      userCategories: pluginConfig.categories,
+      sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
+    }),
     ...taskToolsRecord,
   }
 
