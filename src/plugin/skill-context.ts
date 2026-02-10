@@ -55,15 +55,15 @@ export async function createSkillContext(args: {
     return true
   })
 
-  const includeExternalSkills = pluginConfig.claude_code?.skills !== false
+  const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
   const [userSkills, globalSkills, projectSkills, opencodeProjectSkills, agentsProjectSkills, agentsGlobalSkills] =
     await Promise.all([
-      includeExternalSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
+      includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
       discoverOpencodeGlobalSkills(),
-      includeExternalSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
+      includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
       discoverOpencodeProjectSkills(),
-      includeExternalSkills ? discoverProjectAgentsSkills() : Promise.resolve([]),
-      includeExternalSkills ? discoverGlobalAgentsSkills() : Promise.resolve([]),
+      discoverProjectAgentsSkills(),
+      discoverGlobalAgentsSkills(),
     ])
 
   const mergedSkills = mergeSkills(
