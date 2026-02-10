@@ -149,10 +149,12 @@ export function writeProviderModelsCache(data: { models: Record<string, string[]
  */
 export async function updateConnectedProvidersCache(client: {
 	provider?: {
-		list?: () => Promise<{ data?: { connected?: string[] } }>
-	}
-	model?: {
-		list?: () => Promise<{ data?: Array<{ id: string; provider: string }> }>
+		list?: () => Promise<{
+			data?: {
+				connected?: string[]
+				all?: Array<{ id: string; models?: Record<string, unknown> }>
+			}
+		}>
 	}
 }): Promise<void> {
 	if (!client?.provider?.list) {
@@ -167,30 +169,22 @@ export async function updateConnectedProvidersCache(client: {
 
 		writeConnectedProvidersCache(connected)
 
-		// Always update provider-models cache (overwrite with fresh data)
-		let modelsByProvider: Record<string, string[]> = {}
-		if (client.model?.list) {
-			try {
-				const modelsResult = await client.model.list()
-				const models = modelsResult.data ?? []
+		const modelsByProvider: Record<string, string[]> = {}
+		const allProviders = result.data?.all ?? []
 
-				for (const model of models) {
-					if (!modelsByProvider[model.provider]) {
-						modelsByProvider[model.provider] = []
-					}
-					modelsByProvider[model.provider].push(model.id)
+		for (const provider of allProviders) {
+			if (provider.models) {
+				const modelIds = Object.keys(provider.models)
+				if (modelIds.length > 0) {
+					modelsByProvider[provider.id] = modelIds
 				}
-
-				log("[connected-providers-cache] Fetched models from API", {
-					providerCount: Object.keys(modelsByProvider).length,
-					totalModels: models.length,
-				})
-			} catch (modelErr) {
-				log("[connected-providers-cache] Error fetching models, writing empty cache", { error: String(modelErr) })
 			}
-		} else {
-			log("[connected-providers-cache] client.model.list not available, writing empty cache")
 		}
+
+		log("[connected-providers-cache] Extracted models from provider list", {
+			providerCount: Object.keys(modelsByProvider).length,
+			totalModels: Object.values(modelsByProvider).reduce((sum, ids) => sum + ids.length, 0),
+		})
 
 		writeProviderModelsCache({
 			models: modelsByProvider,
