@@ -1053,9 +1053,87 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     //#when
     await handler(config)
 
-    //#then
-    const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    expect(agentResult.sisyphus?.permission?.todowrite).toBeUndefined()
-    expect(agentResult.sisyphus?.permission?.todoread).toBeUndefined()
+     //#then
+     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
+     expect(agentResult.sisyphus?.permission?.todowrite).toBeUndefined()
+     expect(agentResult.sisyphus?.permission?.todoread).toBeUndefined()
+   })
+})
+
+describe("Agent display name re-keying", () => {
+  test("re-keys agents in config.agent when agent_display_names is provided", async () => {
+    //#given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      oracle: { name: "oracle", prompt: "test", mode: "subagent" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      agent_display_names: {
+        sisyphus: "MyCustomSisyphus",
+        oracle: "MyOracle",
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {
+        sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+        oracle: { name: "oracle", prompt: "test", mode: "subagent" },
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then - agents should be re-keyed by display names
+    const agentConfig = config.agent as Record<string, unknown>
+    expect(agentConfig["MyCustomSisyphus"]).toBeDefined()
+    expect(agentConfig["MyOracle"]).toBeDefined()
+    expect(agentConfig.sisyphus).toBeUndefined()
+    expect(agentConfig.oracle).toBeUndefined()
+  })
+
+  test("does not re-key when agent_display_names is undefined", async () => {
+    //#given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {
+        sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+      },
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then - agents should keep original keys
+    const agentConfig = config.agent as Record<string, unknown>
+    expect(agentConfig.sisyphus).toBeDefined()
   })
 })

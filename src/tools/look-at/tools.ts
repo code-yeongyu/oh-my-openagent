@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
-import { log, promptWithModelSuggestionRetry } from "../../shared"
+import { log, promptWithModelSuggestionRetry, toRegistered } from "../../shared"
 import { pollSessionUntilIdle } from "./session-poller"
 import { extractLatestAssistantText } from "./assistant-message-extractor"
 import type { LookAtArgsWithAlias } from "./look-at-arguments"
@@ -106,12 +106,12 @@ Original error: ${createResult.error}`
 
       const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
 
-      log(`[look_at] Sending async prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
-      try {
-        await promptWithModelSuggestionRetry(ctx.client, {
-          path: { id: sessionID },
-          body: {
-            agent: MULTIMODAL_LOOKER_AGENT,
+       log(`[look_at] Sending async prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
+       try {
+         await promptWithModelSuggestionRetry(ctx.client, {
+           path: { id: sessionID },
+           body: {
+             agent: toRegistered(MULTIMODAL_LOOKER_AGENT),
             tools: {
               task: false,
               call_omo_agent: false,

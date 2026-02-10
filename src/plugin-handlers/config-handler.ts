@@ -7,6 +7,7 @@ import { applyMcpConfig } from "./mcp-config-handler";
 import { applyProviderConfig } from "./provider-config-handler";
 import { loadPluginComponents } from "./plugin-components-loader";
 import { applyToolConfig } from "./tool-config-handler";
+import { rekeyAgentsByDisplayNames } from "./agent-display-name-rekeyer";
 
 export { resolveCategoryConfig } from "./category-config-resolver";
 
@@ -32,6 +33,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     });
 
     applyToolConfig({ config, pluginConfig, agentResult });
+    rekeyAgentsByDisplayNames({ config, agentResult, displayNames: pluginConfig.agent_display_names });
     await applyMcpConfig({ config, pluginConfig, pluginComponents });
     await applyCommandConfig({ config, pluginConfig, pluginComponents });
 
