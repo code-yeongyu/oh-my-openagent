@@ -17,6 +17,7 @@ export function maybeCreateAtlasConfig(input: {
   availableSkills: AvailableSkill[]
   mergedCategories: Record<string, CategoryConfig>
   userCategories?: CategoriesConfig
+  useTaskSystem?: boolean
 }): AgentConfig | undefined {
   const {
     disabledAgents,

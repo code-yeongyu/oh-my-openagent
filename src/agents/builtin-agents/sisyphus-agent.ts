@@ -21,6 +21,7 @@ export function maybeCreateSisyphusConfig(input: {
   mergedCategories: Record<string, CategoryConfig>
   directory?: string
   userCategories?: CategoriesConfig
+  useTaskSystem: boolean
 }): AgentConfig | undefined {
   const {
     disabledAgents,
@@ -34,6 +35,7 @@ export function maybeCreateSisyphusConfig(input: {
     availableCategories,
     mergedCategories,
     directory,
+    useTaskSystem,
   } = input
 
   const sisyphusOverride = agentOverrides["sisyphus"]
@@ -67,7 +69,8 @@ export function maybeCreateSisyphusConfig(input: {
     availableAgents,
     undefined,
     availableSkills,
-    availableCategories
+    availableCategories,
+    useTaskSystem
   )
 
   if (sisyphusResolvedVariant) {
