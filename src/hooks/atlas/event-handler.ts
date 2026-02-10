@@ -89,13 +89,20 @@ export function createAtlasEventHandler(input: {
         return
       }
 
-      const requiredAgent = (boulderState.agent ?? "atlas").toLowerCase()
       const lastAgent = getLastAgentFromSession(sessionID)
-      if (!lastAgent || lastAgent !== requiredAgent) {
+      const requiredAgent = (boulderState.agent ?? "atlas").toLowerCase()
+      const lastAgentMatchesRequired = lastAgent === requiredAgent
+      const boulderAgentWasNotExplicitlySet = boulderState.agent === undefined
+      const boulderAgentDefaultsToAtlas = requiredAgent === "atlas"
+      const lastAgentIsSisyphus = lastAgent === "sisyphus"
+      const allowSisyphusWhenDefaultAtlas = boulderAgentWasNotExplicitlySet && boulderAgentDefaultsToAtlas && lastAgentIsSisyphus
+      const agentMatches = lastAgentMatchesRequired || allowSisyphusWhenDefaultAtlas
+      if (!agentMatches) {
         log(`[${HOOK_NAME}] Skipped: last agent does not match boulder agent`, {
           sessionID,
           lastAgent: lastAgent ?? "unknown",
           requiredAgent,
+          boulderAgentExplicitlySet: boulderState.agent !== undefined,
         })
         return
       }
