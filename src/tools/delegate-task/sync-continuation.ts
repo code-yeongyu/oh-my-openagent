@@ -50,11 +50,13 @@ export async function executeSyncContinuation(
   let resumeAgent: string | undefined
   let resumeModel: { providerID: string; modelID: string } | undefined
   let resumeVariant: string | undefined
+  let anchorMessageCount: number | undefined
 
   try {
     try {
       const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
       const messages = (messagesResp.data ?? []) as SessionMessage[]
+      anchorMessageCount = messages.length
       for (let i = messages.length - 1; i >= 0; i--) {
         const info = messages[i].info
         if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
@@ -91,39 +93,34 @@ export async function executeSyncContinuation(
         parts: [{ type: "text", text: args.prompt }],
       },
     })
-  } catch (promptError) {
-    if (toastManager) {
-      toastManager.removeTask(taskId)
-    }
-    const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
-    return `Failed to send continuation prompt: ${errorMessage}\n\nSession ID: ${args.session_id}`
-  }
+   } catch (promptError) {
+     if (toastManager) {
+       toastManager.removeTask(taskId)
+     }
+     const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+     return `Failed to send continuation prompt: ${errorMessage}\n\nSession ID: ${args.session_id}`
+   }
 
-  const pollError = await pollSyncSession(ctx, client, {
-    sessionID: args.session_id!,
-    agentToUse: resumeAgent ?? "continue",
-    toastManager,
-    taskId,
-  })
-  if (pollError) {
-    return pollError
-  }
+    try {
+      const pollError = await pollSyncSession(ctx, client, {
+        sessionID: args.session_id!,
+        agentToUse: resumeAgent ?? "continue",
+        toastManager,
+        taskId,
+        anchorMessageCount,
+      })
+      if (pollError) {
+        return pollError
+      }
 
-  const result = await fetchSyncResult(client, args.session_id!)
-  if (!result.ok) {
-    if (toastManager) {
-      toastManager.removeTask(taskId)
-    }
-    return result.error
-  }
+      const result = await fetchSyncResult(client, args.session_id!, anchorMessageCount)
+     if (!result.ok) {
+       return result.error
+     }
 
-  if (toastManager) {
-    toastManager.removeTask(taskId)
-  }
+     const duration = formatDuration(startTime)
 
-  const duration = formatDuration(startTime)
-
-  return `Task continued and completed in ${duration}.
+     return `Task continued and completed in ${duration}.
 
 ---
 
@@ -132,4 +129,9 @@ ${result.textContent || "(No text output)"}
 <task_metadata>
 session_id: ${args.session_id}
 </task_metadata>`
+   } finally {
+     if (toastManager) {
+       toastManager.removeTask(taskId)
+     }
+   }
 }
