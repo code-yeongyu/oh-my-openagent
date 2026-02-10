@@ -82,6 +82,7 @@ export async function run(options: RunOptions): Promise<number> {
       console.log(pc.dim("Waiting for completion...\n"))
       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
+      abortController.abort()
       await eventProcessor.catch(() => {})
       cleanup()
 
