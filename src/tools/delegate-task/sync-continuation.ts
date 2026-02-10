@@ -87,7 +87,7 @@ export async function executeSyncContinuation(
         tools: {
           ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
           task: allowTask,
-          call_omo_agent: true,
+          call_omo_agent: true, // Intentionally overrides restrictions - continuation context needs delegation capability even for restricted agents
           question: false,
         },
         parts: [{ type: "text", text: args.prompt }],
