@@ -12,6 +12,7 @@ import { lspManager } from "../tools"
 
 import type { CreatedHooks } from "../create-hooks"
 import type { Managers } from "../create-managers"
+import { normalizeSessionStatusToIdle } from "./session-status-normalizer"
 
 type FirstMessageVariantGate = {
   markSessionCreated: (sessionInfo: { id?: string; title?: string; parentID?: string } | undefined) => void
@@ -27,7 +28,7 @@ export function createEventHandler(args: {
 }): (input: { event: { type: string; properties?: Record<string, unknown> } }) => Promise<void> {
   const { ctx, firstMessageVariantGate, managers, hooks } = args
 
-  return async (input): Promise<void> => {
+  const dispatchToHooks = async (input: { event: { type: string; properties?: Record<string, unknown> } }): Promise<void> => {
     await Promise.resolve(hooks.autoUpdateChecker?.event?.(input))
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input))
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input))
@@ -47,6 +48,31 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.stopContinuationGuard?.event?.(input))
     await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input))
     await Promise.resolve(hooks.atlasHook?.handler?.(input))
+  }
+
+  const recentSyntheticIdles = new Map<string, number>()
+  const DEDUP_WINDOW_MS = 500
+
+  return async (input): Promise<void> => {
+    if (input.event.type === "session.idle") {
+      const sessionID = (input.event.properties as Record<string, unknown> | undefined)?.sessionID as string | undefined
+      if (sessionID) {
+        const emittedAt = recentSyntheticIdles.get(sessionID)
+        if (emittedAt && Date.now() - emittedAt < DEDUP_WINDOW_MS) {
+          recentSyntheticIdles.delete(sessionID)
+          return
+        }
+      }
+    }
+
+    await dispatchToHooks(input)
+
+    const syntheticIdle = normalizeSessionStatusToIdle(input)
+    if (syntheticIdle) {
+      const sessionID = (syntheticIdle.event.properties as Record<string, unknown>)?.sessionID as string
+      recentSyntheticIdles.set(sessionID, Date.now())
+      await dispatchToHooks(syntheticIdle)
+    }
 
     const { event } = input
     const props = event.properties as Record<string, unknown> | undefined
