@@ -41,7 +41,7 @@ export async function fetchSyncResult(
     return { ok: false, error: `No assistant response found.\n\nSession ID: ${sessionID}` }
   }
 
-  const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
+  const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning" || p.type === "reasoning.encrypted") ?? []
   const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
 
   return { ok: true, textContent }

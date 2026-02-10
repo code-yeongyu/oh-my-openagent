@@ -98,7 +98,7 @@ export async function pollSyncSession(
       if (m.info?.role !== "assistant") return false
       const parts = m.parts ?? []
       return parts.some((p) => {
-        if (p.type !== "text" && p.type !== "reasoning") return false
+        if (p.type !== "text" && p.type !== "reasoning" && p.type !== "reasoning.encrypted") return false
         const text = (p.text ?? "").trim()
         return text.length > 0
       })

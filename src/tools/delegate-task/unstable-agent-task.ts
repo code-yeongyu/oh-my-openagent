@@ -120,7 +120,7 @@ export async function executeUnstableAgentTask(
       return `No assistant response found (task ran in background mode).\n\nSession ID: ${sessionID}`
     }
 
-    const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
+    const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning" || p.type === "reasoning.encrypted") ?? []
     const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
     const duration = formatDuration(startTime)
 
