@@ -1,87 +1,52 @@
-**Generated:** 2026-02-09T14:16:00+09:00
-**Commit:** f22f14d9
-**Branch:** dev
+# CONFIG KNOWLEDGE BASE
 
 ## OVERVIEW
 
-Zod schema definitions for plugin configuration. 455+ lines of type-safe config validation with JSONC support, multi-level inheritance, and comprehensive agent/category overrides.
+Zod schema definitions for plugin configuration. 21 component files composing `OhMyOpenCodeConfigSchema` with multi-level inheritance and JSONC support.
 
 ## STRUCTURE
-
 ```
 config/
-├── schema/               # Schema components (21 files)
-│   ├── index.ts          # Main schema composition
-│   └── [module].ts       # Agent names, overrides, categories, hooks, etc.
-├── schema.ts             # Main Zod schema (455 lines)
-├── schema.test.ts        # Schema validation tests (735 lines)
-├── types.ts              # TypeScript types
-└── index.ts              # Barrel export
+├── schema/                    # 21 schema component files
+│   ├── oh-my-opencode-config.ts # Root schema composition (57 lines)
+│   ├── agent-names.ts         # BuiltinAgentNameSchema (11 agents), BuiltinSkillNameSchema
+│   ├── agent-overrides.ts     # AgentOverrideConfigSchema (model, variant, temp, thinking...)
+│   ├── categories.ts          # 8 categories: visual-engineering, ultrabrain, deep, artistry, quick, ...
+│   ├── hooks.ts               # HookNameSchema (100+ hook names)
+│   ├── commands.ts            # BuiltinCommandNameSchema
+│   ├── experimental.ts        # ExperimentalConfigSchema
+│   ├── dynamic-context-pruning.ts # DynamicContextPruningConfigSchema (55 lines)
+│   ├── background-task.ts     # BackgroundTaskConfigSchema
+│   ├── claude-code.ts         # ClaudeCodeConfigSchema
+│   ├── comment-checker.ts     # CommentCheckerConfigSchema
+│   ├── notification.ts        # NotificationConfigSchema
+│   ├── ralph-loop.ts          # RalphLoopConfigSchema
+│   ├── sisyphus.ts            # SisyphusConfigSchema
+│   ├── sisyphus-agent.ts      # SisyphusAgentConfigSchema
+│   ├── skills.ts              # SkillsConfigSchema (45 lines)
+│   ├── tmux.ts                # TmuxConfigSchema, TmuxLayoutSchema
+│   ├── websearch.ts           # WebsearchConfigSchema
+│   ├── browser-automation.ts  # BrowserAutomationConfigSchema
+│   ├── git-master.ts          # GitMasterConfigSchema
+│   └── babysitting.ts         # BabysittingConfigSchema
+├── schema.ts                  # Barrel export (24 lines)
+├── schema.test.ts             # Validation tests (735 lines)
+├── types.ts                   # TypeScript types from schemas
+└── index.ts                   # Barrel export (33 lines)
 ```
 
-## SCHEMA COMPONENTS
+## ROOT SCHEMA
 
-**Agent Config:** `AgentOverrideConfigSchema`, `AgentOverridesSchema`, `AgentPermissionSchema`
-
-**Category Config:** `CategoryConfigSchema`, `CategoriesConfigSchema` (visual-engineering, ultrabrain, deep)
-
-**Experimental:** `ExperimentalConfigSchema`, `DynamicContextPruningConfigSchema`
-
-**Built-in Enums:** `AgentNameSchema` (11 agents), `HookNameSchema` (100+ hooks), `BuiltinCommandNameSchema`, `BuiltinSkillNameSchema`
+`OhMyOpenCodeConfigSchema` composes: `$schema`, `new_task_system_enabled`, `default_run_agent`, `auto_update`, `disabled_{mcps,agents,skills,hooks,commands,tools}`, `agents` (14 agent keys), `categories` (8 built-in), `claude_code`, `sisyphus_agent`, `comment_checker`, `experimental`, `skills`, `ralph_loop`, `background_task`, `notification`, `babysitting`, `git_master`, `browser_automation_engine`, `websearch`, `tmux`, `sisyphus`
 
 ## CONFIGURATION HIERARCHY
 
-1. **Project config** (`.opencode/oh-my-opencode.json`)
-2. **User config** (`~/.config/opencode/oh-my-opencode.json`)
-3. **Defaults** (hardcoded fallbacks)
+Project (`.opencode/oh-my-opencode.json`) → User (`~/.config/opencode/oh-my-opencode.json`) → Defaults
 
-**Multi-level inheritance:** Project → User → Defaults
+## AGENT OVERRIDE FIELDS
 
-## VALIDATION FEATURES
+`model`, `variant`, `category`, `skills`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `prompt`, `prompt_append`, `tools`, `permission`, `providerOptions`, `disable`, `description`, `mode`, `color`
 
-- **JSONC support**: Comments and trailing commas
-- **Type safety**: Full TypeScript inference
-- **Migration support**: Legacy config compatibility
-- **Schema versioning**: $schema field for validation
+## AFTER SCHEMA CHANGES
 
-## KEY SCHEMAS
-
-| Schema | Purpose | Lines |
-|--------|---------|-------|
-| `OhMyOpenCodeConfigSchema` | Root config schema | 400+ |
-| `AgentOverrideConfigSchema` | Agent customization | 50+ |
-| `CategoryConfigSchema` | Task category defaults | 30+ |
-| `ExperimentalConfigSchema` | Beta features | 40+ |
-
-## USAGE PATTERNS
-
-**Agent Override:**
-```typescript
-agents: {
-  sisyphus: {
-    model: "anthropic/claude-opus-4-6",
-    variant: "max",
-    temperature: 0.1
-  }
-}
-```
-
-**Category Definition:**
-```typescript
-categories: {
-  "visual-engineering": {
-    model: "google/gemini-3-pro",
-    variant: "high"
-  }
-}
-```
-
-**Experimental Features:**
-```typescript
-experimental: {
-  dynamic_context_pruning: {
-    enabled: true,
-    notification: "detailed"
-  }
-}
-```
+Run `bun run build:schema` to regenerate `dist/oh-my-opencode.schema.json`
