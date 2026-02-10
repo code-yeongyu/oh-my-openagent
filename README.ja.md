@@ -121,16 +121,6 @@
   - [アンインストール](#アンインストール)
   - [機能](#機能)
   - [設定](#設定)
-    - [JSONC のサポート](#jsonc-のサポート)
-    - [Google Auth](#google-auth)
-    - [Agents](#agents)
-      - [Permission オプション](#permission-オプション)
-    - [Sisyphus Agent](#sisyphus-agent)
-    - [Background Tasks](#background-tasks)
-    - [Hooks](#hooks)
-    - [MCPs](#mcps)
-    - [LSP](#lsp)
-    - [Experimental](#experimental)
   - [作者のノート](#作者のノート)
   - [注意](#注意)
   - [こちらの企業の専門家にご愛用いただいています](#こちらの企業の専門家にご愛用いただいています)
@@ -380,6 +370,8 @@ OpenCode が Debian / ArchLinux だとしたら、Oh My OpenCode は Ubuntu / [O
   - Making Spray - influencer marketing solution, vovushop - crossborder commerce platform, vreview - ai commerce review marketing solution
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [ELESTYLE](https://elestyle.jp)
+  - elepay - マルチモバイル決済ゲートウェイ、OneQR - キャッシュレスソリューション向けモバイルアプリケーションSaaS
 
 ## スポンサー
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)

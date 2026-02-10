@@ -122,20 +122,6 @@
   - [卸载](#卸载)
   - [功能特性](#功能特性)
   - [配置](#配置)
-    - [JSONC 支持](#jsonc-支持)
-    - [Google 认证](#google-认证)
-    - [智能体](#智能体)
-      - [权限选项](#权限选项)
-    - [内置技能](#内置技能)
-    - [Git Master](#git-master)
-    - [Sisyphus 智能体](#sisyphus-智能体)
-    - [后台任务](#后台任务)
-    - [类别](#类别)
-    - [钩子](#钩子)
-    - [MCP](#mcp)
-    - [LSP](#lsp)
-    - [实验性功能](#实验性功能)
-    - [环境变量](#环境变量)
   - [作者札记](#作者札记)
   - [警告](#警告)
   - [受到以下专业人士的喜爱](#受到以下专业人士的喜爱)
@@ -390,6 +376,8 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads
   - 制作 Spray - 网红营销解决方案、vovushop - 跨境电商平台、vreview - AI 电商评论营销解决方案
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [ELESTYLE](https://elestyle.jp)
+  - elepay - 多渠道移动支付网关、OneQR - 无现金解决方案移动应用 SaaS
 
 ## 赞助商
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)

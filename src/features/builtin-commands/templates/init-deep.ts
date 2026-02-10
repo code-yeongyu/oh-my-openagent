@@ -45,12 +45,12 @@ Don't wait—these run async while main session works.
 
 \`\`\`
 // Fire all at once, collect results later
-delegate_task(agent="explore", prompt="Project structure: PREDICT standard patterns for detected language → REPORT deviations only")
-delegate_task(agent="explore", prompt="Entry points: FIND main files → REPORT non-standard organization")
-delegate_task(agent="explore", prompt="Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules")
-delegate_task(agent="explore", prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
-delegate_task(agent="explore", prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
-delegate_task(agent="explore", prompt="Test patterns: FIND test configs, test structure → REPORT unique conventions")
+task(subagent_type="explore", load_skills=[], description="Explore project structure", run_in_background=true, prompt="Project structure: PREDICT standard patterns for detected language → REPORT deviations only")
+task(subagent_type="explore", load_skills=[], description="Find entry points", run_in_background=true, prompt="Entry points: FIND main files → REPORT non-standard organization")
+task(subagent_type="explore", load_skills=[], description="Find conventions", run_in_background=true, prompt="Conventions: FIND config files (.eslintrc, pyproject.toml, .editorconfig) → REPORT project-specific rules")
+task(subagent_type="explore", load_skills=[], description="Find anti-patterns", run_in_background=true, prompt="Anti-patterns: FIND 'DO NOT', 'NEVER', 'ALWAYS', 'DEPRECATED' comments → LIST forbidden patterns")
+task(subagent_type="explore", load_skills=[], description="Explore build/CI", run_in_background=true, prompt="Build/CI: FIND .github/workflows, Makefile → REPORT non-standard patterns")
+task(subagent_type="explore", load_skills=[], description="Find test patterns", run_in_background=true, prompt="Test patterns: FIND test configs, test structure → REPORT unique conventions")
 \`\`\`
 
 <dynamic-agents>
@@ -76,9 +76,9 @@ max_depth=$(find . -type d -not -path '*/node_modules/*' -not -path '*/.git/*' |
 Example spawning:
 \`\`\`
 // 500 files, 50k lines, depth 6, 15 large files → spawn 5+5+2+1 = 13 additional agents
-delegate_task(agent="explore", prompt="Large file analysis: FIND files >500 lines, REPORT complexity hotspots")
-delegate_task(agent="explore", prompt="Deep modules at depth 4+: FIND hidden patterns, internal conventions")
-delegate_task(agent="explore", prompt="Cross-cutting concerns: FIND shared utilities across directories")
+task(subagent_type="explore", load_skills=[], description="Analyze large files", run_in_background=true, prompt="Large file analysis: FIND files >500 lines, REPORT complexity hotspots")
+task(subagent_type="explore", load_skills=[], description="Explore deep modules", run_in_background=true, prompt="Deep modules at depth 4+: FIND hidden patterns, internal conventions")
+task(subagent_type="explore", load_skills=[], description="Find shared utilities", run_in_background=true, prompt="Cross-cutting concerns: FIND shared utilities across directories")
 // ... more based on calculation
 \`\`\`
 </dynamic-agents>
@@ -185,6 +185,11 @@ AGENTS_LOCATIONS = [
 
 **Mark "generate" as in_progress.**
 
+<critical>
+**File Writing Rule**: If AGENTS.md already exists at the target path → use \`Edit\` tool. If it does NOT exist → use \`Write\` tool.
+NEVER use Write to overwrite an existing file. ALWAYS check existence first via \`Read\` or discovery results.
+</critical>
+
 ### Root AGENTS.md (Full Treatment)
 
 \`\`\`markdown
@@ -240,7 +245,7 @@ Launch writing tasks for each location:
 
 \`\`\`
 for loc in AGENTS_LOCATIONS (except root):
-  delegate_task(category="writing", load_skills=[], run_in_background=false, prompt=\\\`
+  task(category="writing", load_skills=[], run_in_background=false, description="Generate AGENTS.md", prompt=\\\`
     Generate AGENTS.md for: \${loc.path}
     - Reason: \${loc.reason}
     - 30-80 lines max

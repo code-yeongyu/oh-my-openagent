@@ -8,7 +8,7 @@ import {
 describe("sisyphus-task-retry", () => {
   describe("DELEGATE_TASK_ERROR_PATTERNS", () => {
     // given error patterns are defined
-    // then should include all known delegate_task error types
+    // then should include all known task error types
     it("should contain all known error patterns", () => {
       expect(DELEGATE_TASK_ERROR_PATTERNS.length).toBeGreaterThan(5)
       

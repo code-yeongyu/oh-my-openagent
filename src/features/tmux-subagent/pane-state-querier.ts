@@ -1,6 +1,6 @@
 import { spawn } from "bun"
 import type { WindowState, TmuxPaneInfo } from "./types"
-import { getTmuxPath } from "../../tools/interactive-bash/utils"
+import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { log } from "../../shared"
 
 export async function queryWindowState(sourcePaneId: string): Promise<WindowState | null> {

@@ -1,10 +1,29 @@
 import type { OpencodeClient } from "@opencode-ai/sdk"
+export type { OpencodeClient }
 
 export interface RunOptions {
   message: string
   agent?: string
   directory?: string
   timeout?: number
+  port?: number
+  attach?: string
+  onComplete?: string
+  json?: boolean
+  sessionId?: string
+}
+
+export interface ServerConnection {
+  client: OpencodeClient
+  cleanup: () => void
+}
+
+export interface RunResult {
+  sessionId: string
+  success: boolean
+  durationMs: number
+  messageCount: number
+  summary: string
 }
 
 export interface RunContext {

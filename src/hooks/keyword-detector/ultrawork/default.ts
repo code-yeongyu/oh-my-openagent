@@ -2,7 +2,7 @@
  * Default ultrawork message optimized for Claude series models.
  *
  * Key characteristics:
- * - Natural tool-like usage of explore/librarian agents (background=true)
+ * - Natural tool-like usage of explore/librarian agents (run_in_background=true)
  * - Parallel execution emphasized - fire agents and continue working
  * - Simple workflow: EXPLORES → GATHER → PLAN → DELEGATE
  */
@@ -44,9 +44,9 @@ export const ULTRAWORK_DEFAULT_MESSAGE = `<ultrawork-mode>
 
 **WHEN IN DOUBT:**
 \`\`\`
-delegate_task(subagent_type="explore", load_skills=[], prompt="Find [X] patterns in codebase", run_in_background=true)
-delegate_task(subagent_type="librarian", load_skills=[], prompt="Find docs/examples for [Y]", run_in_background=true)
-delegate_task(subagent_type="oracle", load_skills=[], prompt="Review my approach: [describe plan]", run_in_background=false)
+task(subagent_type="explore", load_skills=[], prompt="I'm implementing [TASK DESCRIPTION] and need to understand [SPECIFIC KNOWLEDGE GAP]. Find [X] patterns in the codebase — show file paths, implementation approach, and conventions used. I'll use this to [HOW RESULTS WILL BE USED]. Focus on src/ directories, skip test files unless test patterns are specifically needed. Return concrete file paths with brief descriptions of what each file does.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="I'm working with [LIBRARY/TECHNOLOGY] and need [SPECIFIC INFORMATION]. Find official documentation and production-quality examples for [Y] — specifically: API reference, configuration options, recommended patterns, and common pitfalls. Skip beginner tutorials. I'll use this to [DECISION THIS WILL INFORM].", run_in_background=true)
+task(subagent_type="oracle", load_skills=[], prompt="I need architectural review of my approach to [TASK]. Here's my plan: [DESCRIBE PLAN WITH SPECIFIC FILES AND CHANGES]. My concerns are: [LIST SPECIFIC UNCERTAINTIES]. Please evaluate: correctness of approach, potential issues I'm missing, and whether a better alternative exists.", run_in_background=false)
 \`\`\`
 
 **ONLY AFTER YOU HAVE:**
@@ -104,7 +104,7 @@ TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
 | Architecture decision needed | MUST call plan agent |
 
 \`\`\`
-delegate_task(subagent_type="plan", prompt="<gathered context + user request>")
+task(subagent_type="plan", load_skills=[], prompt="<gathered context + user request>")
 \`\`\`
 
 **WHY PLAN AGENT IS MANDATORY:**
@@ -119,9 +119,9 @@ delegate_task(subagent_type="plan", prompt="<gathered context + user request>")
 
 | Scenario | Action |
 |----------|--------|
-| Plan agent asks clarifying questions | \`delegate_task(session_id="{returned_session_id}", prompt="<your answer>")\` |
-| Need to refine the plan | \`delegate_task(session_id="{returned_session_id}", prompt="Please adjust: <feedback>")\` |
-| Plan needs more detail | \`delegate_task(session_id="{returned_session_id}", prompt="Add more detail to Task N")\` |
+| Plan agent asks clarifying questions | \`task(session_id="{returned_session_id}", load_skills=[], prompt="<your answer>")\` |
+| Need to refine the plan | \`task(session_id="{returned_session_id}", load_skills=[], prompt="Please adjust: <feedback>")\` |
+| Plan needs more detail | \`task(session_id="{returned_session_id}", load_skills=[], prompt="Add more detail to Task N")\` |
 
 **WHY SESSION_ID IS CRITICAL:**
 - Plan agent retains FULL conversation context
@@ -131,10 +131,10 @@ delegate_task(subagent_type="plan", prompt="<gathered context + user request>")
 
 \`\`\`
 // WRONG: Starting fresh loses all context
-delegate_task(subagent_type="plan", prompt="Here's more info...")
+task(subagent_type="plan", load_skills=[], prompt="Here's more info...")
 
 // CORRECT: Resume preserves everything
-delegate_task(session_id="ses_abc123", prompt="Here's my answer to your question: ...")
+task(session_id="ses_abc123", load_skills=[], prompt="Here's my answer to your question: ...")
 \`\`\`
 
 **FAILURE TO CALL PLAN AGENT = INCOMPLETE WORK.**
@@ -147,23 +147,23 @@ delegate_task(session_id="ses_abc123", prompt="Here's my answer to your question
 
 | Task Type | Action | Why |
 |-----------|--------|-----|
-| Codebase exploration | delegate_task(subagent_type="explore", run_in_background=true) | Parallel, context-efficient |
-| Documentation lookup | delegate_task(subagent_type="librarian", run_in_background=true) | Specialized knowledge |
-| Planning | delegate_task(subagent_type="plan") | Parallel task graph + structured TODO list |
-| Hard problem (conventional) | delegate_task(subagent_type="oracle") | Architecture, debugging, complex logic |
-| Hard problem (non-conventional) | delegate_task(category="artistry", load_skills=[...]) | Different approach needed |
-| Implementation | delegate_task(category="...", load_skills=[...]) | Domain-optimized models |
+| Codebase exploration | task(subagent_type="explore", load_skills=[], run_in_background=true) | Parallel, context-efficient |
+| Documentation lookup | task(subagent_type="librarian", load_skills=[], run_in_background=true) | Specialized knowledge |
+| Planning | task(subagent_type="plan", load_skills=[]) | Parallel task graph + structured TODO list |
+| Hard problem (conventional) | task(subagent_type="oracle", load_skills=[]) | Architecture, debugging, complex logic |
+| Hard problem (non-conventional) | task(category="artistry", load_skills=[...]) | Different approach needed |
+| Implementation | task(category="...", load_skills=[...]) | Domain-optimized models |
 
 **CATEGORY + SKILL DELEGATION:**
 \`\`\`
 // Frontend work
-delegate_task(category="visual-engineering", load_skills=["frontend-ui-ux"])
+task(category="visual-engineering", load_skills=["frontend-ui-ux"])
 
 // Complex logic
-delegate_task(category="ultrabrain", load_skills=["typescript-programmer"])
+task(category="ultrabrain", load_skills=["typescript-programmer"])
 
 // Quick fixes
-delegate_task(category="quick", load_skills=["git-master"])
+task(category="quick", load_skills=["git-master"])
 \`\`\`
 
 **YOU SHOULD ONLY DO IT YOURSELF WHEN:**
@@ -177,14 +177,14 @@ delegate_task(category="quick", load_skills=["git-master"])
 
 ## EXECUTION RULES
 - **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
-- **PARALLEL**: Fire independent agent calls simultaneously via delegate_task(background=true) - NEVER wait sequentially.
-- **BACKGROUND FIRST**: Use delegate_task for exploration/research agents (10+ concurrent if needed).
+- **PARALLEL**: Fire independent agent calls simultaneously via task(run_in_background=true) - NEVER wait sequentially.
+- **BACKGROUND FIRST**: Use task for exploration/research agents (10+ concurrent if needed).
 - **VERIFY**: Re-read request after completion. Check ALL requirements met before reporting done.
 - **DELEGATE**: Don't do everything yourself - orchestrate specialized agents for their strengths.
 
 ## WORKFLOW
 1. Analyze the request and identify required capabilities
-2. Spawn exploration/librarian agents via delegate_task(background=true) in PARALLEL (10+ if needed)
+2. Spawn exploration/librarian agents via task(run_in_background=true) in PARALLEL (10+ if needed)
 3. Use Plan agent with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 

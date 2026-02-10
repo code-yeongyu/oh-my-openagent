@@ -121,21 +121,7 @@ Yes, technically possible. But I cannot recommend using it.
     - [For LLM Agents](#for-llm-agents)
   - [Uninstallation](#uninstallation)
   - [Features](#features)
-   - [Configuration](#configuration)
-    - [JSONC Support](#jsonc-support)
-    - [Google Auth](#google-auth)
-    - [Agents](#agents)
-      - [Permission Options](#permission-options)
-    - [Built-in Skills](#built-in-skills)
-    - [Git Master](#git-master)
-    - [Sisyphus Agent](#sisyphus-agent)
-    - [Background Tasks](#background-tasks)
-    - [Categories](#categories)
-    - [Hooks](#hooks)
-    - [MCPs](#mcps)
-    - [LSP](#lsp)
-    - [Experimental](#experimental)
-    - [Environment Variables](#environment-variables)
+  - [Configuration](#configuration)
   - [Author's Note](#authors-note)
   - [Warnings](#warnings)
   - [Loved by professionals at](#loved-by-professionals-at)
@@ -392,5 +378,7 @@ I have no affiliation with any project or model mentioned here. This is purely p
   - Making Spray - influencer marketing solution, vovushop - crossborder commerce platform, vreview - ai commerce review marketing solution
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [ELESTYLE](https://elestyle.jp)
+  - Making elepay - multi-mobile payment gateway, OneQR - mobile application SaaS for cashless solutions
 
 *Special thanks to [@junhoyeo](https://github.com/junhoyeo) for this amazing hero image.*

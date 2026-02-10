@@ -123,20 +123,6 @@
   - [제거](#제거)
    - [기능](#기능)
    - [구성](#구성)
-    - [JSONC 지원](#jsonc-지원)
-    - [Google 인증](#google-인증)
-    - [에이전트](#에이전트)
-      - [권한 옵션](#권한-옵션)
-    - [내장 스킬](#내장-스킬)
-    - [Git Master](#git-master)
-    - [Sisyphus 에이전트](#sisyphus-에이전트)
-    - [백그라운드 작업](#백그라운드-작업)
-    - [카테고리](#카테고리)
-    - [훅](#훅)
-    - [MCP](#mcp)
-    - [LSP](#lsp)
-    - [실험적 기능](#실험적-기능)
-    - [환경 변수](#환경-변수)
   - [작성자의 메모](#작성자의-메모)
   - [경고](#경고)
   - [다음 기업 전문가들이 사랑합니다](#다음-기업-전문가들이-사랑합니다)
@@ -393,5 +379,7 @@ OpenCode가 Debian/Arch라면 Oh My OpenCode는 Ubuntu/[Omarchy](https://omarchy
   - Spray(인플루언서 마케팅 솔루션), vovushop(국가 간 상거래 플랫폼), vreview(AI 상거래 리뷰 마케팅 솔루션) 제작
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [ELESTYLE](https://elestyle.jp)
+  - elepay - 멀티 모바일 결제 게이트웨이, OneQR - 캐시리스 솔루션용 모바일 애플리케이션 SaaS
 
 *이 놀라운 히어로 이미지에 대해 [@junhoyeo](https://github.com/junhoyeo)에게 특별히 감사드립니다.*

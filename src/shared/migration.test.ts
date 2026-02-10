@@ -4,8 +4,10 @@ import * as path from "path"
 import {
   AGENT_NAME_MAP,
   HOOK_NAME_MAP,
+  MODEL_VERSION_MAP,
   migrateAgentNames,
   migrateHookNames,
+  migrateModelVersions,
   migrateConfigFile,
   migrateAgentConfigToCategory,
   shouldDeleteAgentConfig,
@@ -15,7 +17,7 @@ describe("migrateAgentNames", () => {
   test("migrates legacy OmO names to lowercase", () => {
     // given: Config with legacy OmO agent names
     const agents = {
-      omo: { model: "anthropic/claude-opus-4-5" },
+      omo: { model: "anthropic/claude-opus-4-6" },
       OmO: { temperature: 0.5 },
       "OmO-Plan": { prompt: "custom prompt" },
     }
@@ -84,7 +86,7 @@ describe("migrateAgentNames", () => {
   test("migrates orchestrator-sisyphus to atlas", () => {
     // given: Config with legacy orchestrator-sisyphus agent name
     const agents = {
-      "orchestrator-sisyphus": { model: "anthropic/claude-opus-4-5" },
+      "orchestrator-sisyphus": { model: "anthropic/claude-opus-4-6" },
     }
 
     // when: Migrate agent names
@@ -92,14 +94,14 @@ describe("migrateAgentNames", () => {
 
     // then: orchestrator-sisyphus should be migrated to atlas
     expect(changed).toBe(true)
-    expect(migrated["atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["atlas"]).toEqual({ model: "anthropic/claude-opus-4-6" })
     expect(migrated["orchestrator-sisyphus"]).toBeUndefined()
   })
 
   test("migrates lowercase atlas to atlas", () => {
     // given: Config with lowercase atlas agent name
     const agents = {
-      atlas: { model: "anthropic/claude-opus-4-5" },
+      atlas: { model: "anthropic/claude-opus-4-6" },
     }
 
     // when: Migrate agent names
@@ -107,7 +109,7 @@ describe("migrateAgentNames", () => {
 
     // then: lowercase atlas should remain atlas (no change needed)
     expect(changed).toBe(false)
-    expect(migrated["atlas"]).toEqual({ model: "anthropic/claude-opus-4-5" })
+    expect(migrated["atlas"]).toEqual({ model: "anthropic/claude-opus-4-6" })
   })
 
   test("migrates Sisyphus variants to lowercase", () => {
@@ -369,29 +371,81 @@ describe("migrateConfigFile", () => {
     expect(needsWrite).toBe(false)
   })
 
-  test("handles migration of all legacy items together", () => {
-    // given: Config with all legacy items
-    const rawConfig: Record<string, unknown> = {
-      omo_agent: { disabled: false },
-      agents: {
-        omo: { model: "test" },
-        "OmO-Plan": { prompt: "custom" },
-      },
-      disabled_hooks: ["anthropic-auto-compact"],
-    }
+   test("handles migration of all legacy items together", () => {
+     // given: Config with all legacy items
+     const rawConfig: Record<string, unknown> = {
+       omo_agent: { disabled: false },
+       agents: {
+         omo: { model: "test" },
+         "OmO-Plan": { prompt: "custom" },
+       },
+       disabled_hooks: ["anthropic-auto-compact"],
+     }
 
-    // when: Migrate config file
-    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+     // when: Migrate config file
+     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // then: All legacy items should be migrated
-    expect(needsWrite).toBe(true)
-    expect(rawConfig.sisyphus_agent).toEqual({ disabled: false })
-    expect(rawConfig.omo_agent).toBeUndefined()
-    const agents = rawConfig.agents as Record<string, unknown>
-    expect(agents["sisyphus"]).toBeDefined()
-    expect(agents["prometheus"]).toBeDefined()
-    expect(rawConfig.disabled_hooks).toContain("anthropic-context-window-limit-recovery")
-  })
+     // then: All legacy items should be migrated
+     expect(needsWrite).toBe(true)
+     expect(rawConfig.sisyphus_agent).toEqual({ disabled: false })
+     expect(rawConfig.omo_agent).toBeUndefined()
+     const agents = rawConfig.agents as Record<string, unknown>
+     expect(agents["sisyphus"]).toBeDefined()
+     expect(agents["prometheus"]).toBeDefined()
+     expect(rawConfig.disabled_hooks).toContain("anthropic-context-window-limit-recovery")
+   })
+
+   test("migrates model versions in agents", () => {
+     // given: Config with old model version in agents
+     const rawConfig: Record<string, unknown> = {
+       agents: {
+         sisyphus: { model: "openai/gpt-5.2-codex", temperature: 0.1 },
+       },
+     }
+
+     // when: Migrate config file
+     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+     // then: Model version should be migrated
+     expect(needsWrite).toBe(true)
+     const agents = rawConfig.agents as Record<string, Record<string, unknown>>
+     expect(agents["sisyphus"].model).toBe("openai/gpt-5.3-codex")
+   })
+
+   test("migrates model versions in categories", () => {
+     // given: Config with old model version in categories
+     const rawConfig: Record<string, unknown> = {
+       categories: {
+         "my-category": { model: "anthropic/claude-opus-4-5", temperature: 0.2 },
+       },
+     }
+
+     // when: Migrate config file
+     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+     // then: Model version should be migrated
+     expect(needsWrite).toBe(true)
+     const categories = rawConfig.categories as Record<string, Record<string, unknown>>
+     expect(categories["my-category"].model).toBe("anthropic/claude-opus-4-6")
+   })
+
+   test("does not set needsWrite when no model versions need migration", () => {
+     // given: Config with current model versions
+     const rawConfig: Record<string, unknown> = {
+       agents: {
+         sisyphus: { model: "openai/gpt-5.3-codex" },
+       },
+       categories: {
+         "my-category": { model: "anthropic/claude-opus-4-6" },
+       },
+     }
+
+     // when: Migrate config file
+     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+     // then: No write should be needed
+     expect(needsWrite).toBe(false)
+   })
 })
 
 describe("migration maps", () => {
@@ -410,6 +464,263 @@ describe("migration maps", () => {
     // given/#when: Check HOOK_NAME_MAP
     // then: Should contain be legacy hook name mapping
     expect(HOOK_NAME_MAP["anthropic-auto-compact"]).toBe("anthropic-context-window-limit-recovery")
+  })
+})
+
+describe("MODEL_VERSION_MAP", () => {
+  test("maps openai/gpt-5.2-codex to openai/gpt-5.3-codex", () => {
+    // given/when: Check MODEL_VERSION_MAP
+    // then: Should contain correct mapping
+    expect(MODEL_VERSION_MAP["openai/gpt-5.2-codex"]).toBe("openai/gpt-5.3-codex")
+  })
+
+  test("maps anthropic/claude-opus-4-5 to anthropic/claude-opus-4-6", () => {
+    // given/when: Check MODEL_VERSION_MAP
+    // then: Should contain correct mapping
+    expect(MODEL_VERSION_MAP["anthropic/claude-opus-4-5"]).toBe("anthropic/claude-opus-4-6")
+  })
+})
+
+describe("migrateModelVersions", () => {
+  test("replaces old model string in agent config", () => {
+    // given: Agent config with old model version
+    const agents = {
+      sisyphus: { model: "openai/gpt-5.2-codex", temperature: 0.1 },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Model should be updated, other fields preserved
+    expect(changed).toBe(true)
+    const sisyphus = migrated["sisyphus"] as Record<string, unknown>
+    expect(sisyphus.model).toBe("openai/gpt-5.3-codex")
+    expect(sisyphus.temperature).toBe(0.1)
+  })
+
+  test("replaces anthropic model version", () => {
+    // given: Agent config with old anthropic model
+    const agents = {
+      prometheus: { model: "anthropic/claude-opus-4-5" },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Model should be updated
+    expect(changed).toBe(true)
+    const prometheus = migrated["prometheus"] as Record<string, unknown>
+    expect(prometheus.model).toBe("anthropic/claude-opus-4-6")
+  })
+
+  test("leaves unknown model strings untouched", () => {
+    // given: Agent config with unknown model
+    const agents = {
+      oracle: { model: "openai/gpt-5.2", temperature: 0.5 },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Config should remain unchanged
+    expect(changed).toBe(false)
+    const oracle = migrated["oracle"] as Record<string, unknown>
+    expect(oracle.model).toBe("openai/gpt-5.2")
+  })
+
+  test("handles agent config with no model field", () => {
+    // given: Agent config without model field
+    const agents = {
+      sisyphus: { temperature: 0.1, prompt: "custom" },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Config should remain unchanged
+    expect(changed).toBe(false)
+    const sisyphus = migrated["sisyphus"] as Record<string, unknown>
+    expect(sisyphus.temperature).toBe(0.1)
+  })
+
+  test("handles agent config with non-string model", () => {
+    // given: Agent config with non-string model
+    const agents = {
+      sisyphus: { model: 123, temperature: 0.1 },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Config should remain unchanged
+    expect(changed).toBe(false)
+  })
+
+  test("migrates multiple agents in one pass", () => {
+    // given: Multiple agents with old models
+    const agents = {
+      sisyphus: { model: "openai/gpt-5.2-codex" },
+      prometheus: { model: "anthropic/claude-opus-4-5" },
+      oracle: { model: "openai/gpt-5.2" },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Only mapped models should be updated
+    expect(changed).toBe(true)
+    expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.3-codex")
+    expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-6")
+    expect((migrated["oracle"] as Record<string, unknown>).model).toBe("openai/gpt-5.2")
+  })
+
+  test("handles empty object", () => {
+    // given: Empty agents object
+    const agents = {}
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Should return empty with no change
+    expect(changed).toBe(false)
+    expect(Object.keys(migrated)).toHaveLength(0)
+  })
+
+  test("skips already-applied migrations", () => {
+    // given: Agent config with old model, but migration already applied
+    const agents = {
+      sisyphus: { model: "openai/gpt-5.2-codex", temperature: 0.1 },
+    }
+    const appliedMigrations = new Set(["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"])
+
+    // when: Migrate with applied migrations
+    const { migrated, changed, newMigrations } = migrateModelVersions(agents, appliedMigrations)
+
+    // then: Model should NOT be changed (user reverted intentionally)
+    expect(changed).toBe(false)
+    expect(newMigrations).toHaveLength(0)
+    const sisyphus = migrated["sisyphus"] as Record<string, unknown>
+    expect(sisyphus.model).toBe("openai/gpt-5.2-codex")
+  })
+
+  test("applies new migrations and records them", () => {
+    // given: Agent config with old model, no prior migrations
+    const agents = {
+      sisyphus: { model: "openai/gpt-5.2-codex" },
+    }
+
+    // when: Migrate without applied migrations
+    const { migrated, changed, newMigrations } = migrateModelVersions(agents)
+
+    // then: Migration applied and recorded
+    expect(changed).toBe(true)
+    expect(newMigrations).toEqual(["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"])
+    const sisyphus = migrated["sisyphus"] as Record<string, unknown>
+    expect(sisyphus.model).toBe("openai/gpt-5.3-codex")
+  })
+
+  test("handles mixed: some applied, some new", () => {
+    // given: Multiple agents, one migration already applied
+    const agents = {
+      sisyphus: { model: "openai/gpt-5.2-codex" },
+      prometheus: { model: "anthropic/claude-opus-4-5" },
+    }
+    const appliedMigrations = new Set(["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"])
+
+    // when: Migrate with partial history
+    const { migrated, changed, newMigrations } = migrateModelVersions(agents, appliedMigrations)
+
+    // then: Only prometheus should be migrated
+    expect(changed).toBe(true)
+    expect(newMigrations).toEqual(["model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-6"])
+    expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.2-codex")
+    expect((migrated["prometheus"] as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-6")
+  })
+
+  test("backward compatible without appliedMigrations param", () => {
+    // given: Agent config with old model, no appliedMigrations param
+    const agents = {
+      sisyphus: { model: "openai/gpt-5.2-codex" },
+    }
+
+    // when: Migrate without the param (backward compat)
+    const { migrated, changed, newMigrations } = migrateModelVersions(agents)
+
+    // then: Should still migrate normally
+    expect(changed).toBe(true)
+    expect(newMigrations).toHaveLength(1)
+    expect((migrated["sisyphus"] as Record<string, unknown>).model).toBe("openai/gpt-5.3-codex")
+  })
+})
+
+describe("migrateConfigFile _migrations tracking", () => {
+  test("records migrations in _migrations field", () => {
+    // given: Config with old model, no prior migrations
+    const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
+    const configPath = `${tmpDir}/oh-my-opencode.json`
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        sisyphus: { model: "openai/gpt-5.2-codex" },
+      },
+    }
+
+    // when: Migrate config file
+    const result = migrateConfigFile(configPath, rawConfig)
+
+    // then: _migrations should be recorded
+    expect(result).toBe(true)
+    expect(rawConfig._migrations).toEqual(["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"])
+
+    // cleanup
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  test("skips re-migration when _migrations contains the key", () => {
+    // given: Config with old model BUT migration already recorded
+    const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
+    const configPath = `${tmpDir}/oh-my-opencode.json`
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        sisyphus: { model: "openai/gpt-5.2-codex" },
+      },
+      _migrations: ["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"],
+    }
+
+    // when: Migrate config file
+    const result = migrateConfigFile(configPath, rawConfig)
+
+    // then: Should NOT rewrite (model stays as user set it)
+    // Note: result may be true due to other migrations, but model should NOT change
+    const sisyphus = (rawConfig.agents as Record<string, Record<string, unknown>>).sisyphus
+    expect(sisyphus.model).toBe("openai/gpt-5.2-codex")
+
+    // cleanup
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  test("preserves existing _migrations and appends new ones", () => {
+    // given: Config with existing migration history and a new migratable model
+    const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
+    const configPath = `${tmpDir}/oh-my-opencode.json`
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        prometheus: { model: "anthropic/claude-opus-4-5" },
+      },
+      _migrations: ["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"],
+    }
+
+    // when: Migrate config file
+    const result = migrateConfigFile(configPath, rawConfig)
+
+    // then: New migration appended, old one preserved
+    expect(result).toBe(true)
+    expect(rawConfig._migrations).toEqual([
+      "model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex",
+      "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-6",
+    ])
+
+    // cleanup
+    fs.rmSync(tmpDir, { recursive: true })
   })
 })
 
@@ -470,7 +781,7 @@ describe("migrateAgentConfigToCategory", () => {
       { model: "google/gemini-3-flash" },
       { model: "openai/gpt-5.2" },
       { model: "anthropic/claude-haiku-4-5" },
-      { model: "anthropic/claude-opus-4-5" },
+      { model: "anthropic/claude-opus-4-6" },
       { model: "anthropic/claude-sonnet-4-5" },
     ]
 
@@ -550,7 +861,7 @@ describe("shouldDeleteAgentConfig", () => {
     // given: Config with custom model override
     const config = {
       category: "visual-engineering",
-      model: "anthropic/claude-opus-4-5",
+      model: "anthropic/claude-opus-4-6",
     }
 
     // when: Check if config should be deleted
@@ -707,6 +1018,40 @@ describe("migrateConfigFile with backup", () => {
     expect(agents.oracle.category).toBe("ultrabrain")
   })
 
+  test("does not write or create backups for experimental.task_system", () => {
+    //#given: Config with experimental.task_system enabled
+    const testConfigPath = "/tmp/test-config-task-system.json"
+    const rawConfig: Record<string, unknown> = {
+      experimental: { task_system: true },
+    }
+
+    fs.writeFileSync(testConfigPath, globalThis.JSON.stringify(rawConfig, null, 2))
+    cleanupPaths.push(testConfigPath)
+
+    const dir = path.dirname(testConfigPath)
+    const basename = path.basename(testConfigPath)
+    const existingFiles = fs.readdirSync(dir)
+    const existingBackups = existingFiles.filter((f) => f.startsWith(`${basename}.bak.`))
+    existingBackups.forEach((f) => {
+      const backupPath = path.join(dir, f)
+      try {
+        fs.unlinkSync(backupPath)
+        cleanupPaths.splice(cleanupPaths.indexOf(backupPath), 1)
+      } catch {
+      }
+    })
+
+    //#when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    //#then: No write or backup should occur
+    expect(needsWrite).toBe(false)
+
+    const files = fs.readdirSync(dir)
+    const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
+    expect(backupFiles.length).toBe(0)
+  })
+
   test("does not write when no migration needed", () => {
      // given: Config with no migrations needed
      const testConfigPath = "/tmp/test-config-no-migration.json"
@@ -743,6 +1088,168 @@ describe("migrateConfigFile with backup", () => {
      const backupFiles = files.filter((f) => f.startsWith(`${basename}.bak.`))
      expect(backupFiles.length).toBe(0)
    })
+})
+
+describe("migrateModelVersions with applied migrations", () => {
+  test("skips already-applied migrations", () => {
+    // given: Config with old model and migration already applied
+    const configs = {
+      sisyphus: { model: "openai/gpt-5.2-codex" },
+    }
+    const appliedMigrations = new Set(["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"])
+
+    // when: Migrate model versions
+    const { migrated, changed, newMigrations } = migrateModelVersions(configs, appliedMigrations)
+
+    // then: Migration should be skipped (user reverted)
+    expect(changed).toBe(false)
+    expect(newMigrations).toEqual([])
+    expect((migrated.sisyphus as Record<string, unknown>).model).toBe("openai/gpt-5.2-codex")
+  })
+
+  test("applies new migrations not in history", () => {
+    // given: Config with old model, no migration history
+    const configs = {
+      sisyphus: { model: "openai/gpt-5.2-codex" },
+    }
+    const appliedMigrations = new Set<string>()
+
+    // when: Migrate model versions
+    const { migrated, changed, newMigrations } = migrateModelVersions(configs, appliedMigrations)
+
+    // then: Migration should be applied
+    expect(changed).toBe(true)
+    expect(newMigrations).toEqual(["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"])
+    expect((migrated.sisyphus as Record<string, unknown>).model).toBe("openai/gpt-5.3-codex")
+  })
+
+  test("handles mixed: skip applied, apply new", () => {
+    // given: Config with 2 old models, 1 already migrated
+    const configs = {
+      sisyphus: { model: "openai/gpt-5.2-codex" },
+      oracle: { model: "anthropic/claude-opus-4-5" },
+    }
+    const appliedMigrations = new Set(["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"])
+
+    // when: Migrate model versions
+    const { migrated, changed, newMigrations } = migrateModelVersions(configs, appliedMigrations)
+
+    // then: Skip sisyphus (already applied), apply oracle
+    expect(changed).toBe(true)
+    expect(newMigrations).toEqual(["model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-6"])
+    expect((migrated.sisyphus as Record<string, unknown>).model).toBe("openai/gpt-5.2-codex")
+    expect((migrated.oracle as Record<string, unknown>).model).toBe("anthropic/claude-opus-4-6")
+  })
+
+  test("backward compatible: no appliedMigrations param", () => {
+    // given: Config with old model, no appliedMigrations param (legacy call)
+    const configs = {
+      sisyphus: { model: "openai/gpt-5.2-codex" },
+    }
+
+    // when: Migrate model versions (without appliedMigrations)
+    const { migrated, changed, newMigrations } = migrateModelVersions(configs)
+
+    // then: Migration should be applied (backward compatible)
+    expect(changed).toBe(true)
+    expect(newMigrations).toEqual(["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"])
+    expect((migrated.sisyphus as Record<string, unknown>).model).toBe("openai/gpt-5.3-codex")
+  })
+
+  test("returns empty newMigrations when no migrations applied", () => {
+    // given: Config with no old models
+    const configs = {
+      sisyphus: { model: "openai/gpt-5.3-codex" },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed, newMigrations } = migrateModelVersions(configs, new Set())
+
+    // then: No migrations
+    expect(changed).toBe(false)
+    expect(newMigrations).toEqual([])
+  })
+})
+
+describe("migrateConfigFile with _migrations tracking", () => {
+  const cleanupPaths: string[] = []
+
+  afterEach(() => {
+    for (const p of cleanupPaths) {
+      try {
+        fs.unlinkSync(p)
+      } catch {
+      }
+    }
+    cleanupPaths.length = 0
+  })
+
+  test("records new migrations in _migrations field", () => {
+    // given: Config with old model, no _migrations field
+    const testConfigPath = "/tmp/test-config-migrations-1.json"
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        sisyphus: { model: "openai/gpt-5.2-codex" },
+      },
+    }
+    fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
+    cleanupPaths.push(testConfigPath)
+
+    // when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: _migrations field should be added
+    expect(needsWrite).toBe(true)
+    expect(rawConfig._migrations).toEqual(["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"])
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).sisyphus.model).toBe("openai/gpt-5.3-codex")
+  })
+
+  test("skips re-applying already-recorded migrations", () => {
+    // given: Config with old model but migration already in _migrations
+    const testConfigPath = "/tmp/test-config-migrations-2.json"
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        sisyphus: { model: "openai/gpt-5.2-codex" },
+      },
+      _migrations: ["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"],
+    }
+    fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
+    cleanupPaths.push(testConfigPath)
+
+    // when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: Should not migrate (user reverted)
+    expect(needsWrite).toBe(false)
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).sisyphus.model).toBe("openai/gpt-5.2-codex")
+    expect(rawConfig._migrations).toEqual(["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"])
+  })
+
+  test("preserves existing _migrations and appends new ones", () => {
+    // given: Config with multiple old models, partial migration history
+    const testConfigPath = "/tmp/test-config-migrations-3.json"
+    const rawConfig: Record<string, unknown> = {
+      agents: {
+        sisyphus: { model: "openai/gpt-5.2-codex" },
+        oracle: { model: "anthropic/claude-opus-4-5" },
+      },
+      _migrations: ["model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex"],
+    }
+    fs.writeFileSync(testConfigPath, JSON.stringify(rawConfig, null, 2))
+    cleanupPaths.push(testConfigPath)
+
+    // when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: Should skip sisyphus, migrate oracle, append to _migrations
+    expect(needsWrite).toBe(true)
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).sisyphus.model).toBe("openai/gpt-5.2-codex")
+    expect((rawConfig.agents as Record<string, Record<string, unknown>>).oracle.model).toBe("anthropic/claude-opus-4-6")
+    expect(rawConfig._migrations).toEqual([
+      "model-version:openai/gpt-5.2-codex->openai/gpt-5.3-codex",
+      "model-version:anthropic/claude-opus-4-5->anthropic/claude-opus-4-6",
+    ])
+  })
 
 
 })

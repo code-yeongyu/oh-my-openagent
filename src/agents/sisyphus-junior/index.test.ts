@@ -143,13 +143,12 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     })
   })
 
-  describe("tool safety (task/delegate_task blocked, call_omo_agent allowed)", () => {
-    test("task and delegate_task remain blocked, call_omo_agent is allowed via tools format", () => {
+  describe("tool safety (task blocked, call_omo_agent allowed)", () => {
+    test("task remains blocked, call_omo_agent is allowed via tools format", () => {
       // given
       const override = {
         tools: {
           task: true,
-          delegate_task: true,
           call_omo_agent: true,
           read: true,
         },
@@ -163,25 +162,22 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const permission = result.permission as Record<string, string> | undefined
       if (tools) {
         expect(tools.task).toBe(false)
-        expect(tools.delegate_task).toBe(false)
         // call_omo_agent is NOW ALLOWED for subagents to spawn explore/librarian
         expect(tools.call_omo_agent).toBe(true)
         expect(tools.read).toBe(true)
       }
       if (permission) {
         expect(permission.task).toBe("deny")
-        expect(permission.delegate_task).toBe("deny")
         // call_omo_agent is NOW ALLOWED for subagents to spawn explore/librarian
         expect(permission.call_omo_agent).toBe("allow")
       }
     })
 
-    test("task and delegate_task remain blocked when using permission format override", () => {
+    test("task remains blocked when using permission format override", () => {
       // given
       const override = {
         permission: {
           task: "allow",
-          delegate_task: "allow",
           call_omo_agent: "allow",
           read: "allow",
         },
@@ -190,19 +186,99 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
 
-      // then - task/delegate_task blocked, but call_omo_agent allowed for explore/librarian spawning
+      // then - task blocked, but call_omo_agent allowed for explore/librarian spawning
       const tools = result.tools as Record<string, boolean> | undefined
       const permission = result.permission as Record<string, string> | undefined
       if (tools) {
         expect(tools.task).toBe(false)
-        expect(tools.delegate_task).toBe(false)
         expect(tools.call_omo_agent).toBe(true)
       }
       if (permission) {
         expect(permission.task).toBe("deny")
-        expect(permission.delegate_task).toBe("deny")
         expect(permission.call_omo_agent).toBe("allow")
       }
+    })
+  })
+
+  describe("useTaskSystem integration", () => {
+    test("useTaskSystem=true produces Task_Discipline prompt for Claude", () => {
+      //#given
+      const override = { model: "anthropic/claude-sonnet-4-5" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
+
+      //#then
+      expect(result.prompt).toContain("TaskCreate")
+      expect(result.prompt).toContain("TaskUpdate")
+      expect(result.prompt).not.toContain("todowrite")
+    })
+
+    test("useTaskSystem=true produces task_discipline_spec prompt for GPT", () => {
+      //#given
+      const override = { model: "openai/gpt-5.2" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
+
+      //#then
+      expect(result.prompt).toContain("<task_discipline_spec>")
+      expect(result.prompt).toContain("TaskCreate")
+      expect(result.prompt).not.toContain("<todo_discipline_spec>")
+    })
+
+    test("useTaskSystem=false (default) produces Todo_Discipline prompt", () => {
+      //#given
+      const override = {}
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      //#then
+      expect(result.prompt).toContain("todowrite")
+      expect(result.prompt).not.toContain("TaskCreate")
+    })
+
+    test("useTaskSystem=true explicitly lists task management tools as ALLOWED for Claude", () => {
+      //#given
+      const override = { model: "anthropic/claude-sonnet-4-5" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
+
+      //#then - prompt must disambiguate: delegation tool blocked, management tools allowed
+      expect(result.prompt).toContain("task_create")
+      expect(result.prompt).toContain("task_update")
+      expect(result.prompt).toContain("task_list")
+      expect(result.prompt).toContain("task_get")
+      expect(result.prompt).toContain("agent delegation tool")
+    })
+
+    test("useTaskSystem=true explicitly lists task management tools as ALLOWED for GPT", () => {
+      //#given
+      const override = { model: "openai/gpt-5.2" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
+
+      //#then - prompt must disambiguate: delegation tool blocked, management tools allowed
+      expect(result.prompt).toContain("task_create")
+      expect(result.prompt).toContain("task_update")
+      expect(result.prompt).toContain("task_list")
+      expect(result.prompt).toContain("task_get")
+      expect(result.prompt).toContain("Agent delegation tool")
+    })
+
+    test("useTaskSystem=false does NOT list task management tools in constraints", () => {
+      //#given - Claude model without task system
+      const override = { model: "anthropic/claude-sonnet-4-5" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, false)
+
+      //#then - no task management tool references in constraints section
+      expect(result.prompt).not.toContain("task_create")
+      expect(result.prompt).not.toContain("task_update")
     })
   })
 

@@ -246,5 +246,33 @@ describe("boulder-state", () => {
       expect(state.plan_name).toBe("auth-refactor")
       expect(state.started_at).toBeDefined()
     })
+
+    test("should include agent field when provided", () => {
+      //#given - plan path, session id, and agent type
+      const planPath = "/path/to/feature.md"
+      const sessionId = "ses-xyz789"
+      const agent = "atlas"
+
+      //#when - createBoulderState is called with agent
+      const state = createBoulderState(planPath, sessionId, agent)
+
+      //#then - state should include the agent field
+      expect(state.agent).toBe("atlas")
+      expect(state.active_plan).toBe(planPath)
+      expect(state.session_ids).toEqual([sessionId])
+      expect(state.plan_name).toBe("feature")
+    })
+
+    test("should allow agent to be undefined", () => {
+      //#given - plan path and session id without agent
+      const planPath = "/path/to/legacy.md"
+      const sessionId = "ses-legacy"
+
+      //#when - createBoulderState is called without agent
+      const state = createBoulderState(planPath, sessionId)
+
+      //#then - state should not have agent field (backward compatible)
+      expect(state.agent).toBeUndefined()
+    })
   })
 })

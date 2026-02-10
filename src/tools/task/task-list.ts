@@ -4,7 +4,7 @@ import { existsSync, readdirSync } from "fs"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 import type { TaskObject, TaskStatus } from "./types"
 import { TaskObjectSchema } from "./types"
-import { readJsonSafe } from "../../features/claude-tasks/storage"
+import { readJsonSafe, getTaskDir } from "../../features/claude-tasks/storage"
 
 interface TaskSummary {
   id: string
@@ -23,9 +23,7 @@ For each task's blockedBy field, filters to only include unresolved (non-complet
 Returns summary format: id, subject, status, owner, blockedBy (not full description).`,
     args: {},
     execute: async (): Promise<string> => {
-      const tasksConfig = config.sisyphus?.tasks
-      const storagePath = tasksConfig?.storage_path ?? ".sisyphus/tasks"
-      const taskDir = storagePath.startsWith("/") ? storagePath : join(process.cwd(), storagePath)
+      const taskDir = getTaskDir(config)
 
       if (!existsSync(taskDir)) {
         return JSON.stringify({ tasks: [] })
@@ -72,7 +70,7 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
 
        return JSON.stringify({
          tasks: summaries,
-         reminder: "1 task = 1 delegate_task. Maximize parallel execution by running independent tasks (tasks with empty blockedBy) concurrently."
+         reminder: "1 task = 1 task. Maximize parallel execution by running independent tasks (tasks with empty blockedBy) concurrently."
        })
     },
   })

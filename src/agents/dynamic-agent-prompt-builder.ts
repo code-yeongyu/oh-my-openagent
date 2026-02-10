@@ -1,7 +1,8 @@
-import type { AgentPromptMetadata, BuiltinAgentName } from "./types"
+import type { AgentPromptMetadata } from "./types"
+import { truncateDescription } from "../shared/truncate-description"
 
 export interface AvailableAgent {
-  name: BuiltinAgentName
+  name: string
   description: string
   metadata: AgentPromptMetadata
 }
@@ -20,6 +21,7 @@ export interface AvailableSkill {
 export interface AvailableCategory {
   name: string
   description: string
+  model?: string
 }
 
 export function categorizeTools(toolNames: string[]): AvailableTool[] {
@@ -166,6 +168,33 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
   return rows.join("\n")
 }
 
+/**
+ * Renders the "User-Installed Skills (HIGH PRIORITY)" block used across multiple agent prompts.
+ * Extracted to avoid duplication between buildCategorySkillsDelegationGuide, buildSkillsSection, etc.
+ */
+export function formatCustomSkillsBlock(
+  customRows: string[],
+  customSkills: AvailableSkill[],
+  headerLevel: "####" | "**" = "####"
+): string {
+  const customSkillNames = customSkills.map((s) => `"${s.name}"`).join(", ")
+  const header = headerLevel === "####"
+    ? `#### User-Installed Skills (HIGH PRIORITY)`
+    : `**User-Installed Skills (HIGH PRIORITY):**`
+
+  return `${header}
+
+**The user has installed these custom skills. They MUST be evaluated for EVERY delegation.**
+Subagents are STATELESS — they lose all custom knowledge unless you pass these skills via \`load_skills\`.
+
+| Skill | Expertise Domain | Source |
+|-------|------------------|--------|
+${customRows.join("\n")}
+
+> **CRITICAL**: Ignoring user-installed skills when they match the task domain is a failure.
+> The user installed ${customSkillNames} for a reason — USE THEM when the task overlaps with their domain.`
+}
+
 export function buildCategorySkillsDelegationGuide(categories: AvailableCategory[], skills: AvailableSkill[]): string {
   if (categories.length === 0 && skills.length === 0) return ""
 
@@ -174,14 +203,47 @@ export function buildCategorySkillsDelegationGuide(categories: AvailableCategory
     return `| \`${c.name}\` | ${desc} |`
   })
 
-  const skillRows = skills.map((s) => {
-    const desc = s.description.split(".")[0] || s.description
-    return `| \`${s.name}\` | ${desc} |`
-  })
+  const builtinSkills = skills.filter((s) => s.location === "plugin")
+  const customSkills = skills.filter((s) => s.location !== "plugin")
+
+   const builtinRows = builtinSkills.map((s) => {
+     const desc = truncateDescription(s.description)
+     return `| \`${s.name}\` | ${desc} |`
+   })
+
+   const customRows = customSkills.map((s) => {
+     const desc = truncateDescription(s.description)
+     const source = s.location === "project" ? "project" : "user"
+     return `| \`${s.name}\` | ${desc} | ${source} |`
+   })
+
+  const customSkillBlock = formatCustomSkillsBlock(customRows, customSkills)
+
+  let skillsSection: string
+
+  if (customSkills.length > 0 && builtinSkills.length > 0) {
+    skillsSection = `#### Built-in Skills
+
+| Skill | Expertise Domain |
+|-------|------------------|
+${builtinRows.join("\n")}
+
+${customSkillBlock}`
+  } else if (customSkills.length > 0) {
+    skillsSection = customSkillBlock
+  } else {
+    skillsSection = `#### Available Skills (Domain Expertise Injection)
+
+Skills inject specialized instructions into the subagent. Read the description to understand when each skill applies.
+
+| Skill | Expertise Domain |
+|-------|------------------|
+${builtinRows.join("\n")}`
+  }
 
   return `### Category + Skills Delegation System
 
-**delegate_task() combines categories and skills for optimal task execution.**
+**task() combines categories and skills for optimal task execution.**
 
 #### Available Categories (Domain-Optimized Models)
 
@@ -191,13 +253,7 @@ Each category is configured with a model optimized for that domain. Read the des
 |----------|-------------------|
 ${categoryRows.join("\n")}
 
-#### Available Skills (Domain Expertise Injection)
-
-Skills inject specialized instructions into the subagent. Read the description to understand when each skill applies.
-
-| Skill | Expertise Domain |
-|-------|------------------|
-${skillRows.join("\n")}
+${skillsSection}
 
 ---
 
@@ -208,12 +264,15 @@ ${skillRows.join("\n")}
 - Match task requirements to category domain
 - Select the category whose domain BEST fits the task
 
-**STEP 2: Evaluate ALL Skills**
+**STEP 2: Evaluate ALL Skills (Built-in AND User-Installed)**
 For EVERY skill listed above, ask yourself:
 > "Does this skill's expertise domain overlap with my task?"
 
 - If YES → INCLUDE in \`load_skills=[...]\`
 - If NO → You MUST justify why (see below)
+${customSkills.length > 0 ? `
+> **User-installed skills get PRIORITY.** The user explicitly installed them for their workflow.
+> When in doubt about a user-installed skill, INCLUDE it rather than omit it.` : ""}
 
 **STEP 3: Justify Omissions**
 
@@ -238,16 +297,16 @@ SKILL EVALUATION for "[skill-name]":
 ### Delegation Pattern
 
 \`\`\`typescript
-delegate_task(
+task(
   category="[selected-category]",
-  load_skills=["skill-1", "skill-2"],  // Include ALL relevant skills
+  load_skills=["skill-1", "skill-2"],  // Include ALL relevant skills — ESPECIALLY user-installed ones
   prompt="..."
 )
 \`\`\`
 
 **ANTI-PATTERN (will produce poor results):**
 \`\`\`typescript
-delegate_task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
+task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
 \`\`\``
 }
 
@@ -328,12 +387,26 @@ export function buildUltraworkSection(
   }
 
   if (skills.length > 0) {
-    lines.push("**Skills** (combine with categories - EVALUATE ALL for relevance):")
-    for (const skill of skills) {
-      const shortDesc = skill.description.split(".")[0] || skill.description
-      lines.push(`- \`${skill.name}\`: ${shortDesc}`)
+    const builtinSkills = skills.filter((s) => s.location === "plugin")
+    const customSkills = skills.filter((s) => s.location !== "plugin")
+
+    if (builtinSkills.length > 0) {
+      lines.push("**Built-in Skills** (combine with categories):")
+      for (const skill of builtinSkills) {
+        const shortDesc = skill.description.split(".")[0] || skill.description
+        lines.push(`- \`${skill.name}\`: ${shortDesc}`)
+      }
+      lines.push("")
     }
-    lines.push("")
+
+    if (customSkills.length > 0) {
+      lines.push("**User-Installed Skills** (HIGH PRIORITY - user installed these for their workflow):")
+      for (const skill of customSkills) {
+        const shortDesc = skill.description.split(".")[0] || skill.description
+        lines.push(`- \`${skill.name}\`: ${shortDesc}`)
+      }
+      lines.push("")
+    }
   }
 
   if (agents.length > 0) {
@@ -349,7 +422,7 @@ export function buildUltraworkSection(
 
     lines.push("**Agents** (for specialized consultation/exploration):")
     for (const agent of sortedAgents) {
-      const shortDesc = agent.description.split(".")[0] || agent.description
+      const shortDesc = agent.description.length > 120 ? agent.description.slice(0, 120) + "..." : agent.description
       const suffix = agent.name === "explore" || agent.name === "librarian" ? " (multiple)" : ""
       lines.push(`- \`${agent.name}${suffix}\`: ${shortDesc}`)
     }

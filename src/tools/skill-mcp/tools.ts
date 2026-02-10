@@ -118,7 +118,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
       resource_name: tool.schema.string().optional().describe("MCP resource URI to read"),
       prompt_name: tool.schema.string().optional().describe("MCP prompt to get"),
       arguments: tool.schema
-        .union([tool.schema.string(), tool.schema.record(tool.schema.string(), tool.schema.unknown())])
+        .union([tool.schema.string(), tool.schema.object({})])
         .optional()
         .describe("JSON string or object of arguments"),
       grep: tool.schema
