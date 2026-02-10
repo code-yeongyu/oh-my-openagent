@@ -70,6 +70,7 @@ export async function validateSessionHasOutput(
         if (type === "tool") return true
         if (type === "text" && hasNonEmptyText(part.text)) return true
         if (type === "reasoning" && hasNonEmptyText(part.text)) return true
+        if (type === "reasoning.encrypted" && hasNonEmptyText(part.text)) return true
         if (type === "tool_result" && isToolResultContentNonEmpty(part.content)) return true
         return false
       })
