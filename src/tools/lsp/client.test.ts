@@ -266,6 +266,12 @@ describe("LSPClient", () => {
       const filePath = join(dir, "test.ts")
       writeFileSync(filePath, "const a = 1\n")
 
+      const originalSetTimeout = globalThis.setTimeout
+      globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
+        fn()
+        return 0 as unknown as ReturnType<typeof setTimeout>
+      }) as typeof setTimeout
+
       const server: ResolvedServer = {
         id: "typescript",
         command: ["typescript-language-server", "--stdio"],
@@ -294,16 +300,15 @@ describe("LSPClient", () => {
         const absPath = resolve(filePath)
         const uri = pathToFileURL(absPath).href
 
-        // Schedule push notification to populate store after 200ms
-        setTimeout(() => {
-          ;(client as unknown as { diagnosticsStore: Map<string, unknown> }).diagnosticsStore.set(uri, expectedDiagnostics)
-        }, 200)
+        // Pre-populate store to simulate push notification that arrived before poll
+        ;(client as unknown as { diagnosticsStore: Map<string, unknown> }).diagnosticsStore.set(uri, expectedDiagnostics)
 
         const result = await client.diagnostics(filePath)
 
         // #then
         expect(result.items).toEqual(expectedDiagnostics)
       } finally {
+        globalThis.setTimeout = originalSetTimeout
         sendRequestSpy.mockRestore()
         openFileSpy.mockRestore()
         rmSync(dir, { recursive: true, force: true })
@@ -315,6 +320,19 @@ describe("LSPClient", () => {
       const dir = mkdtempSync(join(tmpdir(), "lsp-diagnostics-timeout-test-"))
       const filePath = join(dir, "test.ts")
       writeFileSync(filePath, "const a = 1\n")
+
+      const originalSetTimeout = globalThis.setTimeout
+      globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
+        fn()
+        return 0 as unknown as ReturnType<typeof setTimeout>
+      }) as typeof setTimeout
+
+      const dateNowSpy = spyOn(Date, "now")
+      let callCount = 0
+      dateNowSpy.mockImplementation(() => {
+        callCount++
+        return callCount <= 2 ? 0 : 10_000
+      })
 
       const server: ResolvedServer = {
         id: "typescript",
@@ -345,6 +363,58 @@ describe("LSPClient", () => {
         // #then
         expect(result.items).toEqual([])
       } finally {
+        globalThis.setTimeout = originalSetTimeout
+        dateNowSpy.mockRestore()
+        sendRequestSpy.mockRestore()
+        openFileSpy.mockRestore()
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it("returns empty diagnostics immediately when push delivers clean file during poll", async () => {
+      // #given
+      const dir = mkdtempSync(join(tmpdir(), "lsp-diagnostics-empty-test-"))
+      const filePath = join(dir, "test.ts")
+      writeFileSync(filePath, "const a = 1\n")
+
+      const originalSetTimeout = globalThis.setTimeout
+      globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
+        fn()
+        return 0 as unknown as ReturnType<typeof setTimeout>
+      }) as typeof setTimeout
+
+      const server: ResolvedServer = {
+        id: "typescript",
+        command: ["typescript-language-server", "--stdio"],
+        extensions: [".ts"],
+        priority: 0,
+      }
+
+      const client = new LSPClient(dir, server)
+
+      const sendRequestSpy = spyOn(
+        client as unknown as { sendRequest: (m: string, p?: unknown) => Promise<unknown> },
+        "sendRequest"
+      )
+      sendRequestSpy.mockImplementation(async () => {
+        throw new Error("pull not supported")
+      })
+
+      const openFileSpy = spyOn(client, "openFile")
+      openFileSpy.mockImplementation(async () => {})
+
+      try {
+        // #when
+        const absPath = resolve(filePath)
+        const uri = pathToFileURL(absPath).href
+        ;(client as unknown as { diagnosticsStore: Map<string, unknown[]> }).diagnosticsStore.set(uri, [])
+
+        const result = await client.diagnostics(filePath)
+
+        // #then
+        expect(result.items).toEqual([])
+      } finally {
+        globalThis.setTimeout = originalSetTimeout
         sendRequestSpy.mockRestore()
         openFileSpy.mockRestore()
         rmSync(dir, { recursive: true, force: true })

@@ -111,7 +111,7 @@ export class LSPClient extends LSPClientConnection {
 
     while (Date.now() - startTime < POLL_TIMEOUT_MS) {
       const items = this.diagnosticsStore.get(uri)
-      if (items && items.length > 0) {
+      if (items !== undefined) {
         return { items }
       }
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
