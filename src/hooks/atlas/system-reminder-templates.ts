@@ -33,6 +33,7 @@ export const BOULDER_CONTINUATION_PROMPT = `${createSystemDirective(SystemDirect
 You have an active work plan with incomplete tasks. Continue working.
 
 RULES:
+- **FIRST**: Read the plan file NOW to check exact current progress — count remaining \`- [ ]\` tasks
 - Proceed without asking for permission
 - Change \`- [ ]\` to \`- [x]\` in the plan file when done
 - Use the notepad at .sisyphus/notepads/{PLAN_NAME}/ to record learnings
@@ -48,15 +49,36 @@ Tests FAILING, code has ERRORS, implementation INCOMPLETE - but they say "done".
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**STEP 1: VERIFY WITH YOUR OWN TOOL CALLS (DO THIS NOW)**
+**STEP 1: AUTOMATED VERIFICATION (DO THIS FIRST)**
 
 Run these commands YOURSELF - do NOT trust agent's claims:
 1. \`lsp_diagnostics\` on changed files → Must be CLEAN
 2. \`bash\` to run tests → Must PASS
 3. \`bash\` to run build/typecheck → Must succeed
-4. \`Read\` the actual code → Must match requirements
 
-**STEP 2: DETERMINE IF HANDS-ON QA IS NEEDED**
+**STEP 2: MANUAL CODE REVIEW (NON-NEGOTIABLE — DO NOT SKIP)**
+
+Automated checks are NECESSARY but INSUFFICIENT. You MUST read the actual code.
+
+**RIGHT NOW — \`Read\` EVERY file the subagent touched. No exceptions.**
+
+For EACH changed file, verify:
+1. Does the implementation logic ACTUALLY match the task requirements?
+2. Are there incomplete stubs (TODO comments, placeholder code, hardcoded values)?
+3. Are there logic errors, off-by-one bugs, or missing edge cases?
+4. Does it follow existing codebase patterns and conventions?
+5. Are imports correct? No unused or missing imports?
+6. Is error handling present where needed?
+
+**Cross-check the subagent's claims against reality:**
+- Subagent said "Updated X" → READ X. Is it actually updated?
+- Subagent said "Added tests" → READ tests. Do they test the RIGHT behavior?
+- Subagent said "Follows patterns" → COMPARE with reference. Does it actually?
+
+**If you cannot explain what the changed code does, you have not reviewed it.**
+**If you skip this step, you are rubber-stamping broken work.**
+
+**STEP 3: DETERMINE IF HANDS-ON QA IS NEEDED**
 
 | Deliverable Type | QA Method | Tool |
 |------------------|-----------|------|
@@ -66,7 +88,7 @@ Run these commands YOURSELF - do NOT trust agent's claims:
 
 Static analysis CANNOT catch: visual bugs, animation issues, user flow breakages.
 
-**STEP 3: IF QA IS NEEDED - ADD TO TODO IMMEDIATELY**
+**STEP 4: IF QA IS NEEDED - ADD TO TODO IMMEDIATELY**
 
 \`\`\`
 todowrite([
@@ -76,7 +98,8 @@ todowrite([
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-**BLOCKING: DO NOT proceed to Step 4 until Steps 1-3 are VERIFIED.**`
+**BLOCKING: DO NOT proceed until Steps 1-4 are ALL completed.**
+**Skipping Step 2 (manual code review) = unverified work = FAILURE.**`
 
 export const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
