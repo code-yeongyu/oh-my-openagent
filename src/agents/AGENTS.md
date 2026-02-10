@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-11 AI agents for multi-model orchestration. Each agent has factory function + metadata + fallback chains.
+32 files containing AI agents and utilities for multi-model orchestration. Each agent has factory function + metadata + fallback chains.
 
 **Primary Agents** (respect UI model selection):
 - Sisyphus, Atlas, Prometheus
@@ -30,18 +30,19 @@ agents/
 │   ├── index.ts
 │   ├── default.ts
 │   └── gpt.ts
-├── sisyphus.ts                 # Main orchestrator prompt (530 lines)
-├── hephaestus.ts               # Autonomous deep worker (618 lines, GPT 5.3 Codex)
-├── oracle.ts                   # Strategic advisor (GPT-5.2)
+├── sisyphus.ts                 # Main orchestrator (530 lines)
+├── hephaestus.ts               # Autonomous deep worker (618 lines)
+├── oracle.ts                   # Strategic advisor (170 lines)
 ├── librarian.ts                # Multi-repo research (328 lines)
-├── explore.ts                  # Fast contextual grep
-├── multimodal-looker.ts        # Media analyzer (Gemini 3 Flash)
-├── metis.ts                    # Pre-planning analysis (347 lines)
-├── momus.ts                    # Plan reviewer
+├── explore.ts                  # Fast codebase grep (124 lines)
+├── multimodal-looker.ts        # Media analyzer (58 lines)
+├── metis.ts                    # Pre-planning analysis (346 lines)
+├── momus.ts                    # Plan validator (243 lines)
 ├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation (431 lines)
+├── builtin-agents.ts           # Agent registry (179 lines)
 ├── types.ts                    # AgentModelConfig, AgentPromptMetadata
-├── utils.ts                    # createBuiltinAgents(), resolveModelWithFallback() (485 lines)
-└── index.ts                    # builtinAgents export
+├── utils.ts                    # Agent creation, model fallback resolution (571 lines)
+└── index.ts                    # Exports
 ```
 
 ## AGENT MODELS
@@ -61,7 +62,7 @@ agents/
 
 ## HOW TO ADD
 1. Create `src/agents/my-agent.ts` exporting factory + metadata.
-2. Add to `agentSources` in `src/agents/utils.ts`.
+2. Add to `agentSources` in `src/agents/builtin-agents.ts`.
 3. Update `AgentNameSchema` in `src/config/schema.ts`.
 4. Register in `src/index.ts` initialization.
 

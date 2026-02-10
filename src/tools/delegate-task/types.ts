@@ -34,6 +34,10 @@ export interface ToolContextWithMetadata {
    * but present at runtime via spread in fromPlugin()). Used for metadata store keying.
    */
   callID?: string
+  /** @deprecated OpenCode internal naming may vary across versions */
+  callId?: string
+  /** @deprecated OpenCode internal naming may vary across versions */
+  call_id?: string
 }
 
 export interface SyncSessionCreatedEvent {
@@ -46,6 +50,15 @@ export interface DelegateTaskToolOptions {
   manager: BackgroundManager
   client: OpencodeClient
   directory: string
+  /**
+   * Test hook: bypass global cache reads (Bun runs tests in parallel).
+   * If provided, resolveCategoryExecution/resolveSubagentExecution uses this instead of reading from disk cache.
+   */
+  connectedProvidersOverride?: string[] | null
+  /**
+   * Test hook: bypass fetchAvailableModels() by providing an explicit available model set.
+   */
+  availableModelsOverride?: Set<string>
   userCategories?: CategoriesConfig
   gitMasterConfig?: GitMasterConfig
   sisyphusJuniorModel?: string

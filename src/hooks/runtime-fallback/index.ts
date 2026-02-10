@@ -115,7 +115,26 @@ function getFallbackModelsForSession(
     if (result) return result
   }
 
-  const sessionAgentMatch = sessionID.match(/\b(sisyphus|oracle|librarian|explore|prometheus|atlas|metis|momus|hephaestus|sisyphus-junior|build|plan|multimodal-looker)\b/i)
+  const AGENT_NAMES = [
+    "sisyphus",
+    "oracle",
+    "librarian",
+    "explore",
+    "prometheus",
+    "atlas",
+    "metis",
+    "momus",
+    "hephaestus",
+    "sisyphus-junior",
+    "build",
+    "plan",
+    "multimodal-looker",
+  ]
+  const agentPattern = new RegExp(
+    `\\b(${AGENT_NAMES.map((a) => a.replace(/-/g, "\\-")).join("|")})\\b`,
+    "i",
+  )
+  const sessionAgentMatch = sessionID.match(agentPattern)
   if (sessionAgentMatch) {
     const detectedAgent = sessionAgentMatch[1].toLowerCase()
     const result = tryGetFallbackFromAgent(detectedAgent)
@@ -199,6 +218,28 @@ export function createRuntimeFallbackHook(
   }
 
   const sessionStates = new Map<string, FallbackState>()
+  const sessionLastAccess = new Map<string, number>()
+  const SESSION_TTL_MS = 30 * 60 * 1000 // 30 minutes TTL for stale sessions
+
+  // Periodic cleanup of stale session states to prevent memory leaks
+  const cleanupStaleSessions = () => {
+    const now = Date.now()
+    let cleanedCount = 0
+    for (const [sessionID, lastAccess] of sessionLastAccess.entries()) {
+      if (now - lastAccess > SESSION_TTL_MS) {
+        sessionStates.delete(sessionID)
+        sessionLastAccess.delete(sessionID)
+        SessionCategoryRegistry.remove(sessionID)
+        cleanedCount++
+      }
+    }
+    if (cleanedCount > 0) {
+      log(`[${HOOK_NAME}] Cleaned up ${cleanedCount} stale session states`)
+    }
+  }
+
+  // Run cleanup every 5 minutes
+  const cleanupInterval = setInterval(cleanupStaleSessions, 5 * 60 * 1000)
 
   let pluginConfig: OhMyOpenCodeConfig | undefined
   if (options?.pluginConfig) {
@@ -225,6 +266,7 @@ export function createRuntimeFallbackHook(
       if (sessionID && model) {
         log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
         sessionStates.set(sessionID, createFallbackState(model))
+        sessionLastAccess.set(sessionID, Date.now())
       }
       return
     }
@@ -236,6 +278,7 @@ export function createRuntimeFallbackHook(
       if (sessionID) {
         log(`[${HOOK_NAME}] Cleaning up session state`, { sessionID })
         sessionStates.delete(sessionID)
+        sessionLastAccess.delete(sessionID)
         SessionCategoryRegistry.remove(sessionID)
       }
       return
@@ -271,10 +314,13 @@ export function createRuntimeFallbackHook(
         if (currentModel) {
           state = createFallbackState(currentModel)
           sessionStates.set(sessionID, state)
+          sessionLastAccess.set(sessionID, Date.now())
         } else {
           log(`[${HOOK_NAME}] No model info available, cannot fallback`, { sessionID })
           return
         }
+      } else {
+        sessionLastAccess.set(sessionID, Date.now())
       }
 
       const result = prepareFallback(sessionID, state, fallbackModels, config)
@@ -324,6 +370,9 @@ export function createRuntimeFallbackHook(
         if (!state) {
           state = createFallbackState(model)
           sessionStates.set(sessionID, state)
+          sessionLastAccess.set(sessionID, Date.now())
+        } else {
+          sessionLastAccess.set(sessionID, Date.now())
         }
 
         const result = prepareFallback(sessionID, state, fallbackModels, config)

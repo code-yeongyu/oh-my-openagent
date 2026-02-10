@@ -236,13 +236,17 @@ export class BackgroundManager {
     const parentDirectory = parentSession?.data?.directory ?? this.directory
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
+    const inheritedPermission = (parentSession as any)?.data?.permission
+    const permissionRules = Array.isArray(inheritedPermission)
+      ? inheritedPermission.filter((r: any) => r?.permission !== "question")
+      : []
+    permissionRules.push({ permission: "question", action: "deny" as const, pattern: "*" })
+
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionID,
         title: `${input.description} (@${input.agent} subagent)`,
-        permission: [
-          { permission: "question", action: "deny" as const, pattern: "*" },
-        ],
+        permission: permissionRules,
       } as any,
       query: {
         directory: parentDirectory,
@@ -339,7 +343,7 @@ export class BackgroundManager {
       log("[background-agent] promptAsync error:", error)
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
-        existingTask.status = "error"
+        existingTask.status = "interrupt"
         const errorMessage = error instanceof Error ? error.message : String(error)
         if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
           existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
@@ -596,7 +600,7 @@ export class BackgroundManager {
       },
     }).catch((error) => {
       log("[background-agent] resume prompt error:", error)
-      existingTask.status = "error"
+      existingTask.status = "interrupt"
       const errorMessage = error instanceof Error ? error.message : String(error)
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
@@ -1043,9 +1047,9 @@ export class BackgroundManager {
   }
 
   /**
-   * Get all completed tasks still in memory (for compaction hook)
+   * Get all non-running tasks still in memory (for compaction hook)
    */
-  getCompletedTasks(): BackgroundTask[] {
+  getNonRunningTasks(): BackgroundTask[] {
     return Array.from(this.tasks.values()).filter(t => t.status !== "running")
   }
 
@@ -1133,7 +1137,7 @@ export class BackgroundManager {
       allComplete = true
     }
 
-    const statusText = task.status === "completed" ? "COMPLETED" : "CANCELLED"
+    const statusText = task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
     
     let notification: string

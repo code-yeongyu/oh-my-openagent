@@ -4,24 +4,23 @@ import { join } from "path"
 import { tmpdir } from "os"
 
 const TEST_DIR = join(tmpdir(), "mcp-loader-test-" + Date.now())
+const TEST_HOME = join(TEST_DIR, "home")
 
 describe("getSystemMcpServerNames", () => {
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })
-
-    // Isolate tests from real user environment (e.g., ~/.claude.json).
-    // loader.ts reads user-level config via os.homedir() + getClaudeConfigDir().
+    mkdirSync(TEST_HOME, { recursive: true })
     mock.module("os", () => ({
-      homedir: () => TEST_DIR,
+      homedir: () => TEST_HOME,
       tmpdir,
     }))
-
     mock.module("../../shared", () => ({
-      getClaudeConfigDir: () => join(TEST_DIR, ".claude"),
+      getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
     }))
   })
 
   afterEach(() => {
+    mock.restore()
     rmSync(TEST_DIR, { recursive: true, force: true })
   })
 
@@ -173,7 +172,7 @@ describe("getSystemMcpServerNames", () => {
 
     it("reads user-level MCP config from ~/.claude.json", async () => {
       // given
-      const userConfigPath = join(TEST_DIR, ".claude.json")
+      const userConfigPath = join(TEST_HOME, ".claude.json")
       const userMcpConfig = {
         mcpServers: {
           "user-server": {
@@ -182,53 +181,37 @@ describe("getSystemMcpServerNames", () => {
           },
         },
       }
+      writeFileSync(userConfigPath, JSON.stringify(userMcpConfig))
 
       const originalCwd = process.cwd()
       process.chdir(TEST_DIR)
 
       try {
-        mock.module("os", () => ({
-          homedir: () => TEST_DIR,
-          tmpdir,
-        }))
-
-        writeFileSync(userConfigPath, JSON.stringify(userMcpConfig))
-
+        // when
         const { getSystemMcpServerNames } = await import("./loader")
         const names = getSystemMcpServerNames()
 
+        // then
         expect(names.has("user-server")).toBe(true)
       } finally {
         process.chdir(originalCwd)
-        rmSync(userConfigPath, { force: true })
       }
     })
 
     it("reads both ~/.claude.json and ~/.claude/.mcp.json for user scope", async () => {
-      // given: simulate both user-level config files
-      const userClaudeJson = join(TEST_DIR, ".claude.json")
-      const claudeDir = join(TEST_DIR, ".claude")
-      const claudeDirMcpJson = join(claudeDir, ".mcp.json")
-
+      // given
+      const claudeDir = join(TEST_HOME, ".claude")
       mkdirSync(claudeDir, { recursive: true })
 
-      // ~/.claude.json has server-a
-      writeFileSync(userClaudeJson, JSON.stringify({
+      writeFileSync(join(TEST_HOME, ".claude.json"), JSON.stringify({
         mcpServers: {
-          "server-from-claude-json": {
-            command: "npx",
-            args: ["server-a"],
-          },
+          "server-from-claude-json": { command: "npx", args: ["server-a"] },
         },
       }))
 
-      // ~/.claude/.mcp.json has server-b (CLI-managed)
-      writeFileSync(claudeDirMcpJson, JSON.stringify({
+      writeFileSync(join(claudeDir, ".mcp.json"), JSON.stringify({
         mcpServers: {
-          "server-from-mcp-json": {
-            command: "npx",
-            args: ["server-b"],
-          },
+          "server-from-mcp-json": { command: "npx", args: ["server-b"] },
         },
       }))
 
@@ -236,20 +219,11 @@ describe("getSystemMcpServerNames", () => {
       process.chdir(TEST_DIR)
 
       try {
-        mock.module("os", () => ({
-          homedir: () => TEST_DIR,
-          tmpdir,
-        }))
-
-        // Also mock getClaudeConfigDir to point to our test .claude dir
-        mock.module("../../shared", () => ({
-          getClaudeConfigDir: () => claudeDir,
-        }))
-
+        // when
         const { getSystemMcpServerNames } = await import("./loader")
         const names = getSystemMcpServerNames()
 
-        // Both sources should be merged
+        // then
         expect(names.has("server-from-claude-json")).toBe(true)
         expect(names.has("server-from-mcp-json")).toBe(true)
       } finally {

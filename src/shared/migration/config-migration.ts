@@ -8,30 +8,32 @@ export function migrateConfigFile(
   configPath: string,
   rawConfig: Record<string, unknown>
 ): boolean {
+  // Work on a deep copy — only apply changes to rawConfig if file write succeeds
+  const copy = structuredClone(rawConfig)
   let needsWrite = false
 
   // Load previously applied migrations
-  const existingMigrations = Array.isArray(rawConfig._migrations)
-    ? new Set(rawConfig._migrations as string[])
+  const existingMigrations = Array.isArray(copy._migrations)
+    ? new Set(copy._migrations as string[])
     : new Set<string>()
   const allNewMigrations: string[] = []
 
-  if (rawConfig.agents && typeof rawConfig.agents === "object") {
-    const { migrated, changed } = migrateAgentNames(rawConfig.agents as Record<string, unknown>)
+  if (copy.agents && typeof copy.agents === "object") {
+    const { migrated, changed } = migrateAgentNames(copy.agents as Record<string, unknown>)
     if (changed) {
-      rawConfig.agents = migrated
+      copy.agents = migrated
       needsWrite = true
     }
   }
 
   // Migrate model versions in agents (skip already-applied migrations)
-  if (rawConfig.agents && typeof rawConfig.agents === "object") {
+  if (copy.agents && typeof copy.agents === "object") {
     const { migrated, changed, newMigrations } = migrateModelVersions(
-      rawConfig.agents as Record<string, unknown>,
+      copy.agents as Record<string, unknown>,
       existingMigrations
     )
     if (changed) {
-      rawConfig.agents = migrated
+      copy.agents = migrated
       needsWrite = true
       log("Migrated model versions in agents config")
     }
@@ -39,13 +41,13 @@ export function migrateConfigFile(
   }
 
   // Migrate model versions in categories (skip already-applied migrations)
-  if (rawConfig.categories && typeof rawConfig.categories === "object") {
+  if (copy.categories && typeof copy.categories === "object") {
     const { migrated, changed, newMigrations } = migrateModelVersions(
-      rawConfig.categories as Record<string, unknown>,
+      copy.categories as Record<string, unknown>,
       existingMigrations
     )
     if (changed) {
-      rawConfig.categories = migrated
+      copy.categories = migrated
       needsWrite = true
       log("Migrated model versions in categories config")
     }
@@ -56,20 +58,20 @@ export function migrateConfigFile(
   if (allNewMigrations.length > 0) {
     const updatedMigrations = Array.from(existingMigrations)
     updatedMigrations.push(...allNewMigrations)
-    rawConfig._migrations = updatedMigrations
+    copy._migrations = updatedMigrations
     needsWrite = true
   }
 
-  if (rawConfig.omo_agent) {
-    rawConfig.sisyphus_agent = rawConfig.omo_agent
-    delete rawConfig.omo_agent
+  if (copy.omo_agent) {
+    copy.sisyphus_agent = copy.omo_agent
+    delete copy.omo_agent
     needsWrite = true
   }
 
-  if (rawConfig.disabled_agents && Array.isArray(rawConfig.disabled_agents)) {
+  if (copy.disabled_agents && Array.isArray(copy.disabled_agents)) {
     const migrated: string[] = []
     let changed = false
-    for (const agent of rawConfig.disabled_agents as string[]) {
+    for (const agent of copy.disabled_agents as string[]) {
       const newAgent = AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
       if (newAgent !== agent) {
         changed = true
@@ -77,15 +79,15 @@ export function migrateConfigFile(
       migrated.push(newAgent)
     }
     if (changed) {
-      rawConfig.disabled_agents = migrated
+      copy.disabled_agents = migrated
       needsWrite = true
     }
   }
 
-  if (rawConfig.disabled_hooks && Array.isArray(rawConfig.disabled_hooks)) {
-    const { migrated, changed, removed } = migrateHookNames(rawConfig.disabled_hooks as string[])
+  if (copy.disabled_hooks && Array.isArray(copy.disabled_hooks)) {
+    const { migrated, changed, removed } = migrateHookNames(copy.disabled_hooks as string[])
     if (changed) {
-      rawConfig.disabled_hooks = migrated
+      copy.disabled_hooks = migrated
       needsWrite = true
     }
     if (removed.length > 0) {
@@ -99,13 +101,25 @@ export function migrateConfigFile(
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
       const backupPath = `${configPath}.bak.${timestamp}`
-      fs.copyFileSync(configPath, backupPath)
+      try {
+        fs.copyFileSync(configPath, backupPath)
+      } catch {
+        // Original file may not exist yet — skip backup
+      }
 
-      fs.writeFileSync(configPath, JSON.stringify(rawConfig, null, 2) + "\n", "utf-8")
+      fs.writeFileSync(configPath, JSON.stringify(copy, null, 2) + "\n", "utf-8")
       log(`Migrated config file: ${configPath} (backup: ${backupPath})`)
     } catch (err) {
       log(`Failed to write migrated config to ${configPath}:`, err)
+      // File write failed — rawConfig is untouched, preserving user's original values
+      return false
     }
+
+    // File write succeeded — apply changes to the original rawConfig
+    for (const key of Object.keys(rawConfig)) {
+      delete rawConfig[key]
+    }
+    Object.assign(rawConfig, copy)
   }
 
   return needsWrite

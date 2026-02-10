@@ -58,13 +58,17 @@ export async function startTask(
   const parentDirectory = parentSession?.data?.directory ?? directory
   log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
+  const inheritedPermission = (parentSession as any)?.data?.permission
+  const permissionRules = Array.isArray(inheritedPermission)
+    ? inheritedPermission.filter((r: any) => r?.permission !== "question")
+    : []
+  permissionRules.push({ permission: "question", action: "deny" as const, pattern: "*" })
+
   const createResult = await client.session.create({
     body: {
       parentID: input.parentSessionID,
       title: `Background: ${input.description}`,
-      permission: [
-        { permission: "question", action: "deny" as const, pattern: "*" },
-      ],
+      permission: permissionRules,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any,
     query: {
