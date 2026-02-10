@@ -1,7 +1,15 @@
 import type { PendingCall } from "./types"
 import type { CommentCheckerConfig } from "../../config/schema"
 
-import { initializeCommentCheckerCli, getCommentCheckerCliPathPromise, isCliPathUsable, processWithCli } from "./cli-runner"
+import z from "zod"
+
+import {
+  initializeCommentCheckerCli,
+  getCommentCheckerCliPathPromise,
+  isCliPathUsable,
+  processWithCli,
+  processApplyPatchEditsWithCli,
+} from "./cli-runner"
 import { registerPendingCall, startPendingCallCleanup, takePendingCall } from "./pending-calls"
 
 import * as fs from "fs"
@@ -81,13 +89,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
     ): Promise<void> => {
       debugLog("tool.execute.after:", { tool: input.tool, callID: input.callID })
 
-      const pendingCall = takePendingCall(input.callID)
-      if (!pendingCall) {
-        debugLog("no pendingCall found for:", input.callID)
-        return
-      }
-
-      debugLog("processing pendingCall:", pendingCall)
+      const toolLower = input.tool.toLowerCase()
 
       // Only skip if the output indicates a tool execution failure
       const outputLower = output.output.toLowerCase()
@@ -102,17 +104,75 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
         return
       }
 
-      try {
-        // Wait for CLI path resolution
-        const cliPath = await getCommentCheckerCliPathPromise()
+      const ApplyPatchMetadataSchema = z.object({
+        files: z.array(
+          z.object({
+            filePath: z.string(),
+            movePath: z.string().optional(),
+            before: z.string(),
+            after: z.string(),
+            type: z.string().optional(),
+          }),
+        ),
+      })
 
+      if (toolLower === "apply_patch") {
+        const parsed = ApplyPatchMetadataSchema.safeParse(output.metadata)
+        if (!parsed.success) {
+          debugLog("apply_patch metadata schema mismatch, skipping")
+          return
+        }
+
+        const edits = parsed.data.files
+          .filter((f) => f.type !== "delete")
+          .map((f) => ({
+            filePath: f.movePath ?? f.filePath,
+            before: f.before,
+            after: f.after,
+          }))
+
+        if (edits.length === 0) {
+          debugLog("apply_patch had no editable files, skipping")
+          return
+        }
+
+        try {
+          const cliPath = await getCommentCheckerCliPathPromise()
+          if (!isCliPathUsable(cliPath)) {
+            debugLog("CLI not available, skipping comment check")
+            return
+          }
+
+          debugLog("using CLI for apply_patch:", cliPath)
+          await processApplyPatchEditsWithCli(
+            input.sessionID,
+            edits,
+            output,
+            cliPath,
+            config?.custom_prompt,
+            debugLog,
+          )
+        } catch (err) {
+          debugLog("apply_patch comment check failed:", err)
+        }
+        return
+      }
+
+      const pendingCall = takePendingCall(input.callID)
+      if (!pendingCall) {
+        debugLog("no pendingCall found for:", input.callID)
+        return
+      }
+
+      debugLog("processing pendingCall:", pendingCall)
+
+      try {
+        const cliPath = await getCommentCheckerCliPathPromise()
         if (!isCliPathUsable(cliPath)) {
-          // CLI not available - silently skip comment checking
           debugLog("CLI not available, skipping comment check")
           return
         }
 
-        // CLI mode only
         debugLog("using CLI:", cliPath)
         await processWithCli(input, pendingCall, output, cliPath, config?.custom_prompt, debugLog)
       } catch (err) {

@@ -21,6 +21,7 @@ export function buildGptSisyphusJuniorPrompt(
   promptAppend?: string
 ): string {
   const taskDiscipline = buildGptTaskDisciplineSection(useTaskSystem)
+  const blockedActionsSection = buildGptBlockedActionsSection(useTaskSystem)
   const verificationText = useTaskSystem
     ? "All tasks marked completed"
     : "All todos marked completed"
@@ -45,19 +46,7 @@ Role: Execute tasks directly. You work ALONE.
 - Do NOT expand task boundaries beyond what's written.
 </scope_and_design_constraints>
 
-<blocked_actions>
-BLOCKED (will fail if attempted):
-| Tool | Status |
-|------|--------|
-| task | BLOCKED |
-
-ALLOWED:
-| Tool | Usage |
-|------|-------|
-| call_omo_agent | Spawn explore/librarian for research ONLY |
-
-You work ALONE for implementation. No delegation.
-</blocked_actions>
+${blockedActionsSection}
 
 <uncertainty_and_ambiguity>
 - If a task is ambiguous or underspecified:
@@ -97,6 +86,42 @@ Task NOT complete without evidence:
 
   if (!promptAppend) return prompt
   return prompt + "\n\n" + promptAppend
+}
+
+function buildGptBlockedActionsSection(useTaskSystem: boolean): string {
+  if (useTaskSystem) {
+    return `<blocked_actions>
+BLOCKED (will fail if attempted):
+| Tool | Status | Description |
+|------|--------|-------------|
+| task | BLOCKED | Agent delegation tool — you cannot spawn other agents |
+
+ALLOWED:
+| Tool | Usage |
+|------|-------|
+| call_omo_agent | Spawn explore/librarian for research ONLY |
+| task_create | Create tasks to track your work |
+| task_update | Update task status (in_progress, completed) |
+| task_list | List active tasks |
+| task_get | Get task details by ID |
+
+You work ALONE for implementation. No delegation.
+</blocked_actions>`
+  }
+
+  return `<blocked_actions>
+BLOCKED (will fail if attempted):
+| Tool | Status | Description |
+|------|--------|-------------|
+| task | BLOCKED | Agent delegation tool — you cannot spawn other agents |
+
+ALLOWED:
+| Tool | Usage |
+|------|-------|
+| call_omo_agent | Spawn explore/librarian for research ONLY |
+
+You work ALONE for implementation. No delegation.
+</blocked_actions>`
 }
 
 function buildGptTaskDisciplineSection(useTaskSystem: boolean): string {
