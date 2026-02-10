@@ -1,4 +1,4 @@
-export type ThinkingPartType = "thinking" | "redacted_thinking" | "reasoning"
+export type ThinkingPartType = "thinking" | "redacted_thinking" | "reasoning" | "reasoning.encrypted"
 export type MetaPartType = "step-start" | "step-finish"
 export type ContentPartType = "text" | "tool" | "tool_use" | "tool_result"
 
