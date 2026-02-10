@@ -48,22 +48,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
       deleteCalls.push(id)
     })
 
-    //#given - mock other dependencies
-    mock.module("./sync-session-creator.ts", () => ({
-      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
-    }))
-
-    mock.module("./sync-prompt-sender.ts", () => ({
-      sendSyncPrompt: async () => null,
-    }))
-
-    mock.module("./sync-session-poller.ts", () => ({
-      pollSyncSession: async () => null,
-    }))
-
-    mock.module("./sync-result-fetcher.ts", () => ({
-      fetchSyncResult: async () => ({ ok: true, textContent: "Result" }),
-    }))
   })
 
   afterEach(() => {
@@ -77,11 +61,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
   })
 
   test("cleans up toast and subagentSessions when fetchSyncResult returns ok: false", async () => {
-    //#given - mock fetchSyncResult to return error
-    mock.module("./sync-result-fetcher.ts", () => ({
-      fetchSyncResult: async () => ({ ok: false, error: "Fetch failed" }),
-    }))
-
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
@@ -89,6 +68,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }
 
     const { executeSyncTask } = require("./sync-task")
+
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: false as const, error: "Fetch failed" }),
+    }
 
     const mockCtx = {
       sessionID: "parent-session",
@@ -114,7 +100,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#when - executeSyncTask with fetchSyncResult failing
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
-    }, "test-agent", undefined, undefined)
+    }, "test-agent", undefined, undefined, undefined, deps)
 
     //#then - should return error and cleanup resources
     expect(result).toBe("Fetch failed")
@@ -125,11 +111,6 @@ describe("executeSyncTask - cleanup on error paths", () => {
   })
 
   test("cleans up toast and subagentSessions when pollSyncSession returns error", async () => {
-    //#given - mock pollSyncSession to return error
-    mock.module("./sync-session-poller.ts", () => ({
-      pollSyncSession: async () => "Poll error",
-    }))
-
     const mockClient = {
       session: {
         create: async () => ({ data: { id: "ses_test_12345678" } }),
@@ -137,6 +118,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }
 
     const { executeSyncTask } = require("./sync-task")
+
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => "Poll error",
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
 
     const mockCtx = {
       sessionID: "parent-session",
@@ -162,7 +150,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#when - executeSyncTask with pollSyncSession failing
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
-    }, "test-agent", undefined, undefined)
+    }, "test-agent", undefined, undefined, undefined, deps)
 
     //#then - should return error and cleanup resources
     expect(result).toBe("Poll error")
@@ -180,6 +168,13 @@ describe("executeSyncTask - cleanup on error paths", () => {
     }
 
     const { executeSyncTask } = require("./sync-task")
+
+    const deps = {
+      createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
 
     const mockCtx = {
       sessionID: "parent-session",
@@ -205,7 +200,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#when - executeSyncTask completes successfully
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
-    }, "test-agent", undefined, undefined)
+    }, "test-agent", undefined, undefined, undefined, deps)
 
     //#then - should complete and cleanup resources
     expect(result).toContain("Task completed")

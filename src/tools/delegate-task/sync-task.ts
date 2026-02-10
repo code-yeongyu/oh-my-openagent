@@ -7,10 +7,7 @@ import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
-import { createSyncSession } from "./sync-session-creator"
-import { sendSyncPrompt } from "./sync-prompt-sender"
-import { pollSyncSession } from "./sync-session-poller"
-import { fetchSyncResult } from "./sync-result-fetcher"
+import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -20,7 +17,8 @@ export async function executeSyncTask(
   agentToUse: string,
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
-  modelInfo?: ModelFallbackInfo
+  modelInfo?: ModelFallbackInfo,
+  deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
   const { client, directory, onSyncSessionCreated } = executorCtx
   const toastManager = getTaskToastManager()
@@ -28,7 +26,7 @@ export async function executeSyncTask(
   let syncSessionID: string | undefined
 
   try {
-    const createSessionResult = await createSyncSession(client, {
+    const createSessionResult = await deps.createSyncSession(client, {
       parentSessionID: parentContext.sessionID,
       agentToUse,
       description: args.description,
@@ -89,7 +87,7 @@ export async function executeSyncTask(
       storeToolMetadata(ctx.sessionID, ctx.callID, syncTaskMeta)
     }
 
-    const promptError = await sendSyncPrompt(client, {
+    const promptError = await deps.sendSyncPrompt(client, {
       sessionID,
       agentToUse,
       args,
@@ -103,7 +101,7 @@ export async function executeSyncTask(
     }
 
     try {
-      const pollError = await pollSyncSession(ctx, client, {
+      const pollError = await deps.pollSyncSession(ctx, client, {
         sessionID,
         agentToUse,
         toastManager,
@@ -113,7 +111,7 @@ export async function executeSyncTask(
         return pollError
       }
 
-      const result = await fetchSyncResult(client, sessionID)
+      const result = await deps.fetchSyncResult(client, sessionID)
       if (!result.ok) {
         return result.error
       }
