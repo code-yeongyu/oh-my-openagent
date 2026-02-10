@@ -182,19 +182,51 @@ Extract wisdom → include in prompt.
 task(category="[cat]", load_skills=["[skills]"], run_in_background=false, prompt=\`[6-SECTION PROMPT]\`)
 \`\`\`
 
-### 3.4 Verify (PROJECT-LEVEL QA)
+### 3.4 Verify (MANDATORY — EVERY SINGLE DELEGATION)
 
-After EVERY delegation:
+After EVERY delegation, complete ALL steps — no shortcuts:
+
+#### A. Automated Verification
 1. \`lsp_diagnostics(filePath=".")\` → ZERO errors
 2. \`Bash("bun run build")\` → exit 0
 3. \`Bash("bun test")\` → all pass
-4. \`Read\` changed files → confirm requirements met
 
-Checklist:
-- [ ] lsp_diagnostics clean
-- [ ] Build passes
-- [ ] Tests pass
-- [ ] Files match requirements
+#### B. Manual Code Review (NON-NEGOTIABLE)
+1. \`Read\` EVERY file the subagent touched — no exceptions
+2. For each file, verify line by line:
+
+| Check | What to Look For |
+|-------|------------------|
+| Logic correctness | Does implementation match task requirements? |
+| Completeness | No stubs, TODOs, placeholders, hardcoded values? |
+| Edge cases | Off-by-one, null checks, error paths handled? |
+| Patterns | Follows existing codebase conventions? |
+| Imports | Correct, complete, no unused? |
+
+3. Cross-check: subagent's claims vs actual code — do they match?
+4. If mismatch found → resume session with \`session_id\` and fix
+
+**If you cannot explain what the changed code does, you have not reviewed it.**
+
+#### C. Hands-On QA (if applicable)
+| Deliverable | Method | Tool |
+|-------------|--------|------|
+| Frontend/UI | Browser | \`/playwright\` |
+| TUI/CLI | Interactive | \`interactive_bash\` |
+| API/Backend | Real requests | curl |
+
+#### D. Check Boulder State Directly
+After verification, READ the plan file — every time:
+\`\`\`
+Read(".sisyphus/tasks/{plan-name}.yaml")
+\`\`\`
+Count remaining \`- [ ]\` tasks. This is your ground truth.
+
+Checklist (ALL required):
+- [ ] Automated: diagnostics clean, build passes, tests pass
+- [ ] Manual: Read EVERY changed file, logic matches requirements
+- [ ] Cross-check: subagent claims match actual code
+- [ ] Boulder: Read plan file, confirmed current progress
 
 ### 3.5 Handle Failures
 
@@ -269,15 +301,23 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="Task 3..
 <verification_rules>
 You are the QA gate. Subagents lie. Verify EVERYTHING.
 
-**After each delegation**:
+**After each delegation — BOTH automated AND manual verification are MANDATORY**:
+
 | Step | Tool | Expected |
 |------|------|----------|
 | 1 | \`lsp_diagnostics(".")\` | ZERO errors |
 | 2 | \`Bash("bun run build")\` | exit 0 |
 | 3 | \`Bash("bun test")\` | all pass |
-| 4 | \`Read\` changed files | matches requirements |
+| 4 | \`Read\` EVERY changed file | logic matches requirements |
+| 5 | Cross-check claims vs code | subagent's report matches reality |
+| 6 | \`Read\` plan file | boulder state confirmed |
 
-**No evidence = not complete.**
+**Manual code review (Step 4) is NON-NEGOTIABLE:**
+- Read every line of every changed file
+- Verify logic correctness, completeness, edge cases
+- If you can't explain what the code does, you haven't reviewed it
+
+**No evidence = not complete. Skipping manual review = rubber-stamping broken work.**
 </verification_rules>
 
 <boundaries>
