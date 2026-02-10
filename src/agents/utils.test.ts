@@ -1,5 +1,7 @@
+/// <reference types="bun-types" />
+
 import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
-import { createBuiltinAgents } from "./utils"
+import { createBuiltinAgents } from "./builtin-agents"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { clearSkillCache } from "../features/opencode-skill-loader/skill-content"
 import * as connectedProvidersCache from "../shared/connected-providers-cache"
@@ -248,6 +250,222 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.sisyphus.prompt).not.toContain("playwright")
     expect(agents.sisyphus.prompt).toContain("frontend-ui-ux")
     expect(agents.sisyphus.prompt).toContain("git-master")
+  })
+
+  test("includes custom agents in orchestrator prompts when provided via config", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set([
+        "anthropic/claude-opus-4-6",
+        "kimi-for-coding/k2p5",
+        "opencode/kimi-k2.5-free",
+        "zai-coding-plan/glm-4.7",
+        "opencode/glm-4.7-free",
+        "openai/gpt-5.2",
+      ])
+    )
+
+    const customAgentSummaries = [
+      {
+        name: "researcher",
+        description: "Research agent for deep analysis",
+        hidden: false,
+      },
+    ]
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents(
+        [],
+        {},
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        customAgentSummaries
+      )
+
+      // #then
+      expect(agents.sisyphus.prompt).toContain("researcher")
+      expect(agents.hephaestus.prompt).toContain("researcher")
+      expect(agents.atlas.prompt).toContain("researcher")
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("excludes hidden custom agents from orchestrator prompts", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["anthropic/claude-opus-4-6", "openai/gpt-5.2"])
+    )
+
+    const customAgentSummaries = [
+      {
+        name: "hidden-agent",
+        description: "Should never show",
+        hidden: true,
+      },
+    ]
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents(
+        [],
+        {},
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        customAgentSummaries
+      )
+
+      // #then
+      expect(agents.sisyphus.prompt).not.toContain("hidden-agent")
+      expect(agents.hephaestus.prompt).not.toContain("hidden-agent")
+      expect(agents.atlas.prompt).not.toContain("hidden-agent")
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("excludes disabled custom agents from orchestrator prompts", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["anthropic/claude-opus-4-6", "openai/gpt-5.2"])
+    )
+
+    const customAgentSummaries = [
+      {
+        name: "disabled-agent",
+        description: "Should never show",
+        disabled: true,
+      },
+    ]
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents(
+        [],
+        {},
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        customAgentSummaries
+      )
+
+      // #then
+      expect(agents.sisyphus.prompt).not.toContain("disabled-agent")
+      expect(agents.hephaestus.prompt).not.toContain("disabled-agent")
+      expect(agents.atlas.prompt).not.toContain("disabled-agent")
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("excludes custom agents when disabledAgents contains their name (case-insensitive)", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["anthropic/claude-opus-4-6", "openai/gpt-5.2"])
+    )
+
+    const disabledAgents = ["ReSeArChEr"]
+    const customAgentSummaries = [
+      {
+        name: "researcher",
+        description: "Should never show",
+      },
+    ]
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents(
+        disabledAgents,
+        {},
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        customAgentSummaries
+      )
+
+      // #then
+      expect(agents.sisyphus.prompt).not.toContain("researcher")
+      expect(agents.hephaestus.prompt).not.toContain("researcher")
+      expect(agents.atlas.prompt).not.toContain("researcher")
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("deduplicates custom agents case-insensitively", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["anthropic/claude-opus-4-6", "openai/gpt-5.2"])
+    )
+
+    const customAgentSummaries = [
+      { name: "Researcher", description: "First" },
+      { name: "researcher", description: "Second" },
+    ]
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents(
+        [],
+        {},
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        customAgentSummaries
+      )
+
+      // #then
+      const matches = agents.sisyphus.prompt.match(/Custom agent: researcher/gi) ?? []
+      expect(matches.length).toBe(1)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("sanitizes custom agent strings for markdown tables", async () => {
+    // #given
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["anthropic/claude-opus-4-6", "openai/gpt-5.2"])
+    )
+
+    const customAgentSummaries = [
+      {
+        name: "table-agent",
+        description: "Line1\nAlpha | Beta",
+      },
+    ]
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents(
+        [],
+        {},
+        undefined,
+        TEST_DEFAULT_MODEL,
+        undefined,
+        undefined,
+        [],
+        customAgentSummaries
+      )
+
+      // #then
+      expect(agents.sisyphus.prompt).toContain("Line1 Alpha \\| Beta")
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })
 
@@ -543,7 +761,7 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
 })
 
 describe("buildAgent with category and skills", () => {
-  const { buildAgent } = require("./utils")
+  const { buildAgent } = require("./agent-builder")
   const TEST_MODEL = "anthropic/claude-opus-4-6"
 
   beforeEach(() => {
@@ -991,4 +1209,29 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
      fetchSpy.mockRestore?.()
      cacheSpy.mockRestore?.()
    })
+  test("Hephaestus variant override respects user config over hardcoded default", async () => {
+    // #given - user provides variant in config
+    const overrides = {
+      hephaestus: { variant: "high" },
+    }
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then - user variant takes precedence over hardcoded "medium"
+    expect(agents.hephaestus).toBeDefined()
+    expect(agents.hephaestus.variant).toBe("high")
+  })
+
+  test("Hephaestus uses default variant when no user override provided", async () => {
+    // #given - no variant override in config
+    const overrides = {}
+
+    // #when
+    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+
+    // #then - default "medium" variant is applied
+    expect(agents.hephaestus).toBeDefined()
+    expect(agents.hephaestus.variant).toBe("medium")
+  })
 })

@@ -6,6 +6,7 @@ import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { REVIEW_LOOP_TEMPLATE } from "./templates/review-loop"
+import { HANDOFF_TEMPLATE } from "./templates/handoff"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -88,6 +89,22 @@ ${REVIEW_LOOP_TEMPLATE}
 $ARGUMENTS
 </user-task>`,
     argumentHint: "[target-branch]",
+  },
+  handoff: {
+    description: "(builtin) Create a detailed context summary for continuing work in a new session",
+    template: `<command-instruction>
+${HANDOFF_TEMPLATE}
+</command-instruction>
+
+<session-context>
+Session ID: $SESSION_ID
+Timestamp: $TIMESTAMP
+</session-context>
+
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[goal]",
   },
 }
 

@@ -84,6 +84,39 @@ export async function promptWithModelSuggestionRetry(
   client: Client,
   args: PromptArgs,
 ): Promise<void> {
+  // NOTE: Model suggestion retry removed — promptAsync returns 204 immediately,
+  // model errors happen asynchronously server-side and cannot be caught here
+  const promptPromise = client.session.promptAsync(
+    args as Parameters<typeof client.session.promptAsync>[0],
+  )
+
+  let timeoutID: ReturnType<typeof setTimeout> | null = null
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutID = setTimeout(() => {
+      reject(new Error("promptAsync timed out after 120000ms"))
+    }, 120000)
+  })
+
+  try {
+    await Promise.race([promptPromise, timeoutPromise])
+  } finally {
+    if (timeoutID !== null) clearTimeout(timeoutID)
+  }
+}
+
+/**
+ * Synchronous variant of promptWithModelSuggestionRetry.
+ *
+ * Uses `session.prompt` (blocking HTTP call that waits for the LLM response)
+ * instead of `promptAsync` (fire-and-forget HTTP 204).
+ *
+ * Required by callers that need the response to be available immediately after
+ * the call returns — e.g. look_at, which reads session messages right away.
+ */
+export async function promptSyncWithModelSuggestionRetry(
+  client: Client,
+  args: PromptArgs,
+): Promise<void> {
   try {
     await client.session.prompt(args as Parameters<typeof client.session.prompt>[0])
   } catch (error) {

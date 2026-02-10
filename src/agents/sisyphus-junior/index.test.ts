@@ -200,6 +200,88 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
     })
   })
 
+  describe("useTaskSystem integration", () => {
+    test("useTaskSystem=true produces Task_Discipline prompt for Claude", () => {
+      //#given
+      const override = { model: "anthropic/claude-sonnet-4-5" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
+
+      //#then
+      expect(result.prompt).toContain("TaskCreate")
+      expect(result.prompt).toContain("TaskUpdate")
+      expect(result.prompt).not.toContain("todowrite")
+    })
+
+    test("useTaskSystem=true produces task_discipline_spec prompt for GPT", () => {
+      //#given
+      const override = { model: "openai/gpt-5.2" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
+
+      //#then
+      expect(result.prompt).toContain("<task_discipline_spec>")
+      expect(result.prompt).toContain("TaskCreate")
+      expect(result.prompt).not.toContain("<todo_discipline_spec>")
+    })
+
+    test("useTaskSystem=false (default) produces Todo_Discipline prompt", () => {
+      //#given
+      const override = {}
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override)
+
+      //#then
+      expect(result.prompt).toContain("todowrite")
+      expect(result.prompt).not.toContain("TaskCreate")
+    })
+
+    test("useTaskSystem=true explicitly lists task management tools as ALLOWED for Claude", () => {
+      //#given
+      const override = { model: "anthropic/claude-sonnet-4-5" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
+
+      //#then - prompt must disambiguate: delegation tool blocked, management tools allowed
+      expect(result.prompt).toContain("task_create")
+      expect(result.prompt).toContain("task_update")
+      expect(result.prompt).toContain("task_list")
+      expect(result.prompt).toContain("task_get")
+      expect(result.prompt).toContain("agent delegation tool")
+    })
+
+    test("useTaskSystem=true explicitly lists task management tools as ALLOWED for GPT", () => {
+      //#given
+      const override = { model: "openai/gpt-5.2" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
+
+      //#then - prompt must disambiguate: delegation tool blocked, management tools allowed
+      expect(result.prompt).toContain("task_create")
+      expect(result.prompt).toContain("task_update")
+      expect(result.prompt).toContain("task_list")
+      expect(result.prompt).toContain("task_get")
+      expect(result.prompt).toContain("Agent delegation tool")
+    })
+
+    test("useTaskSystem=false does NOT list task management tools in constraints", () => {
+      //#given - Claude model without task system
+      const override = { model: "anthropic/claude-sonnet-4-5" }
+
+      //#when
+      const result = createSisyphusJuniorAgentWithOverrides(override, undefined, false)
+
+      //#then - no task management tool references in constraints section
+      expect(result.prompt).not.toContain("task_create")
+      expect(result.prompt).not.toContain("task_update")
+    })
+  })
+
   describe("prompt composition", () => {
     test("base prompt contains discipline constraints", () => {
       // given

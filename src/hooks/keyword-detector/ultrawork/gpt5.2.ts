@@ -73,10 +73,10 @@ Use these when they provide clear value based on the decision framework above:
 
 | Resource | When to Use | How to Use |
 |----------|-------------|------------|
-| explore agent | Need codebase patterns you don't have | \`task(subagent_type="explore", run_in_background=true, ...)\` |
-| librarian agent | External library docs, OSS examples | \`task(subagent_type="librarian", run_in_background=true, ...)\` |
-| oracle agent | Stuck on architecture/debugging after 2+ attempts | \`task(subagent_type="oracle", ...)\` |
-| plan agent | Complex multi-step with dependencies (5+ steps) | \`task(subagent_type="plan", ...)\` |
+| explore agent | Need codebase patterns you don't have | \`task(subagent_type="explore", load_skills=[], run_in_background=true, ...)\` |
+| librarian agent | External library docs, OSS examples | \`task(subagent_type="librarian", load_skills=[], run_in_background=true, ...)\` |
+| oracle agent | Stuck on architecture/debugging after 2+ attempts | \`task(subagent_type="oracle", load_skills=[], ...)\` |
+| plan agent | Complex multi-step with dependencies (5+ steps) | \`task(subagent_type="plan", load_skills=[], ...)\` |
 | task category | Specialized work matching a category | \`task(category="...", load_skills=[...])\` |
 
 <tool_usage_rules>
@@ -97,8 +97,8 @@ Use these when they provide clear value based on the decision framework above:
 **ALWAYS run both tracks in parallel:**
 \`\`\`
 // Fire background agents for deep exploration
-task(subagent_type="explore", load_skills=[], prompt="Find X patterns...", run_in_background=true)
-task(subagent_type="librarian", load_skills=[], prompt="Find docs for Y...", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="I'm implementing [TASK] and need to understand [KNOWLEDGE GAP]. Find [X] patterns in the codebase — file paths, implementation approach, conventions used, and how modules connect. I'll use this to [DOWNSTREAM DECISION]. Focus on production code in src/. Return file paths with brief descriptions.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="I'm working with [TECHNOLOGY] and need [SPECIFIC INFO]. Find official docs and production examples for [Y] — API reference, configuration, recommended patterns, and pitfalls. Skip tutorials. I'll use this to [DECISION THIS INFORMS].", run_in_background=true)
 
 // WHILE THEY RUN - use direct tools for immediate context
 grep(pattern="relevant_pattern", path="src/")

@@ -2,7 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRgFiles } from "./cli"
 import { resolveGrepCliWithAutoInstall } from "./constants"
-import { formatGlobResult } from "./utils"
+import { formatGlobResult } from "./result-formatter"
 
 export function createGlobTools(ctx: PluginInput): Record<string, ToolDefinition> {
   const glob: ToolDefinition = tool({

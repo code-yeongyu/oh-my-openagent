@@ -19,14 +19,18 @@ export async function resolveSession(options: {
     return sessionId
   }
 
-  let lastError: unknown
   for (let attempt = 1; attempt <= SESSION_CREATE_MAX_RETRIES; attempt++) {
     const res = await client.session.create({
-      body: { title: "oh-my-opencode run" },
+      body: {
+        title: "oh-my-opencode run",
+        // In CLI run mode there's no TUI to answer questions.
+        permission: [
+          { permission: "question", action: "deny" as const, pattern: "*" },
+        ],
+      } as any,
     })
 
     if (res.error) {
-      lastError = res.error
       console.error(
         pc.yellow(`Session create attempt ${attempt}/${SESSION_CREATE_MAX_RETRIES} failed:`)
       )
@@ -44,9 +48,6 @@ export async function resolveSession(options: {
       return res.data.id
     }
 
-    lastError = new Error(
-      `Unexpected response: ${JSON.stringify(res, null, 2)}`
-    )
     console.error(
       pc.yellow(
         `Session create attempt ${attempt}/${SESSION_CREATE_MAX_RETRIES}: No session ID returned`

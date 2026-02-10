@@ -4,6 +4,7 @@ export type BackgroundTaskStatus =
   | "completed"
   | "error"
   | "cancelled"
+  | "interrupt"
 
 export interface TaskProgress {
   toolCalls: number

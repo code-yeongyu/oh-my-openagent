@@ -1,69 +1,91 @@
-# CLAUDE TASKS FEATURE KNOWLEDGE BASE
+# CLAUDE TASKS KNOWLEDGE BASE
 
 ## OVERVIEW
 
-Claude Code compatible task schema and storage. Provides core task management utilities used by task-related tools and features.
+Claude Code compatible task schema and storage. Core task management with file-based persistence and atomic writes.
 
 ## STRUCTURE
-
 ```
 claude-tasks/
-├── types.ts          # Task schema (Zod)
-├── types.test.ts     # Schema validation tests (8 tests)
-├── storage.ts        # File operations
-├── storage.test.ts   # Storage tests (14 tests)
-├── todo-sync.ts      # Task → Todo synchronization
-└── index.ts          # Barrel exports
+├── types.ts               # Task schema (Zod)
+├── types.test.ts          # Schema validation tests
+├── storage.ts             # File operations (atomic write, locking)
+├── storage.test.ts        # Storage tests (30 tests, 543 lines)
+├── session-storage.ts     # Session-scoped task storage
+├── session-storage.test.ts
+└── index.ts               # Barrel exports
 ```
 
 ## TASK SCHEMA
 
 ```typescript
 type TaskStatus = "pending" | "in_progress" | "completed" | "deleted"
-
 interface Task {
-  id: string
-  subject: string           // Imperative: "Run tests" (was: title)
+  id: string                    // T-{uuid}
+  subject: string               // Imperative: "Run tests"
   description: string
   status: TaskStatus
-  activeForm?: string       // Present continuous: "Running tests"
-  blocks: string[]          // Task IDs this task blocks
-  blockedBy: string[]       // Task IDs blocking this task (was: dependsOn)
-  owner?: string            // Agent name
+  activeForm?: string           // Present continuous: "Running tests"
+  blocks: string[]              // Task IDs this task blocks
+  blockedBy: string[]           // Task IDs blocking this task
+  owner?: string                // Agent name
   metadata?: Record<string, unknown>
-  repoURL?: string          // oh-my-opencode specific
-  parentID?: string         // oh-my-opencode specific
-  threadID: string          // oh-my-opencode specific
+  repoURL?: string
+  parentID?: string
+  threadID?: string
 }
 ```
-
-**Key Differences from Legacy**:
-- `subject` (was `title`)
-- `blockedBy` (was `dependsOn`)
-- `blocks` (new field)
-- `activeForm` (new field)
-
-## TODO SYNC
-
-Task system includes sync layer (`todo-sync.ts`) that automatically mirrors task state to the project's Todo system.
-
-- **Creation**: `task_create` adds corresponding Todo item
-- **Updates**: `task_update` reflects in Todo list
-- **Completion**: `completed` status marks Todo item done
 
 ## STORAGE UTILITIES
 
 | Function | Purpose |
 |----------|---------|
-| `getTaskDir(config)` | Returns task storage directory path |
-| `resolveTaskListId(config)` | Resolves task list ID (env → config → cwd basename) |
-| `readJsonSafe(path, schema)` | Parse + validate, returns null on failure |
-| `writeJsonAtomic(path, data)` | Atomic write via temp file + rename |
-| `acquireLock(dirPath)` | File-based lock with 30s stale threshold |
+| `getTaskDir(config)` | Task storage directory path |
+| `resolveTaskListId(config)` | Task list ID (env → config → cwd) |
+| `readJsonSafe(path, schema)` | Parse + validate, null on failure |
+| `writeJsonAtomic(path, data)` | Atomic write via temp + rename |
+| `acquireLock(dirPath)` | File lock with 30s stale threshold |
+| `generateTaskId()` | `T-{uuid}` format |
+| `findTaskAcrossSessions(config, taskId)` | Locate task in any session |
+
+## TODO SYNC
+
+Automatic bidirectional synchronization between tasks and OpenCode's todo system.
+
+| Function | Purpose |
+|----------|---------|
+| `syncTaskToTodo(task)` | Convert Task to TodoInfo, returns `null` for deleted tasks |
+| `syncTaskTodoUpdate(ctx, task, sessionID, writer?)` | Fetch current todos, update specific task, write back |
+| `syncAllTasksToTodos(ctx, tasks, sessionID?)` | Bulk sync multiple tasks to todos |
+
+### Status Mapping
+
+| Task Status | Todo Status |
+|-------------|-------------|
+| `pending` | `pending` |
+| `in_progress` | `in_progress` |
+| `completed` | `completed` |
+| `deleted` | `null` (removed from todos) |
+
+### Field Mapping
+
+| Task Field | Todo Field |
+|------------|------------|
+| `task.id` | `todo.id` |
+| `task.subject` | `todo.content` |
+| `task.status` (mapped) | `todo.status` |
+| `task.metadata.priority` | `todo.priority` |
+
+Priority values: `"low"`, `"medium"`, `"high"`
+
+### Automatic Sync Triggers
+
+Sync occurs automatically on:
+- `task_create` — new task added to todos
+- `task_update` — task changes reflected in todos
 
 ## ANTI-PATTERNS
 
 - Direct fs operations (use storage utilities)
 - Skipping lock acquisition for writes
-- Ignoring null returns from readJsonSafe
-- Using old schema field names (title, dependsOn)
+- Using old field names (title → subject, dependsOn → blockedBy)

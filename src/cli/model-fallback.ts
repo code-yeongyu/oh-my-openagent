@@ -1,133 +1,27 @@
 import {
-  AGENT_MODEL_REQUIREMENTS,
-  CATEGORY_MODEL_REQUIREMENTS,
-  type FallbackEntry,
+	AGENT_MODEL_REQUIREMENTS,
+	CATEGORY_MODEL_REQUIREMENTS,
 } from "../shared/model-requirements"
 import type { InstallConfig } from "./types"
 
-interface ProviderAvailability {
-  native: {
-    claude: boolean
-    openai: boolean
-    gemini: boolean
-  }
-  opencodeZen: boolean
-  copilot: boolean
-  zai: boolean
-  kimiForCoding: boolean
-  isMaxPlan: boolean
-}
+import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
+import { toProviderAvailability } from "./provider-availability"
+import {
+	getSisyphusFallbackChain,
+	isAnyFallbackEntryAvailable,
+	isRequiredModelAvailable,
+	isRequiredProviderAvailable,
+	resolveModelFromChain,
+} from "./fallback-chain-resolution"
 
-interface AgentConfig {
-  model: string
-  variant?: string
-}
-
-interface CategoryConfig {
-  model: string
-  variant?: string
-}
-
-export interface GeneratedOmoConfig {
-  $schema: string
-  agents?: Record<string, AgentConfig>
-  categories?: Record<string, CategoryConfig>
-  [key: string]: unknown
-}
+export type { GeneratedOmoConfig } from "./model-fallback-types"
 
 const ZAI_MODEL = "zai-coding-plan/glm-4.7"
 
 const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
 
-function toProviderAvailability(config: InstallConfig): ProviderAvailability {
-  return {
-    native: {
-      claude: config.hasClaude,
-      openai: config.hasOpenAI,
-      gemini: config.hasGemini,
-    },
-    opencodeZen: config.hasOpencodeZen,
-    copilot: config.hasCopilot,
-    zai: config.hasZaiCodingPlan,
-    kimiForCoding: config.hasKimiForCoding,
-    isMaxPlan: config.isMax20,
-  }
-}
 
-function isProviderAvailable(provider: string, avail: ProviderAvailability): boolean {
-  const mapping: Record<string, boolean> = {
-    anthropic: avail.native.claude,
-    openai: avail.native.openai,
-    google: avail.native.gemini,
-    "github-copilot": avail.copilot,
-    opencode: avail.opencodeZen,
-    "zai-coding-plan": avail.zai,
-    "kimi-for-coding": avail.kimiForCoding,
-  }
-  return mapping[provider] ?? false
-}
-
-function transformModelForProvider(provider: string, model: string): string {
-  if (provider === "github-copilot") {
-    return model
-      .replace("claude-opus-4-6", "claude-opus-4.6")
-      .replace("claude-sonnet-4-5", "claude-sonnet-4.5")
-      .replace("claude-haiku-4-5", "claude-haiku-4.5")
-      .replace("claude-sonnet-4", "claude-sonnet-4")
-      .replace("gemini-3-pro", "gemini-3-pro-preview")
-      .replace("gemini-3-flash", "gemini-3-flash-preview")
-  }
-  return model
-}
-
-function resolveModelFromChain(
-  fallbackChain: FallbackEntry[],
-  avail: ProviderAvailability
-): { model: string; variant?: string } | null {
-  for (const entry of fallbackChain) {
-    for (const provider of entry.providers) {
-      if (isProviderAvailable(provider, avail)) {
-        const transformedModel = transformModelForProvider(provider, entry.model)
-        return {
-          model: `${provider}/${transformedModel}`,
-          variant: entry.variant,
-        }
-      }
-    }
-  }
-  return null
-}
-
-function getSisyphusFallbackChain(): FallbackEntry[] {
-  return AGENT_MODEL_REQUIREMENTS.sisyphus.fallbackChain
-}
-
-function isAnyFallbackEntryAvailable(
-  fallbackChain: FallbackEntry[],
-  avail: ProviderAvailability
-): boolean {
-  return fallbackChain.some((entry) =>
-    entry.providers.some((provider) => isProviderAvailable(provider, avail))
-  )
-}
-
-function isRequiredModelAvailable(
-  requiresModel: string,
-  fallbackChain: FallbackEntry[],
-  avail: ProviderAvailability
-): boolean {
-  const matchingEntry = fallbackChain.find((entry) => entry.model === requiresModel)
-  if (!matchingEntry) return false
-  return matchingEntry.providers.some((provider) => isProviderAvailable(provider, avail))
-}
-
-function isRequiredProviderAvailable(
-  requiredProviders: string[],
-  avail: ProviderAvailability
-): boolean {
-  return requiredProviders.some((provider) => isProviderAvailable(provider, avail))
-}
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const avail = toProviderAvailability(config)

@@ -1,6 +1,5 @@
 import pc from "picocolors"
 import type { RunOptions, RunContext } from "./types"
-import { checkCompletionConditions } from "./completion"
 import { createEventState, processEvents, serializeError } from "./events"
 import { loadPluginConfig } from "../../plugin-config"
 import { createServerConnection } from "./server-connection"
@@ -8,11 +7,11 @@ import { resolveSession } from "./session-resolver"
 import { createJsonOutputManager } from "./json-output"
 import { executeOnCompleteHook } from "./on-complete-hook"
 import { resolveRunAgent } from "./agent-resolver"
+import { pollForCompletion } from "./poll-for-completion"
 
 export { resolveRunAgent }
 
-const POLL_INTERVAL_MS = 500
-const DEFAULT_TIMEOUT_MS = 0
+const DEFAULT_TIMEOUT_MS = 600_000
 
 export async function run(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLI_RUN_MODE = "true"
@@ -68,7 +67,9 @@ export async function run(options: RunOptions): Promise<number> {
       const ctx: RunContext = { client, sessionID, directory, abortController }
       const events = await client.event.subscribe()
       const eventState = createEventState()
-      const eventProcessor = processEvents(ctx, events.stream, eventState)
+      const eventProcessor = processEvents(ctx, events.stream, eventState).catch(
+        () => {},
+      )
 
       console.log(pc.dim("\nSending prompt..."))
       await client.session.promptAsync({
@@ -80,11 +81,14 @@ export async function run(options: RunOptions): Promise<number> {
         query: { directory },
       })
 
-      console.log(pc.dim("Waiting for completion...\n"))
-      const exitCode = await pollForCompletion(ctx, eventState, abortController)
+       console.log(pc.dim("Waiting for completion...\n"))
+       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
-      await eventProcessor.catch(() => {})
-      cleanup()
+       // Abort the event stream to stop the processor
+       abortController.abort()
+
+       await eventProcessor
+       cleanup()
 
       const durationMs = Date.now() - startTime
 
@@ -124,30 +128,3 @@ export async function run(options: RunOptions): Promise<number> {
   }
 }
 
-async function pollForCompletion(
-  ctx: RunContext,
-  eventState: ReturnType<typeof createEventState>,
-  abortController: AbortController
-): Promise<number> {
-  while (!abortController.signal.aborted) {
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
-
-    if (!eventState.mainSessionIdle) continue
-
-    if (eventState.mainSessionError) {
-      console.error(pc.red(`\n\nSession ended with error: ${eventState.lastError}`))
-      console.error(pc.yellow("Check if todos were completed before the error."))
-      return 1
-    }
-
-    if (!eventState.hasReceivedMeaningfulWork) continue
-
-    const shouldExit = await checkCompletionConditions(ctx)
-    if (shouldExit) {
-      console.log(pc.green("\n\nAll tasks completed."))
-      return 0
-    }
-  }
-
-  return 130
-}

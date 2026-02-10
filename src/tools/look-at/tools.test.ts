@@ -111,17 +111,16 @@ describe("look-at tool", () => {
   })
 
   describe("createLookAt error handling", () => {
-    // given JSON parse error occurs in session.prompt
+    // given promptAsync throws error
     // when LookAt tool executed
-    // then return user-friendly error message
-    test("handles JSON parse error from session.prompt gracefully", async () => {
+    // then returns error string immediately (no message fetch)
+    test("returns error immediately when promptAsync fails", async () => {
       const mockClient = {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_test_json_error" } }),
-          prompt: async () => {
-            throw new Error("JSON Parse error: Unexpected EOF")
-          },
+          create: async () => ({ data: { id: "ses_test_prompt_fail" } }),
+          promptAsync: async () => { throw new Error("Network connection failed") },
+          status: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
         },
       }
@@ -144,26 +143,63 @@ describe("look-at tool", () => {
 
       const result = await tool.execute(
         { file_path: "/test/file.png", goal: "analyze image" },
-        toolContext
+        toolContext,
       )
-
-      expect(result).toContain("Error: Failed to analyze")
-      expect(result).toContain("malformed response")
-      expect(result).toContain("multimodal-looker")
-      expect(result).toContain("image/png")
+      expect(result).toContain("Error")
+      expect(result).toContain("Network connection failed")
     })
 
-    // given generic error occurs in session.prompt
+    // given promptAsync succeeds but status API fails (polling degrades gracefully)
     // when LookAt tool executed
-    // then return error including original error message
-    test("handles generic prompt error gracefully", async () => {
+    // then still attempts to fetch messages (graceful degradation)
+    test("fetches messages even when status API fails", async () => {
       const mockClient = {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
-          create: async () => ({ data: { id: "ses_test_generic_error" } }),
-          prompt: async () => {
-            throw new Error("Network connection failed")
-          },
+          create: async () => ({ data: { id: "ses_test_poll_timeout" } }),
+          promptAsync: async () => ({}),
+          status: async () => ({ error: new Error("status unavailable") }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "partial result" }] },
+            ],
+          }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext: ToolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
+      }
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze" },
+        toolContext,
+      )
+      expect(result).toBe("partial result")
+    })
+
+    // given promptAsync succeeds and session becomes idle
+    // when LookAt tool executed and no assistant message found
+    // then returns error about no response
+    test("returns error when no assistant message after successful prompt", async () => {
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_test_no_msg" } }),
+          promptAsync: async () => ({}),
+          status: async () => ({ data: {} }),
           messages: async () => ({ data: [] }),
         },
       }
@@ -186,19 +222,56 @@ describe("look-at tool", () => {
 
       const result = await tool.execute(
         { file_path: "/test/file.pdf", goal: "extract text" },
-        toolContext
+        toolContext,
       )
+      expect(result).toContain("Error")
+      expect(result).toContain("multimodal-looker")
+    })
 
-      expect(result).toContain("Error: Failed to send prompt")
-      expect(result).toContain("Network connection failed")
+    // given session creation fails
+    // when LookAt tool executed
+    // then returns error about session creation
+    test("returns error when session creation fails", async () => {
+      const mockClient = {
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ error: "Internal server error" }),
+          promptAsync: async () => ({}),
+          status: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext: ToolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
+      }
+
+      const result = await tool.execute(
+        { file_path: "/test/file.png", goal: "analyze" },
+        toolContext,
+      )
+      expect(result).toContain("Error")
+      expect(result).toContain("session")
     })
   })
 
   describe("createLookAt model passthrough", () => {
     // given multimodal-looker agent has resolved model info
     // when LookAt tool executed
-    // then model info should be passed to session.prompt
-    test("passes multimodal-looker model to session.prompt when available", async () => {
+    // then model info should be passed to promptAsync
+    test("passes multimodal-looker model to promptAsync when available", async () => {
       let promptBody: any
 
       const mockClient = {
@@ -216,10 +289,11 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_model_passthrough" } }),
-          prompt: async (input: any) => {
+          promptAsync: async (input: any) => {
             promptBody = input.body
             return { data: {} }
           },
+          status: async () => ({ data: {} }),
           messages: async () => ({
             data: [
               { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "done" }] },
@@ -259,7 +333,7 @@ describe("look-at tool", () => {
   describe("createLookAt with image_data", () => {
     // given base64 image data is provided
     // when LookAt tool executed
-    // then should send data URL to session.prompt
+    // then should send data URL to promptAsync
     test("sends data URL when image_data provided", async () => {
       let promptBody: any
 
@@ -270,10 +344,11 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_image_data_test" } }),
-          prompt: async (input: any) => {
+          promptAsync: async (input: any) => {
             promptBody = input.body
             return { data: {} }
           },
+          status: async () => ({ data: {} }),
           messages: async () => ({
             data: [
               { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] },
@@ -323,10 +398,11 @@ describe("look-at tool", () => {
         session: {
           get: async () => ({ data: { directory: "/project" } }),
           create: async () => ({ data: { id: "ses_raw_base64_test" } }),
-          prompt: async (input: any) => {
+          promptAsync: async (input: any) => {
             promptBody = input.body
             return { data: {} }
           },
+          status: async () => ({ data: {} }),
           messages: async () => ({
             data: [
               { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] },

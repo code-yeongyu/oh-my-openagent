@@ -1,26 +1,43 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+declare const require: (name: string) => any
+const { describe, it, expect, beforeEach, afterEach, beforeAll } = require("bun:test")
 import { mkdtempSync, writeFileSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
-import { fetchAvailableModels, fuzzyMatchModel, getConnectedProviders, __resetModelCache, isModelAvailable } from "./model-availability"
+
+let __resetModelCache: () => void
+let fetchAvailableModels: (client?: unknown, options?: { connectedProviders?: string[] | null }) => Promise<Set<string>>
+let fuzzyMatchModel: (target: string, available: Set<string>, providers?: string[]) => string | null
+let isModelAvailable: (targetModel: string, availableModels: Set<string>) => boolean
+let getConnectedProviders: (client: unknown) => Promise<string[]>
+
+beforeAll(async () => {
+  ;({
+    __resetModelCache,
+    fetchAvailableModels,
+    fuzzyMatchModel,
+    isModelAvailable,
+    getConnectedProviders,
+  } = await import("./model-availability"))
+})
 
 describe("fetchAvailableModels", () => {
   let tempDir: string
-  let originalXdgCache: string | undefined
+	let originalXdgCache: string | undefined
+
 
   beforeEach(() => {
     __resetModelCache()
     tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
-    originalXdgCache = process.env.XDG_CACHE_HOME
-    process.env.XDG_CACHE_HOME = tempDir
+		originalXdgCache = process.env.XDG_CACHE_HOME
+		process.env.XDG_CACHE_HOME = tempDir
   })
 
   afterEach(() => {
     if (originalXdgCache !== undefined) {
-      process.env.XDG_CACHE_HOME = originalXdgCache
-    } else {
-      delete process.env.XDG_CACHE_HOME
-    }
+			process.env.XDG_CACHE_HOME = originalXdgCache
+		} else {
+			delete process.env.XDG_CACHE_HOME
+		}
     rmSync(tempDir, { recursive: true, force: true })
   })
 

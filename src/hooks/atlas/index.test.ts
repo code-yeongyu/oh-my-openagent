@@ -34,6 +34,7 @@ describe("atlas hook", () => {
       client: {
         session: {
           prompt: promptMock,
+          promptAsync: promptMock,
         },
       },
       _promptMock: promptMock,
@@ -687,6 +688,34 @@ describe("atlas hook", () => {
       })
 
       // then - should not call prompt
+      expect(mockInput._promptMock).not.toHaveBeenCalled()
+    })
+
+    test("should not inject when main session is not in boulder session_ids", async () => {
+      // given - boulder state exists but current (main) session is NOT in session_ids
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["some-other-session-id"],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when - main session fires idle but is NOT in boulder's session_ids
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then - should NOT call prompt because session is not part of this boulder
       expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 

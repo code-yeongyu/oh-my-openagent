@@ -89,6 +89,7 @@ export class BackgroundManager {
   private processingKeys: Set<string> = new Set()
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private notificationQueueByParent: Map<string, Promise<void>> = new Map()
 
   constructor(
     ctx: PluginInput,
@@ -235,13 +236,17 @@ export class BackgroundManager {
     const parentDirectory = parentSession?.data?.directory ?? this.directory
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
+    const inheritedPermission = (parentSession as any)?.data?.permission
+    const permissionRules = Array.isArray(inheritedPermission)
+      ? inheritedPermission.filter((r: any) => r?.permission !== "question")
+      : []
+    permissionRules.push({ permission: "question", action: "deny" as const, pattern: "*" })
+
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionID,
         title: `${input.description} (@${input.agent} subagent)`,
-        permission: [
-          { permission: "question", action: "deny" as const, pattern: "*" },
-        ],
+        permission: permissionRules,
       } as any,
       query: {
         directory: parentDirectory,
@@ -310,7 +315,7 @@ export class BackgroundManager {
       promptLength: input.prompt.length,
     })
 
-    // Use prompt() instead of promptAsync() to properly initialize agent loop (fire-and-forget)
+    // Fire-and-forget prompt via promptAsync (no response body needed)
     // Include model if caller provided one (e.g., from Sisyphus category configs)
     // IMPORTANT: variant must be a top-level field in the body, NOT nested inside model
     // OpenCode's PromptInput schema expects: { model: { providerID, modelID }, variant: "max" }
@@ -338,7 +343,7 @@ export class BackgroundManager {
       log("[background-agent] promptAsync error:", error)
       const existingTask = this.findBySession(sessionID)
       if (existingTask) {
-        existingTask.status = "error"
+        existingTask.status = "interrupt"
         const errorMessage = error instanceof Error ? error.message : String(error)
         if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
           existingTask.error = `Agent "${input.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`
@@ -358,7 +363,7 @@ export class BackgroundManager {
 
         this.markForNotification(existingTask)
         this.cleanupPendingByParent(existingTask)
-        this.notifyParentSession(existingTask).catch(err => {
+        this.enqueueNotificationForParent(existingTask.parentSessionID, () => this.notifyParentSession(existingTask)).catch(err => {
           log("[background-agent] Failed to notify on error:", err)
         })
       }
@@ -571,7 +576,7 @@ export class BackgroundManager {
       promptLength: input.prompt.length,
     })
 
-    // Use prompt() instead of promptAsync() to properly initialize agent loop
+    // Fire-and-forget prompt via promptAsync (no response body needed)
     // Include model if task has one (preserved from original launch with category config)
     // variant must be top-level in body, not nested inside model (OpenCode PromptInput schema)
     const resumeModel = existingTask.model
@@ -579,7 +584,7 @@ export class BackgroundManager {
       : undefined
     const resumeVariant = existingTask.model?.variant
 
-    this.client.session.prompt({
+    this.client.session.promptAsync({
       path: { id: existingTask.sessionID },
       body: {
         agent: existingTask.agent,
@@ -595,7 +600,7 @@ export class BackgroundManager {
       },
     }).catch((error) => {
       log("[background-agent] resume prompt error:", error)
-      existingTask.status = "error"
+      existingTask.status = "interrupt"
       const errorMessage = error instanceof Error ? error.message : String(error)
       existingTask.error = errorMessage
       existingTask.completedAt = new Date()
@@ -615,7 +620,7 @@ export class BackgroundManager {
 
       this.markForNotification(existingTask)
       this.cleanupPendingByParent(existingTask)
-      this.notifyParentSession(existingTask).catch(err => {
+      this.enqueueNotificationForParent(existingTask.parentSessionID, () => this.notifyParentSession(existingTask)).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
       })
     })
@@ -949,7 +954,7 @@ export class BackgroundManager {
     this.markForNotification(task)
 
     try {
-      await this.notifyParentSession(task)
+      await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
       log(`[background-agent] Task cancelled via ${source}:`, task.id)
     } catch (err) {
       log("[background-agent] Error in notifyParentSession for cancelled task:", { taskId: task.id, error: err })
@@ -1039,9 +1044,9 @@ export class BackgroundManager {
   }
 
   /**
-   * Get all completed tasks still in memory (for compaction hook)
+   * Get all non-running tasks still in memory (for compaction hook)
    */
-  getCompletedTasks(): BackgroundTask[] {
+  getNonRunningTasks(): BackgroundTask[] {
     return Array.from(this.tasks.values()).filter(t => t.status !== "running")
   }
 
@@ -1084,7 +1089,7 @@ export class BackgroundManager {
     }
 
     try {
-      await this.notifyParentSession(task)
+      await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
       log(`[background-agent] Task completed via ${source}:`, task.id)
     } catch (err) {
       log("[background-agent] Error in notifyParentSession:", { taskId: task.id, error: err })
@@ -1114,17 +1119,20 @@ export class BackgroundManager {
 
     // Update pending tracking and check if all tasks complete
     const pendingSet = this.pendingByParent.get(task.parentSessionID)
+    let allComplete = false
+    let remainingCount = 0
     if (pendingSet) {
       pendingSet.delete(task.id)
-      if (pendingSet.size === 0) {
+      remainingCount = pendingSet.size
+      allComplete = remainingCount === 0
+      if (allComplete) {
         this.pendingByParent.delete(task.parentSessionID)
       }
+    } else {
+      allComplete = true
     }
 
-    const allComplete = !pendingSet || pendingSet.size === 0
-    const remainingCount = pendingSet?.size ?? 0
-
-    const statusText = task.status === "completed" ? "COMPLETED" : "CANCELLED"
+    const statusText = task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
     
     let notification: string
@@ -1198,7 +1206,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     })
 
     try {
-      await this.client.session.prompt({
+      await this.client.session.promptAsync({
         path: { id: task.parentSessionID },
         body: {
           noReply: !allComplete,
@@ -1378,7 +1386,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
 
       try {
-        await this.notifyParentSession(task)
+        await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
       } catch (err) {
         log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
       }
@@ -1572,11 +1580,36 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.tasks.clear()
     this.notifications.clear()
     this.pendingByParent.clear()
+    this.notificationQueueByParent.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
     this.unregisterProcessCleanup()
     log("[background-agent] Shutdown complete")
 
+  }
+
+  private enqueueNotificationForParent(
+    parentSessionID: string | undefined,
+    operation: () => Promise<void>
+  ): Promise<void> {
+    if (!parentSessionID) {
+      return operation()
+    }
+
+    const previous = this.notificationQueueByParent.get(parentSessionID) ?? Promise.resolve()
+    const current = previous
+      .catch(() => {})
+      .then(operation)
+
+    this.notificationQueueByParent.set(parentSessionID, current)
+
+    void current.finally(() => {
+      if (this.notificationQueueByParent.get(parentSessionID) === current) {
+        this.notificationQueueByParent.delete(parentSessionID)
+      }
+    }).catch(() => {})
+
+    return current
   }
 }
 

@@ -17,10 +17,12 @@ interface McpConfigPath {
 }
 
 function getMcpConfigPaths(): McpConfigPath[] {
+  const claudeConfigDir = getClaudeConfigDir()
   const cwd = process.cwd()
 
   return [
     { path: join(homedir(), ".claude.json"), scope: "user" },
+    { path: join(claudeConfigDir, ".mcp.json"), scope: "user" },
     { path: join(cwd, ".mcp.json"), scope: "project" },
     { path: join(cwd, ".claude", ".mcp.json"), scope: "local" },
   ]
