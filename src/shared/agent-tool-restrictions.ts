@@ -4,6 +4,8 @@
  * true = tool allowed, false = tool denied.
  */
 
+import { toCanonical } from "./agent-name-aliases"
+
 const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   write: false,
   edit: false,
@@ -45,13 +47,15 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
 }
 
 export function getAgentToolRestrictions(agentName: string): Record<string, boolean> {
-  return AGENT_RESTRICTIONS[agentName]
-    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
+  const canonical = toCanonical(agentName)
+  return AGENT_RESTRICTIONS[canonical]
+    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === canonical.toLowerCase())?.[1]
     ?? {}
 }
 
 export function hasAgentToolRestrictions(agentName: string): boolean {
-  const restrictions = AGENT_RESTRICTIONS[agentName]
-    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
+  const canonical = toCanonical(agentName)
+  const restrictions = AGENT_RESTRICTIONS[canonical]
+    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === canonical.toLowerCase())?.[1]
   return restrictions !== undefined && Object.keys(restrictions).length > 0
 }

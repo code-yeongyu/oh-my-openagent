@@ -3,6 +3,7 @@ import * as os from "node:os"
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../features/hook-message-injector"
+import { toCanonical } from "./agent-name-aliases"
 
 export function getMessageDir(sessionID: string): string | null {
   if (!existsSync(MESSAGE_STORAGE)) return null
@@ -23,5 +24,5 @@ export function isCallerOrchestrator(sessionID?: string): boolean {
   const messageDir = getMessageDir(sessionID)
   if (!messageDir) return false
   const nearest = findNearestMessageWithFields(messageDir)
-  return nearest?.agent?.toLowerCase() === "atlas"
+  return toCanonical(nearest?.agent ?? "").toLowerCase() === "atlas"
 }

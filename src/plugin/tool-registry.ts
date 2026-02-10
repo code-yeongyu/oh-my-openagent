@@ -28,7 +28,7 @@ import {
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
-import { log } from "../shared"
+import { toCanonical, log } from "../shared"
 
 import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"
@@ -51,7 +51,7 @@ export function createToolRegistry(args: {
   const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager)
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
-    (agent) => agent.toLowerCase() === "multimodal-looker",
+    (agent) => toCanonical(agent).toLowerCase() === "multimodal-looker",
   )
   const lookAt = isMultimodalLookerEnabled ? createLookAt(ctx) : null
 

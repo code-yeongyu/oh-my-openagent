@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 
 import type { BackgroundManager } from "../../features/background-agent"
 import { setMainSession, subagentSessions, _resetForTesting } from "../../features/claude-code-session-state"
+import { initializeAgentNameAliases, resetAgentNameAliases } from "../../shared/agent-name-aliases"
 import { createTodoContinuationEnforcer } from "."
 
 type TimerCallback = (...args: any[]) => void
@@ -212,19 +213,21 @@ describe("todo-continuation-enforcer", () => {
     } as any
   }
 
-  beforeEach(() => {
-    fakeTimers = createFakeTimers()
-    _resetForTesting()
-    promptCalls = []
-    toastCalls = []
-    mockMessages = []
-  })
+   beforeEach(() => {
+     fakeTimers = createFakeTimers()
+     _resetForTesting()
+     resetAgentNameAliases()
+     promptCalls = []
+     toastCalls = []
+     mockMessages = []
+   })
 
-  afterEach(() => {
-    fakeTimers.restore()
-    _resetForTesting()
-    cleanupBoulderFile()
-  })
+   afterEach(() => {
+     fakeTimers.restore()
+     _resetForTesting()
+     resetAgentNameAliases()
+     cleanupBoulderFile()
+   })
 
   test("should inject continuation when idle with incomplete todos", async () => {
     fakeTimers.restore()
@@ -1415,25 +1418,147 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
-  test("should still inject for background task session regardless of boulder state", async () => {
-    fakeTimers.restore()
-    // given - background task session with no boulder entry
-    setMainSession("main-session")
-    const bgTaskSession = "bg-task-boulder-test"
-    subagentSessions.add(bgTaskSession)
-    cleanupBoulderFile()
+   test("should still inject for background task session regardless of boulder state", async () => {
+     fakeTimers.restore()
+     // given - background task session with no boulder entry
+     setMainSession("main-session")
+     const bgTaskSession = "bg-task-boulder-test"
+     subagentSessions.add(bgTaskSession)
+     cleanupBoulderFile()
+ 
+     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+ 
+     // when - background task session goes idle
+     await hook.handler({
+       event: { type: "session.idle", properties: { sessionID: bgTaskSession } },
+     })
+ 
+     await wait(2500)
+ 
+     // then - continuation still injected (background tasks bypass boulder check)
+     expect(promptCalls.length).toBe(1)
+     expect(promptCalls[0].sessionID).toBe(bgTaskSession)
+   }, { timeout: 15000 })
 
-    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+   test("should canonicalize agent name when checking skipAgents list", async () => {
+     // given - session with renamed prometheus agent
+     const sessionID = "main-renamed-prometheus"
+     setupMainSessionWithBoulder(sessionID)
 
-    // when - background task session goes idle
-    await hook.handler({
-      event: { type: "session.idle", properties: { sessionID: bgTaskSession } },
-    })
+     initializeAgentNameAliases(
+       { prometheus: "Prometheus (Planner)" },
+       ["prometheus", "compaction", "sisyphus"]
+     )
 
-    await wait(2500)
+     const mockMessagesWithRenamedPrometheus = [
+       { info: { id: "msg-1", role: "user", agent: "Prometheus (Planner)" } },
+       { info: { id: "msg-2", role: "assistant", agent: "Prometheus (Planner)" } },
+     ]
 
-    // then - continuation still injected (background tasks bypass boulder check)
-    expect(promptCalls.length).toBe(1)
-    expect(promptCalls[0].sessionID).toBe(bgTaskSession)
-  }, { timeout: 15000 })
+     const mockInput = {
+       client: {
+         session: {
+           todo: async () => ({
+             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
+           }),
+           messages: async () => ({ data: mockMessagesWithRenamedPrometheus }),
+           prompt: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+           promptAsync: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+         },
+         tui: { showToast: async () => ({}) },
+       },
+       directory: "/tmp/test",
+     } as any
+
+     const hook = createTodoContinuationEnforcer(mockInput, {
+       skipAgents: ["prometheus"],
+     })
+
+     // when - session goes idle with renamed prometheus agent
+     await hook.handler({
+       event: { type: "session.idle", properties: { sessionID } },
+     })
+
+     await fakeTimers.advanceBy(3000)
+
+     // then - no continuation (renamed agent canonicalized and matched in skipAgents)
+     expect(promptCalls).toHaveLength(0)
+   })
+
+   test("should canonicalize compaction agent name when filtering messages", async () => {
+     // given - session where compaction agent is renamed
+     const sessionID = "main-renamed-compaction"
+     setupMainSessionWithBoulder(sessionID)
+
+     initializeAgentNameAliases(
+       { compaction: "Compaction Agent" },
+       ["prometheus", "compaction", "sisyphus"]
+     )
+
+     const mockMessagesWithRenamedCompaction = [
+       { info: { id: "msg-1", role: "user", agent: "sisyphus" } },
+       { info: { id: "msg-2", role: "assistant", agent: "sisyphus" } },
+       { info: { id: "msg-3", role: "assistant", agent: "Compaction Agent" } },
+     ]
+
+     const mockInput = {
+       client: {
+         session: {
+           todo: async () => ({
+             data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
+           }),
+           messages: async () => ({ data: mockMessagesWithRenamedCompaction }),
+           prompt: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+           promptAsync: async (opts: any) => {
+             promptCalls.push({
+               sessionID: opts.path.id,
+               agent: opts.body.agent,
+               model: opts.body.model,
+               text: opts.body.parts[0].text,
+             })
+             return {}
+           },
+         },
+         tui: { showToast: async () => ({}) },
+       },
+       directory: "/tmp/test",
+     } as any
+
+     const hook = createTodoContinuationEnforcer(mockInput, {})
+
+     // when - session goes idle
+     await hook.handler({
+       event: { type: "session.idle", properties: { sessionID } },
+     })
+
+     await fakeTimers.advanceBy(2500)
+
+     // then - continuation uses sisyphus (renamed compaction agent was filtered)
+     expect(promptCalls.length).toBe(1)
+     expect(promptCalls[0].agent).toBe("sisyphus")
+   })
 })

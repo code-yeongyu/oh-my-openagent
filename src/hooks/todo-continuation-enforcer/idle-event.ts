@@ -5,6 +5,7 @@ import { readBoulderState } from "../../features/boulder-state"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import type { ToolPermission } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
+import { toCanonical } from "../../shared/agent-name-aliases"
 
 import {
   ABORT_WINDOW_MS,
@@ -112,12 +113,12 @@ export async function handleSessionIdle(args: {
       path: { id: sessionID },
     })
     const messages = (messagesResp.data ?? []) as Array<{ info?: MessageInfo }>
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const info = messages[i].info
-      if (info?.agent === "compaction") {
-        hasCompactionMessage = true
-        continue
-      }
+     for (let i = messages.length - 1; i >= 0; i--) {
+       const info = messages[i].info
+       if (toCanonical(info?.agent ?? "") === "compaction") {
+         hasCompactionMessage = true
+         continue
+       }
       if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
         resolvedInfo = {
           agent: info.agent,
@@ -131,12 +132,12 @@ export async function handleSessionIdle(args: {
     log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(error) })
   }
 
-  log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents, hasCompactionMessage })
+   log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents, hasCompactionMessage })
 
-  if (resolvedInfo?.agent && skipAgents.includes(resolvedInfo.agent)) {
-    log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedInfo.agent })
-    return
-  }
+   if (resolvedInfo?.agent && skipAgents.includes(toCanonical(resolvedInfo.agent))) {
+     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedInfo.agent })
+     return
+   }
   if (hasCompactionMessage && !resolvedInfo?.agent) {
     log(`[${HOOK_NAME}] Skipped: compaction occurred but no agent info resolved`, { sessionID })
     return

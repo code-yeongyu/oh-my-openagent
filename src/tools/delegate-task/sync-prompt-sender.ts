@@ -3,6 +3,7 @@ import { isPlanFamily } from "./constants"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { formatDetailedError } from "./error-formatting"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { toCanonical } from "../../shared/agent-name-aliases"
 
 export async function sendSyncPrompt(
   client: OpencodeClient,
@@ -17,7 +18,7 @@ export async function sendSyncPrompt(
   }
 ): Promise<string | null> {
   try {
-    const allowTask = isPlanFamily(input.agentToUse)
+    const allowTask = isPlanFamily(toCanonical(input.agentToUse))
     await promptWithModelSuggestionRetry(client, {
       path: { id: input.sessionID },
       body: {

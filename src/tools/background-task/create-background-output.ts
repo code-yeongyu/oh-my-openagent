@@ -8,6 +8,7 @@ import { delay } from "./delay"
 import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
+import { toCanonical } from "../../shared"
 
 const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
 
@@ -27,7 +28,7 @@ function resolveToolCallID(ctx: ToolContextWithMetadata): string | undefined {
 }
 
 function formatResolvedTitle(task: BackgroundTask): string {
-  const label = task.agent === SISYPHUS_JUNIOR_AGENT && task.category ? task.category : task.agent
+  const label = toCanonical(task.agent) === SISYPHUS_JUNIOR_AGENT && task.category ? task.category : task.agent
   return `${label} - ${task.description}`
 }
 

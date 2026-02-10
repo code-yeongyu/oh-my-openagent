@@ -9,6 +9,7 @@ import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-re
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
+import { toCanonical } from "../../shared/agent-name-aliases"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
@@ -76,7 +77,7 @@ export async function executeSyncContinuation(
       resumeVariant = resumeMessage?.model?.variant
     }
 
-    const allowTask = isPlanFamily(resumeAgent)
+    const allowTask = isPlanFamily(toCanonical(resumeAgent ?? ""))
 
     await promptWithModelSuggestionRetry(client, {
       path: { id: args.session_id! },

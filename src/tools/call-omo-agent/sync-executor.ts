@@ -1,6 +1,6 @@
 import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
+import { log, toRegistered } from "../../shared"
 import { getAgentToolRestrictions } from "../../shared"
 import { createOrGetSession } from "./session-creator"
 import { waitForCompletion } from "./completion-poller"
@@ -27,18 +27,18 @@ export async function executeSync(
   log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
   log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
 
-  try {
-    await (ctx.client.session as any).promptAsync({
-      path: { id: sessionID },
-      body: {
-        agent: args.subagent_type,
-        tools: {
-          ...getAgentToolRestrictions(args.subagent_type),
-          task: false,
-        },
-        parts: [{ type: "text", text: args.prompt }],
-      },
-    })
+   try {
+     await (ctx.client.session as any).promptAsync({
+       path: { id: sessionID },
+       body: {
+         agent: toRegistered(args.subagent_type),
+         tools: {
+           ...getAgentToolRestrictions(args.subagent_type),
+           task: false,
+         },
+         parts: [{ type: "text", text: args.prompt }],
+       },
+     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     log(`[call_omo_agent] Prompt error:`, errorMessage)

@@ -6,6 +6,7 @@ import { parseModelString } from "./model-string-parser"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
+import { toCanonical } from "../../shared/agent-name-aliases"
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
@@ -21,7 +22,7 @@ export async function resolveSubagentExecution(
 
   const agentName = args.subagent_type.trim()
 
-  if (agentName.toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
+  if (toCanonical(agentName).toLowerCase() === SISYPHUS_JUNIOR_AGENT.toLowerCase()) {
     return {
       agentToUse: "",
       categoryModel: undefined,
@@ -31,7 +32,7 @@ Sisyphus-Junior is spawned automatically when you specify a category. Pick the a
     }
   }
 
-  if (isPlanFamily(agentName) && isPlanFamily(parentAgent)) {
+  if (isPlanFamily(toCanonical(agentName)) && isPlanFamily(toCanonical(parentAgent ?? ""))) {
     return {
       agentToUse: "",
       categoryModel: undefined,
@@ -80,10 +81,10 @@ Create the work plan directly - that's your job as the planning agent.`,
 
     agentToUse = matchedAgent.name
 
-    const agentNameLower = agentToUse.toLowerCase()
-    const agentOverride = agentOverrides?.[agentNameLower as keyof typeof agentOverrides]
-      ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentNameLower)?.[1] : undefined)
-    const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentNameLower]
+    const canonicalLower = toCanonical(agentToUse).toLowerCase()
+    const agentOverride = agentOverrides?.[canonicalLower as keyof typeof agentOverrides]
+      ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === canonicalLower)?.[1] : undefined)
+    const agentRequirement = AGENT_MODEL_REQUIREMENTS[canonicalLower]
 
     if (agentOverride?.model || agentRequirement || matchedAgent.model) {
       const availableModels = await getAvailableModelsForDelegateTask(client)

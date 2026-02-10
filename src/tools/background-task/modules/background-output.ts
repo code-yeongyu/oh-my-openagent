@@ -7,6 +7,7 @@ import { delay } from "./utils"
 import { storeToolMetadata } from "../../../features/tool-metadata-store"
 import type { BackgroundTask } from "../../../features/background-agent"
 import type { ToolContextWithMetadata } from "./utils"
+import { toCanonical } from "../../../shared"
 
 const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
 
@@ -30,7 +31,7 @@ function resolveToolCallID(ctx: ToolContextWithCallId): string | undefined {
 }
 
 function formatResolvedTitle(task: BackgroundTask): string {
-  const label = task.agent === SISYPHUS_JUNIOR_AGENT && task.category
+  const label = toCanonical(task.agent) === SISYPHUS_JUNIOR_AGENT && task.category
     ? task.category
     : task.agent
   return `${label} - ${task.description}`

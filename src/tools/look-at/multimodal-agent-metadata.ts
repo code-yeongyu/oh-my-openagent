@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { MULTIMODAL_LOOKER_AGENT } from "./constants"
-import { log } from "../../shared"
+import { log, toCanonical } from "../../shared"
 
 type AgentModel = { providerID: string; modelID: string }
 
@@ -42,7 +42,7 @@ export async function resolveMultimodalLookerAgentMetadata(
     const agents = Array.isArray(agentsRaw) ? agentsRaw.map(toAgentInfo).filter(Boolean) : []
 
     const matched = agents.find(
-      (agent) => agent?.name?.toLowerCase() === MULTIMODAL_LOOKER_AGENT.toLowerCase()
+      (agent) => toCanonical(agent?.name ?? "").toLowerCase() === MULTIMODAL_LOOKER_AGENT.toLowerCase()
     )
 
     return {

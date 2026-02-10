@@ -1,4 +1,6 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, beforeEach } from "bun:test"
+import { initializeAgentNameAliases, toCanonical, resetAgentNameAliases } from "./shared/agent-name-aliases"
+
 /**
  * Tests for conditional tool registration logic in index.ts
  * 
@@ -79,12 +81,55 @@ describe("look_at tool conditional registration", () => {
     // given lookAt is null (agent disabled)
     // when spreading into tool object
     // then look_at should NOT be included
-    it("excludes look_at when lookAt is null", () => {
-      const lookAt = null
-      const tools = {
-        ...(lookAt ? { look_at: lookAt } : {}),
-      }
-      expect(tools).not.toHaveProperty("look_at")
-    })
-  })
+     it("excludes look_at when lookAt is null", () => {
+       const lookAt = null
+       const tools = {
+         ...(lookAt ? { look_at: lookAt } : {}),
+       }
+       expect(tools).not.toHaveProperty("look_at")
+     })
+   })
+
+   describe("disabled_agents with canonicalization", () => {
+     beforeEach(() => {
+       resetAgentNameAliases()
+     })
+
+     // given disabled_agents contains canonical name "multimodal-looker"
+     // when checking if agent is enabled with toCanonical
+     // then should return false (disabled)
+     it("returns false when multimodal-looker is disabled (canonical name)", () => {
+       const disabledAgents: string[] = ["multimodal-looker"]
+       const isEnabled = !disabledAgents.some(
+         (agent) => toCanonical(agent).toLowerCase() === "multimodal-looker"
+       )
+       expect(isEnabled).toBe(false)
+     })
+
+     // given disabled_agents contains display name alias for multimodal-looker
+     // when checking if agent is enabled with toCanonical
+     // then should return false (disabled via alias)
+     it("returns false when multimodal-looker is disabled (via display name alias)", () => {
+       initializeAgentNameAliases(
+         { "multimodal-looker": "Image Analyzer" },
+         ["multimodal-looker"]
+       )
+       const disabledAgents: string[] = ["Image Analyzer"]
+       const isEnabled = !disabledAgents.some(
+         (agent) => toCanonical(agent).toLowerCase() === "multimodal-looker"
+       )
+       expect(isEnabled).toBe(false)
+     })
+
+     // given disabled_agents is empty
+     // when checking if agent is enabled with toCanonical
+     // then should return true (enabled by default)
+     it("returns true when disabled_agents is empty (with canonicalization)", () => {
+       const disabledAgents: string[] = []
+       const isEnabled = !disabledAgents.some(
+         (agent) => toCanonical(agent).toLowerCase() === "multimodal-looker"
+       )
+       expect(isEnabled).toBe(true)
+     })
+   })
 })

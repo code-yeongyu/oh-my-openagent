@@ -356,4 +356,146 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(addTaskCalls.length).toBe(0)
     expect(removeTaskCalls.length).toBe(0)
   })
+
+  test("canonicalizes agent name when checking isPlanFamily for prometheus alias", async () => {
+    //#given
+    const { initializeAgentNameAliases } = require("../../shared/agent-name-aliases")
+    const { __setTimingConfig } = require("./timing")
+    __setTimingConfig({
+      POLL_INTERVAL_MS: 10,
+      MIN_STABILITY_TIME_MS: 0,
+      STABILITY_POLLS_REQUIRED: 1,
+      MAX_POLL_TIME_MS: 100,
+    })
+
+    initializeAgentNameAliases({ prometheus: "Bob" }, ["prometheus", "plan", "sisyphus"])
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 }, agent: "Bob" } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      session_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    let promptArgs: any
+    const originalPrompt = mockClient.session.promptAsync
+    mockClient.session.promptAsync = mock(async (input: any) => {
+      promptArgs = input
+      return originalPrompt.call(mockClient.session)
+    })
+
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+
+    //#then - should recognize "Bob" as prometheus (plan family) and allow task
+    expect(promptArgs.body.tools.task).toBe(true)
+    expect(result).toContain("Task continued and completed")
+  })
+
+  test("canonicalizes agent name when checking isPlanFamily for plan alias", async () => {
+    //#given
+    const { initializeAgentNameAliases } = require("../../shared/agent-name-aliases")
+    const { __setTimingConfig } = require("./timing")
+    __setTimingConfig({
+      POLL_INTERVAL_MS: 10,
+      MIN_STABILITY_TIME_MS: 0,
+      STABILITY_POLLS_REQUIRED: 1,
+      MAX_POLL_TIME_MS: 100,
+    })
+
+    initializeAgentNameAliases({ plan: "Planner" }, ["prometheus", "plan", "sisyphus"])
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 }, agent: "Planner" } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      session_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    let promptArgs: any
+    const originalPrompt = mockClient.session.promptAsync
+    mockClient.session.promptAsync = mock(async (input: any) => {
+      promptArgs = input
+      return originalPrompt.call(mockClient.session)
+    })
+
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+
+    //#then - should recognize "Planner" as plan (plan family) and allow task
+    expect(promptArgs.body.tools.task).toBe(true)
+    expect(result).toContain("Task continued and completed")
+  })
 })
