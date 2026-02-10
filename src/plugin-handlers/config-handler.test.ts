@@ -1053,9 +1053,113 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     //#when
     await handler(config)
 
+     //#then
+     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
+     expect(agentResult.sisyphus?.permission?.todowrite).toBeUndefined()
+     expect(agentResult.sisyphus?.permission?.todoread).toBeUndefined()
+   })
+})
+
+describe("OpenCode-Builder default registration", () => {
+  test("registers OpenCode-Builder by default when sisyphus is enabled", async () => {
+    //#given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
     //#then
-    const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    expect(agentResult.sisyphus?.permission?.todowrite).toBeUndefined()
-    expect(agentResult.sisyphus?.permission?.todoread).toBeUndefined()
+    const agentConfig = config.agent as Record<string, unknown>
+    expect(agentConfig["OpenCode-Builder"]).toBeDefined()
+  })
+
+  test("does not register OpenCode-Builder when explicitly disabled", async () => {
+    //#given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        default_builder_enabled: false,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const agentConfig = config.agent as Record<string, unknown>
+    expect(agentConfig["OpenCode-Builder"]).toBeUndefined()
+  })
+
+  test("does not register OpenCode-Builder when sisyphus is disabled", async () => {
+    //#given
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "test", mode: "primary" },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      sisyphus_agent: {
+        disabled: true,
+        default_builder_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const agentConfig = config.agent as Record<string, unknown>
+    expect(agentConfig["OpenCode-Builder"]).toBeUndefined()
   })
 })
