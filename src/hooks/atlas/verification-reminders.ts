@@ -30,7 +30,7 @@ ${buildVerificationReminder(sessionId)}
 
 Do NOT rely on cached progress. Read the plan file NOW:
 \`\`\`
-Read(".sisyphus/tasks/${planName}.yaml")
+Read(".sisyphus/plans/${planName}.md")
 \`\`\`
 Count exactly: how many \`- [ ]\` remain? How many \`- [x]\` completed?
 This is YOUR ground truth. Use it to decide what comes next.
@@ -39,7 +39,7 @@ This is YOUR ground truth. Use it to decide what comes next.
 
 RIGHT NOW - Do not delay. Verification passed → Mark IMMEDIATELY.
 
-Update the plan file \`.sisyphus/tasks/${planName}.yaml\`:
+Update the plan file \`.sisyphus/plans/${planName}.md\`:
 - Change \`- [ ]\` to \`- [x]\` for the completed task
 - Use \`Edit\` tool to modify the checkbox
 
