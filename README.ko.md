@@ -373,5 +373,7 @@ OpenCode가 Debian/Arch라면 Oh My OpenCode는 Ubuntu/[Omarchy](https://omarchy
   - Spray(인플루언서 마케팅 솔루션), vovushop(국가 간 상거래 플랫폼), vreview(AI 상거래 리뷰 마케팅 솔루션) 제작
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [ELESTYLE](https://elestyle.jp)
+  - elepay - 멀티 모바일 결제 게이트웨이, OneQR - 캐시리스 솔루션용 모바일 애플리케이션 SaaS
 
 *이 놀라운 히어로 이미지에 대해 [@junhoyeo](https://github.com/junhoyeo)에게 특별히 감사드립니다.*
