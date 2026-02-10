@@ -226,7 +226,7 @@ describe("agent-name-aliases", () => {
 
       //#then all state is cleared
       expect(hasAliases()).toBe(false)
-      expect(toCanonical("Bob")).toBe("Bob")
+      expect(toCanonical("Bob")).toBe("bob")
       expect(toRegistered("sisyphus")).toBe("sisyphus")
       expect(getCanonicalToRegisteredMap().size).toBe(0)
     })

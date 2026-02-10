@@ -54,7 +54,7 @@ export function initializeAgentNameAliases(
 
 export function toCanonical(name: string): string {
   const lower = name.toLowerCase()
-  return aliasToCanonical.get(lower) ?? name
+  return aliasToCanonical.get(lower) ?? lower
 }
 
 export function toRegistered(name: string): string {

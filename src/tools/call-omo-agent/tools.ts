@@ -41,7 +41,7 @@ export function createCallOmoAgent(
         return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`
       }
 
-      const normalizedAgent = args.subagent_type.toLowerCase() as AllowedAgentType
+      const normalizedAgent = toCanonical(args.subagent_type).toLowerCase() as AllowedAgentType
       args = { ...args, subagent_type: normalizedAgent }
 
       if (args.run_in_background) {
