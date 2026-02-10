@@ -133,9 +133,6 @@ session_id: ${sessionID}
       if (toastManager && taskId !== undefined) {
         toastManager.removeTask(taskId)
       }
-      if (syncSessionID) {
-        subagentSessions.delete(syncSessionID)
-      }
     }
   } catch (error) {
     return formatDetailedError(error, {
@@ -145,5 +142,9 @@ session_id: ${sessionID}
       agent: agentToUse,
       category: args.category,
     })
+  } finally {
+    if (syncSessionID) {
+      subagentSessions.delete(syncSessionID)
+    }
   }
 }
