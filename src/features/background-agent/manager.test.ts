@@ -2062,7 +2062,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
          promptAsync: async () => ({}),
          abort: async () => ({}),
        },
-    }
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
 
     const task: BackgroundTask = {
@@ -2087,6 +2087,46 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     expect(task.status).toBe("running")
   })
+
+   test("should interrupt task with no output even when lastUpdate is fresh", async () => {
+     const abortedSessionIDs: string[] = []
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async (args: { path: { id: string } }) => {
+           abortedSessionIDs.push(args.path.id)
+           return {}
+         },
+       },
+     }
+     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
+     stubNotifyParentSession(manager)
+
+     const task: BackgroundTask = {
+       id: "task-no-output",
+       sessionID: "session-no-output",
+       parentSessionID: "parent-no-output",
+       parentMessageID: "msg-no-output",
+       description: "No output task",
+       prompt: "Test",
+       agent: "test-agent",
+       status: "running",
+       startedAt: new Date(Date.now() - 240_000),
+       progress: {
+         toolCalls: 0,
+         lastUpdate: new Date(Date.now() - 5_000),
+       },
+     }
+
+     getTaskMap(manager).set(task.id, task)
+
+     await manager["checkAndInterruptStaleTasks"]()
+
+     expect(task.status).toBe("cancelled")
+     expect(task.error).toContain("No output received")
+     expect(abortedSessionIDs).toContain("session-no-output")
+   })
 
    test("should interrupt task with stale lastUpdate (> 3min)", async () => {
      const client = {

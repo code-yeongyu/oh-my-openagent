@@ -117,18 +117,36 @@ export async function pollRunningTasks(args: {
         }
       }
 
+      const currentMsgCount = messages.length
+      const previousMsgCount = task.lastMsgCount ?? -1
+      const previousToolCalls = task.progress?.toolCalls ?? 0
+      const previousLastMessage = task.progress?.lastMessage
+      const hasAssistantOrToolOutput = messages.some(
+        (m) => m.info?.role === "assistant" || m.info?.role === "tool"
+      )
+      const hasNewMessageText = Boolean(lastMessage && lastMessage !== previousLastMessage)
+      const hasProgressDelta =
+        currentMsgCount !== previousMsgCount ||
+        toolCalls !== previousToolCalls ||
+        hasNewMessageText
+      const now = new Date()
+
       if (!task.progress) {
         task.progress = { toolCalls: 0, lastUpdate: new Date() }
       }
       task.progress.toolCalls = toolCalls
       task.progress.lastTool = lastTool
-      task.progress.lastUpdate = new Date()
+      if (hasProgressDelta) {
+        task.progress.lastUpdate = now
+      }
+      if (hasAssistantOrToolOutput && !task.progress.lastMessageAt) {
+        task.progress.lastMessageAt = now
+      }
       if (lastMessage) {
         task.progress.lastMessage = lastMessage
-        task.progress.lastMessageAt = new Date()
+        task.progress.lastMessageAt = now
       }
 
-      const currentMsgCount = messages.length
       const startedAt = task.startedAt
       if (!startedAt) continue
 

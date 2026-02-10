@@ -11,6 +11,7 @@ export function pruneStaleState(args: {
   tasks: Map<string, BackgroundTask>
   notifications: Map<string, BackgroundTask[]>
   concurrencyManager: ConcurrencyManager
+  abortSession: (sessionID: string) => void
   cleanupPendingByParent: (task: BackgroundTask) => void
   clearNotificationsForTask: (taskId: string) => void
 }): void {
@@ -18,6 +19,7 @@ export function pruneStaleState(args: {
     tasks,
     notifications,
     concurrencyManager,
+    abortSession,
     cleanupPendingByParent,
     clearNotificationsForTask,
   } = args
@@ -26,6 +28,7 @@ export function pruneStaleState(args: {
     tasks,
     notifications,
     onTaskPruned: (taskId, task, errorMessage) => {
+      const wasRunning = task.status === "running"
       const now = Date.now()
       const timestamp = task.status === "pending"
         ? task.queuedAt?.getTime()
@@ -44,6 +47,9 @@ export function pruneStaleState(args: {
       if (task.concurrencyKey) {
         concurrencyManager.release(task.concurrencyKey)
         task.concurrencyKey = undefined
+      }
+      if (wasRunning && task.sessionID) {
+        abortSession(task.sessionID)
       }
 
       cleanupPendingByParent(task)

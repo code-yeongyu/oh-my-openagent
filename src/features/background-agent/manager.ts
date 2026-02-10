@@ -1309,6 +1309,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       
       const age = now - timestamp
       if (age > TASK_TTL_MS) {
+        const wasRunning = task.status === "running"
         const errorMessage = task.status === "pending"
           ? "Task timed out while queued (30 minutes)"
           : "Task timed out after 30 minutes"
@@ -1320,6 +1321,11 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
           task.concurrencyKey = undefined
+        }
+        if (wasRunning && task.sessionID) {
+          this.client.session.abort({
+            path: { id: task.sessionID },
+          }).catch(() => {})
         }
         // Clean up pendingByParent to prevent stale entries
         this.cleanupPendingByParent(task)
@@ -1363,6 +1369,39 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
       const runtime = now - startedAt.getTime()
       if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
+
+      const hasReceivedOutput = !!task.progress.lastMessageAt || (task.progress.toolCalls ?? 0) > 0
+      if (!hasReceivedOutput && runtime > staleTimeoutMs) {
+        if (task.status !== "running") continue
+
+        const noOutputMinutes = Math.max(1, Math.round(runtime / 60000))
+        const selectedModel = task.model
+          ? `${task.model.providerID}/${task.model.modelID}`
+          : undefined
+        task.status = "cancelled"
+        task.error = selectedModel
+          ? `No output received for ${noOutputMinutes}min (model: ${selectedModel}). Possible model/provider issue (unavailable, blocked, or incompatible model).`
+          : `No output received for ${noOutputMinutes}min. Possible model/provider issue (unavailable, blocked, or incompatible model).`
+        task.completedAt = new Date()
+
+        if (task.concurrencyKey) {
+          this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined
+        }
+
+        this.client.session.abort({
+          path: { id: sessionID },
+        }).catch(() => {})
+
+        log(`[background-agent] Task ${task.id} interrupted: no output timeout`)
+
+        try {
+          await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
+        } catch (err) {
+          log("[background-agent] Error in notifyParentSession for no-output task:", { taskId: task.id, error: err })
+        }
+        continue
+      }
 
       const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
       if (timeSinceLastUpdate <= staleTimeoutMs) continue
@@ -1461,19 +1500,37 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             }
           }
 
+          const currentMsgCount = messages.length
+          const previousMsgCount = task.lastMsgCount ?? -1
+          const previousToolCalls = task.progress?.toolCalls ?? 0
+          const previousLastMessage = task.progress?.lastMessage
+          const hasAssistantOrToolOutput = messages.some(
+            (m) => m.info?.role === "assistant" || m.info?.role === "tool"
+          )
+          const hasNewMessageText = Boolean(lastMessage && lastMessage !== previousLastMessage)
+          const hasProgressDelta =
+            currentMsgCount !== previousMsgCount ||
+            toolCalls !== previousToolCalls ||
+            hasNewMessageText
+          const now = new Date()
+
           if (!task.progress) {
             task.progress = { toolCalls: 0, lastUpdate: new Date() }
           }
           task.progress.toolCalls = toolCalls
           task.progress.lastTool = lastTool
-          task.progress.lastUpdate = new Date()
+          if (hasProgressDelta) {
+            task.progress.lastUpdate = now
+          }
+          if (hasAssistantOrToolOutput && !task.progress.lastMessageAt) {
+            task.progress.lastMessageAt = now
+          }
           if (lastMessage) {
             task.progress.lastMessage = lastMessage
-            task.progress.lastMessageAt = new Date()
+            task.progress.lastMessageAt = now
           }
 
           // Stability detection: complete when message count unchanged for 3 polls
-          const currentMsgCount = messages.length
           const startedAt = task.startedAt
           if (!startedAt) continue
           

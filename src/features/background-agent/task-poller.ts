@@ -78,6 +78,39 @@ export async function checkAndInterruptStaleTasks(args: {
     const runtime = now - startedAt.getTime()
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 
+    const hasReceivedOutput = !!task.progress.lastMessageAt || (task.progress.toolCalls ?? 0) > 0
+    if (!hasReceivedOutput && runtime > staleTimeoutMs) {
+      if (task.status !== "running") continue
+
+      const noOutputMinutes = Math.max(1, Math.round(runtime / 60000))
+      const selectedModel = task.model
+        ? `${task.model.providerID}/${task.model.modelID}`
+        : undefined
+      task.status = "cancelled"
+      task.error = selectedModel
+        ? `No output received for ${noOutputMinutes}min (model: ${selectedModel}). Possible model/provider issue (unavailable, blocked, or incompatible model).`
+        : `No output received for ${noOutputMinutes}min. Possible model/provider issue (unavailable, blocked, or incompatible model).`
+      task.completedAt = new Date()
+
+      if (task.concurrencyKey) {
+        concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined
+      }
+
+      client.session.abort({
+        path: { id: sessionID },
+      }).catch(() => {})
+
+      log(`[background-agent] Task ${task.id} interrupted: no output timeout`)
+
+      try {
+        await notifyParentSession(task)
+      } catch (err) {
+        log("[background-agent] Error in notifyParentSession for no-output task:", { taskId: task.id, error: err })
+      }
+      continue
+    }
+
     const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
     if (timeSinceLastUpdate <= staleTimeoutMs) continue
     if (task.status !== "running") continue
