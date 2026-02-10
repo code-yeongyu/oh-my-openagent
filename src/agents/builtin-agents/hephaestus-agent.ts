@@ -19,6 +19,7 @@ export function maybeCreateHephaestusConfig(input: {
   availableCategories: AvailableCategory[]
   mergedCategories: Record<string, CategoryConfig>
   directory?: string
+  useTaskSystem: boolean
 }): AgentConfig | undefined {
   const {
     disabledAgents,
@@ -31,6 +32,7 @@ export function maybeCreateHephaestusConfig(input: {
     availableCategories,
     mergedCategories,
     directory,
+    useTaskSystem,
   } = input
 
   if (disabledAgents.includes("hephaestus")) return undefined
@@ -66,7 +68,8 @@ export function maybeCreateHephaestusConfig(input: {
     availableAgents,
     undefined,
     availableSkills,
-    availableCategories
+    availableCategories,
+    useTaskSystem
   )
 
   hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }

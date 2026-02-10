@@ -22,6 +22,7 @@ export function collectPendingBuiltinAgents(input: {
   uiSelectedModel?: string
   availableModels: Set<string>
   disabledSkills?: Set<string>
+  useTaskSystem?: boolean
 }): { pendingAgentConfigs: Map<string, AgentConfig>; availableAgents: AvailableAgent[] } {
   const {
     agentSources,

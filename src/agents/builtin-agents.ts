@@ -63,7 +63,8 @@ export async function createBuiltinAgents(
   customAgentSummaries?: unknown,
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
-  disabledSkills?: Set<string>
+  disabledSkills?: Set<string>,
+  useTaskSystem = false
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
   // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
@@ -134,6 +135,7 @@ export async function createBuiltinAgents(
     mergedCategories,
     directory,
     userCategories: categories,
+    useTaskSystem,
   })
   if (sisyphusConfig) {
     result["sisyphus"] = sisyphusConfig
@@ -150,6 +152,7 @@ export async function createBuiltinAgents(
     availableCategories,
     mergedCategories,
     directory,
+    useTaskSystem,
   })
   if (hephaestusConfig) {
     result["hephaestus"] = hephaestusConfig
