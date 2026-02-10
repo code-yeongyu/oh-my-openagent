@@ -65,15 +65,16 @@ describe("websearch MCP provider configuration", () => {
     expect(result.url).toContain(`exaApiKey=${encodeURIComponent(apiKey)}`)
   })
 
-  test("does not set x-api-key header when EXA_API_KEY is set", () => {
+  test("sets x-api-key header when EXA_API_KEY is set", () => {
     //#given
-    process.env.EXA_API_KEY = "test-exa-key-12345"
+    const apiKey = "test-exa-key-12345"
+    process.env.EXA_API_KEY = apiKey
 
     //#when
     const result = createWebsearchConfig()
 
     //#then
-    expect(result.headers).toBeUndefined()
+    expect(result.headers).toEqual({ "x-api-key": apiKey })
   })
 
   test("URL-encodes EXA_API_KEY when it contains special characters", () => {
@@ -126,7 +127,7 @@ describe("websearch MCP provider configuration", () => {
     //#then
     expect(result.url).toContain("mcp.exa.ai")
     expect(result.url).toContain(`exaApiKey=${encodeURIComponent(exaKey)}`)
-    expect(result.headers).toBeUndefined()
+    expect(result.headers).toEqual({ "x-api-key": exaKey })
   })
 
   test("Tavily config uses Authorization Bearer header format", () => {
