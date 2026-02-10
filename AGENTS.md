@@ -27,12 +27,14 @@ feature branches (your work)
 | **ALL PRs → `dev`** | Every pull request MUST target the `dev` branch |
 | **NEVER PR → `master`** | PRs to `master` are **automatically rejected** by CI |
 | **"Create a PR" = target `dev`** | When asked to create a new PR, it ALWAYS means targeting `dev` |
+| **Merge commit ONLY** | Squash merge is **disabled** in this repo. Always use merge commit when merging PRs. |
 
 ### Why This Matters
 
 - `master` = production/published npm package
 - `dev` = integration branch where features are merged and tested
 - Feature branches → `dev` → (after testing) → `master`
+- Squash merge is disabled at the repository level — attempting it will fail
 
 **If you create a PR targeting `master`, it WILL be rejected. No exceptions.**
 
