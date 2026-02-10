@@ -371,7 +371,7 @@ OpenCode が Debian / ArchLinux だとしたら、Oh My OpenCode は Ubuntu / [O
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
 - [ELESTYLE](https://elestyle.jp)
-  - Making elepay - マルチモバイル決済ゲートウェイ、OneQR - キャッシュレスソリューション向けモバイルアプリケーションSaaS
+  - elepay - マルチモバイル決済ゲートウェイ、OneQR - キャッシュレスソリューション向けモバイルアプリケーションSaaS
 
 ## スポンサー
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
