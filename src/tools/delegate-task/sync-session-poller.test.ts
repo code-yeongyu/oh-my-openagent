@@ -282,48 +282,144 @@ describe("pollSyncSession", () => {
     })
   })
 
-  describe("non-idle session status", () => {
-    test("skips message check when session is not idle", async () => {
-      //#given
-      const { pollSyncSession } = require("./sync-session-poller")
+   describe("non-idle session status", () => {
+     test("skips message check when session is not idle", async () => {
+       //#given
+       const { pollSyncSession } = require("./sync-session-poller")
 
-      let statusCallCount = 0
-      let messageCallCount = 0
-      const mockClient = {
-        session: {
-          messages: async () => {
-            messageCallCount++
-            return {
-              data: [
-                { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
-                {
-                  info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
-                  parts: [{ type: "text", text: "Done" }],
-                },
-              ],
-            }
-          },
-          status: async () => {
-            statusCallCount++
-            if (statusCallCount <= 2) {
-              return { data: { "ses_busy": { type: "running" } } }
-            }
-            return { data: { "ses_busy": { type: "idle" } } }
-          },
-        },
-      }
+       let statusCallCount = 0
+       let messageCallCount = 0
+       const mockClient = {
+         session: {
+           messages: async () => {
+             messageCallCount++
+             return {
+               data: [
+                 { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                 {
+                   info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+                   parts: [{ type: "text", text: "Done" }],
+                 },
+               ],
+             }
+           },
+           status: async () => {
+             statusCallCount++
+             if (statusCallCount <= 2) {
+               return { data: { "ses_busy": { type: "running" } } }
+             }
+             return { data: { "ses_busy": { type: "idle" } } }
+           },
+         },
+       }
 
-      //#when
-      const result = await pollSyncSession(createMockCtx(), mockClient, {
-        sessionID: "ses_busy",
-        agentToUse: "test-agent",
-        toastManager: null,
-        taskId: undefined,
-      })
+       //#when
+       const result = await pollSyncSession(createMockCtx(), mockClient, {
+         sessionID: "ses_busy",
+         agentToUse: "test-agent",
+         toastManager: null,
+         taskId: undefined,
+       })
 
-      //#then - should have waited for idle before checking messages
-      expect(result).toBeNull()
-      expect(statusCallCount).toBeGreaterThanOrEqual(3)
-    })
-  })
-})
+       //#then - should have waited for idle before checking messages
+       expect(result).toBeNull()
+       expect(statusCallCount).toBeGreaterThanOrEqual(3)
+     })
+   })
+
+   describe("isSessionComplete edge cases", () => {
+     const { isSessionComplete } = require("./sync-session-poller")
+
+     test("returns false when messages array is empty", () => {
+       //#given - empty messages array
+       const messages: any[] = []
+
+       //#when
+       const result = isSessionComplete(messages)
+
+       //#then - should return false
+       expect(result).toBe(false)
+     })
+
+     test("returns false when no assistant message exists", () => {
+       //#given - only user messages, no assistant
+       const messages = [
+         { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+         { info: { id: "msg_002", role: "user", time: { created: 2000 } } },
+       ]
+
+       //#when
+       const result = isSessionComplete(messages)
+
+       //#then - should return false
+       expect(result).toBe(false)
+     })
+
+     test("returns false when only assistant message exists (no user)", () => {
+       //#given - only assistant message, no user message
+       const messages = [
+         {
+           info: { id: "msg_001", role: "assistant", time: { created: 1000 }, finish: "end_turn" },
+           parts: [{ type: "text", text: "Response" }],
+         },
+       ]
+
+       //#when
+       const result = isSessionComplete(messages)
+
+       //#then - should return false (no user message to compare IDs)
+       expect(result).toBe(false)
+     })
+
+     test("returns false when assistant message has missing finish field", () => {
+       //#given - assistant message without finish field
+       const messages = [
+         { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+         {
+           info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
+           parts: [{ type: "text", text: "Response" }],
+         },
+       ]
+
+       //#when
+       const result = isSessionComplete(messages)
+
+       //#then - should return false (missing finish)
+       expect(result).toBe(false)
+     })
+
+     test("returns false when assistant message has missing info.id field", () => {
+       //#given - assistant message without id in info
+       const messages = [
+         { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+         {
+           info: { role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+           parts: [{ type: "text", text: "Response" }],
+         },
+       ]
+
+       //#when
+       const result = isSessionComplete(messages)
+
+       //#then - should return false (missing assistant id)
+       expect(result).toBe(false)
+     })
+
+     test("returns false when user message has missing info.id field", () => {
+       //#given - user message without id in info
+       const messages = [
+         { info: { role: "user", time: { created: 1000 } } },
+         {
+           info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+           parts: [{ type: "text", text: "Response" }],
+         },
+       ]
+
+       //#when
+       const result = isSessionComplete(messages)
+
+       //#then - should return false (missing user id)
+       expect(result).toBe(false)
+     })
+   })
+ })
