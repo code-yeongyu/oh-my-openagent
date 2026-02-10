@@ -1,96 +1,65 @@
-**Generated:** 2026-02-09T14:16:00+09:00
-**Commit:** f22f14d9
-**Branch:** dev
+# PLUGIN-HANDLERS KNOWLEDGE BASE
 
 ## OVERVIEW
 
-Plugin component loading and configuration orchestration. 500+ lines of config merging, migration, and component discovery for Claude Code compatibility.
+Configuration orchestration layer. Runs once at plugin init — transforms raw OpenCode config into resolved agent/tool/permission structures.
 
 ## STRUCTURE
 ```
 plugin-handlers/
-├── config-handler.ts       # Main config orchestrator (563 lines) - agent/skill/command loading
-├── config-handler.test.ts  # Config handler tests (1061 lines)
-├── plan-model-inheritance.ts # Plan agent model inheritance logic (657 lines)
-├── plan-model-inheritance.test.ts # Inheritance tests (3696 lines)
-└── index.ts               # Barrel export
+├── config-handler.ts                  # Main orchestrator (45 lines) — 6-phase loading
+├── agent-config-handler.ts            # Agent loading pipeline (197 lines)
+├── plan-model-inheritance.ts          # Plan demotion logic (28 lines)
+├── prometheus-agent-config-builder.ts # Prometheus config builder (99 lines)
+├── plugin-components-loader.ts        # Claude Code plugin discovery (71 lines, 10s timeout)
+├── provider-config-handler.ts         # Provider config + model context limits cache
+├── tool-config-handler.ts             # Permission migration (101 lines)
+├── mcp-config-handler.ts              # Builtin + CC + plugin MCP merge
+├── command-config-handler.ts          # Command/skill parallel discovery
+├── category-config-resolver.ts        # Category lookup
+├── agent-priority-order.ts            # Agent ordering (sisyphus, hephaestus, prometheus, atlas first)
+├── plan-model-inheritance.test.ts     # 3696 lines of tests
+├── config-handler.test.ts             # 1061 lines of tests
+└── index.ts                           # Barrel exports
 ```
 
-## CORE FUNCTIONS
+## CONFIG LOADING FLOW (6 phases, sequential)
 
-**Config Handler (`createConfigHandler`):**
-- Loads all plugin components (agents, skills, commands, MCPs)
-- Applies permission migrations for compatibility
-- Merges user/project/global configurations
-- Handles Claude Code plugin integration
+1. `applyProviderConfig` → Cache model context limits, detect anthropic-beta headers
+2. `loadPluginComponents` → Discover Claude Code plugins (10s timeout, error isolation)
+3. `applyAgentConfig` → Load all agents, sisyphus/prometheus/plan demotion
+4. `applyToolConfig` → Agent-specific tool permissions (grep_app, task, teammate)
+5. `applyMcpConfig` → Merge builtin + Claude Code + plugin MCPs
+6. `applyCommandConfig` → Merge builtin + user + project + opencode commands/skills
 
-**Plan Model Inheritance:**
-- Demotes plan agent to prometheus when planner enabled
-- Preserves user overrides during migration
-- Handles model/variant inheritance from categories
+## PLAN MODEL INHERITANCE
 
-## LOADING PHASES
+When `sisyphus_agent.planner_enabled === true`:
+1. Prometheus config → extract model settings (model, variant, temperature, ...)
+2. Apply user `agents.plan` overrides (plan override wins)
+3. Set `mode: "subagent"` (plan becomes subagent, not primary)
+4. Strip prompt/permission/description (only model settings inherited)
 
-1. **Plugin Discovery**: Load Claude Code plugins with timeout protection
-2. **Component Loading**: Parallel loading of agents, skills, commands
-3. **Config Merging**: User → Project → Global → Defaults
-4. **Migration**: Legacy config format compatibility
-5. **Permission Application**: Tool access control per agent
+## AGENT LOADING ORDER
 
-## KEY FEATURES
+1. Builtin agents (sisyphus, hephaestus, oracle, ...)
+2. Sisyphus-Junior (if sisyphus enabled)
+3. OpenCode-Builder (if `default_builder_enabled`)
+4. Prometheus (if `planner_enabled`)
+5. User agents → Project agents → Plugin agents → Custom agents
 
-**Parallel Loading:**
-- Concurrent discovery of user/project/global components
-- Timeout protection for plugin loading (default: 10s)
-- Error isolation (failed plugins don't break others)
+**Reordered** by `reorderAgentsByPriority()`: sisyphus, hephaestus, prometheus, atlas first.
 
-**Migration Support:**
-- Agent name mapping (old → new names)
-- Permission format conversion
-- Config structure updates
+## TOOL PERMISSIONS
 
-**Claude Code Integration:**
-- Plugin component loading
-- MCP server discovery
-- Agent/skill/command compatibility
+| Agent | Special Permissions |
+|-------|---------------------|
+| librarian | grep_app_* allowed |
+| atlas | task, task_*, teammate allowed |
+| sisyphus | task, task_*, teammate, question allowed |
+| hephaestus | task, question allowed |
+| multimodal-looker | Denies task, look_at |
 
-## CONFIGURATION FLOW
+## INTEGRATION
 
-```
-User Config → Migration → Merging → Validation → Agent Creation → Permission Application
-```
-
-## TESTING COVERAGE
-
-- **Config Handler**: 1061 lines of tests
-- **Plan Inheritance**: 3696 lines of tests
-- **Migration Logic**: Legacy compatibility verification
-- **Parallel Loading**: Timeout and error handling
-
-## USAGE PATTERNS
-
-**Config Handler Creation:**
-```typescript
-const handler = createConfigHandler({
-  ctx: { directory: projectDir },
-  pluginConfig: userConfig,
-  modelCacheState: cache
-});
-```
-
-**Plan Demotion:**
-```typescript
-const demotedPlan = buildPlanDemoteConfig(
-  prometheusConfig,
-  userPlanOverrides
-);
-```
-
-**Component Loading:**
-```typescript
-const [agents, skills, commands] = await Promise.all([
-  loadUserAgents(),
-  loadProjectSkills(),
-  loadGlobalCommands()
-]);
-```
+Created in `create-managers.ts`, exposed as `config` hook in `plugin-interface.ts`. OpenCode calls it during session init.
