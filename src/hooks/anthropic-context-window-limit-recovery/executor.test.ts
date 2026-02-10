@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:
 import { executeCompact } from "./executor"
 import type { AutoCompactState } from "./types"
 import * as storage from "./storage"
+import * as messagesReader from "../session-recovery/storage/messages-reader"
 
 type TimerCallback = (...args: any[]) => void
 
@@ -168,7 +169,8 @@ describe("executeCompact lock management", () => {
   })
 
   test("clears lock when fixEmptyMessages path executes", async () => {
-    // given: Empty content error scenario
+    //#given - Empty content error scenario with no messages in storage
+    const readMessagesSpy = spyOn(messagesReader, "readMessages").mockReturnValue([])
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "non-empty content required",
       messageIndex: 0,
@@ -176,16 +178,17 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    // when: Execute compaction (fixEmptyMessages will be called)
+    //#when - Execute compaction (fixEmptyMessages will be called)
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // then: Lock should be cleared
+    //#then - Lock should be cleared
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+    readMessagesSpy.mockRestore()
   })
 
   test("clears lock when truncation is sufficient", async () => {
-    // given: Aggressive truncation scenario with sufficient truncation
-    // This test verifies the early return path in aggressive truncation
+    //#given - Aggressive truncation scenario with no messages in storage
+    const readMessagesSpy = spyOn(messagesReader, "readMessages").mockReturnValue([])
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 250000,
@@ -197,7 +200,7 @@ describe("executeCompact lock management", () => {
       aggressive_truncation: true,
     }
 
-    // when: Execute compaction with experimental flag
+    //#when - Execute compaction with experimental flag
     await executeCompact(
       sessionID,
       msg,
@@ -207,8 +210,9 @@ describe("executeCompact lock management", () => {
       experimental,
     )
 
-    // then: Lock should be cleared even on early return
+    //#then - Lock should be cleared even on early return
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+    readMessagesSpy.mockRestore()
   })
 
   test("prevents concurrent compaction attempts", async () => {
