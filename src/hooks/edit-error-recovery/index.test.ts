@@ -88,6 +88,26 @@ describe("createEditErrorRecoveryHook", () => {
       })
     })
 
+    describe("#given output.output is nullish", () => {
+      it("#then should not throw when output.output is undefined", async () => {
+        const input = createInput("Edit")
+        const output = { title: "Edit", output: undefined as unknown as string, metadata: {} }
+
+        await hook["tool.execute.after"](input, output)
+
+        expect(output.output).toBeUndefined()
+      })
+
+      it("#then should not throw when output.output is null", async () => {
+        const input = createInput("Edit")
+        const output = { title: "Edit", output: null as unknown as string, metadata: {} }
+
+        await hook["tool.execute.after"](input, output)
+
+        expect(output.output).toBeNull()
+      })
+    })
+
     describe("#given Edit tool with successful output", () => {
       describe("#when no error in output", () => {
         it("#then should not modify output", async () => {

@@ -46,7 +46,9 @@ export async function processFilePathForAgentsInjection(input: {
       const truncationNotice = truncated
         ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${agentsPath}]`
         : "";
-      input.output.output += `\n\n[Directory Context: ${agentsPath}]\n${result}${truncationNotice}`;
+      if (input.output.output != null) {
+        input.output.output += `\n\n[Directory Context: ${agentsPath}]\n${result}${truncationNotice}`;
+      }
       cache.add(agentsDir);
     } catch {}
   }

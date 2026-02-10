@@ -16,7 +16,7 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 		input: { tool: string; sessionID: string; callID: string },
 		output: { title: string; output: string; metadata: unknown } | undefined,
 	): Promise<void> => {
-		if (!output) {
+		if (!output || output.output == null) {
 			return
 		}
 

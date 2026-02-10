@@ -116,7 +116,9 @@ export function createRuleInjectionProcessor(deps: {
       const truncationNotice = truncated
         ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${rule.relativePath}]`
         : "";
-      output.output += `\n\n[Rule: ${rule.relativePath}]\n[Match: ${rule.matchReason}]\n${result}${truncationNotice}`;
+      if (output.output != null) {
+        output.output += `\n\n[Rule: ${rule.relativePath}]\n[Match: ${rule.matchReason}]\n${result}${truncationNotice}`;
+      }
     }
 
     saveInjectedRules(sessionID, cache);

@@ -38,6 +38,7 @@ export function createContextWindowMonitorHook(ctx: PluginInput) {
     output: { title: string; output: string; metadata: unknown }
   ) => {
     const { sessionID } = input
+    if (output.output == null) return
 
     if (remindedSessions.has(sessionID)) return
 

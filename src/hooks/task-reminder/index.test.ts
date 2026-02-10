@@ -123,6 +123,40 @@ describe("TaskReminderHook", () => {
     expect(output2.output).not.toContain("task tools haven't been used")
   })
 
+  test("does not throw when output.output is nullish", async () => {
+    //#given
+    const sessionID = "test-session"
+    const output = { output: undefined as unknown as string }
+
+    //#when - run enough turns to trigger reminder
+    for (let i = 0; i < 10; i++) {
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID, callID: `call-${i}` },
+        output
+      )
+    }
+
+    //#then - should not throw, output remains undefined
+    expect(output.output).toBeUndefined()
+  })
+
+  test("does not throw when output.output is null", async () => {
+    //#given
+    const sessionID = "test-session-null"
+    const output = { output: null as unknown as string }
+
+    //#when
+    for (let i = 0; i < 10; i++) {
+      await hook["tool.execute.after"]?.(
+        { tool: "bash", sessionID, callID: `call-${i}` },
+        output
+      )
+    }
+
+    //#then
+    expect(output.output).toBeNull()
+  })
+
   test("cleans up counters on session.deleted", async () => {
     //#given
     const sessionID = "test-session"

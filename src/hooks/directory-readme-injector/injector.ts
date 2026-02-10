@@ -46,7 +46,9 @@ export async function processFilePathForReadmeInjection(input: {
       const truncationNotice = truncated
         ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${readmePath}]`
         : "";
-      input.output.output += `\n\n[Project README: ${readmePath}]\n${result}${truncationNotice}`;
+      if (input.output.output != null) {
+        input.output.output += `\n\n[Project README: ${readmePath}]\n${result}${truncationNotice}`;
+      }
       cache.add(readmeDir);
     } catch {}
   }

@@ -92,7 +92,7 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
     }
 
     const isSessionOperation = isNewSession || isKillSession || isKillServer;
-    if (isSessionOperation) {
+    if (isSessionOperation && output.output != null) {
       const reminder = buildSessionReminderMessage(
         Array.from(state.tmuxSessions),
       );

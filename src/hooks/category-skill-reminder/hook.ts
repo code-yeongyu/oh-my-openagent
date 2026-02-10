@@ -105,7 +105,7 @@ export function createCategorySkillReminderHook(
 
     state.toolCallCount++
 
-    if (state.toolCallCount >= 3 && !state.delegationUsed && !state.reminderShown) {
+    if (state.toolCallCount >= 3 && !state.delegationUsed && !state.reminderShown && output.output != null) {
       output.output += reminderMessage
       state.reminderShown = true
       log("[category-skill-reminder] Reminder injected", {

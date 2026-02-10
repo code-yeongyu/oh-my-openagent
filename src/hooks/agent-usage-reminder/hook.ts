@@ -77,6 +77,7 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
       return;
     }
 
+    if (output.output == null) return;
     output.output += REMINDER_MESSAGE;
     state.reminderCount++;
     state.updatedAt = Date.now();

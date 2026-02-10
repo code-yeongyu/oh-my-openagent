@@ -38,7 +38,7 @@ export function createTaskReminderHook(_ctx: PluginInput) {
     const currentCount = sessionCounters.get(sessionID) ?? 0
     const newCount = currentCount + 1
 
-    if (newCount >= TURN_THRESHOLD) {
+    if (newCount >= TURN_THRESHOLD && output.output != null) {
       output.output += REMINDER_MESSAGE
       sessionCounters.set(sessionID, 0)
     } else {
