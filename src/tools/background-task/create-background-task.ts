@@ -79,7 +79,7 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
           }
           await delay(WAIT_FOR_SESSION_INTERVAL_MS)
           const updated = manager.getTask(task.id)
-          if (!updated || updated.status === "error") {
+          if (!updated || updated.status === "error" || updated.status === "cancelled" || updated.status === "interrupt") {
             return `Task ${!updated ? "was deleted" : `entered error state`}\.\n\nTask ID: ${task.id}`
           }
           sessionId = updated?.sessionID
