@@ -1,9 +1,9 @@
-declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
+const { describe, test, expect, beforeEach, afterEach, mock, spyOn } = require("bun:test")
 
 describe("executeSyncContinuation - toast cleanup error paths", () => {
   let removeTaskCalls: string[] = []
   let addTaskCalls: any[] = []
+  let resetToastManager: (() => void) | null = null
 
   beforeEach(() => {
     //#given - configure fast timing for all tests
@@ -19,19 +19,21 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     removeTaskCalls = []
     addTaskCalls = []
 
-    //#given - mock task-toast-manager module
-    const mockToastManager = {
-      addTask: (task: any) => { addTaskCalls.push(task) },
-      removeTask: (id: string) => { removeTaskCalls.push(id) },
-    }
+    //#given - initialize real task toast manager (avoid global module mocks)
+    const { initTaskToastManager, _resetTaskToastManagerForTesting } = require("../../features/task-toast-manager/manager")
+    _resetTaskToastManagerForTesting()
+    resetToastManager = _resetTaskToastManagerForTesting
 
-    const mockGetTaskToastManager = () => mockToastManager
+    const toastManager = initTaskToastManager({
+      tui: { showToast: mock(() => Promise.resolve()) },
+    })
 
-    mock.module("../../features/task-toast-manager/index.ts", () => ({
-      getTaskToastManager: mockGetTaskToastManager,
-      TaskToastManager: class {},
-      initTaskToastManager: () => mockToastManager,
-    }))
+    spyOn(toastManager, "addTask").mockImplementation((task: any) => {
+      addTaskCalls.push(task)
+    })
+    spyOn(toastManager, "removeTask").mockImplementation((id: string) => {
+      removeTaskCalls.push(id)
+    })
 
     //#given - mock other dependencies
     mock.module("./sync-session-poller.ts", () => ({
@@ -48,7 +50,9 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { __resetTimingConfig } = require("./timing")
     __resetTimingConfig()
 
-    mock.restore()
+		mock.restore()
+		resetToastManager?.()
+		resetToastManager = null
   })
 
   test("removes toast when fetchSyncResult throws", async () => {
@@ -294,14 +298,9 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
   })
 
   test("no crash when toastManager is null", async () => {
-    //#given - mock task-toast-manager module to return null
-    const mockGetTaskToastManager = () => null
-
-    mock.module("../../features/task-toast-manager/index.ts", () => ({
-      getTaskToastManager: mockGetTaskToastManager,
-      TaskToastManager: class {},
-      initTaskToastManager: () => null,
-    }))
+		//#given - reset toast manager instance to null
+    const { _resetTaskToastManagerForTesting } = require("../../features/task-toast-manager/manager")
+    _resetTaskToastManagerForTesting()
 
     const mockClient = {
       session: {
