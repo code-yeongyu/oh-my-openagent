@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { migrateAgentNames } from "./migration"
-import { getAgentDisplayName } from "./agent-display-names"
+import { getAgentDisplayName, initializeAgentDisplayNames, resetAgentDisplayNames } from "./agent-display-names"
 import { AGENT_MODEL_REQUIREMENTS } from "./model-requirements"
 
 describe("Agent Config Integration", () => {
@@ -217,8 +217,77 @@ describe("Agent Config Integration", () => {
       const atlasDisplay = getAgentDisplayName("atlas")
 
       // then - display names are correct
-      expect(sisyphusDisplay).toBe("Sisyphus (Ultraworker)")
-      expect(atlasDisplay).toBe("Atlas (Plan Execution Orchestrator)")
+     expect(sisyphusDisplay).toBe("Sisyphus (Ultraworker)")
+     expect(atlasDisplay).toBe("Atlas (Plan Execution Orchestrator)")
+    })
+  })
+
+  describe("Plugin initialization flow", () => {
+    test("initializeAgentDisplayNames applies user overrides", () => {
+      // given - user-provided display name overrides
+      const userOverrides = {
+        sisyphus: "My Custom Sisyphus",
+        oracle: "My Custom Oracle",
+      }
+
+      // when - initialization is called
+      initializeAgentDisplayNames(userOverrides)
+
+      // then - overrides are applied
+      expect(getAgentDisplayName("sisyphus")).toBe("My Custom Sisyphus")
+      expect(getAgentDisplayName("oracle")).toBe("My Custom Oracle")
+
+      // then - non-overridden agents still use defaults
+      expect(getAgentDisplayName("atlas")).toBe("Atlas (Plan Execution Orchestrator)")
+
+      // cleanup
+      resetAgentDisplayNames()
+    })
+
+    test("initializeAgentDisplayNames handles empty overrides", () => {
+      // given - empty overrides
+      const emptyOverrides = {}
+
+      // when - initialization is called
+      initializeAgentDisplayNames(emptyOverrides)
+
+      // then - defaults are still used
+      expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
+      expect(getAgentDisplayName("atlas")).toBe("Atlas (Plan Execution Orchestrator)")
+
+      // cleanup
+      resetAgentDisplayNames()
+    })
+
+    test("initializeAgentDisplayNames case-insensitive override matching", () => {
+      // given - overrides with different case
+      const overrides = {
+        Sisyphus: "Custom Sisyphus",
+        ATLAS: "Custom Atlas",
+      }
+
+      // when - initialization is called
+      initializeAgentDisplayNames(overrides)
+
+      // then - case-insensitive matching works
+      expect(getAgentDisplayName("sisyphus")).toBe("Custom Sisyphus")
+      expect(getAgentDisplayName("atlas")).toBe("Custom Atlas")
+      expect(getAgentDisplayName("SISYPHUS")).toBe("Custom Sisyphus")
+
+      // cleanup
+      resetAgentDisplayNames()
+    })
+
+    test("resetAgentDisplayNames clears overrides", () => {
+      // given - initialized overrides
+      initializeAgentDisplayNames({ sisyphus: "Custom" })
+      expect(getAgentDisplayName("sisyphus")).toBe("Custom")
+
+      // when - reset is called
+      resetAgentDisplayNames()
+
+      // then - defaults are restored
+      expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
     })
   })
 })
