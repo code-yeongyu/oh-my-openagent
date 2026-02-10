@@ -783,6 +783,7 @@ export class BackgroundManager {
       this.cleanupPendingByParent(task)
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
+      getTaskToastManager()?.removeTask(task.id)
       if (task.sessionID) {
         subagentSessions.delete(task.sessionID)
       }
@@ -1001,6 +1002,7 @@ export class BackgroundManager {
 
     if (options?.skipNotification) {
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
+      getTaskToastManager()?.removeTask(task.id)
       return true
     }
 
@@ -1413,6 +1415,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           }
         }
         this.clearNotificationsForTask(taskId)
+        getTaskToastManager()?.removeTask(task.id)
         this.tasks.delete(taskId)
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)

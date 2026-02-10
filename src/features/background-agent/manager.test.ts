@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
+const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTask, ResumeInput } from "./types"
@@ -3452,5 +3452,130 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
 
     //#then - task should still be running (delta event refreshed lastUpdate)
     expect(task.status).toBe("running")
+  })
+})
+
+describe("BackgroundManager - toast cleanup on non-happy-path completion", () => {
+  let toastManager: { removeTask: ReturnType<typeof mock> }
+
+  beforeEach(() => {
+    toastManager = {
+      removeTask: mock(() => {}),
+    }
+    mock.module("../../features/task-toast-manager", () => ({
+      getTaskToastManager: () => toastManager,
+    }))
+  })
+
+  afterEach(() => {
+    mock.restore()
+  })
+
+  test("session.error removes toast entry", async () => {
+    //#given - a running task with mocked toast manager
+    const manager = createBackgroundManager()
+    const concurrencyManager = getConcurrencyManager(manager)
+    const concurrencyKey = "test-provider/test-model"
+    await concurrencyManager.acquire(concurrencyKey)
+
+    const sessionID = "ses_error_toast"
+    const task = createMockTask({
+      id: "task-session-error-toast",
+      sessionID,
+      parentSessionID: "parent-session",
+      status: "running",
+      concurrencyKey,
+    })
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionID, new Set([task.id]))
+
+    //#when - session.error event fires for that task's session
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID,
+        error: {
+          name: "UnknownError",
+          data: { message: "boom" },
+        },
+      },
+    })
+
+    //#then - toastManager.removeTask(task.id) was called
+    expect(toastManager.removeTask).toHaveBeenCalledWith(task.id)
+
+    manager.shutdown()
+  })
+
+  test("session.deleted removes toast entry (via cancelTask skipNotification)", () => {
+    //#given - a running task, session deleted
+    const manager = createBackgroundManager()
+    const parentSessionID = "parent-session-deleted"
+    const task = createMockTask({
+      id: "task-session-deleted-toast",
+      sessionID: "session-child-deleted",
+      parentSessionID,
+      status: "running",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(parentSessionID, new Set([task.id]))
+
+    //#when - session.deleted event fires for the task's parent session
+    manager.handleEvent({
+      type: "session.deleted",
+      properties: { info: { id: parentSessionID } },
+    })
+
+    //#then - toastManager.removeTask(task.id) was called
+    expect(toastManager.removeTask).toHaveBeenCalledWith(task.id)
+
+    manager.shutdown()
+  })
+
+  test("pruneStaleTasksAndNotifications removes toast entry", () => {
+    //#given - a stale task (startedAt > 30min ago)
+    const manager = createBackgroundManager()
+    const staleDate = new Date(Date.now() - 31 * 60 * 1000)
+    const task = createMockTask({
+      id: "task-stale-toast",
+      sessionID: "session-stale-toast",
+      parentSessionID: "parent-session",
+      status: "running",
+      startedAt: staleDate,
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - pruneStaleTasksAndNotifications runs
+    pruneStaleTasksAndNotificationsForTest(manager)
+
+    //#then - toastManager.removeTask(task.id) was called
+    expect(toastManager.removeTask).toHaveBeenCalledWith(task.id)
+
+    manager.shutdown()
+  })
+
+  test("cancelTask with skipNotification removes toast entry", async () => {
+    //#given - a running task
+    const manager = createBackgroundManager()
+    const concurrencyManager = getConcurrencyManager(manager)
+    const concurrencyKey = "test-provider/test-model"
+    await concurrencyManager.acquire(concurrencyKey)
+    const task = createMockTask({
+      id: "task-cancel-toast",
+      sessionID: "session-cancel-toast",
+      parentSessionID: "parent-session",
+      status: "running",
+      concurrencyKey,
+    })
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionID, new Set([task.id]))
+
+    //#when - cancelTask(taskId, { skipNotification: true }) is called
+    await manager.cancelTask(task.id, { source: "test", skipNotification: true })
+
+    //#then - toastManager.removeTask(task.id) was called
+    expect(toastManager.removeTask).toHaveBeenCalledWith(task.id)
+
+    manager.shutdown()
   })
 })
