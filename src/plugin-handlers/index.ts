@@ -8,3 +8,4 @@ export * from "./plugin-components-loader";
 export * from "./category-config-resolver";
 export * from "./prometheus-agent-config-builder";
 export * from "./agent-priority-order";
+export * from "./agent-display-name-rekeyer";
