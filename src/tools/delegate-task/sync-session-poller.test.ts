@@ -1,4 +1,5 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+declare const require: (name: string) => any
+const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
 
 function createMockCtx(aborted = false) {
@@ -427,88 +428,7 @@ describe("pollSyncSession", () => {
 
       //#then - should return false (missing user id)
       expect(result).toBe(false)
-    })
   })
+})
 
-     test("returns false when no assistant message exists", () => {
-       //#given - only user messages, no assistant
-       const messages = [
-         { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
-         { info: { id: "msg_002", role: "user", time: { created: 2000 } } },
-       ]
-
-       //#when
-       const result = isSessionComplete(messages)
-
-       //#then - should return false
-       expect(result).toBe(false)
-     })
-
-     test("returns false when only assistant message exists (no user)", () => {
-       //#given - only assistant message, no user message
-       const messages = [
-         {
-           info: { id: "msg_001", role: "assistant", time: { created: 1000 }, finish: "end_turn" },
-           parts: [{ type: "text", text: "Response" }],
-         },
-       ]
-
-       //#when
-       const result = isSessionComplete(messages)
-
-       //#then - should return false (no user message to compare IDs)
-       expect(result).toBe(false)
-     })
-
-     test("returns false when assistant message has missing finish field", () => {
-       //#given - assistant message without finish field
-       const messages = [
-         { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
-         {
-           info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
-           parts: [{ type: "text", text: "Response" }],
-         },
-       ]
-
-       //#when
-       const result = isSessionComplete(messages)
-
-       //#then - should return false (missing finish)
-       expect(result).toBe(false)
-     })
-
-     test("returns false when assistant message has missing info.id field", () => {
-       //#given - assistant message without id in info
-       const messages = [
-         { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
-         {
-           info: { role: "assistant", time: { created: 2000 }, finish: "end_turn" },
-           parts: [{ type: "text", text: "Response" }],
-         },
-       ]
-
-       //#when
-       const result = isSessionComplete(messages)
-
-       //#then - should return false (missing assistant id)
-       expect(result).toBe(false)
-     })
-
-     test("returns false when user message has missing info.id field", () => {
-       //#given - user message without id in info
-       const messages = [
-         { info: { role: "user", time: { created: 1000 } } },
-         {
-           info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
-           parts: [{ type: "text", text: "Response" }],
-         },
-       ]
-
-       //#when
-       const result = isSessionComplete(messages)
-
-       //#then - should return false (missing user id)
-       expect(result).toBe(false)
-     })
-   })
- })
+})
