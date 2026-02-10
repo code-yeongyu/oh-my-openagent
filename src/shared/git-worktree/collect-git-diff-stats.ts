@@ -12,21 +12,21 @@ export function collectGitDiffStats(directory: string): GitFileStat[] {
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
-    }).trim()
+    }).trimEnd()
 
     const statusOutput = execFileSync("git", ["status", "--porcelain"], {
       cwd: directory,
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
-    }).trim()
+    }).trimEnd()
 
     const untrackedOutput = execFileSync("git", ["ls-files", "--others", "--exclude-standard"], {
       cwd: directory,
       encoding: "utf-8",
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
-    }).trim()
+    }).trimEnd()
 
     const untrackedNumstat = untrackedOutput
       ? untrackedOutput
