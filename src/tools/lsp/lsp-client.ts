@@ -105,6 +105,18 @@ export class LSPClient extends LSPClientConnection {
       }
     } catch {}
 
+    const POLL_INTERVAL_MS = 200
+    const POLL_TIMEOUT_MS = 3000
+    const startTime = Date.now()
+
+    while (Date.now() - startTime < POLL_TIMEOUT_MS) {
+      const items = this.diagnosticsStore.get(uri)
+      if (items && items.length > 0) {
+        return { items }
+      }
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
+    }
+
     return { items: this.diagnosticsStore.get(uri) ?? [] }
   }
 

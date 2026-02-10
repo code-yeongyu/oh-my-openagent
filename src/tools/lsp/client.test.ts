@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import { tmpdir } from "node:os"
+import { pathToFileURL } from "node:url"
 
 import { describe, it, expect, spyOn, mock, beforeEach, afterEach } from "bun:test"
 
@@ -253,6 +254,146 @@ describe("LSPClient", () => {
         // #when / #then
         await expect(client.start()).rejects.toThrow("Path is not a directory")
       } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+  })
+
+  describe("diagnostics", () => {
+    it("polls diagnosticsStore when pull fails and push arrives during poll window", async () => {
+      // #given
+      const dir = mkdtempSync(join(tmpdir(), "lsp-diagnostics-test-"))
+      const filePath = join(dir, "test.ts")
+      writeFileSync(filePath, "const a = 1\n")
+
+      const server: ResolvedServer = {
+        id: "typescript",
+        command: ["typescript-language-server", "--stdio"],
+        extensions: [".ts"],
+        priority: 0,
+      }
+
+      const client = new LSPClient(dir, server)
+
+      // Mock sendRequest to throw (pull fails)
+      const sendRequestSpy = spyOn(
+        client as unknown as { sendRequest: (m: string, p?: unknown) => Promise<unknown> },
+        "sendRequest"
+      )
+      sendRequestSpy.mockImplementation(async () => {
+        throw new Error("pull not supported")
+      })
+
+      // Mock openFile to avoid actual file operations
+      const openFileSpy = spyOn(client, "openFile")
+      openFileSpy.mockImplementation(async () => {})
+
+      try {
+        // #when
+        const expectedDiagnostics = [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } }, message: "error" }]
+        const absPath = resolve(filePath)
+        const uri = pathToFileURL(absPath).href
+
+        // Schedule push notification to populate store after 200ms
+        setTimeout(() => {
+          ;(client as unknown as { diagnosticsStore: Map<string, unknown> }).diagnosticsStore.set(uri, expectedDiagnostics)
+        }, 200)
+
+        const result = await client.diagnostics(filePath)
+
+        // #then
+        expect(result.items).toEqual(expectedDiagnostics)
+      } finally {
+        sendRequestSpy.mockRestore()
+        openFileSpy.mockRestore()
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it("returns empty array when pull fails and no push arrives within timeout", async () => {
+      // #given
+      const dir = mkdtempSync(join(tmpdir(), "lsp-diagnostics-timeout-test-"))
+      const filePath = join(dir, "test.ts")
+      writeFileSync(filePath, "const a = 1\n")
+
+      const server: ResolvedServer = {
+        id: "typescript",
+        command: ["typescript-language-server", "--stdio"],
+        extensions: [".ts"],
+        priority: 0,
+      }
+
+      const client = new LSPClient(dir, server)
+
+      // Mock sendRequest to throw (pull fails)
+      const sendRequestSpy = spyOn(
+        client as unknown as { sendRequest: (m: string, p?: unknown) => Promise<unknown> },
+        "sendRequest"
+      )
+      sendRequestSpy.mockImplementation(async () => {
+        throw new Error("pull not supported")
+      })
+
+      // Mock openFile to avoid actual file operations
+      const openFileSpy = spyOn(client, "openFile")
+      openFileSpy.mockImplementation(async () => {})
+
+      try {
+        // #when
+        const result = await client.diagnostics(filePath)
+
+        // #then
+        expect(result.items).toEqual([])
+      } finally {
+        sendRequestSpy.mockRestore()
+        openFileSpy.mockRestore()
+        rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it("returns pull result immediately without polling when pull succeeds", async () => {
+      // #given
+      const dir = mkdtempSync(join(tmpdir(), "lsp-diagnostics-pull-success-test-"))
+      const filePath = join(dir, "test.ts")
+      writeFileSync(filePath, "const a = 1\n")
+
+      const server: ResolvedServer = {
+        id: "typescript",
+        command: ["typescript-language-server", "--stdio"],
+        extensions: [".ts"],
+        priority: 0,
+      }
+
+      const client = new LSPClient(dir, server)
+
+      const pullDiagnostics = [{ range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } }, message: "pull error" }]
+
+      // Mock sendRequest to return diagnostics (pull succeeds)
+      const sendRequestSpy = spyOn(
+        client as unknown as { sendRequest: (m: string, p?: unknown) => Promise<unknown> },
+        "sendRequest"
+      )
+      sendRequestSpy.mockImplementation(async () => ({
+        items: pullDiagnostics,
+      }))
+
+      // Mock openFile to avoid actual file operations
+      const openFileSpy = spyOn(client, "openFile")
+      openFileSpy.mockImplementation(async () => {})
+
+      try {
+        // #when
+        const startTime = Date.now()
+        const result = await client.diagnostics(filePath)
+        const elapsed = Date.now() - startTime
+
+        // #then
+        expect(result.items).toEqual(pullDiagnostics)
+        // Should return quickly without waiting for poll timeout
+        expect(elapsed).toBeLessThan(1000)
+      } finally {
+        sendRequestSpy.mockRestore()
+        openFileSpy.mockRestore()
         rmSync(dir, { recursive: true, force: true })
       }
     })
