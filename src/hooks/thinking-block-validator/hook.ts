@@ -71,7 +71,7 @@ function startsWithThinkingBlock(parts: Part[]): boolean {
 
   const firstPart = parts[0]
   const type = firstPart.type as string
-  return type === "thinking" || type === "reasoning"
+  return type === "thinking" || type === "reasoning" || type === "reasoning.encrypted"
 }
 
 /**
@@ -90,7 +90,7 @@ function findPreviousThinkingContent(
     if (!msg.parts) continue
     for (const part of msg.parts) {
       const type = part.type as string
-      if (type === "thinking" || type === "reasoning") {
+      if (type === "thinking" || type === "reasoning" || type === "reasoning.encrypted") {
         const thinking = (part as any).thinking || (part as any).text
         if (thinking && typeof thinking === "string" && thinking.trim().length > 0) {
           return thinking
