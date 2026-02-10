@@ -4,11 +4,11 @@ import * as deps from "./dependencies"
 describe("dependencies check", () => {
   describe("checkAstGrepCli", () => {
     it("returns dependency info", async () => {
-      // #given
-      // #when checking ast-grep cli
+      // given
+      // when checking ast-grep cli
       const info = await deps.checkAstGrepCli()
 
-      // #then should return valid info
+      // then should return valid info
       expect(info.name).toBe("AST-Grep CLI")
       expect(info.required).toBe(false)
       expect(typeof info.installed).toBe("boolean")
@@ -17,11 +17,11 @@ describe("dependencies check", () => {
 
   describe("checkAstGrepNapi", () => {
     it("returns dependency info", async () => {
-      // #given
-      // #when checking ast-grep napi
+      // given
+      // when checking ast-grep napi
       const info = await deps.checkAstGrepNapi()
 
-      // #then should return valid info
+      // then should return valid info
       expect(info.name).toBe("AST-Grep NAPI")
       expect(info.required).toBe(false)
       expect(typeof info.installed).toBe("boolean")
@@ -30,11 +30,11 @@ describe("dependencies check", () => {
 
   describe("checkCommentChecker", () => {
     it("returns dependency info", async () => {
-      // #given
-      // #when checking comment checker
+      // given
+      // when checking comment checker
       const info = await deps.checkCommentChecker()
 
-      // #then should return valid info
+      // then should return valid info
       expect(info.name).toBe("Comment Checker")
       expect(info.required).toBe(false)
       expect(typeof info.installed).toBe("boolean")
@@ -49,7 +49,7 @@ describe("dependencies check", () => {
     })
 
     it("returns pass when installed", async () => {
-      // #given ast-grep installed
+      // given ast-grep installed
       checkSpy = spyOn(deps, "checkAstGrepCli").mockResolvedValue({
         name: "AST-Grep CLI",
         required: false,
@@ -58,16 +58,16 @@ describe("dependencies check", () => {
         path: "/usr/local/bin/sg",
       })
 
-      // #when checking
+      // when checking
       const result = await deps.checkDependencyAstGrepCli()
 
-      // #then should pass
+      // then should pass
       expect(result.status).toBe("pass")
       expect(result.message).toContain("0.25.0")
     })
 
     it("returns warn when not installed", async () => {
-      // #given ast-grep not installed
+      // given ast-grep not installed
       checkSpy = spyOn(deps, "checkAstGrepCli").mockResolvedValue({
         name: "AST-Grep CLI",
         required: false,
@@ -77,10 +77,10 @@ describe("dependencies check", () => {
         installHint: "Install: npm install -g @ast-grep/cli",
       })
 
-      // #when checking
+      // when checking
       const result = await deps.checkDependencyAstGrepCli()
 
-      // #then should warn (optional)
+      // then should warn (optional)
       expect(result.status).toBe("warn")
       expect(result.message).toContain("optional")
     })
@@ -94,7 +94,7 @@ describe("dependencies check", () => {
     })
 
     it("returns pass when installed", async () => {
-      // #given napi installed
+      // given napi installed
       checkSpy = spyOn(deps, "checkAstGrepNapi").mockResolvedValue({
         name: "AST-Grep NAPI",
         required: false,
@@ -103,10 +103,10 @@ describe("dependencies check", () => {
         path: null,
       })
 
-      // #when checking
+      // when checking
       const result = await deps.checkDependencyAstGrepNapi()
 
-      // #then should pass
+      // then should pass
       expect(result.status).toBe("pass")
     })
   })
@@ -119,7 +119,7 @@ describe("dependencies check", () => {
     })
 
     it("returns warn when not installed", async () => {
-      // #given comment checker not installed
+      // given comment checker not installed
       checkSpy = spyOn(deps, "checkCommentChecker").mockResolvedValue({
         name: "Comment Checker",
         required: false,
@@ -129,21 +129,21 @@ describe("dependencies check", () => {
         installHint: "Hook will be disabled if not available",
       })
 
-      // #when checking
+      // when checking
       const result = await deps.checkDependencyCommentChecker()
 
-      // #then should warn
+      // then should warn
       expect(result.status).toBe("warn")
     })
   })
 
   describe("getDependencyCheckDefinitions", () => {
     it("returns definitions for all dependencies", () => {
-      // #given
-      // #when getting definitions
+      // given
+      // when getting definitions
       const defs = deps.getDependencyCheckDefinitions()
 
-      // #then should have 3 definitions
+      // then should have 3 definitions
       expect(defs.length).toBe(3)
       expect(defs.every((d) => d.category === "dependencies")).toBe(true)
       expect(defs.every((d) => d.critical === false)).toBe(true)

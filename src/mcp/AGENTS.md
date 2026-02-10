@@ -2,14 +2,19 @@
 
 ## OVERVIEW
 
-3 remote MCP servers: web search, documentation, code search. HTTP/SSE transport. Part of three-tier MCP system.
+Tier 1 of three-tier MCP system: 3 built-in remote HTTP MCPs.
+
+**Three-Tier System**:
+1. **Built-in** (this directory): websearch, context7, grep_app
+2. **Claude Code compat**: `.mcp.json` with `${VAR}` expansion
+3. **Skill-embedded**: YAML frontmatter in skills
 
 ## STRUCTURE
 
 ```
 mcp/
 ├── index.ts        # createBuiltinMcps() factory
-├── websearch.ts    # Exa AI web search
+├── websearch.ts    # Exa AI / Tavily web search
 ├── context7.ts     # Library documentation
 ├── grep-app.ts     # GitHub code search
 ├── types.ts        # McpNameSchema
@@ -20,15 +25,24 @@ mcp/
 
 | Name | URL | Purpose | Auth |
 |------|-----|---------|------|
-| websearch | mcp.exa.ai/mcp?tools=web_search_exa | Real-time web search | EXA_API_KEY |
-| context7 | mcp.context7.com/mcp | Library docs | CONTEXT7_API_KEY |
+| websearch | mcp.exa.ai / mcp.tavily.com | Real-time web search | EXA_API_KEY / TAVILY_API_KEY |
+| context7 | mcp.context7.com/mcp | Library docs | CONTEXT7_API_KEY (optional) |
 | grep_app | mcp.grep.app | GitHub code search | None |
 
-## THREE-TIER MCP SYSTEM
+## Websearch Provider Configuration
 
-1. **Built-in** (this directory): websearch, context7, grep_app
-2. **Claude Code compat**: `.mcp.json` with `${VAR}` expansion
-3. **Skill-embedded**: YAML frontmatter in skills (handled by skill-mcp-manager)
+| Provider | URL | Auth | API Key Required |
+|----------|-----|------|------------------|
+| exa (default) | mcp.exa.ai | x-api-key header | No (optional) |
+| tavily | mcp.tavily.com | Authorization Bearer | Yes |
+
+```jsonc
+{
+  "websearch": {
+    "provider": "tavily"  // or "exa" (default)
+  }
+}
+```
 
 ## CONFIG PATTERN
 
@@ -42,15 +56,6 @@ export const mcp_name = {
 }
 ```
 
-## USAGE
-
-```typescript
-import { createBuiltinMcps } from "./mcp"
-
-const mcps = createBuiltinMcps()  // Enable all
-const mcps = createBuiltinMcps(["websearch"])  // Disable specific
-```
-
 ## HOW TO ADD
 
 1. Create `src/mcp/my-mcp.ts`
@@ -61,5 +66,5 @@ const mcps = createBuiltinMcps(["websearch"])  // Disable specific
 
 - **Remote only**: HTTP/SSE, no stdio
 - **Disable**: User can set `disabled_mcps: ["name"]` in config
-- **Context7**: Optional auth using `CONTEXT7_API_KEY` env var
-- **Exa**: Optional auth using `EXA_API_KEY` env var
+- **Exa**: Default provider, works without API key
+- **Tavily**: Requires `TAVILY_API_KEY` env var

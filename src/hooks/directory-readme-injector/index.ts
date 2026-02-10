@@ -25,11 +25,6 @@ interface ToolExecuteBeforeOutput {
   args: unknown;
 }
 
-interface BatchToolCall {
-  tool: string;
-  parameters: Record<string, unknown>;
-}
-
 interface EventInput {
   event: {
     type: string;
@@ -39,7 +34,6 @@ interface EventInput {
 
 export function createDirectoryReadmeInjectorHook(ctx: PluginInput) {
   const sessionCaches = new Map<string, Set<string>>();
-  const pendingBatchReads = new Map<string, string[]>();
   const truncator = createDynamicTruncator(ctx);
 
   function getSessionCache(sessionID: string): Set<string> {
@@ -105,27 +99,6 @@ export function createDirectoryReadmeInjectorHook(ctx: PluginInput) {
     saveInjectedPaths(sessionID, cache);
   }
 
-  const toolExecuteBefore = async (
-    input: ToolExecuteInput,
-    output: ToolExecuteBeforeOutput,
-  ) => {
-    if (input.tool.toLowerCase() !== "batch") return;
-
-    const args = output.args as { tool_calls?: BatchToolCall[] } | undefined;
-    if (!args?.tool_calls) return;
-
-    const readFilePaths: string[] = [];
-    for (const call of args.tool_calls) {
-      if (call.tool.toLowerCase() === "read" && call.parameters?.filePath) {
-        readFilePaths.push(call.parameters.filePath as string);
-      }
-    }
-
-    if (readFilePaths.length > 0) {
-      pendingBatchReads.set(input.callID, readFilePaths);
-    }
-  };
-
   const toolExecuteAfter = async (
     input: ToolExecuteInput,
     output: ToolExecuteOutput,
@@ -136,16 +109,14 @@ export function createDirectoryReadmeInjectorHook(ctx: PluginInput) {
       await processFilePathForInjection(output.title, input.sessionID, output);
       return;
     }
+  };
 
-    if (toolName === "batch") {
-      const filePaths = pendingBatchReads.get(input.callID);
-      if (filePaths) {
-        for (const filePath of filePaths) {
-          await processFilePathForInjection(filePath, input.sessionID, output);
-        }
-        pendingBatchReads.delete(input.callID);
-      }
-    }
+  const toolExecuteBefore = async (
+    input: ToolExecuteInput,
+    output: ToolExecuteBeforeOutput,
+  ): Promise<void> => {
+    void input;
+    void output;
   };
 
   const eventHandler = async ({ event }: EventInput) => {

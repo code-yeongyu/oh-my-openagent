@@ -11,3 +11,13 @@ export { createMultimodalLookerAgent, MULTIMODAL_LOOKER_PROMPT_METADATA } from "
 export { createMetisAgent, METIS_SYSTEM_PROMPT, metisPromptMetadata } from "./metis"
 export { createMomusAgent, MOMUS_SYSTEM_PROMPT, momusPromptMetadata } from "./momus"
 export { createAtlasAgent, atlasPromptMetadata } from "./atlas"
+export {
+  PROMETHEUS_SYSTEM_PROMPT,
+  PROMETHEUS_PERMISSION,
+  PROMETHEUS_IDENTITY_CONSTRAINTS,
+  PROMETHEUS_INTERVIEW_MODE,
+  PROMETHEUS_PLAN_GENERATION,
+  PROMETHEUS_HIGH_ACCURACY_MODE,
+  PROMETHEUS_PLAN_TEMPLATE,
+  PROMETHEUS_BEHAVIORAL_SUMMARY,
+} from "./prometheus"

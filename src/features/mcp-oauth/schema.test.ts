@@ -4,57 +4,57 @@ import { McpOauthSchema } from "./schema"
 
 describe("McpOauthSchema", () => {
   test("parses empty oauth config", () => {
-    //#given
+    // given
     const input = {}
 
-    //#when
+    // when
     const result = McpOauthSchema.parse(input)
 
-    //#then
+    // then
     expect(result).toEqual({})
   })
 
   test("parses oauth config with clientId", () => {
-    //#given
+    // given
     const input = { clientId: "client-123" }
 
-    //#when
+    // when
     const result = McpOauthSchema.parse(input)
 
-    //#then
+    // then
     expect(result).toEqual({ clientId: "client-123" })
   })
 
   test("parses oauth config with scopes", () => {
-    //#given
+    // given
     const input = { scopes: ["openid", "profile"] }
 
-    //#when
+    // when
     const result = McpOauthSchema.parse(input)
 
-    //#then
+    // then
     expect(result).toEqual({ scopes: ["openid", "profile"] })
   })
 
   test("rejects non-string clientId", () => {
-    //#given
+    // given
     const input = { clientId: 123 }
 
-    //#when
+    // when
     const result = McpOauthSchema.safeParse(input)
 
-    //#then
+    // then
     expect(result.success).toBe(false)
   })
 
   test("rejects non-string scopes", () => {
-    //#given
+    // given
     const input = { scopes: ["openid", 42] }
 
-    //#when
+    // when
     const result = McpOauthSchema.safeParse(input)
 
-    //#then
+    // then
     expect(result.success).toBe(false)
   })
 })

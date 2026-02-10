@@ -4,9 +4,11 @@ import { runSg } from "./cli"
 import { formatSearchResult, formatReplaceResult } from "./utils"
 import type { CliLanguage } from "./types"
 
-function showOutputToUser(context: unknown, output: string): void {
-  const ctx = context as { metadata?: (input: { metadata: { output: string } }) => void }
-  ctx.metadata?.({ metadata: { output } })
+async function showOutputToUser(context: unknown, output: string): Promise<void> {
+  const ctx = context as {
+    metadata?: (input: { metadata: { output: string } }) => void | Promise<void>
+  }
+  await ctx.metadata?.({ metadata: { output } })
 }
 
 function getEmptyResultHint(pattern: string, lang: CliLanguage): string | null {
@@ -65,11 +67,11 @@ export const ast_grep_search: ToolDefinition = tool({
         }
       }
 
-      showOutputToUser(context, output)
+      await showOutputToUser(context, output)
       return output
     } catch (e) {
       const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      showOutputToUser(context, output)
+      await showOutputToUser(context, output)
       return output
     }
   },
@@ -99,14 +101,13 @@ export const ast_grep_replace: ToolDefinition = tool({
         updateAll: args.dryRun === false,
       })
       const output = formatReplaceResult(result, args.dryRun !== false)
-      showOutputToUser(context, output)
+      await showOutputToUser(context, output)
       return output
     } catch (e) {
       const output = `Error: ${e instanceof Error ? e.message : String(e)}`
-      showOutputToUser(context, output)
+      await showOutputToUser(context, output)
       return output
     }
   },
 })
-
 

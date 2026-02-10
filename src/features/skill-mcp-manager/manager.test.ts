@@ -66,7 +66,7 @@ describe("SkillMcpManager", () => {
   describe("getOrCreateClient", () => {
     describe("configuration validation", () => {
       it("throws error when neither url nor command is provided", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "test-server",
           skillName: "test-skill",
@@ -74,14 +74,14 @@ describe("SkillMcpManager", () => {
         }
         const config: ClaudeCodeMcpServer = {}
 
-        // #when / #then
+        // when / #then
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /no valid connection configuration/
         )
       })
 
       it("includes both HTTP and stdio examples in error message", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "my-mcp",
           skillName: "data-skill",
@@ -89,14 +89,14 @@ describe("SkillMcpManager", () => {
         }
         const config: ClaudeCodeMcpServer = {}
 
-        // #when / #then
+        // when / #then
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /HTTP[\s\S]*Stdio/
         )
       })
 
       it("includes server and skill names in error message", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "custom-server",
           skillName: "custom-skill",
@@ -104,7 +104,7 @@ describe("SkillMcpManager", () => {
         }
         const config: ClaudeCodeMcpServer = {}
 
-        // #when / #then
+        // when / #then
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /custom-server[\s\S]*custom-skill/
         )
@@ -113,7 +113,7 @@ describe("SkillMcpManager", () => {
 
     describe("connection type detection", () => {
       it("detects HTTP connection from explicit type='http'", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "http-server",
           skillName: "test-skill",
@@ -124,14 +124,14 @@ describe("SkillMcpManager", () => {
           url: "https://example.com/mcp",
         }
 
-        // #when / #then - should fail at connection, not config validation
+        // when / #then - should fail at connection, not config validation
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /Failed to connect/
         )
       })
 
       it("detects HTTP connection from explicit type='sse'", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "sse-server",
           skillName: "test-skill",
@@ -142,14 +142,14 @@ describe("SkillMcpManager", () => {
           url: "https://example.com/mcp",
         }
 
-        // #when / #then - should fail at connection, not config validation
+        // when / #then - should fail at connection, not config validation
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /Failed to connect/
         )
       })
 
       it("detects HTTP connection from url field when type is not specified", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "inferred-http",
           skillName: "test-skill",
@@ -159,14 +159,14 @@ describe("SkillMcpManager", () => {
           url: "https://example.com/mcp",
         }
 
-        // #when / #then - should fail at connection, not config validation
+        // when / #then - should fail at connection, not config validation
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /Failed to connect[\s\S]*URL/
         )
       })
 
       it("detects stdio connection from explicit type='stdio'", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "stdio-server",
           skillName: "test-skill",
@@ -178,14 +178,14 @@ describe("SkillMcpManager", () => {
           args: ["-e", "process.exit(0)"],
         }
 
-        // #when / #then - should fail at connection, not config validation
+        // when / #then - should fail at connection, not config validation
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /Failed to connect[\s\S]*Command/
         )
       })
 
       it("detects stdio connection from command field when type is not specified", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "inferred-stdio",
           skillName: "test-skill",
@@ -196,14 +196,14 @@ describe("SkillMcpManager", () => {
           args: ["-e", "process.exit(0)"],
         }
 
-        // #when / #then - should fail at connection, not config validation
+        // when / #then - should fail at connection, not config validation
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /Failed to connect[\s\S]*Command/
         )
       })
 
       it("prefers explicit type over inferred type", async () => {
-        // #given - has both url and command, but type is explicitly stdio
+        // given - has both url and command, but type is explicitly stdio
         const info: SkillMcpClientInfo = {
           serverName: "mixed-config",
           skillName: "test-skill",
@@ -216,7 +216,7 @@ describe("SkillMcpManager", () => {
           args: ["-e", "process.exit(0)"],
         }
 
-        // #when / #then - should use stdio (show Command in error, not URL)
+        // when / #then - should use stdio (show Command in error, not URL)
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /Command: node/
         )
@@ -225,7 +225,7 @@ describe("SkillMcpManager", () => {
 
     describe("HTTP connection", () => {
       it("throws error for invalid URL", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "bad-url-server",
           skillName: "test-skill",
@@ -236,14 +236,14 @@ describe("SkillMcpManager", () => {
           url: "not-a-valid-url",
         }
 
-        // #when / #then
+        // when / #then
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /invalid URL/
         )
       })
 
       it("includes URL in HTTP connection error", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "http-error-server",
           skillName: "test-skill",
@@ -253,14 +253,14 @@ describe("SkillMcpManager", () => {
           url: "https://nonexistent.example.com/mcp",
         }
 
-        // #when / #then
+        // when / #then
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /https:\/\/nonexistent\.example\.com\/mcp/
         )
       })
 
       it("includes helpful hints for HTTP connection failures", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "hint-server",
           skillName: "test-skill",
@@ -270,14 +270,14 @@ describe("SkillMcpManager", () => {
           url: "https://nonexistent.example.com/mcp",
         }
 
-        // #when / #then
+        // when / #then
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /Hints[\s\S]*Verify the URL[\s\S]*authentication headers[\s\S]*MCP over HTTP/
         )
       })
 
       it("calls mocked transport connect for HTTP connections", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "mock-test-server",
           skillName: "test-skill",
@@ -287,14 +287,14 @@ describe("SkillMcpManager", () => {
           url: "https://example.com/mcp",
         }
 
-        // #when
+        // when
         try {
           await manager.getOrCreateClient(info, config)
         } catch {
           // Expected to fail
         }
 
-        // #then - verify mock was called (transport was instantiated)
+        // then - verify mock was called (transport was instantiated)
         // The connection attempt happens through the Client.connect() which
         // internally calls transport.start()
         expect(mockHttpConnect).toHaveBeenCalled()
@@ -303,7 +303,7 @@ describe("SkillMcpManager", () => {
 
     describe("stdio connection (backward compatibility)", () => {
       it("throws error when command is missing for stdio type", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "missing-command",
           skillName: "test-skill",
@@ -314,14 +314,14 @@ describe("SkillMcpManager", () => {
           // command is missing
         }
 
-        // #when / #then
+        // when / #then
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /missing 'command' field/
         )
       })
 
       it("includes command in stdio connection error", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "test-server",
           skillName: "test-skill",
@@ -332,14 +332,14 @@ describe("SkillMcpManager", () => {
           args: ["--foo"],
         }
 
-        // #when / #then
+        // when / #then
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /nonexistent-command-xyz --foo/
         )
       })
 
       it("includes helpful hints for stdio connection failures", async () => {
-        // #given
+        // given
         const info: SkillMcpClientInfo = {
           serverName: "test-server",
           skillName: "test-skill",
@@ -349,7 +349,7 @@ describe("SkillMcpManager", () => {
           command: "nonexistent-command",
         }
 
-        // #when / #then
+        // when / #then
         await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
           /Hints[\s\S]*PATH[\s\S]*package exists/
         )
@@ -359,7 +359,7 @@ describe("SkillMcpManager", () => {
 
   describe("disconnectSession", () => {
     it("removes all clients for a specific session", async () => {
-      // #given
+      // given
       const session1Info: SkillMcpClientInfo = {
         serverName: "server1",
         skillName: "skill1",
@@ -371,56 +371,85 @@ describe("SkillMcpManager", () => {
         sessionID: "session-2",
       }
 
-      // #when
+      // when
       await manager.disconnectSession("session-1")
 
-      // #then
+      // then
       expect(manager.isConnected(session1Info)).toBe(false)
       expect(manager.isConnected(session2Info)).toBe(false)
     })
 
     it("does not throw when session has no clients", async () => {
-      // #given / #when / #then
+      // given / #when / #then
       await expect(manager.disconnectSession("nonexistent")).resolves.toBeUndefined()
     })
   })
 
   describe("disconnectAll", () => {
     it("clears all clients", async () => {
-      // #given - no actual clients connected (would require real MCP server)
+      // given - no actual clients connected (would require real MCP server)
 
-      // #when
+      // when
       await manager.disconnectAll()
 
-      // #then
+      // then
       expect(manager.getConnectedServers()).toEqual([])
+    })
+
+    it("unregisters signal handlers after disconnectAll", async () => {
+      // given
+      const info: SkillMcpClientInfo = {
+        serverName: "signal-server",
+        skillName: "signal-skill",
+        sessionID: "session-1",
+      }
+      const config: ClaudeCodeMcpServer = {
+        url: "https://example.com/mcp",
+      }
+
+      const before = process.listenerCount("SIGINT")
+
+      // when
+      try {
+        await manager.getOrCreateClient(info, config)
+      } catch {
+        // Expected to fail connection, still registers cleanup handlers
+      }
+      const afterRegister = process.listenerCount("SIGINT")
+
+      await manager.disconnectAll()
+      const afterDisconnect = process.listenerCount("SIGINT")
+
+      // then
+      expect(afterRegister).toBe(before + 1)
+      expect(afterDisconnect).toBe(before)
     })
   })
 
   describe("isConnected", () => {
     it("returns false for unconnected server", () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "unknown",
         skillName: "test",
         sessionID: "session-1",
       }
 
-      // #when / #then
+      // when / #then
       expect(manager.isConnected(info)).toBe(false)
     })
   })
 
   describe("getConnectedServers", () => {
     it("returns empty array when no servers connected", () => {
-      // #given / #when / #then
+      // given / #when / #then
       expect(manager.getConnectedServers()).toEqual([])
     })
   })
 
   describe("environment variable handling", () => {
     it("always inherits process.env even when config.env is undefined", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "test-server",
         skillName: "test-skill",
@@ -431,8 +460,8 @@ describe("SkillMcpManager", () => {
         args: ["-e", "process.exit(0)"],
       }
 
-      // #when - attempt connection (will fail but exercises env merging code path)
-      // #then - should not throw "undefined" related errors for env
+      // when - attempt connection (will fail but exercises env merging code path)
+      // then - should not throw "undefined" related errors for env
       try {
         await manager.getOrCreateClient(info, configWithoutEnv)
       } catch (error) {
@@ -443,7 +472,7 @@ describe("SkillMcpManager", () => {
     })
 
     it("overlays config.env on top of inherited process.env", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "test-server",
         skillName: "test-skill",
@@ -457,8 +486,8 @@ describe("SkillMcpManager", () => {
         },
       }
 
-      // #when - attempt connection
-      // #then - should not throw, env merging should work
+      // when - attempt connection
+      // then - should not throw, env merging should work
       try {
         await manager.getOrCreateClient(info, configWithEnv)
       } catch (error) {
@@ -470,7 +499,7 @@ describe("SkillMcpManager", () => {
 
   describe("HTTP headers handling", () => {
     it("accepts configuration with headers", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "auth-server",
         skillName: "test-skill",
@@ -484,7 +513,7 @@ describe("SkillMcpManager", () => {
         },
       }
 
-      // #when / #then - should fail at connection, not config validation
+      // when / #then - should fail at connection, not config validation
       // Headers are passed through to the transport
       await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
         /Failed to connect/
@@ -498,7 +527,7 @@ describe("SkillMcpManager", () => {
     })
 
     it("works without headers (optional)", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "no-auth-server",
         skillName: "test-skill",
@@ -509,7 +538,7 @@ describe("SkillMcpManager", () => {
         // no headers
       }
 
-      // #when / #then - should fail at connection, not config validation
+      // when / #then - should fail at connection, not config validation
       await expect(manager.getOrCreateClient(info, config)).rejects.toThrow(
         /Failed to connect/
       )
@@ -518,7 +547,7 @@ describe("SkillMcpManager", () => {
 
   describe("operation retry logic", () => {
     it("should retry operation when 'Not connected' error occurs", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "retry-server",
         skillName: "retry-skill",
@@ -546,17 +575,17 @@ describe("SkillMcpManager", () => {
       const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
-      // #when
+      // when
       const result = await manager.callTool(info, context, "test-tool", {})
 
-      // #then
+      // then
       expect(callCount).toBe(2)
       expect(result).toEqual([{ type: "text", text: "success" }])
       expect(getOrCreateSpy).toHaveBeenCalledTimes(2)
     })
 
     it("should fail after 3 retry attempts", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "fail-server",
         skillName: "fail-skill",
@@ -579,7 +608,7 @@ describe("SkillMcpManager", () => {
       const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
-      // #when / #then
+      // when / #then
       await expect(manager.callTool(info, context, "test-tool", {})).rejects.toThrow(
         /Failed after 3 reconnection attempts/
       )
@@ -587,7 +616,7 @@ describe("SkillMcpManager", () => {
     })
 
     it("should not retry on non-connection errors", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "error-server",
         skillName: "error-skill",
@@ -610,7 +639,7 @@ describe("SkillMcpManager", () => {
       const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
-      // #when / #then
+      // when / #then
       await expect(manager.callTool(info, context, "test-tool", {})).rejects.toThrow(
         "Tool not found"
       )
@@ -625,7 +654,7 @@ describe("SkillMcpManager", () => {
     })
 
     it("injects Authorization header when oauth config has stored tokens", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "oauth-server",
         skillName: "oauth-skill",
@@ -640,18 +669,18 @@ describe("SkillMcpManager", () => {
       }
       mockTokens.mockReturnValue({ accessToken: "stored-access-token" })
 
-      // #when
+      // when
       try {
         await manager.getOrCreateClient(info, config)
       } catch { /* connection fails in test */ }
 
-      // #then
+      // then
       const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
       expect(headers?.Authorization).toBe("Bearer stored-access-token")
     })
 
     it("does not inject Authorization header when no stored tokens exist and login fails", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "oauth-no-token",
         skillName: "oauth-skill",
@@ -666,18 +695,18 @@ describe("SkillMcpManager", () => {
       mockTokens.mockReturnValue(null)
       mockLogin.mockRejectedValue(new Error("Login failed"))
 
-      // #when
+      // when
       try {
         await manager.getOrCreateClient(info, config)
       } catch { /* connection fails in test */ }
 
-      // #then
+      // then
       const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
       expect(headers?.Authorization).toBeUndefined()
     })
 
     it("preserves existing static headers alongside OAuth token", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "oauth-with-headers",
         skillName: "oauth-skill",
@@ -694,19 +723,19 @@ describe("SkillMcpManager", () => {
       }
       mockTokens.mockReturnValue({ accessToken: "oauth-token" })
 
-      // #when
+      // when
       try {
         await manager.getOrCreateClient(info, config)
       } catch { /* connection fails in test */ }
 
-      // #then
+      // then
       const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
       expect(headers?.["X-Custom"]).toBe("custom-value")
       expect(headers?.Authorization).toBe("Bearer oauth-token")
     })
 
     it("does not create auth provider when oauth config is absent", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "no-oauth-server",
         skillName: "test-skill",
@@ -719,19 +748,19 @@ describe("SkillMcpManager", () => {
         },
       }
 
-      // #when
+      // when
       try {
         await manager.getOrCreateClient(info, config)
       } catch { /* connection fails in test */ }
 
-      // #then
+      // then
       const headers = lastTransportInstance.options?.requestInit?.headers as Record<string, string> | undefined
       expect(headers?.Authorization).toBe("Bearer static-token")
       expect(mockTokens).not.toHaveBeenCalled()
     })
 
     it("handles step-up auth by triggering re-login on 403 with scope", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "stepup-server",
         skillName: "stepup-skill",
@@ -767,16 +796,16 @@ describe("SkillMcpManager", () => {
       const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
-      // #when
+      // when
       const result = await manager.callTool(info, context, "test-tool", {})
 
-      // #then
+      // then
       expect(result).toEqual([{ type: "text", text: "success" }])
       expect(mockLogin).toHaveBeenCalled()
     })
 
     it("does not attempt step-up when oauth config is absent", async () => {
-      // #given
+      // given
       const info: SkillMcpClientInfo = {
         serverName: "no-stepup-server",
         skillName: "no-stepup-skill",
@@ -799,7 +828,7 @@ describe("SkillMcpManager", () => {
       const getOrCreateSpy = spyOn(manager as any, "getOrCreateClientWithRetry")
       getOrCreateSpy.mockResolvedValue(mockClient)
 
-      // #when / #then
+      // when / #then
       await expect(manager.callTool(info, context, "test-tool", {})).rejects.toThrow(/403/)
       expect(mockLogin).not.toHaveBeenCalled()
     })

@@ -4,13 +4,10 @@
  * true = tool allowed, false = tool denied.
  */
 
-import { findCaseInsensitive } from "./case-insensitive"
-
 const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   write: false,
   edit: false,
   task: false,
-  delegate_task: false,
   call_omo_agent: false,
 }
 
@@ -23,7 +20,19 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     write: false,
     edit: false,
     task: false,
-    delegate_task: false,
+    call_omo_agent: false,
+  },
+
+  metis: {
+    write: false,
+    edit: false,
+    task: false,
+  },
+
+  momus: {
+    write: false,
+    edit: false,
+    task: false,
   },
 
   "multimodal-looker": {
@@ -32,15 +41,17 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
 
   "sisyphus-junior": {
     task: false,
-    delegate_task: false,
   },
 }
 
 export function getAgentToolRestrictions(agentName: string): Record<string, boolean> {
-  return findCaseInsensitive(AGENT_RESTRICTIONS, agentName) ?? {}
+  return AGENT_RESTRICTIONS[agentName]
+    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
+    ?? {}
 }
 
 export function hasAgentToolRestrictions(agentName: string): boolean {
-  const restrictions = findCaseInsensitive(AGENT_RESTRICTIONS, agentName)
+  const restrictions = AGENT_RESTRICTIONS[agentName]
+    ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
   return restrictions !== undefined && Object.keys(restrictions).length > 0
 }

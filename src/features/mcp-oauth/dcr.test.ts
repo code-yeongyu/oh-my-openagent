@@ -27,7 +27,7 @@ function createStorage(initial: ClientCredentials | null):
 
 describe("getOrRegisterClient", () => {
   it("returns cached registration when available", async () => {
-    // #given
+    // given
     const storage = createStorage({
       clientId: "cached-client",
       clientSecret: "cached-secret",
@@ -36,7 +36,7 @@ describe("getOrRegisterClient", () => {
       throw new Error("fetch should not be called")
     }
 
-    // #when
+    // when
     const result = await getOrRegisterClient({
       registrationEndpoint: "https://server.example.com/register",
       serverIdentifier: "server-1",
@@ -47,7 +47,7 @@ describe("getOrRegisterClient", () => {
       fetch: fetchMock,
     })
 
-    // #then
+    // then
     expect(result).toEqual({
       clientId: "cached-client",
       clientSecret: "cached-secret",
@@ -55,7 +55,7 @@ describe("getOrRegisterClient", () => {
   })
 
   it("registers client and stores credentials when endpoint available", async () => {
-    // #given
+    // given
     const storage = createStorage(null)
     let fetchCalled = false
     const fetchMock: DcrFetch = async (
@@ -85,7 +85,7 @@ describe("getOrRegisterClient", () => {
       }
     }
 
-    // #when
+    // when
     const result = await getOrRegisterClient({
       registrationEndpoint: "https://server.example.com/register",
       serverIdentifier: "server-2",
@@ -96,7 +96,7 @@ describe("getOrRegisterClient", () => {
       fetch: fetchMock,
     })
 
-    // #then
+    // then
     expect(fetchCalled).toBe(true)
     expect(result).toEqual({
       clientId: "registered-client",
@@ -110,7 +110,7 @@ describe("getOrRegisterClient", () => {
   })
 
   it("uses config client id when registration endpoint missing", async () => {
-    // #given
+    // given
     const storage = createStorage(null)
     let fetchCalled = false
     const fetchMock: DcrFetch = async () => {
@@ -121,7 +121,7 @@ describe("getOrRegisterClient", () => {
       }
     }
 
-    // #when
+    // when
     const result = await getOrRegisterClient({
       registrationEndpoint: undefined,
       serverIdentifier: "server-3",
@@ -133,19 +133,19 @@ describe("getOrRegisterClient", () => {
       fetch: fetchMock,
     })
 
-    // #then
+    // then
     expect(fetchCalled).toBe(false)
     expect(result).toEqual({ clientId: "config-client" })
   })
 
   it("falls back to config client id when registration fails", async () => {
-    // #given
+    // given
     const storage = createStorage(null)
     const fetchMock: DcrFetch = async () => {
       throw new Error("network error")
     }
 
-    // #when
+    // when
     const result = await getOrRegisterClient({
       registrationEndpoint: "https://server.example.com/register",
       serverIdentifier: "server-4",
@@ -157,7 +157,7 @@ describe("getOrRegisterClient", () => {
       fetch: fetchMock,
     })
 
-    // #then
+    // then
     expect(result).toEqual({ clientId: "fallback-client" })
     expect(storage.getLastSet()).toBeNull()
   })

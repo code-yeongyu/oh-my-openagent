@@ -28,56 +28,6 @@ export function appendTranscriptEntry(
   appendFileSync(path, line)
 }
 
-export function recordToolUse(
-  sessionId: string,
-  toolName: string,
-  toolInput: Record<string, unknown>
-): void {
-  appendTranscriptEntry(sessionId, {
-    type: "tool_use",
-    timestamp: new Date().toISOString(),
-    tool_name: toolName,
-    tool_input: toolInput,
-  })
-}
-
-export function recordToolResult(
-  sessionId: string,
-  toolName: string,
-  toolInput: Record<string, unknown>,
-  toolOutput: Record<string, unknown>
-): void {
-  appendTranscriptEntry(sessionId, {
-    type: "tool_result",
-    timestamp: new Date().toISOString(),
-    tool_name: toolName,
-    tool_input: toolInput,
-    tool_output: toolOutput,
-  })
-}
-
-export function recordUserMessage(
-  sessionId: string,
-  content: string
-): void {
-  appendTranscriptEntry(sessionId, {
-    type: "user",
-    timestamp: new Date().toISOString(),
-    content,
-  })
-}
-
-export function recordAssistantMessage(
-  sessionId: string,
-  content: string
-): void {
-  appendTranscriptEntry(sessionId, {
-    type: "assistant",
-    timestamp: new Date().toISOString(),
-    content,
-  })
-}
-
 // ============================================================================
 // Claude Code Compatible Transcript Builder (PORT FROM DISABLED)
 // ============================================================================

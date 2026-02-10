@@ -25,13 +25,12 @@ import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { OhMyOpenCodeConfig } from "../config";
-import { log, fetchAvailableModels, readConnectedProvidersCache } from "../shared";
+import { log, fetchAvailableModels, readConnectedProvidersCache, resolveModelPipeline, addConfigLoadError } from "../shared";
 import { getOpenCodeConfigPaths } from "../shared/opencode-config-dir";
 import { migrateAgentConfig } from "../shared/permission-compat";
 import { AGENT_NAME_MAP } from "../shared/migration";
-import { resolveModelWithFallback } from "../shared/model-resolver";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
-import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus-prompt";
+import { PROMETHEUS_SYSTEM_PROMPT, PROMETHEUS_PERMISSION } from "../agents/prometheus";
 import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants";
 import type { ModelCacheState } from "../plugin-state";
 import type { CategoryConfig } from "../config/schema";
@@ -47,6 +46,28 @@ export function resolveCategoryConfig(
   userCategories?: Record<string, CategoryConfig>
 ): CategoryConfig | undefined {
   return userCategories?.[categoryName] ?? DEFAULT_CATEGORIES[categoryName];
+}
+
+const CORE_AGENT_ORDER = ["sisyphus", "hephaestus", "prometheus", "atlas"] as const;
+
+function reorderAgentsByPriority(agents: Record<string, unknown>): Record<string, unknown> {
+  const ordered: Record<string, unknown> = {};
+  const seen = new Set<string>();
+
+  for (const key of CORE_AGENT_ORDER) {
+    if (Object.prototype.hasOwnProperty.call(agents, key)) {
+      ordered[key] = agents[key];
+      seen.add(key);
+    }
+  }
+
+  for (const [key, value] of Object.entries(agents)) {
+    if (!seen.has(key)) {
+      ordered[key] = value;
+    }
+  }
+
+  return ordered;
 }
 
 export function createConfigHandler(deps: ConfigHandlerDeps) {
@@ -83,19 +104,44 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       }
     }
 
-    const pluginComponents = (pluginConfig.claude_code?.plugins ?? true)
-      ? await loadAllPluginComponents({
-          enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
-        })
-      : {
-          commands: {},
-          skills: {},
-          agents: {},
-          mcpServers: {},
-          hooksConfigs: [],
-          plugins: [],
-          errors: [],
-        };
+    const emptyPluginDefaults = {
+      commands: {},
+      skills: {},
+      agents: {},
+      mcpServers: {},
+      hooksConfigs: [] as { hooks?: Record<string, unknown> }[],
+      plugins: [] as { name: string; version: string }[],
+      errors: [] as { pluginKey: string; installPath: string; error: string }[],
+    };
+
+    let pluginComponents: typeof emptyPluginDefaults;
+    const pluginsEnabled = pluginConfig.claude_code?.plugins ?? true;
+
+    if (pluginsEnabled) {
+      const timeoutMs = pluginConfig.experimental?.plugin_load_timeout_ms ?? 10000;
+      try {
+        let timeoutId: ReturnType<typeof setTimeout>;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(
+            () => reject(new Error(`Plugin loading timed out after ${timeoutMs}ms`)),
+            timeoutMs,
+          );
+        });
+        pluginComponents = await Promise.race([
+          loadAllPluginComponents({
+            enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+          }),
+          timeoutPromise,
+        ]).finally(() => clearTimeout(timeoutId));
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        log("[config-handler] Plugin loading failed", { error: errorMessage });
+        addConfigLoadError({ path: "plugin-loading", error: errorMessage });
+        pluginComponents = emptyPluginDefaults;
+      }
+    } else {
+      pluginComponents = emptyPluginDefaults;
+    }
 
     if (pluginComponents.plugins.length > 0) {
       log(`Loaded ${pluginComponents.plugins.length} Claude Code plugins`, {
@@ -136,6 +182,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     // config.model represents the currently active model in OpenCode (including UI selection)
     // Pass it as uiSelectedModel so it takes highest priority in model resolution
     const currentModel = config.model as string | undefined;
+    const disabledSkills = new Set<string>(pluginConfig.disabled_skills ?? []);
     const builtinAgents = await createBuiltinAgents(
       migratedDisabledAgents,
       pluginConfig.agents,
@@ -146,7 +193,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       allDiscoveredSkills,
       ctx.client,
       browserProvider,
-      currentModel // uiSelectedModel - takes highest priority
+      currentModel, // uiSelectedModel - takes highest priority
+      disabledSkills
     );
 
     // Claude Code agents: Do NOT apply permission migration
@@ -174,6 +222,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     const plannerEnabled =
       pluginConfig.sisyphus_agent?.planner_enabled ?? true;
     const replacePlan = pluginConfig.sisyphus_agent?.replace_plan ?? true;
+    const shouldDemotePlan = plannerEnabled && replacePlan;
 
     type AgentConfig = Record<
       string,
@@ -198,7 +247,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
       agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
         pluginConfig.agents?.["sisyphus-junior"],
-        config.model as string | undefined
+        undefined
       );
 
       if (builderEnabled) {
@@ -220,11 +269,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       }
 
       if (plannerEnabled) {
-        const { name: _planName, mode: _planMode, ...planConfigWithoutName } =
-          configAgent?.plan ?? {};
-        const migratedPlanConfig = migrateAgentConfig(
-          planConfigWithoutName as Record<string, unknown>
-        );
         const prometheusOverride =
           pluginConfig.agents?.["prometheus"] as
             | (Record<string, unknown> & {
@@ -249,16 +293,26 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
 
         const prometheusRequirement = AGENT_MODEL_REQUIREMENTS["prometheus"];
         const connectedProviders = readConnectedProvidersCache();
-        const availableModels = ctx.client
-          ? await fetchAvailableModels(ctx.client, { connectedProviders: connectedProviders ?? undefined })
-          : new Set<string>();
+        // IMPORTANT: Do NOT pass ctx.client to fetchAvailableModels during plugin initialization.
+        // Calling client API (e.g., client.provider.list()) from config handler causes deadlock:
+        // - Plugin init waits for server response
+        // - Server waits for plugin init to complete before handling requests
+        // Use cache-only mode instead. If cache is unavailable, fallback chain uses first model.
+        // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1301
+        const availableModels = await fetchAvailableModels(undefined, {
+          connectedProviders: connectedProviders ?? undefined,
+        });
 
-        const modelResolution = resolveModelWithFallback({
-          uiSelectedModel: currentModel,
-          userModel: prometheusOverride?.model ?? categoryConfig?.model,
-          fallbackChain: prometheusRequirement?.fallbackChain,
-          availableModels,
-          systemDefaultModel: undefined,
+        const modelResolution = resolveModelPipeline({
+          intent: {
+            uiSelectedModel: currentModel,
+            userModel: prometheusOverride?.model ?? categoryConfig?.model,
+          },
+          constraints: { availableModels },
+          policy: {
+            fallbackChain: prometheusRequirement?.fallbackChain,
+            systemDefaultModel: undefined,
+          },
         });
         const resolvedModel = modelResolution?.model;
         const resolvedVariant = modelResolution?.variant;
@@ -278,7 +332,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           prompt: PROMETHEUS_SYSTEM_PROMPT,
           permission: PROMETHEUS_PERMISSION,
           description: `${configAgent?.plan?.description ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
-          color: (configAgent?.plan?.color as string) ?? "#FF6347",
+          color: (configAgent?.plan?.color as string) ?? "#FF5722", // Deep Orange - Fire/Flame theme
           ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
           ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),
           ...(maxTokensToUse !== undefined ? { maxTokens: maxTokensToUse } : {}),
@@ -292,9 +346,19 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
             : {}),
         };
 
-        agentConfig["prometheus"] = prometheusOverride
-          ? { ...prometheusBase, ...prometheusOverride }
-          : prometheusBase;
+        // Properly handle prompt_append for Prometheus
+        // Extract prompt_append and append it to prompt instead of shallow spread
+        // Fixes: https://github.com/code-yeongyu/oh-my-opencode/issues/723
+        if (prometheusOverride) {
+          const { prompt_append, ...restOverride } = prometheusOverride as Record<string, unknown> & { prompt_append?: string };
+          const merged = { ...prometheusBase, ...restOverride };
+          if (prompt_append && merged.prompt) {
+            merged.prompt = merged.prompt + "\n" + prompt_append;
+          }
+          agentConfig["prometheus"] = merged;
+        } else {
+          agentConfig["prometheus"] = prometheusBase;
+        }
       }
 
     const filteredConfigAgents = configAgent
@@ -302,7 +366,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
           Object.entries(configAgent)
             .filter(([key]) => {
               if (key === "build") return false;
-              if (key === "plan" && replacePlan) return false;
+              if (key === "plan" && shouldDemotePlan) return false;
               // Filter out agents that oh-my-opencode provides to prevent
               // OpenCode defaults from overwriting user config in oh-my-opencode.json
               // See: https://github.com/code-yeongyu/oh-my-opencode/issues/472
@@ -320,11 +384,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
         ? migrateAgentConfig(configAgent.build as Record<string, unknown>)
         : {};
 
-      const planDemoteConfig = replacePlan && agentConfig["prometheus"]
-        ? { 
-            ...agentConfig["prometheus"],
-            name: "plan", 
-            mode: "subagent" as const 
+      const planDemoteConfig = shouldDemotePlan
+           ? { mode: "subagent" as const
           }
         : undefined;
 
@@ -350,6 +411,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       };
     }
 
+    if (config.agent) {
+      config.agent = reorderAgentsByPriority(config.agent as Record<string, unknown>);
+    }
+
     const agentResult = config.agent as AgentConfig;
 
     config.tools = {
@@ -358,9 +423,16 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       LspHover: false,
       LspCodeActions: false,
       LspCodeActionResolve: false,
+      "task_*": false,
+      teammate: false,
+      ...(pluginConfig.experimental?.task_system ? { todowrite: false, todoread: false } : {}),
     };
 
     type AgentWithPermission = { permission?: Record<string, unknown> };
+
+    // In CLI run mode, deny Question tool for all agents (no TUI to answer questions)
+    const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true";
+    const questionPermission = isCliRunMode ? "deny" : "allow";
     
     if (agentResult.librarian) {
       const agent = agentResult.librarian as AgentWithPermission;
@@ -372,26 +444,30 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     }
     if (agentResult["atlas"]) {
       const agent = agentResult["atlas"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, task: "deny", call_omo_agent: "deny", delegate_task: "allow" };
+      agent.permission = { ...agent.permission, task: "allow", call_omo_agent: "deny", "task_*": "allow", teammate: "allow" };
     }
     if (agentResult.sisyphus) {
       const agent = agentResult.sisyphus as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", task: "allow", question: questionPermission, "task_*": "allow", teammate: "allow" };
+    }
+    if (agentResult.hephaestus) {
+      const agent = agentResult.hephaestus as AgentWithPermission;
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", task: "allow", question: questionPermission };
     }
     if (agentResult["prometheus"]) {
       const agent = agentResult["prometheus"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, call_omo_agent: "deny", delegate_task: "allow", question: "allow" };
+      agent.permission = { ...agent.permission, call_omo_agent: "deny", task: "allow", question: questionPermission, "task_*": "allow", teammate: "allow" };
     }
     if (agentResult["sisyphus-junior"]) {
       const agent = agentResult["sisyphus-junior"] as AgentWithPermission;
-      agent.permission = { ...agent.permission, delegate_task: "allow" };
+      agent.permission = { ...agent.permission, task: "allow", "task_*": "allow", teammate: "allow" };
     }
 
     config.permission = {
       ...(config.permission as Record<string, unknown>),
       webfetch: "allow",
       external_directory: "allow",
-      delegate_task: "deny",
+      task: "deny",
     };
 
     const mcpResult = (pluginConfig.claude_code?.mcp ?? true)
@@ -399,7 +475,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
       : { servers: {} };
 
     config.mcp = {
-      ...createBuiltinMcps(pluginConfig.disabled_mcps),
+      ...createBuiltinMcps(pluginConfig.disabled_mcps, pluginConfig),
       ...(config.mcp as Record<string, unknown>),
       ...mcpResult.servers,
       ...pluginComponents.mcpServers,

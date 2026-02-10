@@ -6,49 +6,49 @@ import type { OAuthTokenData } from "./storage"
 describe("McpOAuthProvider", () => {
   describe("generateCodeVerifier", () => {
     it("returns a base64url-encoded 32-byte random string", () => {
-      //#given
+      // given
       const verifier = generateCodeVerifier()
 
-      //#when
+      // when
       const decoded = Buffer.from(verifier, "base64url")
 
-      //#then
+      // then
       expect(decoded.length).toBe(32)
       expect(verifier).toMatch(/^[A-Za-z0-9_-]+$/)
     })
 
     it("produces unique values on each call", () => {
-      //#given
+      // given
       const first = generateCodeVerifier()
 
-      //#when
+      // when
       const second = generateCodeVerifier()
 
-      //#then
+      // then
       expect(first).not.toBe(second)
     })
   })
 
   describe("generateCodeChallenge", () => {
     it("returns SHA256 base64url digest of the verifier", () => {
-      //#given
+      // given
       const verifier = "test-verifier-value"
       const expected = createHash("sha256").update(verifier).digest("base64url")
 
-      //#when
+      // when
       const challenge = generateCodeChallenge(verifier)
 
-      //#then
+      // then
       expect(challenge).toBe(expected)
     })
   })
 
   describe("buildAuthorizationUrl", () => {
     it("builds URL with all required PKCE parameters", () => {
-      //#given
+      // given
       const endpoint = "https://auth.example.com/authorize"
 
-      //#when
+      // when
       const url = buildAuthorizationUrl(endpoint, {
         clientId: "my-client",
         redirectUri: "http://127.0.0.1:8912/callback",
@@ -58,7 +58,7 @@ describe("McpOAuthProvider", () => {
         resource: "https://mcp.example.com",
       })
 
-      //#then
+      // then
       const parsed = new URL(url)
       expect(parsed.origin + parsed.pathname).toBe("https://auth.example.com/authorize")
       expect(parsed.searchParams.get("response_type")).toBe("code")
@@ -72,10 +72,10 @@ describe("McpOAuthProvider", () => {
     })
 
     it("omits scope when empty", () => {
-      //#given
+      // given
       const endpoint = "https://auth.example.com/authorize"
 
-      //#when
+      // when
       const url = buildAuthorizationUrl(endpoint, {
         clientId: "my-client",
         redirectUri: "http://127.0.0.1:8912/callback",
@@ -84,16 +84,16 @@ describe("McpOAuthProvider", () => {
         scopes: [],
       })
 
-      //#then
+      // then
       const parsed = new URL(url)
       expect(parsed.searchParams.has("scope")).toBe(false)
     })
 
     it("omits resource when undefined", () => {
-      //#given
+      // given
       const endpoint = "https://auth.example.com/authorize"
 
-      //#when
+      // when
       const url = buildAuthorizationUrl(endpoint, {
         clientId: "my-client",
         redirectUri: "http://127.0.0.1:8912/callback",
@@ -101,7 +101,7 @@ describe("McpOAuthProvider", () => {
         state: "state-value",
       })
 
-      //#then
+      // then
       const parsed = new URL(url)
       expect(parsed.searchParams.has("resource")).toBe(false)
     })
@@ -109,43 +109,43 @@ describe("McpOAuthProvider", () => {
 
   describe("constructor and basic methods", () => {
     it("stores serverUrl and optional clientId and scopes", () => {
-      //#given
+      // given
       const options = {
         serverUrl: "https://mcp.example.com",
         clientId: "my-client",
         scopes: ["openid"],
       }
 
-      //#when
+      // when
       const provider = new McpOAuthProvider(options)
 
-      //#then
+      // then
       expect(provider.tokens()).toBeNull()
       expect(provider.clientInformation()).toBeNull()
       expect(provider.codeVerifier()).toBeNull()
     })
 
     it("defaults scopes to empty array", () => {
-      //#given
+      // given
       const options = { serverUrl: "https://mcp.example.com" }
 
-      //#when
+      // when
       const provider = new McpOAuthProvider(options)
 
-      //#then
+      // then
       expect(provider.redirectUrl()).toBe("http://127.0.0.1:19877/callback")
     })
   })
 
   describe("saveCodeVerifier / codeVerifier", () => {
     it("stores and retrieves code verifier", () => {
-      //#given
+      // given
       const provider = new McpOAuthProvider({ serverUrl: "https://mcp.example.com" })
 
-      //#when
+      // when
       provider.saveCodeVerifier("my-verifier")
 
-      //#then
+      // then
       expect(provider.codeVerifier()).toBe("my-verifier")
     })
   })
@@ -172,7 +172,7 @@ describe("McpOAuthProvider", () => {
     })
 
     it("persists and loads token data via storage", () => {
-      //#given
+      // given
       const provider = new McpOAuthProvider({ serverUrl: "https://mcp.example.com" })
       const tokenData: OAuthTokenData = {
         accessToken: "access-token-123",
@@ -180,11 +180,11 @@ describe("McpOAuthProvider", () => {
         expiresAt: 1710000000,
       }
 
-      //#when
+      // when
       const saved = provider.saveTokens(tokenData)
       const loaded = provider.tokens()
 
-      //#then
+      // then
       expect(saved).toBe(true)
       expect(loaded).toEqual(tokenData)
     })
@@ -192,7 +192,7 @@ describe("McpOAuthProvider", () => {
 
   describe("redirectToAuthorization", () => {
     it("throws when no client information is set", async () => {
-      //#given
+      // given
       const provider = new McpOAuthProvider({ serverUrl: "https://mcp.example.com" })
       const metadata = {
         authorizationEndpoint: "https://auth.example.com/authorize",
@@ -200,23 +200,23 @@ describe("McpOAuthProvider", () => {
         resource: "https://mcp.example.com",
       }
 
-      //#when
+      // when
       const result = provider.redirectToAuthorization(metadata)
 
-      //#then
+      // then
       await expect(result).rejects.toThrow("No client information available")
     })
   })
 
   describe("redirectUrl", () => {
     it("returns localhost callback URL with default port", () => {
-      //#given
+      // given
       const provider = new McpOAuthProvider({ serverUrl: "https://mcp.example.com" })
 
-      //#when
+      // when
       const url = provider.redirectUrl()
 
-      //#then
+      // then
       expect(url).toBe("http://127.0.0.1:19877/callback")
     })
   })

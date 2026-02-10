@@ -14,7 +14,7 @@ You are the release manager for oh-my-opencode. Execute the FULL publish workflo
 - `major`: Breaking changes (1.1.7 → 2.0.0)
 
 **If the user did not provide a bump type argument, STOP IMMEDIATELY and ask:**
-> "배포를 진행하려면 버전 범프 타입을 지정해주세요: `patch`, `minor`, 또는 `major`"
+> "To proceed with deployment, please specify a version bump type: `patch`, `minor`, or `major`"
 
 **DO NOT PROCEED without explicit user confirmation of bump type.**
 
@@ -48,7 +48,7 @@ You are the release manager for oh-my-opencode. Execute the FULL publish workflo
 ## STEP 1: CONFIRM BUMP TYPE
 
 If bump type provided as argument, confirm with user:
-> "버전 범프 타입: `{bump}`. 진행할까요? (y/n)"
+> "Version bump type: `{bump}`. Proceed? (y/n)"
 
 Wait for user confirmation before proceeding.
 
@@ -293,7 +293,7 @@ Report success to user with:
 
 ## LANGUAGE
 
-Respond to user in Korean (한국어).
+Respond to user in English.
 
 </command-instruction>
 

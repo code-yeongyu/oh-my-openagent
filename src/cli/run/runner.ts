@@ -3,21 +3,94 @@ import pc from "picocolors"
 import type { RunOptions, RunContext } from "./types"
 import { checkCompletionConditions } from "./completion"
 import { createEventState, processEvents, serializeError } from "./events"
+import type { OhMyOpenCodeConfig } from "../../config"
+import { loadPluginConfig } from "../../plugin-config"
+import { getAvailableServerPort, DEFAULT_SERVER_PORT } from "../../shared/port-utils"
 
 const POLL_INTERVAL_MS = 500
 const DEFAULT_TIMEOUT_MS = 0
 const SESSION_CREATE_MAX_RETRIES = 3
 const SESSION_CREATE_RETRY_DELAY_MS = 1000
+const CORE_AGENT_ORDER = ["sisyphus", "hephaestus", "prometheus", "atlas"] as const
+const DEFAULT_AGENT = "sisyphus"
+
+type EnvVars = Record<string, string | undefined>
+
+const normalizeAgentName = (agent?: string): string | undefined => {
+  if (!agent) return undefined
+  const trimmed = agent.trim()
+  if (!trimmed) return undefined
+  const lowered = trimmed.toLowerCase()
+  const coreMatch = CORE_AGENT_ORDER.find((name) => name.toLowerCase() === lowered)
+  return coreMatch ?? trimmed
+}
+
+const isAgentDisabled = (agent: string, config: OhMyOpenCodeConfig): boolean => {
+  const lowered = agent.toLowerCase()
+  if (lowered === "sisyphus" && config.sisyphus_agent?.disabled === true) {
+    return true
+  }
+  return (config.disabled_agents ?? []).some(
+    (disabled) => disabled.toLowerCase() === lowered
+  )
+}
+
+const pickFallbackAgent = (config: OhMyOpenCodeConfig): string => {
+  for (const agent of CORE_AGENT_ORDER) {
+    if (!isAgentDisabled(agent, config)) {
+      return agent
+    }
+  }
+  return DEFAULT_AGENT
+}
+
+export const resolveRunAgent = (
+  options: RunOptions,
+  pluginConfig: OhMyOpenCodeConfig,
+  env: EnvVars = process.env
+): string => {
+  const cliAgent = normalizeAgentName(options.agent)
+  const envAgent = normalizeAgentName(env.OPENCODE_DEFAULT_AGENT)
+  const configAgent = normalizeAgentName(pluginConfig.default_run_agent)
+  const resolved = cliAgent ?? envAgent ?? configAgent ?? DEFAULT_AGENT
+  const normalized = normalizeAgentName(resolved) ?? DEFAULT_AGENT
+
+  if (isAgentDisabled(normalized, pluginConfig)) {
+    const fallback = pickFallbackAgent(pluginConfig)
+    const fallbackDisabled = isAgentDisabled(fallback, pluginConfig)
+    if (fallbackDisabled) {
+      console.log(
+        pc.yellow(
+          `Requested agent "${normalized}" is disabled and no enabled core agent was found. Proceeding with "${fallback}".`
+        )
+      )
+      return fallback
+    }
+    console.log(
+      pc.yellow(
+        `Requested agent "${normalized}" is disabled. Falling back to "${fallback}".`
+      )
+    )
+    return fallback
+  }
+
+  return normalized
+}
 
 export async function run(options: RunOptions): Promise<number> {
+  // Set CLI run mode environment variable before any config loading
+  // This signals to config-handler to deny Question tool (no TUI to answer)
+  process.env.OPENCODE_CLI_RUN_MODE = "true"
+
   const {
     message,
-    agent,
     directory = process.cwd(),
     timeout = DEFAULT_TIMEOUT_MS,
   } = options
+  const pluginConfig = loadPluginConfig(directory, { command: "run" })
+  const resolvedAgent = resolveRunAgent(options, pluginConfig)
 
-  console.log(pc.cyan("Starting opencode server..."))
+  console.log(pc.cyan("Starting opencode server (auto port selection enabled)..."))
 
   const abortController = new AbortController()
   let timeoutId: ReturnType<typeof setTimeout> | null = null
@@ -31,18 +104,24 @@ export async function run(options: RunOptions): Promise<number> {
   }
 
   try {
-    // Support custom OpenCode server port via environment variable
-    // This allows Open Agent and other orchestrators to run multiple
-    // concurrent missions without port conflicts
-    const serverPort = process.env.OPENCODE_SERVER_PORT
+    const envPort = process.env.OPENCODE_SERVER_PORT
       ? parseInt(process.env.OPENCODE_SERVER_PORT, 10)
       : undefined
-    const serverHostname = process.env.OPENCODE_SERVER_HOSTNAME || undefined
+    const serverHostname = process.env.OPENCODE_SERVER_HOSTNAME || "127.0.0.1"
+    const preferredPort = envPort && !isNaN(envPort) ? envPort : DEFAULT_SERVER_PORT
+
+    const { port: serverPort, wasAutoSelected } = await getAvailableServerPort(preferredPort, serverHostname)
+
+    if (wasAutoSelected) {
+      console.log(pc.yellow(`Port ${preferredPort} is busy, using port ${serverPort} instead`))
+    } else {
+      console.log(pc.dim(`Using port ${serverPort}`))
+    }
 
     const { client, server } = await createOpencode({
       signal: abortController.signal,
-      ...(serverPort && !isNaN(serverPort) ? { port: serverPort } : {}),
-      ...(serverHostname ? { hostname: serverHostname } : {}),
+      port: serverPort,
+      hostname: serverHostname,
     })
 
     const cleanup = () => {
@@ -120,7 +199,7 @@ export async function run(options: RunOptions): Promise<number> {
       await client.session.promptAsync({
         path: { id: sessionID },
         body: {
-          agent,
+          agent: resolvedAgent,
           parts: [{ type: "text", text: message }],
         },
         query: { directory },

@@ -12,12 +12,14 @@ const AgentPermissionSchema = z.object({
   edit: PermissionValue.optional(),
   bash: BashPermission.optional(),
   webfetch: PermissionValue.optional(),
+  task: PermissionValue.optional(),
   doom_loop: PermissionValue.optional(),
   external_directory: PermissionValue.optional(),
 })
 
 export const BuiltinAgentNameSchema = z.enum([
   "sisyphus",
+  "hephaestus",
   "prometheus",
   "oracle",
   "librarian",
@@ -31,6 +33,7 @@ export const BuiltinAgentNameSchema = z.enum([
 export const BuiltinSkillNameSchema = z.enum([
   "playwright",
   "agent-browser",
+  "dev-browser",
   "frontend-ui-ux",
   "git-master",
 ])
@@ -39,6 +42,7 @@ export const OverridableAgentNameSchema = z.enum([
   "build",
   "plan",
   "sisyphus",
+  "hephaestus",
   "sisyphus-junior",
   "OpenCode-Builder",
   "prometheus",
@@ -61,11 +65,14 @@ export const HookNameSchema = z.enum([
   "comment-checker",
   "grep-output-truncator",
   "tool-output-truncator",
+  "question-label-truncator",
   "directory-agents-injector",
   "directory-readme-injector",
   "empty-task-response-detector",
   "think-mode",
+  "subagent-question-blocker",
   "anthropic-context-window-limit-recovery",
+  "preemptive-compaction",
   "rules-injector",
   "background-notification",
   "auto-update-checker",
@@ -88,11 +95,23 @@ export const HookNameSchema = z.enum([
   "sisyphus-junior-notepad",
   "start-work",
   "atlas",
+  "unstable-agent-babysitter",
+  "task-reminder",
+  "task-resume-info",
+  "stop-continuation-guard",
+  "tasks-todowrite-disabler",
+  "write-existing-file-guard",
+  "anthropic-effort",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([
   "init-deep",
+  "ralph-loop",
+  "ulw-loop",
+  "cancel-ralph",
+  "refactor",
   "start-work",
+  "stop-continuation",
 ])
 
 export const AgentOverrideConfigSchema = z.object({
@@ -135,6 +154,7 @@ export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
   plan: AgentOverrideConfigSchema.optional(),
   sisyphus: AgentOverrideConfigSchema.optional(),
+  hephaestus: AgentOverrideConfigSchema.optional(),
   "sisyphus-junior": AgentOverrideConfigSchema.optional(),
   "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
   prometheus: AgentOverrideConfigSchema.optional(),
@@ -165,7 +185,7 @@ export const SisyphusAgentConfigSchema = z.object({
 })
 
 export const CategoryConfigSchema = z.object({
-  /** Human-readable description of the category's purpose. Shown in delegate_task prompt. */
+  /** Human-readable description of the category's purpose. Shown in task prompt. */
   description: z.string().optional(),
   model: z.string().optional(),
   variant: z.string().optional(),
@@ -180,7 +200,7 @@ export const CategoryConfigSchema = z.object({
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   prompt_append: z.string().optional(),
-  /** Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini models. */
+  /** Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini/minimax models. */
   is_unstable_agent: z.boolean().optional(),
 })
 
@@ -241,10 +261,17 @@ export const DynamicContextPruningConfigSchema = z.object({
 export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
   auto_resume: z.boolean().optional(),
+  preemptive_compaction: z.boolean().optional(),
   /** Truncate all tool outputs, not just whitelisted tools (default: false). Tool output truncator is enabled by default - disable via disabled_hooks. */
   truncate_all_tool_outputs: z.boolean().optional(),
   /** Dynamic context pruning configuration */
   dynamic_context_pruning: DynamicContextPruningConfigSchema.optional(),
+  /** Enable experimental task system for Todowrite disabler hook */
+  task_system: z.boolean().optional(),
+  /** Timeout in ms for loadAllPluginComponents during config handler init (default: 10000, min: 1000) */
+  plugin_load_timeout_ms: z.number().min(1000).optional(),
+  /** Wrap hook creation in try/catch to prevent one failing hook from crashing the plugin (default: true at call site) */
+  safe_hook_creation: z.boolean().optional(),
 })
 
 export const SkillSourceSchema = z.union([
@@ -307,6 +334,10 @@ export const NotificationConfigSchema = z.object({
   force_enable: z.boolean().optional(),
 })
 
+export const BabysittingConfigSchema = z.object({
+  timeout_ms: z.number().default(120000),
+})
+
 export const GitMasterConfigSchema = z.object({
   /** Add "Ultraworked with Sisyphus" footer to commit messages (default: true) */
   commit_footer: z.boolean().default(true),
@@ -326,6 +357,17 @@ export const BrowserAutomationConfigSchema = z.object({
   provider: BrowserAutomationProviderSchema.default("playwright"),
 })
 
+export const WebsearchProviderSchema = z.enum(["exa", "tavily"])
+
+export const WebsearchConfigSchema = z.object({
+  /**
+   * Websearch provider to use.
+   * - "exa": Uses Exa websearch (default, works without API key)
+   * - "tavily": Uses Tavily websearch (requires TAVILY_API_KEY)
+   */
+  provider: WebsearchProviderSchema.optional(),
+})
+
 export const TmuxLayoutSchema = z.enum([
   'main-horizontal',  // main pane top, agent panes bottom stack
   'main-vertical',    // main pane left, agent panes right stack (default)
@@ -343,34 +385,30 @@ export const TmuxConfigSchema = z.object({
 })
 
 export const SisyphusTasksConfigSchema = z.object({
-  /** Enable Sisyphus Tasks system (default: false) */
-  enabled: z.boolean().default(false),
-  /** Storage path for tasks (default: .sisyphus/tasks) */
-  storage_path: z.string().default(".sisyphus/tasks"),
+  /** Absolute or relative storage path override. When set, bypasses global config dir. */
+  storage_path: z.string().optional(),
+  /** Force task list ID (alternative to env ULTRAWORK_TASK_LIST_ID) */
+  task_list_id: z.string().optional(),
   /** Enable Claude Code path compatibility mode */
   claude_code_compat: z.boolean().default(false),
 })
 
-export const SisyphusSwarmConfigSchema = z.object({
-  /** Enable Sisyphus Swarm system (default: false) */
-  enabled: z.boolean().default(false),
-  /** Storage path for teams (default: .sisyphus/teams) */
-  storage_path: z.string().default(".sisyphus/teams"),
-  /** UI mode: toast notifications, tmux panes, or both */
-  ui_mode: z.enum(["toast", "tmux", "both"]).default("toast"),
-})
-
 export const SisyphusConfigSchema = z.object({
   tasks: SisyphusTasksConfigSchema.optional(),
-  swarm: SisyphusSwarmConfigSchema.optional(),
 })
 export const OhMyOpenCodeConfigSchema = z.object({
   $schema: z.string().optional(),
+  /** Enable new task system (default: false) */
+  new_task_system_enabled: z.boolean().optional(),
+  /** Default agent name for `oh-my-opencode run` (env: OPENCODE_DEFAULT_AGENT) */
+  default_run_agent: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
   disabled_hooks: z.array(HookNameSchema).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
+  /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
+  disabled_tools: z.array(z.string()).optional(),
   agents: AgentOverridesSchema.optional(),
   categories: CategoriesConfigSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),
@@ -382,8 +420,10 @@ export const OhMyOpenCodeConfigSchema = z.object({
   ralph_loop: RalphLoopConfigSchema.optional(),
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
+  babysitting: BabysittingConfigSchema.optional(),
   git_master: GitMasterConfigSchema.optional(),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
+  websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
 })
@@ -404,16 +444,18 @@ export type SkillsConfig = z.infer<typeof SkillsConfigSchema>
 export type SkillDefinition = z.infer<typeof SkillDefinitionSchema>
 export type RalphLoopConfig = z.infer<typeof RalphLoopConfigSchema>
 export type NotificationConfig = z.infer<typeof NotificationConfigSchema>
+export type BabysittingConfig = z.infer<typeof BabysittingConfigSchema>
 export type CategoryConfig = z.infer<typeof CategoryConfigSchema>
 export type CategoriesConfig = z.infer<typeof CategoriesConfigSchema>
 export type BuiltinCategoryName = z.infer<typeof BuiltinCategoryNameSchema>
 export type GitMasterConfig = z.infer<typeof GitMasterConfigSchema>
 export type BrowserAutomationProvider = z.infer<typeof BrowserAutomationProviderSchema>
 export type BrowserAutomationConfig = z.infer<typeof BrowserAutomationConfigSchema>
+export type WebsearchProvider = z.infer<typeof WebsearchProviderSchema>
+export type WebsearchConfig = z.infer<typeof WebsearchConfigSchema>
 export type TmuxConfig = z.infer<typeof TmuxConfigSchema>
 export type TmuxLayout = z.infer<typeof TmuxLayoutSchema>
 export type SisyphusTasksConfig = z.infer<typeof SisyphusTasksConfigSchema>
-export type SisyphusSwarmConfig = z.infer<typeof SisyphusSwarmConfigSchema>
 export type SisyphusConfig = z.infer<typeof SisyphusConfigSchema>
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

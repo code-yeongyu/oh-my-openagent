@@ -96,10 +96,19 @@ The Bash tool can execute these commands directly. Do NOT retry with interactive
 
       const timeoutPromise = new Promise<never>((_, reject) => {
         const id = setTimeout(() => {
-          proc.kill()
-          reject(new Error(`Timeout after ${DEFAULT_TIMEOUT_MS}ms`))
+          const timeoutError = new Error(`Timeout after ${DEFAULT_TIMEOUT_MS}ms`)
+          try {
+            proc.kill()
+            // Fire-and-forget: wait for process exit in background to avoid zombies
+            void proc.exited.catch(() => {})
+          } catch {
+            // Ignore kill errors; we'll still reject with timeoutError below
+          }
+          reject(timeoutError)
         }, DEFAULT_TIMEOUT_MS)
-        proc.exited.then(() => clearTimeout(id))
+        proc.exited
+          .then(() => clearTimeout(id))
+          .catch(() => clearTimeout(id))
       })
 
       // Read stdout and stderr in parallel to avoid race conditions

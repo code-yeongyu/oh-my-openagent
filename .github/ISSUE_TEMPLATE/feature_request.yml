@@ -20,7 +20,7 @@ body:
           required: true
         - label: This feature request is specific to oh-my-opencode (not OpenCode core)
           required: true
-        - label: I have read the [documentation](https://github.com/code-yeongyu/oh-my-opencode#readme)
+        - label: I have read the [documentation](https://github.com/code-yeongyu/oh-my-opencode#readme) or asked an AI coding agent with this project's GitHub URL loaded and couldn't find the answer
           required: true
 
   - type: textarea

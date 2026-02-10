@@ -64,7 +64,6 @@ export const HOOK_NAME_MAP: Record<string, string | null> = {
   "sisyphus-orchestrator": "atlas",
 
   // Removed hooks (v3.0.0) - will be filtered out and user warned
-  "preemptive-compaction": null,
   "empty-message-sanitizer": null,
 }
 
@@ -86,8 +85,20 @@ export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
   "google/gemini-3-flash": "writing",
   "openai/gpt-5.2": "ultrabrain",
   "anthropic/claude-haiku-4-5": "quick",
-  "anthropic/claude-opus-4-5": "unspecified-high",
+  "anthropic/claude-opus-4-6": "unspecified-high",
   "anthropic/claude-sonnet-4-5": "unspecified-low",
+}
+
+/**
+ * Model version migration map: old full model strings → new full model strings.
+ * Used to auto-upgrade hardcoded model versions in user configs when the plugin
+ * bumps to newer model versions.
+ *
+ * Keys are full "provider/model" strings. Only openai and anthropic entries needed.
+ */
+export const MODEL_VERSION_MAP: Record<string, string> = {
+  "openai/gpt-5.2-codex": "openai/gpt-5.3-codex",
+  "anthropic/claude-opus-4-5": "anthropic/claude-opus-4-6",
 }
 
 export function migrateAgentNames(agents: Record<string, unknown>): { migrated: Record<string, unknown>; changed: boolean } {
@@ -100,6 +111,25 @@ export function migrateAgentNames(agents: Record<string, unknown>): { migrated: 
       changed = true
     }
     migrated[newKey] = value
+  }
+
+  return { migrated, changed }
+}
+
+export function migrateModelVersions(configs: Record<string, unknown>): { migrated: Record<string, unknown>; changed: boolean } {
+  const migrated: Record<string, unknown> = {}
+  let changed = false
+
+  for (const [key, value] of Object.entries(configs)) {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const config = value as Record<string, unknown>
+      if (typeof config.model === "string" && MODEL_VERSION_MAP[config.model]) {
+        migrated[key] = { ...config, model: MODEL_VERSION_MAP[config.model] }
+        changed = true
+        continue
+      }
+    }
+    migrated[key] = value
   }
 
   return { migrated, changed }
@@ -179,7 +209,25 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     }
   }
 
+  // Migrate model versions in agents
+  if (rawConfig.agents && typeof rawConfig.agents === "object") {
+    const { migrated, changed } = migrateModelVersions(rawConfig.agents as Record<string, unknown>)
+    if (changed) {
+      rawConfig.agents = migrated
+      needsWrite = true
+      log(`Migrated model versions in agents config`)
+    }
+  }
 
+  // Migrate model versions in categories
+  if (rawConfig.categories && typeof rawConfig.categories === "object") {
+    const { migrated, changed } = migrateModelVersions(rawConfig.categories as Record<string, unknown>)
+    if (changed) {
+      rawConfig.categories = migrated
+      needsWrite = true
+      log(`Migrated model versions in categories config`)
+    }
+  }
 
   if (rawConfig.omo_agent) {
     rawConfig.sisyphus_agent = rawConfig.omo_agent
@@ -211,6 +259,13 @@ export function migrateConfigFile(configPath: string, rawConfig: Record<string, 
     }
     if (removed.length > 0) {
       log(`Removed obsolete hooks from disabled_hooks: ${removed.join(", ")} (these hooks no longer exist in v3.0.0)`)
+    }
+  }
+
+  if (rawConfig.experimental && typeof rawConfig.experimental === "object") {
+    const exp = rawConfig.experimental as Record<string, unknown>
+    if ("task_system" in exp && exp.task_system !== undefined) {
+      needsWrite = true
     }
   }
 

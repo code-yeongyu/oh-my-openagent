@@ -12,8 +12,8 @@ export function createSisyphusJuniorNotepadHook(ctx: PluginInput) {
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown>; message?: string }
     ): Promise<void> => {
-      // 1. Check if tool is delegate_task
-      if (input.tool !== "delegate_task") {
+      // 1. Check if tool is task
+      if (input.tool !== "task") {
         return
       }
 
@@ -37,7 +37,7 @@ export function createSisyphusJuniorNotepadHook(ctx: PluginInput) {
       output.args.prompt = NOTEPAD_DIRECTIVE + prompt
 
       // 6. Log injection
-      log(`[${HOOK_NAME}] Injected notepad directive to delegate_task`, {
+      log(`[${HOOK_NAME}] Injected notepad directive to task`, {
         sessionID: input.sessionID,
       })
     },

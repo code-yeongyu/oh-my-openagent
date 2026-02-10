@@ -26,6 +26,13 @@ function isSisyphusPath(filePath: string): boolean {
 
 const WRITE_EDIT_TOOLS = ["Write", "Edit", "write", "edit"]
 
+function getLastAgentFromSession(sessionID: string): string | null {
+  const messageDir = getMessageDir(sessionID)
+  if (!messageDir) return null
+  const nearest = findNearestMessageWithFields(messageDir)
+  return nearest?.agent?.toLowerCase() ?? null
+}
+
 const DIRECT_WORK_REMINDER = `
 
 ---
@@ -37,7 +44,7 @@ You just performed direct file modifications outside \`.sisyphus/\`.
 **You are an ORCHESTRATOR, not an IMPLEMENTER.**
 
 As an orchestrator, you should:
-- **DELEGATE** implementation work to subagents via \`delegate_task\`
+- **DELEGATE** implementation work to subagents via \`task\`
 - **VERIFY** the work done by subagents
 - **COORDINATE** multiple tasks and ensure completion
 
@@ -47,7 +54,7 @@ You should NOT:
 - Implement features yourself
 
 **If you need to make changes:**
-1. Use \`delegate_task\` to delegate to an appropriate subagent
+1. Use \`task\` to delegate to an appropriate subagent
 2. Provide clear instructions in the prompt
 3. Verify the subagent's work after completion
 
@@ -60,7 +67,7 @@ You have an active work plan with incomplete tasks. Continue working.
 
 RULES:
 - Proceed without asking for permission
-- Mark each checkbox [x] in the plan file when done
+- Change \`- [ ]\` to \`- [x]\` in the plan file when done
 - Use the notepad at .sisyphus/notepads/{PLAN_NAME}/ to record learnings
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`
@@ -121,7 +128,7 @@ You (Atlas) are attempting to directly modify a file outside \`.sisyphus/\`.
 **THIS IS FORBIDDEN** (except for VERIFICATION purposes)
 
 As an ORCHESTRATOR, you MUST:
-1. **DELEGATE** all implementation work via \`delegate_task\`
+1. **DELEGATE** all implementation work via \`task\`
 2. **VERIFY** the work done by subagents (reading files is OK)
 3. **COORDINATE** - you orchestrate, you don't implement
 
@@ -139,11 +146,11 @@ As an ORCHESTRATOR, you MUST:
 
 **IF THIS IS FOR VERIFICATION:**
 Proceed if you are verifying subagent work by making a small fix.
-But for any substantial changes, USE \`delegate_task\`.
+But for any substantial changes, USE \`task\`.
 
 **CORRECT APPROACH:**
 \`\`\`
-delegate_task(
+task(
   category="...",
   prompt="[specific single task with clear acceptance criteria]"
 )
@@ -186,7 +193,7 @@ function buildVerificationReminder(sessionId: string): string {
 
 **If ANY verification fails, use this immediately:**
 \`\`\`
-delegate_task(session_id="${sessionId}", prompt="fix: [describe the specific failure]")
+task(session_id="${sessionId}", prompt="fix: [describe the specific failure]")
 \`\`\``
 }
 
@@ -206,7 +213,7 @@ ${buildVerificationReminder(sessionId)}
 RIGHT NOW - Do not delay. Verification passed → Mark IMMEDIATELY.
 
 Update the plan file \`.sisyphus/tasks/${planName}.yaml\`:
-- Change \`[ ]\` to \`[x]\` for the completed task
+- Change \`- [ ]\` to \`- [x]\` for the completed task
 - Use \`Edit\` tool to modify the checkbox
 
 **DO THIS BEFORE ANYTHING ELSE. Unmarked = Untracked = Lost progress.**
@@ -218,7 +225,7 @@ Update the plan file \`.sisyphus/tasks/${planName}.yaml\`:
 
 **STEP 6: PROCEED TO NEXT TASK**
 
-- Read the plan file to identify the next \`[ ]\` task
+- Read the plan file to identify the next \`- [ ]\` task
 - Start immediately - DO NOT STOP
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -384,6 +391,7 @@ interface ToolExecuteAfterOutput {
 interface SessionState {
   lastEventWasAbortError?: boolean
   lastContinuationInjectedAt?: number
+  promptFailureCount: number
 }
 
 const CONTINUATION_COOLDOWN_MS = 5000
@@ -425,13 +433,14 @@ export function createAtlasHook(
   function getState(sessionID: string): SessionState {
     let state = sessions.get(sessionID)
     if (!state) {
-      state = {}
+      state = { promptFailureCount: 0 }
       sessions.set(sessionID, state)
     }
     return state
   }
 
-  async function injectContinuation(sessionID: string, planName: string, remaining: number, total: number): Promise<void> {
+  async function injectContinuation(sessionID: string, planName: string, remaining: number, total: number, agent?: string): Promise<void> {
+    const state = getState(sessionID)
     const hasRunningBgTasks = backgroundManager
       ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
       : false
@@ -474,21 +483,28 @@ export function createAtlasHook(
           : undefined
       }
 
-       await ctx.client.session.prompt({
-         path: { id: sessionID },
-         body: {
-            agent: "atlas",
-           ...(model !== undefined ? { model } : {}),
-           parts: [{ type: "text", text: prompt }],
-         },
-         query: { directory: ctx.directory },
-       })
+        await ctx.client.session.prompt({
+          path: { id: sessionID },
+          body: {
+             agent: agent ?? "atlas",
+            ...(model !== undefined ? { model } : {}),
+            parts: [{ type: "text", text: prompt }],
+          },
+          query: { directory: ctx.directory },
+        })
 
-      log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
-    } catch (err) {
-      log(`[${HOOK_NAME}] Boulder continuation failed`, { sessionID, error: String(err) })
-    }
-  }
+       state.promptFailureCount = 0
+
+       log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
+     } catch (err) {
+      state.promptFailureCount += 1
+      log(`[${HOOK_NAME}] Boulder continuation failed`, {
+        sessionID,
+        error: String(err),
+        promptFailureCount: state.promptFailureCount,
+      })
+     }
+   }
 
   return {
     handler: async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
@@ -534,6 +550,14 @@ export function createAtlasHook(
           return
         }
 
+        if (state.promptFailureCount >= 2) {
+          log(`[${HOOK_NAME}] Skipped: continuation disabled after repeated prompt failures`, {
+            sessionID,
+            promptFailureCount: state.promptFailureCount,
+          })
+          return
+        }
+
         const hasRunningBgTasks = backgroundManager
           ? backgroundManager.getTasksByParentSession(sessionID).some(t => t.status === "running")
           : false
@@ -549,8 +573,14 @@ export function createAtlasHook(
           return
         }
 
-        if (!isCallerOrchestrator(sessionID)) {
-          log(`[${HOOK_NAME}] Skipped: last agent is not Atlas`, { sessionID })
+        const requiredAgent = (boulderState.agent ?? "atlas").toLowerCase()
+        const lastAgent = getLastAgentFromSession(sessionID)
+        if (!lastAgent || lastAgent !== requiredAgent) {
+          log(`[${HOOK_NAME}] Skipped: last agent does not match boulder agent`, {
+            sessionID,
+            lastAgent: lastAgent ?? "unknown",
+            requiredAgent,
+          })
           return
         }
 
@@ -568,7 +598,7 @@ export function createAtlasHook(
 
         state.lastContinuationInjectedAt = now
         const remaining = progress.total - progress.completed
-        injectContinuation(sessionID, boulderState.plan_name, remaining, progress.total)
+        injectContinuation(sessionID, boulderState.plan_name, remaining, progress.total, boulderState.agent)
         return
       }
 
@@ -618,6 +648,17 @@ export function createAtlasHook(
         }
         return
       }
+
+      if (event.type === "session.compacted") {
+        const sessionID = (props?.sessionID ?? (props?.info as { id?: string } | undefined)?.id) as
+          | string
+          | undefined
+        if (sessionID) {
+          sessions.delete(sessionID)
+          log(`[${HOOK_NAME}] Session compacted: cleaned up`, { sessionID })
+        }
+        return
+      }
     },
 
     "tool.execute.before": async (
@@ -647,12 +688,12 @@ export function createAtlasHook(
         return
       }
 
-      // Check delegate_task - inject single-task directive
-      if (input.tool === "delegate_task") {
+      // Check task - inject single-task directive
+      if (input.tool === "task") {
         const prompt = output.args.prompt as string | undefined
         if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
           output.args.prompt = `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt
-          log(`[${HOOK_NAME}] Injected single-task directive to delegate_task`, {
+          log(`[${HOOK_NAME}] Injected single-task directive to task`, {
             sessionID: input.sessionID,
           })
         }
@@ -691,7 +732,7 @@ export function createAtlasHook(
         return
       }
 
-      if (input.tool !== "delegate_task") {
+      if (input.tool !== "task") {
         return
       }
 

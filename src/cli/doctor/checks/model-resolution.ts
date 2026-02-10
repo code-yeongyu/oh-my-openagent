@@ -51,6 +51,7 @@ export interface AgentResolutionInfo {
   name: string
   requirement: ModelRequirement
   userOverride?: string
+  userVariant?: string
   effectiveModel: string
   effectiveResolution: string
 }
@@ -59,6 +60,7 @@ export interface CategoryResolutionInfo {
   name: string
   requirement: ModelRequirement
   userOverride?: string
+  userVariant?: string
   effectiveModel: string
   effectiveResolution: string
 }
@@ -69,8 +71,8 @@ export interface ModelResolutionInfo {
 }
 
 interface OmoConfig {
-  agents?: Record<string, { model?: string }>
-  categories?: Record<string, { model?: string }>
+  agents?: Record<string, { model?: string; variant?: string; category?: string }>
+  categories?: Record<string, { model?: string; variant?: string }>
 }
 
 function loadConfig(): OmoConfig | null {
@@ -152,10 +154,12 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
   const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
       const userOverride = config.agents?.[name]?.model
+      const userVariant = config.agents?.[name]?.variant
       return {
         name,
         requirement,
         userOverride,
+        userVariant,
         effectiveModel: getEffectiveModel(requirement, userOverride),
         effectiveResolution: buildEffectiveResolution(requirement, userOverride),
       }
@@ -165,10 +169,12 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
   const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
       const userOverride = config.categories?.[name]?.model
+      const userVariant = config.categories?.[name]?.variant
       return {
         name,
         requirement,
         userOverride,
+        userVariant,
         effectiveModel: getEffectiveModel(requirement, userOverride),
         effectiveResolution: buildEffectiveResolution(requirement, userOverride),
       }
@@ -182,7 +188,44 @@ function formatModelWithVariant(model: string, variant?: string): string {
   return variant ? `${model} (${variant})` : model
 }
 
-function getEffectiveVariant(requirement: ModelRequirement): string | undefined {
+function getAgentOverride(
+  agentName: string,
+  config: OmoConfig,
+): { variant?: string; category?: string } | undefined {
+  const agentOverrides = config.agents
+  if (!agentOverrides) return undefined
+
+  // Direct lookup first, then case-insensitive lookup (matches agent-variant.ts)
+  return (
+    agentOverrides[agentName] ??
+    Object.entries(agentOverrides).find(
+      ([key]) => key.toLowerCase() === agentName.toLowerCase()
+    )?.[1]
+  )
+}
+
+function getEffectiveVariant(
+  name: string,
+  requirement: ModelRequirement,
+  config: OmoConfig,
+): string | undefined {
+  const agentOverride = getAgentOverride(name, config)
+
+  // Priority 1: Agent's direct variant override
+  if (agentOverride?.variant) {
+    return agentOverride.variant
+  }
+
+  // Priority 2: Agent's category -> category's variant (matches agent-variant.ts)
+  const categoryName = agentOverride?.category
+  if (categoryName) {
+    const categoryVariant = config.categories?.[categoryName]?.variant
+    if (categoryVariant) {
+      return categoryVariant
+    }
+  }
+
+  // Priority 3: Fall back to requirement's fallback chain
   const firstEntry = requirement.fallbackChain[0]
   return firstEntry?.variant ?? requirement.variant
 }
@@ -193,7 +236,20 @@ interface AvailableModelsInfo {
   cacheExists: boolean
 }
 
-function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModelsInfo): string[] {
+function getCategoryEffectiveVariant(
+  categoryName: string,
+  requirement: ModelRequirement,
+  config: OmoConfig,
+): string | undefined {
+  const categoryVariant = config.categories?.[categoryName]?.variant
+  if (categoryVariant) {
+    return categoryVariant
+  }
+  const firstEntry = requirement.fallbackChain[0]
+  return firstEntry?.variant ?? requirement.variant
+}
+
+function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModelsInfo, config: OmoConfig): string[] {
   const details: string[] = []
 
   details.push("═══ Available Models (from cache) ═══")
@@ -215,14 +271,17 @@ function buildDetailsArray(info: ModelResolutionInfo, available: AvailableModels
   details.push("Agents:")
   for (const agent of info.agents) {
     const marker = agent.userOverride ? "●" : "○"
-    const display = formatModelWithVariant(agent.effectiveModel, getEffectiveVariant(agent.requirement))
+    const display = formatModelWithVariant(agent.effectiveModel, getEffectiveVariant(agent.name, agent.requirement, config))
     details.push(`  ${marker} ${agent.name}: ${display}`)
   }
   details.push("")
   details.push("Categories:")
   for (const category of info.categories) {
     const marker = category.userOverride ? "●" : "○"
-    const display = formatModelWithVariant(category.effectiveModel, getEffectiveVariant(category.requirement))
+    const display = formatModelWithVariant(
+      category.effectiveModel,
+      getCategoryEffectiveVariant(category.name, category.requirement, config)
+    )
     details.push(`  ${marker} ${category.name}: ${display}`)
   }
   details.push("")
@@ -249,7 +308,7 @@ export async function checkModelResolution(): Promise<CheckResult> {
     name: CHECK_NAMES[CHECK_IDS.MODEL_RESOLUTION],
     status: available.cacheExists ? "pass" : "warn",
     message: `${agentCount} agents, ${categoryCount} categories${overrideNote}${cacheNote}`,
-    details: buildDetailsArray(info, available),
+    details: buildDetailsArray(info, available, config),
   }
 }
 

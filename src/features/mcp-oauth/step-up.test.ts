@@ -3,24 +3,24 @@ import { isStepUpRequired, mergeScopes, parseWwwAuthenticate } from "./step-up"
 
 describe("parseWwwAuthenticate", () => {
   it("parses scope from simple Bearer header", () => {
-    // #given
+    // given
     const header = 'Bearer scope="read write"'
 
-    // #when
+    // when
     const result = parseWwwAuthenticate(header)
 
-    // #then
+    // then
     expect(result).toEqual({ requiredScopes: ["read", "write"] })
   })
 
   it("parses scope with error fields", () => {
-    // #given
+    // given
     const header = 'Bearer error="insufficient_scope", scope="admin"'
 
-    // #when
+    // when
     const result = parseWwwAuthenticate(header)
 
-    // #then
+    // then
     expect(result).toEqual({
       requiredScopes: ["admin"],
       error: "insufficient_scope",
@@ -28,14 +28,14 @@ describe("parseWwwAuthenticate", () => {
   })
 
   it("parses all fields including error_description", () => {
-    // #given
+    // given
     const header =
       'Bearer realm="example", error="insufficient_scope", error_description="Need admin access", scope="admin write"'
 
-    // #when
+    // when
     const result = parseWwwAuthenticate(header)
 
-    // #then
+    // then
     expect(result).toEqual({
       requiredScopes: ["admin", "write"],
       error: "insufficient_scope",
@@ -44,180 +44,180 @@ describe("parseWwwAuthenticate", () => {
   })
 
   it("returns null for non-Bearer scheme", () => {
-    // #given
+    // given
     const header = 'Basic realm="example"'
 
-    // #when
+    // when
     const result = parseWwwAuthenticate(header)
 
-    // #then
+    // then
     expect(result).toBeNull()
   })
 
   it("returns null when no scope parameter present", () => {
-    // #given
+    // given
     const header = 'Bearer error="invalid_token"'
 
-    // #when
+    // when
     const result = parseWwwAuthenticate(header)
 
-    // #then
+    // then
     expect(result).toBeNull()
   })
 
   it("returns null for empty scope value", () => {
-    // #given
+    // given
     const header = 'Bearer scope=""'
 
-    // #when
+    // when
     const result = parseWwwAuthenticate(header)
 
-    // #then
+    // then
     expect(result).toBeNull()
   })
 
   it("returns null for bare Bearer with no params", () => {
-    // #given
+    // given
     const header = "Bearer"
 
-    // #when
+    // when
     const result = parseWwwAuthenticate(header)
 
-    // #then
+    // then
     expect(result).toBeNull()
   })
 
   it("handles case-insensitive Bearer prefix", () => {
-    // #given
+    // given
     const header = 'bearer scope="read"'
 
-    // #when
+    // when
     const result = parseWwwAuthenticate(header)
 
-    // #then
+    // then
     expect(result).toEqual({ requiredScopes: ["read"] })
   })
 
   it("parses single scope value", () => {
-    // #given
+    // given
     const header = 'Bearer scope="admin"'
 
-    // #when
+    // when
     const result = parseWwwAuthenticate(header)
 
-    // #then
+    // then
     expect(result).toEqual({ requiredScopes: ["admin"] })
   })
 })
 
 describe("mergeScopes", () => {
   it("merges new scopes into existing", () => {
-    // #given
+    // given
     const existing = ["read", "write"]
     const required = ["admin", "write"]
 
-    // #when
+    // when
     const result = mergeScopes(existing, required)
 
-    // #then
+    // then
     expect(result).toEqual(["read", "write", "admin"])
   })
 
   it("returns required when existing is empty", () => {
-    // #given
+    // given
     const existing: string[] = []
     const required = ["read", "write"]
 
-    // #when
+    // when
     const result = mergeScopes(existing, required)
 
-    // #then
+    // then
     expect(result).toEqual(["read", "write"])
   })
 
   it("returns existing when required is empty", () => {
-    // #given
+    // given
     const existing = ["read"]
     const required: string[] = []
 
-    // #when
+    // when
     const result = mergeScopes(existing, required)
 
-    // #then
+    // then
     expect(result).toEqual(["read"])
   })
 
   it("deduplicates identical scopes", () => {
-    // #given
+    // given
     const existing = ["read", "write"]
     const required = ["read", "write"]
 
-    // #when
+    // when
     const result = mergeScopes(existing, required)
 
-    // #then
+    // then
     expect(result).toEqual(["read", "write"])
   })
 })
 
 describe("isStepUpRequired", () => {
   it("returns step-up info for 403 with WWW-Authenticate", () => {
-    // #given
+    // given
     const statusCode = 403
     const headers = { "www-authenticate": 'Bearer scope="admin"' }
 
-    // #when
+    // when
     const result = isStepUpRequired(statusCode, headers)
 
-    // #then
+    // then
     expect(result).toEqual({ requiredScopes: ["admin"] })
   })
 
   it("returns null for non-403 status", () => {
-    // #given
+    // given
     const statusCode = 401
     const headers = { "www-authenticate": 'Bearer scope="admin"' }
 
-    // #when
+    // when
     const result = isStepUpRequired(statusCode, headers)
 
-    // #then
+    // then
     expect(result).toBeNull()
   })
 
   it("returns null when no WWW-Authenticate header", () => {
-    // #given
+    // given
     const statusCode = 403
     const headers = { "content-type": "application/json" }
 
-    // #when
+    // when
     const result = isStepUpRequired(statusCode, headers)
 
-    // #then
+    // then
     expect(result).toBeNull()
   })
 
   it("handles capitalized WWW-Authenticate header", () => {
-    // #given
+    // given
     const statusCode = 403
     const headers = { "WWW-Authenticate": 'Bearer scope="read write"' }
 
-    // #when
+    // when
     const result = isStepUpRequired(statusCode, headers)
 
-    // #then
+    // then
     expect(result).toEqual({ requiredScopes: ["read", "write"] })
   })
 
   it("returns null for 403 with unparseable WWW-Authenticate", () => {
-    // #given
+    // given
     const statusCode = 403
     const headers = { "www-authenticate": 'Basic realm="example"' }
 
-    // #when
+    // when
     const result = isStepUpRequired(statusCode, headers)
 
-    // #then
+    // then
     expect(result).toBeNull()
   })
 })

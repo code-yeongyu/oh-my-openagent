@@ -4,12 +4,13 @@ import { join } from "node:path"
 import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
-import { log, getAgentToolRestrictions, includesCaseInsensitive } from "../../shared"
+import { log, getAgentToolRestrictions } from "../../shared"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields, MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 
 function getMessageDir(sessionID: string): string | null {
+  if (!sessionID.startsWith("ses_")) return null
   if (!existsSync(MESSAGE_STORAGE)) return null
 
   const directPath = join(MESSAGE_STORAGE, sessionID)
@@ -58,7 +59,9 @@ export function createCallOmoAgent(
       log(`[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`)
 
       // Case-insensitive agent validation - allows "Explore", "EXPLORE", "explore" etc.
-      if (!includesCaseInsensitive([...ALLOWED_AGENTS], args.subagent_type)) {
+      if (![...ALLOWED_AGENTS].some(
+        (name) => name.toLowerCase() === args.subagent_type.toLowerCase()
+      )) {
         return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`
       }
       
@@ -108,15 +111,31 @@ async function executeBackground(
       parentAgent,
     })
 
-    toolContext.metadata?.({
+    const WAIT_FOR_SESSION_INTERVAL_MS = 50
+    const WAIT_FOR_SESSION_TIMEOUT_MS = 30000
+    const waitStart = Date.now()
+    let sessionId = task.sessionID
+    while (!sessionId && Date.now() - waitStart < WAIT_FOR_SESSION_TIMEOUT_MS) {
+      if (toolContext.abort?.aborted) {
+        return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
+      }
+      const updated = manager.getTask(task.id)
+      if (updated?.status === "error" || updated?.status === "cancelled") {
+        return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
+      }
+      await new Promise(resolve => setTimeout(resolve, WAIT_FOR_SESSION_INTERVAL_MS))
+      sessionId = manager.getTask(task.id)?.sessionID
+    }
+
+    await toolContext.metadata?.({
       title: args.description,
-      metadata: { sessionId: task.sessionID },
+      metadata: { sessionId: sessionId ?? "pending" },
     })
 
     return `Background agent task launched successfully.
 
 Task ID: ${task.id}
-Session ID: ${task.sessionID}
+Session ID: ${sessionId ?? "pending"}
 Description: ${task.description}
 Agent: ${task.agent} (subagent)
 Status: ${task.status}
@@ -192,7 +211,7 @@ Original error: ${createResult.error}`
     log(`[call_omo_agent] Created session: ${sessionID}`)
   }
 
-  toolContext.metadata?.({
+  await toolContext.metadata?.({
     title: args.description,
     metadata: { sessionId: sessionID },
   })
@@ -208,7 +227,6 @@ Original error: ${createResult.error}`
         tools: {
           ...getAgentToolRestrictions(args.subagent_type),
           task: false,
-          delegate_task: false,
         },
         parts: [{ type: "text", text: args.prompt }],
       },

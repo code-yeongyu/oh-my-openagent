@@ -11,29 +11,29 @@ import type { SessionInfo, SessionMessage, SearchResult } from "./types"
 
 describe("session-manager utils", () => {
   test("formatSessionList handles empty array", async () => {
-    // #given
+    // given
     const sessions: string[] = []
 
-    // #when
+    // when
     const result = await formatSessionList(sessions)
 
-    // #then
+    // then
     expect(result).toContain("No sessions found")
   })
 
   test("formatSessionMessages handles empty array", () => {
-    // #given
+    // given
     const messages: SessionMessage[] = []
 
-    // #when
+    // when
     const result = formatSessionMessages(messages)
 
-    // #then
+    // then
     expect(result).toContain("No messages")
   })
 
   test("formatSessionMessages includes message content", () => {
-    // #given
+    // given
     const messages: SessionMessage[] = [
       {
         id: "msg_001",
@@ -43,16 +43,16 @@ describe("session-manager utils", () => {
       },
     ]
 
-    // #when
+    // when
     const result = formatSessionMessages(messages)
 
-    // #then
+    // then
     expect(result).toContain("user")
     expect(result).toContain("Hello world")
   })
 
   test("formatSessionMessages includes todos when requested", () => {
-    // #given
+    // given
     const messages: SessionMessage[] = [
       {
         id: "msg_001",
@@ -66,17 +66,17 @@ describe("session-manager utils", () => {
       { id: "2", content: "Task 2", status: "pending" as const },
     ]
 
-    // #when
+    // when
     const result = formatSessionMessages(messages, true, todos)
 
-    // #then
+    // then
     expect(result).toContain("Todos")
     expect(result).toContain("Task 1")
     expect(result).toContain("Task 2")
   })
 
   test("formatSessionInfo includes all metadata", () => {
-    // #given
+    // given
     const info: SessionInfo = {
       id: "ses_test123",
       message_count: 42,
@@ -89,10 +89,10 @@ describe("session-manager utils", () => {
       transcript_entries: 123,
     }
 
-    // #when
+    // when
     const result = formatSessionInfo(info)
 
-    // #then
+    // then
     expect(result).toContain("ses_test123")
     expect(result).toContain("42")
     expect(result).toContain("build, oracle")
@@ -100,18 +100,18 @@ describe("session-manager utils", () => {
   })
 
   test("formatSearchResults handles empty array", () => {
-    // #given
+    // given
     const results: SearchResult[] = []
 
-    // #when
+    // when
     const result = formatSearchResults(results)
 
-    // #then
+    // then
     expect(result).toContain("No matches")
   })
 
   test("formatSearchResults formats matches correctly", () => {
-    // #given
+    // given
     const results: SearchResult[] = [
       {
         session_id: "ses_test123",
@@ -123,10 +123,10 @@ describe("session-manager utils", () => {
       },
     ]
 
-    // #when
+    // when
     const result = formatSearchResults(results)
 
-    // #then
+    // then
     expect(result).toContain("Found 1 matches")
     expect(result).toContain("ses_test123")
     expect(result).toContain("msg_001")
@@ -135,25 +135,25 @@ describe("session-manager utils", () => {
   })
 
   test("filterSessionsByDate filters correctly", async () => {
-    // #given
+    // given
     const sessionIDs = ["ses_001", "ses_002", "ses_003"]
 
-    // #when
+    // when
     const result = await filterSessionsByDate(sessionIDs)
 
-    // #then
+    // then
     expect(Array.isArray(result)).toBe(true)
   })
 
   test("searchInSession finds matches case-insensitively", async () => {
-    // #given
+    // given
     const sessionID = "ses_nonexistent"
     const query = "test"
 
-    // #when
+    // when
     const results = await searchInSession(sessionID, query, false)
 
-    // #then
+    // then
     expect(Array.isArray(results)).toBe(true)
     expect(results.length).toBe(0)
   })

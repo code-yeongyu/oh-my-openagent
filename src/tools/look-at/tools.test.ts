@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { normalizeArgs, validateArgs, createLookAt } from "./tools"
 
 describe("look-at tool", () => {
   describe("normalizeArgs", () => {
-    // #given LLM이 file_path 대신 path를 사용할 수 있음
-    // #when path 파라미터로 호출
-    // #then file_path로 정규화되어야 함
+    // given LLM might use `path` instead of `file_path`
+    // when called with path parameter
+    // then should normalize to file_path
     test("normalizes path to file_path for LLM compatibility", () => {
       const args = { path: "/some/file.png", goal: "analyze" }
       const normalized = normalizeArgs(args as any)
@@ -13,47 +14,74 @@ describe("look-at tool", () => {
       expect(normalized.goal).toBe("analyze")
     })
 
-    // #given 정상적인 file_path 사용
-    // #when file_path 파라미터로 호출
-    // #then 그대로 유지
+    // given proper file_path usage
+    // when called with file_path parameter
+    // then keep as-is
     test("keeps file_path when properly provided", () => {
       const args = { file_path: "/correct/path.pdf", goal: "extract" }
       const normalized = normalizeArgs(args)
       expect(normalized.file_path).toBe("/correct/path.pdf")
     })
 
-    // #given 둘 다 제공된 경우
-    // #when file_path와 path 모두 있음
-    // #then file_path 우선
+    // given both parameters provided
+    // when file_path and path are both present
+    // then prefer file_path
     test("prefers file_path over path when both provided", () => {
       const args = { file_path: "/preferred.png", path: "/fallback.png", goal: "test" }
       const normalized = normalizeArgs(args as any)
       expect(normalized.file_path).toBe("/preferred.png")
     })
+
+    // given image_data provided
+    // when called with base64 image data
+    // then preserve image_data in normalized args
+    test("preserves image_data when provided", () => {
+      const args = { image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "analyze" }
+      const normalized = normalizeArgs(args as any)
+      expect(normalized.image_data).toBe("data:image/png;base64,iVBORw0KGgo=")
+      expect(normalized.file_path).toBeUndefined()
+    })
   })
 
   describe("validateArgs", () => {
-    // #given 유효한 인자
-    // #when 검증
-    // #then null 반환 (에러 없음)
-    test("returns null for valid args", () => {
+    // given valid arguments with file_path
+    // when validated
+    // then return null (no error)
+    test("returns null for valid args with file_path", () => {
       const args = { file_path: "/valid/path.png", goal: "analyze" }
       expect(validateArgs(args)).toBeNull()
     })
 
-    // #given file_path 누락
-    // #when 검증
-    // #then 명확한 에러 메시지
-    test("returns error when file_path is missing", () => {
+    // given valid arguments with image_data
+    // when validated
+    // then return null (no error)
+    test("returns null for valid args with image_data", () => {
+      const args = { image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "analyze" }
+      expect(validateArgs(args)).toBeNull()
+    })
+
+    // given neither file_path nor image_data
+    // when validated
+    // then clear error message
+    test("returns error when neither file_path nor image_data provided", () => {
       const args = { goal: "analyze" } as any
       const error = validateArgs(args)
       expect(error).toContain("file_path")
-      expect(error).toContain("required")
+      expect(error).toContain("image_data")
     })
 
-    // #given goal 누락
-    // #when 검증
-    // #then 명확한 에러 메시지
+    // given both file_path and image_data
+    // when validated
+    // then return error (mutually exclusive)
+    test("returns error when both file_path and image_data provided", () => {
+      const args = { file_path: "/path.png", image_data: "base64data", goal: "analyze" }
+      const error = validateArgs(args)
+      expect(error).toContain("only one")
+    })
+
+    // given goal missing
+    // when validated
+    // then clear error message
     test("returns error when goal is missing", () => {
       const args = { file_path: "/some/path.png" } as any
       const error = validateArgs(args)
@@ -61,20 +89,31 @@ describe("look-at tool", () => {
       expect(error).toContain("required")
     })
 
-    // #given file_path가 빈 문자열
-    // #when 검증
-    // #then 에러 반환
+    // given file_path is empty string
+    // when validated
+    // then return error
     test("returns error when file_path is empty string", () => {
       const args = { file_path: "", goal: "analyze" }
       const error = validateArgs(args)
       expect(error).toContain("file_path")
+      expect(error).toContain("image_data")
+    })
+
+    // given image_data is empty string
+    // when validated
+    // then return error
+    test("returns error when image_data is empty string", () => {
+      const args = { image_data: "", goal: "analyze" }
+      const error = validateArgs(args)
+      expect(error).toContain("file_path")
+      expect(error).toContain("image_data")
     })
   })
 
   describe("createLookAt error handling", () => {
-    // #given session.prompt에서 JSON parse 에러 발생
-    // #when LookAt 도구 실행
-    // #then 사용자 친화적 에러 메시지 반환
+    // given JSON parse error occurs in session.prompt
+    // when LookAt tool executed
+    // then return user-friendly error message
     test("handles JSON parse error from session.prompt gracefully", async () => {
       const mockClient = {
         session: {
@@ -92,11 +131,15 @@ describe("look-at tool", () => {
         directory: "/project",
       } as any)
 
-      const toolContext = {
+      const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
         abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
       }
 
       const result = await tool.execute(
@@ -104,15 +147,15 @@ describe("look-at tool", () => {
         toolContext
       )
 
-      expect(result).toContain("Error: Failed to analyze file")
+      expect(result).toContain("Error: Failed to analyze")
       expect(result).toContain("malformed response")
       expect(result).toContain("multimodal-looker")
       expect(result).toContain("image/png")
     })
 
-    // #given session.prompt에서 일반 에러 발생
-    // #when LookAt 도구 실행
-    // #then 원본 에러 메시지 포함한 에러 반환
+    // given generic error occurs in session.prompt
+    // when LookAt tool executed
+    // then return error including original error message
     test("handles generic prompt error gracefully", async () => {
       const mockClient = {
         session: {
@@ -130,11 +173,15 @@ describe("look-at tool", () => {
         directory: "/project",
       } as any)
 
-      const toolContext = {
+      const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
         abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
       }
 
       const result = await tool.execute(
@@ -148,9 +195,9 @@ describe("look-at tool", () => {
   })
 
   describe("createLookAt model passthrough", () => {
-    // #given multimodal-looker agent has resolved model info
-    // #when LookAt 도구 실행
-    // #then session.prompt에 model 정보가 전달되어야 함
+    // given multimodal-looker agent has resolved model info
+    // when LookAt tool executed
+    // then model info should be passed to session.prompt
     test("passes multimodal-looker model to session.prompt when available", async () => {
       let promptBody: any
 
@@ -186,11 +233,15 @@ describe("look-at tool", () => {
         directory: "/project",
       } as any)
 
-      const toolContext = {
+      const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
         abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
       }
 
       await tool.execute(
@@ -202,6 +253,113 @@ describe("look-at tool", () => {
         providerID: "google",
         modelID: "gemini-3-flash",
       })
+    })
+  })
+
+  describe("createLookAt with image_data", () => {
+    // given base64 image data is provided
+    // when LookAt tool executed
+    // then should send data URL to session.prompt
+    test("sends data URL when image_data provided", async () => {
+      let promptBody: any
+
+      const mockClient = {
+        app: {
+          agents: async () => ({ data: [] }),
+        },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_image_data_test" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] },
+            ],
+          }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext: ToolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
+      }
+
+      await tool.execute(
+        { image_data: "data:image/png;base64,iVBORw0KGgo=", goal: "describe this image" },
+        toolContext
+      )
+
+      const filePart = promptBody.parts.find((p: any) => p.type === "file")
+      expect(filePart).toBeDefined()
+      expect(filePart.url).toContain("data:image/png;base64")
+      expect(filePart.mime).toBe("image/png")
+      expect(filePart.filename).toContain("clipboard-image")
+    })
+
+    // given raw base64 without data URI prefix
+    // when LookAt tool executed
+    // then should detect mime type and create proper data URL
+    test("handles raw base64 without data URI prefix", async () => {
+      let promptBody: any
+
+      const mockClient = {
+        app: {
+          agents: async () => ({ data: [] }),
+        },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_raw_base64_test" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: 1 } }, parts: [{ type: "text", text: "analyzed" }] },
+            ],
+          }),
+        },
+      }
+
+      const tool = createLookAt({
+        client: mockClient,
+        directory: "/project",
+      } as any)
+
+      const toolContext: ToolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        directory: "/project",
+        worktree: "/project",
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
+      }
+
+      await tool.execute(
+        { image_data: "iVBORw0KGgo=", goal: "analyze" },
+        toolContext
+      )
+
+      const filePart = promptBody.parts.find((p: any) => p.type === "file")
+      expect(filePart).toBeDefined()
+      expect(filePart.url).toContain("data:")
+      expect(filePart.url).toContain("base64")
     })
   })
 })

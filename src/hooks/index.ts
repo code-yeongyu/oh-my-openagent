@@ -9,7 +9,6 @@ export { createDirectoryReadmeInjectorHook } from "./directory-readme-injector";
 export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detector";
 export { createAnthropicContextWindowLimitRecoveryHook, type AnthropicContextWindowLimitRecoveryOptions } from "./anthropic-context-window-limit-recovery";
 
-export { createCompactionContextInjector } from "./compaction-context-injector";
 export { createThinkModeHook } from "./think-mode";
 export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
@@ -34,3 +33,9 @@ export { createAtlasHook } from "./atlas";
 export { createDelegateTaskRetryHook } from "./delegate-task-retry";
 export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
 export { createSubagentQuestionBlockerHook } from "./subagent-question-blocker";
+export { createStopContinuationGuardHook, type StopContinuationGuard } from "./stop-continuation-guard";
+export { createCompactionContextInjector } from "./compaction-context-injector";
+export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
+export { createPreemptiveCompactionHook } from "./preemptive-compaction";
+export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
+export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";

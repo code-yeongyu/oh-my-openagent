@@ -66,7 +66,8 @@ async function loadSkillFromPath(
   skillPath: string,
   resolvedPath: string,
   defaultName: string,
-  scope: SkillScope
+  scope: SkillScope,
+  namePrefix: string = ""
 ): Promise<LoadedSkill | null> {
   try {
     const content = await fs.readFile(skillPath, "utf-8")
@@ -75,7 +76,10 @@ async function loadSkillFromPath(
     const mcpJsonMcp = await loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
 
-    const skillName = data.name || defaultName
+    // For nested skills, use the full path as the name (e.g., "superpowers/brainstorming")
+    // For flat skills, use frontmatter name or directory name
+    const baseName = data.name || defaultName
+    const skillName = namePrefix ? `${namePrefix}/${baseName}` : baseName
     const originalDescription = data.description || ""
     const isOpencodeSource = scope === "opencode" || scope === "opencode-project"
     const formattedDescription = `(${scope} - Skill) ${originalDescription}`
@@ -128,48 +132,67 @@ $ARGUMENTS
   }
 }
 
-async function loadSkillsFromDir(skillsDir: string, scope: SkillScope): Promise<LoadedSkill[]> {
+async function loadSkillsFromDir(
+  skillsDir: string,
+  scope: SkillScope,
+  namePrefix: string = "",
+  depth: number = 0,
+  maxDepth: number = 2
+): Promise<LoadedSkill[]> {
   const entries = await fs.readdir(skillsDir, { withFileTypes: true }).catch(() => [])
-  const skills: LoadedSkill[] = []
+  const skillMap = new Map<string, LoadedSkill>()
 
-  for (const entry of entries) {
-    if (entry.name.startsWith(".")) continue
+  const directories = entries.filter(e => !e.name.startsWith(".") && (e.isDirectory() || e.isSymbolicLink()))
+  const files = entries.filter(e => !e.name.startsWith(".") && !e.isDirectory() && !e.isSymbolicLink() && isMarkdownFile(e))
 
+  for (const entry of directories) {
     const entryPath = join(skillsDir, entry.name)
+    const resolvedPath = await resolveSymlinkAsync(entryPath)
+    const dirName = entry.name
 
-    if (entry.isDirectory() || entry.isSymbolicLink()) {
-      const resolvedPath = await resolveSymlinkAsync(entryPath)
-      const dirName = entry.name
-
-      const skillMdPath = join(resolvedPath, "SKILL.md")
-      try {
-        await fs.access(skillMdPath)
-        const skill = await loadSkillFromPath(skillMdPath, resolvedPath, dirName, scope)
-        if (skill) skills.push(skill)
-        continue
-      } catch {
+    const skillMdPath = join(resolvedPath, "SKILL.md")
+    try {
+      await fs.access(skillMdPath)
+      const skill = await loadSkillFromPath(skillMdPath, resolvedPath, dirName, scope, namePrefix)
+      if (skill && !skillMap.has(skill.name)) {
+        skillMap.set(skill.name, skill)
       }
-
-      const namedSkillMdPath = join(resolvedPath, `${dirName}.md`)
-      try {
-        await fs.access(namedSkillMdPath)
-        const skill = await loadSkillFromPath(namedSkillMdPath, resolvedPath, dirName, scope)
-        if (skill) skills.push(skill)
-        continue
-      } catch {
-      }
-
       continue
+    } catch {
     }
 
-    if (isMarkdownFile(entry)) {
-      const skillName = basename(entry.name, ".md")
-      const skill = await loadSkillFromPath(entryPath, skillsDir, skillName, scope)
-      if (skill) skills.push(skill)
+    const namedSkillMdPath = join(resolvedPath, `${dirName}.md`)
+    try {
+      await fs.access(namedSkillMdPath)
+      const skill = await loadSkillFromPath(namedSkillMdPath, resolvedPath, dirName, scope, namePrefix)
+      if (skill && !skillMap.has(skill.name)) {
+        skillMap.set(skill.name, skill)
+      }
+      continue
+    } catch {
+    }
+
+    if (depth < maxDepth) {
+      const newPrefix = namePrefix ? `${namePrefix}/${dirName}` : dirName
+      const nestedSkills = await loadSkillsFromDir(resolvedPath, scope, newPrefix, depth + 1, maxDepth)
+      for (const nestedSkill of nestedSkills) {
+        if (!skillMap.has(nestedSkill.name)) {
+          skillMap.set(nestedSkill.name, nestedSkill)
+        }
+      }
     }
   }
 
-  return skills
+  for (const entry of files) {
+    const entryPath = join(skillsDir, entry.name)
+    const baseName = basename(entry.name, ".md")
+    const skill = await loadSkillFromPath(entryPath, skillsDir, baseName, scope, namePrefix)
+    if (skill && !skillMap.has(skill.name)) {
+      skillMap.set(skill.name, skill)
+    }
+  }
+
+  return Array.from(skillMap.values())
 }
 
 function skillsToRecord(skills: LoadedSkill[]): Record<string, CommandDefinition> {
@@ -210,15 +233,33 @@ export interface DiscoverSkillsOptions {
   includeClaudeCodePaths?: boolean
 }
 
+/**
+ * Deduplicates skills by name, keeping the first occurrence (higher priority).
+ * Priority order: opencode-project > opencode > project > user
+ * (OpenCode Global skills take precedence over legacy Claude project skills)
+ */
+function deduplicateSkills(skills: LoadedSkill[]): LoadedSkill[] {
+  const seen = new Set<string>()
+  const result: LoadedSkill[] = []
+  for (const skill of skills) {
+    if (!seen.has(skill.name)) {
+      seen.add(skill.name)
+      result.push(skill)
+    }
+  }
+  return result
+}
+
 export async function discoverAllSkills(): Promise<LoadedSkill[]> {
-  const [opencodeProjectSkills, projectSkills, opencodeGlobalSkills, userSkills] = await Promise.all([
+  const [opencodeProjectSkills, opencodeGlobalSkills, projectSkills, userSkills] = await Promise.all([
     discoverOpencodeProjectSkills(),
-    discoverProjectClaudeSkills(),
     discoverOpencodeGlobalSkills(),
+    discoverProjectClaudeSkills(),
     discoverUserClaudeSkills(),
   ])
 
-  return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
+  // Priority: opencode-project > opencode > project > user
+  return deduplicateSkills([...opencodeProjectSkills, ...opencodeGlobalSkills, ...projectSkills, ...userSkills])
 }
 
 export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
@@ -230,7 +271,8 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
   ])
 
   if (!includeClaudeCodePaths) {
-    return [...opencodeProjectSkills, ...opencodeGlobalSkills]
+    // Priority: opencode-project > opencode
+    return deduplicateSkills([...opencodeProjectSkills, ...opencodeGlobalSkills])
   }
 
   const [projectSkills, userSkills] = await Promise.all([
@@ -238,7 +280,8 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     discoverUserClaudeSkills(),
   ])
 
-  return [...opencodeProjectSkills, ...projectSkills, ...opencodeGlobalSkills, ...userSkills]
+  // Priority: opencode-project > opencode > project > user
+  return deduplicateSkills([...opencodeProjectSkills, ...opencodeGlobalSkills, ...projectSkills, ...userSkills])
 }
 
 export async function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): Promise<LoadedSkill | undefined> {
