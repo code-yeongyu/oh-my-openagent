@@ -29,11 +29,17 @@ export interface RunOptions {
 }
 
 export async function runSg(options: RunOptions): Promise<SgResult> {
+  // ast-grep CLI silently ignores --update-all when --json is present.
+  // When both rewrite and updateAll are requested, we must run two separate
+  // invocations: one with --json=compact to collect match results, and
+  // another with --update-all to perform the actual file writes.
+  const shouldSeparateWritePass = !!(options.rewrite && options.updateAll)
+
   const args = ["run", "-p", options.pattern, "--lang", options.lang, "--json=compact"]
 
   if (options.rewrite) {
     args.push("-r", options.rewrite)
-    if (options.updateAll) {
+    if (options.updateAll && !shouldSeparateWritePass) {
       args.push("--update-all")
     }
   }
@@ -144,5 +150,28 @@ export async function runSg(options: RunOptions): Promise<SgResult> {
     return { matches: [], totalMatches: 0, truncated: false }
   }
 
-  return createSgResultFromStdout(stdout)
+  const jsonResult = createSgResultFromStdout(stdout)
+
+  if (shouldSeparateWritePass && jsonResult.matches.length > 0) {
+    const writeArgs = args.filter(a => a !== "--json=compact")
+    writeArgs.push("--update-all")
+
+    const writeProc = spawn([cliPath, ...writeArgs], {
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    try {
+      const writeOutput = await collectProcessOutputWithTimeout(writeProc, timeout)
+      if (writeOutput.exitCode !== 0) {
+        const errorDetail = writeOutput.stderr.trim() || `ast-grep exited with code ${writeOutput.exitCode}`
+        return { ...jsonResult, error: `Replace failed: ${errorDetail}` }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      return { ...jsonResult, error: `Replace failed: ${errorMessage}` }
+    }
+  }
+
+  return jsonResult
 }
