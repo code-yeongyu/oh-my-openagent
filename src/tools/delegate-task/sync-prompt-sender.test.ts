@@ -1,6 +1,11 @@
-const { describe, test, expect, mock } = require("bun:test")
+const { describe, test, expect, mock, afterEach } = require("bun:test")
+const { resetAgentNameAliases } = require("../../shared/agent-name-aliases")
 
 describe("sendSyncPrompt", () => {
+  afterEach(() => {
+    resetAgentNameAliases()
+  })
+
   test("applies agent tool restrictions for explore agent", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")

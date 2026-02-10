@@ -41,6 +41,10 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { __resetTimingConfig } = require("./timing")
     __resetTimingConfig()
 
+    //#given - reset agent name aliases to prevent state leakage
+    const { resetAgentNameAliases } = require("../../shared/agent-name-aliases")
+    resetAgentNameAliases()
+
 		mock.restore()
 
 		resetToastManager?.()
