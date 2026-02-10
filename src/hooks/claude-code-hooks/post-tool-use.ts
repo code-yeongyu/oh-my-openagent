@@ -91,11 +91,12 @@ export async function executePostToolUseHooks(
 
     const startTime = Date.now()
 
-    for (const matcher of matchers) {
-      for (const hook of matcher.hooks) {
-        if (hook.type !== "command") continue
+     for (const matcher of matchers) {
+       if (!matcher.hooks || matcher.hooks.length === 0) continue
+       for (const hook of matcher.hooks) {
+         if (hook.type !== "command") continue
 
-        if (isHookCommandDisabled("PostToolUse", hook.command, extendedConfig ?? null)) {
+         if (isHookCommandDisabled("PostToolUse", hook.command, extendedConfig ?? null)) {
           log("PostToolUse hook command skipped (disabled by config)", { command: hook.command, toolName: ctx.toolName })
           continue
         }
@@ -123,7 +124,7 @@ export async function executePostToolUseHooks(
 
         if (result.exitCode === 0 && result.stdout) {
           try {
-            const output = JSON.parse(result.stdout) as PostToolUseOutput
+            const output = JSON.parse(result.stdout || "{}") as PostToolUseOutput
             if (output.decision === "block") {
               return {
                 block: true,

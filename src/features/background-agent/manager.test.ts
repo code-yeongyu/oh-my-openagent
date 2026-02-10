@@ -1,8 +1,9 @@
-import { describe, test, expect, beforeEach } from "bun:test"
-import { afterEach } from "bun:test"
+declare const require: (name: string) => any
+const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTask, ResumeInput } from "./types"
+import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
 import { ConcurrencyManager } from "./concurrency"
 
@@ -170,6 +171,8 @@ function createBackgroundManager(): BackgroundManager {
   const client = {
     session: {
       prompt: async () => ({}),
+      promptAsync: async () => ({}),
+      abort: async () => ({}),
     },
   }
   return new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
@@ -183,12 +186,17 @@ function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> {
   return (manager as unknown as { tasks: Map<string, BackgroundTask> }).tasks
 }
 
-function stubNotifyParentSession(manager: BackgroundManager): void {
-  (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> }).notifyParentSession = async () => {}
+function getPendingByParent(manager: BackgroundManager): Map<string, Set<string>> {
+  return (manager as unknown as { pendingByParent: Map<string, Set<string>> }).pendingByParent
 }
 
 async function tryCompleteTaskForTest(manager: BackgroundManager, task: BackgroundTask): Promise<boolean> {
-  return (manager as unknown as { tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean> }).tryCompleteTask(task, "test")
+  return (manager as unknown as { tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean> })
+    .tryCompleteTask(task, "test")
+}
+
+function stubNotifyParentSession(manager: BackgroundManager): void {
+  ;(manager as unknown as { notifyParentSession: () => Promise<void> }).notifyParentSession = async () => {}
 }
 
 function getCleanupSignals(): Array<NodeJS.Signals | "beforeExit" | "exit"> {
@@ -208,22 +216,22 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
   let manager: MockBackgroundManager
 
   beforeEach(() => {
-    // #given
+    // given
     manager = new MockBackgroundManager()
   })
 
   test("should return empty array when no tasks exist", () => {
-    // #given - empty manager
+    // given - empty manager
 
-    // #when
+    // when
     const result = manager.getAllDescendantTasks("session-a")
 
-    // #then
+    // then
     expect(result).toEqual([])
   })
 
   test("should return direct children only when no nested tasks", () => {
-    // #given
+    // given
     const taskB = createMockTask({
       id: "task-b",
       sessionID: "session-b",
@@ -231,16 +239,16 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
     })
     manager.addTask(taskB)
 
-    // #when
+    // when
     const result = manager.getAllDescendantTasks("session-a")
 
-    // #then
+    // then
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe("task-b")
   })
 
   test("should return all nested descendants (2 levels deep)", () => {
-    // #given
+    // given
     // Session A -> Task B -> Task C
     const taskB = createMockTask({
       id: "task-b",
@@ -255,17 +263,17 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
     manager.addTask(taskB)
     manager.addTask(taskC)
 
-    // #when
+    // when
     const result = manager.getAllDescendantTasks("session-a")
 
-    // #then
+    // then
     expect(result).toHaveLength(2)
     expect(result.map(t => t.id)).toContain("task-b")
     expect(result.map(t => t.id)).toContain("task-c")
   })
 
   test("should return all nested descendants (3 levels deep)", () => {
-    // #given
+    // given
     // Session A -> Task B -> Task C -> Task D
     const taskB = createMockTask({
       id: "task-b",
@@ -286,10 +294,10 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
     manager.addTask(taskC)
     manager.addTask(taskD)
 
-    // #when
+    // when
     const result = manager.getAllDescendantTasks("session-a")
 
-    // #then
+    // then
     expect(result).toHaveLength(3)
     expect(result.map(t => t.id)).toContain("task-b")
     expect(result.map(t => t.id)).toContain("task-c")
@@ -297,7 +305,7 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
   })
 
   test("should handle multiple branches (tree structure)", () => {
-    // #given
+    // given
     // Session A -> Task B1 -> Task C1
     //           -> Task B2 -> Task C2
     const taskB1 = createMockTask({
@@ -325,10 +333,10 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
     manager.addTask(taskC1)
     manager.addTask(taskC2)
 
-    // #when
+    // when
     const result = manager.getAllDescendantTasks("session-a")
 
-    // #then
+    // then
     expect(result).toHaveLength(4)
     expect(result.map(t => t.id)).toContain("task-b1")
     expect(result.map(t => t.id)).toContain("task-b2")
@@ -337,7 +345,7 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
   })
 
   test("should not include tasks from unrelated sessions", () => {
-    // #given
+    // given
     // Session A -> Task B
     // Session X -> Task Y (unrelated)
     const taskB = createMockTask({
@@ -353,17 +361,17 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
     manager.addTask(taskB)
     manager.addTask(taskY)
 
-    // #when
+    // when
     const result = manager.getAllDescendantTasks("session-a")
 
-    // #then
+    // then
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe("task-b")
     expect(result.map(t => t.id)).not.toContain("task-y")
   })
 
   test("getTasksByParentSession should only return direct children (not recursive)", () => {
-    // #given
+    // given
     // Session A -> Task B -> Task C
     const taskB = createMockTask({
       id: "task-b",
@@ -378,10 +386,10 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
     manager.addTask(taskB)
     manager.addTask(taskC)
 
-    // #when
+    // when
     const result = manager.getTasksByParentSession("session-a")
 
-    // #then
+    // then
     expect(result).toHaveLength(1)
     expect(result[0].id).toBe("task-b")
   })
@@ -389,7 +397,7 @@ describe("BackgroundManager.getAllDescendantTasks", () => {
 
 describe("BackgroundManager.notifyParentSession - release ordering", () => {
   test("should unblock queued task even when prompt hangs", async () => {
-    // #given - concurrency limit 1, task1 running, task2 waiting
+    // given - concurrency limit 1, task1 running, task2 waiting
     const { ConcurrencyManager } = await import("./concurrency")
     const concurrencyManager = new ConcurrencyManager({ defaultConcurrency: 1 })
 
@@ -403,7 +411,7 @@ describe("BackgroundManager.notifyParentSession - release ordering", () => {
     await Promise.resolve()
     expect(task2Resolved).toBe(false)
 
-    // #when - simulate notifyParentSession: release BEFORE prompt (fixed behavior)
+    // when - simulate notifyParentSession: release BEFORE prompt (fixed behavior)
     let promptStarted = false
     const simulateNotifyParentSession = async () => {
       concurrencyManager.release("explore")
@@ -417,14 +425,14 @@ describe("BackgroundManager.notifyParentSession - release ordering", () => {
     await Promise.resolve()
     await Promise.resolve()
 
-    // #then - task2 should be unblocked even though prompt never completes
+    // then - task2 should be unblocked even though prompt never completes
     expect(promptStarted).toBe(true)
     await task2Promise
     expect(task2Resolved).toBe(true)
   })
 
   test("should keep queue blocked if release is after prompt (demonstrates the bug)", async () => {
-    // #given - same setup
+    // given - same setup
     const { ConcurrencyManager } = await import("./concurrency")
     const concurrencyManager = new ConcurrencyManager({ defaultConcurrency: 1 })
 
@@ -438,7 +446,7 @@ describe("BackgroundManager.notifyParentSession - release ordering", () => {
     await Promise.resolve()
     expect(task2Resolved).toBe(false)
 
-    // #when - simulate BUGGY behavior: release AFTER prompt (in finally)
+    // when - simulate BUGGY behavior: release AFTER prompt (in finally)
     const simulateBuggyNotifyParentSession = async () => {
       try {
         await new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 50))
@@ -449,7 +457,7 @@ describe("BackgroundManager.notifyParentSession - release ordering", () => {
 
     await simulateBuggyNotifyParentSession().catch(() => {})
 
-    // #then - task2 resolves only after prompt completes (blocked during hang)
+    // then - task2 resolves only after prompt completes (blocked during hang)
     await Promise.resolve()
     expect(task2Resolved).toBe(true)
   })
@@ -459,12 +467,12 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
   let manager: MockBackgroundManager
 
   beforeEach(() => {
-    // #given
+    // given
     manager = new MockBackgroundManager()
   })
 
   test("should not prune fresh tasks", () => {
-    // #given
+    // given
     const task = createMockTask({
       id: "task-fresh",
       sessionID: "session-fresh",
@@ -473,16 +481,16 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
     })
     manager.addTask(task)
 
-    // #when
+    // when
     const result = manager.pruneStaleTasksAndNotifications()
 
-    // #then
+    // then
     expect(result.prunedTasks).toHaveLength(0)
     expect(manager.getTaskCount()).toBe(1)
   })
 
   test("should prune tasks older than 30 minutes", () => {
-    // #given
+    // given
     const staleDate = new Date(Date.now() - 31 * 60 * 1000)
     const task = createMockTask({
       id: "task-stale",
@@ -492,16 +500,16 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
     })
     manager.addTask(task)
 
-    // #when
+    // when
     const result = manager.pruneStaleTasksAndNotifications()
 
-    // #then
+    // then
     expect(result.prunedTasks).toContain("task-stale")
     expect(manager.getTaskCount()).toBe(0)
   })
 
   test("should prune stale notifications", () => {
-    // #given
+    // given
     const staleDate = new Date(Date.now() - 31 * 60 * 1000)
     const task = createMockTask({
       id: "task-stale",
@@ -511,16 +519,16 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
     })
     manager.markForNotification(task)
 
-    // #when
+    // when
     const result = manager.pruneStaleTasksAndNotifications()
 
-    // #then
+    // then
     expect(result.prunedNotifications).toBe(1)
     expect(manager.getNotificationCount()).toBe(0)
   })
 
   test("should clean up notifications when task is pruned", () => {
-    // #given
+    // given
     const staleDate = new Date(Date.now() - 31 * 60 * 1000)
     const task = createMockTask({
       id: "task-stale",
@@ -531,16 +539,16 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
     manager.addTask(task)
     manager.markForNotification(task)
 
-    // #when
+    // when
     manager.pruneStaleTasksAndNotifications()
 
-    // #then
+    // then
     expect(manager.getTaskCount()).toBe(0)
     expect(manager.getNotificationCount()).toBe(0)
   })
 
   test("should keep fresh tasks while pruning stale ones", () => {
-    // #given
+    // given
     const staleDate = new Date(Date.now() - 31 * 60 * 1000)
     const staleTask = createMockTask({
       id: "task-stale",
@@ -557,10 +565,10 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
     manager.addTask(staleTask)
     manager.addTask(freshTask)
 
-    // #when
+    // when
     const result = manager.pruneStaleTasksAndNotifications()
 
-    // #then
+    // then
     expect(result.prunedTasks).toHaveLength(1)
     expect(result.prunedTasks).toContain("task-stale")
     expect(manager.getTaskCount()).toBe(1)
@@ -572,14 +580,14 @@ describe("BackgroundManager.resume", () => {
   let manager: MockBackgroundManager
 
   beforeEach(() => {
-    // #given
+    // given
     manager = new MockBackgroundManager()
   })
 
   test("should throw error when task not found", () => {
-    // #given - empty manager
+    // given - empty manager
 
-    // #when / #then
+    // when / #then
     expect(() => manager.resume({
       sessionId: "non-existent",
       prompt: "continue",
@@ -589,7 +597,7 @@ describe("BackgroundManager.resume", () => {
   })
 
   test("should resume existing task and reset state to running", () => {
-    // #given
+    // given
     const completedTask = createMockTask({
       id: "task-a",
       sessionID: "session-a",
@@ -600,7 +608,7 @@ describe("BackgroundManager.resume", () => {
     completedTask.error = "previous error"
     manager.addTask(completedTask)
 
-    // #when
+    // when
     const result = manager.resume({
       sessionId: "session-a",
       prompt: "continue the work",
@@ -608,7 +616,7 @@ describe("BackgroundManager.resume", () => {
       parentMessageID: "msg-new",
     })
 
-    // #then
+    // then
     expect(result.status).toBe("running")
     expect(result.completedAt).toBeUndefined()
     expect(result.error).toBeUndefined()
@@ -617,7 +625,7 @@ describe("BackgroundManager.resume", () => {
   })
 
   test("should preserve task identity while updating parent context", () => {
-    // #given
+    // given
     const existingTask = createMockTask({
       id: "task-a",
       sessionID: "session-a",
@@ -628,7 +636,7 @@ describe("BackgroundManager.resume", () => {
     })
     manager.addTask(existingTask)
 
-    // #when
+    // when
     const result = manager.resume({
       sessionId: "session-a",
       prompt: "new prompt",
@@ -637,7 +645,7 @@ describe("BackgroundManager.resume", () => {
       parentModel: { providerID: "anthropic", modelID: "claude-opus" },
     })
 
-    // #then
+    // then
     expect(result.id).toBe("task-a")
     expect(result.sessionID).toBe("session-a")
     expect(result.description).toBe("original description")
@@ -646,7 +654,7 @@ describe("BackgroundManager.resume", () => {
   })
 
   test("should track resume calls with prompt", () => {
-    // #given
+    // given
     const task = createMockTask({
       id: "task-a",
       sessionID: "session-a",
@@ -655,7 +663,7 @@ describe("BackgroundManager.resume", () => {
     })
     manager.addTask(task)
 
-    // #when
+    // when
     manager.resume({
       sessionId: "session-a",
       prompt: "continue with additional context",
@@ -663,7 +671,7 @@ describe("BackgroundManager.resume", () => {
       parentMessageID: "msg-new",
     })
 
-    // #then
+    // then
     expect(manager.resumeCalls).toHaveLength(1)
     expect(manager.resumeCalls[0]).toEqual({
       sessionId: "session-a",
@@ -672,7 +680,7 @@ describe("BackgroundManager.resume", () => {
   })
 
   test("should preserve existing tool call count in progress", () => {
-    // #given
+    // given
     const taskWithProgress = createMockTask({
       id: "task-a",
       sessionID: "session-a",
@@ -686,7 +694,7 @@ describe("BackgroundManager.resume", () => {
     }
     manager.addTask(taskWithProgress)
 
-    // #when
+    // when
     const result = manager.resume({
       sessionId: "session-a",
       prompt: "continue",
@@ -694,12 +702,12 @@ describe("BackgroundManager.resume", () => {
       parentMessageID: "msg-new",
     })
 
-    // #then
+    // then
     expect(result.progress?.toolCalls).toBe(42)
   })
 
   test("should ignore resume when task is already running", () => {
-    // #given
+    // given
     const runningTask = createMockTask({
       id: "task-a",
       sessionID: "session-a",
@@ -708,7 +716,7 @@ describe("BackgroundManager.resume", () => {
     })
     manager.addTask(runningTask)
 
-    // #when
+    // when
     const result = manager.resume({
       sessionId: "session-a",
       prompt: "resume should be ignored",
@@ -716,7 +724,7 @@ describe("BackgroundManager.resume", () => {
       parentMessageID: "new-msg",
     })
 
-    // #then
+    // then
     expect(result.parentSessionID).toBe("session-parent")
     expect(manager.resumeCalls).toHaveLength(0)
   })
@@ -724,7 +732,7 @@ describe("BackgroundManager.resume", () => {
 
 describe("LaunchInput.skillContent", () => {
   test("skillContent should be optional in LaunchInput type", () => {
-    // #given
+    // given
     const input: import("./types").LaunchInput = {
       description: "test",
       prompt: "test prompt",
@@ -733,12 +741,12 @@ describe("LaunchInput.skillContent", () => {
       parentMessageID: "parent-msg",
     }
 
-    // #when / #then - should compile without skillContent
+    // when / #then - should compile without skillContent
     expect(input.skillContent).toBeUndefined()
   })
 
   test("skillContent can be provided in LaunchInput", () => {
-    // #given
+    // given
     const input: import("./types").LaunchInput = {
       description: "test",
       prompt: "test prompt",
@@ -748,7 +756,7 @@ describe("LaunchInput.skillContent", () => {
       skillContent: "You are a playwright expert",
     }
 
-    // #when / #then
+    // when / #then
     expect(input.skillContent).toBe("You are a playwright expert")
   })
 })
@@ -760,7 +768,7 @@ interface CurrentMessage {
 
 describe("BackgroundManager.notifyParentSession - dynamic message lookup", () => {
   test("should use currentMessage model/agent when available", async () => {
-    // #given - currentMessage has model and agent
+    // given - currentMessage has model and agent
     const task: BackgroundTask = {
       id: "task-1",
       sessionID: "session-child",
@@ -776,20 +784,20 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
       parentModel: { providerID: "old", modelID: "old-model" },
     }
     const currentMessage: CurrentMessage = {
-      agent: "Sisyphus",
-      model: { providerID: "anthropic", modelID: "claude-opus-4-5" },
+      agent: "sisyphus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
     }
 
-    // #when
+    // when
     const promptBody = buildNotificationPromptBody(task, currentMessage)
 
-    // #then - uses currentMessage values, not task.parentModel/parentAgent
-    expect(promptBody.agent).toBe("Sisyphus")
-    expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-5" })
+    // then - uses currentMessage values, not task.parentModel/parentAgent
+    expect(promptBody.agent).toBe("sisyphus")
+    expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
   })
 
   test("should fallback to parentAgent when currentMessage.agent is undefined", async () => {
-    // #given
+    // given
     const task: BackgroundTask = {
       id: "task-2",
       sessionID: "session-child",
@@ -806,16 +814,16 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     }
     const currentMessage: CurrentMessage = { agent: undefined, model: undefined }
 
-    // #when
+    // when
     const promptBody = buildNotificationPromptBody(task, currentMessage)
 
-    // #then - falls back to task.parentAgent
+    // then - falls back to task.parentAgent
     expect(promptBody.agent).toBe("FallbackAgent")
     expect("model" in promptBody).toBe(false)
   })
 
   test("should not pass model when currentMessage.model is incomplete", async () => {
-    // #given - model missing modelID
+    // given - model missing modelID
     const task: BackgroundTask = {
       id: "task-3",
       sessionID: "session-child",
@@ -827,24 +835,24 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
       status: "completed",
       startedAt: new Date(),
       completedAt: new Date(),
-      parentAgent: "Sisyphus",
+      parentAgent: "sisyphus",
       parentModel: { providerID: "anthropic", modelID: "claude-opus" },
     }
     const currentMessage: CurrentMessage = {
-      agent: "Sisyphus",
+      agent: "sisyphus",
       model: { providerID: "anthropic" },
     }
 
-    // #when
+    // when
     const promptBody = buildNotificationPromptBody(task, currentMessage)
 
-    // #then - model not passed due to incomplete data
-    expect(promptBody.agent).toBe("Sisyphus")
+    // then - model not passed due to incomplete data
+    expect(promptBody.agent).toBe("sisyphus")
     expect("model" in promptBody).toBe(false)
   })
 
   test("should handle null currentMessage gracefully", async () => {
-    // #given - no message found (messageDir lookup failed)
+    // given - no message found (messageDir lookup failed)
     const task: BackgroundTask = {
       id: "task-4",
       sessionID: "session-child",
@@ -856,16 +864,104 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
       status: "completed",
       startedAt: new Date(),
       completedAt: new Date(),
-      parentAgent: "Sisyphus",
+      parentAgent: "sisyphus",
       parentModel: { providerID: "anthropic", modelID: "claude-opus" },
     }
 
-    // #when
+    // when
     const promptBody = buildNotificationPromptBody(task, null)
 
-    // #then - falls back to task.parentAgent, no model
-    expect(promptBody.agent).toBe("Sisyphus")
+    // then - falls back to task.parentAgent, no model
+    expect(promptBody.agent).toBe("sisyphus")
     expect("model" in promptBody).toBe(false)
+  })
+})
+
+describe("BackgroundManager.notifyParentSession - aborted parent", () => {
+  test("should skip notification when parent session is aborted", async () => {
+    //#given
+    let promptCalled = false
+    const promptMock = async () => {
+      promptCalled = true
+      return {}
+    }
+    const client = {
+      session: {
+        prompt: promptMock,
+        promptAsync: promptMock,
+        abort: async () => ({}),
+        messages: async () => {
+          const error = new Error("User aborted")
+          error.name = "MessageAbortedError"
+          throw error
+        },
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-aborted-parent",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task aborted parent",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id, "task-remaining"]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalled).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("should swallow aborted error from prompt", async () => {
+    //#given
+    let promptCalled = false
+    const promptMock = async () => {
+      promptCalled = true
+      const error = new Error("User aborted")
+      error.name = "MessageAbortedError"
+      throw error
+    }
+    const client = {
+      session: {
+        prompt: promptMock,
+        promptAsync: promptMock,
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-aborted-prompt",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task aborted prompt",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalled).toBe(true)
+
+    manager.shutdown()
   })
 })
 
@@ -896,7 +992,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
   let manager: BackgroundManager
 
   beforeEach(() => {
-    // #given
+    // given
     manager = createBackgroundManager()
     stubNotifyParentSession(manager)
   })
@@ -906,8 +1002,8 @@ describe("BackgroundManager.tryCompleteTask", () => {
   })
 
   test("should release concurrency and clear key on completion", async () => {
-    // #given
-    const concurrencyKey = "anthropic/claude-opus-4-5"
+    // given
+    const concurrencyKey = "anthropic/claude-opus-4-6"
     const concurrencyManager = getConcurrencyManager(manager)
     await concurrencyManager.acquire(concurrencyKey)
 
@@ -924,10 +1020,10 @@ describe("BackgroundManager.tryCompleteTask", () => {
       concurrencyKey,
     }
 
-    // #when
+    // when
     const completed = await tryCompleteTaskForTest(manager, task)
 
-    // #then
+    // then
     expect(completed).toBe(true)
     expect(task.status).toBe("completed")
     expect(task.concurrencyKey).toBeUndefined()
@@ -935,8 +1031,8 @@ describe("BackgroundManager.tryCompleteTask", () => {
   })
 
   test("should prevent double completion and double release", async () => {
-    // #given
-    const concurrencyKey = "anthropic/claude-opus-4-5"
+    // given
+    const concurrencyKey = "anthropic/claude-opus-4-6"
     const concurrencyManager = getConcurrencyManager(manager)
     await concurrencyManager.acquire(concurrencyKey)
 
@@ -953,14 +1049,172 @@ describe("BackgroundManager.tryCompleteTask", () => {
       concurrencyKey,
     }
 
-    // #when
+    // when
     await tryCompleteTaskForTest(manager, task)
     const secondAttempt = await tryCompleteTaskForTest(manager, task)
 
-    // #then
+    // then
     expect(secondAttempt).toBe(false)
     expect(task.status).toBe("completed")
     expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
+  })
+
+   test("should abort session on completion", async () => {
+     // #given
+     const abortedSessionIDs: string[] = []
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async (args: { path: { id: string } }) => {
+           abortedSessionIDs.push(args.path.id)
+           return {}
+         },
+         messages: async () => ({ data: [] }),
+       },
+     }
+    manager.shutdown()
+    manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-1",
+      description: "test task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    // #when
+    await tryCompleteTaskForTest(manager, task)
+
+    // #then
+    expect(abortedSessionIDs).toEqual(["session-1"])
+  })
+
+  test("should clean pendingByParent even when notifyParentSession throws", async () => {
+    // given
+    ;(manager as unknown as { notifyParentSession: () => Promise<void> }).notifyParentSession = async () => {
+      throw new Error("notify failed")
+    }
+
+    const task: BackgroundTask = {
+      id: "task-pending-cleanup",
+      sessionID: "session-pending-cleanup",
+      parentSessionID: "parent-pending-cleanup",
+      parentMessageID: "msg-1",
+      description: "pending cleanup task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionID, new Set([task.id]))
+
+    // when
+    await tryCompleteTaskForTest(manager, task)
+
+    // then
+    expect(task.status).toBe("completed")
+    expect(getPendingByParent(manager).get(task.parentSessionID)).toBeUndefined()
+  })
+
+  test("should avoid overlapping promptAsync calls when tasks complete concurrently", async () => {
+    // given
+    type PromptAsyncBody = Record<string, unknown> & { noReply?: boolean }
+
+    let resolveMessages: ((value: { data: unknown[] }) => void) | undefined
+    const messagesBarrier = new Promise<{ data: unknown[] }>((resolve) => {
+      resolveMessages = resolve
+    })
+
+    const promptBodies: PromptAsyncBody[] = []
+    let promptInFlight = false
+    let rejectedCount = 0
+    let promptCallCount = 0
+
+    let releaseFirstPrompt: (() => void) | undefined
+    let resolveFirstStarted: (() => void) | undefined
+    const firstStarted = new Promise<void>((resolve) => {
+      resolveFirstStarted = resolve
+    })
+
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => messagesBarrier,
+        promptAsync: async (args: { path: { id: string }; body: PromptAsyncBody }) => {
+          promptBodies.push(args.body)
+
+          if (!promptInFlight) {
+            promptCallCount += 1
+            if (promptCallCount === 1) {
+              promptInFlight = true
+              resolveFirstStarted?.()
+              return await new Promise((resolve) => {
+                releaseFirstPrompt = () => {
+                  promptInFlight = false
+                  resolve({})
+                }
+              })
+            }
+
+            return {}
+          }
+
+          rejectedCount += 1
+          throw new Error("BUSY")
+        },
+      },
+    }
+
+    manager.shutdown()
+    manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+
+    const parentSessionID = "parent-session"
+    const taskA = createMockTask({
+      id: "task-a",
+      sessionID: "session-a",
+      parentSessionID,
+    })
+    const taskB = createMockTask({
+      id: "task-b",
+      sessionID: "session-b",
+      parentSessionID,
+    })
+
+    getTaskMap(manager).set(taskA.id, taskA)
+    getTaskMap(manager).set(taskB.id, taskB)
+    getPendingByParent(manager).set(parentSessionID, new Set([taskA.id, taskB.id]))
+
+    // when
+    const completionA = tryCompleteTaskForTest(manager, taskA)
+    const completionB = tryCompleteTaskForTest(manager, taskB)
+    resolveMessages?.({ data: [] })
+
+    await firstStarted
+
+    // Give the second completion a chance to attempt promptAsync while the first is in-flight.
+    // In the buggy implementation, this triggers an overlap and increments rejectedCount.
+    for (let i = 0; i < 20; i++) {
+      await Promise.resolve()
+      if (rejectedCount > 0) break
+      if (promptBodies.length >= 2) break
+    }
+
+    releaseFirstPrompt?.()
+    await Promise.all([completionA, completionB])
+
+    // then
+    expect(rejectedCount).toBe(0)
+    expect(promptBodies.length).toBe(2)
+    expect(promptBodies.some((b) => b.noReply === false)).toBe(true)
   })
 })
 
@@ -968,7 +1222,7 @@ describe("BackgroundManager.trackTask", () => {
   let manager: BackgroundManager
 
   beforeEach(() => {
-    // #given
+    // given
     manager = createBackgroundManager()
     stubNotifyParentSession(manager)
   })
@@ -978,21 +1232,21 @@ describe("BackgroundManager.trackTask", () => {
   })
 
   test("should not double acquire on duplicate registration", async () => {
-    // #given
+    // given
     const input = {
       taskId: "task-1",
       sessionID: "session-1",
       parentSessionID: "parent-session",
       description: "external task",
-      agent: "delegate_task",
+      agent: "task",
       concurrencyKey: "external-key",
     }
 
-    // #when
+    // when
     await manager.trackTask(input)
     await manager.trackTask(input)
 
-    // #then
+    // then
     const concurrencyManager = getConcurrencyManager(manager)
     expect(concurrencyManager.getCount("external-key")).toBe(1)
     expect(getTaskMap(manager).size).toBe(1)
@@ -1003,7 +1257,7 @@ describe("BackgroundManager.resume concurrency key", () => {
   let manager: BackgroundManager
 
   beforeEach(() => {
-    // #given
+    // given
     manager = createBackgroundManager()
     stubNotifyParentSession(manager)
   })
@@ -1013,19 +1267,19 @@ describe("BackgroundManager.resume concurrency key", () => {
   })
 
   test("should re-acquire using external task concurrency key", async () => {
-    // #given
+    // given
     const task = await manager.trackTask({
       taskId: "task-1",
       sessionID: "session-1",
       parentSessionID: "parent-session",
       description: "external task",
-      agent: "delegate_task",
+      agent: "task",
       concurrencyKey: "external-key",
     })
 
     await tryCompleteTaskForTest(manager, task)
 
-    // #when
+    // when
     await manager.resume({
       sessionId: "session-1",
       prompt: "resume",
@@ -1033,7 +1287,7 @@ describe("BackgroundManager.resume concurrency key", () => {
       parentMessageID: "msg-2",
     })
 
-    // #then
+    // then
     const concurrencyManager = getConcurrencyManager(manager)
     expect(concurrencyManager.getCount("external-key")).toBe(1)
     expect(task.concurrencyKey).toBe("external-key")
@@ -1041,30 +1295,33 @@ describe("BackgroundManager.resume concurrency key", () => {
 })
 
 describe("BackgroundManager.resume model persistence", () => {
-  let manager: BackgroundManager
-  let promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }>
+   let manager: BackgroundManager
+   let promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }>
 
-  beforeEach(() => {
-    // #given
-    promptCalls = []
-    const client = {
-      session: {
-        prompt: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
-          promptCalls.push(args)
-          return {}
-        },
-      },
-    }
-    manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
-    stubNotifyParentSession(manager)
-  })
+   beforeEach(() => {
+     // given
+     promptCalls = []
+     const promptMock = async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+       promptCalls.push(args)
+       return {}
+     }
+     const client = {
+       session: {
+         prompt: promptMock,
+         promptAsync: promptMock,
+         abort: async () => ({}),
+       },
+     }
+     manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+     stubNotifyParentSession(manager)
+   })
 
   afterEach(() => {
     manager.shutdown()
   })
 
   test("should pass model when task has a configured model", async () => {
-    // #given - task with model from category config
+    // given - task with model from category config
     const taskWithModel: BackgroundTask = {
       id: "task-with-model",
       sessionID: "session-1",
@@ -1081,7 +1338,7 @@ describe("BackgroundManager.resume model persistence", () => {
     }
     getTaskMap(manager).set(taskWithModel.id, taskWithModel)
 
-    // #when
+    // when
     await manager.resume({
       sessionId: "session-1",
       prompt: "continue the work",
@@ -1089,14 +1346,14 @@ describe("BackgroundManager.resume model persistence", () => {
       parentMessageID: "msg-2",
     })
 
-    // #then - model should be passed in prompt body
+    // then - model should be passed in prompt body
     expect(promptCalls).toHaveLength(1)
     expect(promptCalls[0].body.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
     expect(promptCalls[0].body.agent).toBe("explore")
   })
 
   test("should NOT pass model when task has no model (backward compatibility)", async () => {
-    // #given - task without model (default behavior)
+    // given - task without model (default behavior)
     const taskWithoutModel: BackgroundTask = {
       id: "task-no-model",
       sessionID: "session-2",
@@ -1112,7 +1369,7 @@ describe("BackgroundManager.resume model persistence", () => {
     }
     getTaskMap(manager).set(taskWithoutModel.id, taskWithoutModel)
 
-    // #when
+    // when
     await manager.resume({
       sessionId: "session-2",
       prompt: "continue the work",
@@ -1120,7 +1377,7 @@ describe("BackgroundManager.resume model persistence", () => {
       parentMessageID: "msg-2",
     })
 
-    // #then - model should NOT be in prompt body
+    // then - model should NOT be in prompt body
     expect(promptCalls).toHaveLength(1)
     expect("model" in promptCalls[0].body).toBe(false)
     expect(promptCalls[0].body.agent).toBe("explore")
@@ -1129,20 +1386,20 @@ describe("BackgroundManager.resume model persistence", () => {
 
 describe("BackgroundManager process cleanup", () => {
   test("should remove listeners after last shutdown", () => {
-    // #given
+    // given
     const signals = getCleanupSignals()
     const baseline = getListenerCounts(signals)
     const managerA = createBackgroundManager()
     const managerB = createBackgroundManager()
 
-    // #when
+    // when
     const afterCreate = getListenerCounts(signals)
     managerA.shutdown()
     const afterFirstShutdown = getListenerCounts(signals)
     managerB.shutdown()
     const afterSecondShutdown = getListenerCounts(signals)
 
-    // #then
+    // then
     for (const signal of signals) {
       expect(afterCreate[signal]).toBe(baseline[signal] + 1)
       expect(afterFirstShutdown[signal]).toBe(baseline[signal] + 1)
@@ -1155,22 +1412,23 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   let manager: BackgroundManager
   let mockClient: ReturnType<typeof createMockClient>
 
-  function createMockClient() {
-    return {
-      session: {
-        create: async () => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
-        get: async () => ({ data: { directory: "/test/dir" } }),
-        prompt: async () => ({}),
-        messages: async () => ({ data: [] }),
-        todo: async () => ({ data: [] }),
-        status: async () => ({ data: {} }),
-        abort: async () => ({}),
-      },
-    }
-  }
+    function createMockClient() {
+      return {
+        session: {
+          create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          get: async () => ({ data: { directory: "/test/dir" } }),
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+          messages: async () => ({ data: [] }),
+         todo: async () => ({ data: [] }),
+         status: async () => ({ data: {} }),
+         abort: async () => ({}),
+       },
+     }
+   }
 
   beforeEach(() => {
-    // #given
+    // given
     mockClient = createMockClient()
     manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput)
   })
@@ -1181,7 +1439,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
   describe("launch() returns immediately with pending status", () => {
     test("should return task with pending status immediately", async () => {
-      // #given
+      // given
       const input = {
         description: "Test task",
         prompt: "Do something",
@@ -1190,10 +1448,10 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // #when
+      // when
       const task = await manager.launch(input)
 
-      // #then
+      // then
       expect(task.status).toBe("pending")
       expect(task.id).toMatch(/^bg_/)
       expect(task.description).toBe("Test task")
@@ -1204,7 +1462,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     })
 
     test("should return immediately even with concurrency limit", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1217,20 +1475,20 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // #when
+      // when
       const startTime = Date.now()
       const task1 = await manager.launch(input)
       const task2 = await manager.launch(input)
       const endTime = Date.now()
 
-      // #then
+      // then
       expect(endTime - startTime).toBeLessThan(100) // Should be instant
       expect(task1.status).toBe("pending")
       expect(task2.status).toBe("pending")
     })
 
     test("should queue multiple tasks without blocking", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 2 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1243,7 +1501,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // #when
+      // when
       const tasks = await Promise.all([
         manager.launch(input),
         manager.launch(input),
@@ -1252,7 +1510,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         manager.launch(input),
       ])
 
-      // #then
+      // then
       expect(tasks).toHaveLength(5)
       tasks.forEach(task => {
         expect(task.status).toBe("pending")
@@ -1262,8 +1520,57 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   })
 
   describe("task transitions pending→running when slot available", () => {
+    test("should inherit parent session permission rules (and force deny question)", async () => {
+      // given
+      const createCalls: any[] = []
+      const parentPermission = [
+        { permission: "question", action: "allow" as const, pattern: "*" },
+        { permission: "plan_enter", action: "deny" as const, pattern: "*" },
+      ]
+
+      const customClient = {
+        session: {
+          create: async (args?: any) => {
+            createCalls.push(args)
+            return { data: { id: `ses_${crypto.randomUUID()}` } }
+          },
+          get: async () => ({ data: { directory: "/test/dir", permission: parentPermission } }),
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+          messages: async () => ({ data: [] }),
+          todo: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+          abort: async () => ({}),
+        },
+      }
+      manager.shutdown()
+      manager = new BackgroundManager({ client: customClient, directory: tmpdir() } as unknown as PluginInput, {
+        defaultConcurrency: 5,
+      })
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+
+      // when
+      await manager.launch(input)
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      // then
+      expect(createCalls).toHaveLength(1)
+      const permission = createCalls[0]?.body?.permission
+      expect(permission).toEqual([
+        { permission: "plan_enter", action: "deny", pattern: "*" },
+        { permission: "question", action: "deny", pattern: "*" },
+      ])
+    })
+
     test("should transition first task to running immediately", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 5 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1276,13 +1583,13 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // #when
+      // when
       const task = await manager.launch(input)
 
       // Give processKey time to run
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // #then
+      // then
       const updatedTask = manager.getTask(task.id)
       expect(updatedTask?.status).toBe("running")
       expect(updatedTask?.startedAt).toBeInstanceOf(Date)
@@ -1291,7 +1598,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     })
 
     test("should set startedAt when transitioning to running", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 5 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1304,14 +1611,14 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // #when
+      // when
       const task = await manager.launch(input)
       const queuedAt = task.queuedAt
 
       // Wait for transition
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // #then
+      // then
       const updatedTask = manager.getTask(task.id)
       expect(updatedTask?.startedAt).toBeInstanceOf(Date)
       if (updatedTask?.startedAt && queuedAt) {
@@ -1322,7 +1629,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
   describe("pending task can be cancelled", () => {
     test("should cancel pending task successfully", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1341,10 +1648,10 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // Wait for first task to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // #when
+      // when
       const cancelled = manager.cancelPendingTask(task2.id)
 
-      // #then
+      // then
       expect(cancelled).toBe(true)
       const updatedTask2 = manager.getTask(task2.id)
       expect(updatedTask2?.status).toBe("cancelled")
@@ -1352,7 +1659,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     })
 
     test("should not cancel running task", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 5 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1370,17 +1677,17 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // Wait for task to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // #when
+      // when
       const cancelled = manager.cancelPendingTask(task.id)
 
-      // #then
+      // then
       expect(cancelled).toBe(false)
       const updatedTask = manager.getTask(task.id)
       expect(updatedTask?.status).toBe("running")
     })
 
     test("should remove cancelled task from queue", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1400,7 +1707,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // Wait for first task to start
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // #when - cancel middle task
+      // when - cancel middle task
       const cancelledTask2 = manager.getTask(task2.id)
       expect(cancelledTask2?.status).toBe("pending")
       
@@ -1409,15 +1716,53 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       const afterCancel = manager.getTask(task2.id)
       expect(afterCancel?.status).toBe("cancelled")
 
-      // #then - verify task3 is still pending (task1 still running)
+      // then - verify task3 is still pending (task1 still running)
       const task3BeforeRelease = manager.getTask(task3.id)
       expect(task3BeforeRelease?.status).toBe("pending")
     })
   })
 
+  describe("cancelTask", () => {
+    test("should cancel running task and release concurrency", async () => {
+      // given
+      const manager = createBackgroundManager()
+      stubNotifyParentSession(manager)
+
+      const concurrencyManager = getConcurrencyManager(manager)
+      const concurrencyKey = "test-provider/test-model"
+      await concurrencyManager.acquire(concurrencyKey)
+
+      const task = createMockTask({
+        id: "task-cancel-running",
+        sessionID: "session-cancel-running",
+        parentSessionID: "parent-cancel",
+        status: "running",
+        concurrencyKey,
+      })
+
+      getTaskMap(manager).set(task.id, task)
+      const pendingByParent = getPendingByParent(manager)
+      pendingByParent.set(task.parentSessionID, new Set([task.id]))
+
+      // when
+      const cancelled = await manager.cancelTask(task.id, { source: "test" })
+
+      // then
+      const updatedTask = manager.getTask(task.id)
+      expect(cancelled).toBe(true)
+      expect(updatedTask?.status).toBe("cancelled")
+      expect(updatedTask?.completedAt).toBeInstanceOf(Date)
+      expect(updatedTask?.concurrencyKey).toBeUndefined()
+      expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
+
+      const pendingSet = pendingByParent.get(task.parentSessionID)
+      expect(pendingSet?.has(task.id) ?? false).toBe(false)
+    })
+  })
+
   describe("multiple keys process in parallel", () => {
     test("should process different concurrency keys in parallel", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1438,14 +1783,14 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // #when
+      // when
       const task1 = await manager.launch(input1)
       const task2 = await manager.launch(input2)
 
       // Wait for both to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // #then - both should be running despite limit of 1 (different keys)
+      // then - both should be running despite limit of 1 (different keys)
       const updatedTask1 = manager.getTask(task1.id)
       const updatedTask2 = manager.getTask(task2.id)
 
@@ -1454,7 +1799,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     })
 
     test("should respect per-key concurrency limits", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1467,14 +1812,14 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // #when
+      // when
       const task1 = await manager.launch(input)
       const task2 = await manager.launch(input)
 
       // Wait for processing
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // #then - same key should respect limit
+      // then - same key should respect limit
       const updatedTask1 = manager.getTask(task1.id)
       const updatedTask2 = manager.getTask(task2.id)
 
@@ -1483,7 +1828,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     })
 
     test("should process model-based keys in parallel", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1492,7 +1837,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         description: "Task 1",
         prompt: "Do something",
         agent: "test-agent",
-        model: { providerID: "anthropic", modelID: "claude-opus-4-5" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
         parentSessionID: "parent-session",
         parentMessageID: "parent-message",
       }
@@ -1506,14 +1851,14 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // #when
+      // when
       const task1 = await manager.launch(input1)
       const task2 = await manager.launch(input2)
 
       // Wait for both to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // #then - different models should run in parallel
+      // then - different models should run in parallel
       const updatedTask1 = manager.getTask(task1.id)
       const updatedTask2 = manager.getTask(task2.id)
 
@@ -1524,7 +1869,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
   describe("TTL uses queuedAt for pending, startedAt for running", () => {
     test("should use queuedAt for pending task TTL", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1544,10 +1889,10 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // Wait for first to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // #when
+      // when
       const pendingTask = manager.getTask(task2.id)
 
-      // #then
+      // then
       expect(pendingTask?.status).toBe("pending")
       expect(pendingTask?.queuedAt).toBeInstanceOf(Date)
       expect(pendingTask?.startedAt).toBeUndefined()
@@ -1559,7 +1904,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     })
 
     test("should use startedAt for running task TTL", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 5 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1572,13 +1917,13 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // #when
+      // when
       const task = await manager.launch(input)
 
       // Wait for task to start
       await new Promise(resolve => setTimeout(resolve, 50))
 
-      // #then
+      // then
       const runningTask = manager.getTask(task.id)
       expect(runningTask?.status).toBe("running")
       expect(runningTask?.startedAt).toBeInstanceOf(Date)
@@ -1590,7 +1935,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     })
 
     test("should have different timestamps for queuedAt and startedAt", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 1 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1623,7 +1968,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // Wait for second task to start
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // #then
+      // then
       const startedTask = manager.getTask(task2.id)
       if (startedTask?.status === "running" && startedTask.startedAt) {
         expect(startedTask.startedAt).toBeInstanceOf(Date)
@@ -1634,7 +1979,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
   describe("manual verification scenario", () => {
     test("should handle 10 tasks with limit 5 returning immediately", async () => {
-      // #given
+      // given
       const config = { defaultConcurrency: 5 }
       manager.shutdown()
       manager = new BackgroundManager({ client: mockClient, directory: tmpdir() } as unknown as PluginInput, config)
@@ -1647,14 +1992,14 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      // #when
+      // when
       const startTime = Date.now()
       const tasks = await Promise.all(
         Array.from({ length: 10 }, () => manager.launch(input))
       )
       const endTime = Date.now()
 
-      // #then
+      // then
       expect(endTime - startTime).toBeLessThan(200) // Should be very fast
       expect(tasks).toHaveLength(10)
       tasks.forEach(task => {
@@ -1677,13 +2022,14 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 })
 
 describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
-  test("should NOT interrupt task running less than 30 seconds (min runtime guard)", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
-    }
+   test("should NOT interrupt task running less than 30 seconds (min runtime guard)", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
 
     const task: BackgroundTask = {
@@ -1702,19 +2048,20 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["tasks"].set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
     expect(task.status).toBe("running")
   })
 
-  test("should NOT interrupt task with recent lastUpdate", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
+   test("should NOT interrupt task with recent lastUpdate", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
 
@@ -1734,21 +2081,23 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["tasks"].set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
     expect(task.status).toBe("running")
   })
 
-  test("should interrupt task with stale lastUpdate (> 3min)", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
+   test("should interrupt task with stale lastUpdate (> 3min)", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-3",
@@ -1766,7 +2115,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["tasks"].set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1776,14 +2125,16 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.completedAt).toBeDefined()
   })
 
-  test("should respect custom staleTimeoutMs config", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
+   test("should respect custom staleTimeoutMs config", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
         abort: async () => ({}),
       },
     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 60_000 })
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-4",
@@ -1801,7 +2152,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["tasks"].set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1809,14 +2160,16 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("Stale timeout")
   })
 
-  test("should release concurrency before abort", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
-    }
+   test("should release concurrency before abort", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-5",
@@ -1835,7 +2188,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       concurrencyKey: "test-agent",
     }
 
-    manager["tasks"].set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1843,14 +2196,16 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("cancelled")
   })
 
-  test("should handle multiple stale tasks in same poll cycle", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
-    }
+   test("should handle multiple stale tasks in same poll cycle", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
+    stubNotifyParentSession(manager)
 
     const task1: BackgroundTask = {
       id: "task-6",
@@ -1884,8 +2239,8 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["tasks"].set(task1.id, task1)
-    manager["tasks"].set(task2.id, task2)
+    getTaskMap(manager).set(task1.id, task1)
+    getTaskMap(manager).set(task2.id, task2)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1893,14 +2248,16 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task2.status).toBe("cancelled")
   })
 
-  test("should use default timeout when config not provided", async () => {
-    const client = {
-      session: {
-        prompt: async () => ({}),
-        abort: async () => ({}),
-      },
-    }
+   test("should use default timeout when config not provided", async () => {
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
 
     const task: BackgroundTask = {
       id: "task-8",
@@ -1918,7 +2275,7 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
       },
     }
 
-    manager["tasks"].set(task.id, task)
+    getTaskMap(manager).set(task.id, task)
 
     await manager["checkAndInterruptStaleTasks"]()
 
@@ -1926,3 +2283,561 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
   })
 })
 
+describe("BackgroundManager.shutdown session abort", () => {
+   test("should call session.abort for all running tasks during shutdown", () => {
+     // given
+     const abortedSessionIDs: string[] = []
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async (args: { path: { id: string } }) => {
+           abortedSessionIDs.push(args.path.id)
+           return {}
+         },
+       },
+     }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+
+    const task1: BackgroundTask = {
+      id: "task-1",
+      sessionID: "session-1",
+      parentSessionID: "parent-1",
+      parentMessageID: "msg-1",
+      description: "Running task 1",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(),
+    }
+    const task2: BackgroundTask = {
+      id: "task-2",
+      sessionID: "session-2",
+      parentSessionID: "parent-2",
+      parentMessageID: "msg-2",
+      description: "Running task 2",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    getTaskMap(manager).set(task1.id, task1)
+    getTaskMap(manager).set(task2.id, task2)
+
+    // when
+    manager.shutdown()
+
+    // then
+    expect(abortedSessionIDs).toContain("session-1")
+    expect(abortedSessionIDs).toContain("session-2")
+    expect(abortedSessionIDs).toHaveLength(2)
+  })
+
+   test("should not call session.abort for completed or cancelled tasks", () => {
+     // given
+     const abortedSessionIDs: string[] = []
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async (args: { path: { id: string } }) => {
+           abortedSessionIDs.push(args.path.id)
+           return {}
+         },
+       },
+     }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+
+    const completedTask: BackgroundTask = {
+      id: "task-completed",
+      sessionID: "session-completed",
+      parentSessionID: "parent-1",
+      parentMessageID: "msg-1",
+      description: "Completed task",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    const cancelledTask: BackgroundTask = {
+      id: "task-cancelled",
+      sessionID: "session-cancelled",
+      parentSessionID: "parent-2",
+      parentMessageID: "msg-2",
+      description: "Cancelled task",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "cancelled",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    const pendingTask: BackgroundTask = {
+      id: "task-pending",
+      parentSessionID: "parent-3",
+      parentMessageID: "msg-3",
+      description: "Pending task",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "pending",
+      queuedAt: new Date(),
+    }
+
+    getTaskMap(manager).set(completedTask.id, completedTask)
+    getTaskMap(manager).set(cancelledTask.id, cancelledTask)
+    getTaskMap(manager).set(pendingTask.id, pendingTask)
+
+    // when
+    manager.shutdown()
+
+    // then
+    expect(abortedSessionIDs).toHaveLength(0)
+  })
+
+   test("should call onShutdown callback during shutdown", () => {
+     // given
+     let shutdownCalled = false
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
+    const manager = new BackgroundManager(
+      { client, directory: tmpdir() } as unknown as PluginInput,
+      undefined,
+      {
+        onShutdown: () => {
+          shutdownCalled = true
+        },
+      }
+    )
+
+    // when
+    manager.shutdown()
+
+    // then
+    expect(shutdownCalled).toBe(true)
+  })
+
+   test("should not throw when onShutdown callback throws", () => {
+     // given
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+       },
+     }
+    const manager = new BackgroundManager(
+      { client, directory: tmpdir() } as unknown as PluginInput,
+      undefined,
+      {
+        onShutdown: () => {
+          throw new Error("cleanup failed")
+        },
+      }
+    )
+
+    // when / #then
+    expect(() => manager.shutdown()).not.toThrow()
+  })
+})
+
+describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
+  test("should cancel descendant tasks when parent session is deleted", () => {
+    // given
+    const manager = createBackgroundManager()
+    const parentSessionID = "session-parent"
+    const childTask = createMockTask({
+      id: "task-child",
+      sessionID: "session-child",
+      parentSessionID,
+      status: "running",
+    })
+    const siblingTask = createMockTask({
+      id: "task-sibling",
+      sessionID: "session-sibling",
+      parentSessionID,
+      status: "running",
+    })
+    const grandchildTask = createMockTask({
+      id: "task-grandchild",
+      sessionID: "session-grandchild",
+      parentSessionID: "session-child",
+      status: "pending",
+      startedAt: undefined,
+      queuedAt: new Date(),
+    })
+    const unrelatedTask = createMockTask({
+      id: "task-unrelated",
+      sessionID: "session-unrelated",
+      parentSessionID: "other-parent",
+      status: "running",
+    })
+
+    const taskMap = getTaskMap(manager)
+    taskMap.set(childTask.id, childTask)
+    taskMap.set(siblingTask.id, siblingTask)
+    taskMap.set(grandchildTask.id, grandchildTask)
+    taskMap.set(unrelatedTask.id, unrelatedTask)
+
+    const pendingByParent = getPendingByParent(manager)
+    pendingByParent.set(parentSessionID, new Set([childTask.id, siblingTask.id]))
+    pendingByParent.set("session-child", new Set([grandchildTask.id]))
+
+    // when
+    manager.handleEvent({
+      type: "session.deleted",
+      properties: { info: { id: parentSessionID } },
+    })
+
+    // then
+    expect(taskMap.has(childTask.id)).toBe(false)
+    expect(taskMap.has(siblingTask.id)).toBe(false)
+    expect(taskMap.has(grandchildTask.id)).toBe(false)
+    expect(taskMap.has(unrelatedTask.id)).toBe(true)
+    expect(childTask.status).toBe("cancelled")
+    expect(siblingTask.status).toBe("cancelled")
+    expect(grandchildTask.status).toBe("cancelled")
+    expect(pendingByParent.get(parentSessionID)).toBeUndefined()
+    expect(pendingByParent.get("session-child")).toBeUndefined()
+
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
+  function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+    return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
+  }
+
+  function setCompletionTimer(manager: BackgroundManager, taskId: string): void {
+    const completionTimers = getCompletionTimers(manager)
+    const timer = setTimeout(() => {
+      completionTimers.delete(taskId)
+    }, 5 * 60 * 1000)
+    completionTimers.set(taskId, timer)
+  }
+
+  test("should have completionTimers Map initialized", () => {
+    // given
+    const manager = createBackgroundManager()
+
+    // when
+    const completionTimers = getCompletionTimers(manager)
+
+    // then
+    expect(completionTimers).toBeDefined()
+    expect(completionTimers).toBeInstanceOf(Map)
+    expect(completionTimers.size).toBe(0)
+
+    manager.shutdown()
+  })
+
+  test("should start cleanup timers only after all tasks complete", async () => {
+    // given
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const taskA: BackgroundTask = {
+      id: "task-timer-a",
+      sessionID: "session-timer-a",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-a",
+      description: "Task A",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    const taskB: BackgroundTask = {
+      id: "task-timer-b",
+      sessionID: "session-timer-b",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-b",
+      description: "Task B",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(taskA.id, taskA)
+    getTaskMap(manager).set(taskB.id, taskB)
+    ;(manager as unknown as { pendingByParent: Map<string, Set<string>> }).pendingByParent.set(
+      "parent-session",
+      new Set([taskA.id, taskB.id])
+    )
+
+    // when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(taskA)
+
+    // then
+    const completionTimers = getCompletionTimers(manager)
+    expect(completionTimers.size).toBe(0)
+
+    // when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(taskB)
+
+    // then
+    expect(completionTimers.size).toBe(2)
+    expect(completionTimers.has(taskA.id)).toBe(true)
+    expect(completionTimers.has(taskB.id)).toBe(true)
+
+    manager.shutdown()
+  })
+
+  test("should clear all completion timers on shutdown", () => {
+    // given
+    const manager = createBackgroundManager()
+    setCompletionTimer(manager, "task-1")
+    setCompletionTimer(manager, "task-2")
+
+    const completionTimers = getCompletionTimers(manager)
+    expect(completionTimers.size).toBe(2)
+
+    // when
+    manager.shutdown()
+
+    // then
+    expect(completionTimers.size).toBe(0)
+  })
+
+  test("should cancel timer when task is deleted via session.deleted", () => {
+    // given
+    const manager = createBackgroundManager()
+    const task: BackgroundTask = {
+      id: "task-timer-4",
+      sessionID: "session-timer-4",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "Test task",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+    setCompletionTimer(manager, task.id)
+
+    const completionTimers = getCompletionTimers(manager)
+    expect(completionTimers.size).toBe(1)
+
+    // when
+    manager.handleEvent({
+      type: "session.deleted",
+      properties: {
+        info: { id: "session-timer-4" },
+      },
+    })
+
+    // then
+    expect(completionTimers.has(task.id)).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("should not leak timers across multiple shutdown calls", () => {
+    // given
+    const manager = createBackgroundManager()
+    setCompletionTimer(manager, "task-1")
+
+    // when
+    manager.shutdown()
+    manager.shutdown()
+
+    // then
+    const completionTimers = getCompletionTimers(manager)
+    expect(completionTimers.size).toBe(0)
+  })
+})
+
+describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
+  test("should defer and retry when session.idle fires before MIN_IDLE_TIME_MS", async () => {
+    //#given - a running task started less than MIN_IDLE_TIME_MS ago
+    const sessionID = "session-early-idle"
+    const messagesCalls: string[] = []
+    const realDateNow = Date.now
+    const baseNow = realDateNow()
+
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+         messages: async (args: { path: { id: string } }) => {
+           messagesCalls.push(args.path.id)
+           return {
+             data: [
+               {
+                 info: { role: "assistant" },
+                 parts: [{ type: "text", text: "ok" }],
+               },
+             ],
+          }
+        },
+        todo: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
+
+    const remainingMs = 1200
+    const task: BackgroundTask = {
+      id: "task-early-idle",
+      sessionID,
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "early idle task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(baseNow),
+    }
+
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - session.idle fires
+    try {
+      Date.now = () => baseNow + (MIN_IDLE_TIME_MS - 100)
+      manager.handleEvent({ type: "session.idle", properties: { sessionID } })
+
+      // Advance time so deferred callback (if any) sees elapsed >= MIN_IDLE_TIME_MS
+      Date.now = () => baseNow + (MIN_IDLE_TIME_MS + 10)
+
+      //#then - idle should be deferred (not dropped), and task should eventually complete
+      expect(task.status).toBe("running")
+      await new Promise((resolve) => setTimeout(resolve, 220))
+      expect(task.status).toBe("completed")
+      expect(messagesCalls).toEqual([sessionID])
+    } finally {
+      Date.now = realDateNow
+      manager.shutdown()
+    }
+  })
+
+  test("should not defer when session.idle fires after MIN_IDLE_TIME_MS", async () => {
+     //#given - a running task started more than MIN_IDLE_TIME_MS ago
+     const sessionID = "session-late-idle"
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+         messages: async () => ({
+           data: [
+             {
+               info: { role: "assistant" },
+               parts: [{ type: "text", text: "ok" }],
+             },
+           ],
+         }),
+         todo: async () => ({ data: [] }),
+       },
+     }
+
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-late-idle",
+      sessionID,
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "late idle task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(Date.now() - (MIN_IDLE_TIME_MS + 10)),
+    }
+
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    manager.handleEvent({ type: "session.idle", properties: { sessionID } })
+
+    //#then - should be processed immediately
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(task.status).toBe("completed")
+
+    manager.shutdown()
+  })
+
+  test("should not process deferred idle if task already completed by other means", async () => {
+    //#given - a running task
+    const sessionID = "session-deferred-noop"
+    let messagesCallCount = 0
+    const realDateNow = Date.now
+    const baseNow = realDateNow()
+
+     const client = {
+       session: {
+         prompt: async () => ({}),
+         promptAsync: async () => ({}),
+         abort: async () => ({}),
+         messages: async () => {
+           messagesCallCount += 1
+           return {
+             data: [
+               {
+                 info: { role: "assistant" },
+                 parts: [{ type: "text", text: "ok" }],
+               },
+             ],
+           }
+        },
+        todo: async () => ({ data: [] }),
+      },
+    }
+
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    stubNotifyParentSession(manager)
+
+    const remainingMs = 120
+    const task: BackgroundTask = {
+      id: "task-deferred-noop",
+      sessionID,
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "deferred noop task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(baseNow),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - session.idle fires early, then task completes via another path before defer timer
+    try {
+      Date.now = () => baseNow + (MIN_IDLE_TIME_MS - remainingMs)
+      manager.handleEvent({ type: "session.idle", properties: { sessionID } })
+      expect(messagesCallCount).toBe(0)
+
+      await tryCompleteTaskForTest(manager, task)
+      expect(task.status).toBe("completed")
+
+      // Advance time so deferred callback (if any) sees elapsed >= MIN_IDLE_TIME_MS
+      Date.now = () => baseNow + (MIN_IDLE_TIME_MS + 10)
+
+      //#then - deferred callback should be a no-op
+      await new Promise((resolve) => setTimeout(resolve, remainingMs + 80))
+      expect(task.status).toBe("completed")
+      expect(messagesCallCount).toBe(0)
+    } finally {
+      Date.now = realDateNow
+      manager.shutdown()
+    }
+  })
+})

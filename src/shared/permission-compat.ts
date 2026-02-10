@@ -73,5 +73,14 @@ export function migrateAgentConfig(
     delete result.tools
   }
 
+  if (result.permission && typeof result.permission === "object") {
+    const perm = { ...(result.permission as Record<string, PermissionValue>) }
+    if ("delegate_task" in perm && !("task" in perm)) {
+      perm["task"] = perm["delegate_task"]
+      delete perm["delegate_task"]
+      result.permission = perm
+    }
+  }
+
   return result
 }

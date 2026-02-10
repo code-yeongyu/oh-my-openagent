@@ -16,10 +16,16 @@ export * from "./claude-config-dir"
 export * from "./jsonc-parser"
 export * from "./migration"
 export * from "./opencode-config-dir"
+export type {
+  OpenCodeBinaryType,
+  OpenCodeConfigDirOptions,
+  OpenCodeConfigPaths,
+} from "./opencode-config-dir-types"
 export * from "./opencode-version"
 export * from "./permission-compat"
 export * from "./external-plugin-detector"
 export * from "./zip-extractor"
+export * from "./binary-downloader"
 export * from "./agent-variant"
 export * from "./session-cursor"
 export * from "./shell-env"
@@ -27,7 +33,19 @@ export * from "./system-directive"
 export * from "./agent-tool-restrictions"
 export * from "./model-requirements"
 export * from "./model-resolver"
+export { resolveModelPipeline } from "./model-resolution-pipeline"
+export type {
+  ModelResolutionRequest,
+  ModelResolutionProvenance,
+  ModelResolutionResult as ModelResolutionPipelineResult,
+} from "./model-resolution-types"
 export * from "./model-availability"
-export * from "./case-insensitive"
+export * from "./connected-providers-cache"
 export * from "./session-utils"
 export * from "./tmux"
+export * from "./model-suggestion-retry"
+export * from "./opencode-server-auth"
+export * from "./port-utils"
+export * from "./git-worktree"
+export * from "./safe-create-hook"
+export * from "./truncate-description"

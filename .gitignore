@@ -1,5 +1,6 @@
 # Dependencies
-.sisyphus/
+.sisyphus/*
+!.sisyphus/rules/
 node_modules/
 
 # Build output
@@ -33,3 +34,4 @@ yarn.lock
 test-injection/
 notepad.md
 oauth-success.html
+*.bun-build

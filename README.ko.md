@@ -116,26 +116,13 @@
     - [🪄 마법의 단어: `ultrawork`](#-마법의-단어-ultrawork)
     - [읽고 싶은 분들을 위해: Sisyphus를 소개합니다](#읽고-싶은-분들을-위해-sisyphus를-소개합니다)
       - [그냥 설치하세요](#그냥-설치하세요)
+    - [자율성을 원한다면: 헤파이스토스를 만나세요](#자율성을-원한다면-헤파이스토스를-만나세요)
   - [설치](#설치)
     - [인간을 위한](#인간을-위한)
     - [LLM 에이전트를 위한](#llm-에이전트를-위한)
   - [제거](#제거)
    - [기능](#기능)
    - [구성](#구성)
-    - [JSONC 지원](#jsonc-지원)
-    - [Google 인증](#google-인증)
-    - [에이전트](#에이전트)
-      - [권한 옵션](#권한-옵션)
-    - [내장 스킬](#내장-스킬)
-    - [Git Master](#git-master)
-    - [Sisyphus 에이전트](#sisyphus-에이전트)
-    - [백그라운드 작업](#백그라운드-작업)
-    - [카테고리](#카테고리)
-    - [훅](#훅)
-    - [MCP](#mcp)
-    - [LSP](#lsp)
-    - [실험적 기능](#실험적-기능)
-    - [환경 변수](#환경-변수)
   - [작성자의 메모](#작성자의-메모)
   - [경고](#경고)
   - [다음 기업 전문가들이 사랑합니다](#다음-기업-전문가들이-사랑합니다)
@@ -194,10 +181,11 @@ Hey please read this readme and tell me why it is different from other agent har
 *아래의 모든 것은 사용자 정의 가능합니다. 원하는 것을 가져가세요. 모든 기능은 기본적으로 활성화됩니다. 아무것도 할 필요가 없습니다. 포함되어 있으며, 즉시 작동합니다.*
 
 - Sisyphus의 팀원 (큐레이팅된 에이전트)
+  - Hephaestus: 자율적 딥 워커, 목표 지향 실행 (GPT 5.2 Codex Medium) — *합법적인 장인*
   - Oracle: 디자인, 디버깅 (GPT 5.2 Medium)
   - Frontend UI/UX Engineer: 프론트엔드 개발 (Gemini 3 Pro)
   - Librarian: 공식 문서, 오픈 소스 구현, 코드베이스 탐색 (Claude Sonnet 4.5)
-  - Explore: 엄청나게 빠른 코드베이스 탐색 (Contextual Grep) (Grok Code)
+   - Explore: 엄청나게 빠른 코드베이스 탐색 (Contextual Grep) (Claude Haiku 4.5)
 - 완전한 LSP / AstGrep 지원: 결정적으로 리팩토링합니다.
 - TODO 연속 강제: 에이전트가 중간에 멈추면 계속하도록 강제합니다. **이것이 Sisyphus가 그 바위를 굴리게 하는 것입니다.**
 - 주석 검사기: AI가 과도한 주석을 추가하는 것을 방지합니다. Sisyphus가 생성한 코드는 인간이 작성한 것과 구별할 수 없어야 합니다.
@@ -234,6 +222,24 @@ Hey please read this readme and tell me why it is different from other agent har
 5. 이 프로젝트에 깊이 파고들고 싶지 않나요? 문제 없습니다. 'ultrathink'를 입력하세요.
 
 이 모든 것이 필요하지 않다면, 앞서 언급했듯이 특정 기능을 선택할 수 있습니다.
+
+### 자율성을 원한다면: 헤파이스토스를 만나세요
+
+![Meet Hephaestus](.github/assets/hephaestus.png)
+
+그리스 신화에서 헤파이스토스는 대장간, 불, 금속 세공, 장인 정신의 신이었습니다—비교할 수 없는 정밀함과 헌신으로 신들의 무기를 만든 신성한 대장장이입니다.
+**자율적 딥 워커를 소개합니다: 헤파이스토스 (GPT 5.2 Codex Medium). 합법적인 장인 에이전트.**
+
+*왜 "합법적인"일까요? Anthropic이 ToS 위반을 이유로 서드파티 접근을 차단했을 때, 커뮤니티에서 "합법적인" 사용에 대한 농담이 시작되었습니다. 헤파이스토스는 이 아이러니를 받아들입니다—그는 편법 없이 올바른 방식으로, 체계적이고 철저하게 만드는 장인입니다.*
+
+헤파이스토스는 [AmpCode의 딥 모드](https://ampcode.com)에서 영감을 받았습니다—결정적인 행동 전에 철저한 조사를 하는 자율적 문제 해결. 단계별 지시가 필요 없습니다; 목표만 주면 나머지는 알아서 합니다.
+
+**핵심 특성:**
+- **목표 지향**: 레시피가 아닌 목표를 주세요. 단계는 스스로 결정합니다.
+- **행동 전 탐색**: 코드 한 줄 쓰기 전에 2-5개의 explore/librarian 에이전트를 병렬로 실행합니다.
+- **끝까지 완료**: 검증 증거와 함께 100% 완료될 때까지 멈추지 않습니다.
+- **패턴 매칭**: 기존 코드베이스를 검색하여 프로젝트 스타일에 맞춥니다—AI 슬롭 없음.
+- **합법적인 정밀함**: 마스터 대장장이처럼 코드를 만듭니다—수술적으로, 최소한으로, 정확히 필요한 것만.
 
 ## 설치
 
@@ -373,5 +379,7 @@ OpenCode가 Debian/Arch라면 Oh My OpenCode는 Ubuntu/[Omarchy](https://omarchy
   - Spray(인플루언서 마케팅 솔루션), vovushop(국가 간 상거래 플랫폼), vreview(AI 상거래 리뷰 마케팅 솔루션) 제작
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [ELESTYLE](https://elestyle.jp)
+  - elepay - 멀티 모바일 결제 게이트웨이, OneQR - 캐시리스 솔루션용 모바일 애플리케이션 SaaS
 
 *이 놀라운 히어로 이미지에 대해 [@junhoyeo](https://github.com/junhoyeo)에게 특별히 감사드립니다.*

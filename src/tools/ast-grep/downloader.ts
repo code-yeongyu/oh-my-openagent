@@ -1,8 +1,16 @@
-import { existsSync, mkdirSync, chmodSync, unlinkSync } from "fs"
+import { existsSync } from "fs"
 import { join } from "path"
 import { homedir } from "os"
 import { createRequire } from "module"
-import { extractZip } from "../../shared"
+import {
+  cleanupArchive,
+  downloadArchive,
+  ensureCacheDir,
+  ensureExecutable,
+  extractZipArchive,
+  getCachedBinaryPath as getCachedBinaryPathShared,
+} from "../../shared/binary-downloader"
+import { log } from "../../shared/logger"
 
 const REPO = "ast-grep/ast-grep"
 
@@ -52,8 +60,7 @@ export function getBinaryName(): string {
 }
 
 export function getCachedBinaryPath(): string | null {
-  const binaryPath = join(getCacheDir(), getBinaryName())
-  return existsSync(binaryPath) ? binaryPath : null
+  return getCachedBinaryPathShared(getCacheDir(), getBinaryName())
 }
 
 
@@ -63,7 +70,7 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
   const platformInfo = PLATFORM_MAP[platformKey]
 
   if (!platformInfo) {
-    console.error(`[oh-my-opencode] Unsupported platform for ast-grep: ${platformKey}`)
+    log(`[oh-my-opencode] Unsupported platform for ast-grep: ${platformKey}`)
     return null
   }
 
@@ -79,38 +86,21 @@ export async function downloadAstGrep(version: string = DEFAULT_VERSION): Promis
   const assetName = `app-${arch}-${os}.zip`
   const downloadUrl = `https://github.com/${REPO}/releases/download/${version}/${assetName}`
 
-  console.log(`[oh-my-opencode] Downloading ast-grep binary...`)
+  log(`[oh-my-opencode] Downloading ast-grep binary...`)
 
   try {
-    if (!existsSync(cacheDir)) {
-      mkdirSync(cacheDir, { recursive: true })
-    }
-
-    const response = await fetch(downloadUrl, { redirect: "follow" })
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
     const archivePath = join(cacheDir, assetName)
-    const arrayBuffer = await response.arrayBuffer()
-    await Bun.write(archivePath, arrayBuffer)
+    ensureCacheDir(cacheDir)
+    await downloadArchive(downloadUrl, archivePath)
+    await extractZipArchive(archivePath, cacheDir)
+    cleanupArchive(archivePath)
+    ensureExecutable(binaryPath)
 
-    await extractZip(archivePath, cacheDir)
-
-    if (existsSync(archivePath)) {
-      unlinkSync(archivePath)
-    }
-
-    if (process.platform !== "win32" && existsSync(binaryPath)) {
-      chmodSync(binaryPath, 0o755)
-    }
-
-    console.log(`[oh-my-opencode] ast-grep binary ready.`)
+    log(`[oh-my-opencode] ast-grep binary ready.`)
 
     return binaryPath
   } catch (err) {
-    console.error(
+    log(
       `[oh-my-opencode] Failed to download ast-grep: ${err instanceof Error ? err.message : err}`
     )
     return null

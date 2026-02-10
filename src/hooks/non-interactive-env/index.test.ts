@@ -15,7 +15,7 @@ describe("non-interactive-env hook", () => {
       CI: process.env.CI,
       OPENCODE_NON_INTERACTIVE: process.env.OPENCODE_NON_INTERACTIVE,
     }
-    // #given clean Unix-like environment for all tests
+    // given clean Unix-like environment for all tests
     // This prevents CI environments (which may have PSModulePath set) from
     // triggering PowerShell detection in tests that expect Unix behavior
     delete process.env.PSModulePath

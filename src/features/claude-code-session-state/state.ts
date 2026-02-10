@@ -14,6 +14,7 @@ export function getMainSessionID(): string | undefined {
 export function _resetForTesting(): void {
   _mainSessionID = undefined
   subagentSessions.clear()
+  sessionAgentMap.clear()
 }
 
 const sessionAgentMap = new Map<string, string>()

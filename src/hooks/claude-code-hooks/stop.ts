@@ -65,11 +65,12 @@ export async function executeStopHooks(
     hook_source: "opencode-plugin",
   }
 
-  for (const matcher of matchers) {
-    for (const hook of matcher.hooks) {
-      if (hook.type !== "command") continue
+   for (const matcher of matchers) {
+     if (!matcher.hooks || matcher.hooks.length === 0) continue
+     for (const hook of matcher.hooks) {
+       if (hook.type !== "command") continue
 
-      if (isHookCommandDisabled("Stop", hook.command, extendedConfig ?? null)) {
+       if (isHookCommandDisabled("Stop", hook.command, extendedConfig ?? null)) {
         log("Stop hook command skipped (disabled by config)", { command: hook.command })
         continue
       }
@@ -93,7 +94,7 @@ export async function executeStopHooks(
 
        if (result.stdout) {
          try {
-           const output = JSON.parse(result.stdout) as StopOutput
+           const output = JSON.parse(result.stdout || "{}") as StopOutput
            if (output.stop_hook_active !== undefined) {
              stopHookActiveState.set(ctx.sessionId, output.stop_hook_active)
            }

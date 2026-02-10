@@ -2,50 +2,49 @@
 
 ## OVERVIEW
 
-Full Claude Code settings.json hook compatibility. 5 lifecycle events: PreToolUse, PostToolUse, UserPromptSubmit, Stop, PreCompact.
+Full Claude Code `settings.json` hook compatibility layer. Intercepts OpenCode events to execute external scripts/commands.
+
+**Config Sources** (priority): `.claude/settings.local.json` > `.claude/settings.json` (project) > `~/.claude/settings.json` (global)
 
 ## STRUCTURE
-
 ```
 claude-code-hooks/
-├── index.ts              # Main factory (401 lines)
-├── config.ts             # Loads ~/.claude/settings.json
-├── config-loader.ts      # Extended config
-├── pre-tool-use.ts       # PreToolUse executor
-├── post-tool-use.ts      # PostToolUse executor
+├── index.ts              # Barrel export
+├── claude-code-hooks-hook.ts  # Main factory
+├── config.ts             # Claude settings.json loader
+├── config-loader.ts      # Extended plugin config
+├── pre-tool-use.ts       # PreToolUse hook executor
+├── post-tool-use.ts      # PostToolUse hook executor
 ├── user-prompt-submit.ts # UserPromptSubmit executor
 ├── stop.ts               # Stop hook executor
 ├── pre-compact.ts        # PreCompact executor
 ├── transcript.ts         # Tool use recording
-├── tool-input-cache.ts   # Pre→post caching
-├── types.ts              # Hook types
-└── todo.ts               # Todo JSON fix
+├── tool-input-cache.ts   # Pre→post input caching
+├── todo.ts               # Todo integration
+├── session-hook-state.ts # Active state tracking
+├── types.ts              # Hook & IO type definitions
+├── plugin-config.ts      # Default config constants
+└── handlers/             # Event handlers (5 files)
 ```
 
 ## HOOK LIFECYCLE
 
-| Event | When | Can Block | Context |
-|-------|------|-----------|---------|
-| PreToolUse | Before tool | Yes | sessionId, toolName, toolInput |
-| PostToolUse | After tool | Warn | + toolOutput, transcriptPath |
-| UserPromptSubmit | On message | Yes | sessionId, prompt, parts |
-| Stop | Session idle | inject | sessionId, parentSessionId |
-| PreCompact | Before summarize | No | sessionId |
+| Event | Timing | Can Block | Context Provided |
+|-------|--------|-----------|------------------|
+| PreToolUse | Before exec | Yes (exit 2) | sessionId, toolName, toolInput, cwd |
+| PostToolUse | After exec | Warn (exit 1) | + toolOutput, transcriptPath |
+| UserPromptSubmit | On message | Yes (exit 2) | sessionId, prompt, parts, cwd |
+| Stop | Session end | Inject | sessionId, parentSessionId, cwd |
+| PreCompact | Before summarize | No | sessionId, cwd |
 
-## CONFIG SOURCES
+## EXIT CODES
 
-Priority (highest first):
-1. `.claude/settings.json` (project)
-2. `~/.claude/settings.json` (user)
-
-## HOOK EXECUTION
-
-1. Hooks loaded from settings.json
-2. Matchers filter by tool name
-3. Commands via subprocess with `$SESSION_ID`, `$TOOL_NAME`
-4. Exit codes: 0=pass, 1=warn, 2=block
+- `0`: Pass (continue)
+- `1`: Warn (continue + system message)
+- `2`: Block (abort operation)
 
 ## ANTI-PATTERNS
 
-- **Heavy PreToolUse**: Runs before EVERY tool call
-- **Blocking non-critical**: Use PostToolUse warnings
+- **Heavy PreToolUse**: Runs before EVERY tool — keep scripts fast
+- **Blocking non-critical**: Prefer PostToolUse warnings
+- **Ignoring exit codes**: Return `2` to block sensitive tools

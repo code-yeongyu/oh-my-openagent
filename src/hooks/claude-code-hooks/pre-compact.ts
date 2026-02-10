@@ -47,11 +47,12 @@ export async function executePreCompactHooks(
   let firstHookName: string | undefined
   const collectedContext: string[] = []
 
-  for (const matcher of matchers) {
-    for (const hook of matcher.hooks) {
-      if (hook.type !== "command") continue
+   for (const matcher of matchers) {
+     if (!matcher.hooks || matcher.hooks.length === 0) continue
+     for (const hook of matcher.hooks) {
+       if (hook.type !== "command") continue
 
-      if (isHookCommandDisabled("PreCompact", hook.command, extendedConfig ?? null)) {
+       if (isHookCommandDisabled("PreCompact", hook.command, extendedConfig ?? null)) {
         log("PreCompact hook command skipped (disabled by config)", { command: hook.command })
         continue
       }
@@ -73,7 +74,7 @@ export async function executePreCompactHooks(
 
       if (result.stdout) {
         try {
-          const output = JSON.parse(result.stdout) as PreCompactOutput
+          const output = JSON.parse(result.stdout || "{}") as PreCompactOutput
 
           if (output.hookSpecificOutput?.additionalContext) {
             collectedContext.push(...output.hookSpecificOutput.additionalContext)

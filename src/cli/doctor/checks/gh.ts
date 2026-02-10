@@ -13,7 +13,8 @@ export interface GhCliInfo {
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
   try {
-    const proc = Bun.spawn(["which", binary], { stdout: "pipe", stderr: "pipe" })
+    const whichCmd = process.platform === "win32" ? "where" : "which"
+    const proc = Bun.spawn([whichCmd, binary], { stdout: "pipe", stderr: "pipe" })
     const output = await new Response(proc.stdout).text()
     await proc.exited
     if (proc.exitCode === 0) {

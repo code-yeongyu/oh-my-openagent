@@ -4,6 +4,7 @@ export type BackgroundTaskStatus =
   | "completed"
   | "error"
   | "cancelled"
+  | "interrupt"
 
 export interface TaskProgress {
   toolCalls: number
@@ -36,6 +37,10 @@ export interface BackgroundTask {
   concurrencyGroup?: string
   /** Parent session's agent name for notification */
   parentAgent?: string
+  /** Marks if the task was launched from an unstable agent/category */
+  isUnstableAgent?: boolean
+  /** Category used for this task (e.g., 'quick', 'visual-engineering') */
+  category?: string
 
   /** Last message count for stability detection */
   lastMsgCount?: number
@@ -52,8 +57,10 @@ export interface LaunchInput {
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   model?: { providerID: string; modelID: string; variant?: string }
+  isUnstableAgent?: boolean
   skills?: string[]
   skillContent?: string
+  category?: string
 }
 
 export interface ResumeInput {

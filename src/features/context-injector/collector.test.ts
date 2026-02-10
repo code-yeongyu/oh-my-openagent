@@ -11,7 +11,7 @@ describe("ContextCollector", () => {
 
   describe("register", () => {
     it("registers context for a session", () => {
-      // #given
+      // given
       const sessionID = "ses_test1"
       const options = {
         id: "ulw-context",
@@ -19,10 +19,10 @@ describe("ContextCollector", () => {
         content: "Ultrawork mode activated",
       }
 
-      // #when
+      // when
       collector.register(sessionID, options)
 
-      // #then
+      // then
       const pending = collector.getPending(sessionID)
       expect(pending.hasContent).toBe(true)
       expect(pending.entries).toHaveLength(1)
@@ -30,26 +30,26 @@ describe("ContextCollector", () => {
     })
 
     it("assigns default priority of 'normal' when not specified", () => {
-      // #given
+      // given
       const sessionID = "ses_test2"
 
-      // #when
+      // when
       collector.register(sessionID, {
         id: "test",
         source: "keyword-detector",
         content: "test content",
       })
 
-      // #then
+      // then
       const pending = collector.getPending(sessionID)
       expect(pending.entries[0].priority).toBe("normal")
     })
 
     it("uses specified priority", () => {
-      // #given
+      // given
       const sessionID = "ses_test3"
 
-      // #when
+      // when
       collector.register(sessionID, {
         id: "critical-context",
         source: "keyword-detector",
@@ -57,13 +57,13 @@ describe("ContextCollector", () => {
         priority: "critical",
       })
 
-      // #then
+      // then
       const pending = collector.getPending(sessionID)
       expect(pending.entries[0].priority).toBe("critical")
     })
 
     it("deduplicates by source + id combination", () => {
-      // #given
+      // given
       const sessionID = "ses_test4"
       const options = {
         id: "ulw-context",
@@ -71,21 +71,21 @@ describe("ContextCollector", () => {
         content: "First content",
       }
 
-      // #when
+      // when
       collector.register(sessionID, options)
       collector.register(sessionID, { ...options, content: "Updated content" })
 
-      // #then
+      // then
       const pending = collector.getPending(sessionID)
       expect(pending.entries).toHaveLength(1)
       expect(pending.entries[0].content).toBe("Updated content")
     })
 
     it("allows same id from different sources", () => {
-      // #given
+      // given
       const sessionID = "ses_test5"
 
-      // #when
+      // when
       collector.register(sessionID, {
         id: "context-1",
         source: "keyword-detector",
@@ -97,7 +97,7 @@ describe("ContextCollector", () => {
         content: "From rules-injector",
       })
 
-      // #then
+      // then
       const pending = collector.getPending(sessionID)
       expect(pending.entries).toHaveLength(2)
     })
@@ -105,20 +105,20 @@ describe("ContextCollector", () => {
 
   describe("getPending", () => {
     it("returns empty result for session with no context", () => {
-      // #given
+      // given
       const sessionID = "ses_empty"
 
-      // #when
+      // when
       const pending = collector.getPending(sessionID)
 
-      // #then
+      // then
       expect(pending.hasContent).toBe(false)
       expect(pending.entries).toHaveLength(0)
       expect(pending.merged).toBe("")
     })
 
     it("merges multiple contexts with separator", () => {
-      // #given
+      // given
       const sessionID = "ses_merge"
       collector.register(sessionID, {
         id: "ctx-1",
@@ -131,17 +131,17 @@ describe("ContextCollector", () => {
         content: "Second context",
       })
 
-      // #when
+      // when
       const pending = collector.getPending(sessionID)
 
-      // #then
+      // then
       expect(pending.hasContent).toBe(true)
       expect(pending.merged).toContain("First context")
       expect(pending.merged).toContain("Second context")
     })
 
     it("orders contexts by priority (critical > high > normal > low)", () => {
-      // #given
+      // given
       const sessionID = "ses_priority"
       collector.register(sessionID, {
         id: "low",
@@ -168,16 +168,16 @@ describe("ContextCollector", () => {
         priority: "high",
       })
 
-      // #when
+      // when
       const pending = collector.getPending(sessionID)
 
-      // #then
+      // then
       const order = pending.entries.map((e) => e.priority)
       expect(order).toEqual(["critical", "high", "normal", "low"])
     })
 
     it("maintains registration order within same priority", () => {
-      // #given
+      // given
       const sessionID = "ses_order"
       collector.register(sessionID, {
         id: "first",
@@ -198,10 +198,10 @@ describe("ContextCollector", () => {
         priority: "normal",
       })
 
-      // #when
+      // when
       const pending = collector.getPending(sessionID)
 
-      // #then
+      // then
       const ids = pending.entries.map((e) => e.id)
       expect(ids).toEqual(["first", "second", "third"])
     })
@@ -209,7 +209,7 @@ describe("ContextCollector", () => {
 
   describe("consume", () => {
     it("clears pending context for session", () => {
-      // #given
+      // given
       const sessionID = "ses_consume"
       collector.register(sessionID, {
         id: "ctx",
@@ -217,16 +217,16 @@ describe("ContextCollector", () => {
         content: "test",
       })
 
-      // #when
+      // when
       collector.consume(sessionID)
 
-      // #then
+      // then
       const pending = collector.getPending(sessionID)
       expect(pending.hasContent).toBe(false)
     })
 
     it("returns the consumed context", () => {
-      // #given
+      // given
       const sessionID = "ses_consume_return"
       collector.register(sessionID, {
         id: "ctx",
@@ -234,16 +234,16 @@ describe("ContextCollector", () => {
         content: "test content",
       })
 
-      // #when
+      // when
       const consumed = collector.consume(sessionID)
 
-      // #then
+      // then
       expect(consumed.hasContent).toBe(true)
       expect(consumed.entries[0].content).toBe("test content")
     })
 
     it("does not affect other sessions", () => {
-      // #given
+      // given
       const session1 = "ses_1"
       const session2 = "ses_2"
       collector.register(session1, {
@@ -257,10 +257,10 @@ describe("ContextCollector", () => {
         content: "session 2",
       })
 
-      // #when
+      // when
       collector.consume(session1)
 
-      // #then
+      // then
       expect(collector.getPending(session1).hasContent).toBe(false)
       expect(collector.getPending(session2).hasContent).toBe(true)
     })
@@ -268,7 +268,7 @@ describe("ContextCollector", () => {
 
   describe("clear", () => {
     it("removes all context for a session", () => {
-      // #given
+      // given
       const sessionID = "ses_clear"
       collector.register(sessionID, {
         id: "ctx-1",
@@ -281,17 +281,17 @@ describe("ContextCollector", () => {
         content: "test 2",
       })
 
-      // #when
+      // when
       collector.clear(sessionID)
 
-      // #then
+      // then
       expect(collector.getPending(sessionID).hasContent).toBe(false)
     })
   })
 
   describe("hasPending", () => {
     it("returns true when session has pending context", () => {
-      // #given
+      // given
       const sessionID = "ses_has"
       collector.register(sessionID, {
         id: "ctx",
@@ -299,20 +299,20 @@ describe("ContextCollector", () => {
         content: "test",
       })
 
-      // #when / #then
+      // when / #then
       expect(collector.hasPending(sessionID)).toBe(true)
     })
 
     it("returns false when session has no pending context", () => {
-      // #given
+      // given
       const sessionID = "ses_empty"
 
-      // #when / #then
+      // when / #then
       expect(collector.hasPending(sessionID)).toBe(false)
     })
 
     it("returns false after consume", () => {
-      // #given
+      // given
       const sessionID = "ses_after_consume"
       collector.register(sessionID, {
         id: "ctx",
@@ -320,10 +320,10 @@ describe("ContextCollector", () => {
         content: "test",
       })
 
-      // #when
+      // when
       collector.consume(sessionID)
 
-      // #then
+      // then
       expect(collector.hasPending(sessionID)).toBe(false)
     })
   })
