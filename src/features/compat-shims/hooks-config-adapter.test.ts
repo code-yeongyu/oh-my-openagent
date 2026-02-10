@@ -44,4 +44,26 @@ describe("compat-shims/hooks-config-adapter", () => {
     expect(result.warnings).toHaveLength(1)
     expect(result.warnings[0]).toContain("Invalid hooks.json")
   })
+
+  //#given valid JSON that parses to null
+  //#when adaptLegacyHooksConfig is called
+  //#then it returns an empty result with warning instead of crashing
+  it("handles JSON null safely", () => {
+    const result = adaptLegacyHooksConfig("null")
+
+    expect(result.disabledHooks).toEqual([])
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings[0]).toContain("expected an object")
+  })
+
+  //#given valid JSON that parses to an array
+  //#when adaptLegacyHooksConfig is called
+  //#then it returns an empty result with warning
+  it("handles JSON array safely", () => {
+    const result = adaptLegacyHooksConfig('["atlas"]')
+
+    expect(result.disabledHooks).toEqual([])
+    expect(result.warnings).toHaveLength(1)
+    expect(result.warnings[0]).toContain("expected an object")
+  })
 })

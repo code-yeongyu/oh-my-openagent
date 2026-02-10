@@ -49,11 +49,13 @@ async function shutdownTeammateWithCleanup(
     return removeTeammate(current, agentName)
   })
 
-  if (removed) {
-    clearInbox(teamName, agentName)
+  try {
+    if (removed) {
+      clearInbox(teamName, agentName)
+    }
+  } finally {
+    resetOwnerTasks(teamName, agentName)
   }
-
-  resetOwnerTasks(teamName, agentName)
   return null
 }
 

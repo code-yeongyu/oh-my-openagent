@@ -33,9 +33,9 @@ function mapLegacyName(name: string): string | null {
 }
 
 export function adaptLegacyHooksConfig(raw: string): HooksConfigAdaptation {
-  let parsed: LegacyHooksJson
+  let parsed: unknown
   try {
-    parsed = JSON.parse(raw) as LegacyHooksJson
+    parsed = JSON.parse(raw)
   } catch {
     return {
       disabledHooks: [],
@@ -43,10 +43,17 @@ export function adaptLegacyHooksConfig(raw: string): HooksConfigAdaptation {
     }
   }
 
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return {
+      disabledHooks: [],
+      warnings: ["Invalid hooks.json: expected an object"],
+    }
+  }
+
   const warnings: string[] = []
   const normalized = new Set<string>()
 
-  for (const hook of normalizeRawHooks(parsed)) {
+  for (const hook of normalizeRawHooks(parsed as LegacyHooksJson)) {
     const mapped = mapLegacyName(hook)
 
     if (mapped === null) {
