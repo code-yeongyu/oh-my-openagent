@@ -81,7 +81,7 @@ export async function formatFullSession(
   const normalizedMessages: BackgroundOutputMessage[] = []
   for (const message of filteredMessages) {
     const parts = (message.parts ?? []).filter((part) => {
-      if (part.type === "thinking" || part.type === "reasoning") {
+      if (part.type === "thinking" || part.type === "reasoning" || part.type === "reasoning.encrypted") {
         return includeThinking
       }
       if (part.type === "tool_result") {
