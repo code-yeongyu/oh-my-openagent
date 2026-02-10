@@ -66,7 +66,7 @@ async function setFallbackForAllAgents(state: ConfigEditorState): Promise<void> 
 
   if (p.isCancel(model)) return
 
-  let finalModel: string
+  let finalModel: string | undefined
   if (model === "__custom__") {
     const custom = await p.text({
       message: "Enter custom fallback model:",
@@ -78,13 +78,13 @@ async function setFallbackForAllAgents(state: ConfigEditorState): Promise<void> 
     if (p.isCancel(custom)) return
     finalModel = custom.trim()
   } else if (model === "__clear__") {
-    return
+    finalModel = undefined
   } else {
     finalModel = model as string
   }
 
   const confirm = await p.confirm({
-    message: `Set fallback model "${finalModel}" for all ${AGENT_NAMES.length} agents?`,
+    message: `Set fallback model "${finalModel ?? "(clear)"}" for all ${AGENT_NAMES.length} agents?`,
     initialValue: false,
   })
 

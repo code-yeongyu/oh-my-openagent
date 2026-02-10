@@ -7,9 +7,28 @@ export type ProviderMap = Record<string, string[]>
 export function getModelsByProvider(): ProviderMap {
   const cacheDir = getOpenCodeCacheDir()
   const modelsJsonPath = join(cacheDir, "models.json")
+  const providerModelsJsonPath = join(cacheDir, "provider-models.json")
   
   const result: ProviderMap = {}
 
+  // Try provider-models.json first (preferred format)
+  if (existsSync(providerModelsJsonPath)) {
+    try {
+      const content = readFileSync(providerModelsJsonPath, "utf-8")
+      const data = JSON.parse(content)
+      if (typeof data === "object" && data !== null && !Array.isArray(data)) {
+        for (const [provider, models] of Object.entries(data)) {
+          if (Array.isArray(models)) {
+            result[provider] = models.sort()
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Try models.json fallback (legacy format or API cache)
   if (existsSync(modelsJsonPath)) {
     try {
       const content = readFileSync(modelsJsonPath, "utf-8")
@@ -21,7 +40,9 @@ export function getModelsByProvider(): ProviderMap {
            for (const item of data) {
              if (item.provider && item.id) {
                if (!result[item.provider]) result[item.provider] = []
-               result[item.provider].push(item.id)
+               if (!result[item.provider].includes(item.id)) {
+                 result[item.provider].push(item.id)
+               }
              }
            }
         } 
@@ -31,7 +52,13 @@ export function getModelsByProvider(): ProviderMap {
             if (providerData && typeof providerData === 'object' && 'models' in providerData) {
               const modelsMap = (providerData as any).models
               if (modelsMap && typeof modelsMap === 'object') {
-                result[providerId] = Object.keys(modelsMap).sort()
+                if (!result[providerId]) result[providerId] = []
+                const models = Object.keys(modelsMap)
+                for (const m of models) {
+                  if (!result[providerId].includes(m)) {
+                    result[providerId].push(m)
+                  }
+                }
               }
             }
           }
@@ -42,6 +69,11 @@ export function getModelsByProvider(): ProviderMap {
     }
   }
   
+  // Sort all lists
+  for (const provider in result) {
+    result[provider].sort()
+  }
+
   return result
 }
 
