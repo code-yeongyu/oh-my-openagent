@@ -97,6 +97,9 @@ async function getThinkingSummary(ctx: BabysitterContext, sessionID: string): Pr
         if (part.type === "reasoning" && part.text) {
           chunks.push(part.text)
         }
+        if (part.type === "reasoning.encrypted" && part.text) {
+          chunks.push(part.text)
+        }
       }
     }
 
