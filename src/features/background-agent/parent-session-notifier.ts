@@ -36,7 +36,7 @@ export async function notifyParentSession(
   const allComplete = !pendingSet || pendingSet.size === 0
   const remainingCount = pendingSet?.size ?? 0
 
-  const statusText = task.status === "completed" ? "COMPLETED" : "CANCELLED"
+  const statusText = task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : "CANCELLED"
 
   const completedTasks = allComplete
     ? Array.from(state.tasks.values()).filter(
