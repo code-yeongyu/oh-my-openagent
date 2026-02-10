@@ -1,10 +1,15 @@
 import type { McbAvailabilityStatus, McbToolAvailability } from "./types"
 
 let cachedStatus: McbAvailabilityStatus | null = null
+let configLocked = false
 const CACHE_TTL_MS = 60_000
 
+export function lockMcbAvailability(): void {
+  configLocked = true
+}
+
 export function getMcbAvailability(): McbAvailabilityStatus {
-  if (cachedStatus && Date.now() - cachedStatus.checkedAt < CACHE_TTL_MS) {
+  if (cachedStatus && (configLocked || Date.now() - cachedStatus.checkedAt < CACHE_TTL_MS)) {
     return cachedStatus
   }
 
@@ -38,4 +43,5 @@ export function markMcbUnavailable(tool?: keyof McbToolAvailability): void {
 
 export function resetMcbAvailability(): void {
   cachedStatus = null
+  configLocked = false
 }

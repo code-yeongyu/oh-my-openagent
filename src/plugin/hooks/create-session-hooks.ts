@@ -21,6 +21,8 @@ import {
   createQuestionLabelTruncatorHook,
   createSubagentQuestionBlockerHook,
   createPreemptiveCompactionHook,
+  createAmbiguityDetectorHook,
+  createWisdomCaptureHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
@@ -52,6 +54,8 @@ export type SessionHooks = {
   subagentQuestionBlocker: ReturnType<typeof createSubagentQuestionBlockerHook>
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
+  ambiguityDetector: ReturnType<typeof createAmbiguityDetectorHook> | null
+  wisdomCapture: ReturnType<typeof createWisdomCaptureHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -156,6 +160,14 @@ export function createSessionHooks(args: {
     ? safeHook("anthropic-effort", () => createAnthropicEffortHook())
     : null
 
+  const ambiguityDetector = isHookEnabled("ambiguity-detector")
+    ? safeHook("ambiguity-detector", () => createAmbiguityDetectorHook(ctx))
+    : null
+
+  const wisdomCapture = isHookEnabled("wisdom-capture")
+    ? safeHook("wisdom-capture", () => createWisdomCaptureHook(ctx))
+    : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -177,5 +189,7 @@ export function createSessionHooks(args: {
     subagentQuestionBlocker,
     taskResumeInfo,
     anthropicEffort,
+    ambiguityDetector,
+    wisdomCapture,
   }
 }
