@@ -102,30 +102,25 @@ export async function executeSyncTask(
       return promptError
     }
 
-    const pollError = await pollSyncSession(ctx, client, {
-      sessionID,
-      agentToUse,
-      toastManager,
-      taskId,
-    })
-    if (pollError) {
-      return pollError
-    }
+    try {
+      const pollError = await pollSyncSession(ctx, client, {
+        sessionID,
+        agentToUse,
+        toastManager,
+        taskId,
+      })
+      if (pollError) {
+        return pollError
+      }
 
-    const result = await fetchSyncResult(client, sessionID)
-    if (!result.ok) {
-      return result.error
-    }
+      const result = await fetchSyncResult(client, sessionID)
+      if (!result.ok) {
+        return result.error
+      }
 
-    const duration = formatDuration(startTime)
+      const duration = formatDuration(startTime)
 
-    if (toastManager) {
-      toastManager.removeTask(taskId)
-    }
-
-    subagentSessions.delete(sessionID)
-
-    return `Task completed in ${duration}.
+      return `Task completed in ${duration}.
 
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
 
@@ -136,13 +131,15 @@ ${result.textContent || "(No text output)"}
 <task_metadata>
 session_id: ${sessionID}
 </task_metadata>`
+    } finally {
+      if (toastManager && taskId !== undefined) {
+        toastManager.removeTask(taskId)
+      }
+      if (syncSessionID) {
+        subagentSessions.delete(syncSessionID)
+      }
+    }
   } catch (error) {
-    if (toastManager && taskId !== undefined) {
-      toastManager.removeTask(taskId)
-    }
-    if (syncSessionID) {
-      subagentSessions.delete(syncSessionID)
-    }
     return formatDetailedError(error, {
       operation: "Execute task",
       args,
