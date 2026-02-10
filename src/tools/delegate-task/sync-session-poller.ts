@@ -34,13 +34,14 @@ export async function pollSyncSession(
   }
 ): Promise<string | null> {
   const syncTiming = getTimingConfig()
+  const maxPollTimeMs = Math.max(syncTiming.MAX_POLL_TIME_MS, 50)
   const pollStart = Date.now()
   let pollCount = 0
   let timedOut = false
 
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse })
 
-  while (Date.now() - pollStart < syncTiming.MAX_POLL_TIME_MS) {
+  while (Date.now() - pollStart < maxPollTimeMs) {
     if (ctx.abort?.aborted) {
       log("[task] Aborted by user", { sessionID: input.sessionID })
       if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
@@ -91,12 +92,31 @@ export async function pollSyncSession(
       log("[task] Poll complete - terminal finish detected", { sessionID: input.sessionID, pollCount })
       break
     }
+
+    const lastAssistant = [...msgs].reverse().find((m) => m.info?.role === "assistant")
+    const hasAssistantText = msgs.some((m) => {
+      if (m.info?.role !== "assistant") return false
+      const parts = m.parts ?? []
+      return parts.some((p) => {
+        if (p.type !== "text" && p.type !== "reasoning") return false
+        const text = (p.text ?? "").trim()
+        return text.length > 0
+      })
+    })
+
+    if (!lastAssistant?.info?.finish && hasAssistantText) {
+      log("[task] Poll complete - assistant text detected (fallback)", {
+        sessionID: input.sessionID,
+        pollCount,
+      })
+      break
+    }
   }
 
-  if (Date.now() - pollStart >= syncTiming.MAX_POLL_TIME_MS) {
+  if (Date.now() - pollStart >= maxPollTimeMs) {
     timedOut = true
     log("[task] Poll timeout reached", { sessionID: input.sessionID, pollCount })
   }
 
-  return timedOut ? `Poll timeout reached after ${syncTiming.MAX_POLL_TIME_MS}ms for session ${input.sessionID}` : null
+  return timedOut ? `Poll timeout reached after ${maxPollTimeMs}ms for session ${input.sessionID}` : null
 }
