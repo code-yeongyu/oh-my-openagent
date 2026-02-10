@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
+import { mock } from "bun:test"
 
 const TEST_DIR = join(tmpdir(), "skill-loader-test-" + Date.now())
 const SKILLS_DIR = join(TEST_DIR, ".opencode", "skills")
@@ -557,6 +558,120 @@ Skill body.
         } else {
           process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
         }
+      }
+     })
+   })
+
+  describe("agents skills discovery (.agents/skills/)", () => {
+    it("discoverProjectAgentsSkills discovers skills from .agents/skills/ directory", async () => {
+      // given
+      const skillContent = `---
+name: agent-project-skill
+description: A skill from project .agents/skills directory
+---
+Skill body.
+`
+      const agentsProjectSkillsDir = join(TEST_DIR, ".agents", "skills")
+      const skillDir = join(agentsProjectSkillsDir, "agent-project-skill")
+      mkdirSync(skillDir, { recursive: true })
+      writeFileSync(join(skillDir, "SKILL.md"), skillContent)
+
+      // when
+      const { discoverProjectAgentsSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverProjectAgentsSkills()
+        const skill = skills.find(s => s.name === "agent-project-skill")
+
+        // then
+        expect(skill).toBeDefined()
+        expect(skill?.scope).toBe("project")
+        expect(skill?.definition.description).toContain("A skill from project .agents/skills directory")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("discoverGlobalAgentsSkills discovers skills from home ~/.agents/skills/ directory", async () => {
+      // given
+      const tempHome = join(TEST_DIR, "home")
+      const agentsGlobalSkillsDir = join(tempHome, ".agents", "skills")
+      const skillDir = join(agentsGlobalSkillsDir, "agent-global-skill")
+      mkdirSync(skillDir, { recursive: true })
+      const skillContent = `---
+name: agent-global-skill
+description: A skill from global .agents/skills directory
+---
+Skill body.
+`
+      writeFileSync(join(skillDir, "SKILL.md"), skillContent)
+
+      // given: mock homedir to return tempHome
+      mock.module("os", () => ({
+        homedir: () => tempHome,
+        tmpdir,
+      }))
+
+      // when
+      const { discoverGlobalAgentsSkills } = await import("./loader")
+
+      try {
+        const skills = await discoverGlobalAgentsSkills()
+        const skill = skills.find(s => s.name === "agent-global-skill")
+
+        // then
+        expect(skill).toBeDefined()
+        expect(skill?.scope).toBe("user")
+        expect(skill?.definition.description).toContain("A skill from global .agents/skills directory")
+      } finally {
+        mock.restore()
+      }
+    })
+
+    it("discoverSkills includes .agents/skills/ when includeClaudeCodePaths is true", async () => {
+      // given
+      const originalCwd = process.cwd()
+      const skillContentOpencode = `---
+name: mixed-skill
+description: From .opencode/skills
+---
+Opencode skill body.
+`
+      const skillContentAgents = `---
+name: agents-only-skill
+description: From .agents/skills
+---
+Agents skill body.
+`
+      const opencodeSkillsDir = join(TEST_DIR, ".opencode", "skills")
+      const agentsSkillsDir = join(TEST_DIR, ".agents", "skills")
+      
+      const opencodeSkillDir = join(opencodeSkillsDir, "mixed-skill")
+      mkdirSync(opencodeSkillDir, { recursive: true })
+      writeFileSync(join(opencodeSkillDir, "SKILL.md"), skillContentOpencode)
+
+      const agentsSkillDir = join(agentsSkillsDir, "agents-only-skill")
+      mkdirSync(agentsSkillDir, { recursive: true })
+      writeFileSync(join(agentsSkillDir, "SKILL.md"), skillContentAgents)
+
+      // when
+      const { discoverSkills } = await import("./loader")
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: true })
+        const opencodeSkill = skills.find(s => s.name === "mixed-skill")
+        const agentsSkill = skills.find(s => s.name === "agents-only-skill")
+
+        // then
+        expect(opencodeSkill).toBeDefined()
+        expect(opencodeSkill?.scope).toBe("opencode-project")
+        expect(agentsSkill).toBeDefined()
+        expect(agentsSkill?.scope).toBe("project")
+      } finally {
+        process.chdir(originalCwd)
       }
     })
   })
