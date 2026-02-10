@@ -39,6 +39,13 @@ export function createToolExecuteBeforeHandler(args: {
       }
     }
 
+    // Coerce string booleans for edit tool (LLMs sometimes output "false"/"true" instead of false/true)
+    if (input.tool === "edit") {
+      if (typeof output.args.replaceAll === "string") {
+        output.args.replaceAll = output.args.replaceAll === "true"
+      }
+    }
+
     if (hooks.ralphLoop && input.tool === "slashcommand") {
       const rawCommand = typeof output.args.command === "string" ? output.args.command : undefined
       const command = rawCommand?.replace(/^\//, "").toLowerCase()
