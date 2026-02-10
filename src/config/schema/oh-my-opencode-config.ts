@@ -33,6 +33,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
   disabled_tools: z.array(z.string()).optional(),
+  agent_display_names: z.record(z.string(), z.string()).optional(),
   agents: AgentOverridesSchema.optional(),
   categories: CategoriesConfigSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),

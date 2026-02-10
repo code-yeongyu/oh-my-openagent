@@ -722,14 +722,78 @@ describe("GitMasterConfigSchema", () => {
     }
   })
 
-  test("rejects number for commit_footer", () => {
-    //#given
-    const config = { commit_footer: 123 }
+   test("rejects number for commit_footer", () => {
+     //#given
+     const config = { commit_footer: 123 }
 
-    //#when
-    const result = GitMasterConfigSchema.safeParse(config)
+     //#when
+     const result = GitMasterConfigSchema.safeParse(config)
 
-    //#then
+     //#then
+     expect(result.success).toBe(false)
+   })
+})
+
+describe("agent_display_names schema", () => {
+  test("should accept agent_display_names with string values", () => {
+    // given
+    const config = {
+      agent_display_names: { sisyphus: "Builder", oracle: "Debugger" },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agent_display_names).toEqual({
+        sisyphus: "Builder",
+        oracle: "Debugger",
+      })
+    }
+  })
+
+  test("should reject agent_display_names with non-string values", () => {
+    // given
+    const config = {
+      agent_display_names: { sisyphus: 123 },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
     expect(result.success).toBe(false)
+  })
+
+  test("should accept empty agent_display_names object", () => {
+    // given
+    const config = {
+      agent_display_names: {},
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agent_display_names).toEqual({})
+    }
+  })
+
+  test("should accept undefined agent_display_names (optional field)", () => {
+    // given
+    const config = {}
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agent_display_names).toBeUndefined()
+    }
   })
 })

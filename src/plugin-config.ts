@@ -54,6 +54,7 @@ export function mergeConfigs(
   return {
     ...base,
     ...override,
+    agent_display_names: deepMerge(base.agent_display_names ?? {}, override.agent_display_names ?? {}),
     agents: deepMerge(base.agents, override.agents),
     categories: deepMerge(base.categories, override.categories),
     disabled_agents: [
