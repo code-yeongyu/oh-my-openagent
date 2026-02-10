@@ -36,14 +36,15 @@ export async function handleSessionIdle(args: {
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
-  const isBackgroundTaskSession = subagentSessions.has(sessionID)
-  const boulderState = readBoulderState(ctx.directory)
-  const isBoulderSession = boulderState?.session_ids.includes(sessionID) ?? false
+   const isBackgroundTaskSession = subagentSessions.has(sessionID)
+   const boulderState = readBoulderState(ctx.directory)
+   const isBoulderSession = boulderState?.session_ids.includes(sessionID) ?? false
 
-  if (!isBackgroundTaskSession && !isBoulderSession) {
-    log(`[${HOOK_NAME}] Skipped: not boulder or background task session`, { sessionID })
-    return
-  }
+   // Continuation is restricted to boulder/background sessions to prevent accidental continuation in regular sessions, ensuring controlled task resumption.
+   if (!isBackgroundTaskSession && !isBoulderSession) {
+     log(`[${HOOK_NAME}] Skipped: not boulder or background task session`, { sessionID })
+     return
+   }
 
   const state = sessionStateStore.getState(sessionID)
   if (state.isRecovering) {
