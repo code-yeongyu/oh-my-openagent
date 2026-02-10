@@ -2,68 +2,71 @@
 
 ## OVERVIEW
 
-CLI entry: `bunx oh-my-opencode`. 107 CLI utilities with Commander.js + @clack/prompts TUI.
+CLI entry: `bunx oh-my-opencode`. 107+ files with Commander.js + @clack/prompts TUI.
 
-**Commands**: install (interactive setup), doctor (14 health checks), run (session launcher), get-local-version, mcp-oauth
+**Commands**: install, run, doctor, get-local-version, mcp-oauth
 
 ## STRUCTURE
-
 ```
 cli/
-├── index.ts                 # Commander.js entry (5 commands)
-├── install.ts               # TTY routing to TUI or CLI installer
+├── index.ts                 # Entry point (5 lines)
+├── cli-program.ts           # Commander.js program (150+ lines, 5 commands)
+├── install.ts               # TTY routing (TUI or CLI installer)
 ├── cli-installer.ts         # Non-interactive installer (164 lines)
 ├── tui-installer.ts         # Interactive TUI with @clack/prompts (140 lines)
-├── config-manager/          # Config management utilities (17 files)
-├── model-fallback.ts        # Model fallback configuration
-├── model-fallback.test.ts   # Fallback tests (523 lines)
-├── doctor/
+├── config-manager/          # 17 config utilities
+│   ├── add-plugin-to-opencode-config.ts  # Plugin registration
+│   ├── add-provider-config.ts            # Provider setup
+│   ├── detect-current-config.ts          # Project vs user config
+│   ├── write-omo-config.ts               # JSONC writing
+│   └── ...
+├── doctor/                  # 14 health checks
 │   ├── runner.ts            # Check orchestration
 │   ├── formatter.ts         # Colored output
-│   └── checks/              # 29 files with individual checks
+│   └── checks/              # 29 files: auth, config, dependencies, gh, lsp, mcp, opencode, plugin, version, model-resolution (6 sub-checks)
 ├── run/                     # Session launcher (24 files)
-│   ├── events.ts            # CLI run events
-│   └── runner.ts            # Run orchestration
-├── mcp-oauth/               # OAuth flow
-└── get-local-version/       # Version detection
+│   ├── runner.ts            # Run orchestration (126 lines)
+│   ├── agent-resolver.ts    # Agent selection: flag → env → config → fallback
+│   ├── session-resolver.ts  # Session creation or resume
+│   ├── event-handlers.ts    # Event processing (125 lines)
+│   ├── completion.ts        # Completion detection
+│   └── poll-for-completion.ts # Polling with timeout
+├── mcp-oauth/               # OAuth token management (login, logout, status)
+├── get-local-version/       # Version detection + update check
+├── model-fallback.ts        # Model fallback configuration
+└── provider-availability.ts # Provider availability checks
 ```
 
 ## COMMANDS
 
-| Command | Purpose |
-|---------|---------|
-| `install` | Interactive setup with provider selection |
-| `doctor` | 14 health checks for diagnostics |
-| `run` | Launch session with todo enforcement |
-| `get-local-version` | Version detection and update check |
-| `mcp-oauth` | MCP OAuth authentication flow |
+| Command | Purpose | Key Logic |
+|---------|---------|-----------|
+| `install` | Interactive setup | Provider selection → config generation → plugin registration |
+| `run` | Session launcher | Agent: flag → env → config → Sisyphus. Enforces todo completion. |
+| `doctor` | 14 health checks | installation, config, auth, deps, tools, updates |
+| `get-local-version` | Version check | Detects installed, compares with npm latest |
+| `mcp-oauth` | OAuth tokens | login (PKCE flow), logout, status |
 
-## DOCTOR CATEGORIES (14 Checks)
+## DOCTOR CHECK CATEGORIES
 
 | Category | Checks |
 |----------|--------|
 | installation | opencode, plugin |
-| configuration | config validity, Zod, model-resolution |
+| configuration | config validity, Zod, model-resolution (6 sub-checks) |
 | authentication | anthropic, openai, google |
 | dependencies | ast-grep, comment-checker, gh-cli |
-| tools | LSP, MCP |
+| tools | LSP, MCP, MCP-OAuth |
 | updates | version comparison |
 
 ## HOW TO ADD CHECK
 
 1. Create `src/cli/doctor/checks/my-check.ts`
-2. Export `getXXXCheckDefinition()` factory returning `CheckDefinition`
+2. Export `getXXXCheckDefinition()` returning `CheckDefinition`
 3. Add to `getAllCheckDefinitions()` in `checks/index.ts`
-
-## TUI FRAMEWORK
-
-- **@clack/prompts**: `select()`, `spinner()`, `intro()`, `outro()`
-- **picocolors**: Terminal colors for status and headers
-- **Symbols**: check (pass), cross (fail), warning (warn), info (info)
 
 ## ANTI-PATTERNS
 
-- **Blocking in non-TTY**: Always check `process.stdout.isTTY`
-- **Direct JSON.parse**: Use `parseJsonc()` from shared utils
-- **Silent failures**: Return `warn` or `fail` in doctor instead of throwing
-- **Hardcoded paths**: Use `getOpenCodeConfigPaths()` from `config-manager`
+- **Blocking in non-TTY**: Check `process.stdout.isTTY`
+- **Direct JSON.parse**: Use `parseJsonc()` from shared
+- **Silent failures**: Return `warn` or `fail` in doctor, don't throw
+- **Hardcoded paths**: Use `getOpenCodeConfigPaths()` from config-manager

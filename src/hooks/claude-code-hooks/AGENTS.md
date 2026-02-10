@@ -28,24 +28,23 @@ claude-code-hooks/
 ```
 
 ## HOOK LIFECYCLE
+
 | Event | Timing | Can Block | Context Provided |
 |-------|--------|-----------|------------------|
-| PreToolUse | Before tool exec | Yes | sessionId, toolName, toolInput, cwd |
-| PostToolUse | After tool exec | Warn | + toolOutput, transcriptPath |
-| UserPromptSubmit | On message send | Yes | sessionId, prompt, parts, cwd |
-| Stop | Session idle/end | Inject | sessionId, parentSessionId, cwd |
+| PreToolUse | Before exec | Yes (exit 2) | sessionId, toolName, toolInput, cwd |
+| PostToolUse | After exec | Warn (exit 1) | + toolOutput, transcriptPath |
+| UserPromptSubmit | On message | Yes (exit 2) | sessionId, prompt, parts, cwd |
+| Stop | Session end | Inject | sessionId, parentSessionId, cwd |
 | PreCompact | Before summarize | No | sessionId, cwd |
 
-## HOOK EXECUTION
-- **Matchers**: Hooks filter by tool name or event type via regex/glob
-- **Commands**: Executed via subprocess with env vars (`$SESSION_ID`, `$TOOL_NAME`)
-- **Exit Codes**:
-  - `0`: Pass (Success)
-  - `1`: Warn (Continue with system message)
-  - `2`: Block (Abort operation/prompt)
+## EXIT CODES
+
+- `0`: Pass (continue)
+- `1`: Warn (continue + system message)
+- `2`: Block (abort operation)
 
 ## ANTI-PATTERNS
-- **Heavy PreToolUse**: Runs before EVERY tool; keep logic light to avoid latency
-- **Blocking non-critical**: Prefer PostToolUse warnings for non-fatal issues
-- **Direct state mutation**: Use `updatedInput` in PreToolUse instead of side effects
-- **Ignoring Exit Codes**: Ensure scripts return `2` to properly block sensitive tools
+
+- **Heavy PreToolUse**: Runs before EVERY tool — keep scripts fast
+- **Blocking non-critical**: Prefer PostToolUse warnings
+- **Ignoring exit codes**: Return `2` to block sensitive tools

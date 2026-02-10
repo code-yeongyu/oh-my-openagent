@@ -1,88 +1,80 @@
-# AGENTS KNOWLEDGE BASE
+# SRC KNOWLEDGE BASE
 
 ## OVERVIEW
 
 Main plugin entry point and orchestration layer. Plugin initialization, hook registration, tool composition, and lifecycle management.
 
-**Core Responsibilities:**
-- Plugin initialization via `OhMyOpenCodePlugin()` factory
-- Hook registration: `createCoreHooks()`, `createContinuationHooks()`, `createSkillHooks()`
-- Tool composition with filtering
-- Background agent management via `BackgroundManager`
-- MCP lifecycle via `SkillMcpManager`
-
 ## STRUCTURE
 ```
 src/
-├── index.ts                          # Main plugin entry (999 lines)
-├── create-hooks.ts                   # Hook coordination: core, continuation, skill
-├── plugin-config.ts                  # Config loading orchestration
-├── plugin-state.ts                   # Model cache state
-├── agents/                           # 11 AI agents (20 files) - see agents/AGENTS.md
-├── cli/                              # CLI installer, doctor (100+ files) - see cli/AGENTS.md
-├── config/                           # Zod schema (21 files) - see config/AGENTS.md
-├── features/                         # Background agents, skills, commands (17 dirs) - see features/AGENTS.md
-├── hooks/                            # 40+ lifecycle hooks (30+ dirs) - see hooks/AGENTS.md
-├── mcp/                              # Built-in MCPs (8 files) - see mcp/AGENTS.md
-├── plugin/                           # Plugin SDK types
-├── plugin-handlers/                  # Plugin config loading (5 files) - see plugin-handlers/AGENTS.md
+├── index.ts                          # Main plugin entry (88 lines) — OhMyOpenCodePlugin factory
+├── create-hooks.ts                   # Hook coordination: core, continuation, skill (62 lines)
+├── create-managers.ts                # Manager initialization: Tmux, Background, SkillMcp, Config (80 lines)
+├── create-tools.ts                   # Tool registry + skill context composition (54 lines)
+├── plugin-interface.ts               # Plugin interface assembly — 7 OpenCode hooks (66 lines)
+├── plugin-config.ts                  # Config loading orchestration (user + project merge)
+├── plugin-state.ts                   # Model cache state (context limits, anthropic 1M flag)
+├── agents/                           # 11 AI agents (32 files) - see agents/AGENTS.md
+├── cli/                              # CLI installer, doctor (107+ files) - see cli/AGENTS.md
+├── config/                           # Zod schema (21 component files) - see config/AGENTS.md
+├── features/                         # Background agents, skills, commands (18 dirs) - see features/AGENTS.md
+├── hooks/                            # 41 lifecycle hooks (36 dirs) - see hooks/AGENTS.md
+├── mcp/                              # Built-in MCPs (6 files) - see mcp/AGENTS.md
+├── plugin/                           # Plugin interface composition (21 files)
+├── plugin-handlers/                  # Config loading, plan inheritance (15 files) - see plugin-handlers/AGENTS.md
 ├── shared/                           # Cross-cutting utilities (84 files) - see shared/AGENTS.md
 └── tools/                            # 25+ tools (14 dirs) - see tools/AGENTS.md
 ```
 
-## KEY COMPONENTS
+## PLUGIN INITIALIZATION (10 steps)
 
-**Plugin Initialization:**
-- `OhMyOpenCodePlugin()`: Main plugin factory
-- Configuration loading via `loadPluginConfig()`
-- Hook registration with safe creation patterns
-- Tool composition and disabled tool filtering
+1. `injectServerAuthIntoClient(ctx.client)` — Auth injection
+2. `startTmuxCheck()` — Tmux availability
+3. `loadPluginConfig(ctx.directory, ctx)` — User + project config merge → Zod validation
+4. `createFirstMessageVariantGate()` — First message variant override gate
+5. `createModelCacheState()` — Model context limits cache
+6. `createManagers(...)` → 4 managers:
+   - `TmuxSessionManager` — Multi-pane tmux sessions
+   - `BackgroundManager` — Parallel subagent execution
+   - `SkillMcpManager` — MCP server lifecycle
+   - `ConfigHandler` — Plugin config API to OpenCode
+7. `createTools(...)` → `createSkillContext()` + `createAvailableCategories()` + `createToolRegistry()`
+8. `createHooks(...)` → `createCoreHooks()` + `createContinuationHooks()` + `createSkillHooks()`
+9. `createPluginInterface(...)` → 7 OpenCode hook handlers
+10. Return plugin with `experimental.session.compacting`
 
-**Lifecycle Management:**
-- 40+ hooks: session recovery, continuation enforcers, compaction, context injection
-- Background agent coordination via `BackgroundManager`
-- Tmux session management for multi-pane workflows
-- MCP server lifecycle via `SkillMcpManager`
+## HOOK REGISTRATION (3 tiers)
 
-**Tool Ecosystem:**
-- 25+ tools: LSP, AST-grep, delegation, background tasks, skills
-- Tool filtering based on agent permissions and user config
-- Metadata restoration for tool outputs
+**Core Hooks** (`create-core-hooks.ts`):
+- Session (20): context-window-monitor, session-recovery, think-mode, ralph-loop, anthropic-effort, ...
+- Tool Guard (8): comment-checker, tool-output-truncator, rules-injector, write-existing-file-guard, ...
+- Transform (4): claude-code-hooks, keyword-detector, context-injector, thinking-block-validator
 
-## HOOK REGISTRATION
+**Continuation Hooks** (`create-continuation-hooks.ts`):
+- 7 hooks: stop-continuation-guard, compaction-context-injector, todo-continuation-enforcer, atlas, ...
 
-**Safe Hook Creation:**
+**Skill Hooks** (`create-skill-hooks.ts`):
+- 2 hooks: category-skill-reminder, auto-slash-command
+
+## PLUGIN INTERFACE (7 OpenCode handlers)
+
+| Handler | Source | Purpose |
+|---------|--------|---------|
+| `tool` | filteredTools | All registered tools |
+| `chat.params` | createChatParamsHandler | Anthropic effort level |
+| `chat.message` | createChatMessageHandler | First message variant, session setup |
+| `experimental.chat.messages.transform` | createMessagesTransformHandler | Context injection, keyword detection |
+| `config` | configHandler | Agent/MCP/command registration |
+| `event` | createEventHandler | Session lifecycle |
+| `tool.execute.before` | createToolExecuteBeforeHandler | Pre-tool hooks |
+| `tool.execute.after` | createToolExecuteAfterHandler | Post-tool hooks |
+
+## SAFE HOOK CREATION PATTERN
+
 ```typescript
 const hook = isHookEnabled("hook-name")
   ? safeCreateHook("hook-name", () => createHookFactory(ctx), { enabled: safeHookEnabled })
   : null;
 ```
 
-**Hook Categories:**
-- **Session Management**: recovery, notification, compaction
-- **Continuation**: todo/task enforcers, stop guards
-- **Context**: injection, rules, directory content
-- **Tool Enhancement**: output truncation, error recovery
-- **Agent Coordination**: usage reminders, babysitting, delegation
-
-## TOOL COMPOSITION
-
-```typescript
-const allTools: Record<string, ToolDefinition> = {
-  ...builtinTools,
-  ...createGrepTools(ctx),
-  ...createAstGrepTools(ctx),
-  task: delegateTask,
-  skill: skillTool,
-};
-```
-
-**Filtering:** Agent permissions, user `disabled_tools`, session state.
-
-## LIFECYCLE FLOW
-
-1. User message triggers agent selection
-2. Model/variant resolution applied
-3. Tools execute with hook interception
-4. Continuation enforcers monitor completion
-5. Session compaction preserves context
+All hooks use this pattern for graceful degradation on failure.
