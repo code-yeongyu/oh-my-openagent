@@ -2323,6 +2323,61 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
   })
 })
 
+describe("BackgroundManager.pollRunningTasks lastMessageAt updates", () => {
+  test("should not refresh lastMessageAt when there is no new output", async () => {
+    const sessionID = "session-no-new-output"
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        status: async () => ({ data: { [sessionID]: { type: "running" } } }),
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant" },
+              parts: [{ type: "text", text: "same output" }],
+            },
+          ],
+        }),
+      },
+    }
+
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, {
+      staleTimeoutMs: 180_000,
+    })
+
+    const originalLastMessageAt = new Date(Date.now() - 60_000)
+    const task: BackgroundTask = {
+      id: "task-no-new-output",
+      sessionID,
+      parentSessionID: "parent-no-new-output",
+      parentMessageID: "msg-no-new-output",
+      description: "No new output task",
+      prompt: "Test",
+      agent: "test-agent",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+      lastMsgCount: 1,
+      progress: {
+        toolCalls: 0,
+        lastUpdate: new Date(),
+        lastMessage: "same output",
+        lastMessageAt: originalLastMessageAt,
+      },
+    }
+
+    getTaskMap(manager).set(task.id, task)
+
+    await manager["pollRunningTasks"]()
+
+    expect(task.status).toBe("running")
+    expect(task.progress?.lastMessageAt?.getTime()).toBe(originalLastMessageAt.getTime())
+
+    manager.shutdown()
+  })
+})
+
 describe("BackgroundManager.shutdown session abort", () => {
    test("should call session.abort for all running tasks during shutdown", () => {
      // given

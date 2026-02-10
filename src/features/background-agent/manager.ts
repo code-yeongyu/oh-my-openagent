@@ -1527,7 +1527,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           }
           if (lastMessage) {
             task.progress.lastMessage = lastMessage
-            task.progress.lastMessageAt = now
+            if (hasProgressDelta) {
+              task.progress.lastMessageAt = now
+            }
           }
 
           // Stability detection: complete when message count unchanged for 3 polls

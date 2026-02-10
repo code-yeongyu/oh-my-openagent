@@ -144,7 +144,9 @@ export async function pollRunningTasks(args: {
       }
       if (lastMessage) {
         task.progress.lastMessage = lastMessage
-        task.progress.lastMessageAt = now
+        if (hasProgressDelta) {
+          task.progress.lastMessageAt = now
+        }
       }
 
       const startedAt = task.startedAt
