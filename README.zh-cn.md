@@ -376,6 +376,8 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads
   - 制作 Spray - 网红营销解决方案、vovushop - 跨境电商平台、vreview - AI 电商评论营销解决方案
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [ELESTYLE](https://elestyle.jp)
+  - elepay - 多渠道移动支付网关、OneQR - 无现金解决方案移动应用 SaaS
 
 ## 赞助商
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
