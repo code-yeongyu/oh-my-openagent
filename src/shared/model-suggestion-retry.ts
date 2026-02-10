@@ -86,7 +86,22 @@ export async function promptWithModelSuggestionRetry(
 ): Promise<void> {
   // NOTE: Model suggestion retry removed — promptAsync returns 204 immediately,
   // model errors happen asynchronously server-side and cannot be caught here
-  await client.session.promptAsync(args as Parameters<typeof client.session.promptAsync>[0])
+  const promptPromise = client.session.promptAsync(
+    args as Parameters<typeof client.session.promptAsync>[0],
+  )
+
+  let timeoutID: ReturnType<typeof setTimeout> | null = null
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutID = setTimeout(() => {
+      reject(new Error("promptAsync timed out after 120000ms"))
+    }, 120000)
+  })
+
+  try {
+    await Promise.race([promptPromise, timeoutPromise])
+  } finally {
+    if (timeoutID !== null) clearTimeout(timeoutID)
+  }
 }
 
 /**
