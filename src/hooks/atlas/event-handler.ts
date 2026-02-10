@@ -122,16 +122,21 @@ export function createAtlasEventHandler(input: {
 
       state.lastContinuationInjectedAt = now
       const remaining = progress.total - progress.completed
-      injectBoulderContinuation({
-        ctx,
-        sessionID,
-        planName: boulderState.plan_name,
-        remaining,
-        total: progress.total,
-        agent: boulderState.agent,
-        backgroundManager,
-        sessionState: state,
-      })
+      try {
+        await injectBoulderContinuation({
+          ctx,
+          sessionID,
+          planName: boulderState.plan_name,
+          remaining,
+          total: progress.total,
+          agent: boulderState.agent,
+          backgroundManager,
+          sessionState: state,
+        })
+      } catch (err) {
+        log(`[${HOOK_NAME}] Failed to inject boulder continuation`, { sessionID, error: err })
+        state.promptFailureCount++
+      }
       return
     }
 
