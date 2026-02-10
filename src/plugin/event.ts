@@ -13,6 +13,7 @@ import { lspManager } from "../tools"
 import type { CreatedHooks } from "../create-hooks"
 import type { Managers } from "../create-managers"
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer"
+import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles"
 
 type FirstMessageVariantGate = {
   markSessionCreated: (sessionInfo: { id?: string; title?: string; parentID?: string } | undefined) => void
@@ -54,6 +55,12 @@ export function createEventHandler(args: {
   const DEDUP_WINDOW_MS = 500
 
   return async (input): Promise<void> => {
+    pruneRecentSyntheticIdles({
+      recentSyntheticIdles,
+      now: Date.now(),
+      dedupWindowMs: DEDUP_WINDOW_MS,
+    })
+
     if (input.event.type === "session.idle") {
       const sessionID = (input.event.properties as Record<string, unknown> | undefined)?.sessionID as string | undefined
       if (sessionID) {
