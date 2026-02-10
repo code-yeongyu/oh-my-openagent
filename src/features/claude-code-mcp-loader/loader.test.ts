@@ -229,5 +229,109 @@ describe("getSystemMcpServerNames", () => {
       } finally {
         process.chdir(originalCwd)
       }
-    })
+     })
 })
+
+describe("loadMcpConfigs", () => {
+  beforeEach(() => {
+    mkdirSync(TEST_DIR, { recursive: true })
+    mkdirSync(TEST_HOME, { recursive: true })
+    mock.module("os", () => ({
+      homedir: () => TEST_HOME,
+      tmpdir,
+    }))
+    mock.module("../../shared", () => ({
+      getClaudeConfigDir: () => join(TEST_HOME, ".claude"),
+    }))
+    mock.module("../../shared/logger", () => ({
+      log: () => {},
+    }))
+  })
+
+  afterEach(() => {
+    mock.restore()
+    rmSync(TEST_DIR, { recursive: true, force: true })
+  })
+
+  it("should skip MCPs in disabledMcps list", async () => {
+    //#given
+    const mcpConfig = {
+      mcpServers: {
+        playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
+        sqlite: { command: "uvx", args: ["mcp-server-sqlite"] },
+        active: { command: "npx", args: ["some-mcp"] },
+      },
+    }
+    writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify(mcpConfig))
+
+    const originalCwd = process.cwd()
+    process.chdir(TEST_DIR)
+
+    try {
+      //#when
+      const { loadMcpConfigs } = await import("./loader")
+      const result = await loadMcpConfigs(["playwright", "sqlite"])
+
+      //#then
+      expect(result.servers).not.toHaveProperty("playwright")
+      expect(result.servers).not.toHaveProperty("sqlite")
+      expect(result.servers).toHaveProperty("active")
+      expect(result.loadedServers.find((s) => s.name === "playwright")).toBeUndefined()
+      expect(result.loadedServers.find((s) => s.name === "sqlite")).toBeUndefined()
+      expect(result.loadedServers.find((s) => s.name === "active")).toBeDefined()
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
+
+  it("should load all MCPs when disabledMcps is empty", async () => {
+    //#given
+    const mcpConfig = {
+      mcpServers: {
+        playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
+        active: { command: "npx", args: ["some-mcp"] },
+      },
+    }
+    writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify(mcpConfig))
+
+    const originalCwd = process.cwd()
+    process.chdir(TEST_DIR)
+
+    try {
+      //#when
+      const { loadMcpConfigs } = await import("./loader")
+      const result = await loadMcpConfigs([])
+
+      //#then
+      expect(result.servers).toHaveProperty("playwright")
+      expect(result.servers).toHaveProperty("active")
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
+
+  it("should load all MCPs when disabledMcps is not provided", async () => {
+    //#given
+    const mcpConfig = {
+      mcpServers: {
+        playwright: { command: "npx", args: ["@playwright/mcp@latest"] },
+      },
+    }
+    writeFileSync(join(TEST_DIR, ".mcp.json"), JSON.stringify(mcpConfig))
+
+    const originalCwd = process.cwd()
+    process.chdir(TEST_DIR)
+
+    try {
+      //#when
+      const { loadMcpConfigs } = await import("./loader")
+      const result = await loadMcpConfigs()
+
+      //#then
+      expect(result.servers).toHaveProperty("playwright")
+    } finally {
+      process.chdir(originalCwd)
+    }
+  })
+})
+
