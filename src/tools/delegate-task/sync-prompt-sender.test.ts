@@ -3,16 +3,17 @@ const { describe, test, expect, mock } = require("bun:test")
 describe("sendSyncPrompt", () => {
   test("applies agent tool restrictions for explore agent", async () => {
     //#given
-    const mockPromptWithModelSuggestionRetry = mock(async () => {})
-    mock.module("../../shared/model-suggestion-retry", () => ({
-      promptWithModelSuggestionRetry: mockPromptWithModelSuggestionRetry,
-    }))
-
     const { sendSyncPrompt } = require("./sync-prompt-sender")
+
+    let promptArgs: any
+    const promptAsync = mock(async (input: any) => {
+      promptArgs = input
+      return { data: {} }
+    })
 
     const mockClient = {
       session: {
-        prompt: mock(async () => ({ data: {} })),
+        promptAsync,
       },
     }
 
@@ -36,23 +37,23 @@ describe("sendSyncPrompt", () => {
     await sendSyncPrompt(mockClient as any, input)
 
     //#then
-    expect(mockPromptWithModelSuggestionRetry).toHaveBeenCalled()
-    const callArgs = mockPromptWithModelSuggestionRetry.mock.calls[0][1]
-    expect(callArgs.body.tools.call_omo_agent).toBe(false)
+    expect(promptAsync).toHaveBeenCalled()
+    expect(promptArgs.body.tools.call_omo_agent).toBe(false)
   })
 
   test("applies agent tool restrictions for librarian agent", async () => {
     //#given
-    const mockPromptWithModelSuggestionRetry = mock(async () => {})
-    mock.module("../../shared/model-suggestion-retry", () => ({
-      promptWithModelSuggestionRetry: mockPromptWithModelSuggestionRetry,
-    }))
-
     const { sendSyncPrompt } = require("./sync-prompt-sender")
+
+    let promptArgs: any
+    const promptAsync = mock(async (input: any) => {
+      promptArgs = input
+      return { data: {} }
+    })
 
     const mockClient = {
       session: {
-        prompt: mock(async () => ({ data: {} })),
+        promptAsync,
       },
     }
 
@@ -76,23 +77,23 @@ describe("sendSyncPrompt", () => {
     await sendSyncPrompt(mockClient as any, input)
 
     //#then
-    expect(mockPromptWithModelSuggestionRetry).toHaveBeenCalled()
-    const callArgs = mockPromptWithModelSuggestionRetry.mock.calls[0][1]
-    expect(callArgs.body.tools.call_omo_agent).toBe(false)
+    expect(promptAsync).toHaveBeenCalled()
+    expect(promptArgs.body.tools.call_omo_agent).toBe(false)
   })
 
   test("does not restrict call_omo_agent for sisyphus agent", async () => {
     //#given
-    const mockPromptWithModelSuggestionRetry = mock(async () => {})
-    mock.module("../../shared/model-suggestion-retry", () => ({
-      promptWithModelSuggestionRetry: mockPromptWithModelSuggestionRetry,
-    }))
-
     const { sendSyncPrompt } = require("./sync-prompt-sender")
+
+    let promptArgs: any
+    const promptAsync = mock(async (input: any) => {
+      promptArgs = input
+      return { data: {} }
+    })
 
     const mockClient = {
       session: {
-        prompt: mock(async () => ({ data: {} })),
+        promptAsync,
       },
     }
 
@@ -116,8 +117,7 @@ describe("sendSyncPrompt", () => {
     await sendSyncPrompt(mockClient as any, input)
 
     //#then
-    expect(mockPromptWithModelSuggestionRetry).toHaveBeenCalled()
-    const callArgs = mockPromptWithModelSuggestionRetry.mock.calls[0][1]
-    expect(callArgs.body.tools.call_omo_agent).toBe(true)
+    expect(promptAsync).toHaveBeenCalled()
+    expect(promptArgs.body.tools.call_omo_agent).toBe(true)
   })
 })
