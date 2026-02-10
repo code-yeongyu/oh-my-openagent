@@ -2,6 +2,7 @@ import type { DelegateTaskArgs, OpencodeClient } from "./types"
 import { isPlanFamily } from "./constants"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { formatDetailedError } from "./error-formatting"
+import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 
 export async function sendSyncPrompt(
   client: OpencodeClient,
@@ -26,6 +27,7 @@ export async function sendSyncPrompt(
           task: allowTask,
           call_omo_agent: true,
           question: false,
+          ...getAgentToolRestrictions(input.agentToUse),
         },
         parts: [{ type: "text", text: input.args.prompt }],
         ...(input.categoryModel ? { model: { providerID: input.categoryModel.providerID, modelID: input.categoryModel.modelID } } : {}),

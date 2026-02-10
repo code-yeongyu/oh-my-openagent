@@ -36,6 +36,7 @@ export async function pollSyncSession(
   const syncTiming = getTimingConfig()
   const pollStart = Date.now()
   let pollCount = 0
+  let timedOut = false
 
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse })
 
@@ -93,8 +94,9 @@ export async function pollSyncSession(
   }
 
   if (Date.now() - pollStart >= syncTiming.MAX_POLL_TIME_MS) {
+    timedOut = true
     log("[task] Poll timeout reached", { sessionID: input.sessionID, pollCount })
   }
 
-  return null
+  return timedOut ? `Poll timeout reached after ${syncTiming.MAX_POLL_TIME_MS}ms for session ${input.sessionID}` : null
 }

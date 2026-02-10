@@ -11,7 +11,7 @@ import { pollForCompletion } from "./poll-for-completion"
 
 export { resolveRunAgent }
 
-const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
+const DEFAULT_TIMEOUT_MS = 0
 
 export async function run(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLI_RUN_MODE = "true"
@@ -79,11 +79,14 @@ export async function run(options: RunOptions): Promise<number> {
         query: { directory },
       })
 
-      console.log(pc.dim("Waiting for completion...\n"))
-      const exitCode = await pollForCompletion(ctx, eventState, abortController)
+       console.log(pc.dim("Waiting for completion...\n"))
+       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
-      await eventProcessor.catch(() => {})
-      cleanup()
+       // Abort the event stream to stop the processor
+       abortController.abort()
+
+       await eventProcessor.catch(() => {})
+       cleanup()
 
       const durationMs = Date.now() - startTime
 
