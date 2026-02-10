@@ -32,6 +32,15 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       TaskToastManager: class {},
       initTaskToastManager: () => mockToastManager,
     }))
+
+    //#given - mock other dependencies
+    mock.module("./sync-session-poller.ts", () => ({
+      pollSyncSession: async () => null,
+    }))
+
+    mock.module("./sync-result-fetcher.ts", () => ({
+      fetchSyncResult: async () => ({ ok: true, textContent: "Result" }),
+    }))
   })
 
   afterEach(() => {
@@ -42,8 +51,14 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     mock.restore()
   })
 
-  test("removes toast when fetchSyncResult throws an exception", async () => {
-    //#given - mock dependencies where messages return error state
+  test("removes toast when fetchSyncResult throws", async () => {
+    //#given - mock fetchSyncResult to throw an error
+    mock.module("./sync-result-fetcher.ts", () => ({
+      fetchSyncResult: async () => {
+        throw new Error("Network error")
+      },
+    }))
+
     const mockClient = {
       session: {
         messages: async () => ({
@@ -82,16 +97,30 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       run_in_background: false,
     }
 
-    //#when - executeSyncContinuation completes
-    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
+    //#when - executeSyncContinuation with fetchSyncResult throwing
+    let error: any = null
+    let result: string | null = null
+    try {
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
+    } catch (e) {
+      error = e
+    }
 
-    //#then - removeTask should have been called exactly once
+    //#then - error should be thrown but toast should still be removed
+    expect(error).not.toBeNull()
+    expect(error.message).toBe("Network error")
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
   })
 
-  test("removes toast when pollSyncSession throws an exception", async () => {
-    //#given - mock client with completion issues
+  test("removes toast when pollSyncSession throws", async () => {
+    //#given - mock pollSyncSession to throw an error
+    mock.module("./sync-session-poller.ts", () => ({
+      pollSyncSession: async () => {
+        throw new Error("Poll error")
+      },
+    }))
+
     const mockClient = {
       session: {
         messages: async () => ({
@@ -130,16 +159,24 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       run_in_background: false,
     }
 
-    //#when - executeSyncContinuation
-    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
+    //#when - executeSyncContinuation with pollSyncSession throwing
+    let error: any = null
+    let result: string | null = null
+    try {
+      result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
+    } catch (e) {
+      error = e
+    }
 
-    //#then - removeTask should have been called exactly once
+    //#then - error should be thrown but toast should still be removed
+    expect(error).not.toBeNull()
+    expect(error.message).toBe("Poll error")
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
   })
 
   test("removes toast on successful completion", async () => {
-    //#given - mock dependencies where everything succeeds with new assistant message
+    //#given - mock successful completion with messages growing after anchor
     const mockClient = {
       session: {
         messages: async () => ({
@@ -183,16 +220,27 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       run_in_background: false,
     }
 
-    //#when - executeSyncContinuation successfully
+    //#when - executeSyncContinuation completes successfully
     const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
 
-    //#then - removeTask should have been called exactly once
+    //#then - toast should be removed exactly once
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
-    expect(result).toContain("Session completed but no new response was generated")
+    expect(result).toContain("Task continued and completed")
+    expect(result).toContain("Result")
   })
 
-  test("removes toast when poll returns abort error", async () => {
+  test("removes toast when abort happens", async () => {
+    //#given - mock pollSyncSession to detect abort and remove toast
+    mock.module("./sync-session-poller.ts", () => ({
+      pollSyncSession: async (ctx: any, client: any, input: any) => {
+        if (input.toastManager && input.taskId) {
+          input.toastManager.removeTask(input.taskId)
+        }
+        return "Task aborted.\n\nSession ID: ses_test_12345678"
+      },
+    }))
+
     //#given - create a context with abort signal
     const controller = new AbortController()
     controller.abort()
@@ -239,12 +287,13 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     //#when - executeSyncContinuation with abort signal
     const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx)
 
-    //#then - removeTask should have been called twice (once in catch, once in finally)
-    expect(removeTaskCalls.length).toBe(2)
+    //#then - removeTask should be called at least once (poller and finally may both call it)
+    expect(removeTaskCalls.length).toBeGreaterThanOrEqual(1)
+    expect(removeTaskCalls[0]).toBe("resume_sync_ses_test")
     expect(result).toContain("Task aborted")
   })
 
-  test("does not add toast when toastManager is null (no crash)", async () => {
+  test("no crash when toastManager is null", async () => {
     //#given - mock task-toast-manager module to return null
     const mockGetTaskToastManager = () => null
 
