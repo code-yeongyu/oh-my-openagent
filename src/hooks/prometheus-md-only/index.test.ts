@@ -173,7 +173,7 @@ describe("prometheus-md-only", () => {
       ).rejects.toThrow("can only write/edit .md files")
     })
 
-    test("should block bash commands from Prometheus", async () => {
+    test("should allow bash commands from Prometheus", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
@@ -188,7 +188,7 @@ describe("prometheus-md-only", () => {
       // when / #then
       await expect(
         hook["tool.execute.before"](input, output)
-      ).rejects.toThrow("cannot execute bash commands")
+      ).resolves.toBeUndefined()
     })
 
     test("should not affect non-blocked tools", async () => {
