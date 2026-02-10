@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentDisplayName } from "./agent-display-names"
+import { describe, it, expect, beforeEach } from "bun:test"
+import { AGENT_DISPLAY_NAMES, getAgentDisplayName, initializeAgentDisplayNames, resetAgentDisplayNames } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -154,5 +154,78 @@ describe("AGENT_DISPLAY_NAMES", () => {
     // when checking the constant
     // then contains all expected mappings
     expect(AGENT_DISPLAY_NAMES).toEqual(expectedMappings)
+  })
+})
+
+describe("config-aware display names", () => {
+  beforeEach(() => {
+    resetAgentDisplayNames()
+  })
+
+  it("returns override when initialized with custom name", () => {
+    // given override for sisyphus
+    initializeAgentDisplayNames({ sisyphus: "Builder" })
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName("sisyphus")
+
+    // then returns custom name
+    expect(result).toBe("Builder")
+  })
+
+  it("preserves defaults for non-overridden agents", () => {
+    // given override for sisyphus only
+    initializeAgentDisplayNames({ sisyphus: "Builder" })
+
+    // when getAgentDisplayName called for atlas
+    const result = getAgentDisplayName("atlas")
+
+    // then returns default name
+    expect(result).toBe("Atlas (Plan Execution Orchestrator)")
+  })
+
+  it("handles case-insensitive override keys", () => {
+    // given override with uppercase key
+    initializeAgentDisplayNames({ Sisyphus: "Builder" })
+
+    // when getAgentDisplayName called with lowercase
+    const result = getAgentDisplayName("sisyphus")
+
+    // then returns custom name
+    expect(result).toBe("Builder")
+  })
+
+  it("allows override for unknown agents", () => {
+    // given override for custom agent
+    initializeAgentDisplayNames({ "my-agent": "My Agent" })
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName("my-agent")
+
+    // then returns custom name
+    expect(result).toBe("My Agent")
+  })
+
+  it("preserves all defaults with empty overrides", () => {
+    // given empty overrides
+    initializeAgentDisplayNames({})
+
+    // when getAgentDisplayName called for sisyphus
+    const result = getAgentDisplayName("sisyphus")
+
+    // then returns default name
+    expect(result).toBe("Sisyphus (Ultraworker)")
+  })
+
+  it("clears overrides after reset", () => {
+    // given override
+    initializeAgentDisplayNames({ sisyphus: "Builder" })
+
+    // when resetAgentDisplayNames called
+    resetAgentDisplayNames()
+
+    // then getAgentDisplayName returns default
+    const result = getAgentDisplayName("sisyphus")
+    expect(result).toBe("Sisyphus (Ultraworker)")
   })
 })
