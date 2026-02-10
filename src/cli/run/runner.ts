@@ -83,8 +83,8 @@ export async function run(options: RunOptions): Promise<number> {
       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
       abortController.abort()
-      await eventProcessor.catch(() => {})
       cleanup()
+      await eventProcessor.catch(() => {})
 
       const durationMs = Date.now() - startTime
 
