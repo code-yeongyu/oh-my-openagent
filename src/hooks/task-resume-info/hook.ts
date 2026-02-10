@@ -21,6 +21,7 @@ export function createTaskResumeInfoHook() {
     output: { title: string; output: string; metadata: unknown }
   ) => {
     if (!TARGET_TOOLS.includes(input.tool)) return
+    if (!output.output || typeof output.output !== "string") return
     if (output.output.startsWith("Error:") || output.output.startsWith("Failed")) return
     if (output.output.includes("\nto continue:")) return
 

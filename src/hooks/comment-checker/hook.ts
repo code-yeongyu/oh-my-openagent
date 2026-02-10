@@ -89,6 +89,11 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
     ): Promise<void> => {
       debugLog("tool.execute.after:", { tool: input.tool, callID: input.callID })
 
+      if (!output.output || typeof output.output !== "string") {
+        debugLog("skipping: output.output is undefined or not a string")
+        return
+      }
+
       const toolLower = input.tool.toLowerCase()
 
       // Only skip if the output indicates a tool execution failure
