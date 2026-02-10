@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, afterEach } from "bun:test"
 import { migrateAgentNames } from "./migration"
 import { getAgentDisplayName, initializeAgentDisplayNames, resetAgentDisplayNames } from "./agent-display-names"
 import { AGENT_MODEL_REQUIREMENTS } from "./model-requirements"
@@ -223,6 +223,10 @@ describe("Agent Config Integration", () => {
   })
 
   describe("Plugin initialization flow", () => {
+    afterEach(() => {
+      resetAgentDisplayNames()
+    })
+
     test("initializeAgentDisplayNames applies user overrides", () => {
       // given - user-provided display name overrides
       const userOverrides = {
@@ -239,9 +243,6 @@ describe("Agent Config Integration", () => {
 
       // then - non-overridden agents still use defaults
       expect(getAgentDisplayName("atlas")).toBe("Atlas (Plan Execution Orchestrator)")
-
-      // cleanup
-      resetAgentDisplayNames()
     })
 
     test("initializeAgentDisplayNames handles empty overrides", () => {
@@ -254,9 +255,6 @@ describe("Agent Config Integration", () => {
       // then - defaults are still used
       expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
       expect(getAgentDisplayName("atlas")).toBe("Atlas (Plan Execution Orchestrator)")
-
-      // cleanup
-      resetAgentDisplayNames()
     })
 
     test("initializeAgentDisplayNames case-insensitive override matching", () => {
@@ -273,9 +271,6 @@ describe("Agent Config Integration", () => {
       expect(getAgentDisplayName("sisyphus")).toBe("Custom Sisyphus")
       expect(getAgentDisplayName("atlas")).toBe("Custom Atlas")
       expect(getAgentDisplayName("SISYPHUS")).toBe("Custom Sisyphus")
-
-      // cleanup
-      resetAgentDisplayNames()
     })
 
     test("resetAgentDisplayNames clears overrides", () => {
