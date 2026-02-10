@@ -58,6 +58,45 @@ export async function processWithCli(
   }
 }
 
+export interface ApplyPatchEdit {
+  filePath: string
+  before: string
+  after: string
+}
+
+export async function processApplyPatchEditsWithCli(
+  sessionID: string,
+  edits: ApplyPatchEdit[],
+  output: { output: string },
+  cliPath: string,
+  customPrompt: string | undefined,
+  debugLog: (...args: unknown[]) => void,
+): Promise<void> {
+  debugLog("processing apply_patch edits:", edits.length)
+
+  for (const edit of edits) {
+    const hookInput: HookInput = {
+      session_id: sessionID,
+      tool_name: "Edit",
+      transcript_path: "",
+      cwd: process.cwd(),
+      hook_event_name: "PostToolUse",
+      tool_input: {
+        file_path: edit.filePath,
+        old_string: edit.before,
+        new_string: edit.after,
+      },
+    }
+
+    const result = await runCommentChecker(hookInput, cliPath, customPrompt)
+
+    if (result.hasComments && result.message) {
+      debugLog("CLI detected comments for apply_patch file:", edit.filePath)
+      output.output += `\n\n${result.message}`
+    }
+  }
+}
+
 export function isCliPathUsable(cliPath: string | null): cliPath is string {
   return Boolean(cliPath && existsSync(cliPath))
 }
