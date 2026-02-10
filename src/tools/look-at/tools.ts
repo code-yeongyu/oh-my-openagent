@@ -3,7 +3,8 @@ import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
-import { log, promptSyncWithModelSuggestionRetry } from "../../shared"
+import { log, promptWithModelSuggestionRetry } from "../../shared"
+import { pollSessionUntilIdle } from "./session-poller"
 import { extractLatestAssistantText } from "./assistant-message-extractor"
 import type { LookAtArgsWithAlias } from "./look-at-arguments"
 import { normalizeArgs, validateArgs } from "./look-at-arguments"
@@ -105,9 +106,9 @@ Original error: ${createResult.error}`
 
       const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
 
-      log(`[look_at] Sending prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
+      log(`[look_at] Sending async prompt with ${isBase64Input ? "base64 image" : "file"} to session ${sessionID}`)
       try {
-        await promptSyncWithModelSuggestionRetry(ctx.client, {
+        await promptWithModelSuggestionRetry(ctx.client, {
           path: { id: sessionID },
           body: {
             agent: MULTIMODAL_LOOKER_AGENT,
@@ -126,7 +127,15 @@ Original error: ${createResult.error}`
           },
         })
       } catch (promptError) {
-        log(`[look_at] Prompt error (ignored, will still fetch messages):`, promptError)
+        log(`[look_at] promptAsync error:`, promptError)
+        return `Error: Failed to send prompt to multimodal-looker agent: ${promptError instanceof Error ? promptError.message : String(promptError)}`
+      }
+
+      log(`[look_at] Polling session ${sessionID} until idle...`)
+      try {
+        await pollSessionUntilIdle(ctx.client, sessionID, { pollIntervalMs: 500, timeoutMs: 120_000 })
+      } catch (pollError) {
+        log(`[look_at] Polling error (will still try to fetch messages):`, pollError)
       }
 
       log(`[look_at] Fetching messages from session ${sessionID}...`)
