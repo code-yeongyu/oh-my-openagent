@@ -378,5 +378,7 @@ I have no affiliation with any project or model mentioned here. This is purely p
   - Making Spray - influencer marketing solution, vovushop - crossborder commerce platform, vreview - ai commerce review marketing solution
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [ELESTYLE](https://elestyle.jp)
+  - Making elepay - multi-mobile payment gateway, OneQR - mobile application SaaS for cashless solutions
 
 *Special thanks to [@junhoyeo](https://github.com/junhoyeo) for this amazing hero image.*

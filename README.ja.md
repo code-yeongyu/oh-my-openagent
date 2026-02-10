@@ -370,6 +370,8 @@ OpenCode が Debian / ArchLinux だとしたら、Oh My OpenCode は Ubuntu / [O
   - Making Spray - influencer marketing solution, vovushop - crossborder commerce platform, vreview - ai commerce review marketing solution
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
+- [ELESTYLE](https://elestyle.jp)
+  - elepay - マルチモバイル決済ゲートウェイ、OneQR - キャッシュレスソリューション向けモバイルアプリケーションSaaS
 
 ## スポンサー
 - **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
