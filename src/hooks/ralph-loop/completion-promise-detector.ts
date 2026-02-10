@@ -63,10 +63,19 @@ export async function detectCompletionInSessionMessages(
 			options.apiTimeoutMs,
 		)
 
-		const messages = (response as { data?: unknown[] }).data ?? []
-		if (!Array.isArray(messages)) return false
+		const messagesResponse: unknown = response
+		const responseData =
+			typeof messagesResponse === "object" && messagesResponse !== null && "data" in messagesResponse
+				? (messagesResponse as { data?: unknown }).data
+				: undefined
 
-		const assistantMessages = (messages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
+		const messageArray: unknown[] = Array.isArray(messagesResponse)
+			? messagesResponse
+			: Array.isArray(responseData)
+				? responseData
+				: []
+
+		const assistantMessages = (messageArray as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
 		if (assistantMessages.length === 0) return false
 
 		const pattern = buildPromisePattern(options.promise)
@@ -74,10 +83,11 @@ export async function detectCompletionInSessionMessages(
 		for (const assistant of recentAssistants) {
 			if (!assistant.parts) continue
 
-			const responseText = assistant.parts
-				.filter((p) => p.type === "text" || p.type === "reasoning")
-				.map((p) => p.text ?? "")
-				.join("\n")
+			let responseText = ""
+			for (const part of assistant.parts) {
+				if (part.type !== "text") continue
+				responseText += `${responseText ? "\n" : ""}${part.text ?? ""}`
+			}
 
 			if (pattern.test(responseText)) {
 				return true

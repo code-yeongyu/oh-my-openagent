@@ -1,3 +1,4 @@
+/// <reference types="bun-types" />
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -12,6 +13,7 @@ describe("ralph-loop", () => {
   let toastCalls: Array<{ title: string; message: string; variant: string }>
   let messagesCalls: Array<{ sessionID: string }>
   let mockSessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
+  let mockMessagesApiResponseShape: "data" | "array"
 
   function createMockPluginInput() {
     return {
@@ -33,7 +35,7 @@ describe("ralph-loop", () => {
           },
           messages: async (opts: { path: { id: string } }) => {
             messagesCalls.push({ sessionID: opts.path.id })
-            return { data: mockSessionMessages }
+            return mockMessagesApiResponseShape === "array" ? mockSessionMessages : { data: mockSessionMessages }
           },
         },
         tui: {
@@ -56,6 +58,7 @@ describe("ralph-loop", () => {
     toastCalls = []
     messagesCalls = []
     mockSessionMessages = []
+    mockMessagesApiResponseShape = "data"
 
     if (!existsSync(TEST_DIR)) {
       mkdirSync(TEST_DIR, { recursive: true })
@@ -511,7 +514,37 @@ describe("ralph-loop", () => {
       expect(messagesCalls[0].sessionID).toBe("session-123")
     })
 
-    test("should detect completion promise in reasoning part via session messages API", async () => {
+    test("should detect completion promise via session messages API when API returns array", async () => {
+      // given - active loop with assistant message containing completion promise
+      mockMessagesApiResponseShape = "array"
+      mockSessionMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "API_DONE" })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - loop completed via API detection, no continuation
+      expect(promptCalls.length).toBe(0)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(hook.getState()).toBeNull()
+
+      // then - messages API was called with correct session ID
+      expect(messagesCalls.length).toBe(1)
+      expect(messagesCalls[0].sessionID).toBe("session-123")
+    })
+
+    test("should ignore completion promise in reasoning part via session messages API", async () => {
       //#given - active loop with assistant reasoning containing completion promise
       mockSessionMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
@@ -527,6 +560,7 @@ describe("ralph-loop", () => {
       })
       hook.startLoop("session-123", "Build something", {
         completionPromise: "REASONING_DONE",
+        maxIterations: 10,
       })
 
       //#when - session goes idle
@@ -537,10 +571,13 @@ describe("ralph-loop", () => {
         },
       })
 
-      //#then - loop completed via API detection, no continuation
-      expect(promptCalls.length).toBe(0)
-      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
-      expect(hook.getState()).toBeNull()
+      //#then - completion promise in reasoning is ignored, continuation injected
+      expect(promptCalls.length).toBe(1)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(false)
+
+      const state = hook.getState()
+      expect(state).not.toBeNull()
+      expect(state?.iteration).toBe(2)
     })
 
     test("should handle multiple iterations correctly", async () => {
