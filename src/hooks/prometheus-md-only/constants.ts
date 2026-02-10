@@ -9,7 +9,7 @@ export const ALLOWED_EXTENSIONS = [".md"]
 
 export const ALLOWED_PATH_PREFIX = ".sisyphus"
 
-export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit", "bash"]
+export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
 
 export const PLANNING_CONSULT_WARNING = `
 
