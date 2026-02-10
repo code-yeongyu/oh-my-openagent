@@ -91,6 +91,12 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
 
       const toolLower = input.tool.toLowerCase()
 
+      // Guard against undefined output (e.g., MCP tools may not return output.output)
+      if (!output.output || typeof output.output !== "string") {
+        debugLog("skipping due to non-string output:", typeof output.output)
+        return
+      }
+
       // Only skip if the output indicates a tool execution failure
       const outputLower = output.output.toLowerCase()
       const isToolFailure =

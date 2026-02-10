@@ -44,6 +44,9 @@ export function createEditErrorRecoveryHook(_ctx: PluginInput) {
     ) => {
       if (input.tool.toLowerCase() !== "edit") return
 
+      // Guard against undefined output (e.g., MCP tools may not return output.output)
+      if (!output.output || typeof output.output !== "string") return
+
       const outputLower = output.output.toLowerCase()
       const hasEditError = EDIT_ERROR_PATTERNS.some((pattern) =>
         outputLower.includes(pattern.toLowerCase())
