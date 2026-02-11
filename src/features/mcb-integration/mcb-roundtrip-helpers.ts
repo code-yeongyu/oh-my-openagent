@@ -2,7 +2,11 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { callMcbTool, createDefaultArgs, parseMcbToolResponse } from "./mcb-client-helper"
 import type { McbCallToolResult, McbToolName } from "./types"
 
-const DEFAULT_AGENT_TYPE_CANDIDATES = ["claude", "assistant", "agent", "default", "ai", "bot", "system", "human"]
+const DEFAULT_AGENT_TYPE_CANDIDATES = [
+  "sisyphus", "oracle", "explore", "prometheus", "momus",
+  "librarian", "metis", "sisyphus-junior", "hephaestus",
+  "atlas", "multimodal-looker",
+]
 const READY_KEYWORDS = ["complete", "completed", "ready", "done"]
 
 type CallToolFn = (

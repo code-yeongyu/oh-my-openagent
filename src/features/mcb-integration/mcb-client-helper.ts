@@ -8,11 +8,17 @@ export interface McbTestClient {
   close: () => Promise<void>
 }
 
-export async function createMcbTestClient(timeoutMs = 10_000): Promise<McbTestClient> {
+export async function createMcbTestClient(
+  timeoutMs = 10_000,
+  configPath?: string,
+  env?: Record<string, string>,
+): Promise<McbTestClient> {
+  const serveArgs = configPath ? ["serve", "--config", configPath] : ["serve"]
   const transport = new StdioClientTransport({
     command: "mcb",
-    args: ["serve"],
+    args: serveArgs,
     stderr: "pipe",
+    ...(env ? { env: { ...env, PATH: process.env.PATH ?? "" } } : {}),
   })
 
   const client = new Client({ name: "mcb-e2e-test", version: "0.1.0" }, { capabilities: {} })
