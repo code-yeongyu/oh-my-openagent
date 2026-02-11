@@ -30,11 +30,11 @@ describe("prometheus-md-only", () => {
     } as never
   }
 
-  function setupMessageStorage(sessionID: string, agent: string): void {
+  function setupMessageStorage(sessionID: string, agent: string | undefined): void {
     testMessageDir = join(MESSAGE_STORAGE, sessionID)
     mkdirSync(testMessageDir, { recursive: true })
     const messageContent = {
-      agent,
+      ...(agent ? { agent } : {}),
       model: { providerID: "test", modelID: "test-model" },
     }
     writeFileSync(
@@ -53,6 +53,122 @@ describe("prometheus-md-only", () => {
       }
     }
     rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
+  })
+
+  describe("agent name matching", () => {
+    test("should enforce md-only restriction for exact prometheus agent name", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+
+    test("should enforce md-only restriction for Prometheus display name Plan Builder", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "Prometheus (Plan Builder)")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+
+    test("should enforce md-only restriction for Prometheus display name Planner", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "Prometheus (Planner)")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+
+    test("should enforce md-only restriction for uppercase PROMETHEUS", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "PROMETHEUS")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+
+    test("should not enforce restriction for non-Prometheus agent", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "sisyphus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).resolves.toBeUndefined()
+    })
+
+    test("should not enforce restriction when agent name is undefined", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, undefined)
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).resolves.toBeUndefined()
+    })
   })
 
    describe("with Prometheus agent in message storage", () => {
