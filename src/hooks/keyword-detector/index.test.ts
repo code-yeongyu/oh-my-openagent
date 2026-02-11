@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
-import { createKeywordDetectorHook } from "./index"
+import { createKeywordDetectorHook, createKeywordDetectors } from "./index"
 import { setMainSession, updateSessionAgent, clearSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
@@ -744,5 +744,175 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(textPart).toBeDefined()
     expect(textPart!.text).toBe("ultrawork plan this")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+  })
+})
+
+describe("createKeywordDetectors factory", () => {
+  test("should include default aliases when called with no args", () => {
+    //#given - no extra aliases
+    const detectors = createKeywordDetectors()
+
+    //#when - testing the ultrawork pattern (first detector)
+    const ultraworkPattern = detectors[0].pattern
+
+    //#then - should match built-in aliases
+    expect(ultraworkPattern.test("ultrawork")).toBe(true)
+    expect(ultraworkPattern.test("ulw")).toBe(true)
+    expect(ultraworkPattern.test("lfg")).toBe(false)
+  })
+
+  test("should include custom aliases alongside defaults", () => {
+    //#given - extra alias "lfg"
+    const detectors = createKeywordDetectors(["lfg"])
+
+    //#when - testing the ultrawork pattern
+    const ultraworkPattern = detectors[0].pattern
+
+    //#then - should match both built-in and custom aliases
+    expect(ultraworkPattern.test("ultrawork")).toBe(true)
+    expect(ultraworkPattern.test("ulw")).toBe(true)
+    expect(ultraworkPattern.test("lfg")).toBe(true)
+  })
+
+  test("should respect word boundaries for custom aliases", () => {
+    //#given - extra alias "lfg"
+    const detectors = createKeywordDetectors(["lfg"])
+    const ultraworkPattern = detectors[0].pattern
+
+    //#when - testing partial matches
+    //#then - should NOT match substrings
+    expect(ultraworkPattern.test("lfg do this")).toBe(true)
+    expect(ultraworkPattern.test("configuring stuff")).toBe(false)
+  })
+
+  test("should escape regex special characters in custom aliases", () => {
+    //#given - alias with regex special chars
+    const detectors = createKeywordDetectors(["go+go"])
+
+    //#when - testing the pattern
+    const ultraworkPattern = detectors[0].pattern
+
+    //#then - should match literal "go+go", not regex "go+go"
+    expect(ultraworkPattern.test("go+go")).toBe(true)
+    expect(ultraworkPattern.test("gooogo")).toBe(false)
+  })
+
+  test("should return all three detector types", () => {
+    //#given - factory called with custom aliases
+    const detectors = createKeywordDetectors(["lfg"])
+
+    //#then - should have ultrawork, search, and analyze detectors
+    expect(detectors).toHaveLength(3)
+  })
+})
+
+describe("keyword-detector custom aliases integration", () => {
+  let logSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    _resetForTesting()
+    logSpy = spyOn(sharedModule, "log").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    logSpy?.mockRestore()
+    _resetForTesting()
+  })
+
+  function createMockPluginInput(options: { toastCalls?: string[] } = {}) {
+    const toastCalls = options.toastCalls ?? []
+    return {
+      client: {
+        tui: {
+          showToast: async (opts: any) => {
+            toastCalls.push(opts.body.title)
+          },
+        },
+      },
+    } as any
+  }
+
+  test("should trigger ultrawork mode with custom alias 'lfg'", async () => {
+    //#given - hook configured with extra alias "lfg"
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput({ toastCalls }),
+      undefined,
+      { extra_ultrawork_aliases: ["lfg"] },
+    )
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "lfg ship this feature" }],
+    }
+
+    //#when - message with custom alias is processed
+    await hook["chat.message"]({ sessionID: "test-session" }, output)
+
+    //#then - ultrawork mode should activate
+    expect(output.message.variant).toBe("max")
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+  })
+
+  test("should NOT trigger ultrawork on partial match of custom alias", async () => {
+    //#given - hook with alias "lfg"
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput({ toastCalls }),
+      undefined,
+      { extra_ultrawork_aliases: ["lfg"] },
+    )
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "configuring the deployment" }],
+    }
+
+    //#when - message with partial match is processed
+    await hook["chat.message"]({ sessionID: "test-session" }, output)
+
+    //#then - ultrawork mode should NOT activate
+    expect(output.message.variant).toBeUndefined()
+    expect(toastCalls).not.toContain("Ultrawork Mode Activated")
+  })
+
+  test("should still trigger on built-in aliases when custom aliases are configured", async () => {
+    //#given - hook with custom alias, but using built-in "ulw"
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput({ toastCalls }),
+      undefined,
+      { extra_ultrawork_aliases: ["lfg"] },
+    )
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ulw do this task" }],
+    }
+
+    //#when - message with built-in alias is processed
+    await hook["chat.message"]({ sessionID: "test-session" }, output)
+
+    //#then - ultrawork mode should activate via built-in alias
+    expect(output.message.variant).toBe("max")
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
+  })
+
+  test("should work without config (backward compatible)", async () => {
+    //#given - hook with no config (original behavior)
+    const toastCalls: string[] = []
+    const hook = createKeywordDetectorHook(
+      createMockPluginInput({ toastCalls }),
+    )
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork implement this" }],
+    }
+
+    //#when - message with built-in alias is processed
+    await hook["chat.message"]({ sessionID: "test-session" }, output)
+
+    //#then - ultrawork mode should still work
+    expect(output.message.variant).toBe("max")
+    expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 })
