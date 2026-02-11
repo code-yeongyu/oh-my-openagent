@@ -99,24 +99,33 @@ describe.skipIf(!mcbAvailable)("mcb session roundtrip with DB verification", () 
   }, 20_000)
 
   //#given a memory store observation call with required project_id
-  //#when the MCP operation completes (known MCB bug: returns "internal error")
-  //#then observations table should still be queried to verify persistence state
+  //#when the MCP operation completes and DB is queried
+  //#then observations table has a row matching our content, type, and project_id
   test("memory store observation persists to observations table", async () => {
-    await callMcbTool(testClient.client, "memory", {
+    const storeResult = await callMcbTool(testClient.client, "memory", {
       ...createDefaultArgs("memory"),
       action: "store",
       resource: "observation",
       project_id: "test-project",
       data: { content: "e2e-memory-test", observation_type: "code", project_id: "test-project" },
     })
+    const storePayload = parseMcbToolResponse(storeResult)
+    const storeText = typeof storePayload === "string" ? storePayload : JSON.stringify(storePayload)
+    expect(storeText).toContain("observation_id")
 
     const db = new Database(dbPath, { readonly: true })
     try {
       const hasTable = db.query("SELECT 1 FROM sqlite_master WHERE type='table' AND name='observations'").get()
       expect(hasTable).toBeTruthy()
 
-      const rows = db.query("SELECT * FROM observations").all()
+      const rows = db.query("SELECT * FROM observations WHERE project_id = ? AND content = ?").all(
+        "test-project",
+        "e2e-memory-test",
+      ) as Record<string, unknown>[]
       expect(rows.length).toBeGreaterThan(0)
+      expect(rows[0]!.observation_type).toBe("code")
+      expect(rows[0]!.project_id).toBe("test-project")
+      expect(rows[0]!.content).toBe("e2e-memory-test")
     } finally {
       db.close()
     }
