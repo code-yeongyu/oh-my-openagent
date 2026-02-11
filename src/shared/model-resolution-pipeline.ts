@@ -102,7 +102,7 @@ export function resolveModelPipeline(
   const userFallbackModels = intent?.userFallbackModels
   if (userFallbackModels && userFallbackModels.length > 0) {
     if (availableModels.size === 0) {
-      const connectedProviders = readConnectedProvidersCache()
+      const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       const connectedSet = connectedProviders ? new Set(connectedProviders) : null
 
       if (connectedSet !== null) {
