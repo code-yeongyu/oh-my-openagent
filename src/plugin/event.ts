@@ -7,7 +7,7 @@ import {
   setMainSession,
   updateSessionAgent,
 } from "../features/claude-code-session-state"
-import { resetMessageCursor } from "../shared"
+import { log, resetMessageCursor } from "../shared"
 import { lspManager } from "../tools"
 
 import type { CreatedHooks } from "../create-hooks"
@@ -28,6 +28,9 @@ export function createEventHandler(args: {
   const { ctx, firstMessageVariantGate, managers, hooks } = args
 
   return async (input): Promise<void> => {
+    const { event } = input
+    const props = event.properties as Record<string, unknown> | undefined
+
     await Promise.resolve(hooks.autoUpdateChecker?.event?.(input))
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input))
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input))
@@ -46,10 +49,8 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.ralphLoop?.event?.(input))
     await Promise.resolve(hooks.stopContinuationGuard?.event?.(input))
     await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input))
+    await Promise.resolve(hooks.runtimeFallback?.event?.(input))
     await Promise.resolve(hooks.atlasHook?.handler?.(input))
-
-    const { event } = input
-    const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.created") {
       const sessionInfo = props?.info as

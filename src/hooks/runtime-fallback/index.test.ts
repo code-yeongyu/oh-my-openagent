@@ -23,7 +23,12 @@ describe("runtime-fallback", () => {
     logSpy?.mockRestore()
   })
 
-  function createMockPluginInput() {
+  function createMockPluginInput(overrides?: {
+    session?: {
+      messages?: (args: unknown) => Promise<unknown>
+      promptAsync?: (args: unknown) => Promise<unknown>
+    }
+  }) {
     return {
       client: {
         tui: {
@@ -34,6 +39,10 @@ describe("runtime-fallback", () => {
               variant: opts.body.variant,
             })
           },
+        },
+        session: {
+          messages: overrides?.session?.messages ?? (async () => ({ data: [] })),
+          promptAsync: overrides?.session?.promptAsync ?? (async () => ({})),
         },
       },
       directory: "/test/dir",
@@ -174,7 +183,10 @@ describe("runtime-fallback", () => {
     })
 
     test("should log when no fallback models configured", async () => {
-      const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig(),
+        pluginConfig: {},
+      })
       const sessionID = "test-session-no-fallbacks"
 
       await hook.event({
@@ -487,7 +499,7 @@ describe("runtime-fallback", () => {
 
       const output = { message: {}, parts: [] }
       await hook["chat.message"]?.(
-        { sessionID, model: { providerID: "anthropic", modelID: "claude-opus-4-5" } },
+        { sessionID },
         output
       )
 
@@ -587,6 +599,50 @@ describe("runtime-fallback", () => {
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
       expect(fallbackLog).toBeDefined()
       expect(fallbackLog?.data).toMatchObject({ to: "openai/gpt-5.2" })
+    })
+
+    test("should preserve resolved agent during auto-retry", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "test" }],
+                },
+              ],
+            }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithAgentFallback("prometheus", ["github-copilot/claude-opus-4.6"]),
+        },
+      )
+      const sessionID = "test-preserve-agent-on-retry"
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            model: "anthropic/claude-opus-4-6",
+            error: { statusCode: 503, message: "Service unavailable" },
+            agent: "prometheus",
+          },
+        },
+      })
+
+      expect(promptCalls.length).toBe(1)
+      const callBody = promptCalls[0]?.body as Record<string, unknown>
+      expect(callBody?.agent).toBe("prometheus")
+      expect(callBody?.model).toEqual({ providerID: "github-copilot", modelID: "claude-opus-4.6" })
     })
   })
 
