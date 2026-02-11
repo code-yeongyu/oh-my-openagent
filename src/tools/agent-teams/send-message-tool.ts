@@ -168,28 +168,26 @@ export function createSendMessageTool(manager: BackgroundManager): ToolDefinitio
           return JSON.stringify({ error: "plan_response_recipient_not_found" })
         }
 
+        const targetMember = getTeamMember(config, input.recipient)
+
         if (input.approve) {
           sendStructuredInboxMessage(
             input.team_name,
             sender,
             input.recipient,
-            {
-              type: "plan_approval",
-              approved: true,
-              requestId: input.request_id,
-            },
+            { type: "plan_approval", approved: true, requestId: input.request_id },
             "plan_approved",
           )
+          if (targetMember && isTeammateMember(targetMember)) {
+            await resumeTeammateWithMessage(manager, context, input.team_name, targetMember, "plan_approved", input.content ?? "Plan approved")
+          }
           return JSON.stringify({ success: true, message: `plan_approved:${input.recipient}` })
         }
 
-        sendPlainInboxMessage(
-          input.team_name,
-          sender,
-          input.recipient,
-          input.content ?? "Plan rejected",
-          "plan_rejected",
-        )
+        sendPlainInboxMessage(input.team_name, sender, input.recipient, input.content ?? "Plan rejected", "plan_rejected")
+        if (targetMember && isTeammateMember(targetMember)) {
+          await resumeTeammateWithMessage(manager, context, input.team_name, targetMember, "plan_rejected", input.content ?? "Plan rejected")
+        }
         return JSON.stringify({ success: true, message: `plan_rejected:${input.recipient}` })
       } catch (error) {
         return JSON.stringify({ error: error instanceof Error ? error.message : "send_message_failed" })

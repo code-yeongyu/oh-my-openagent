@@ -39,4 +39,4 @@ oauth-success.html
 # Runtime data
 .arbor/
 .oc-state/
-mcb.*
+/mcb.*
