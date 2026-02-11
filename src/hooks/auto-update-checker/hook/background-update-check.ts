@@ -56,13 +56,9 @@ export async function runBackgroundUpdateCheck(
   }
 
   if (pluginInfo.isPinned) {
-    const updated = updatePinnedVersion(pluginInfo.configPath, pluginInfo.entry, latestVersion)
-    if (!updated) {
-      await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
-      log("[auto-update-checker] Failed to update pinned version in config")
-      return
-    }
-    log(`[auto-update-checker] Config updated: ${pluginInfo.entry} → ${PACKAGE_NAME}@${latestVersion}`)
+    await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+    log(`[auto-update-checker] User-pinned version detected (${pluginInfo.entry}), skipping auto-update. Notification only.`)
+    return
   }
 
   invalidatePackage(PACKAGE_NAME)
