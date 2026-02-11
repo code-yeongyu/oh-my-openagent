@@ -2,10 +2,9 @@ import * as fs from "node:fs"
 import { log } from "../../../shared/logger"
 import { PACKAGE_NAME } from "../constants"
 
-export function updatePinnedVersion(configPath: string, oldEntry: string, newVersion: string): boolean {
+function replacePluginEntry(configPath: string, oldEntry: string, newEntry: string): boolean {
   try {
     const content = fs.readFileSync(configPath, "utf-8")
-    const newEntry = `${PACKAGE_NAME}@${newVersion}`
 
     const pluginMatch = content.match(/"plugin"\s*:\s*\[/)
     if (!pluginMatch || pluginMatch.index === undefined) {
@@ -50,4 +49,14 @@ export function updatePinnedVersion(configPath: string, oldEntry: string, newVer
     log(`[auto-update-checker] Failed to update config file ${configPath}:`, err)
     return false
   }
+}
+
+export function updatePinnedVersion(configPath: string, oldEntry: string, newVersion: string): boolean {
+  const newEntry = `${PACKAGE_NAME}@${newVersion}`
+  return replacePluginEntry(configPath, oldEntry, newEntry)
+}
+
+export function revertPinnedVersion(configPath: string, failedVersion: string, originalEntry: string): boolean {
+  const failedEntry = `${PACKAGE_NAME}@${failedVersion}`
+  return replacePluginEntry(configPath, failedEntry, originalEntry)
 }
