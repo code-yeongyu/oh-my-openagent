@@ -37,6 +37,8 @@ export const AgentOverrideConfigSchema = z.object({
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   /** Provider-specific options. Passed directly to OpenCode SDK. */
   providerOptions: z.record(z.string(), z.unknown()).optional(),
+  /** Model candidates for fallback selection. */
+  model_candidates: z.array(z.string()).optional(),
 })
 
 export const AgentOverridesSchema = z.object({
