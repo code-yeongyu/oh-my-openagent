@@ -39,7 +39,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const modelCacheState = createModelCacheState()
 
-
+  const managers = createManagers({
+    ctx,
     pluginConfig,
     tmuxConfig,
     modelCacheState,
