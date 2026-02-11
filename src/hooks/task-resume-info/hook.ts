@@ -21,14 +21,15 @@ export function createTaskResumeInfoHook() {
     output: { title: string; output: string; metadata: unknown }
   ) => {
     if (!TARGET_TOOLS.includes(input.tool)) return
-    if (output.output.startsWith("Error:") || output.output.startsWith("Failed")) return
-    if (output.output.includes("\nto continue:")) return
+    const outputText = output.output ?? ""
+    if (outputText.startsWith("Error:") || outputText.startsWith("Failed")) return
+    if (outputText.includes("\nto continue:")) return
 
-    const sessionId = extractSessionId(output.output)
+    const sessionId = extractSessionId(outputText)
     if (!sessionId) return
 
     output.output =
-      output.output.trimEnd() +
+      outputText.trimEnd() +
       `\n\nto continue: task(session_id="${sessionId}", prompt="...")`
   }
 

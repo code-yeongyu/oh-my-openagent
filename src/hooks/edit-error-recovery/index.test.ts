@@ -102,6 +102,23 @@ describe("createEditErrorRecoveryHook", () => {
       })
     })
 
+    describe("#given MCP tool with undefined output.output", () => {
+      describe("#when output.output is undefined", () => {
+        it("#then should not crash", async () => {
+          const input = createInput("Edit")
+          const output = {
+            title: "Edit",
+            output: undefined as unknown as string,
+            metadata: {},
+          }
+
+          await hook["tool.execute.after"](input, output)
+
+          expect(output.output).toBeUndefined()
+        })
+      })
+    })
+
     describe("#given case insensitive tool name", () => {
       describe("#when tool is 'edit' lowercase", () => {
         it("#then should still detect and append reminder", async () => {
