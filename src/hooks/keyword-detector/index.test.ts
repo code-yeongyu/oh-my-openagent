@@ -797,6 +797,32 @@ describe("createKeywordDetectors factory", () => {
     expect(ultraworkPattern.test("gooogo")).toBe(false)
   })
 
+  test("should filter out empty and whitespace-only aliases", () => {
+    //#given - aliases containing empty strings and whitespace
+    const detectors = createKeywordDetectors(["", "  ", "lfg", ""])
+
+    //#when - testing the ultrawork pattern
+    const ultraworkPattern = detectors[0].pattern
+
+    //#then - should match valid aliases but not produce overly broad regex
+    expect(ultraworkPattern.test("ultrawork")).toBe(true)
+    expect(ultraworkPattern.test("ulw")).toBe(true)
+    expect(ultraworkPattern.test("lfg")).toBe(true)
+    expect(ultraworkPattern.test("hello")).toBe(false)
+    expect(ultraworkPattern.test("some random text")).toBe(false)
+  })
+
+  test("should trim whitespace from aliases", () => {
+    //#given - alias with surrounding whitespace
+    const detectors = createKeywordDetectors(["  lfg  "])
+
+    //#when - testing the ultrawork pattern
+    const ultraworkPattern = detectors[0].pattern
+
+    //#then - should match trimmed alias
+    expect(ultraworkPattern.test("lfg")).toBe(true)
+  })
+
   test("should return all three detector types", () => {
     //#given - factory called with custom aliases
     const detectors = createKeywordDetectors(["lfg"])

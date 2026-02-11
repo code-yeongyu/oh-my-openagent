@@ -37,7 +37,13 @@ export const KEYWORD_DETECTORS: KeywordDetector[] = [
 
 export function createKeywordDetectors(extraUltraworkAliases?: string[]): KeywordDetector[] {
   const allAliases = extraUltraworkAliases
-    ? [...DEFAULT_ULTRAWORK_ALIASES, ...extraUltraworkAliases.map(escapeRegExp)]
+    ? [
+        ...DEFAULT_ULTRAWORK_ALIASES,
+        ...extraUltraworkAliases
+          .map((a) => a.trim())
+          .filter((a) => a.length > 0)
+          .map(escapeRegExp),
+      ]
     : DEFAULT_ULTRAWORK_ALIASES
   const ultraworkPattern = new RegExp(`\\b(${allAliases.join("|")})\\b`, "i")
 
