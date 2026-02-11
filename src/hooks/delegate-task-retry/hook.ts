@@ -12,11 +12,11 @@ export function createDelegateTaskRetryHook(_ctx: PluginInput) {
     ) => {
       if (input.tool.toLowerCase() !== "task") return
 
-       const errorInfo = detectDelegateTaskError(output.output ?? "")
-       if (errorInfo) {
-         const guidance = buildRetryGuidance(errorInfo)
-         appendToOutput(output, `\n${guidance}`)
-       }
+      const errorInfo = detectDelegateTaskError(output.output ?? "")
+      if (errorInfo) {
+        const guidance = buildRetryGuidance(errorInfo)
+        appendToOutput(output, `\n${guidance}`)
+      }
     },
   }
 }

@@ -50,9 +50,9 @@ export function createEditErrorRecoveryHook(_ctx: PluginInput) {
         outputLower.includes(pattern.toLowerCase())
       )
 
-       if (hasEditError) {
-         appendToOutput(output, `\n${EDIT_ERROR_REMINDER}`)
-       }
+      if (hasEditError) {
+        appendToOutput(output, `\n${EDIT_ERROR_REMINDER}`)
+      }
     },
   }
 }

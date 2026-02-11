@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { createInteractiveBashSessionTracker } from "./interactive-bash-session-tracker";
 import { parseTmuxCommand } from "./tmux-command-parser";
+import { appendToOutput } from "../hook-output-guard";
 
 interface ToolExecuteInput {
   tool: string;
@@ -57,7 +58,7 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
       toolOutput,
     })
     if (reminderToAppend) {
-      output.output += reminderToAppend
+      appendToOutput(output, reminderToAppend)
     }
   };
 

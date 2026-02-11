@@ -97,9 +97,9 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
       const reminder = buildSessionReminderMessage(
         Array.from(state.tmuxSessions),
       );
-       if (reminder) {
-         appendToOutput(output, reminder);
-       }
+      if (reminder) {
+        appendToOutput(output, reminder);
+      }
     }
   };
 

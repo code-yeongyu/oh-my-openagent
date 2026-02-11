@@ -51,10 +51,10 @@ export async function processWithCli(
 
   const result = await runCommentChecker(hookInput, cliPath, customPrompt)
 
-   if (result.hasComments && result.message) {
-     debugLog("CLI detected comments, appending message")
-     appendToOutput(output, `\n\n${result.message}`)
-   } else {
+  if (result.hasComments && result.message) {
+    debugLog("CLI detected comments, appending message")
+    appendToOutput(output, `\n\n${result.message}`)
+  } else {
     debugLog("CLI: no comments detected")
   }
 }
@@ -91,10 +91,10 @@ export async function processApplyPatchEditsWithCli(
 
     const result = await runCommentChecker(hookInput, cliPath, customPrompt)
 
-     if (result.hasComments && result.message) {
-       debugLog("CLI detected comments for apply_patch file:", edit.filePath)
-       appendToOutput(output, `\n\n${result.message}`)
-     }
+    if (result.hasComments && result.message) {
+      debugLog("CLI detected comments for apply_patch file:", edit.filePath)
+      appendToOutput(output, `\n\n${result.message}`)
+    }
   }
 }
 
