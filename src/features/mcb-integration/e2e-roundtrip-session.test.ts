@@ -28,7 +28,7 @@ describe.skipIf(!mcbAvailable)("mcb session roundtrip with DB verification", () 
     for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true })
   })
 
-  //#given a session create call with agent_type "sisyphus" (known valid from MCB Rust enum)
+  //#given a session create call with all required fields per MCB create.rs
   //#when the MCP operation completes and we query the SQLite DB directly
   //#then agent_sessions table should contain the persisted row
   test("session create persists to agent_sessions table", async () => {
@@ -36,11 +36,14 @@ describe.skipIf(!mcbAvailable)("mcb session roundtrip with DB verification", () 
       ...createDefaultArgs("session"),
       action: "create",
       agent_type: "sisyphus",
-      data: { name: "e2e-session-test" },
+      data: { name: "e2e-session-test", session_summary_id: `e2e-summary-${Date.now()}`, model: "test-model" },
     })
+
+    expect(result.isError).toBe(false)
 
     const parsed = parseMcbToolResponse(result)
     const sessionId = extractSessionId(parsed)
+    expect(sessionId).not.toBeNull()
 
     expect(existsSync(dbPath)).toBe(true)
     const db = new Database(dbPath, { readonly: true })
@@ -70,7 +73,7 @@ describe.skipIf(!mcbAvailable)("mcb session roundtrip with DB verification", () 
       ...createDefaultArgs("session"),
       action: "create",
       agent_type: "explore",
-      data: { name: "e2e-get-test" },
+      data: { name: "e2e-get-test", session_summary_id: `e2e-summary-${Date.now()}`, model: "test-model" },
     })
     const sessionId = extractSessionId(parseMcbToolResponse(createResult))
 

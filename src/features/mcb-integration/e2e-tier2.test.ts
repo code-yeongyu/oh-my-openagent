@@ -14,10 +14,10 @@ describe.skipIf(!mcbAvailable)("mcb-integration: e2e tier2 core tool invocation"
     await testClient.close()
   })
 
-  //#given a real mcb memory tool call
+  //#given a memory store call without project_id
   //#when store is requested for observation resource
-  //#then known mcb bug is surfaced as tool-level error shape
-  test("memory store returns tool-level error shape for current mcb behavior", async () => {
+  //#then mcb returns a validation error requiring project_id
+  test("memory store without project_id returns validation error", async () => {
     const args = {
       ...createDefaultArgs("memory"),
       action: "store",
@@ -29,7 +29,7 @@ describe.skipIf(!mcbAvailable)("mcb-integration: e2e tier2 core tool invocation"
     expect(result.content.length).toBeGreaterThan(0)
     expect(result.content[0]?.type).toBe("text")
     expect(result.isError).toBe(true)
-    expect(result.content[0]?.text).toContain("internal error")
+    expect(result.content[0]?.text).toContain("Project ID")
   }, 10_000)
 
   //#given memory list call with empty query
@@ -83,15 +83,15 @@ describe.skipIf(!mcbAvailable)("mcb-integration: e2e tier2 core tool invocation"
     expect(typeof (parsed as { text?: unknown }).text).toBe("string")
   }, 10_000)
 
-  //#given validate tool invocation
-  //#when list_rules action is called
-  //#then mcb returns text content payload with consistent shape
-  test("validate list_rules returns consistent payload shape", async () => {
+  //#given validate tool invocation with list_rules
+  //#when called without domain_crate config
+  //#then mcb returns config error (known bug: list_rules should not need project config)
+  test("validate list_rules returns config error without domain_crate", async () => {
     const result = await callMcbTool(testClient.client, "validate", createDefaultArgs("validate"))
     expect(result.content.length).toBeGreaterThan(0)
     expect(result.content[0]?.type).toBe("text")
     expect(result.isError).toBe(true)
-    expect(result.content[0]?.text).toContain("internal error")
+    expect(result.content[0]?.text).toContain("domain_crate")
   }, 10_000)
 
   //#given index tool invocation
