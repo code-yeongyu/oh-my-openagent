@@ -32,7 +32,10 @@ export function resolveCategoryConfig(
   const userConfig = userCategories?.[categoryName]
   const hasExplicitUserConfig = userConfig !== undefined
 
-  // Check if category requires a specific model - bypass if user explicitly provides config
+  if (userConfig?.disable) {
+    return null
+  }
+
   const categoryReq = CATEGORY_MODEL_REQUIREMENTS[categoryName]
   if (categoryReq?.requiresModel && availableModels && !hasExplicitUserConfig) {
     if (!isModelAvailable(categoryReq.requiresModel, availableModels)) {

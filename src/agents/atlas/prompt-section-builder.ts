@@ -7,7 +7,8 @@
 
 import type { CategoryConfig } from "../../config/schema"
 import { formatCustomSkillsBlock, type AvailableAgent, type AvailableSkill } from "../dynamic-agent-prompt-builder"
-import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../../tools/delegate-task/constants"
+import { CATEGORY_DESCRIPTIONS } from "../../tools/delegate-task/constants"
+import { mergeCategories } from "../../shared/merge-categories"
 import { truncateDescription } from "../../shared/truncate-description"
 
 export const getCategoryDescription = (name: string, userCategories?: Record<string, CategoryConfig>) =>
@@ -33,7 +34,7 @@ ${rows.join("\n")}`
 }
 
 export function buildCategorySection(userCategories?: Record<string, CategoryConfig>): string {
-  const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
+  const allCategories = mergeCategories(userCategories)
   const categoryRows = Object.entries(allCategories).map(([name, config]) => {
     const temp = config.temperature ?? 0.5
     return `| \`${name}\` | ${temp} | ${getCategoryDescription(name, userCategories)} |`
@@ -116,7 +117,7 @@ task(category="[category]", load_skills=["skill-1", "skill-2"], run_in_backgroun
 }
 
 export function buildDecisionMatrix(agents: AvailableAgent[], userCategories?: Record<string, CategoryConfig>): string {
-  const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
+  const allCategories = mergeCategories(userCategories)
 
   const categoryRows = Object.entries(allCategories).map(([name]) =>
     `| ${getCategoryDescription(name, userCategories)} | \`category="${name}", load_skills=[...]\` |`
