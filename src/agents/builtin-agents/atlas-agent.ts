@@ -52,6 +52,7 @@ export function maybeCreateAtlasConfig(input: {
     availableAgents,
     availableSkills,
     userCategories,
+    agentName: "atlas",
   })
 
   if (atlasResolvedVariant) {

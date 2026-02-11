@@ -1,0 +1,722 @@
+bun test v1.3.9 (cf6cdbbb)
+
+script/build-binaries.test.ts:
+🔨 Building oh-my-opencode platform binaries
+   Entry point: src/cli/index.ts
+   Platforms: 11
+
+📦 Building macOS ARM64...
+   Target: bun-darwin-arm64
+   Output: packages/darwin-arm64/bin/oh-my-opencode
+   [6ms]  minify  -0.76 MB (estimate)
+  [89ms]  bundle  316 modules
+ [260ms] compile  packages/darwin-arm64/bin/oh-my-opencode bun-darwin-aarch64-v1.3.9
+
+src/hooks/session-notification.test.ts:
+   ✓ packages/darwin-arm64/bin/oh-my-opencode: Mach-O 64-bit arm64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|BINDS_TO_WEAK|PIE|HAS_TLV_DESCRIPTORS>
+
+📦 Building macOS x64...
+   Target: bun-darwin-x64
+   Output: packages/darwin-x64/bin/oh-my-opencode
+  [14ms]  minify  -0.76 MB (estimate)
+ [103ms]  bundle  316 modules
+ [141ms] compile  packages/darwin-x64/bin/oh-my-opencode bun-darwin-x64-v1.3.9
+   ✓ packages/darwin-x64/bin/oh-my-opencode: Mach-O 64-bit x86_64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|BINDS_TO_WEAK|PIE|HAS_TLV_DESCRIPTORS>
+
+📦 Building macOS x64 (no AVX2)...
+   Target: bun-darwin-x64-baseline
+   Output: packages/darwin-x64-baseline/bin/oh-my-opencode
+  [10ms]  minify  -0.76 MB (estimate)
+  [96ms]  bundle  316 modules
+ [130ms] compile  packages/darwin-x64-baseline/bin/oh-my-opencode bun-darwin-x64-baseline-v1.3.9
+
+src/agents/dynamic-agent-prompt-builder.test.ts:
+   ✓ packages/darwin-x64-baseline/bin/oh-my-opencode: Mach-O 64-bit x86_64 executable, flags:<NOUNDEFS|DYLDLINK|TWOLEVEL|BINDS_TO_WEAK|PIE|HAS_TLV_DESCRIPTORS>
+
+📦 Building Linux x64 (glibc)...
+   Target: bun-linux-x64
+   Output: packages/linux-x64/bin/oh-my-opencode
+  [15ms]  minify  -15.67 MB (estimate)
+  [92ms]  bundle  318 modules
+ [111ms] compile  packages/linux-x64/bin/oh-my-opencode
+
+src/plugin/event.test.ts:
+   ✓ packages/linux-x64/bin/oh-my-opencode: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=db04d9fbd1eaf9f5deaf68dde4e71e03ac240201, not stripped
+
+📦 Building Linux x64 (glibc, no AVX2)...
+   Target: bun-linux-x64-baseline
+   Output: packages/linux-x64-baseline/bin/oh-my-opencode
+  [13ms]  minify  -15.67 MB (estimate)
+  [88ms]  bundle  318 modules
+  [38ms] compile  packages/linux-x64-baseline/bin/oh-my-opencode bun-linux-x64-baseline-v1.3.9
+   ✓ packages/linux-x64-baseline/bin/oh-my-opencode: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=320abce7c606bf1eb1b0e8252a71de87f146b170, not stripped
+
+📦 Building Linux ARM64 (glibc)...
+   Target: bun-linux-arm64
+   Output: packages/linux-arm64/bin/oh-my-opencode
+   [6ms]  minify  -0.76 MB (estimate)
+  [89ms]  bundle  316 modules
+  [32ms] compile  packages/linux-arm64/bin/oh-my-opencode bun-linux-aarch64-v1.3.9
+   ✓ packages/linux-arm64/bin/oh-my-opencode: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 3.7.0, BuildID[sha1]=11c4ef3be017497488463327d9f186036cd2bebd, not stripped
+
+📦 Building Linux x64 (musl)...
+   Target: bun-linux-x64-musl
+   Output: packages/linux-x64-musl/bin/oh-my-opencode
+  [14ms]  minify  -15.67 MB (estimate)
+  [88ms]  bundle  318 modules
+  [37ms] compile  packages/linux-x64-musl/bin/oh-my-opencode bun-linux-x64-musl-v1.3.9
+   ✓ packages/linux-x64-musl/bin/oh-my-opencode: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-x86_64.so.1, BuildID[sha1]=f56141b6441f47af99ad55f15294d0579ae45f48, not stripped
+
+📦 Building Linux x64 (musl, no AVX2)...
+   Target: bun-linux-x64-musl-baseline
+   Output: packages/linux-x64-musl-baseline/bin/oh-my-opencode
+  [12ms]  minify  -15.67 MB (estimate)
+  [88ms]  bundle  318 modules
+  [49ms] compile  packages/linux-x64-musl-baseline/bin/oh-my-opencode bun-linux-x64-musl-baseline-v1.3.9
+   ✓ packages/linux-x64-musl-baseline/bin/oh-my-opencode: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-x86_64.so.1, BuildID[sha1]=4d4a1a315527b0d814d6c38f55f99b9f59634f60, not stripped
+
+📦 Building Linux ARM64 (musl)...
+   Target: bun-linux-arm64-musl
+   Output: packages/linux-arm64-musl/bin/oh-my-opencode
+   [7ms]  minify  -0.76 MB (estimate)
+  [87ms]  bundle  316 modules
+  [63ms] compile  packages/linux-arm64-musl/bin/oh-my-opencode bun-linux-aarch64-musl-v1.3.9
+   ✓ packages/linux-arm64-musl/bin/oh-my-opencode: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-aarch64.so.1, BuildID[sha1]=ece8722580c5fa25d527b2acf719e76469775e94, not stripped
+
+📦 Building Windows x64...
+   Target: bun-windows-x64
+   Output: packages/windows-x64/bin/oh-my-opencode.exe
+   [7ms]  minify  -0.76 MB (estimate)
+  [87ms]  bundle  316 modules
+ [276ms] compile  packages/windows-x64/bin/oh-my-opencode.exe bun-windows-x64-v1.3.9
+   ✓ packages/windows-x64/bin/oh-my-opencode.exe: PE32+ executable (console) x86-64, for MS Windows, 12 sections
+
+📦 Building Windows x64 (no AVX2)...
+   Target: bun-windows-x64-baseline
+   Output: packages/windows-x64-baseline/bin/oh-my-opencode.exe
+   [7ms]  minify  -0.76 MB (estimate)
+  [87ms]  bundle  316 modules
+
+src/shared/model-resolver.test.ts:
+128 | 
+129 |       // when
+130 |       const result = resolveModelWithFallback(input)
+131 | 
+132 |       // then
+133 |       expect(result!.model).toBe("opencode/glm-4.7-free")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "opencode/glm-4.7-free"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:133:29)
+(fail) resolveModelWithFallback > Step 1: UI Selection (highest priority) > returns uiSelectedModel with override source when provided
+146 | 
+147 |       // when
+148 |       const result = resolveModelWithFallback(input)
+149 | 
+150 |       // then
+151 |       expect(result!.model).toBe("opencode/glm-4.7-free")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "opencode/glm-4.7-free"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:151:29)
+(fail) resolveModelWithFallback > Step 1: UI Selection (highest priority) > UI selection takes priority over config override
+164 |       // when
+165 |       const result = resolveModelWithFallback(input)
+166 | 
+167 |       // then
+168 |       expect(result!.model).toBe("anthropic/claude-opus-4-6")
+169 |       expect(logSpy).toHaveBeenCalledWith("Model resolved via config override", { model: "anthropic/claude-opus-4-6" })
+                           ^
+error: expect(received).toHaveBeenCalledWith(...expected)
+
+Expected: [ "Model resolved via config override", {
+    model: "anthropic/claude-opus-4-6",
+  } ]
+But it was not called.
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:169:22)
+(fail) resolveModelWithFallback > Step 1: UI Selection (highest priority) > whitespace-only uiSelectedModel is treated as not provided
+201 |       // when
+202 |       const result = resolveModelWithFallback(input)
+203 | 
+204 |       // then
+205 |       expect(result!.model).toBe("anthropic/claude-opus-4-6")
+206 |       expect(result!.source).toBe("override")
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "override"
+Received: "provider-fallback"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:206:30)
+(fail) resolveModelWithFallback > Step 2: Config Override > returns userModel with override source when userModel is provided
+220 | 
+221 |       // when
+222 |       const result = resolveModelWithFallback(input)
+223 | 
+224 |       // then
+225 |       expect(result!.model).toBe("custom/my-model")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "custom/my-model"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:225:29)
+(fail) resolveModelWithFallback > Step 2: Config Override > override takes priority even if model not in availableModels
+276 | 
+277 |       // when
+278 |       const result = resolveModelWithFallback(input)
+279 | 
+280 |       // then
+281 |       expect(result!.model).toBe("github-copilot/claude-opus-4-6-preview")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "github-copilot/claude-opus-4-6-preview"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:281:29)
+(fail) resolveModelWithFallback > Step 3: Provider fallback chain > tries providers in order within entry and returns first match
+300 | 
+301 |       // when
+302 |       const result = resolveModelWithFallback(input)
+303 | 
+304 |       // then
+305 |       expect(result!.model).toBe("openai/gpt-5.2")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "openai/gpt-5.2"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:305:29)
+(fail) resolveModelWithFallback > Step 3: Provider fallback chain > respects provider priority order within entry
+318 | 
+319 |       // when
+320 |       const result = resolveModelWithFallback(input)
+321 | 
+322 |       // then
+323 |       expect(result!.model).toBe("opencode/gpt-5-nano")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "opencode/gpt-5-nano"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:323:29)
+(fail) resolveModelWithFallback > Step 3: Provider fallback chain > tries next provider when first provider has no match
+351 | 
+352 |       // when
+353 |       const result = resolveModelWithFallback(input)
+354 | 
+355 |       // then
+356 |       expect(result!.source).toBe("system-default")
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "system-default"
+Received: "provider-fallback"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:356:30)
+(fail) resolveModelWithFallback > Step 3: Provider fallback chain > skips fallback chain when not provided
+366 | 
+367 |       // when
+368 |       const result = resolveModelWithFallback(input)
+369 | 
+370 |       // then
+371 |       expect(result!.source).toBe("system-default")
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "system-default"
+Received: "provider-fallback"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:371:30)
+(fail) resolveModelWithFallback > Step 3: Provider fallback chain > skips fallback chain when empty [1.00ms]
+402 | 
+403 |       // when
+404 |       const result = resolveModelWithFallback(input)
+405 | 
+406 |       // then - should find glm-4.7 from opencode via cross-provider fuzzy match
+407 |       expect(result!.model).toBe("opencode/glm-4.7")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "opencode/glm-4.7"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:407:29)
+(fail) resolveModelWithFallback > Step 3: Provider fallback chain > cross-provider fuzzy match when preferred provider unavailable (librarian scenario)
+425 | 
+426 |       // when
+427 |       const result = resolveModelWithFallback(input)
+428 | 
+429 |       // then - should prefer zai-coding-plan (specified provider) over opencode
+430 |       expect(result!.model).toBe("zai-coding-plan/glm-4.7")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "zai-coding-plan/glm-4.7"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:430:29)
+(fail) resolveModelWithFallback > Step 3: Provider fallback chain > prefers specified provider over cross-provider match
+443 | 
+444 |       // when
+445 |       const result = resolveModelWithFallback(input)
+446 | 
+447 |       // then - variant should be preserved
+448 |       expect(result!.model).toBe("opencode/glm-4.7")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "opencode/glm-4.7"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:448:29)
+(fail) resolveModelWithFallback > Step 3: Provider fallback chain > cross-provider match preserves variant from entry
+462 | 
+463 |       // when
+464 |       const result = resolveModelWithFallback(input)
+465 | 
+466 |       // then - should fall through to second entry
+467 |       expect(result!.model).toBe("anthropic/claude-sonnet-4-5")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "anthropic/claude-sonnet-4-5"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:467:29)
+(fail) resolveModelWithFallback > Step 3: Provider fallback chain > cross-provider match tries next entry if no match found anywhere
+482 | 
+483 |       // when
+484 |       const result = resolveModelWithFallback(input)
+485 | 
+486 |       // then
+487 |       expect(result!.model).toBe("google/gemini-3-pro")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "google/gemini-3-pro"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:487:29)
+(fail) resolveModelWithFallback > Step 4: System default fallback (no availability match) > returns system default when no availability match found in fallback chain
+502 | 
+503 |       // when
+504 |       const result = resolveModelWithFallback(input)
+505 | 
+506 |       // then - should return undefined to let OpenCode use Provider.defaultModel()
+507 |       expect(result).toBeUndefined()
+                           ^
+error: expect(received).toBeUndefined()
+
+Received: {
+  model: "anthropic/claude-opus-4-6",
+  source: "provider-fallback",
+  variant: "max",
+}
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:507:22)
+(fail) resolveModelWithFallback > Step 4: System default fallback (no availability match) > returns undefined when availableModels empty and no connected providers cache exists
+521 | 
+522 |       // when
+523 |       const result = resolveModelWithFallback(input)
+524 | 
+525 |       // then - should use connected provider (openai) from fallback chain
+526 |       expect(result!.model).toBe("openai/claude-opus-4-6")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "openai/claude-opus-4-6"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:526:29)
+(fail) resolveModelWithFallback > Step 4: System default fallback (no availability match) > uses connected provider from fallback when availableModels empty but cache exists
+541 | 
+542 |       // when
+543 |       const result = resolveModelWithFallback(input)
+544 | 
+545 |       // then - should use github-copilot (second provider) since google not connected
+546 |       expect(result!.model).toBe("github-copilot/gemini-3-pro")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "github-copilot/gemini-3-pro"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:546:29)
+(fail) resolveModelWithFallback > Step 4: System default fallback (no availability match) > uses github-copilot when google not connected (visual-engineering scenario)
+561 | 
+562 |       // when
+563 |       const result = resolveModelWithFallback(input)
+564 | 
+565 |       // then - no provider in fallback is connected, fall through to system default
+566 |       expect(result!.model).toBe("quotio/claude-opus-4-6-20251101")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "quotio/claude-opus-4-6-20251101"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:566:29)
+(fail) resolveModelWithFallback > Step 4: System default fallback (no availability match) > falls through to system default when no provider in fallback is connected
+581 | 
+582 |       // when
+583 |       const result = resolveModelWithFallback(input)
+584 | 
+585 |       // then - should fall through to system default
+586 |       expect(result!.model).toBe("google/gemini-3-pro")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "google/gemini-3-pro"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:586:29)
+(fail) resolveModelWithFallback > Step 4: System default fallback (no availability match) > falls through to system default when no cache and systemDefaultModel is provided
+597 | 
+598 |       // when
+599 |       const result = resolveModelWithFallback(input)
+600 | 
+601 |       // then
+602 |       expect(result!.model).toBe("google/gemini-3-pro")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "google/gemini-3-pro"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:602:29)
+(fail) resolveModelWithFallback > Step 4: System default fallback (no availability match) > returns system default when fallbackChain is not provided
+637 |         availableModels,
+638 |         systemDefaultModel: "system/default",
+639 |       })
+640 | 
+641 |       // then
+642 |       expect(result!.model).toBe("google/gemini-3-pro")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "google/gemini-3-pro"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:642:29)
+(fail) resolveModelWithFallback > Multi-entry fallbackChain > tries all providers in first entry before moving to second entry
+659 |         availableModels,
+660 |         systemDefaultModel: "system/default",
+661 |       })
+662 | 
+663 |       // then
+664 |       expect(result!.model).toBe("openai/gpt-5.2")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "openai/gpt-5.2"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:664:29)
+(fail) resolveModelWithFallback > Multi-entry fallbackChain > returns first matching entry even if later entries have better matches
+679 |         availableModels,
+680 |         systemDefaultModel: "system/default",
+681 |       })
+682 | 
+683 |       // then
+684 |       expect(result!.model).toBe("system/default")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "system/default"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:684:29)
+(fail) resolveModelWithFallback > Multi-entry fallbackChain > falls through to system default when none match availability
+719 | 
+720 |       // when
+721 |       const result = resolveModelWithFallback(input)
+722 | 
+723 |       // then - should fuzzy match gemini-3-pro → gemini-3-pro-preview
+724 |       expect(result!.model).toBe("google/gemini-3-pro-preview")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "google/gemini-3-pro-preview"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:724:29)
+(fail) resolveModelWithFallback > categoryDefaultModel (fuzzy matching for category defaults) > applies fuzzy matching to categoryDefaultModel when userModel not provided
+738 | 
+739 |       // when
+740 |       const result = resolveModelWithFallback(input)
+741 | 
+742 |       // then - should use exact match
+743 |       expect(result!.model).toBe("google/gemini-3-pro")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "google/gemini-3-pro"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:743:29)
+(fail) resolveModelWithFallback > categoryDefaultModel (fuzzy matching for category defaults) > categoryDefaultModel uses exact match when available
+778 |       // when
+779 |       const result = resolveModelWithFallback(input)
+780 | 
+781 |       // then - userModel wins
+782 |       expect(result!.model).toBe("anthropic/claude-opus-4-6")
+783 |       expect(result!.source).toBe("override")
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "override"
+Received: "provider-fallback"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:783:30)
+(fail) resolveModelWithFallback > categoryDefaultModel (fuzzy matching for category defaults) > userModel takes priority over categoryDefaultModel
+794 | 
+795 |       // when
+796 |       const result = resolveModelWithFallback(input)
+797 | 
+798 |       // then - should use categoryDefaultModel since google is connected
+799 |       expect(result!.model).toBe("google/gemini-3-pro")
+                                  ^
+error: expect(received).toBe(expected)
+
+Expected: "google/gemini-3-pro"
+Received: "anthropic/claude-opus-4-6"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:799:29)
+(fail) resolveModelWithFallback > categoryDefaultModel (fuzzy matching for category defaults) > categoryDefaultModel works when availableModels is empty but connected provider exists
+815 | 
+816 |       // when
+817 |       const result = resolveModelWithFallback(input)
+818 | 
+819 |       // then
+820 |       expect(result).toBeUndefined()
+                           ^
+error: expect(received).toBeUndefined()
+
+Received: {
+  model: "anthropic/claude-opus-4-6",
+  source: "provider-fallback",
+  variant: "max",
+}
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:820:22)
+(fail) resolveModelWithFallback > Optional systemDefaultModel > returns undefined when systemDefaultModel is undefined and no fallback found
+829 | 
+830 |       // when
+831 |       const result = resolveModelWithFallback(input)
+832 | 
+833 |       // then
+834 |       expect(result).toBeUndefined()
+                           ^
+error: expect(received).toBeUndefined()
+
+Received: {
+  model: "anthropic/claude-opus-4-6",
+  source: "provider-fallback",
+  variant: "max",
+}
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:834:22)
+(fail) resolveModelWithFallback > Optional systemDefaultModel > returns undefined when no fallbackChain and systemDefaultModel is undefined
+846 |       const result = resolveModelWithFallback(input)
+847 | 
+848 |       // then
+849 |       expect(result).toBeDefined()
+850 |       expect(result!.model).toBe("anthropic/claude-opus-4-6")
+851 |       expect(result!.source).toBe("override")
+                                   ^
+error: expect(received).toBe(expected)
+
+Expected: "override"
+Received: "provider-fallback"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/shared/model-resolver.test.ts:851:30)
+(fail) resolveModelWithFallback > Optional systemDefaultModel > still returns override when userModel provided even if systemDefaultModel undefined
+
+src/shared/opencode-server-auth.test.ts:
+[opencode-server-auth] Failed to inject server auth: [opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but SDK client structure is incompatible. This may indicate an OpenCode SDK version mismatch.
+[opencode-server-auth] Failed to inject server auth: [opencode-server-auth] OPENCODE_SERVER_PASSWORD is set but SDK client._client.setConfig is not a function. This may indicate an OpenCode SDK version mismatch.
+ [272ms] compile  packages/windows-x64-baseline/bin/oh-my-opencode.exe bun-windows-x64-baseline-v1.3.9
+
+src/hooks/prometheus-md-only/index.test.ts:
+357 | 
+358 |       // when
+359 |       await hook["tool.execute.before"](input, output)
+360 | 
+361 |       // then
+362 |       expect(output.args.prompt).toContain(SYSTEM_DIRECTIVE_PREFIX)
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[SYSTEM DIRECTIVE: OH-MY-OPENCODE"
+Received: "\n\n---\n\n[DIRECTIVE:PROMETHEUS READ-ONLY]\n\nYou are being invoked by Prometheus (Plan Builder), a READ-ONLY planning agent.\n\n**CRITICAL CONSTRAINTS:**\n- DO NOT modify any files (no Write, Edit, or any file mutations)\n- DO NOT execute commands that change system state\n- DO NOT create, delete, or rename files\n- ONLY provide analysis, recommendations, and information\n\n**YOUR ROLE**: Provide consultation, research, and analysis to assist with planning.\nReturn your findings and recommendations. The actual implementation will be handled separately after planning is complete.\n\n---\n\nAnalyze this codebase"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/hooks/prometheus-md-only/index.test.ts:362:34)
+(fail) prometheus-md-only > with Prometheus agent in message storage > should inject read-only warning when Prometheus calls task
+377 | 
+378 |       // when
+379 |       await hook["tool.execute.before"](input, output)
+380 | 
+381 |       // then
+382 |       expect(output.args.prompt).toContain(SYSTEM_DIRECTIVE_PREFIX)
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[SYSTEM DIRECTIVE: OH-MY-OPENCODE"
+Received: "\n\n---\n\n[DIRECTIVE:PROMETHEUS READ-ONLY]\n\nYou are being invoked by Prometheus (Plan Builder), a READ-ONLY planning agent.\n\n**CRITICAL CONSTRAINTS:**\n- DO NOT modify any files (no Write, Edit, or any file mutations)\n- DO NOT execute commands that change system state\n- DO NOT create, delete, or rename files\n- ONLY provide analysis, recommendations, and information\n\n**YOUR ROLE**: Provide consultation, research, and analysis to assist with planning.\nReturn your findings and recommendations. The actual implementation will be handled separately after planning is complete.\n\n---\n\nResearch this library"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/hooks/prometheus-md-only/index.test.ts:382:34)
+(fail) prometheus-md-only > with Prometheus agent in message storage > should inject read-only warning when Prometheus calls task
+396 | 
+397 |       // when
+398 |       await hook["tool.execute.before"](input, output)
+399 | 
+400 |       // then
+401 |       expect(output.args.prompt).toContain(SYSTEM_DIRECTIVE_PREFIX)
+                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[SYSTEM DIRECTIVE: OH-MY-OPENCODE"
+Received: "\n\n---\n\n[DIRECTIVE:PROMETHEUS READ-ONLY]\n\nYou are being invoked by Prometheus (Plan Builder), a READ-ONLY planning agent.\n\n**CRITICAL CONSTRAINTS:**\n- DO NOT modify any files (no Write, Edit, or any file mutations)\n- DO NOT execute commands that change system state\n- DO NOT create, delete, or rename files\n- ONLY provide analysis, recommendations, and information\n\n**YOUR ROLE**: Provide consultation, research, and analysis to assist with planning.\nReturn your findings and recommendations. The actual implementation will be handled separately after planning is complete.\n\n---\n\nFind implementation examples"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/hooks/prometheus-md-only/index.test.ts:401:34)
+(fail) prometheus-md-only > with Prometheus agent in message storage > should inject read-only warning when Prometheus calls call_omo_agent
+
+src/hooks/keyword-detector/index.test.ts:
+439 |     await hook["chat.message"]({ sessionID }, output)
+440 | 
+441 |     // then - should trigger search mode from user text only
+442 |     const textPart = output.parts.find(p => p.type === "text")
+443 |     expect(textPart).toBeDefined()
+444 |     expect(textPart!.text).toContain("[search-mode]")
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[search-mode]"
+Received: "<system-reminder>\nSystem will find and locate files.\n</system-reminder>\n\nPlease search for the bug in the code."
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/hooks/keyword-detector/index.test.ts:444:28)
+(fail) keyword-detector system-reminder filtering > should detect keywords in user text even when system-reminder is present
+
+src/hooks/unstable-agent-babysitter/index.test.ts:
+85 | 
+86 |     // #when
+87 |     await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+88 | 
+89 |     // #then
+90 |     expect(promptCalls.length).toBe(1)
+                                    ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/hooks/unstable-agent-babysitter/index.test.ts:90:32)
+(fail) unstable-agent-babysitter hook > fires reminder for hung gemini task [1.00ms]
+120 | 
+121 |     // #when
+122 |     await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+123 | 
+124 |     // #then
+125 |     expect(promptCalls.length).toBe(1)
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/hooks/unstable-agent-babysitter/index.test.ts:125:32)
+(fail) unstable-agent-babysitter hook > fires reminder for hung minimax task
+173 |     // #when
+174 |     await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+175 |     await hook.event({ event: { type: "session.idle", properties: { sessionID: "main-1" } } })
+176 | 
+177 |     // #then
+178 |     expect(promptCalls.length).toBe(1)
+                                     ^
+error: expect(received).toBe(expected)
+
+Expected: 1
+Received: 0
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/hooks/unstable-agent-babysitter/index.test.ts:178:32)
+(fail) unstable-agent-babysitter hook > respects per-task cooldown
+
+src/features/tmux-subagent/manager.test.ts:
+(fail) TmuxSessionManager > onSessionCreated > replaces oldest agent when unsplittable (small window) [5000.21ms]
+  ^ this test timed out after 5000ms.
+(fail) TmuxSessionManager > cleanup > closes all tracked panes [5000.21ms]
+  ^ this test timed out after 5000ms.
+
+src/features/background-agent/manager.test.ts:
+1894 |       expect(pendingTask?.startedAt).toBeUndefined()
+1895 | 
+1896 |       // Verify TTL would use queuedAt (implementation detail check)
+1897 |       const now = Date.now()
+1898 |       const age = now - pendingTask!.queuedAt!.getTime()
+1899 |       expect(age).toBeGreaterThanOrEqual(0)
+                         ^
+error: expect(received).toBeGreaterThanOrEqual(expected)
+
+Expected: >= 0
+Received: -10662
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/features/background-agent/manager.test.ts:1899:19)
+(fail) BackgroundManager - Non-blocking Queue Integration > TTL uses queuedAt for pending, startedAt for running > should use queuedAt for pending task TTL [55.00ms]
+1925 |       expect(runningTask?.startedAt).toBeInstanceOf(Date)
+1926 | 
+1927 |       // Verify TTL would use startedAt (implementation detail check)
+1928 |       const now = Date.now()
+1929 |       const age = now - runningTask!.startedAt!.getTime()
+1930 |       expect(age).toBeGreaterThanOrEqual(0)
+                         ^
+error: expect(received).toBeGreaterThanOrEqual(expected)
+
+Expected: >= 0
+Received: -10717
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/features/background-agent/manager.test.ts:1930:19)
+(fail) BackgroundManager - Non-blocking Queue Integration > TTL uses queuedAt for pending, startedAt for running > should use startedAt for running task TTL [58.00ms]
+
+src/features/claude-code-session-state/state.test.ts:
+ 96 | 
+ 97 |     test("should return undefined when not set", () => {
+ 98 |       // given - explicit reset to ensure clean state (parallel test isolation)
+ 99 |       _resetForTesting()
+100 |       // then
+101 |       expect(getMainSessionID()).toBeUndefined()
+                                       ^
+error: expect(received).toBeUndefined()
+
+Received: "main-session-123"
+
+      at <anonymous> (/home/bong/oh-my-opencode/src/features/claude-code-session-state/state.test.ts:101:34)
+(fail) claude-code-session-state > mainSessionID > should return undefined when not set [1.00ms]
+
+src/tools/delegate-task/tools.test.ts:
+(fail) sisyphus-task > session_id with background parameter > sync continuation preserves variant from previous session message [10000.43ms]
+  ^ this test timed out after 10000ms.
+(fail) sisyphus-task > unstable agent forced background mode > gemini model with run_in_background=false should force background but wait for result [20000.86ms]
+  ^ this test timed out after 20000ms.
+(fail) sisyphus-task > unstable agent forced background mode > minimax model with run_in_background=false should force background but wait for result [20002.86ms]
+  ^ this test timed out after 20000ms.
+(fail) sisyphus-task > unstable agent forced background mode > artistry category (gemini) with run_in_background=false should force background but wait for result [20000.87ms]
+  ^ this test timed out after 20000ms.
+(fail) sisyphus-task > unstable agent forced background mode > writing category (gemini-flash) with run_in_background=false should force background but wait for result [20000.88ms]
+  ^ this test timed out after 20000ms.
+(fail) sisyphus-task > unstable agent forced background mode > is_unstable_agent=true should force background but wait for result [20000.88ms]
+  ^ this test timed out after 20000ms.
+
+src/tools/delegate-task/sync-session-poller.test.ts:
+(fail) pollSyncSession > timeout handling > returns error string on timeout [5000.22ms]
+  ^ this test timed out after 5000ms.

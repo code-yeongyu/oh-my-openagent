@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { isGptModel } from "./types"
+import { getActiveModel } from "../features/model-switcher"
 
 const MODE: AgentMode = "primary"
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
@@ -506,8 +507,10 @@ export function createSisyphusAgent(
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[],
   availableCategories?: AvailableCategory[],
-  useTaskSystem = false
+  useTaskSystem = false,
+  agentName?: string
 ): AgentConfig {
+  const effectiveModel = agentName ? getActiveModel(agentName) ?? model : model
   const tools = availableToolNames ? categorizeTools(availableToolNames) : []
   const skills = availableSkills ?? []
   const categories = availableCategories ?? []
@@ -520,7 +523,7 @@ export function createSisyphusAgent(
     description:
       "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
     mode: MODE,
-    model,
+    model: effectiveModel,
     maxTokens: 64000,
     prompt,
     color: "#00CED1",

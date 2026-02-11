@@ -22,6 +22,7 @@ import { maybeCreateSisyphusConfig } from "./builtin-agents/sisyphus-agent"
 import { maybeCreateHephaestusConfig } from "./builtin-agents/hephaestus-agent"
 import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
 import { buildCustomAgentMetadata, parseRegisteredAgentSummaries } from "./custom-agent-summaries"
+import { loadCandidates } from "../features/model-switcher"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -67,6 +68,8 @@ export async function createBuiltinAgents(
   disabledSkills?: Set<string>,
   useTaskSystem = false
 ): Promise<Record<string, AgentConfig>> {
+  loadCandidates(agentOverrides)
+
   const connectedProviders = readConnectedProvidersCache()
   // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
   // This function is called from config handler, and calling client API causes deadlock.

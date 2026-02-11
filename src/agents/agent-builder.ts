@@ -4,6 +4,7 @@ import type { CategoriesConfig, CategoryConfig, GitMasterConfig } from "../confi
 import type { BrowserAutomationProvider } from "../config/schema"
 import { mergeCategories } from "../shared/merge-categories"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
+import { getActiveModel } from "../features/model-switcher"
 
 export type AgentSource = AgentFactory | AgentConfig
 
@@ -17,9 +18,13 @@ export function buildAgent(
   categories?: CategoriesConfig,
   gitMasterConfig?: GitMasterConfig,
   browserProvider?: BrowserAutomationProvider,
-  disabledSkills?: Set<string>
+  disabledSkills?: Set<string>,
+  agentName?: string
 ): AgentConfig {
-  const base = isFactory(source) ? source(model) : { ...source }
+  const activeModel = agentName ? getActiveModel(agentName) : undefined
+  const effectiveModel = activeModel ?? model
+
+  const base = isFactory(source) ? source(effectiveModel) : { ...source }
   const categoryConfigs: Record<string, CategoryConfig> = mergeCategories(categories)
 
   const agentWithCategory = base as AgentConfig & { category?: string; skills?: string[]; variant?: string }

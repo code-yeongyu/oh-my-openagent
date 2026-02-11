@@ -70,7 +70,8 @@ export function maybeCreateSisyphusConfig(input: {
     undefined,
     availableSkills,
     availableCategories,
-    useTaskSystem
+    useTaskSystem,
+    "sisyphus"
   )
 
   if (sisyphusResolvedVariant) {

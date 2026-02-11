@@ -13,6 +13,7 @@ import {
   buildAntiPatternsSection,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder"
+import { getActiveModel } from "../features/model-switcher"
 
 const MODE: AgentMode = "primary"
 
@@ -600,8 +601,10 @@ export function createHephaestusAgent(
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[],
   availableCategories?: AvailableCategory[],
-  useTaskSystem = false
+  useTaskSystem = false,
+  agentName?: string
 ): AgentConfig {
+  const effectiveModel = agentName ? getActiveModel(agentName) ?? model : model
   const tools = availableToolNames ? categorizeTools(availableToolNames) : []
   const skills = availableSkills ?? []
   const categories = availableCategories ?? []
@@ -613,7 +616,7 @@ export function createHephaestusAgent(
     description:
       "Autonomous Deep Worker - goal-oriented execution with GPT 5.2 Codex. Explores thoroughly before acting, uses explore/librarian agents for comprehensive context, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
     mode: MODE,
-    model,
+    model: effectiveModel,
     maxTokens: 32000,
     prompt,
     color: "#D97706", // Forged Amber - Golden heated metal, divine craftsman

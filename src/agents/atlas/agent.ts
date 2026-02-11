@@ -17,6 +17,7 @@ import { buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-buil
 import type { CategoryConfig } from "../../config/schema"
 import { mergeCategories } from "../../shared/merge-categories"
 import { createAgentToolRestrictions } from "../../shared/permission-compat"
+import { getActiveModel } from "../../features/model-switcher"
 
 import { getDefaultAtlasPrompt } from "./default"
 import { getGptAtlasPrompt } from "./gpt"
@@ -47,6 +48,7 @@ export interface OrchestratorContext {
   availableAgents?: AvailableAgent[]
   availableSkills?: AvailableSkill[]
   userCategories?: Record<string, CategoryConfig>
+  agentName?: string
 }
 
 /**
@@ -93,6 +95,9 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
 }
 
 export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
+  const activeModel = ctx.agentName ? getActiveModel(ctx.agentName) : undefined
+  const effectiveModel = activeModel ?? ctx.model
+
   const restrictions = createAgentToolRestrictions([
     "task",
     "call_omo_agent",
@@ -102,7 +107,7 @@ export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
     description:
       "Orchestrates work via task() to complete ALL tasks in a todo list until fully done. (Atlas - OhMyOpenCode)",
     mode: MODE,
-    ...(ctx.model ? { model: ctx.model } : {}),
+    ...(effectiveModel ? { model: effectiveModel } : {}),
     temperature: 0.1,
     prompt: buildDynamicOrchestratorPrompt(ctx),
     color: "#10B981",
