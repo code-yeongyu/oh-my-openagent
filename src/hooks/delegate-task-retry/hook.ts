@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import { buildRetryGuidance } from "./guidance"
 import { detectDelegateTaskError } from "./patterns"
+import { appendToOutput } from "../hook-output-guard"
 
 export function createDelegateTaskRetryHook(_ctx: PluginInput) {
   return {
@@ -11,11 +12,11 @@ export function createDelegateTaskRetryHook(_ctx: PluginInput) {
     ) => {
       if (input.tool.toLowerCase() !== "task") return
 
-      const errorInfo = detectDelegateTaskError(output.output)
-      if (errorInfo) {
-        const guidance = buildRetryGuidance(errorInfo)
-        output.output += `\n${guidance}`
-      }
+       const errorInfo = detectDelegateTaskError(output.output ?? "")
+       if (errorInfo) {
+         const guidance = buildRetryGuidance(errorInfo)
+         appendToOutput(output, `\n${guidance}`)
+       }
     },
   }
 }

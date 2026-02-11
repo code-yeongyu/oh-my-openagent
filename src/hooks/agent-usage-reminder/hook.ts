@@ -6,6 +6,7 @@ import {
 } from "./storage";
 import { TARGET_TOOLS, AGENT_TOOLS, REMINDER_MESSAGE } from "./constants";
 import type { AgentUsageState } from "./types";
+import { appendToOutput } from "../hook-output-guard";
 
 interface ToolExecuteInput {
   tool: string;
@@ -77,7 +78,7 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
       return;
     }
 
-    output.output += REMINDER_MESSAGE;
+    appendToOutput(output, REMINDER_MESSAGE);
     state.reminderCount++;
     state.updatedAt = Date.now();
     saveAgentUsageState(state);

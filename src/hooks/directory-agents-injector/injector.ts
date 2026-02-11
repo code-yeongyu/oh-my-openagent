@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import type { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { findAgentsMdUp, resolveFilePath } from "./finder";
 import { loadInjectedPaths, saveInjectedPaths } from "./storage";
+import { appendToOutput } from "../hook-output-guard";
 
 type DynamicTruncator = ReturnType<typeof createDynamicTruncator>;
 
@@ -46,7 +47,7 @@ export async function processFilePathForAgentsInjection(input: {
       const truncationNotice = truncated
         ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${agentsPath}]`
         : "";
-      input.output.output += `\n\n[Directory Context: ${agentsPath}]\n${result}${truncationNotice}`;
+       appendToOutput(input.output, `\n\n[Directory Context: ${agentsPath}]\n${result}${truncationNotice}`);
       cache.add(agentsDir);
     } catch {}
   }

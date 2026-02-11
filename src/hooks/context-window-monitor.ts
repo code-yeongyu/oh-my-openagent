@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
+import { appendToOutput } from "./hook-output-guard"
 
 const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
 const ANTHROPIC_ACTUAL_LIMIT =
@@ -74,8 +75,8 @@ export function createContextWindowMonitorHook(ctx: PluginInput) {
       const usedTokens = totalInputTokens.toLocaleString()
       const limitTokens = ANTHROPIC_DISPLAY_LIMIT.toLocaleString()
 
-      output.output += `\n\n${CONTEXT_REMINDER}
-[Context Status: ${usedPct}% used (${usedTokens}/${limitTokens} tokens), ${remainingPct}% remaining]`
+       appendToOutput(output, `\n\n${CONTEXT_REMINDER}
+[Context Status: ${usedPct}% used (${usedTokens}/${limitTokens} tokens), ${remainingPct}% remaining]`)
     } catch {
       // Graceful degradation - do not disrupt tool execution
     }

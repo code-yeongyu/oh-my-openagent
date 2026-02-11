@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { appendToOutput } from "../hook-output-guard"
 
 /**
  * Known Edit tool error patterns that indicate the AI made a mistake
@@ -49,9 +50,9 @@ export function createEditErrorRecoveryHook(_ctx: PluginInput) {
         outputLower.includes(pattern.toLowerCase())
       )
 
-      if (hasEditError) {
-        output.output += `\n${EDIT_ERROR_REMINDER}`
-      }
+       if (hasEditError) {
+         appendToOutput(output, `\n${EDIT_ERROR_REMINDER}`)
+       }
     },
   }
 }

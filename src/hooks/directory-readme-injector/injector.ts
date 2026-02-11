@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import type { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { findReadmeMdUp, resolveFilePath } from "./finder";
 import { loadInjectedPaths, saveInjectedPaths } from "./storage";
+import { appendToOutput } from "../hook-output-guard";
 
 type DynamicTruncator = ReturnType<typeof createDynamicTruncator>;
 
@@ -46,7 +47,7 @@ export async function processFilePathForReadmeInjection(input: {
       const truncationNotice = truncated
         ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${readmePath}]`
         : "";
-      input.output.output += `\n\n[Project README: ${readmePath}]\n${result}${truncationNotice}`;
+       appendToOutput(input.output, `\n\n[Project README: ${readmePath}]\n${result}${truncationNotice}`);
       cache.add(readmeDir);
     } catch {}
   }

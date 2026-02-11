@@ -10,6 +10,7 @@ import { getToolInput } from "../tool-input-cache"
 import { appendTranscriptEntry, getTranscriptPath } from "../transcript"
 import type { PluginConfig } from "../types"
 import { isHookDisabled, log } from "../../../shared"
+import { appendToOutput } from "../../../hooks/hook-output-guard"
 
 export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginConfig) {
 	return async (
@@ -80,11 +81,11 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 		}
 
 		if (result.warnings && result.warnings.length > 0) {
-			output.output = `${output.output}\n\n${result.warnings.join("\n")}`
+			appendToOutput(output, `\n\n${result.warnings.join("\n")}`)
 		}
 
 		if (result.message) {
-			output.output = `${output.output}\n\n${result.message}`
+			appendToOutput(output, `\n\n${result.message}`)
 		}
 
 		if (result.hookName) {

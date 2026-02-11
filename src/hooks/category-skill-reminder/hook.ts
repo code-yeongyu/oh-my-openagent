@@ -3,6 +3,7 @@ import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import { buildReminderMessage } from "./formatter"
+import { appendToOutput } from "../hook-output-guard"
 
 /**
  * Target agents that should receive category+skill reminders.
@@ -105,9 +106,9 @@ export function createCategorySkillReminderHook(
 
     state.toolCallCount++
 
-    if (state.toolCallCount >= 3 && !state.delegationUsed && !state.reminderShown) {
-      output.output += reminderMessage
-      state.reminderShown = true
+     if (state.toolCallCount >= 3 && !state.delegationUsed && !state.reminderShown) {
+       appendToOutput(output, reminderMessage)
+       state.reminderShown = true
       log("[category-skill-reminder] Reminder injected", {
         sessionID,
         toolCallCount: state.toolCallCount,

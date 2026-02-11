@@ -5,6 +5,7 @@ import type { InteractiveBashSessionState } from "./types";
 import { tokenizeCommand, findSubcommand, extractSessionNameFromTokens } from "./parser";
 import { getOrCreateState, isOmoSession, killAllTrackedSessions } from "./state-manager";
 import { subagentSessions } from "../../features/claude-code-session-state";
+import { appendToOutput } from "../hook-output-guard";
 
 interface ToolExecuteInput {
   tool: string;
@@ -96,9 +97,9 @@ export function createInteractiveBashSessionHook(ctx: PluginInput) {
       const reminder = buildSessionReminderMessage(
         Array.from(state.tmuxSessions),
       );
-      if (reminder) {
-        output.output += reminder;
-      }
+       if (reminder) {
+         appendToOutput(output, reminder);
+       }
     }
   };
 

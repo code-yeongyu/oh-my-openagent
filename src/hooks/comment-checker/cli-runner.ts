@@ -2,6 +2,7 @@ import type { PendingCall } from "./types"
 import { existsSync } from "fs"
 
 import { runCommentChecker, getCommentCheckerPath, startBackgroundInit, type HookInput } from "./cli"
+import { appendToOutput } from "../hook-output-guard"
 
 let cliPathPromise: Promise<string | null> | null = null
 
@@ -50,10 +51,10 @@ export async function processWithCli(
 
   const result = await runCommentChecker(hookInput, cliPath, customPrompt)
 
-  if (result.hasComments && result.message) {
-    debugLog("CLI detected comments, appending message")
-    output.output += `\n\n${result.message}`
-  } else {
+   if (result.hasComments && result.message) {
+     debugLog("CLI detected comments, appending message")
+     appendToOutput(output, `\n\n${result.message}`)
+   } else {
     debugLog("CLI: no comments detected")
   }
 }
@@ -90,10 +91,10 @@ export async function processApplyPatchEditsWithCli(
 
     const result = await runCommentChecker(hookInput, cliPath, customPrompt)
 
-    if (result.hasComments && result.message) {
-      debugLog("CLI detected comments for apply_patch file:", edit.filePath)
-      output.output += `\n\n${result.message}`
-    }
+     if (result.hasComments && result.message) {
+       debugLog("CLI detected comments for apply_patch file:", edit.filePath)
+       appendToOutput(output, `\n\n${result.message}`)
+     }
   }
 }
 
