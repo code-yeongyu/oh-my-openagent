@@ -26,7 +26,23 @@ export function buildOrchestratorReminder(
 
 ${buildVerificationReminder(sessionId)}
 
-**STEP 5: CHECK BOULDER STATE DIRECTLY (EVERY TIME — NO EXCEPTIONS)**
+**STEP 5: READ SUBAGENT NOTEPAD (LEARNINGS, ISSUES, PROBLEMS)**
+
+The subagent was instructed to record findings in notepad files. Read them NOW:
+\`\`\`
+Glob(".sisyphus/notepads/${planName}/*.md")
+\`\`\`
+Then \`Read\` each file found — especially:
+- **learnings.md**: Patterns, conventions, successful approaches discovered
+- **issues.md**: Problems, blockers, gotchas encountered during work
+- **problems.md**: Unresolved issues, technical debt flagged
+
+**USE this information to:**
+- Inform your next delegation (avoid known pitfalls)
+- Adjust your plan if blockers were discovered
+- Propagate learnings to subsequent subagents
+
+**STEP 6: CHECK BOULDER STATE DIRECTLY (EVERY TIME — NO EXCEPTIONS)**
 
 Do NOT rely on cached progress. Read the plan file NOW:
 \`\`\`
@@ -35,7 +51,7 @@ Read(".sisyphus/plans/${planName}.md")
 Count exactly: how many \`- [ ]\` remain? How many \`- [x]\` completed?
 This is YOUR ground truth. Use it to decide what comes next.
 
-**STEP 6: MARK COMPLETION IN PLAN FILE (IMMEDIATELY)**
+**STEP 7: MARK COMPLETION IN PLAN FILE (IMMEDIATELY)**
 
 RIGHT NOW - Do not delay. Verification passed → Mark IMMEDIATELY.
 
@@ -45,12 +61,12 @@ Update the plan file \`.sisyphus/plans/${planName}.md\`:
 
 **DO THIS BEFORE ANYTHING ELSE. Unmarked = Untracked = Lost progress.**
 
-**STEP 7: COMMIT ATOMIC UNIT**
+**STEP 8: COMMIT ATOMIC UNIT**
 
 - Stage ONLY the verified changes
 - Commit with clear message describing what was done
 
-**STEP 8: PROCEED TO NEXT TASK**
+**STEP 9: PROCEED TO NEXT TASK**
 
 - Read the plan file AGAIN to identify the next \`- [ ]\` task
 - Start immediately - DO NOT STOP
