@@ -108,6 +108,33 @@ describe("look-at tool", () => {
       expect(error).toContain("file_path")
       expect(error).toContain("image_data")
     })
+
+    // given file_path is a remote HTTP URL
+    // when validated
+    // then return error about remote URLs not supported
+    test("returns error when file_path is an http:// URL", () => {
+      const args = { file_path: "http://example.com/image.png", goal: "analyze" }
+      const error = validateArgs(args)
+      expect(error).toContain("Remote URLs are not supported")
+    })
+
+    // given file_path is a remote HTTPS URL
+    // when validated
+    // then return error about remote URLs not supported
+    test("returns error when file_path is an https:// URL", () => {
+      const args = { file_path: "https://example.com/document.pdf", goal: "extract text" }
+      const error = validateArgs(args)
+      expect(error).toContain("Remote URLs are not supported")
+    })
+
+    // given file_path is a remote URL with mixed case scheme
+    // when validated
+    // then return error (case-insensitive check)
+    test("returns error when file_path is a remote URL with mixed case", () => {
+      const args = { file_path: "HTTPS://Example.com/file.png", goal: "analyze" }
+      const error = validateArgs(args)
+      expect(error).toContain("Remote URLs are not supported")
+    })
   })
 
   describe("createLookAt error handling", () => {
