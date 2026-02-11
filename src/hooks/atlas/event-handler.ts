@@ -41,7 +41,7 @@ export function createAtlasEventHandler(input: {
 
       // Read boulder state FIRST to check if this session is part of an active boulder
       const boulderState = readBoulderState(ctx.directory)
-      const isBoulderSession = boulderState?.session_ids.includes(sessionID) ?? false
+      const isBoulderSession = boulderState?.session_ids?.includes(sessionID) ?? false
 
       const isBackgroundTaskSession = subagentSessions.has(sessionID)
 
