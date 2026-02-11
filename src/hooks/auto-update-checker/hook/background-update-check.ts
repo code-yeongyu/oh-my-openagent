@@ -4,7 +4,7 @@ import { log } from "../../../shared/logger"
 import { invalidatePackage } from "../cache"
 import { PACKAGE_NAME } from "../constants"
 import { extractChannel } from "../version-channel"
-import { findPluginEntry, getCachedVersion, getLatestVersion, updatePinnedVersion } from "../checker"
+import { findPluginEntry, getCachedVersion, getLatestVersion, updatePinnedVersion, revertPinnedVersion } from "../checker"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
 async function runBunInstallSafe(): Promise<boolean> {
@@ -72,8 +72,14 @@ export async function runBackgroundUpdateCheck(
   if (installSuccess) {
     await showAutoUpdatedToast(ctx, currentVersion, latestVersion)
     log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestVersion}`)
-  } else {
-    await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
-    log("[auto-update-checker] bun install failed; update not installed (falling back to notification-only)")
+    return
   }
+
+  if (pluginInfo.isPinned) {
+    revertPinnedVersion(pluginInfo.configPath, latestVersion, pluginInfo.entry)
+    log("[auto-update-checker] Config reverted due to install failure")
+  }
+
+  await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+  log("[auto-update-checker] bun install failed; update not installed (falling back to notification-only)")
 }
