@@ -58,7 +58,6 @@ export async function ingestArtifacts(
     if (storeOperation) {
       const mcbResult = await withMcbFallback(
         () => storeOperation(artifact),
-        undefined,
         "memory",
       )
 

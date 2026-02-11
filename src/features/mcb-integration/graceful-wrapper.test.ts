@@ -13,7 +13,6 @@ describe("mcb-integration/graceful-wrapper", () => {
   it("returns success when operation succeeds", async () => {
     const result = await withMcbFallback(
       async () => ({ items: ["a", "b"] }),
-      { items: [] },
       "search",
     )
     expect(result.success).toBe(true)
@@ -28,7 +27,6 @@ describe("mcb-integration/graceful-wrapper", () => {
   it("returns degraded on operation failure", async () => {
     const result = await withMcbFallback(
       async () => { throw new Error("connection refused") },
-      "fallback",
       "search",
     )
     expect(result.success).toBe(false)
@@ -46,7 +44,6 @@ describe("mcb-integration/graceful-wrapper", () => {
     let called = false
     const result = await withMcbFallback(
       async () => { called = true; return "data" },
-      "fallback",
     )
     expect(called).toBe(false)
     expect(result.success).toBe(false)
@@ -60,7 +57,6 @@ describe("mcb-integration/graceful-wrapper", () => {
     let called = false
     const result = await withMcbFallback(
       async () => { called = true; return "data" },
-      "fallback",
       "session",
     )
     expect(called).toBe(false)

@@ -7,7 +7,7 @@ export function buildTeamParentToolContext(context: TeamToolContext): ToolContex
   return {
     sessionID: context.sessionID,
     messageID: context.messageID,
-    agent: context.agent as string,
+    agent: context.agent,
     abort: context.abort ?? new AbortController().signal,
   }
 }

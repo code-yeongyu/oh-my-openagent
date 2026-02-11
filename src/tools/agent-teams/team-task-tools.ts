@@ -9,8 +9,8 @@ import {
   TeamTaskListInputSchema,
   TeamTask,
   TeamToolContext,
-  isTeammateMember,
 } from "./types"
+import { isTeammateMember } from "./team-member-utils"
 import { createTeamTask, listTeamTasks, readTeamTask } from "./team-task-store"
 
 function buildTaskAssignmentPayload(task: TeamTask, assignedBy: string): Record<string, unknown> {

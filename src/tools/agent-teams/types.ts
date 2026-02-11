@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { normalizeTeamRecipient } from "./team-recipient-utils"
 
 export const TEAM_COLOR_PALETTE = [
   "blue",
@@ -115,16 +116,6 @@ export const TeamSpawnInputSchema = z.object({
   plan_mode_required: z.boolean().optional(),
 })
 
-function normalizeTeamRecipient(recipient: string): string {
-  const trimmed = recipient.trim()
-  const atIndex = trimmed.indexOf("@")
-  if (atIndex <= 0) {
-    return trimmed
-  }
-
-  return trimmed.slice(0, atIndex)
-}
-
 export const TeamSendMessageInputSchema = z.object({
   team_name: z.string(),
   type: TeamSendMessageTypeSchema,
@@ -194,8 +185,4 @@ export interface TeamToolContext {
   messageID: string
   abort: AbortSignal
   agent?: string
-}
-
-export function isTeammateMember(member: TeamMember): member is TeamTeammateMember {
-  return member.agentType !== "team-lead"
 }

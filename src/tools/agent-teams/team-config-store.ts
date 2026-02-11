@@ -15,8 +15,8 @@ import {
   TeamLeadMember,
   TeamMember,
   TeamTeammateMember,
-  isTeammateMember,
 } from "./types"
+import { isTeammateMember } from "./team-member-utils"
 import { validateTeamName } from "./name-validation"
 import { withTeamTaskLock } from "./team-task-store"
 

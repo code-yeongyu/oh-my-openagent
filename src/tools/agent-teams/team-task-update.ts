@@ -10,6 +10,12 @@ import {
   ensureForwardStatusTransition,
   wouldCreateCycle,
 } from "./team-task-dependency"
+import {
+  applyAddedBlockedBy,
+  applyAddedBlocks,
+  removeCompletedTaskFromDependents,
+  removeDeletedTaskReferences,
+} from "./dependency-writer"
 import { TeamTask, TeamTaskSchema, TeamTaskStatus } from "./types"
 import { withTeamTaskLock } from "./team-task-store"
 
@@ -42,21 +48,20 @@ function writeTaskToPath(path: string, task: TeamTask): void {
   writeJsonAtomic(path, TeamTaskSchema.parse(task))
 }
 
+function assertPatchTaskReferences(patch: TeamTaskUpdatePatch): void {
+  for (const blockedTaskId of patch.addBlocks ?? []) {
+    assertValidTaskId(blockedTaskId)
+  }
+
+  for (const blockerId of patch.addBlockedBy ?? []) {
+    assertValidTaskId(blockerId)
+  }
+}
+
 export function updateTeamTask(teamName: string, taskId: string, patch: TeamTaskUpdatePatch): TeamTask {
   assertValidTeamName(teamName)
   assertValidTaskId(taskId)
-
-  if (patch.addBlocks) {
-    for (const blockedTaskId of patch.addBlocks) {
-      assertValidTaskId(blockedTaskId)
-    }
-  }
-
-  if (patch.addBlockedBy) {
-    for (const blockerId of patch.addBlockedBy) {
-      assertValidTaskId(blockerId)
-    }
-  }
+  assertPatchTaskReferences(patch)
 
   return withTeamTaskLock(teamName, () => {
     const taskDir = getTeamTaskDir(teamName)
@@ -147,35 +152,11 @@ export function updateTeamTask(teamName: string, taskId: string, patch: TeamTask
     const pendingWrites = new Map<string, TeamTask>()
 
     if (patch.addBlocks) {
-      const existingBlocks = new Set(nextTask.blocks)
-      for (const blockedTaskId of patch.addBlocks) {
-        if (!existingBlocks.has(blockedTaskId)) {
-          nextTask.blocks.push(blockedTaskId)
-          existingBlocks.add(blockedTaskId)
-        }
-
-        const otherPath = getTeamTaskPath(teamName, blockedTaskId)
-        const other = pendingWrites.get(otherPath) ?? readTask(blockedTaskId)
-        if (other && !other.blockedBy.includes(taskId)) {
-          pendingWrites.set(otherPath, { ...other, blockedBy: [...other.blockedBy, taskId] })
-        }
-      }
+      applyAddedBlocks({ teamName, taskId, task: nextTask, pendingWrites, readTask }, patch.addBlocks)
     }
 
     if (patch.addBlockedBy) {
-      const existingBlockedBy = new Set(nextTask.blockedBy)
-      for (const blockerId of patch.addBlockedBy) {
-        if (!existingBlockedBy.has(blockerId)) {
-          nextTask.blockedBy.push(blockerId)
-          existingBlockedBy.add(blockerId)
-        }
-
-        const otherPath = getTeamTaskPath(teamName, blockerId)
-        const other = pendingWrites.get(otherPath) ?? readTask(blockerId)
-        if (other && !other.blocks.includes(taskId)) {
-          pendingWrites.set(otherPath, { ...other, blocks: [...other.blocks, taskId] })
-        }
-      }
+      applyAddedBlockedBy({ teamName, taskId, task: nextTask, pendingWrites, readTask }, patch.addBlockedBy)
     }
 
     if (patch.metadata !== undefined) {
@@ -194,40 +175,16 @@ export function updateTeamTask(teamName: string, taskId: string, patch: TeamTask
       nextTask.status = patch.status
     }
 
-    const allTaskFiles = readdirSync(taskDir).filter((file) => file.endsWith(".json") && file.startsWith("T-"))
+    const allTaskIds = readdirSync(taskDir)
+      .filter((file) => file.endsWith(".json") && file.startsWith("T-"))
+      .map((file) => file.replace(/\.json$/, ""))
 
     if (nextTask.status === "completed") {
-      for (const file of allTaskFiles) {
-        const otherId = file.replace(/\.json$/, "")
-        if (otherId === taskId) continue
-
-        const otherPath = getTeamTaskPath(teamName, otherId)
-        const other = pendingWrites.get(otherPath) ?? readTask(otherId)
-        if (other?.blockedBy.includes(taskId)) {
-          pendingWrites.set(otherPath, {
-            ...other,
-            blockedBy: other.blockedBy.filter((id) => id !== taskId),
-          })
-        }
-      }
+      removeCompletedTaskFromDependents(teamName, taskId, allTaskIds, pendingWrites, readTask)
     }
 
     if (patch.status === "deleted") {
-      for (const file of allTaskFiles) {
-        const otherId = file.replace(/\.json$/, "")
-        if (otherId === taskId) continue
-
-        const otherPath = getTeamTaskPath(teamName, otherId)
-        const other = pendingWrites.get(otherPath) ?? readTask(otherId)
-        if (!other) continue
-
-        const nextOther = {
-          ...other,
-          blockedBy: other.blockedBy.filter((id) => id !== taskId),
-          blocks: other.blocks.filter((id) => id !== taskId),
-        }
-        pendingWrites.set(otherPath, nextOther)
-      }
+      removeDeletedTaskReferences(teamName, taskId, allTaskIds, pendingWrites, readTask)
     }
 
     for (const [path, task] of pendingWrites.entries()) {

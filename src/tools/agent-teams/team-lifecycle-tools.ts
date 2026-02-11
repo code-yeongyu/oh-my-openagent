@@ -8,8 +8,8 @@ import {
   TeamDeleteInputSchema,
   TeamReadConfigInputSchema,
   TeamToolContext,
-  isTeammateMember,
 } from "./types"
+import { isTeammateMember } from "./team-member-utils"
 import { createTeamConfig, deleteTeamData, listTeammates, readTeamConfig, readTeamConfigOrThrow } from "./team-config-store"
 
 function resolveReaderFromContext(config: TeamConfig, context: TeamToolContext): "team-lead" | string | null {

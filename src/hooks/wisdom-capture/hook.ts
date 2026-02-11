@@ -26,7 +26,6 @@ export function createWisdomCaptureHook(_ctx: PluginInput, options: WisdomCaptur
           }
           return learning
         },
-        learning,
         "memory",
       )
     },

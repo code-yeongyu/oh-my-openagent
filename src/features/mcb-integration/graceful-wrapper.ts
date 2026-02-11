@@ -7,7 +7,6 @@ export type McbOperationResult<T> =
 
 export async function withMcbFallback<T>(
   operation: () => Promise<T>,
-  _fallbackValue: T,
   toolName?: keyof McbToolAvailability,
 ): Promise<McbOperationResult<T>> {
   const status = getMcbAvailability()

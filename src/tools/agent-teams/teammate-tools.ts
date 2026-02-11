@@ -9,8 +9,8 @@ import {
   TeamProcessShutdownInputSchema,
   TeamSpawnInputSchema,
   TeamToolContext,
-  isTeammateMember,
 } from "./types"
+import { isTeammateMember } from "./team-member-utils"
 import { getTeamMember, readTeamConfigOrThrow, removeTeammate, updateTeamConfig } from "./team-config-store"
 import { cancelTeammateRun, spawnTeammate } from "./teammate-runtime"
 import { resetOwnerTasks } from "./team-task-store"
