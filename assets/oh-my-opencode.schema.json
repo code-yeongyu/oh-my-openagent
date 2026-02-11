@@ -114,7 +114,9 @@
           "cancel-ralph",
           "refactor",
           "start-work",
-          "stop-continuation"
+          "stop-continuation",
+          "handoff",
+          "switch-model"
         ]
       }
     },
