@@ -236,17 +236,10 @@ export class BackgroundManager {
     const parentDirectory = parentSession?.data?.directory ?? this.directory
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
 
-    const inheritedPermission = (parentSession as any)?.data?.permission
-    const permissionRules = Array.isArray(inheritedPermission)
-      ? inheritedPermission.filter((r: any) => r?.permission !== "question")
-      : []
-    permissionRules.push({ permission: "question", action: "deny" as const, pattern: "*" })
-
     const createResult = await this.client.session.create({
       body: {
         parentID: input.parentSessionID,
         title: `${input.description} (@${input.agent} subagent)`,
-        permission: permissionRules,
       } as any,
       query: {
         directory: parentDirectory,

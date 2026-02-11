@@ -3,7 +3,7 @@ import { describe, test, expect } from "bun:test"
 import { createTask, startTask } from "./spawner"
 
 describe("background-agent spawner.startTask", () => {
-  test("should inherit parent session permission rules (and force deny question)", async () => {
+  test("does not override parent session permission rules when creating child session", async () => {
     //#given
     const createCalls: any[] = []
     const parentPermission = [
@@ -57,9 +57,6 @@ describe("background-agent spawner.startTask", () => {
 
     //#then
     expect(createCalls).toHaveLength(1)
-    expect(createCalls[0]?.body?.permission).toEqual([
-      { permission: "plan_enter", action: "deny", pattern: "*" },
-      { permission: "question", action: "deny", pattern: "*" },
-    ])
+    expect(createCalls[0]?.body?.permission).toBeUndefined()
   })
 })
