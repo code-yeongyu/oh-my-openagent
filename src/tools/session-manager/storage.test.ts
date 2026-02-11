@@ -26,7 +26,7 @@ mock.module("./constants", () => ({
   TOOL_NAME_PREFIX: "session_",
 }))
 
-const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
+const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo, readSessionTranscript } =
   await import("./storage")
 
 const storage = await import("./storage")
@@ -133,6 +133,50 @@ describe("session-manager storage", () => {
 
     // then
     expect(todos).toEqual([])
+  })
+
+  test("readSessionTodos returns mapped todo items from matching JSON file", async () => {
+    // given
+    const sessionID = "ses_test123"
+    const todoData = [
+      { id: "msg_001", content: "implement feature", status: "pending", priority: "high" },
+      { id: "msg_002", content: "write tests", status: "completed", priority: "medium" },
+      { id: "msg_003", content: "update docs", status: "in_progress", priority: "low" },
+    ]
+
+    writeFileSync(join(TEST_TODO_DIR, `${sessionID}_todos.json`), JSON.stringify(todoData))
+
+    // when
+    const todos = await readSessionTodos(sessionID)
+
+    // then
+    expect(todos.length).toBe(3)
+    expect(todos[0]).toEqual({ id: "msg_001", content: "implement feature", status: "pending", priority: "high" })
+    expect(todos[1]).toEqual({ id: "msg_002", content: "write tests", status: "completed", priority: "medium" })
+    expect(todos[2]).toEqual({ id: "msg_003", content: "update docs", status: "in_progress", priority: "low" })
+  })
+
+  test("readSessionTranscript returns count of non-empty lines", async () => {
+    // given
+    const sessionID = "ses_test123"
+
+    const transcriptContent = [
+      '{"role":"user","content":"implement feature"}',
+      "",
+      '{"role":"assistant","content":"feature implemented"}',
+      "",
+      "",
+      '{"role":"user","content":"write tests"}',
+      '{"role":"assistant","content":"tests added"}',
+      "",
+    ].join("\n")
+    writeFileSync(join(TEST_TRANSCRIPT_DIR, `${sessionID}.jsonl`), transcriptContent)
+
+    // when
+    const lineCount = await readSessionTranscript(sessionID)
+
+    // then
+    expect(lineCount).toBe(4)
   })
 
   test("getSessionInfo returns null for non-existent session", async () => {
