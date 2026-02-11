@@ -22,7 +22,14 @@ export function readBoulderState(directory: string): BoulderState | null {
 
   try {
     const content = readFileSync(filePath, "utf-8")
-    return JSON.parse(content) as BoulderState
+    const parsed = JSON.parse(content)
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null
+    }
+    if (!Array.isArray(parsed.session_ids)) {
+      parsed.session_ids = []
+    }
+    return parsed as BoulderState
   } catch {
     return null
   }
@@ -48,7 +55,10 @@ export function appendSessionId(directory: string, sessionId: string): BoulderSt
   const state = readBoulderState(directory)
   if (!state) return null
 
-  if (!state.session_ids.includes(sessionId)) {
+  if (!state.session_ids?.includes(sessionId)) {
+    if (!Array.isArray(state.session_ids)) {
+      state.session_ids = []
+    }
     state.session_ids.push(sessionId)
     if (writeBoulderState(directory, state)) {
       return state

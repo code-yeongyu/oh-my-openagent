@@ -1,8 +1,24 @@
-import { describe, test, expect } from "bun:test"
+declare const require: (name: string) => any
+const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
 import { resolveCategoryExecution } from "./category-resolver"
 import type { ExecutorContext } from "./executor-types"
+import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 
 describe("resolveCategoryExecution", () => {
+	let connectedProvidersSpy: ReturnType<typeof spyOn> | undefined
+	let providerModelsSpy: ReturnType<typeof spyOn> | undefined
+
+	beforeEach(() => {
+		mock.restore()
+		connectedProvidersSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+		providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
+	})
+
+	afterEach(() => {
+		connectedProvidersSpy?.mockRestore()
+		providerModelsSpy?.mockRestore()
+	})
+
 	const createMockExecutorContext = (): ExecutorContext => ({
 		client: {} as any,
 		manager: {} as any,

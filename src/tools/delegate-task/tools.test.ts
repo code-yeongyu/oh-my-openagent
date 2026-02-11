@@ -1132,27 +1132,50 @@ describe("sisyphus-task", () => {
       launch: async () => mockTask,
     }
     
+     let messagesCallCount = 0
+
      const mockClient = {
-       session: {
-         prompt: async () => ({ data: {} }),
-         promptAsync: async () => ({ data: {} }),
-         messages: async () => ({
-           data: [
-             {
-               info: { id: "msg_001", role: "user", time: { created: Date.now() } },
-               parts: [{ type: "text", text: "Continue the task" }],
-             },
-             {
-               info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
-               parts: [{ type: "text", text: "This is the continued task result" }],
-             },
-           ],
-         }),
-         status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
-       },
-       config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-       app: {
-         agents: async () => ({ data: [] }),
+        session: {
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => {
+            messagesCallCount++
+            const now = Date.now()
+
+            const beforeContinuation = [
+              {
+                info: { id: "msg_001", role: "user", time: { created: now } },
+                parts: [{ type: "text", text: "Previous context" }],
+              },
+              {
+                info: { id: "msg_002", role: "assistant", time: { created: now + 1 }, finish: "end_turn" },
+                parts: [{ type: "text", text: "Previous result" }],
+              },
+            ]
+
+            if (messagesCallCount === 1) {
+              return { data: beforeContinuation }
+            }
+
+            return {
+              data: [
+                ...beforeContinuation,
+                {
+                  info: { id: "msg_003", role: "user", time: { created: now + 2 } },
+                  parts: [{ type: "text", text: "Continue the task" }],
+                },
+                {
+                  info: { id: "msg_004", role: "assistant", time: { created: now + 3 }, finish: "end_turn" },
+                  parts: [{ type: "text", text: "This is the continued task result" }],
+                },
+              ],
+            }
+          },
+          status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
+        },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        app: {
+          agents: async () => ({ data: [] }),
        },
      }
      

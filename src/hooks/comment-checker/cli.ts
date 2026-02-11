@@ -164,6 +164,8 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
   const jsonInput = JSON.stringify(input)
   debugLog("running comment-checker with input:", jsonInput.substring(0, 200))
 
+  let didTimeout = false
+
   try {
     const args = [binaryPath, "check"]
     if (customPrompt) {
@@ -176,29 +178,63 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
       stderr: "pipe",
     })
 
-    // Write JSON to stdin
-    proc.stdin.write(jsonInput)
-    proc.stdin.end()
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    const timeoutPromise = new Promise<"timeout">(resolve => {
+      timeoutId = setTimeout(() => {
+        didTimeout = true
+        debugLog("comment-checker timed out after 30s; killing process")
+        try {
+          proc.kill()
+        } catch (err) {
+          debugLog("failed to kill comment-checker process:", err)
+        }
+        resolve("timeout")
+      }, 30_000)
+    })
 
-    const stdout = await new Response(proc.stdout).text()
-    const stderr = await new Response(proc.stderr).text()
-    const exitCode = await proc.exited
+    try {
+      // Write JSON to stdin
+      proc.stdin.write(jsonInput)
+      proc.stdin.end()
 
-    debugLog("exit code:", exitCode, "stdout length:", stdout.length, "stderr length:", stderr.length)
+      const stdoutPromise = new Response(proc.stdout).text()
+      const stderrPromise = new Response(proc.stderr).text()
+      const exitCodePromise = proc.exited
 
-    if (exitCode === 0) {
+      const raceResult = await Promise.race([
+        Promise.all([stdoutPromise, stderrPromise, exitCodePromise] as const),
+        timeoutPromise,
+      ])
+
+      if (raceResult === "timeout") {
+        return { hasComments: false, message: "" }
+      }
+
+      const [stdout, stderr, exitCode] = raceResult
+
+      debugLog("exit code:", exitCode, "stdout length:", stdout.length, "stderr length:", stderr.length)
+
+      if (exitCode === 0) {
+        return { hasComments: false, message: "" }
+      }
+
+      if (exitCode === 2) {
+        // Comments detected - message is in stderr
+        return { hasComments: true, message: stderr }
+      }
+
+      // Error case
+      debugLog("unexpected exit code:", exitCode, "stderr:", stderr)
+      return { hasComments: false, message: "" }
+    } finally {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId)
+      }
+    }
+  } catch (err) {
+    if (didTimeout) {
       return { hasComments: false, message: "" }
     }
-
-    if (exitCode === 2) {
-      // Comments detected - message is in stderr
-      return { hasComments: true, message: stderr }
-    }
-
-    // Error case
-    debugLog("unexpected exit code:", exitCode, "stderr:", stderr)
-    return { hasComments: false, message: "" }
-  } catch (err) {
     debugLog("failed to run comment-checker:", err)
     return { hasComments: false, message: "" }
   }

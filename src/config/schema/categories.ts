@@ -20,6 +20,8 @@ export const CategoryConfigSchema = z.object({
   prompt_append: z.string().optional(),
   /** Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini/minimax models. */
   is_unstable_agent: z.boolean().optional(),
+  /** Disable this category. Disabled categories are excluded from task delegation. */
+  disable: z.boolean().optional(),
 })
 
 export const BuiltinCategoryNameSchema = z.enum([

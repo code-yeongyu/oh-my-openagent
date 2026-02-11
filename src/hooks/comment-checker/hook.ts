@@ -92,7 +92,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
       const toolLower = input.tool.toLowerCase()
 
       // Only skip if the output indicates a tool execution failure
-      const outputLower = output.output.toLowerCase()
+      const outputLower = (output.output ?? "").toLowerCase()
       const isToolFailure =
         outputLower.includes("error:") ||
         outputLower.includes("failed to") ||

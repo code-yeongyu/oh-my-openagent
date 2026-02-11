@@ -2,7 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentFactory } from "./types"
 import type { CategoriesConfig, CategoryConfig, GitMasterConfig } from "../config/schema"
 import type { BrowserAutomationProvider } from "../config/schema"
-import { DEFAULT_CATEGORIES } from "../tools/delegate-task/constants"
+import { mergeCategories } from "../shared/merge-categories"
 import { resolveMultipleSkills } from "../features/opencode-skill-loader/skill-content"
 
 export type AgentSource = AgentFactory | AgentConfig
@@ -20,9 +20,7 @@ export function buildAgent(
   disabledSkills?: Set<string>
 ): AgentConfig {
   const base = isFactory(source) ? source(model) : { ...source }
-  const categoryConfigs: Record<string, CategoryConfig> = categories
-    ? { ...DEFAULT_CATEGORIES, ...categories }
-    : DEFAULT_CATEGORIES
+  const categoryConfigs: Record<string, CategoryConfig> = mergeCategories(categories)
 
   const agentWithCategory = base as AgentConfig & { category?: string; skills?: string[]; variant?: string }
   if (agentWithCategory.category) {

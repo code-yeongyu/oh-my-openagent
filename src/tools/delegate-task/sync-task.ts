@@ -7,10 +7,7 @@ import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
-import { createSyncSession } from "./sync-session-creator"
-import { sendSyncPrompt } from "./sync-prompt-sender"
-import { pollSyncSession } from "./sync-session-poller"
-import { fetchSyncResult } from "./sync-result-fetcher"
+import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -20,7 +17,8 @@ export async function executeSyncTask(
   agentToUse: string,
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
-  modelInfo?: ModelFallbackInfo
+  modelInfo?: ModelFallbackInfo,
+  deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
   const { client, directory, onSyncSessionCreated } = executorCtx
   const toastManager = getTaskToastManager()
@@ -28,7 +26,7 @@ export async function executeSyncTask(
   let syncSessionID: string | undefined
 
   try {
-    const createSessionResult = await createSyncSession(client, {
+    const createSessionResult = await deps.createSyncSession(client, {
       parentSessionID: parentContext.sessionID,
       agentToUse,
       description: args.description,
@@ -89,7 +87,7 @@ export async function executeSyncTask(
       storeToolMetadata(ctx.sessionID, ctx.callID, syncTaskMeta)
     }
 
-    const promptError = await sendSyncPrompt(client, {
+    const promptError = await deps.sendSyncPrompt(client, {
       sessionID,
       agentToUse,
       args,
@@ -102,30 +100,25 @@ export async function executeSyncTask(
       return promptError
     }
 
-    const pollError = await pollSyncSession(ctx, client, {
-      sessionID,
-      agentToUse,
-      toastManager,
-      taskId,
-    })
-    if (pollError) {
-      return pollError
-    }
+    try {
+      const pollError = await deps.pollSyncSession(ctx, client, {
+        sessionID,
+        agentToUse,
+        toastManager,
+        taskId,
+      })
+      if (pollError) {
+        return pollError
+      }
 
-    const result = await fetchSyncResult(client, sessionID)
-    if (!result.ok) {
-      return result.error
-    }
+      const result = await deps.fetchSyncResult(client, sessionID)
+      if (!result.ok) {
+        return result.error
+      }
 
-    const duration = formatDuration(startTime)
+      const duration = formatDuration(startTime)
 
-    if (toastManager) {
-      toastManager.removeTask(taskId)
-    }
-
-    subagentSessions.delete(sessionID)
-
-    return `Task completed in ${duration}.
+      return `Task completed in ${duration}.
 
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
 
@@ -136,13 +129,12 @@ ${result.textContent || "(No text output)"}
 <task_metadata>
 session_id: ${sessionID}
 </task_metadata>`
+    } finally {
+      if (toastManager && taskId !== undefined) {
+        toastManager.removeTask(taskId)
+      }
+    }
   } catch (error) {
-    if (toastManager && taskId !== undefined) {
-      toastManager.removeTask(taskId)
-    }
-    if (syncSessionID) {
-      subagentSessions.delete(syncSessionID)
-    }
     return formatDetailedError(error, {
       operation: "Execute task",
       args,
@@ -150,5 +142,9 @@ session_id: ${sessionID}
       agent: agentToUse,
       category: args.category,
     })
+  } finally {
+    if (syncSessionID) {
+      subagentSessions.delete(syncSessionID)
+    }
   }
 }

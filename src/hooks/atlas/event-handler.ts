@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
-import { getMainSessionID, subagentSessions } from "../../features/claude-code-session-state"
+import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./hook-name"
 import { isAbortError } from "./is-abort-error"
@@ -41,15 +41,13 @@ export function createAtlasEventHandler(input: {
 
       // Read boulder state FIRST to check if this session is part of an active boulder
       const boulderState = readBoulderState(ctx.directory)
-      const isBoulderSession = boulderState?.session_ids.includes(sessionID) ?? false
+      const isBoulderSession = boulderState?.session_ids?.includes(sessionID) ?? false
 
-      const mainSessionID = getMainSessionID()
-      const isMainSession = sessionID === mainSessionID
       const isBackgroundTaskSession = subagentSessions.has(sessionID)
 
-      // Allow continuation if: main session OR background task OR boulder session
-      if (mainSessionID && !isMainSession && !isBackgroundTaskSession && !isBoulderSession) {
-        log(`[${HOOK_NAME}] Skipped: not main, background task, or boulder session`, { sessionID })
+      // Allow continuation only if: session is in boulder's session_ids OR is a background task
+      if (!isBackgroundTaskSession && !isBoulderSession) {
+        log(`[${HOOK_NAME}] Skipped: not boulder or background task session`, { sessionID })
         return
       }
 
@@ -124,16 +122,21 @@ export function createAtlasEventHandler(input: {
 
       state.lastContinuationInjectedAt = now
       const remaining = progress.total - progress.completed
-      injectBoulderContinuation({
-        ctx,
-        sessionID,
-        planName: boulderState.plan_name,
-        remaining,
-        total: progress.total,
-        agent: boulderState.agent,
-        backgroundManager,
-        sessionState: state,
-      })
+      try {
+        await injectBoulderContinuation({
+          ctx,
+          sessionID,
+          planName: boulderState.plan_name,
+          remaining,
+          total: progress.total,
+          agent: boulderState.agent,
+          backgroundManager,
+          sessionState: state,
+        })
+      } catch (err) {
+        log(`[${HOOK_NAME}] Failed to inject boulder continuation`, { sessionID, error: err })
+        state.promptFailureCount++
+      }
       return
     }
 

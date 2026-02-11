@@ -8,7 +8,6 @@ export function migrateConfigFile(
   configPath: string,
   rawConfig: Record<string, unknown>
 ): boolean {
-  // Work on a deep copy — only apply changes to rawConfig if file write succeeds
   const copy = structuredClone(rawConfig)
   let needsWrite = false
 
@@ -98,28 +97,36 @@ export function migrateConfigFile(
   }
 
   if (needsWrite) {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
+    const backupPath = `${configPath}.bak.${timestamp}`
+    let backupSucceeded = false
     try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-      const backupPath = `${configPath}.bak.${timestamp}`
-      try {
-        fs.copyFileSync(configPath, backupPath)
-      } catch {
-        // Original file may not exist yet — skip backup
-      }
-
-      fs.writeFileSync(configPath, JSON.stringify(copy, null, 2) + "\n", "utf-8")
-      log(`Migrated config file: ${configPath} (backup: ${backupPath})`)
-    } catch (err) {
-      log(`Failed to write migrated config to ${configPath}:`, err)
-      // File write failed — rawConfig is untouched, preserving user's original values
-      return false
+      fs.copyFileSync(configPath, backupPath)
+      backupSucceeded = true
+    } catch {
+      // Original file may not exist yet — skip backup
     }
 
-    // File write succeeded — apply changes to the original rawConfig
+    let writeSucceeded = false
+    try {
+      fs.writeFileSync(configPath, JSON.stringify(copy, null, 2) + "\n", "utf-8")
+      writeSucceeded = true
+    } catch (err) {
+      log(`Failed to write migrated config to ${configPath}:`, err)
+    }
+
     for (const key of Object.keys(rawConfig)) {
       delete rawConfig[key]
     }
     Object.assign(rawConfig, copy)
+
+    if (writeSucceeded) {
+      const backupMessage = backupSucceeded ? ` (backup: ${backupPath})` : ""
+      log(`Migrated config file: ${configPath}${backupMessage}`)
+    } else {
+      const backupMessage = backupSucceeded ? ` (backup: ${backupPath})` : ""
+      log(`Applied migrated config in-memory for: ${configPath}${backupMessage}`)
+    }
   }
 
   return needsWrite

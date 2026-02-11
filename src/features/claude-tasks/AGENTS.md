@@ -48,6 +48,42 @@ interface Task {
 | `generateTaskId()` | `T-{uuid}` format |
 | `findTaskAcrossSessions(config, taskId)` | Locate task in any session |
 
+## TODO SYNC
+
+Automatic bidirectional synchronization between tasks and OpenCode's todo system.
+
+| Function | Purpose |
+|----------|---------|
+| `syncTaskToTodo(task)` | Convert Task to TodoInfo, returns `null` for deleted tasks |
+| `syncTaskTodoUpdate(ctx, task, sessionID, writer?)` | Fetch current todos, update specific task, write back |
+| `syncAllTasksToTodos(ctx, tasks, sessionID?)` | Bulk sync multiple tasks to todos |
+
+### Status Mapping
+
+| Task Status | Todo Status |
+|-------------|-------------|
+| `pending` | `pending` |
+| `in_progress` | `in_progress` |
+| `completed` | `completed` |
+| `deleted` | `null` (removed from todos) |
+
+### Field Mapping
+
+| Task Field | Todo Field |
+|------------|------------|
+| `task.id` | `todo.id` |
+| `task.subject` | `todo.content` |
+| `task.status` (mapped) | `todo.status` |
+| `task.metadata.priority` | `todo.priority` |
+
+Priority values: `"low"`, `"medium"`, `"high"`
+
+### Automatic Sync Triggers
+
+Sync occurs automatically on:
+- `task_create` — new task added to todos
+- `task_update` — task changes reflected in todos
+
 ## ANTI-PATTERNS
 
 - Direct fs operations (use storage utilities)

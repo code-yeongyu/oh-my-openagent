@@ -14,7 +14,8 @@ import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import { fetchAvailableModels, readConnectedProvidersCache } from "../shared"
-import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
+import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
+import { mergeCategories } from "../shared/merge-categories"
 import { buildAvailableSkills } from "./builtin-agents/available-skills"
 import { collectPendingBuiltinAgents } from "./builtin-agents/general-agents"
 import { maybeCreateSisyphusConfig } from "./builtin-agents/sisyphus-agent"
@@ -63,7 +64,8 @@ export async function createBuiltinAgents(
   customAgentSummaries?: unknown,
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
-  disabledSkills?: Set<string>
+  disabledSkills?: Set<string>,
+  useTaskSystem = false
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
   // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
@@ -77,9 +79,7 @@ export async function createBuiltinAgents(
 
   const result: Record<string, AgentConfig> = {}
 
-  const mergedCategories = categories
-    ? { ...DEFAULT_CATEGORIES, ...categories }
-    : DEFAULT_CATEGORIES
+  const mergedCategories = mergeCategories(categories)
 
   const availableCategories: AvailableCategory[] = Object.entries(mergedCategories).map(([name]) => ({
     name,
@@ -134,6 +134,7 @@ export async function createBuiltinAgents(
     mergedCategories,
     directory,
     userCategories: categories,
+    useTaskSystem,
   })
   if (sisyphusConfig) {
     result["sisyphus"] = sisyphusConfig
@@ -150,6 +151,7 @@ export async function createBuiltinAgents(
     availableCategories,
     mergedCategories,
     directory,
+    useTaskSystem,
   })
   if (hephaestusConfig) {
     result["hephaestus"] = hephaestusConfig

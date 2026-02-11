@@ -48,7 +48,7 @@ export async function executeBackgroundAgent(
 				return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
 			}
 			const updated = manager.getTask(task.id)
-			if (updated?.status === "error" || updated?.status === "cancelled") {
+			if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
 				return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
 			}
 			await new Promise<void>((resolve) => {

@@ -32,6 +32,8 @@ export function handleSessionStatus(ctx: RunContext, payload: EventPayload, stat
     state.mainSessionIdle = false
   } else if (props?.status?.type === "idle") {
     state.mainSessionIdle = true
+  } else if (props?.status?.type === "retry") {
+    state.mainSessionIdle = false
   }
 }
 

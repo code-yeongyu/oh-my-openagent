@@ -13,6 +13,7 @@ export async function promptSubagentSession(
 				tools: {
 					...getAgentToolRestrictions(options.agent),
 					task: false,
+					question: false,
 				},
 				parts: [{ type: "text", text: options.prompt }],
 			},

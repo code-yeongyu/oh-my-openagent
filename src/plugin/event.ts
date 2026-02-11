@@ -53,11 +53,13 @@ export function createEventHandler(args: {
   }
 
   const recentSyntheticIdles = new Map<string, number>()
+  const recentRealIdles = new Map<string, number>()
   const DEDUP_WINDOW_MS = 500
 
   return async (input): Promise<void> => {
     pruneRecentSyntheticIdles({
       recentSyntheticIdles,
+      recentRealIdles,
       now: Date.now(),
       dedupWindowMs: DEDUP_WINDOW_MS,
     })
@@ -70,6 +72,7 @@ export function createEventHandler(args: {
           recentSyntheticIdles.delete(sessionID)
           return
         }
+        recentRealIdles.set(sessionID, Date.now())
       }
     }
 
@@ -78,6 +81,11 @@ export function createEventHandler(args: {
     const syntheticIdle = normalizeSessionStatusToIdle(input)
     if (syntheticIdle) {
       const sessionID = (syntheticIdle.event.properties as Record<string, unknown>)?.sessionID as string
+      const emittedAt = recentRealIdles.get(sessionID)
+      if (emittedAt && Date.now() - emittedAt < DEDUP_WINDOW_MS) {
+        recentRealIdles.delete(sessionID)
+        return
+      }
       recentSyntheticIdles.set(sessionID, Date.now())
       await dispatchToHooks(syntheticIdle)
     }

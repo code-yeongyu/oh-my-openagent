@@ -1520,7 +1520,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
   })
 
   describe("task transitions pending→running when slot available", () => {
-    test("should inherit parent session permission rules (and force deny question)", async () => {
+    test("does not override parent session permission when creating child session", async () => {
       // given
       const createCalls: any[] = []
       const parentPermission = [
@@ -1562,11 +1562,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // then
       expect(createCalls).toHaveLength(1)
-      const permission = createCalls[0]?.body?.permission
-      expect(permission).toEqual([
-        { permission: "plan_enter", action: "deny", pattern: "*" },
-        { permission: "question", action: "deny", pattern: "*" },
-      ])
+      expect(createCalls[0]?.body?.permission).toBeUndefined()
     })
 
     test("should transition first task to running immediately", async () => {
