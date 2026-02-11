@@ -11,7 +11,7 @@ import { pollForCompletion } from "./poll-for-completion"
 
 export { resolveRunAgent }
 
-const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
+const DEFAULT_TIMEOUT_MS = 600_000
 
 export async function run(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLI_RUN_MODE = "true"
@@ -67,7 +67,9 @@ export async function run(options: RunOptions): Promise<number> {
       const ctx: RunContext = { client, sessionID, directory, abortController }
       const events = await client.event.subscribe()
       const eventState = createEventState()
-      const eventProcessor = processEvents(ctx, events.stream, eventState)
+      const eventProcessor = processEvents(ctx, events.stream, eventState).catch(
+        () => {},
+      )
 
       console.log(pc.dim("\nSending prompt..."))
       await client.session.promptAsync({
@@ -79,11 +81,14 @@ export async function run(options: RunOptions): Promise<number> {
         query: { directory },
       })
 
-      console.log(pc.dim("Waiting for completion...\n"))
-      const exitCode = await pollForCompletion(ctx, eventState, abortController)
+       console.log(pc.dim("Waiting for completion...\n"))
+       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
-      await eventProcessor.catch(() => {})
-      cleanup()
+       // Abort the event stream to stop the processor
+       abortController.abort()
+
+       await eventProcessor
+       cleanup()
 
       const durationMs = Date.now() - startTime
 
@@ -122,5 +127,4 @@ export async function run(options: RunOptions): Promise<number> {
     return 1
   }
 }
-
 

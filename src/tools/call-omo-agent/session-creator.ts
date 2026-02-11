@@ -1,5 +1,6 @@
 import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 
 export async function createOrGetSession(
@@ -38,9 +39,6 @@ export async function createOrGetSession(
       body: {
         parentID: toolContext.sessionID,
         title: `${args.description} (@${args.subagent_type} subagent)`,
-        permission: [
-          { permission: "question", action: "deny" as const, pattern: "*" },
-        ],
       } as any,
       query: {
         directory: parentDirectory,
@@ -65,6 +63,7 @@ Original error: ${createResult.error}`)
 
     const sessionID = createResult.data.id
     log(`[call_omo_agent] Created session: ${sessionID}`)
+    subagentSessions.add(sessionID)
     return { sessionID, isNew: true }
   }
 }

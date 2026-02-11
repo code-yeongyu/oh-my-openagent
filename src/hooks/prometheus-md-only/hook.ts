@@ -40,20 +40,6 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
         return
       }
 
-      // Block bash commands completely - Prometheus is read-only
-      if (toolName === "bash") {
-        log(`[${HOOK_NAME}] Blocked: Prometheus cannot execute bash commands`, {
-          sessionID: input.sessionID,
-          tool: toolName,
-          agent: agentName,
-        })
-        throw new Error(
-          `[${HOOK_NAME}] ${getAgentDisplayName("prometheus")} cannot execute bash commands. ` +
-          `${getAgentDisplayName("prometheus")} is a READ-ONLY planner. Use /start-work to execute the plan. ` +
-          `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
-        )
-      }
-
       const filePath = (output.args.filePath ?? output.args.path ?? output.args.file) as string | undefined
       if (!filePath) {
         return

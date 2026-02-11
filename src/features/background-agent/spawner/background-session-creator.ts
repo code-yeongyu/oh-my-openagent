@@ -15,7 +15,6 @@ export async function createBackgroundSession(options: {
   const body = {
     parentID: input.parentSessionID,
     title: `Background: ${input.description}`,
-    permission: [{ permission: "question", action: "deny" as const, pattern: "*" }],
   }
 
   const createResult = await client.session
