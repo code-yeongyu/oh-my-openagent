@@ -88,7 +88,9 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
         return `No exact match for "/${commandName}". Did you mean: ${matchList}?\n\n${formatCommandList(allItems)}`
       }
 
-      return `Command or skill "/${commandName}" not found.\n\n${formatCommandList(allItems)}\n\nTry a different name.`
+      return commandName.includes(":") 
+        ? `Marketplace plugin commands like "/${commandName}" are not supported. Use .claude/commands/ for custom commands.\n\n${formatCommandList(allItems)}`
+        : `Command or skill "/${commandName}" not found.\n\n${formatCommandList(allItems)}\n\nTry a different name.`
     },
   })
 }
