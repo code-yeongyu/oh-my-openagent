@@ -9,6 +9,7 @@ export type { McbOperationResult } from "./graceful-wrapper"
 export { initializeMcbFromConfig } from "./config-gate"
 export { callMcbTool, createDefaultArgs, createMcbTestClient, parseMcbToolResponse } from "./mcb-client-helper"
 export type { McbTestClient } from "./mcb-client-helper"
+export { discoverValidAgentType, waitForIndexReady } from "./mcb-roundtrip-helpers"
 export {
   clearQueue,
   dequeueOperation,
