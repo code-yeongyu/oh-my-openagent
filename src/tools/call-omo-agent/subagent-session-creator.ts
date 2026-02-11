@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
+import { subagentSessions } from "../../features/claude-code-session-state"
 import type { CallOmoAgentArgs } from "./types"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
 
@@ -63,5 +64,6 @@ Original error: ${createResult.error}`,
 
 	const sessionID = createResult.data.id
 	log(`[call_omo_agent] Created session: ${sessionID}`)
+	subagentSessions.add(sessionID)
 	return { ok: true, sessionID }
 }
