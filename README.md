@@ -280,10 +280,10 @@ To remove oh-my-opencode:
 
    ```bash
    # Remove user config
-   rm -f ~/.config/opencode/oh-my-opencode.json
+   rm -f ~/.config/opencode/oh-my-opencode.json ~/.config/opencode/oh-my-opencode.jsonc
 
    # Remove project config (if exists)
-   rm -f .opencode/oh-my-opencode.json
+   rm -f .opencode/oh-my-opencode.json .opencode/oh-my-opencode.jsonc
    ```
 
 3. **Verify removal**
@@ -314,7 +314,7 @@ Highly opinionated, but adjustable to taste.
 See the full [Configuration Documentation](docs/configurations.md) for detailed information.
 
 **Quick Overview:**
-- **Config Locations**: `.opencode/oh-my-opencode.json` (project) or `~/.config/opencode/oh-my-opencode.json` (user)
+- **Config Locations**: `.opencode/oh-my-opencode.jsonc` or `.opencode/oh-my-opencode.json` (project), `~/.config/opencode/oh-my-opencode.jsonc` or `~/.config/opencode/oh-my-opencode.json` (user)
 - **JSONC Support**: Comments and trailing commas supported
 - **Agents**: Override models, temperatures, prompts, and permissions for any agent
 - **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits)
