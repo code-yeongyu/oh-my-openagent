@@ -1,7 +1,7 @@
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
-import { DEFAULT_CATEGORIES } from "./constants"
+import { mergeCategories } from "../../shared/merge-categories"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
 import { parseModelString } from "./model-string-parser"
@@ -30,7 +30,8 @@ export async function resolveCategoryExecution(
   const availableModels = await getAvailableModelsForDelegateTask(client)
 
   const categoryName = args.category!
-  const categoryExists = DEFAULT_CATEGORIES[categoryName] !== undefined || userCategories?.[categoryName] !== undefined
+  const enabledCategories = mergeCategories(userCategories)
+  const categoryExists = enabledCategories[categoryName] !== undefined
 
   const resolved = resolveCategoryConfig(categoryName, {
     userCategories,
@@ -41,7 +42,7 @@ export async function resolveCategoryExecution(
 
   if (!resolved) {
     const requirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
-    const allCategoryNames = Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")
+    const allCategoryNames = Object.keys(enabledCategories).join(", ")
 
     if (categoryExists && requirement?.requiresModel) {
       return {
@@ -146,7 +147,7 @@ Available categories: ${allCategoryNames}`,
   const categoryPromptAppend = resolved.promptAppend || undefined
 
   if (!categoryModel && !actualModel) {
-    const categoryNames = Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories })
+    const categoryNames = Object.keys(enabledCategories)
     return {
       agentToUse: "",
       categoryModel: undefined,
