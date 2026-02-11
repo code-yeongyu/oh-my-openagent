@@ -18,7 +18,8 @@ export {
 } from "./sync-queue"
 export { emitMcbDegradationWarning, resetWarningState } from "./degradation-warnings"
 export { attemptRecoverySync } from "./recovery-sync"
-export type { RecoverySyncResult } from "./recovery-sync"
+export type { RecoverySyncResult, McbOperationExecutor } from "./recovery-sync"
+export { handleMcbSessionCreated } from "./session-lifecycle"
 export type { QueuedMcbOperation, SyncQueueConfig } from "./sync-queue-types"
 export type {
   McbSearchParams,

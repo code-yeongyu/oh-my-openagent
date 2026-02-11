@@ -7,6 +7,7 @@ import {
   frontendUiUxSkill,
   gitMasterSkill,
   devBrowserSkill,
+  mcbSkill,
 } from "./skills/index"
 
 export interface CreateBuiltinSkillsOptions {
@@ -19,7 +20,7 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
 
   const browserSkill = browserProvider === "agent-browser" ? agentBrowserSkill : playwrightSkill
 
-  const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill]
+  const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill, mcbSkill]
 
   if (!disabledSkills) {
     return skills

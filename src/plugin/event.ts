@@ -7,6 +7,7 @@ import {
   setMainSession,
   updateSessionAgent,
 } from "../features/claude-code-session-state"
+import { handleMcbSessionCreated, type McbOperationExecutor } from "../features/mcb-integration"
 import { resetMessageCursor } from "../shared"
 import { lspManager } from "../tools"
 
@@ -94,6 +95,15 @@ export function createEventHandler(args: {
       }
 
       firstMessageVariantGate.markSessionCreated(sessionInfo)
+
+      const mcbExecutor: McbOperationExecutor = async (op) => {
+        const info = { serverName: "mcb", skillName: "oc-mcb", sessionID: sessionInfo?.id ?? "main" }
+        const mcbConfig = { command: "mcb", args: ["serve"] }
+        const context = { config: mcbConfig, skillName: "oc-mcb" }
+        const toolName = `mcb_${op.tool}`
+        await managers.skillMcpManager.callTool(info, context, toolName, { action: op.action, ...op.params })
+      }
+      handleMcbSessionCreated(ctx.directory, mcbExecutor)
 
       await managers.tmuxSessionManager.onSessionCreated(
         event as {

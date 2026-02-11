@@ -6,7 +6,7 @@ Memory Context Bank (MCB) integration for oh-my-opencode. Provides semantic code
 
 ## Prerequisites
 
-- An MCB server running and accessible via HTTP
+- MCB binary installed (`mcb` v0.2.1+) — [github.com/marlonsc/mcb](https://github.com/marlonsc/mcb)
 - oh-my-opencode v3.4.0+
 
 ## Quick Start
@@ -16,13 +16,14 @@ Add to your `.opencode/oh-my-opencode.json` (project-level) or `~/.config/openco
 ```jsonc
 {
   "mcb": {
-    "enabled": true,
-    "url": "http://localhost:3100"
+    "enabled": true
   }
 }
 ```
 
-That's it. All MCB tools are enabled by default when `enabled` is `true`.
+That's it. MCB connects via stdio (`mcb serve`) by default. All MCB tools are enabled when `enabled` is `true`.
+
+MCB is also registered as a builtin skill (`oc-mcb`), which means agents can load it via `load_skills=["oc-mcb"]` to get access to MCB tools.
 
 ## Configuration Reference
 
@@ -35,7 +36,19 @@ All fields are optional. MCB is disabled unless `enabled` is explicitly set to `
     // Default: undefined (treated as disabled)
     "enabled": true,
 
-    // MCB server URL. Must be a valid URL.
+    // MCB binary command. Default: "mcb"
+    "command": "mcb",
+
+    // Arguments passed to the command. Default: ["serve"]
+    "args": ["serve"],
+
+    // Environment variables for the MCB process.
+    "env": {},
+
+    // MCB data directory override.
+    "data_dir": "/path/to/mcb-data",
+
+    // MCB server URL (legacy/alternative — for HTTP transport).
     "url": "http://localhost:3100",
 
     // Default collection for search and indexing operations.
@@ -62,7 +75,11 @@ All fields are optional. MCB is disabled unless `enabled` is explicitly set to `
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `enabled` | `boolean` | `undefined` | Master switch. MCB is inactive unless explicitly `true`. |
-| `url` | `string` (URL) | - | MCB server endpoint. Required when `enabled` is `true`. |
+| `command` | `string` | `"mcb"` | MCB binary command for stdio transport. |
+| `args` | `string[]` | `["serve"]` | Arguments passed to the MCB command. |
+| `env` | `Record<string, string>` | - | Environment variables for the MCB process. |
+| `data_dir` | `string` | - | Override MCB data directory. |
+| `url` | `string` (URL) | - | MCB server endpoint (legacy — for HTTP transport). |
 | `default_collection` | `string` | - | Default collection name for search/index operations. |
 | `auto_index` | `boolean` | - | Auto-index project codebase on plugin startup. |
 | `tools.search` | `boolean` | `true` | Enable semantic code search (`mcb_search`). |
@@ -82,7 +99,6 @@ Best for: individual developers who want semantic search and cross-session memor
 {
   "mcb": {
     "enabled": true,
-    "url": "http://localhost:3100",
     "tools": {
       "search": true,
       "memory": true,
@@ -103,7 +119,6 @@ Best for: active development workflows where you want code quality checks and au
 {
   "mcb": {
     "enabled": true,
-    "url": "http://localhost:3100",
     "auto_index": true,
     "tools": {
       "search": true,
@@ -125,7 +140,6 @@ Best for: teams or power users who want the complete MCB experience including gi
 {
   "mcb": {
     "enabled": true,
-    "url": "http://localhost:3100",
     "default_collection": "my-project",
     "auto_index": true,
     "tools": {
@@ -140,7 +154,13 @@ Best for: teams or power users who want the complete MCB experience including gi
 }
 ```
 
-## How It Works
+## Architecture
+
+### Transport
+
+MCB connects via **stdio** by default. When an agent loads the `oc-mcb` skill or a tool call targets MCB, the `SkillMcpManager` spawns `mcb serve` as a child process and communicates over stdin/stdout using the MCP protocol.
+
+The connection is **lazy** — the MCB process is only spawned on the first tool call, not at plugin startup. This means zero overhead when MCB is enabled but not used.
 
 ### Config Gate
 
@@ -156,13 +176,21 @@ This lock-on-startup design means:
 
 ### Graceful Degradation
 
-Every MCB operation is wrapped in a fallback layer. If an MCB call fails at runtime (server unreachable, timeout, unexpected error):
+Every MCB operation is wrapped in a fallback layer. If an MCB call fails at runtime (binary not found, process crash, unexpected error):
 
 - The operation returns a degraded result instead of throwing
 - The specific tool that failed is automatically marked unavailable for subsequent calls
+- A one-time warning is emitted describing which capabilities are affected
+- Failed operations are queued to disk for later replay
 - The rest of oh-my-opencode continues working normally
 
-This means a flaky MCB server will never crash your session. At worst, you lose MCB features for that session while everything else keeps working.
+This means MCB issues will never crash your session. At worst, you lose MCB features while everything else keeps working.
+
+### Recovery
+
+On `session.created`, oh-my-opencode automatically:
+1. Resets degradation warnings (so they can re-emit in the new session)
+2. Attempts to replay any queued operations from previous failed MCB calls (fire-and-forget, non-blocking)
 
 ## MCB Tools Reference
 
@@ -237,13 +265,14 @@ Session lifecycle management for tracking work across conversations.
 ### MCB tools not appearing
 
 - Verify `"enabled": true` is set in your config
+- Check that `mcb` is in your PATH: `which mcb`
 - Check that your config file is in the correct location (`.opencode/oh-my-opencode.json` or `~/.config/opencode/oh-my-opencode.json`)
 - Restart your opencode session (MCB config is evaluated once at startup)
 
 ### MCB calls returning degraded results
 
-- Check that your MCB server is running and accessible at the configured `url`
-- Verify network connectivity: `curl http://localhost:3100/health`
+- Check that the MCB binary is installed and runnable: `mcb --version`
+- If using a custom binary path, set `"command": "/path/to/mcb"` in config
 - If a tool was auto-disabled due to errors, restart the session to re-enable it
 
 ### Config changes not taking effect
@@ -254,4 +283,4 @@ MCB availability is locked at startup. Any config changes require restarting the
 
 - Check the `tools` section in your config — individual tools can be disabled
 - Some tools have known limitations (see AGENTS.md for current MCB tool status)
-- Ensure the MCB server version supports the tool you're trying to use
+- Ensure the MCB binary version supports the tool you're trying to use (v0.2.1+ recommended)
