@@ -15,7 +15,7 @@ import { isGptModel } from "../types"
 import type { AvailableAgent, AvailableSkill, AvailableCategory } from "../dynamic-agent-prompt-builder"
 import { buildCategorySkillsDelegationGuide } from "../dynamic-agent-prompt-builder"
 import type { CategoryConfig } from "../../config/schema"
-import { DEFAULT_CATEGORIES } from "../../tools/delegate-task/constants"
+import { mergeCategories } from "../../shared/merge-categories"
 import { createAgentToolRestrictions } from "../../shared/permission-compat"
 
 import { getDefaultAtlasPrompt } from "./default"
@@ -70,7 +70,7 @@ function buildDynamicOrchestratorPrompt(ctx?: OrchestratorContext): string {
   const userCategories = ctx?.userCategories
   const model = ctx?.model
 
-  const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
+  const allCategories = mergeCategories(userCategories)
   const availableCategories: AvailableCategory[] = Object.entries(allCategories).map(([name]) => ({
     name,
     description: getCategoryDescription(name, userCategories),

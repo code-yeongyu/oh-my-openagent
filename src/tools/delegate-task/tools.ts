@@ -1,6 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
-import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "./constants"
+import { CATEGORY_DESCRIPTIONS } from "./constants"
+import { mergeCategories } from "../../shared/merge-categories"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
 import type {
@@ -26,7 +27,7 @@ export { buildSystemContent } from "./prompt-builder"
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
   const { userCategories } = options
 
-  const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
+  const allCategories = mergeCategories(userCategories)
   const categoryNames = Object.keys(allCategories)
   const categoryExamples = categoryNames.map(k => `'${k}'`).join(", ")
 
