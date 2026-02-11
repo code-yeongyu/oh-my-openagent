@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from "bun:test"
-import { getMcbAvailability, markMcbUnavailable, resetMcbAvailability } from "./availability"
+import {
+  getMcbAvailability,
+  lockMcbAvailability,
+  markMcbAvailable,
+  markMcbUnavailable,
+  resetMcbAvailability,
+} from "./availability"
 
 describe("mcb-integration/availability", () => {
   beforeEach(() => {
@@ -60,5 +66,40 @@ describe("mcb-integration/availability", () => {
     resetMcbAvailability()
     const status = getMcbAvailability()
     expect(status.tools.search).toBe(true)
+  })
+
+  //#given a globally unavailable MCB
+  //#when markMcbAvailable is called without args
+  //#then global availability is restored
+  it("restores global availability", () => {
+    getMcbAvailability()
+    markMcbUnavailable()
+    markMcbAvailable()
+    const status = getMcbAvailability()
+    expect(status.available).toBe(true)
+  })
+
+  //#given an unavailable tool
+  //#when markMcbAvailable is called with the tool name
+  //#then only that tool is restored
+  it("restores specific tool availability", () => {
+    getMcbAvailability()
+    markMcbUnavailable("memory")
+    markMcbAvailable("memory")
+    const status = getMcbAvailability()
+    expect(status.tools.memory).toBe(true)
+    expect(status.tools.search).toBe(true)
+  })
+
+  //#given a locked availability state
+  //#when markMcbAvailable is called
+  //#then runtime recovery still updates availability
+  it("restores availability even when config is locked", () => {
+    getMcbAvailability()
+    lockMcbAvailability()
+    markMcbUnavailable("memory")
+    markMcbAvailable("memory")
+    const status = getMcbAvailability()
+    expect(status.tools.memory).toBe(true)
   })
 })

@@ -59,6 +59,17 @@ export async function ingestArtifacts(
       const mcbResult = await withMcbFallback(
         () => storeOperation(artifact),
         "memory",
+        {
+          tool: "memory",
+          action: "store",
+          params: {
+            relativePath: artifact.relativePath,
+            contentHash: artifact.contentHash,
+          },
+          maxRetries: 3,
+          source: "artifact-ingestion",
+        },
+        projectDir,
       )
 
       if (!mcbResult.success) {

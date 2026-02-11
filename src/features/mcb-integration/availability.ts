@@ -41,6 +41,18 @@ export function markMcbUnavailable(tool?: keyof McbToolAvailability): void {
   }
 }
 
+export function markMcbAvailable(tool?: keyof McbToolAvailability): void {
+  if (!cachedStatus) {
+    getMcbAvailability()
+  }
+
+  if (tool && cachedStatus) {
+    cachedStatus.tools[tool] = true
+  } else if (cachedStatus) {
+    cachedStatus.available = true
+  }
+}
+
 export function resetMcbAvailability(): void {
   cachedStatus = null
   configLocked = false

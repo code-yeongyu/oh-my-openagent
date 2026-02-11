@@ -3,7 +3,7 @@ import { withMcbFallback } from "../../features/mcb-integration"
 import { detectLearning, detectOutcome } from "./learning-detector"
 import type { ToolOutcome, WisdomCaptureOptions, ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 
-export function createWisdomCaptureHook(_ctx: PluginInput, options: WisdomCaptureOptions = {}) {
+export function createWisdomCaptureHook(ctx: PluginInput, options: WisdomCaptureOptions = {}) {
   const outcomeByTool = new Map<string, ToolOutcome>()
 
   return {
@@ -27,6 +27,19 @@ export function createWisdomCaptureHook(_ctx: PluginInput, options: WisdomCaptur
           return learning
         },
         "memory",
+        {
+          tool: "memory",
+          action: "store",
+          params: {
+            kind: learning.kind,
+            summary: learning.summary,
+            tool: learning.tool,
+          },
+          maxRetries: 3,
+          source: "wisdom-capture",
+          sessionId: input.sessionID,
+        },
+        ctx.directory,
       )
     },
   }
