@@ -43,6 +43,7 @@ export function createEditErrorRecoveryHook(_ctx: PluginInput) {
       output: { title: string; output: string; metadata: unknown }
     ) => {
       if (input.tool.toLowerCase() !== "edit") return
+      if (typeof output.output !== "string") return
 
       const outputLower = output.output.toLowerCase()
       const hasEditError = EDIT_ERROR_PATTERNS.some((pattern) =>
