@@ -19,6 +19,7 @@ import {
   createAstGrepTools,
   createSessionManagerTools,
   createDelegateTask,
+  createAgentTeamsTools,
   discoverCommandsSync,
   interactive_bash,
   createTaskCreateTool,
@@ -117,6 +118,15 @@ export function createToolRegistry(args: {
       }
     : {}
 
+  const agentTeamsEnabled = pluginConfig.experimental?.agent_teams ?? false
+  const agentTeamsRecord: Record<string, ToolDefinition> = agentTeamsEnabled
+    ? createAgentTeamsTools(managers.backgroundManager, {
+        client: ctx.client,
+        userCategories: pluginConfig.categories,
+        sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
+      })
+    : {}
+
   const allTools: Record<string, ToolDefinition> = {
     ...builtinTools,
     ...createGrepTools(ctx),
@@ -132,6 +142,7 @@ export function createToolRegistry(args: {
     slashcommand: slashcommandTool,
     interactive_bash,
     ...taskToolsRecord,
+    ...agentTeamsRecord,
   }
 
   const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)
