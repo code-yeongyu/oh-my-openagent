@@ -43,6 +43,78 @@ describe("boulder-state", () => {
       expect(result).toBeNull()
     })
 
+    test("should return null for JSON null value", () => {
+      //#given - boulder.json containing null
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, "null")
+
+      //#when
+      const result = readBoulderState(TEST_DIR)
+
+      //#then
+      expect(result).toBeNull()
+    })
+
+    test("should return null for JSON primitive value", () => {
+      //#given - boulder.json containing a string
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, '"just a string"')
+
+      //#when
+      const result = readBoulderState(TEST_DIR)
+
+      //#then
+      expect(result).toBeNull()
+    })
+
+    test("should default session_ids to [] when missing from JSON", () => {
+      //#given - boulder.json without session_ids field
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        plan_name: "plan",
+      }))
+
+      //#when
+      const result = readBoulderState(TEST_DIR)
+
+      //#then
+      expect(result).not.toBeNull()
+      expect(result!.session_ids).toEqual([])
+    })
+
+    test("should default session_ids to [] when not an array", () => {
+      //#given - boulder.json with session_ids as a string
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: "not-an-array",
+        plan_name: "plan",
+      }))
+
+      //#when
+      const result = readBoulderState(TEST_DIR)
+
+      //#then
+      expect(result).not.toBeNull()
+      expect(result!.session_ids).toEqual([])
+    })
+
+    test("should default session_ids to [] for empty object", () => {
+      //#given - boulder.json with empty object
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({}))
+
+      //#when
+      const result = readBoulderState(TEST_DIR)
+
+      //#then
+      expect(result).not.toBeNull()
+      expect(result!.session_ids).toEqual([])
+    })
+
     test("should read valid boulder state", () => {
       // given - valid boulder.json
       const state: BoulderState = {
@@ -128,6 +200,23 @@ describe("boulder-state", () => {
       const result = appendSessionId(TEST_DIR, "new-session")
       // then
       expect(result).toBeNull()
+    })
+
+    test("should not crash when boulder.json has no session_ids field", () => {
+      //#given - boulder.json without session_ids
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        plan_name: "plan",
+      }))
+
+      //#when
+      const result = appendSessionId(TEST_DIR, "ses-new")
+
+      //#then - should not crash and should contain the new session
+      expect(result).not.toBeNull()
+      expect(result!.session_ids).toContain("ses-new")
     })
   })
 
