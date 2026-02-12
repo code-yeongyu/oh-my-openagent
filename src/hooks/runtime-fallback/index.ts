@@ -65,9 +65,91 @@ function extractStatusCode(error: unknown): number | undefined {
   return undefined
 }
 
+function extractErrorName(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined
+
+  const errorObj = error as Record<string, unknown>
+  const directName = errorObj.name
+  if (typeof directName === "string" && directName.length > 0) {
+    return directName
+  }
+
+  const nestedError = errorObj.error as Record<string, unknown> | undefined
+  const nestedName = nestedError?.name
+  if (typeof nestedName === "string" && nestedName.length > 0) {
+    return nestedName
+  }
+
+  const dataError = (errorObj.data as Record<string, unknown> | undefined)?.error as Record<string, unknown> | undefined
+  const dataErrorName = dataError?.name
+  if (typeof dataErrorName === "string" && dataErrorName.length > 0) {
+    return dataErrorName
+  }
+
+  return undefined
+}
+
+function classifyErrorType(error: unknown): string | undefined {
+  const message = getErrorMessage(error)
+  const errorName = extractErrorName(error)?.toLowerCase()
+
+  if (
+    errorName?.includes("loadapi") ||
+    (/api.?key.?is.?missing/i.test(message) && /environment variable/i.test(message))
+  ) {
+    return "missing_api_key"
+  }
+
+  if (/api.?key/i.test(message) && /must be a string/i.test(message)) {
+    return "invalid_api_key"
+  }
+
+  if (errorName?.includes("unknownerror") && /model\s+not\s+found/i.test(message)) {
+    return "model_not_found"
+  }
+
+  return undefined
+}
+
+function extractCopilotAutoRetrySignal(info: Record<string, unknown> | undefined): string | undefined {
+  if (!info) return undefined
+
+  const candidates: string[] = []
+
+  const directStatus = info.status
+  if (typeof directStatus === "string") candidates.push(directStatus)
+
+  const summary = info.summary
+  if (typeof summary === "string") candidates.push(summary)
+
+  const message = info.message
+  if (typeof message === "string") candidates.push(message)
+
+  const details = info.details
+  if (typeof details === "string") candidates.push(details)
+
+  const combined = candidates.join("\n")
+  if (!combined) return undefined
+
+  if (/too.?many.?requests/i.test(combined) && /quota.?exceeded/i.test(combined) && /retrying\s+in/i.test(combined)) {
+    return combined
+  }
+
+  return undefined
+}
+
 function isRetryableError(error: unknown, retryOnErrors: number[]): boolean {
   const statusCode = extractStatusCode(error)
   const message = getErrorMessage(error)
+  const errorType = classifyErrorType(error)
+
+  if (errorType === "missing_api_key") {
+    return true
+  }
+
+  if (errorType === "model_not_found") {
+    return true
+  }
 
   if (statusCode && retryOnErrors.includes(statusCode)) {
     return true
@@ -265,13 +347,77 @@ export function createRuntimeFallbackHook(
     retry_on_errors: options?.config?.retry_on_errors ?? DEFAULT_CONFIG.retry_on_errors,
     max_fallback_attempts: options?.config?.max_fallback_attempts ?? DEFAULT_CONFIG.max_fallback_attempts,
     cooldown_seconds: options?.config?.cooldown_seconds ?? DEFAULT_CONFIG.cooldown_seconds,
+    timeout_seconds: options?.config?.timeout_seconds ?? DEFAULT_CONFIG.timeout_seconds,
     notify_on_fallback: options?.config?.notify_on_fallback ?? DEFAULT_CONFIG.notify_on_fallback,
   }
 
   const sessionStates = new Map<string, FallbackState>()
   const sessionLastAccess = new Map<string, number>()
   const sessionRetryInFlight = new Set<string>()
+  const sessionAwaitingFallbackResult = new Set<string>()
+  const sessionFallbackTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
   const SESSION_TTL_MS = 30 * 60 * 1000 // 30 minutes TTL for stale sessions
+
+  const abortSessionRequest = async (sessionID: string, source: string): Promise<void> => {
+    try {
+      await ctx.client.session.abort({ path: { id: sessionID } })
+      log(`[${HOOK_NAME}] Aborted in-flight session request (${source})`, { sessionID })
+    } catch (error) {
+      log(`[${HOOK_NAME}] Failed to abort in-flight session request (${source})`, {
+        sessionID,
+        error: String(error),
+      })
+    }
+  }
+
+  const clearSessionFallbackTimeout = (sessionID: string) => {
+    const timer = sessionFallbackTimeouts.get(sessionID)
+    if (timer) {
+      clearTimeout(timer)
+      sessionFallbackTimeouts.delete(sessionID)
+    }
+  }
+
+  const scheduleSessionFallbackTimeout = (sessionID: string, resolvedAgent?: string) => {
+    clearSessionFallbackTimeout(sessionID)
+
+    const timeoutMs = options?.session_timeout_ms ?? config.timeout_seconds * 1000
+    if (timeoutMs <= 0) return
+
+    const timer = setTimeout(async () => {
+      sessionFallbackTimeouts.delete(sessionID)
+
+      const state = sessionStates.get(sessionID)
+      if (!state) return
+
+      if (sessionRetryInFlight.has(sessionID)) {
+        log(`[${HOOK_NAME}] Overriding in-flight retry due to session timeout`, { sessionID })
+      }
+
+      await abortSessionRequest(sessionID, "session.timeout")
+      sessionRetryInFlight.delete(sessionID)
+
+      if (state.pendingFallbackModel) {
+        state.pendingFallbackModel = undefined
+      }
+
+      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+      if (fallbackModels.length === 0) return
+
+      log(`[${HOOK_NAME}] Session fallback timeout reached`, {
+        sessionID,
+        timeoutSeconds: config.timeout_seconds,
+        currentModel: state.currentModel,
+      })
+
+      const result = prepareFallback(sessionID, state, fallbackModels, config)
+      if (result.success && result.newModel) {
+        await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
+      }
+    }, timeoutMs)
+
+    sessionFallbackTimeouts.set(sessionID, timer)
+  }
 
   // Periodic cleanup of stale session states to prevent memory leaks
   const cleanupStaleSessions = () => {
@@ -282,6 +428,8 @@ export function createRuntimeFallbackHook(
         sessionStates.delete(sessionID)
         sessionLastAccess.delete(sessionID)
         sessionRetryInFlight.delete(sessionID)
+        sessionAwaitingFallbackResult.delete(sessionID)
+        clearSessionFallbackTimeout(sessionID)
         SessionCategoryRegistry.remove(sessionID)
         cleanedCount++
       }
@@ -354,6 +502,9 @@ export function createRuntimeFallbackHook(
 
         if (retryParts.length > 0) {
           const retryAgent = resolvedAgent ?? getSessionAgent(sessionID)
+          sessionAwaitingFallbackResult.add(sessionID)
+          scheduleSessionFallbackTimeout(sessionID, retryAgent)
+
           await ctx.client.session.promptAsync({
             path: { id: sessionID },
             body: {
@@ -370,6 +521,10 @@ export function createRuntimeFallbackHook(
     } catch (retryError) {
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
     } finally {
+      const state = sessionStates.get(sessionID)
+      if (state?.pendingFallbackModel === newModel) {
+        state.pendingFallbackModel = undefined
+      }
       sessionRetryInFlight.delete(sessionID)
     }
   }
@@ -404,6 +559,47 @@ export function createRuntimeFallbackHook(
     return undefined
   }
 
+  const hasVisibleAssistantResponse = async (
+    sessionID: string,
+    _info: Record<string, unknown> | undefined,
+  ): Promise<boolean> => {
+    try {
+      const messagesResp = await ctx.client.session.messages({
+        path: { id: sessionID },
+        query: { directory: ctx.directory },
+      })
+
+      const msgs = (messagesResp as {
+        data?: Array<{
+          info?: Record<string, unknown>
+          parts?: Array<{ type?: string; text?: string }>
+        }>
+      }).data
+
+      if (!msgs || msgs.length === 0) return false
+
+      const lastAssistant = [...msgs].reverse().find((m) => m.info?.role === "assistant")
+      if (!lastAssistant) return false
+      if (lastAssistant.info?.error) return false
+
+      const parts = lastAssistant.parts ??
+        (lastAssistant.info?.parts as Array<{ type?: string; text?: string }> | undefined)
+
+      const textFromParts = (parts ?? [])
+        .filter((p) => p.type === "text" && typeof p.text === "string")
+        .map((p) => p.text!.trim())
+        .filter((text) => text.length > 0)
+        .join("\n")
+
+      if (!textFromParts) return false
+      if (extractCopilotAutoRetrySignal({ message: textFromParts })) return false
+
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     if (!config.enabled) return
 
@@ -431,7 +627,55 @@ export function createRuntimeFallbackHook(
         sessionStates.delete(sessionID)
         sessionLastAccess.delete(sessionID)
         sessionRetryInFlight.delete(sessionID)
+        sessionAwaitingFallbackResult.delete(sessionID)
+        clearSessionFallbackTimeout(sessionID)
         SessionCategoryRegistry.remove(sessionID)
+      }
+      return
+    }
+
+    if (event.type === "session.stop") {
+      const sessionID = props?.sessionID as string | undefined
+      if (!sessionID) return
+
+      clearSessionFallbackTimeout(sessionID)
+
+      if (sessionRetryInFlight.has(sessionID)) {
+        await abortSessionRequest(sessionID, "session.stop")
+      }
+
+      sessionRetryInFlight.delete(sessionID)
+      sessionAwaitingFallbackResult.delete(sessionID)
+
+      const state = sessionStates.get(sessionID)
+      if (state?.pendingFallbackModel) {
+        state.pendingFallbackModel = undefined
+      }
+
+      log(`[${HOOK_NAME}] Cleared fallback retry state on session.stop`, { sessionID })
+      return
+    }
+
+    if (event.type === "session.idle") {
+      const sessionID = props?.sessionID as string | undefined
+      if (!sessionID) return
+
+      if (sessionAwaitingFallbackResult.has(sessionID)) {
+        log(`[${HOOK_NAME}] session.idle while awaiting fallback result; keeping timeout armed`, { sessionID })
+        return
+      }
+
+      const hadTimeout = sessionFallbackTimeouts.has(sessionID)
+      clearSessionFallbackTimeout(sessionID)
+      sessionRetryInFlight.delete(sessionID)
+
+      const state = sessionStates.get(sessionID)
+      if (state?.pendingFallbackModel) {
+        state.pendingFallbackModel = undefined
+      }
+
+      if (hadTimeout) {
+        log(`[${HOOK_NAME}] Cleared fallback timeout after session completion`, { sessionID })
       }
       return
     }
@@ -447,16 +691,27 @@ export function createRuntimeFallbackHook(
       }
 
       const resolvedAgent = await resolveAgentForSessionFromContext(sessionID, agent)
+      sessionAwaitingFallbackResult.delete(sessionID)
+
+      clearSessionFallbackTimeout(sessionID)
 
       log(`[${HOOK_NAME}] session.error received`, {
         sessionID,
         agent,
         resolvedAgent,
         statusCode: extractStatusCode(error),
+        errorName: extractErrorName(error),
+        errorType: classifyErrorType(error),
       })
 
       if (!isRetryableError(error, config.retry_on_errors)) {
-        log(`[${HOOK_NAME}] Error not retryable, skipping fallback`, { sessionID })
+        log(`[${HOOK_NAME}] Error not retryable, skipping fallback`, {
+          sessionID,
+          retryable: false,
+          statusCode: extractStatusCode(error),
+          errorName: extractErrorName(error),
+          errorType: classifyErrorType(error),
+        })
         return
       }
 
@@ -524,14 +779,74 @@ export function createRuntimeFallbackHook(
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
-      const error = info?.error
+      const retrySignal = extractCopilotAutoRetrySignal(info)
+      const error = info?.error ?? (retrySignal ? { name: "ProviderRateLimitError", message: retrySignal } : undefined)
       const role = info?.role as string | undefined
       const model = info?.model as string | undefined
 
-      if (sessionID && role === "assistant" && error && model) {
-        log(`[${HOOK_NAME}] message.updated with assistant error`, { sessionID, model })
+      if (sessionID && role === "assistant" && !error) {
+        if (!sessionAwaitingFallbackResult.has(sessionID)) {
+          return
+        }
+
+        const hasVisibleResponse = await hasVisibleAssistantResponse(sessionID, info)
+        if (!hasVisibleResponse) {
+          log(`[${HOOK_NAME}] Assistant update observed without visible final response; keeping fallback timeout`, {
+            sessionID,
+            model,
+          })
+          return
+        }
+
+        sessionAwaitingFallbackResult.delete(sessionID)
+        clearSessionFallbackTimeout(sessionID)
+        const state = sessionStates.get(sessionID)
+        if (state?.pendingFallbackModel) {
+          state.pendingFallbackModel = undefined
+        }
+        log(`[${HOOK_NAME}] Assistant response observed; cleared fallback timeout`, { sessionID, model })
+        return
+      }
+
+      if (sessionID && role === "assistant" && error) {
+        sessionAwaitingFallbackResult.delete(sessionID)
+        if (sessionRetryInFlight.has(sessionID) && !retrySignal) {
+          log(`[${HOOK_NAME}] message.updated fallback skipped (retry in flight)`, { sessionID })
+          return
+        }
+
+        if (retrySignal && sessionRetryInFlight.has(sessionID)) {
+          log(`[${HOOK_NAME}] Overriding in-flight retry due to Copilot auto-retry signal`, {
+            sessionID,
+            model,
+          })
+          await abortSessionRequest(sessionID, "message.updated.retry-signal")
+          sessionRetryInFlight.delete(sessionID)
+        }
+
+        if (retrySignal) {
+          log(`[${HOOK_NAME}] Detected Copilot auto-retry signal`, { sessionID, model })
+        }
+
+        if (!retrySignal) {
+          clearSessionFallbackTimeout(sessionID)
+        }
+
+        log(`[${HOOK_NAME}] message.updated with assistant error`, {
+          sessionID,
+          model,
+          statusCode: extractStatusCode(error),
+          errorName: extractErrorName(error),
+          errorType: classifyErrorType(error),
+        })
 
         if (!isRetryableError(error, config.retry_on_errors)) {
+          log(`[${HOOK_NAME}] message.updated error not retryable, skipping fallback`, {
+            sessionID,
+            statusCode: extractStatusCode(error),
+            errorName: extractErrorName(error),
+            errorType: classifyErrorType(error),
+          })
           return
         }
 
@@ -545,11 +860,53 @@ export function createRuntimeFallbackHook(
         }
 
         if (!state) {
-          state = createFallbackState(model)
+          let initialModel = model
+          if (!initialModel) {
+            const detectedAgent = resolvedAgent
+            const agentConfig = detectedAgent
+              ? pluginConfig?.agents?.[detectedAgent as keyof typeof pluginConfig.agents]
+              : undefined
+            const agentModel = agentConfig?.model as string | undefined
+            if (agentModel) {
+              log(`[${HOOK_NAME}] Derived model from agent config for message.updated`, {
+                sessionID,
+                agent: detectedAgent,
+                model: agentModel,
+              })
+              initialModel = agentModel
+            }
+          }
+
+          if (!initialModel) {
+            log(`[${HOOK_NAME}] message.updated missing model info, cannot fallback`, {
+              sessionID,
+              errorName: extractErrorName(error),
+              errorType: classifyErrorType(error),
+            })
+            return
+          }
+
+          state = createFallbackState(initialModel)
           sessionStates.set(sessionID, state)
           sessionLastAccess.set(sessionID, Date.now())
         } else {
           sessionLastAccess.set(sessionID, Date.now())
+
+          if (state.pendingFallbackModel) {
+            if (retrySignal) {
+              log(`[${HOOK_NAME}] Clearing pending fallback due to Copilot auto-retry signal`, {
+                sessionID,
+                pendingFallbackModel: state.pendingFallbackModel,
+              })
+              state.pendingFallbackModel = undefined
+            } else {
+            log(`[${HOOK_NAME}] message.updated fallback skipped (pending fallback in progress)`, {
+              sessionID,
+              pendingFallbackModel: state.pendingFallbackModel,
+            })
+            return
+            }
+          }
         }
 
         const result = prepareFallback(sessionID, state, fallbackModels, config)
@@ -591,6 +948,12 @@ export function createRuntimeFallbackHook(
       : undefined
 
     if (requestedModel && requestedModel !== state.currentModel) {
+      if (state.pendingFallbackModel && state.pendingFallbackModel === requestedModel) {
+        state.pendingFallbackModel = undefined
+        sessionLastAccess.set(sessionID, Date.now())
+        return
+      }
+
       log(`[${HOOK_NAME}] Detected manual model change, resetting fallback state`, {
         sessionID,
         from: state.currentModel,
