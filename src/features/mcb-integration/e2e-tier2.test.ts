@@ -84,14 +84,16 @@ describe.skipIf(!mcbAvailable)("mcb-integration: e2e tier2 core tool invocation"
   }, 10_000)
 
   //#given validate tool invocation with list_rules
-  //#when called without domain_crate config
-  //#then mcb returns config error (known bug: list_rules should not need project config)
-  test("validate list_rules returns config error without domain_crate", async () => {
+  //#when called with current mcb 0.2.1-dev configuration
+  //#then mcb returns a successful rules payload (currently empty in local config)
+  test("validate list_rules returns successful payload", async () => {
     const result = await callMcbTool(testClient.client, "validate", createDefaultArgs("validate"))
     expect(result.content.length).toBeGreaterThan(0)
     expect(result.content[0]?.type).toBe("text")
-    expect(result.isError).toBe(true)
-    expect(result.content[0]?.text).toContain("domain_crate")
+    expect(result.isError).toBe(false)
+    const parsed = parseMcbToolResponse(result) as Record<string, unknown>
+    expect(typeof parsed.count).toBe("number")
+    expect(Array.isArray(parsed.rules)).toBe(true)
   }, 10_000)
 
   //#given index tool invocation

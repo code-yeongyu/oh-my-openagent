@@ -154,7 +154,7 @@ export function createDefaultArgs(toolName: McbToolName): Record<string, unknown
       session_id: "",
       data: {},
       project_id: "",
-      worktree_id: "",
+      worktree_id: null,
       agent_type: "",
       status: "active",
       limit: 10,
