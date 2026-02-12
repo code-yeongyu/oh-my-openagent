@@ -65,7 +65,7 @@ export async function run(options: RunOptions): Promise<number> {
       console.log(pc.dim(`Session: ${sessionID}`))
 
       const ctx: RunContext = { client, sessionID, directory, abortController }
-      const events = await client.event.subscribe()
+      const events = await client.event.subscribe({ query: { directory } })
       const eventState = createEventState()
       const eventProcessor = processEvents(ctx, events.stream, eventState).catch(
         () => {},
