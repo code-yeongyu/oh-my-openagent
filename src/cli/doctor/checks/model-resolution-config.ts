@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import { detectConfigFile, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
+import { detectConfigFile, getOpenCodeConfigPaths, parseConfigContent, type ConfigFormat } from "../../../shared"
 import type { OmoConfig } from "./model-resolution-types"
 
 const PACKAGE_NAME = "oh-my-opencode"
@@ -10,25 +10,24 @@ const USER_CONFIG_BASE = join(
 )
 const PROJECT_CONFIG_BASE = join(process.cwd(), ".opencode", PACKAGE_NAME)
 
+function loadConfigFromPath(path: string, format: Exclude<ConfigFormat, "none">): OmoConfig | null {
+  try {
+    const content = readFileSync(path, "utf-8")
+    return parseConfigContent<OmoConfig>(content, format)
+  } catch {
+    return null
+  }
+}
+
 export function loadOmoConfig(): OmoConfig | null {
   const projectDetected = detectConfigFile(PROJECT_CONFIG_BASE)
   if (projectDetected.format !== "none") {
-    try {
-      const content = readFileSync(projectDetected.path, "utf-8")
-      return parseJsonc<OmoConfig>(content)
-    } catch {
-      return null
-    }
+    return loadConfigFromPath(projectDetected.path, projectDetected.format as Exclude<ConfigFormat, "none">)
   }
 
   const userDetected = detectConfigFile(USER_CONFIG_BASE)
   if (userDetected.format !== "none") {
-    try {
-      const content = readFileSync(userDetected.path, "utf-8")
-      return parseJsonc<OmoConfig>(content)
-    } catch {
-      return null
-    }
+    return loadConfigFromPath(userDetected.path, userDetected.format as Exclude<ConfigFormat, "none">)
   }
 
   return null

@@ -4,9 +4,12 @@ import { AGENT_NAME_MAP, migrateAgentNames } from "./agent-names"
 import { migrateHookNames } from "./hook-names"
 import { migrateModelVersions } from "./model-versions"
 
+export type ConfigFileFormat = "json" | "jsonc" | "toml"
+
 export function migrateConfigFile(
   configPath: string,
-  rawConfig: Record<string, unknown>
+  rawConfig: Record<string, unknown>,
+  format: ConfigFileFormat = "json"
 ): boolean {
   const copy = structuredClone(rawConfig)
   let needsWrite = false
@@ -108,11 +111,17 @@ export function migrateConfigFile(
     }
 
     let writeSucceeded = false
-    try {
-      fs.writeFileSync(configPath, JSON.stringify(copy, null, 2) + "\n", "utf-8")
-      writeSucceeded = true
-    } catch (err) {
-      log(`Failed to write migrated config to ${configPath}:`, err)
+
+    if (format === "toml") {
+      log(`Skipping file write for TOML config (migrations applied in-memory): ${configPath}`)
+      writeSucceeded = false
+    } else {
+      try {
+        fs.writeFileSync(configPath, JSON.stringify(copy, null, 2) + "\n", "utf-8")
+        writeSucceeded = true
+      } catch (err) {
+        log(`Failed to write migrated config to ${configPath}:`, err)
+      }
     }
 
     for (const key of Object.keys(rawConfig)) {

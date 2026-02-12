@@ -2,31 +2,33 @@ import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import type { CheckResult, CheckDefinition, ConfigInfo } from "../types"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
-import { parseJsonc, detectConfigFile, getOpenCodeConfigDir } from "../../../shared"
+import { parseConfigContent, detectConfigFile, getOpenCodeConfigDir, type ConfigFormat } from "../../../shared"
 import { OhMyOpenCodeConfigSchema } from "../../../config"
+
+type DetectedConfigFormat = Exclude<ConfigFormat, "none">
 
 const USER_CONFIG_DIR = getOpenCodeConfigDir({ binary: "opencode" })
 const USER_CONFIG_BASE = join(USER_CONFIG_DIR, `${PACKAGE_NAME}`)
 const PROJECT_CONFIG_BASE = join(process.cwd(), ".opencode", PACKAGE_NAME)
 
-function findConfigPath(): { path: string; format: "json" | "jsonc" } | null {
+function findConfigPath(): { path: string; format: DetectedConfigFormat } | null {
   const projectDetected = detectConfigFile(PROJECT_CONFIG_BASE)
   if (projectDetected.format !== "none") {
-    return { path: projectDetected.path, format: projectDetected.format as "json" | "jsonc" }
+    return { path: projectDetected.path, format: projectDetected.format as DetectedConfigFormat }
   }
 
   const userDetected = detectConfigFile(USER_CONFIG_BASE)
   if (userDetected.format !== "none") {
-    return { path: userDetected.path, format: userDetected.format as "json" | "jsonc" }
+    return { path: userDetected.path, format: userDetected.format as DetectedConfigFormat }
   }
 
   return null
 }
 
-export function validateConfig(configPath: string): { valid: boolean; errors: string[] } {
+export function validateConfig(configPath: string, format: DetectedConfigFormat): { valid: boolean; errors: string[] } {
   try {
     const content = readFileSync(configPath, "utf-8")
-    const rawConfig = parseJsonc<Record<string, unknown>>(content)
+    const rawConfig = parseConfigContent(content, format)
     const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
 
     if (!result.success) {
@@ -68,7 +70,7 @@ export function getConfigInfo(): ConfigInfo {
     }
   }
 
-  const validation = validateConfig(configPath.path)
+  const validation = validateConfig(configPath.path, configPath.format)
 
   return {
     exists: true,

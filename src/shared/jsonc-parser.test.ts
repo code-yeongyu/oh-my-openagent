@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { detectConfigFile, parseJsonc, parseJsoncSafe, readJsoncFile } from "./jsonc-parser"
+import { parseJsonc, parseJsoncSafe, readJsoncFile } from "./jsonc-parser"
+import { detectConfigFile } from "./config-detector"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
