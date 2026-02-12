@@ -128,7 +128,7 @@ ${result.textContent || "(No text output)"}
 
 <task_metadata>
 session_id: ${args.session_id}
-</task_metadata>`
+${resumeAgent ? `subagent: ${resumeAgent}\n` : ""}</task_metadata>`
    } finally {
      if (toastManager) {
        toastManager.removeTask(taskId)
