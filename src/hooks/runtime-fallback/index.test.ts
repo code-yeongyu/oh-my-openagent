@@ -27,6 +27,7 @@ describe("runtime-fallback", () => {
     session?: {
       messages?: (args: unknown) => Promise<unknown>
       promptAsync?: (args: unknown) => Promise<unknown>
+      abort?: (args: unknown) => Promise<unknown>
     }
   }) {
     return {
@@ -43,6 +44,7 @@ describe("runtime-fallback", () => {
         session: {
           messages: overrides?.session?.messages ?? (async () => ({ data: [] })),
           promptAsync: overrides?.session?.promptAsync ?? (async () => ({})),
+          abort: overrides?.session?.abort ?? (async () => ({})),
         },
       },
       directory: "/test/dir",
@@ -160,6 +162,77 @@ describe("runtime-fallback", () => {
       expect(skipLog).toBeDefined()
     })
 
+    test("should log missing API key errors with classification details", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
+      const sessionID = "test-session-missing-api-key"
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "AI_LoadAPIKeyError",
+              message:
+                "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+            },
+          },
+        },
+      })
+
+      const sessionErrorLog = logCalls.find((c) => c.msg.includes("session.error received"))
+      expect(sessionErrorLog).toBeDefined()
+      expect(sessionErrorLog?.data).toMatchObject({
+        sessionID,
+        errorName: "AI_LoadAPIKeyError",
+        errorType: "missing_api_key",
+      })
+
+      const skipLog = logCalls.find((c) => c.msg.includes("Error not retryable"))
+      expect(skipLog).toBeUndefined()
+    })
+
+    test("should trigger fallback for missing API key errors when fallback models are configured", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2"]),
+      })
+      const sessionID = "test-session-missing-api-key-fallback"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "AI_LoadAPIKeyError",
+              message:
+                "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+            },
+          },
+        },
+      })
+
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({ from: "google/gemini-2.5-pro", to: "openai/gpt-5.2" })
+    })
+
     test("should detect retryable error from message pattern 'rate limit'", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
       const sessionID = "test-session-pattern"
@@ -180,6 +253,100 @@ describe("runtime-fallback", () => {
 
       const errorLog = logCalls.find((c) => c.msg.includes("session.error received"))
       expect(errorLog).toBeDefined()
+    })
+
+    test("should continue fallback chain when fallback model is not found", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback([
+          "anthropic/claude-opus-4.6",
+          "openai/gpt-5.2",
+        ]),
+      })
+      const sessionID = "test-session-model-not-found"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: { name: "UnknownError", data: { message: "Model not found: anthropic/claude-opus-4.6." } },
+          },
+        },
+      })
+
+      const fallbackLogs = logCalls.filter((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+      expect(fallbackLogs[1]?.data).toMatchObject({ from: "anthropic/claude-opus-4.6", to: "openai/gpt-5.2" })
+
+      const nonRetryLog = logCalls.find(
+        (c) => c.msg.includes("Error not retryable") && (c.data as { sessionID?: string } | undefined)?.sessionID === sessionID
+      )
+      expect(nonRetryLog).toBeUndefined()
+    })
+
+    test("should trigger fallback on Copilot auto-retry signal in message.updated", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2"]),
+      })
+
+      const sessionID = "test-session-copilot-auto-retry"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "github-copilot/claude-opus-4.6" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "github-copilot/claude-opus-4.6",
+              status:
+                "Too Many Requests: quota exceeded [retrying in ~2 weeks attempt #1]",
+            },
+          },
+        },
+      })
+
+      const signalLog = logCalls.find((c) => c.msg.includes("Detected Copilot auto-retry signal"))
+      expect(signalLog).toBeDefined()
+
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({ from: "github-copilot/claude-opus-4.6", to: "openai/gpt-5.2" })
     })
 
     test("should log when no fallback models configured", async () => {
@@ -410,6 +577,893 @@ describe("runtime-fallback", () => {
       const errorLog = logCalls.find((c) => c.msg.includes("message.updated with assistant error"))
       expect(errorLog).toBeUndefined()
     })
+
+    test("should trigger fallback when message.updated has missing API key error without model", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2"]),
+      })
+      const sessionID = "test-message-updated-missing-model"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              error: {
+                name: "AI_LoadAPIKeyError",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({ from: "google/gemini-2.5-pro", to: "openai/gpt-5.2" })
+    })
+
+    test("should not advance fallback state from message.updated while retry is already in flight", async () => {
+      const pending = new Promise<never>(() => {})
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async () => pending,
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "anthropic/claude-opus-4-6",
+            "openai/gpt-5.2",
+          ]),
+        }
+      )
+
+      const sessionID = "test-message-updated-inflight-race"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      const sessionErrorPromise = hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              error: {
+                name: "ProviderAuthError",
+                data: {
+                  providerID: "google",
+                  message:
+                    "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+                },
+              },
+              model: "github-copilot/claude-opus-4.6",
+            },
+          },
+        },
+      })
+
+      const fallbackLogs = logCalls.filter((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLogs).toHaveLength(1)
+
+      void sessionErrorPromise
+    })
+
+    test("should force advance fallback from message.updated when Copilot auto-retry signal appears during in-flight retry", async () => {
+      const retriedModels: string[] = []
+      const pending = new Promise<never>(() => {})
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+
+              if (retriedModels.length === 1) {
+                await pending
+              }
+
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "anthropic/claude-opus-4-6",
+            "openai/gpt-5.2",
+          ]),
+        }
+      )
+
+      const sessionID = "test-message-updated-inflight-retry-signal"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      const sessionErrorPromise = hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "github-copilot/claude-opus-4.6",
+              status:
+                "Too Many Requests: quota exceeded [retrying in ~2 weeks attempt #1]",
+            },
+          },
+        },
+      })
+
+      expect(retriedModels.length).toBeGreaterThanOrEqual(2)
+      expect(retriedModels[0]).toBe("github-copilot/claude-opus-4.6")
+      expect(retriedModels[1]).toBe("anthropic/claude-opus-4-6")
+
+      void sessionErrorPromise
+    })
+
+    test("should advance fallback after session timeout when Copilot retry emits no retryable events", async () => {
+      const retriedModels: string[] = []
+      const abortCalls: Array<{ path?: { id?: string } }> = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+            abort: async (args: unknown) => {
+              abortCalls.push(args as { path?: { id?: string } })
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "anthropic/claude-opus-4-6",
+            "openai/gpt-5.2",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-session-timeout-watchdog"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(retriedModels).toContain("github-copilot/claude-opus-4.6")
+      expect(retriedModels).toContain("anthropic/claude-opus-4-6")
+      expect(abortCalls.some((call) => call.path?.id === sessionID)).toBe(true)
+
+      const timeoutLog = logCalls.find((c) => c.msg.includes("Session fallback timeout reached"))
+      expect(timeoutLog).toBeDefined()
+    })
+
+    test("should keep session timeout active after chat.message model override", async () => {
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "anthropic/claude-opus-4-6",
+            "openai/gpt-5.2",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-session-timeout-after-chat-message"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      const output: { message: { model?: { providerID: string; modelID: string } }; parts: Array<{ type: string; text?: string }> } = {
+        message: {},
+        parts: [],
+      }
+      await hook["chat.message"]?.(
+        {
+          sessionID,
+          model: { providerID: "github-copilot", modelID: "claude-opus-4.6" },
+        },
+        output
+      )
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(retriedModels).toContain("github-copilot/claude-opus-4.6")
+      expect(retriedModels).toContain("anthropic/claude-opus-4-6")
+    })
+
+    test("should abort in-flight fallback request before advancing on timeout", async () => {
+      const retriedModels: string[] = []
+      const abortCalls: Array<{ path?: { id?: string } }> = []
+      const never = new Promise<never>(() => {})
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+
+              if (retriedModels.length === 1) {
+                await never
+              }
+
+              return {}
+            },
+            abort: async (args: unknown) => {
+              abortCalls.push(args as { path?: { id?: string } })
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "anthropic/claude-opus-4-6",
+            "openai/gpt-5.2",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-session-timeout-abort-inflight"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      const sessionErrorPromise = hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(abortCalls.some((call) => call.path?.id === sessionID)).toBe(true)
+      expect(retriedModels).toContain("github-copilot/claude-opus-4.6")
+      expect(retriedModels).toContain("anthropic/claude-opus-4-6")
+
+      void sessionErrorPromise
+    })
+
+    test("should not advance fallback after session.stop cancels timeout-driven retry", async () => {
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "anthropic/claude-opus-4-6",
+            "openai/gpt-5.2",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-session-stop-cancels-timeout-fallback"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      expect(retriedModels).toContain("github-copilot/claude-opus-4.6")
+
+      await hook.event({
+        event: {
+          type: "session.stop",
+          properties: { sessionID },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(retriedModels).toHaveLength(1)
+    })
+
+    test("should not trigger second fallback after successful assistant reply", async () => {
+      const retriedModels: string[] = []
+      const mockMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "test" }] },
+      ]
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: mockMessages,
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "openai/gpt-5.3-codex",
+            "anthropic/claude-opus-4-6",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-session-success-clears-timeout"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      expect(retriedModels).toEqual(["github-copilot/claude-opus-4.6"])
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "openai/gpt-5.3-codex",
+            },
+          },
+        },
+      })
+
+      mockMessages.push({
+        info: { role: "assistant" },
+        parts: [{ type: "text", text: "Got it - I'm here." }],
+      })
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "openai/gpt-5.3-codex",
+              message: "Got it - I'm here.",
+            },
+          },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      expect(retriedModels).toEqual(["github-copilot/claude-opus-4.6"])
+    })
+
+    test("should not clear fallback timeout on assistant non-error update with Copilot retry signal", async () => {
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "test" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "openai/gpt-5.3-codex",
+            "anthropic/claude-opus-4-6",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-session-copilot-retry-signal-no-error"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      expect(retriedModels).toEqual(["github-copilot/claude-opus-4.6"])
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              status: "Too Many Requests: quota exceeded [retrying in ~2 weeks attempt #1]",
+            },
+          },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 60))
+
+      expect(retriedModels).toContain("openai/gpt-5.3-codex")
+    })
+
+    test("should not clear fallback timeout on assistant non-error update without user-visible content", async () => {
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "test" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "openai/gpt-5.3-codex",
+            "anthropic/claude-opus-4-6",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-session-no-content-non-error-update"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      expect(retriedModels).toEqual(["github-copilot/claude-opus-4.6"])
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "github-copilot/claude-opus-4.6",
+            },
+          },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 60))
+
+      expect(retriedModels).toContain("openai/gpt-5.3-codex")
+    })
+
+    test("should not clear fallback timeout from info.message alone without persisted assistant text", async () => {
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "test" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "openai/gpt-5.3-codex",
+            "anthropic/claude-opus-4-6",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-session-info-message-without-persisted-text"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      expect(retriedModels).toEqual(["github-copilot/claude-opus-4.6"])
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              message: "Thinking: retrying provider request...",
+            },
+          },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 60))
+
+      expect(retriedModels).toContain("openai/gpt-5.3-codex")
+    })
+
+    test("should keep timeout armed when session.idle fires before fallback result", async () => {
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "test" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "openai/gpt-5.3-codex",
+            "anthropic/claude-opus-4-6",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-session-idle-before-fallback-result"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      expect(retriedModels).toEqual(["github-copilot/claude-opus-4.6"])
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 60))
+
+      expect(retriedModels).toContain("openai/gpt-5.3-codex")
+    })
   })
 
   describe("edge cases", () => {
@@ -497,7 +1551,10 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const output = { message: {}, parts: [] }
+      const output: { message: { model?: { providerID: string; modelID: string } }; parts: Array<{ type: string; text?: string }> } = {
+        message: {},
+        parts: [],
+      }
       await hook["chat.message"]?.(
         { sessionID },
         output
