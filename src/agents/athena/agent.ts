@@ -48,7 +48,7 @@ Output requirements:
 - Explicitly identify disagreement areas and false-positive risk.`
 
 export function createAthenaAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions(["write", "edit", "task"])
+  const restrictions = createAgentToolRestrictions(["write", "edit"])
 
   const base = {
     description:
