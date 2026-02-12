@@ -1,5 +1,6 @@
 export * from "./schema/agent-names"
 export * from "./schema/agent-overrides"
+export * from "./schema/athena"
 export * from "./schema/babysitting"
 export * from "./schema/background-task"
 export * from "./schema/browser-automation"

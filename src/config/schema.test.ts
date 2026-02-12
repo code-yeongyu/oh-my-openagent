@@ -518,6 +518,76 @@ describe("Sisyphus-Junior agent override", () => {
   })
 })
 
+describe("Athena agent override", () => {
+  test("accepts athena override with council members and standard override fields", () => {
+    // given
+    const config = {
+      agents: {
+        athena: {
+          model: "openai/gpt-5.3-codex",
+          temperature: 0.2,
+          prompt_append: "Use consensus-first synthesis.",
+          council: {
+            members: [
+              { model: "openai/gpt-5.3-codex", temperature: 0.2, name: "Architect" },
+              { model: "anthropic/claude-sonnet-4-5", temperature: 0.3, name: "Reviewer" },
+              { model: "xai/grok-code-fast-1", temperature: 0.1, name: "Optimizer" },
+            ],
+          },
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.athena?.model).toBe("openai/gpt-5.3-codex")
+      expect(result.data.agents?.athena?.temperature).toBe(0.2)
+      expect(result.data.agents?.athena?.prompt_append).toBe("Use consensus-first synthesis.")
+      expect(result.data.agents?.athena?.council.members).toHaveLength(3)
+    }
+  })
+
+  test("rejects athena override with fewer than two council members", () => {
+    // given
+    const config = {
+      agents: {
+        athena: {
+          council: {
+            members: [{ model: "openai/gpt-5.3-codex" }],
+          },
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects athena override when council is missing", () => {
+    // given
+    const config = {
+      agents: {
+        athena: {
+          model: "openai/gpt-5.3-codex",
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    // then
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("BrowserAutomationProviderSchema", () => {
   test("accepts 'playwright' as valid provider", () => {
     // given
