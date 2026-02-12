@@ -7,6 +7,8 @@
  * 3. Everything else (Claude, etc.) → default.ts
  */
 
+import { isGptModel } from "../../../agents/types"
+
 /**
  * Checks if agent is a planner-type agent.
  * Planners don't need ultrawork injection (they ARE the planner).
@@ -20,15 +22,7 @@ export function isPlannerAgent(agentName?: string): boolean {
   return /\bplan\b/.test(normalized)
 }
 
-/**
- * Checks if model is GPT 5.2 series.
- * GPT models benefit from specific prompting patterns.
- */
-export function isGptModel(modelID?: string): boolean {
-  if (!modelID) return false
-  const lowerModel = modelID.toLowerCase()
-  return lowerModel.includes("gpt")
-}
+export { isGptModel }
 
 /** Ultrawork message source type */
 export type UltraworkSource = "planner" | "gpt" | "default"
@@ -45,8 +39,8 @@ export function getUltraworkSource(
     return "planner"
   }
 
-  // Priority 2: GPT 5.2 models
-  if (isGptModel(modelID)) {
+  // Priority 2: GPT models
+  if (modelID && isGptModel(modelID)) {
     return "gpt"
   }
 
