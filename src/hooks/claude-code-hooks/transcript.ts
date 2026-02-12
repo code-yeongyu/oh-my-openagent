@@ -29,12 +29,9 @@ export function appendTranscriptEntry(
 }
 
 // ============================================================================
-// Claude Code Compatible Transcript Builder (PORT FROM DISABLED)
+// Claude Code Compatible Transcript Builder
 // ============================================================================
 
-/**
- * OpenCode API response type (loosely typed)
- */
 interface OpenCodeMessagePart {
   type: string
   tool?: string
@@ -51,9 +48,6 @@ interface OpenCodeMessage {
   parts?: OpenCodeMessagePart[]
 }
 
-/**
- * Claude Code compatible transcript entry (from disabled file)
- */
 interface DisabledTranscriptEntry {
   type: "assistant"
   message: {
@@ -66,18 +60,93 @@ interface DisabledTranscriptEntry {
   }
 }
 
+// ============================================================================
+// Session-scoped transcript cache to avoid full session.messages() rebuild
+// on every tool call. Cache stores base entries from initial fetch;
+// subsequent calls append new tool entries without re-fetching.
+// ============================================================================
+
+interface TranscriptCacheEntry {
+  baseEntries: string[]
+  tempPath: string | null
+  createdAt: number
+}
+
+const TRANSCRIPT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+const transcriptCache = new Map<string, TranscriptCacheEntry>()
+
 /**
- * Build Claude Code compatible transcript from session messages
- * 
- * PORT FROM DISABLED: This calls client.session.messages() API to fetch
- * the full session history and builds a JSONL file in Claude Code format.
- * 
- * @param client OpenCode client instance
- * @param sessionId Session ID
- * @param directory Working directory
- * @param currentToolName Current tool being executed (added as last entry)
- * @param currentToolInput Current tool input
- * @returns Temp file path (caller must call deleteTempTranscript!)
+ * Clear transcript cache for a specific session or all sessions.
+ * Call on session.deleted to prevent memory accumulation.
+ */
+export function clearTranscriptCache(sessionId?: string): void {
+  if (sessionId) {
+    const entry = transcriptCache.get(sessionId)
+    if (entry?.tempPath) {
+      try { unlinkSync(entry.tempPath) } catch { /* ignore */ }
+    }
+    transcriptCache.delete(sessionId)
+  } else {
+    for (const [, entry] of transcriptCache) {
+      if (entry.tempPath) {
+        try { unlinkSync(entry.tempPath) } catch { /* ignore */ }
+      }
+    }
+    transcriptCache.clear()
+  }
+}
+
+function isCacheValid(entry: TranscriptCacheEntry): boolean {
+  return Date.now() - entry.createdAt < TRANSCRIPT_CACHE_TTL_MS
+}
+
+function buildCurrentEntry(toolName: string, toolInput: Record<string, unknown>): string {
+  const entry: DisabledTranscriptEntry = {
+    type: "assistant",
+    message: {
+      role: "assistant",
+      content: [
+        {
+          type: "tool_use",
+          name: transformToolName(toolName),
+          input: toolInput,
+        },
+      ],
+    },
+  }
+  return JSON.stringify(entry)
+}
+
+function parseMessagesToEntries(messages: OpenCodeMessage[]): string[] {
+  const entries: string[] = []
+  for (const msg of messages) {
+    if (msg.info?.role !== "assistant") continue
+    for (const part of msg.parts || []) {
+      if (part.type !== "tool") continue
+      if (part.state?.status !== "completed") continue
+      if (!part.state?.input) continue
+
+      const rawToolName = part.tool as string
+      const toolName = transformToolName(rawToolName)
+
+      const entry: DisabledTranscriptEntry = {
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [{ type: "tool_use", name: toolName, input: part.state.input }],
+        },
+      }
+      entries.push(JSON.stringify(entry))
+    }
+  }
+  return entries
+}
+
+/**
+ * Build Claude Code compatible transcript from session messages.
+ * Uses per-session cache to avoid redundant session.messages() API calls.
+ * First call fetches and caches; subsequent calls reuse cached base entries.
  */
 export async function buildTranscriptFromSession(
   client: {
@@ -91,97 +160,63 @@ export async function buildTranscriptFromSession(
   currentToolInput: Record<string, unknown>
 ): Promise<string | null> {
   try {
-    const response = await client.session.messages({
-      path: { id: sessionId },
-      query: { directory },
-    })
+    let baseEntries: string[]
 
-    // Handle various response formats
-    const messages = (response as { "200"?: unknown[]; data?: unknown[] })["200"]
-      ?? (response as { data?: unknown[] }).data
-      ?? (Array.isArray(response) ? response : [])
+    const cached = transcriptCache.get(sessionId)
+    if (cached && isCacheValid(cached)) {
+      baseEntries = cached.baseEntries
+    } else {
+      // Fetch full session messages (only on first call or cache expiry)
+      const response = await client.session.messages({
+        path: { id: sessionId },
+        query: { directory },
+      })
 
-    const entries: string[] = []
+      const messages = (response as { "200"?: unknown[]; data?: unknown[] })["200"]
+        ?? (response as { data?: unknown[] }).data
+        ?? (Array.isArray(response) ? response : [])
 
-    if (Array.isArray(messages)) {
-      for (const msg of messages as OpenCodeMessage[]) {
-        if (msg.info?.role !== "assistant") continue
+      baseEntries = Array.isArray(messages)
+        ? parseMessagesToEntries(messages as OpenCodeMessage[])
+        : []
 
-        for (const part of msg.parts || []) {
-          if (part.type !== "tool") continue
-          if (part.state?.status !== "completed") continue
-          if (!part.state?.input) continue
-
-          const rawToolName = part.tool as string
-          const toolName = transformToolName(rawToolName)
-
-          const entry: DisabledTranscriptEntry = {
-            type: "assistant",
-            message: {
-              role: "assistant",
-              content: [
-                {
-                  type: "tool_use",
-                  name: toolName,
-                  input: part.state.input,
-                },
-              ],
-            },
-          }
-          entries.push(JSON.stringify(entry))
-        }
+      // Clean up old temp file if exists
+      if (cached?.tempPath) {
+        try { unlinkSync(cached.tempPath) } catch { /* ignore */ }
       }
+
+      transcriptCache.set(sessionId, {
+        baseEntries,
+        tempPath: null,
+        createdAt: Date.now(),
+      })
     }
 
-    // Always add current tool call as the last entry
-    const currentEntry: DisabledTranscriptEntry = {
-      type: "assistant",
-      message: {
-        role: "assistant",
-        content: [
-          {
-            type: "tool_use",
-            name: transformToolName(currentToolName),
-            input: currentToolInput,
-          },
-        ],
-      },
-    }
-    entries.push(JSON.stringify(currentEntry))
+    // Append current tool call
+    const allEntries = [...baseEntries, buildCurrentEntry(currentToolName, currentToolInput)]
 
-    // Write to temp file
     const tempPath = join(
       tmpdir(),
       `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
     )
-    writeFileSync(tempPath, entries.join("\n") + "\n")
+    writeFileSync(tempPath, allEntries.join("\n") + "\n")
+
+    // Update cache temp path for cleanup tracking
+    const cacheEntry = transcriptCache.get(sessionId)
+    if (cacheEntry) {
+      cacheEntry.tempPath = tempPath
+    }
 
     return tempPath
   } catch {
-    // CRITICAL FIX: Even on API failure, create file with current tool entry only
-    // (matching original disabled behavior - never return null with incompatible format)
     try {
-      const currentEntry: DisabledTranscriptEntry = {
-        type: "assistant",
-        message: {
-          role: "assistant",
-          content: [
-            {
-              type: "tool_use",
-              name: transformToolName(currentToolName),
-              input: currentToolInput,
-            },
-          ],
-        },
-      }
       const tempPath = join(
         tmpdir(),
         `opencode-transcript-${sessionId}-${randomUUID()}.jsonl`
       )
-      writeFileSync(tempPath, JSON.stringify(currentEntry) + "\n")
+      writeFileSync(tempPath, buildCurrentEntry(currentToolName, currentToolInput) + "\n")
       return tempPath
     } catch {
-      // If even this fails, return null (truly catastrophic failure)
       return null
     }
   }
@@ -189,8 +224,6 @@ export async function buildTranscriptFromSession(
 
 /**
  * Delete temp transcript file (call in finally block)
- * 
- * PORT FROM DISABLED: Cleanup mechanism to avoid disk accumulation
  */
 export function deleteTempTranscript(path: string | null): void {
   if (!path) return

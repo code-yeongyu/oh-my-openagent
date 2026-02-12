@@ -1424,94 +1424,16 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           continue
         }
 
-        const messagesResult = await this.client.session.messages({
-          path: { id: sessionID },
+        // Session is still actively running (not idle).
+        // Progress is already tracked via handleEvent(message.part.updated),
+        // so we skip the expensive session.messages() fetch here.
+        // Completion will be detected when session transitions to idle.
+        log("[background-agent] Session still running, relying on event-based progress:", {
+          taskId: task.id,
+          sessionID,
+          sessionStatus: sessionStatus?.type ?? "not_in_status",
+          toolCalls: task.progress?.toolCalls ?? 0,
         })
-
-        if (!messagesResult.error && messagesResult.data) {
-          const messages = messagesResult.data as Array<{
-            info?: { role?: string }
-            parts?: Array<{ type?: string; tool?: string; name?: string; text?: string }>
-          }>
-          const assistantMsgs = messages.filter(
-            (m) => m.info?.role === "assistant"
-          )
-
-          let toolCalls = 0
-          let lastTool: string | undefined
-          let lastMessage: string | undefined
-
-          for (const msg of assistantMsgs) {
-            const parts = msg.parts ?? []
-            for (const part of parts) {
-              if (part.type === "tool_use" || part.tool) {
-                toolCalls++
-                lastTool = part.tool || part.name || "unknown"
-              }
-              if (part.type === "text" && part.text) {
-                lastMessage = part.text
-              }
-            }
-          }
-
-          if (!task.progress) {
-            task.progress = { toolCalls: 0, lastUpdate: new Date() }
-          }
-          task.progress.toolCalls = toolCalls
-          task.progress.lastTool = lastTool
-          task.progress.lastUpdate = new Date()
-          if (lastMessage) {
-            task.progress.lastMessage = lastMessage
-            task.progress.lastMessageAt = new Date()
-          }
-
-          // Stability detection: complete when message count unchanged for 3 polls
-          const currentMsgCount = messages.length
-          const startedAt = task.startedAt
-          if (!startedAt) continue
-          
-          const elapsedMs = Date.now() - startedAt.getTime()
-
-          if (elapsedMs >= MIN_STABILITY_TIME_MS) {
-            if (task.lastMsgCount === currentMsgCount) {
-              task.stablePolls = (task.stablePolls ?? 0) + 1
-              if (task.stablePolls >= 3) {
-                // Re-fetch session status to confirm agent is truly idle
-                const recheckStatus = await this.client.session.status()
-                const recheckData = (recheckStatus.data ?? {}) as Record<string, { type: string }>
-                const currentStatus = recheckData[sessionID]
-                
-                if (currentStatus?.type !== "idle") {
-                  log("[background-agent] Stability reached but session not idle, resetting:", { 
-                    taskId: task.id, 
-                    sessionStatus: currentStatus?.type ?? "not_in_status" 
-                  })
-                  task.stablePolls = 0
-                  continue
-                }
-
-                // Edge guard: Validate session has actual output before completing
-                const hasValidOutput = await this.validateSessionHasOutput(sessionID)
-                if (!hasValidOutput) {
-                  log("[background-agent] Stability reached but no valid output, waiting:", task.id)
-                  continue
-                }
-
-                // Re-check status after async operation
-                if (task.status !== "running") continue
-
-                const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-                if (!hasIncompleteTodos) {
-                  await this.tryCompleteTask(task, "stability detection")
-                  continue
-                }
-              }
-            } else {
-              task.stablePolls = 0
-            }
-          }
-          task.lastMsgCount = currentMsgCount
-        }
       } catch (error) {
         log("[background-agent] Poll error for task:", { taskId: task.id, error })
       }
