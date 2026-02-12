@@ -13,7 +13,7 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
-import { fetchAvailableModels, readConnectedProvidersCache } from "../shared"
+import { fetchAvailableModels, readConnectedProvidersCache, getAgentModelRequirementsForProfile } from "../shared"
 import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { mergeCategories } from "../shared/merge-categories"
 import { buildAvailableSkills } from "./builtin-agents/available-skills"
@@ -65,7 +65,8 @@ export async function createBuiltinAgents(
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
   disabledSkills?: Set<string>,
-  useTaskSystem = false
+  useTaskSystem = false,
+  performanceProfile: "performance" | "balanced" | "budget" = "performance"
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
   // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
@@ -76,6 +77,8 @@ export async function createBuiltinAgents(
   })
   const isFirstRunNoCache =
     availableModels.size === 0 && (!connectedProviders || connectedProviders.length === 0)
+
+  const profileRequirements = getAgentModelRequirementsForProfile(performanceProfile)
 
   const result: Record<string, AgentConfig> = {}
 
@@ -102,6 +105,7 @@ export async function createBuiltinAgents(
     uiSelectedModel,
     availableModels,
     disabledSkills,
+    profileRequirements,
   })
 
   const registeredAgents = parseRegisteredAgentSummaries(customAgentSummaries)

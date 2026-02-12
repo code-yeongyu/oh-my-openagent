@@ -2,6 +2,13 @@ import { log } from "./logger"
 import * as connectedProvidersCache from "./connected-providers-cache"
 import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
+import { AGENT_PROFILE_REQUIREMENTS } from "./performance-profiles"
+import type { ModelRequirement } from "./model-requirements"
+
+// Local alias to keep return type flexible across the codebase
+type AgentName = string
+// Local type alias for performance profiles (to avoid importing internal types)
+type PerformanceProfile = "performance" | "balanced" | "budget"
 
 export type ModelResolutionRequest = {
   intent?: {
@@ -172,4 +179,17 @@ export function resolveModelPipeline(
 
   log("Model resolved via system default", { model: systemDefaultModel })
   return { model: systemDefaultModel, provenance: "system-default", attempted }
+}
+
+/**
+ * Get agent model requirements for a specific performance profile
+ * @param profile - The performance profile (performance, balanced, budget)
+ * @returns Agent model requirements for the profile
+ */
+export function getAgentModelRequirementsForProfile(
+  profile: PerformanceProfile
+): Record<AgentName, ModelRequirement> {
+  // Return profile-specific requirements, fallback to performance tier
+  const reqForProfile = AGENT_PROFILE_REQUIREMENTS[profile] ?? AGENT_PROFILE_REQUIREMENTS.performance
+  return reqForProfile as unknown as Record<AgentName, ModelRequirement>
 }

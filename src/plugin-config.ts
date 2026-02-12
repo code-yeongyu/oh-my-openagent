@@ -113,7 +113,7 @@ export function loadPluginConfig(
 
   // Load user config first (base)
   let config: OhMyOpenCodeConfig =
-    loadConfigFromPath(userConfigPath, ctx) ?? {};
+    loadConfigFromPath(userConfigPath, ctx) ?? { performanceProfile: "performance" };
 
   // Override with project config
   const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
