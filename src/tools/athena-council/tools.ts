@@ -6,9 +6,12 @@ import { ATHENA_COUNCIL_TOOL_DESCRIPTION } from "./constants"
 import { createCouncilLauncher } from "./council-launcher"
 import type { AthenaCouncilToolArgs } from "./types"
 
-const WAIT_INTERVAL_MS = 200
-const WAIT_TIMEOUT_MS = 120000
+const WAIT_INTERVAL_MS = 500
+const WAIT_TIMEOUT_MS = 600000
 const TERMINAL_STATUSES: Set<BackgroundTaskStatus> = new Set(["completed", "error", "cancelled", "interrupt"])
+
+/** Tracks active council executions per session to prevent duplicate launches. */
+const activeCouncilSessions = new Set<string>()
 
 function isCouncilConfigured(councilConfig: CouncilConfig | undefined): councilConfig is CouncilConfig {
   return Boolean(councilConfig && councilConfig.members.length > 0)
@@ -114,25 +117,34 @@ export function createAthenaCouncilTool(args: {
         return "Athena council not configured. Add agents.athena.council.members to your config."
       }
 
-      const execution = await executeCouncil({
-        question: toolArgs.question,
-        council: councilConfig,
-        launcher: createCouncilLauncher(backgroundManager),
-        parentSessionID: toolContext.sessionID,
-        parentMessageID: toolContext.messageID,
-        parentAgent: toolContext.agent,
-      })
+      if (activeCouncilSessions.has(toolContext.sessionID)) {
+        return "Council is already running for this session. Wait for the current council execution to complete."
+      }
 
-      const taskIds = execution.responses
-        .map((response) => response.taskId)
-        .filter((taskId) => taskId.length > 0)
+      activeCouncilSessions.add(toolContext.sessionID)
+      try {
+        const execution = await executeCouncil({
+          question: toolArgs.question,
+          council: councilConfig,
+          launcher: createCouncilLauncher(backgroundManager),
+          parentSessionID: toolContext.sessionID,
+          parentMessageID: toolContext.messageID,
+          parentAgent: toolContext.agent,
+        })
 
-      const latestTasks = await waitForTasksToSettle(taskIds, backgroundManager, toolContext.abort)
-      const refreshedResponses = execution.responses.map((response) =>
-        response.taskId ? refreshResponse(response, latestTasks.get(response.taskId)) : response
-      )
+        const taskIds = execution.responses
+          .map((response) => response.taskId)
+          .filter((taskId) => taskId.length > 0)
 
-      return formatCouncilOutput(refreshedResponses, execution.totalMembers)
+        const latestTasks = await waitForTasksToSettle(taskIds, backgroundManager, toolContext.abort)
+        const refreshedResponses = execution.responses.map((response) =>
+          response.taskId ? refreshResponse(response, latestTasks.get(response.taskId)) : response
+        )
+
+        return formatCouncilOutput(refreshedResponses, execution.totalMembers)
+      } finally {
+        activeCouncilSessions.delete(toolContext.sessionID)
+      }
     },
   })
 }
