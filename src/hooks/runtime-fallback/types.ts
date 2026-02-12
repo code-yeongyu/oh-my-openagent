@@ -58,6 +58,8 @@ export interface RuntimeFallbackOptions {
   config?: RuntimeFallbackConfig
   /** Optional plugin config override (primarily for testing) */
   pluginConfig?: OhMyOpenCodeConfig
+  /** Optional session-level timeout override in milliseconds (primarily for testing) */
+  session_timeout_ms?: number
 }
 
 export interface RuntimeFallbackHook {
