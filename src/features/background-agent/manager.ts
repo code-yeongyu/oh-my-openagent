@@ -5,7 +5,7 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, SessionCategoryRegistry } from "../../shared"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -256,6 +256,10 @@ export class BackgroundManager {
 
     const sessionID = createResult.data.id
     subagentSessions.add(sessionID)
+
+    if (input.category) {
+      SessionCategoryRegistry.register(sessionID, input.category)
+    }
 
     log("[background-agent] tmux callback check", {
       hasCallback: !!this.onSubagentSessionCreated,
@@ -542,6 +546,9 @@ export class BackgroundManager {
     this.startPolling()
     if (existingTask.sessionID) {
       subagentSessions.add(existingTask.sessionID)
+      if (existingTask.category) {
+        SessionCategoryRegistry.register(existingTask.sessionID, existingTask.category)
+      }
     }
 
     if (input.parentSessionID) {
@@ -773,6 +780,7 @@ export class BackgroundManager {
         this.clearNotificationsForTask(task.id)
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
+          SessionCategoryRegistry.remove(task.sessionID)
         }
       }
     }
@@ -1320,6 +1328,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         this.tasks.delete(taskId)
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
+          SessionCategoryRegistry.remove(task.sessionID)
         }
       }
     }

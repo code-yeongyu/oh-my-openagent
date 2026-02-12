@@ -19,5 +19,6 @@ export * from "./schema/sisyphus"
 export * from "./schema/sisyphus-agent"
 export * from "./schema/tmux"
 export * from "./schema/websearch"
+export * from "./schema/runtime-fallback"
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

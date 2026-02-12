@@ -34,6 +34,17 @@ function normalizeModel(model?: string): string | undefined {
 	return trimmed || undefined
 }
 
+export function normalizeFallbackModels(
+	fallbackModels: string | string[] | undefined,
+): string[] | undefined {
+	if (!fallbackModels) return undefined
+	if (Array.isArray(fallbackModels)) {
+		return fallbackModels.filter((m) => m.trim())
+	}
+	const trimmed = fallbackModels.trim()
+	return trimmed ? [trimmed] : undefined
+}
+
 export function resolveModel(input: ModelResolutionInput): string | undefined {
 	return (
 		normalizeModel(input.userModel) ??

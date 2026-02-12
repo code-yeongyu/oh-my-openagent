@@ -49,6 +49,7 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.stopContinuationGuard?.event?.(input))
     await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input))
     await Promise.resolve(hooks.atlasHook?.handler?.(input))
+    await Promise.resolve(hooks.runtimeFallback?.event?.(input))
   }
 
   const recentSyntheticIdles = new Map<string, number>()

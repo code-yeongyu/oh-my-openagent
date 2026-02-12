@@ -22,6 +22,8 @@ export const CategoryConfigSchema = z.object({
   is_unstable_agent: z.boolean().optional(),
   /** Disable this category. Disabled categories are excluded from task delegation. */
   disable: z.boolean().optional(),
+  /** Fallback models for runtime switching on API errors. Can be a single model or array. */
+  fallback_models: z.union([z.string(), z.array(z.string())]).optional(),
 })
 
 export const BuiltinCategoryNameSchema = z.enum([
