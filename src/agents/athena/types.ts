@@ -17,3 +17,20 @@ export interface AthenaConfig {
 export type CouncilMemberStatus = "completed" | "timeout" | "error"
 
 export type AgreementLevel = "unanimous" | "majority" | "minority" | "solo"
+
+export interface CouncilMemberResponse {
+  member: CouncilMemberConfig
+  status: CouncilMemberStatus
+  response?: string
+  error?: string
+  taskId: string
+  durationMs: number
+}
+
+export interface CouncilExecutionResult {
+  question: string
+  responses: CouncilMemberResponse[]
+  totalMembers: number
+  completedCount: number
+  failedCount: number
+}
