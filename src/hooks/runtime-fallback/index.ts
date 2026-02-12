@@ -805,7 +805,9 @@ export function createRuntimeFallbackHook(
       const sessionID = info?.sessionID as string | undefined
       const retrySignalResult = extractAutoRetrySignal(info)
       const retrySignal = retrySignalResult?.signal
-      const error = info?.error ?? (retrySignal ? { name: "ProviderRateLimitError", message: retrySignal } : undefined)
+      const timeoutEnabled = config.timeout_seconds > 0
+      // Only treat auto-retry signal as an error if timeout-based fallback is enabled
+      const error = info?.error ?? (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined)
       const role = info?.role as string | undefined
       const model = info?.model as string | undefined
 
@@ -840,7 +842,7 @@ export function createRuntimeFallbackHook(
           return
         }
 
-        if (retrySignal && sessionRetryInFlight.has(sessionID)) {
+        if (retrySignal && sessionRetryInFlight.has(sessionID) && timeoutEnabled) {
           log(`[${HOOK_NAME}] Overriding in-flight retry due to provider auto-retry signal`, {
             sessionID,
             model,
@@ -849,7 +851,7 @@ export function createRuntimeFallbackHook(
           sessionRetryInFlight.delete(sessionID)
         }
 
-        if (retrySignal) {
+        if (retrySignal && timeoutEnabled) {
           log(`[${HOOK_NAME}] Detected provider auto-retry signal`, { sessionID, model })
         }
 
@@ -918,7 +920,7 @@ export function createRuntimeFallbackHook(
           sessionLastAccess.set(sessionID, Date.now())
 
           if (state.pendingFallbackModel) {
-            if (retrySignal) {
+            if (retrySignal && timeoutEnabled) {
               log(`[${HOOK_NAME}] Clearing pending fallback due to provider auto-retry signal`, {
                 sessionID,
                 pendingFallbackModel: state.pendingFallbackModel,

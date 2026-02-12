@@ -387,6 +387,45 @@ describe("runtime-fallback", () => {
       expect(fallbackLog?.data).toMatchObject({ from: "openai/gpt-5.3-codex", to: "anthropic/claude-opus-4-6" })
     })
 
+    test("should NOT trigger fallback on auto-retry signal when timeout_seconds is 0", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 0 }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-6"]),
+      })
+
+      const sessionID = "test-session-auto-retry-timeout-disabled"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "openai/gpt-5.3-codex" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "openai/gpt-5.3-codex",
+              status: "The usage limit has been reached [retrying in 27s attempt #6]",
+            },
+          },
+        },
+      })
+
+      // Should NOT detect provider auto-retry signal when timeout is disabled
+      const signalLog = logCalls.find((c) => c.msg.includes("Detected provider auto-retry signal"))
+      expect(signalLog).toBeUndefined()
+
+      // Should NOT trigger fallback
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeUndefined()
+    })
+
     test("should log when no fallback models configured", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig(),
