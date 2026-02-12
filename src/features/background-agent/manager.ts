@@ -192,7 +192,7 @@ export class BackgroundManager {
 
         await this.concurrencyManager.acquire(key)
 
-        if (item.task.status === "cancelled") {
+        if (item.task.status === "cancelled" || item.task.status === "error") {
           this.concurrencyManager.release(key)
           queue.shift()
           continue
@@ -727,6 +727,44 @@ export class BackgroundManager {
       }).catch(err => {
         log("[background-agent] Error in session.idle handler:", err)
       })
+    }
+
+    if (event.type === "session.error") {
+      const sessionID = typeof props?.sessionID === "string" ? props.sessionID : undefined
+      if (!sessionID) return
+
+      const task = this.findBySession(sessionID)
+      if (!task || task.status !== "running") return
+
+      const errorMessage = props ? this.getSessionErrorMessage(props) : undefined
+
+      task.status = "error"
+      task.error = errorMessage ?? "Session error"
+      task.completedAt = new Date()
+
+      if (task.concurrencyKey) {
+        this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined
+      }
+
+      const completionTimer = this.completionTimers.get(task.id)
+      if (completionTimer) {
+        clearTimeout(completionTimer)
+        this.completionTimers.delete(task.id)
+      }
+
+      const idleTimer = this.idleDeferralTimers.get(task.id)
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+        this.idleDeferralTimers.delete(task.id)
+      }
+
+      this.cleanupPendingByParent(task)
+      this.tasks.delete(task.id)
+      this.clearNotificationsForTask(task.id)
+      if (task.sessionID) {
+        subagentSessions.delete(task.sessionID)
+      }
     }
 
     if (event.type === "session.deleted") {
@@ -1281,6 +1319,24 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     return ""
   }
 
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null
+  }
+
+  private getSessionErrorMessage(properties: EventProperties): string | undefined {
+    const errorRaw = properties["error"]
+    if (!this.isRecord(errorRaw)) return undefined
+
+    const dataRaw = errorRaw["data"]
+    if (this.isRecord(dataRaw)) {
+      const message = dataRaw["message"]
+      if (typeof message === "string") return message
+    }
+
+    const message = errorRaw["message"]
+    return typeof message === "string" ? message : undefined
+  }
+
   private hasRunningTasks(): boolean {
     for (const task of this.tasks.values()) {
       if (task.status === "running") return true
@@ -1292,6 +1348,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     const now = Date.now()
 
     for (const [taskId, task] of this.tasks.entries()) {
+      const wasPending = task.status === "pending"
       const timestamp = task.status === "pending" 
         ? task.queuedAt?.getTime() 
         : task.startedAt?.getTime()
@@ -1316,6 +1373,21 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         }
         // Clean up pendingByParent to prevent stale entries
         this.cleanupPendingByParent(task)
+        if (wasPending) {
+          const key = task.model
+            ? `${task.model.providerID}/${task.model.modelID}`
+            : task.agent
+          const queue = this.queuesByKey.get(key)
+          if (queue) {
+            const index = queue.findIndex((item) => item.task.id === taskId)
+            if (index !== -1) {
+              queue.splice(index, 1)
+              if (queue.length === 0) {
+                this.queuesByKey.delete(key)
+              }
+            }
+          }
+        }
         this.clearNotificationsForTask(taskId)
         this.tasks.delete(taskId)
         if (task.sessionID) {

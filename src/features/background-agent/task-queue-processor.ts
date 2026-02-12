@@ -27,7 +27,7 @@ export async function processConcurrencyKeyQueue(args: {
 
       await concurrencyManager.acquire(key)
 
-      if (item.task.status === "cancelled") {
+      if (item.task.status === "cancelled" || item.task.status === "error") {
         concurrencyManager.release(key)
         queue.shift()
         continue
