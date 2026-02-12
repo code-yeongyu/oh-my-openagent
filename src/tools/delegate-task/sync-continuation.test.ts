@@ -356,4 +356,112 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(addTaskCalls.length).toBe(0)
     expect(removeTaskCalls.length).toBe(0)
   })
+
+  test("includes subagent in task_metadata when agent info is present in session messages", async () => {
+    //#given - mock session messages with agent info on the last assistant message
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 }, agent: "oracle" } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn", agent: "oracle", providerID: "openai", modelID: "gpt-5.2" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      session_id: "ses_test_12345678",
+      prompt: "continue working",
+      description: "resume oracle task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation completes with agent info in messages
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+
+    //#then - task_metadata should contain subagent field with the agent name
+    expect(result).toContain("<task_metadata>")
+    expect(result).toContain("subagent: oracle")
+    expect(result).toContain("session_id: ses_test_12345678")
+  })
+
+  test("omits subagent from task_metadata when no agent info in session messages", async () => {
+    //#given - mock session messages without any agent info
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+    }
+
+    const args = {
+      session_id: "ses_test_12345678",
+      prompt: "continue working",
+      description: "resume task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when - executeSyncContinuation completes without agent info
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, deps)
+
+    //#then - task_metadata should NOT contain subagent field
+    expect(result).toContain("<task_metadata>")
+    expect(result).toContain("session_id: ses_test_12345678")
+    expect(result).not.toContain("subagent:")
+  })
 })
