@@ -50,7 +50,7 @@ Use \`background_output\` with task_id="${task.id}" to check progress.
 
 <task_metadata>
 session_id: ${task.sessionID}
-</task_metadata>`
+${task.agent ? `subagent: ${task.agent}\n` : ""}</task_metadata>`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Continue background task",
