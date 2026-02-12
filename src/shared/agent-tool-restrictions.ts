@@ -4,12 +4,18 @@
  * true = tool allowed, false = tool denied.
  */
 
+import { createAgentToolRestrictions } from "./permission-compat"
+
 const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   write: false,
   edit: false,
   task: false,
   call_omo_agent: false,
 }
+
+const ATHENA_RESTRICTIONS = permissionToToolBooleans(
+  createAgentToolRestrictions(["write", "edit", "task"]).permission
+)
 
 const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
   explore: EXPLORATION_AGENT_DENYLIST,
@@ -42,6 +48,16 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
   "sisyphus-junior": {
     task: false,
   },
+
+  athena: ATHENA_RESTRICTIONS,
+}
+
+function permissionToToolBooleans(
+  permission: Record<string, "ask" | "allow" | "deny">
+): Record<string, boolean> {
+  return Object.fromEntries(
+    Object.entries(permission).map(([tool, value]) => [tool, value === "allow"])
+  )
 }
 
 export function getAgentToolRestrictions(agentName: string): Record<string, boolean> {
