@@ -1,7 +1,7 @@
 import { log } from "../../shared"
-import { MIN_IDLE_TIME_MS } from "./constants"
-import { subagentSessions } from "../claude-code-session-state"
 import type { BackgroundTask } from "./types"
+import { cleanupTaskAfterSessionEnds } from "./session-task-cleanup"
+import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 
 type Event = { type: string; properties?: Record<string, unknown> }
 
@@ -18,6 +18,7 @@ export function handleBackgroundEvent(args: {
   event: Event
   findBySession: (sessionID: string) => BackgroundTask | undefined
   getAllDescendantTasks: (sessionID: string) => BackgroundTask[]
+  releaseConcurrencyKey?: (key: string) => void
   cancelTask: (
     taskId: string,
     options: { source: string; reason: string; skipNotification: true }
@@ -36,6 +37,7 @@ export function handleBackgroundEvent(args: {
     event,
     findBySession,
     getAllDescendantTasks,
+    releaseConcurrencyKey,
     cancelTask,
     tryCompleteTask,
     validateSessionHasOutput,
@@ -79,70 +81,45 @@ export function handleBackgroundEvent(args: {
 
   if (event.type === "session.idle") {
     if (!props || !isRecord(props)) return
+    handleSessionIdleBackgroundEvent({
+      properties: props,
+      findBySession,
+      idleDeferralTimers,
+      validateSessionHasOutput,
+      checkSessionTodos,
+      tryCompleteTask,
+      emitIdleEvent,
+    })
+  }
+
+  if (event.type === "session.error") {
+    if (!props || !isRecord(props)) return
     const sessionID = getString(props, "sessionID")
     if (!sessionID) return
 
     const task = findBySession(sessionID)
     if (!task || task.status !== "running") return
 
-    const startedAt = task.startedAt
-    if (!startedAt) return
+    const errorRaw = props["error"]
+    const dataRaw = isRecord(errorRaw) ? errorRaw["data"] : undefined
+    const message =
+      (isRecord(dataRaw) ? getString(dataRaw, "message") : undefined) ??
+      (isRecord(errorRaw) ? getString(errorRaw, "message") : undefined) ??
+      "Session error"
 
-    const elapsedMs = Date.now() - startedAt.getTime()
-    if (elapsedMs < MIN_IDLE_TIME_MS) {
-      const remainingMs = MIN_IDLE_TIME_MS - elapsedMs
-      if (!idleDeferralTimers.has(task.id)) {
-        log("[background-agent] Deferring early session.idle:", {
-          elapsedMs,
-          remainingMs,
-          taskId: task.id,
-        })
-        const timer = setTimeout(() => {
-          idleDeferralTimers.delete(task.id)
-          emitIdleEvent(sessionID)
-        }, remainingMs)
-        idleDeferralTimers.set(task.id, timer)
-      } else {
-        log("[background-agent] session.idle already deferred:", { elapsedMs, taskId: task.id })
-      }
-      return
-    }
+    task.status = "error"
+    task.error = message
+    task.completedAt = new Date()
 
-    validateSessionHasOutput(sessionID)
-      .then(async (hasValidOutput) => {
-        if (task.status !== "running") {
-          log("[background-agent] Task status changed during validation, skipping:", {
-            taskId: task.id,
-            status: task.status,
-          })
-          return
-        }
-
-        if (!hasValidOutput) {
-          log("[background-agent] Session.idle but no valid output yet, waiting:", task.id)
-          return
-        }
-
-        const hasIncompleteTodos = await checkSessionTodos(sessionID)
-
-        if (task.status !== "running") {
-          log("[background-agent] Task status changed during todo check, skipping:", {
-            taskId: task.id,
-            status: task.status,
-          })
-          return
-        }
-
-        if (hasIncompleteTodos) {
-          log("[background-agent] Task has incomplete todos, waiting for todo-continuation:", task.id)
-          return
-        }
-
-        await tryCompleteTask(task, "session.idle event")
-      })
-      .catch((err) => {
-        log("[background-agent] Error in session.idle handler:", err)
-      })
+    cleanupTaskAfterSessionEnds({
+      task,
+      tasks,
+      idleDeferralTimers,
+      completionTimers,
+      cleanupPendingByParent,
+      clearNotificationsForTask,
+      releaseConcurrencyKey,
+    })
   }
 
   if (event.type === "session.deleted") {
@@ -176,24 +153,15 @@ export function handleBackgroundEvent(args: {
         })
       }
 
-      const completionTimer = completionTimers.get(task.id)
-      if (completionTimer) {
-        clearTimeout(completionTimer)
-        completionTimers.delete(task.id)
-      }
-
-      const idleTimer = idleDeferralTimers.get(task.id)
-      if (idleTimer) {
-        clearTimeout(idleTimer)
-        idleDeferralTimers.delete(task.id)
-      }
-
-      cleanupPendingByParent(task)
-      tasks.delete(task.id)
-      clearNotificationsForTask(task.id)
-      if (task.sessionID) {
-        subagentSessions.delete(task.sessionID)
-      }
+      cleanupTaskAfterSessionEnds({
+        task,
+        tasks,
+        idleDeferralTimers,
+        completionTimers,
+        cleanupPendingByParent,
+        clearNotificationsForTask,
+        releaseConcurrencyKey,
+      })
     }
   }
 }
