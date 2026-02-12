@@ -4,12 +4,15 @@ import { TASK_TTL_MS } from "./constants"
 import { subagentSessions } from "../claude-code-session-state"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 
-import type { BackgroundTask } from "./types"
+import type { BackgroundTask, LaunchInput } from "./types"
 import type { ConcurrencyManager } from "./concurrency"
+
+type QueueItem = { task: BackgroundTask; input: LaunchInput }
 
 export function pruneStaleState(args: {
   tasks: Map<string, BackgroundTask>
   notifications: Map<string, BackgroundTask[]>
+  queuesByKey: Map<string, QueueItem[]>
   concurrencyManager: ConcurrencyManager
   cleanupPendingByParent: (task: BackgroundTask) => void
   clearNotificationsForTask: (taskId: string) => void
@@ -17,6 +20,7 @@ export function pruneStaleState(args: {
   const {
     tasks,
     notifications,
+    queuesByKey,
     concurrencyManager,
     cleanupPendingByParent,
     clearNotificationsForTask,
@@ -26,6 +30,7 @@ export function pruneStaleState(args: {
     tasks,
     notifications,
     onTaskPruned: (taskId, task, errorMessage) => {
+      const wasPending = task.status === "pending"
       const now = Date.now()
       const timestamp = task.status === "pending"
         ? task.queuedAt?.getTime()
@@ -47,6 +52,21 @@ export function pruneStaleState(args: {
       }
 
       cleanupPendingByParent(task)
+      if (wasPending) {
+        const key = task.model
+          ? `${task.model.providerID}/${task.model.modelID}`
+          : task.agent
+        const queue = queuesByKey.get(key)
+        if (queue) {
+          const index = queue.findIndex((item) => item.task.id === taskId)
+          if (index !== -1) {
+            queue.splice(index, 1)
+            if (queue.length === 0) {
+              queuesByKey.delete(key)
+            }
+          }
+        }
+      }
       clearNotificationsForTask(taskId)
       tasks.delete(taskId)
       if (task.sessionID) {
