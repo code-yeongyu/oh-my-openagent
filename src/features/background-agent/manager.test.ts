@@ -2530,18 +2530,16 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     await concurrencyManager.acquire(concurrencyKey)
 
     const sessionID = "ses_error_1"
-    const task: BackgroundTask = {
+    const task = createMockTask({
       id: "task-session-error",
       sessionID,
       parentSessionID: "parent-session",
       parentMessageID: "msg-1",
       description: "task that errors",
-      prompt: "test",
       agent: "explore",
       status: "running",
-      startedAt: new Date(),
       concurrencyKey,
-    }
+    })
     getTaskMap(manager).set(task.id, task)
     getPendingByParent(manager).set(task.parentSessionID, new Set([task.id]))
 
@@ -2572,19 +2570,17 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     //#given
     const manager = createBackgroundManager()
     const sessionID = "ses_error_ignored"
-    const task: BackgroundTask = {
+    const task = createMockTask({
       id: "task-non-running",
       sessionID,
       parentSessionID: "parent-session",
       parentMessageID: "msg-1",
       description: "task already done",
-      prompt: "test",
       agent: "explore",
       status: "completed",
-      startedAt: new Date(),
-      completedAt: new Date(),
-      error: "previous",
-    }
+    })
+    task.completedAt = new Date()
+    task.error = "previous"
     getTaskMap(manager).set(task.id, task)
 
     //#when
