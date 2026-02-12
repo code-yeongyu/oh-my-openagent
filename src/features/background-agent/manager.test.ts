@@ -190,6 +190,22 @@ function getPendingByParent(manager: BackgroundManager): Map<string, Set<string>
   return (manager as unknown as { pendingByParent: Map<string, Set<string>> }).pendingByParent
 }
 
+function getQueuesByKey(
+  manager: BackgroundManager
+): Map<string, Array<{ task: BackgroundTask; input: import("./types").LaunchInput }>> {
+  return (manager as unknown as {
+    queuesByKey: Map<string, Array<{ task: BackgroundTask; input: import("./types").LaunchInput }>>
+  }).queuesByKey
+}
+
+async function processKeyForTest(manager: BackgroundManager, key: string): Promise<void> {
+  return (manager as unknown as { processKey: (key: string) => Promise<void> }).processKey(key)
+}
+
+function pruneStaleTasksAndNotificationsForTest(manager: BackgroundManager): void {
+  ;(manager as unknown as { pruneStaleTasksAndNotifications: () => void }).pruneStaleTasksAndNotifications()
+}
+
 async function tryCompleteTaskForTest(manager: BackgroundManager, task: BackgroundTask): Promise<boolean> {
   return (manager as unknown as { tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean> })
     .tryCompleteTask(task, "test")
@@ -2500,6 +2516,202 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
     expect(grandchildTask.status).toBe("cancelled")
     expect(pendingByParent.get(parentSessionID)).toBeUndefined()
     expect(pendingByParent.get("session-child")).toBeUndefined()
+
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager.handleEvent - session.error", () => {
+  test("sets task to error, releases concurrency, and cleans up", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const concurrencyManager = getConcurrencyManager(manager)
+    const concurrencyKey = "test-provider/test-model"
+    await concurrencyManager.acquire(concurrencyKey)
+
+    const sessionID = "ses_error_1"
+    const task: BackgroundTask = {
+      id: "task-session-error",
+      sessionID,
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "task that errors",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+      concurrencyKey,
+    }
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionID, new Set([task.id]))
+
+    //#when
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID,
+        error: {
+          name: "UnknownError",
+          data: { message: "Model not found: kimi-for-coding/k2p5." },
+        },
+      },
+    })
+
+    //#then
+    expect(task.status).toBe("error")
+    expect(task.error).toBe("Model not found: kimi-for-coding/k2p5.")
+    expect(task.completedAt).toBeInstanceOf(Date)
+    expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
+    expect(getTaskMap(manager).has(task.id)).toBe(false)
+    expect(getPendingByParent(manager).get(task.parentSessionID)).toBeUndefined()
+
+    manager.shutdown()
+  })
+
+  test("ignores session.error for non-running tasks", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const sessionID = "ses_error_ignored"
+    const task: BackgroundTask = {
+      id: "task-non-running",
+      sessionID,
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "task already done",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      error: "previous",
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID,
+        error: { name: "UnknownError", message: "should not matter" },
+      },
+    })
+
+    //#then
+    expect(task.status).toBe("completed")
+    expect(task.error).toBe("previous")
+    expect(getTaskMap(manager).has(task.id)).toBe(true)
+
+    manager.shutdown()
+  })
+
+  test("ignores session.error for unknown session", () => {
+    //#given
+    const manager = createBackgroundManager()
+
+    //#when
+    const handler = () =>
+      manager.handleEvent({
+        type: "session.error",
+        properties: {
+          sessionID: "ses_unknown",
+          error: { name: "UnknownError", message: "Model not found" },
+        },
+      })
+
+    //#then
+    expect(handler).not.toThrow()
+
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager queue processing - error tasks are skipped", () => {
+  test("does not start tasks with status=error", async () => {
+    //#given
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager(
+      { client, directory: tmpdir() } as unknown as PluginInput,
+      { defaultConcurrency: 1 }
+    )
+
+    const key = "test-key"
+    const task: BackgroundTask = {
+      id: "task-error-queued",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "queued error task",
+      prompt: "test",
+      agent: "test-agent",
+      status: "error",
+      queuedAt: new Date(),
+    }
+
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionID: task.parentSessionID,
+      parentMessageID: task.parentMessageID,
+    }
+
+    let startCalled = false
+    ;(manager as unknown as { startTask: (item: unknown) => Promise<void> }).startTask = async () => {
+      startCalled = true
+    }
+
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+
+    //#when
+    await processKeyForTest(manager, key)
+
+    //#then
+    expect(startCalled).toBe(false)
+    expect(getQueuesByKey(manager).get(key)?.length ?? 0).toBe(0)
+
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tasks from queuesByKey", () => {
+  test("removes stale pending task from queue", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const queuedAt = new Date(Date.now() - 31 * 60 * 1000)
+    const task: BackgroundTask = {
+      id: "task-stale-pending",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "stale pending",
+      prompt: "test",
+      agent: "test-agent",
+      status: "pending",
+      queuedAt,
+    }
+    const key = task.agent
+
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionID: task.parentSessionID,
+      parentMessageID: task.parentMessageID,
+    }
+
+    getTaskMap(manager).set(task.id, task)
+    getQueuesByKey(manager).set(key, [{ task, input }])
+
+    //#when
+    pruneStaleTasksAndNotificationsForTest(manager)
+
+    //#then
+    expect(getQueuesByKey(manager).get(key)).toBeUndefined()
 
     manager.shutdown()
   })
