@@ -341,12 +341,50 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const signalLog = logCalls.find((c) => c.msg.includes("Detected Copilot auto-retry signal"))
+      const signalLog = logCalls.find((c) => c.msg.includes("Detected provider auto-retry signal"))
       expect(signalLog).toBeDefined()
 
       const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
       expect(fallbackLog).toBeDefined()
       expect(fallbackLog?.data).toMatchObject({ from: "github-copilot/claude-opus-4.6", to: "openai/gpt-5.2" })
+    })
+
+    test("should trigger fallback on OpenAI auto-retry signal in message.updated", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-6"]),
+      })
+
+      const sessionID = "test-session-openai-auto-retry"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "openai/gpt-5.3-codex" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "openai/gpt-5.3-codex",
+              status: "The usage limit has been reached [retrying in 27s attempt #6]",
+            },
+          },
+        },
+      })
+
+      const signalLog = logCalls.find((c) => c.msg.includes("Detected provider auto-retry signal"))
+      expect(signalLog).toBeDefined()
+
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({ from: "openai/gpt-5.3-codex", to: "anthropic/claude-opus-4-6" })
     })
 
     test("should log when no fallback models configured", async () => {
@@ -1241,6 +1279,81 @@ describe("runtime-fallback", () => {
       await new Promise((resolve) => setTimeout(resolve, 60))
 
       expect(retriedModels).toContain("openai/gpt-5.3-codex")
+    })
+
+    test("should not clear fallback timeout on assistant non-error update with OpenAI retry signal", async () => {
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "test" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "openai/gpt-5.3-codex",
+            "anthropic/claude-opus-4-6",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-session-openai-retry-signal-no-error"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message:
+                  "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      expect(retriedModels).toEqual(["openai/gpt-5.3-codex"])
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              status: "The usage limit has been reached [retrying in 27s attempt #6]",
+            },
+          },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 60))
+
+      expect(retriedModels).toContain("anthropic/claude-opus-4-6")
     })
 
     test("should not clear fallback timeout on assistant non-error update without user-visible content", async () => {

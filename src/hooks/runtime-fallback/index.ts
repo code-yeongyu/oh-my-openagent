@@ -111,7 +111,29 @@ function classifyErrorType(error: unknown): string | undefined {
   return undefined
 }
 
-function extractCopilotAutoRetrySignal(info: Record<string, unknown> | undefined): string | undefined {
+interface AutoRetrySignal {
+  signal: string
+}
+
+/**
+ * Detects provider auto-retry signals - when a provider hits a quota/limit
+ * and indicates it will automatically retry after a delay.
+ * 
+ * Pattern: mentions limit/quota/rate limit AND indicates [retrying in X]
+ * Examples:
+ * - "Too Many Requests: quota exceeded [retrying in ~2 weeks attempt #1]"
+ * - "The usage limit has been reached [retrying in 27s attempt #6]"
+ * - "Rate limit exceeded. [retrying in 30s]"
+ */
+const AUTO_RETRY_PATTERNS: Array<(combined: string) => boolean> = [
+  // Must have retry indicator
+  (combined) => /retrying\s+in/i.test(combined),
+  // And mention some kind of limit/quota
+  (combined) =>
+    /(?:too\s+many\s+requests|quota\s*exceeded|usage\s+limit|rate\s+limit|limit\s+reached)/i.test(combined),
+]
+
+function extractAutoRetrySignal(info: Record<string, unknown> | undefined): AutoRetrySignal | undefined {
   if (!info) return undefined
 
   const candidates: string[] = []
@@ -131,8 +153,10 @@ function extractCopilotAutoRetrySignal(info: Record<string, unknown> | undefined
   const combined = candidates.join("\n")
   if (!combined) return undefined
 
-  if (/too.?many.?requests/i.test(combined) && /quota.?exceeded/i.test(combined) && /retrying\s+in/i.test(combined)) {
-    return combined
+  // All patterns must match to be considered an auto-retry signal
+  const isAutoRetry = AUTO_RETRY_PATTERNS.every((test) => test(combined))
+  if (isAutoRetry) {
+    return { signal: combined }
   }
 
   return undefined
@@ -592,7 +616,7 @@ export function createRuntimeFallbackHook(
         .join("\n")
 
       if (!textFromParts) return false
-      if (extractCopilotAutoRetrySignal({ message: textFromParts })) return false
+      if (extractAutoRetrySignal({ message: textFromParts })) return false
 
       return true
     } catch {
@@ -779,7 +803,8 @@ export function createRuntimeFallbackHook(
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
       const sessionID = info?.sessionID as string | undefined
-      const retrySignal = extractCopilotAutoRetrySignal(info)
+      const retrySignalResult = extractAutoRetrySignal(info)
+      const retrySignal = retrySignalResult?.signal
       const error = info?.error ?? (retrySignal ? { name: "ProviderRateLimitError", message: retrySignal } : undefined)
       const role = info?.role as string | undefined
       const model = info?.model as string | undefined
@@ -816,7 +841,7 @@ export function createRuntimeFallbackHook(
         }
 
         if (retrySignal && sessionRetryInFlight.has(sessionID)) {
-          log(`[${HOOK_NAME}] Overriding in-flight retry due to Copilot auto-retry signal`, {
+          log(`[${HOOK_NAME}] Overriding in-flight retry due to provider auto-retry signal`, {
             sessionID,
             model,
           })
@@ -825,7 +850,7 @@ export function createRuntimeFallbackHook(
         }
 
         if (retrySignal) {
-          log(`[${HOOK_NAME}] Detected Copilot auto-retry signal`, { sessionID, model })
+          log(`[${HOOK_NAME}] Detected provider auto-retry signal`, { sessionID, model })
         }
 
         if (!retrySignal) {
@@ -894,7 +919,7 @@ export function createRuntimeFallbackHook(
 
           if (state.pendingFallbackModel) {
             if (retrySignal) {
-              log(`[${HOOK_NAME}] Clearing pending fallback due to Copilot auto-retry signal`, {
+              log(`[${HOOK_NAME}] Clearing pending fallback due to provider auto-retry signal`, {
                 sessionID,
                 pendingFallbackModel: state.pendingFallbackModel,
               })
