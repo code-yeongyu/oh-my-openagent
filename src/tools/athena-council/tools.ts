@@ -1,6 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { executeCouncil } from "../../agents/athena/council-orchestrator"
-import type { CouncilConfig, CouncilMemberResponse } from "../../agents/athena/types"
+import type { CouncilConfig, CouncilMemberConfig, CouncilMemberResponse } from "../../agents/athena/types"
 import type { BackgroundManager, BackgroundTask, BackgroundTaskStatus } from "../../features/background-agent"
 import { ATHENA_COUNCIL_TOOL_DESCRIPTION } from "./constants"
 import { createCouncilLauncher } from "./council-launcher"
@@ -101,6 +101,57 @@ function formatCouncilOutput(responses: CouncilMemberResponse[], totalMembers: n
   return `${completedCount}/${totalMembers} council members completed.\n\n${lines.join("\n\n")}`
 }
 
+interface FilterCouncilMembersResult {
+  members: CouncilMemberConfig[]
+  error?: string
+}
+
+export function filterCouncilMembers(
+  members: CouncilMemberConfig[],
+  selectedNames: string[] | undefined
+): FilterCouncilMembersResult {
+  if (!selectedNames || selectedNames.length === 0) {
+    return { members }
+  }
+
+  const memberLookup = new Map<string, CouncilMemberConfig>()
+  members.forEach((member) => {
+    const key = (member.name ?? member.model).toLowerCase()
+    memberLookup.set(key, member)
+  })
+
+  const unresolved: string[] = []
+  const filteredMembers: CouncilMemberConfig[] = []
+  const includedMemberKeys = new Set<string>()
+
+  selectedNames.forEach((selectedName) => {
+    const selectedKey = selectedName.toLowerCase()
+    const matchedMember = memberLookup.get(selectedKey)
+    if (!matchedMember) {
+      unresolved.push(selectedName)
+      return
+    }
+
+    const memberKey = matchedMember.model
+    if (includedMemberKeys.has(memberKey)) {
+      return
+    }
+
+    includedMemberKeys.add(memberKey)
+    filteredMembers.push(matchedMember)
+  })
+
+  if (unresolved.length > 0) {
+    const availableNames = members.map((member) => member.name ?? member.model).join(", ")
+    return {
+      members: [],
+      error: `Unknown council members: ${unresolved.join(", ")}. Available members: ${availableNames}.`,
+    }
+  }
+
+  return { members: filteredMembers }
+}
+
 export function createAthenaCouncilTool(args: {
   backgroundManager: BackgroundManager
   councilConfig: CouncilConfig | undefined
@@ -111,10 +162,19 @@ export function createAthenaCouncilTool(args: {
     description: ATHENA_COUNCIL_TOOL_DESCRIPTION,
     args: {
       question: tool.schema.string().describe("The question to send to all council members"),
+      members: tool.schema
+        .array(tool.schema.string())
+        .optional()
+        .describe("Optional list of council member names or models to consult. Defaults to all configured members."),
     },
     async execute(toolArgs: AthenaCouncilToolArgs, toolContext) {
       if (!isCouncilConfigured(councilConfig)) {
         return "Athena council not configured. Add agents.athena.council.members to your config."
+      }
+
+      const filteredMembers = filterCouncilMembers(councilConfig.members, toolArgs.members)
+      if (filteredMembers.error) {
+        return filteredMembers.error
       }
 
       if (activeCouncilSessions.has(toolContext.sessionID)) {
@@ -125,7 +185,7 @@ export function createAthenaCouncilTool(args: {
       try {
         const execution = await executeCouncil({
           question: toolArgs.question,
-          council: councilConfig,
+          council: { members: filteredMembers.members },
           launcher: createCouncilLauncher(backgroundManager),
           parentSessionID: toolContext.sessionID,
           parentMessageID: toolContext.messageID,
