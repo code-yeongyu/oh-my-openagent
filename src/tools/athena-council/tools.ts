@@ -4,10 +4,8 @@ import type { CouncilConfig, CouncilMemberConfig } from "../../agents/athena/typ
 import type { BackgroundManager } from "../../features/background-agent"
 import { ATHENA_COUNCIL_TOOL_DESCRIPTION_TEMPLATE } from "./constants"
 import { createCouncilLauncher } from "./council-launcher"
+import { isCouncilRunning, markCouncilDone, markCouncilRunning } from "./session-guard"
 import type { AthenaCouncilLaunchResult, AthenaCouncilToolArgs } from "./types"
-
-/** Tracks active council executions per session to prevent duplicate launches. */
-const activeCouncilSessions = new Set<string>()
 
 function isCouncilConfigured(councilConfig: CouncilConfig | undefined): councilConfig is CouncilConfig {
   return Boolean(councilConfig && councilConfig.members.length > 0)
@@ -28,13 +26,15 @@ export function filterCouncilMembers(
 
   const memberLookup = new Map<string, CouncilMemberConfig>()
   members.forEach((member) => {
-    const key = (member.name ?? member.model).toLowerCase()
-    memberLookup.set(key, member)
+    memberLookup.set(member.model.toLowerCase(), member)
+    if (member.name) {
+      memberLookup.set(member.name.toLowerCase(), member)
+    }
   })
 
   const unresolved: string[] = []
   const filteredMembers: CouncilMemberConfig[] = []
-  const includedMemberKeys = new Set<string>()
+  const includedMembers = new Set<CouncilMemberConfig>()
 
   selectedNames.forEach((selectedName) => {
     const selectedKey = selectedName.toLowerCase()
@@ -44,12 +44,11 @@ export function filterCouncilMembers(
       return
     }
 
-    const memberKey = matchedMember.model
-    if (includedMemberKeys.has(memberKey)) {
+    if (includedMembers.has(matchedMember)) {
       return
     }
 
-    includedMemberKeys.add(memberKey)
+    includedMembers.add(matchedMember)
     filteredMembers.push(matchedMember)
   })
 
@@ -98,11 +97,11 @@ export function createAthenaCouncilTool(args: {
         return filteredMembers.error
       }
 
-      if (activeCouncilSessions.has(toolContext.sessionID)) {
+      if (isCouncilRunning(toolContext.sessionID)) {
         return "Council is already running for this session. Wait for the current council execution to complete."
       }
 
-      activeCouncilSessions.add(toolContext.sessionID)
+      markCouncilRunning(toolContext.sessionID)
       try {
         const execution = await executeCouncil({
           question: toolArgs.question,
@@ -132,10 +131,10 @@ export function createAthenaCouncilTool(args: {
             })),
         }
 
-        activeCouncilSessions.delete(toolContext.sessionID)
+        markCouncilDone(toolContext.sessionID)
         return JSON.stringify(launchResult)
       } catch (error) {
-        activeCouncilSessions.delete(toolContext.sessionID)
+        markCouncilDone(toolContext.sessionID)
         throw error
       }
     },

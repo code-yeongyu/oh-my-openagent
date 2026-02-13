@@ -5,10 +5,7 @@ import { collectCouncilResults } from "./council-result-collector"
 import { parseModelString } from "./model-parser"
 import type { CouncilConfig, CouncilExecutionResult, CouncilMemberConfig, CouncilMemberResponse } from "./types"
 
-export interface CouncilLaunchInput extends LaunchInput {
-  temperature?: number
-  permission?: Record<string, "ask" | "allow" | "deny">
-}
+export type CouncilLaunchInput = LaunchInput
 
 export interface CouncilLauncher {
   launch(input: CouncilLaunchInput): Promise<BackgroundTask>

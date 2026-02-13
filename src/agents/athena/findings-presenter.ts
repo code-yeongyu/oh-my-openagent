@@ -72,8 +72,7 @@ export function formatFindingsForUser(result: SynthesisResult): string {
       return []
     }
 
-    const firstFinding = findings[0]
-    const header = `## ${toTitle(level)} Findings (${formatAgreementLine(level, firstFinding)})`
+    const header = `## ${toTitle(level)} Findings (${findings.length})`
     const entries = findings.map((finding) => formatFinding(level, finding)).join("\n\n")
     return [`${header}\n\n${entries}`]
   })

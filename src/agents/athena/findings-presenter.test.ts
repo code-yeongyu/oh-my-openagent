@@ -117,6 +117,42 @@ describe("formatFindingsForUser", () => {
     expect(output).toContain("No synthesized findings are available")
   })
 
+  //#given multiple majority findings with different reporter counts
+  //#when formatting is generated
+  //#then group header shows the agreement level label without a misleading single count
+  test("shows agreement level label in group header without single-finding count", () => {
+    const result = createSynthesisResult({
+      findings: [
+        {
+          summary: "Finding A",
+          details: "Reported by 3 members",
+          agreementLevel: "majority",
+          reportedBy: ["OpenAI", "Claude", "Gemini"],
+          assessment: { agrees: true, rationale: "Valid" },
+          isFalsePositiveRisk: false,
+        },
+        {
+          summary: "Finding B",
+          details: "Reported by 2 members",
+          agreementLevel: "majority",
+          reportedBy: ["OpenAI", "Claude"],
+          assessment: { agrees: true, rationale: "Also valid" },
+          isFalsePositiveRisk: false,
+        },
+      ],
+    })
+
+    const output = formatFindingsForUser(result)
+
+    // The header should show the level label without a misleading single-finding count
+    // It should NOT use the first finding's count as the group header
+    expect(output).not.toContain("## Majority Findings (3 members report this (majority))")
+    expect(output).toContain("## Majority Findings")
+    // Each individual finding still shows its own agreement context
+    expect(output).toContain("Agreement context: 3 members report this (majority)")
+    expect(output).toContain("Agreement context: 2 members report this (majority)")
+  })
+
   //#given a non-empty findings result
   //#when formatting is generated
   //#then output ends with an action recommendation section

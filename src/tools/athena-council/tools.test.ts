@@ -97,6 +97,30 @@ describe("filterCouncilMembers", () => {
     )
   })
 
+  test("selects named member by model ID when name differs from model", () => {
+    // #given - "Claude" has name "Claude" but model "anthropic/claude-sonnet-4-5"
+    const selectedMembers = ["anthropic/claude-sonnet-4-5"]
+
+    // #when
+    const result = filterCouncilMembers(configuredMembers, selectedMembers)
+
+    // #then - should find the member by model ID even though it has a custom name
+    expect(result.members).toEqual([configuredMembers[0]])
+    expect(result.error).toBeUndefined()
+  })
+
+  test("deduplicates when same member is selected by both name and model", () => {
+    // #given
+    const selectedMembers = ["Claude", "anthropic/claude-sonnet-4-5"]
+
+    // #when
+    const result = filterCouncilMembers(configuredMembers, selectedMembers)
+
+    // #then - should return only one copy
+    expect(result.members).toEqual([configuredMembers[0]])
+    expect(result.error).toBeUndefined()
+  })
+
   test("returns error listing only unmatched names when partially matched", () => {
     // #given
     const selectedMembers = ["claude", "non-existent"]

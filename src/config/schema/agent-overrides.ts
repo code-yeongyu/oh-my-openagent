@@ -50,7 +50,7 @@ export const AgentOverrideConfigSchema = z.object({
 
 export const AthenaOverrideConfigSchema = AgentOverrideConfigSchema.merge(
   z.object({
-    council: AthenaConfigSchema.shape.council,
+    council: AthenaConfigSchema.shape.council.optional(),
   })
 )
 

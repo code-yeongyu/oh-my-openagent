@@ -547,7 +547,7 @@ describe("Athena agent override", () => {
       expect(result.data.agents?.athena?.model).toBe("openai/gpt-5.3-codex")
       expect(result.data.agents?.athena?.temperature).toBe(0.2)
       expect(result.data.agents?.athena?.prompt_append).toBe("Use consensus-first synthesis.")
-      expect(result.data.agents?.athena?.council.members).toHaveLength(3)
+      expect(result.data.agents?.athena?.council?.members).toHaveLength(3)
     }
   })
 
@@ -570,7 +570,7 @@ describe("Athena agent override", () => {
     expect(result.success).toBe(false)
   })
 
-  test("rejects athena override when council is missing", () => {
+  test("accepts athena override without council (temperature-only override)", () => {
     // given
     const config = {
       agents: {
@@ -584,7 +584,7 @@ describe("Athena agent override", () => {
     const result = OhMyOpenCodeConfigSchema.safeParse(config)
 
     // then
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 })
 

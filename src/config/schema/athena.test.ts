@@ -41,6 +41,50 @@ describe("CouncilMemberSchema", () => {
     expect(result.success).toBe(false)
   })
 
+  test("rejects model string without provider/model separator", () => {
+    //#given
+    const config = { model: "invalid-model" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects model string with empty provider", () => {
+    //#given
+    const config = { model: "/gpt-5.3-codex" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects model string with empty model ID", () => {
+    //#given
+    const config = { model: "openai/" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects empty model string", () => {
+    //#given
+    const config = { model: "" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
   test("rejects temperature below 0", () => {
     //#given
     const config = { model: "openai/gpt-5.3-codex", temperature: -0.1 }
