@@ -180,14 +180,26 @@ export async function runCommentChecker(input: HookInput, cliPath?: string, cust
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null
     const timeoutPromise = new Promise<"timeout">(resolve => {
-      timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(async () => {
         didTimeout = true
-        debugLog("comment-checker timed out after 30s; killing process")
+        debugLog("comment-checker timed out after 30s; sending SIGTERM")
         try {
-          proc.kill()
+          proc.kill("SIGTERM")
         } catch (err) {
-          debugLog("failed to kill comment-checker process:", err)
+          debugLog("failed to SIGTERM:", err)
         }
+        const graceTimer = setTimeout(() => {
+          try {
+            proc.kill("SIGKILL")
+            debugLog("sent SIGKILL after grace period")
+          } catch {
+          }
+        }, 1000)
+        try {
+          await proc.exited
+        } catch {
+        }
+        clearTimeout(graceTimer)
         resolve("timeout")
       }, 30_000)
     })
