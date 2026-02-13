@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
-import { discoverConfigSourceSkills } from "./config-source-discovery"
+import { SkillsConfigSchema } from "../../config/schema/skills"
+import { discoverConfigSourceSkills, normalizePathForGlob } from "./config-source-discovery"
 
 const TEST_DIR = join(tmpdir(), `config-source-discovery-test-${Date.now()}`)
 
@@ -28,12 +29,13 @@ describe("config source discovery", () => {
     const configDir = join(TEST_DIR, "config")
     const sourceDir = join(configDir, "custom-skills")
     writeSkill(join(sourceDir, "local-skill"), "local-skill", "Loaded from local source")
+    const config = SkillsConfigSchema.parse({
+      sources: [{ path: "./custom-skills", recursive: true }],
+    })
 
     // when
     const skills = await discoverConfigSourceSkills({
-      config: {
-        sources: [{ path: "./custom-skills", recursive: true }],
-      },
+      config,
       configDir,
     })
 
@@ -51,12 +53,13 @@ describe("config source discovery", () => {
 
     writeSkill(join(sourceDir, "keep", "kept"), "kept-skill", "Should be kept")
     writeSkill(join(sourceDir, "skip", "skipped"), "skipped-skill", "Should be skipped")
+    const config = SkillsConfigSchema.parse({
+      sources: [{ path: "./custom-skills", recursive: true, glob: "keep/**" }],
+    })
 
     // when
     const skills = await discoverConfigSourceSkills({
-      config: {
-        sources: [{ path: "./custom-skills", recursive: true, glob: "keep/**" }],
-      },
+      config,
       configDir,
     })
 
@@ -64,5 +67,16 @@ describe("config source discovery", () => {
     const names = skills.map((skill) => skill.name)
     expect(names).toContain("keep/kept-skill")
     expect(names).not.toContain("skip/skipped-skill")
+  })
+
+  it("normalizes windows separators before glob matching", () => {
+    // given
+    const windowsPath = "keep\\nested\\SKILL.md"
+
+    // when
+    const normalized = normalizePathForGlob(windowsPath)
+
+    // then
+    expect(normalized).toBe("keep/nested/SKILL.md")
   })
 })
