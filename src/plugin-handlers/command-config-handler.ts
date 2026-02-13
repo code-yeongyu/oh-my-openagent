@@ -44,13 +44,13 @@ export async function applyCommandConfig(params: {
       configDir: params.ctx.directory,
     }),
     includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
-    includeClaudeCommands ? loadProjectCommands() : Promise.resolve({}),
+    includeClaudeCommands ? loadProjectCommands(params.ctx.directory) : Promise.resolve({}),
     loadOpencodeGlobalCommands(),
-    loadOpencodeProjectCommands(),
+    loadOpencodeProjectCommands(params.ctx.directory),
     includeClaudeSkills ? loadUserSkills() : Promise.resolve({}),
-    includeClaudeSkills ? loadProjectSkills() : Promise.resolve({}),
+    includeClaudeSkills ? loadProjectSkills(params.ctx.directory) : Promise.resolve({}),
     loadOpencodeGlobalSkills(),
-    loadOpencodeProjectSkills(),
+    loadOpencodeProjectSkills(params.ctx.directory),
   ]);
 
   params.config.command = {
