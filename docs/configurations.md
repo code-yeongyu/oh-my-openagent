@@ -211,6 +211,36 @@ Use `prompt_append` to add extra instructions without replacing the default syst
 
 You can also override settings for `Sisyphus` (the main orchestrator) and `build` (the default agent) using the same options.
 
+## Athena Council
+
+Athena requires at least 2 council members. Each member runs an independent analysis of the same question, then Athena synthesizes the results by agreement level.
+
+```jsonc
+{
+  "agents": {
+    "athena": {
+      "council": {
+        "members": [
+          { "model": "anthropic/claude-opus-4-6", "name": "Claude" },
+          { "model": "openai/gpt-5.2", "name": "GPT" },
+          { "model": "google/gemini-3-pro", "name": "Gemini" },
+          { "model": "x-ai/grok-3", "name": "Grok" }
+        ]
+      }
+    }
+  }
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `model` | Yes | Provider/model ID (for example, `openai/gpt-5.2`) |
+| `name` | No | Display name (defaults to model ID) |
+| `variant` | No | Model variant override |
+| `temperature` | No | Temperature override (default: `0.1`) |
+
+Minimum 2 members are required. The installer (`bunx oh-my-opencode install`) auto-configures council members based on your available providers.
+
 ### Permission Options
 
 Fine-grained control over what agents can do:
@@ -245,7 +275,7 @@ Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or 
 }
 ```
 
-Available agents: `sisyphus`, `hephaestus`, `prometheus`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`
+Available agents: `sisyphus`, `hephaestus`, `prometheus`, `athena`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`
 
 ## Built-in Skills
 
