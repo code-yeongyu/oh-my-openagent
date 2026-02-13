@@ -38,13 +38,13 @@ It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optima
 ## Config File Locations
 
 Config file locations (priority order):
-1. `.opencode/oh-my-opencode.json` (project)
-2. User config (platform-specific):
+1. `.opencode/oh-my-opencode.jsonc` or `.opencode/oh-my-opencode.json` (project; prefers `.jsonc` when both exist)
+2. User config (platform-specific; prefers `.jsonc` when both exist):
 
-| Platform        | User Config Path                                                                                            |
-| --------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Windows**     | `~/.config/opencode/oh-my-opencode.json` (preferred) or `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
-| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json`                                                                    |
+| Platform        | User Config Path                                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Windows**     | `~/.config/opencode/oh-my-opencode.jsonc` (preferred) or `~/.config/opencode/oh-my-opencode.json` (fallback); `%APPDATA%\opencode\oh-my-opencode.jsonc` / `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
+| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.jsonc` (preferred) or `~/.config/opencode/oh-my-opencode.json` (fallback)                |
 
 Schema autocomplete supported:
 
@@ -1061,9 +1061,10 @@ Don't want them? Disable via `disabled_mcps` in `~/.config/opencode/oh-my-openco
 
 OpenCode provides LSP tools for analysis.
 Oh My OpenCode adds refactoring tools (rename, code actions).
-All OpenCode LSP configs and custom settings (from opencode.json) are supported, plus additional Oh My OpenCode-specific settings.
+All OpenCode LSP configs and custom settings (from `opencode.jsonc` / `opencode.json`) are supported, plus additional Oh My OpenCode-specific settings.
+For config discovery, `.jsonc` takes precedence over `.json` when both exist (applies to both `opencode.*` and `oh-my-opencode.*`).
 
-Add LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Add LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.jsonc` / `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.jsonc` / `.opencode/oh-my-opencode.json`:
 
 ```json
 {
