@@ -1,10 +1,38 @@
-import { describe, expect, test } from "bun:test"
-import { createToolExecuteBeforeHandler } from "./tool-execute-before"
-import type { CreatedHooks } from "../create-hooks"
+const { describe, expect, test } = require("bun:test")
+const { createToolExecuteBeforeHandler } = require("./tool-execute-before")
 
 describe("createToolExecuteBeforeHandler", () => {
+  test("does not execute subagent question blocker hook for question tool", async () => {
+    //#given
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
+    }
+
+    const hooks = {
+      subagentQuestionBlocker: {
+        "tool.execute.before": async () => {
+          throw new Error("subagentQuestionBlocker should not run")
+        },
+      },
+    }
+
+    const handler = createToolExecuteBeforeHandler({ ctx, hooks })
+    const input = { tool: "question", sessionID: "ses_sub", callID: "call_1" }
+    const output = { args: { questions: [] } as Record<string, unknown> }
+
+    //#when
+    const run = handler(input, output)
+
+    //#then
+    await expect(run).resolves.toBeUndefined()
+  })
+
   describe("task tool subagent_type normalization", () => {
-    const emptyHooks = {} as CreatedHooks
+    const emptyHooks = {}
 
     function createCtxWithSessionMessages(messages: Array<{ info?: { agent?: string; role?: string } }> = []) {
       return {
@@ -13,7 +41,7 @@ describe("createToolExecuteBeforeHandler", () => {
             messages: async () => ({ data: messages }),
           },
         },
-      } as unknown as Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]
+      }
     }
 
     test("sets subagent_type to sisyphus-junior when category is provided without subagent_type", async () => {
@@ -136,3 +164,5 @@ describe("createToolExecuteBeforeHandler", () => {
     })
   })
 })
+
+export {}
