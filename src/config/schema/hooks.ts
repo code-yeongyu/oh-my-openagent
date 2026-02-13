@@ -13,7 +13,6 @@ export const HookNameSchema = z.enum([
   "directory-readme-injector",
   "empty-task-response-detector",
   "think-mode",
-  "subagent-question-blocker",
   "anthropic-context-window-limit-recovery",
   "preemptive-compaction",
   "rules-injector",
