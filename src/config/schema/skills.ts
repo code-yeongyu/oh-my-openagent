@@ -28,17 +28,11 @@ export const SkillEntrySchema = z.union([z.boolean(), SkillDefinitionSchema])
 
 export const SkillsConfigSchema = z.union([
   z.array(z.string()),
-  z
-    .record(z.string(), SkillEntrySchema)
-    .and(
-      z
-        .object({
-          sources: z.array(SkillSourceSchema).optional(),
-          enable: z.array(z.string()).optional(),
-          disable: z.array(z.string()).optional(),
-        })
-        .partial()
-    ),
+  z.object({
+    sources: z.array(SkillSourceSchema).optional(),
+    enable: z.array(z.string()).optional(),
+    disable: z.array(z.string()).optional(),
+  }).catchall(SkillEntrySchema),
 ])
 
 export type SkillsConfig = z.infer<typeof SkillsConfigSchema>

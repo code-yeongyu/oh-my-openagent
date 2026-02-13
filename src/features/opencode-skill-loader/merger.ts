@@ -14,6 +14,7 @@ export interface MergeSkillsOptions {
 export function mergeSkills(
   builtinSkills: BuiltinSkill[],
   config: SkillsConfig | undefined,
+  configSourceSkills: LoadedSkill[],
   userClaudeSkills: LoadedSkill[],
   userOpencodeSkills: LoadedSkill[],
   projectClaudeSkills: LoadedSkill[],
@@ -47,6 +48,7 @@ export function mergeSkills(
   }
 
   const fileSystemSkills = [
+    ...configSourceSkills,
     ...userClaudeSkills,
     ...userOpencodeSkills,
     ...projectClaudeSkills,
