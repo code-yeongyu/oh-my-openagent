@@ -7,6 +7,7 @@ import type { MessageData } from "./types"
 import { recoverToolResultMissing } from "./recover-tool-result-missing"
 import { recoverThinkingBlockOrder } from "./recover-thinking-block-order"
 import { recoverThinkingDisabledViolation } from "./recover-thinking-disabled-violation"
+import { canAttemptPrefillRecovery, markPrefillRecoveryAttempted } from "./recover-assistant-prefill"
 import { extractResumeConfig, findLastUserMessage, resumeSession } from "./resume"
 
 interface MessageInfo {
@@ -81,13 +82,13 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         tool_result_missing: "Tool Crash Recovery",
         thinking_block_order: "Thinking Block Recovery",
         thinking_disabled_violation: "Thinking Strip Recovery",
-        "assistant_prefill_unsupported": "Prefill Unsupported",
+        "assistant_prefill_unsupported": "Prefill Recovery",
       }
       const toastMessages: Record<RecoveryErrorType & string, string> = {
         tool_result_missing: "Injecting cancelled tool results...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
-        "assistant_prefill_unsupported": "Prefill not supported; continuing without recovery.",
+        "assistant_prefill_unsupported": "Retrying — conversation ended with assistant message.",
       }
 
       await ctx.client.tui
@@ -120,7 +121,13 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
           await resumeSession(ctx.client, resumeConfig)
         }
       } else if (errorType === "assistant_prefill_unsupported") {
-        success = false
+        if (canAttemptPrefillRecovery(sessionID)) {
+          markPrefillRecoveryAttempted(sessionID)
+          success = true
+        } else {
+          log("[session-recovery] Prefill recovery already attempted within cooldown, skipping")
+          success = false
+        }
       }
 
       return success
