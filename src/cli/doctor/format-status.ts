@@ -7,7 +7,7 @@ export function formatStatus(result: DoctorResult): string {
 
   lines.push(formatHeader())
 
-  const { systemInfo, providers, tools } = result
+  const { systemInfo, tools } = result
   const padding = " "
 
   const opencodeVer = systemInfo.opencodeVersion ?? "unknown"
@@ -18,12 +18,6 @@ export function formatStatus(result: DoctorResult): string {
   const configPath = systemInfo.configPath ?? "unknown"
   const configStatus = systemInfo.configValid ? color.green("(valid)") : color.red("(invalid)")
   lines.push(` ${padding}Config     ${configPath} ${configStatus}`)
-
-  const providerParts = providers.map((p) => {
-    const mark = formatStatusMark(p.available)
-    return `${p.name}${mark}`
-  })
-  lines.push(` ${padding}Providers  ${providerParts.join("  ")}`)
 
   const lspText = `LSP ${tools.lspInstalled}/${tools.lspTotal}`
   const astGrepMark = formatStatusMark(tools.astGrepCli)

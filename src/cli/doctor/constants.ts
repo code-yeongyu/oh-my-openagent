@@ -20,7 +20,6 @@ export const STATUS_COLORS = {
 export const CHECK_IDS = {
   SYSTEM: "system",
   CONFIG: "config",
-  PROVIDERS: "providers",
   TOOLS: "tools",
   MODELS: "models",
 } as const
@@ -28,21 +27,8 @@ export const CHECK_IDS = {
 export const CHECK_NAMES: Record<string, string> = {
   [CHECK_IDS.SYSTEM]: "System",
   [CHECK_IDS.CONFIG]: "Configuration",
-  [CHECK_IDS.PROVIDERS]: "Providers",
   [CHECK_IDS.TOOLS]: "Tools",
   [CHECK_IDS.MODELS]: "Models",
-} as const
-
-export const AUTH_ENV_VARS: Record<string, string[]> = {
-  anthropic: ["ANTHROPIC_API_KEY"],
-  openai: ["OPENAI_API_KEY"],
-  google: ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
-} as const
-
-export const AUTH_PLUGINS: Record<string, { plugin: string; name: string }> = {
-  anthropic: { plugin: "builtin", name: "Anthropic" },
-  openai: { plugin: "opencode-openai-codex-auth", name: "OpenAI" },
-  google: { plugin: "opencode-antigravity-auth", name: "Google" },
 } as const
 
 export const EXIT_CODES = {
