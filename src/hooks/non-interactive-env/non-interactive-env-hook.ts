@@ -55,6 +55,13 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       // The bash tool always runs in a Unix-like shell (bash/sh), even on Windows
       // (via Git Bash, WSL, etc.), so always use unix export syntax.
       const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, "unix")
+      
+      // Check if the command already starts with the prefix to avoid stacking.
+      // This maintain the non-interactive behaivor but make the operation idempotent.
+      if (command.trim().startsWith(envPrefix.trim())) {
+        return
+      }
+
       output.args.command = `${envPrefix} ${command}`
 
       log(`[${HOOK_NAME}] Prepended non-interactive env vars to git command`, {
