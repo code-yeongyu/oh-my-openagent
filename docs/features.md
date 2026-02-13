@@ -24,6 +24,7 @@ Oh-My-OpenCode provides 11 specialized AI agents. Each has distinct expertise, o
 | **Prometheus** | `anthropic/claude-opus-4-6` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. Fallback: k2p5 → kimi-k2.5-free → gpt-5.2 → gemini-3-pro. |
 | **Metis** | `anthropic/claude-opus-4-6` | Plan consultant - pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: k2p5 → kimi-k2.5-free → gpt-5.2 → gemini-3-pro. |
 | **Momus** | `openai/gpt-5.2` | Plan reviewer - validates plans against clarity, verifiability, and completeness standards. Fallback: claude-opus-4-6 → gemini-3-pro. |
+| **Athena** | Configured per council member | **Multi-model council orchestrator.** Sends your question to multiple AI models in parallel, synthesizes their responses by agreement level, and delegates confirmed fixes to Atlas or planning to Prometheus. Uses Question tool for interactive member selection and action routing. |
 
 ### Invoking Agents
 
@@ -42,6 +43,7 @@ Ask @explore for the policy on this feature
 | oracle | Read-only: cannot write, edit, or delegate |
 | librarian | Cannot write, edit, or delegate |
 | explore | Cannot write, edit, or delegate |
+| athena | Cannot write or edit files. Can delegate via session_handoff. |
 | multimodal-looker | Allowlist only: read, glob, grep |
 
 ### Background Agents
@@ -85,6 +87,35 @@ When running inside tmux:
 See [Tmux Integration](configurations.md#tmux-integration) for full configuration options.
 
 Customize agent models, prompts, and permissions in `oh-my-opencode.json`. See [Configuration](configurations.md#agents).
+
+## Athena: Multi-Model Council
+
+Athena sends the same question to multiple AI models, collects their independent analyses, groups findings by agreement level (unanimous, majority, minority, solo), and returns an actionable synthesis you can execute immediately.
+
+Different models have different blind spots. Unanimous findings are high-confidence, while solo findings are explicitly flagged as potential false positives.
+
+### Workflow
+
+1. User asks Athena to analyze something (or Sisyphus delegates to Athena).
+2. Athena uses the Question tool to let the user pick council members.
+3. Athena calls `athena_council` and receives task IDs immediately.
+4. Athena calls `background_output` for each task ID so each member's full analysis appears in the conversation.
+5. Athena synthesizes findings by agreement level and flags solo findings.
+6. Athena uses the Question tool to ask: Fix now (Atlas), Create plan (Prometheus), or No action.
+7. If Atlas or Prometheus is selected, Athena calls `session_handoff` and transfers execution.
+
+### Example Invocation
+
+```
+Ask @athena to review the authentication implementation for security issues
+```
+
+### Quick Tips
+
+- Skip member selection by specifying members directly (for example: "ask GPT and Claude about X").
+- Say "all" or "everyone" to consult the full council.
+- Each member's full response is visible in the conversation before synthesis.
+- See [Configuration](configurations.md#athena-council) to define council members.
 
 ---
 
