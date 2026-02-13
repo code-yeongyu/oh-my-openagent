@@ -733,3 +733,20 @@ describe("GitMasterConfigSchema", () => {
     expect(result.success).toBe(false)
   })
 })
+
+describe("skills schema", () => {
+  test("accepts skills.sources configuration", () => {
+    //#given
+    const config = {
+      skills: {
+        sources: [{ path: "skill/", recursive: true }],
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+})
