@@ -10,6 +10,7 @@ export function createDelegateTaskRetryHook(_ctx: PluginInput) {
       output: { title: string; output: string; metadata: unknown }
     ) => {
       if (input.tool.toLowerCase() !== "task") return
+      if (typeof output.output !== "string") return
 
       const errorInfo = detectDelegateTaskError(output.output)
       if (errorInfo) {
