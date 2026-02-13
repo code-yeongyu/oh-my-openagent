@@ -43,7 +43,7 @@ Ask @explore for the policy on this feature
 | oracle | Read-only: cannot write, edit, or delegate |
 | librarian | Cannot write, edit, or delegate |
 | explore | Cannot write, edit, or delegate |
-| athena | Cannot write or edit files. Can delegate via session_handoff. |
+| athena | Cannot write or edit files. Can delegate via switch_agent. |
 | multimodal-looker | Allowlist only: read, glob, grep |
 
 ### Background Agents
@@ -102,7 +102,7 @@ Different models have different blind spots. Unanimous findings are high-confide
 4. Athena calls `background_output` for each task ID so each member's full analysis appears in the conversation.
 5. Athena synthesizes findings by agreement level and flags solo findings.
 6. Athena uses the Question tool to ask: Fix now (Atlas), Create plan (Prometheus), or No action.
-7. If Atlas or Prometheus is selected, Athena calls `session_handoff` and transfers execution.
+7. If Atlas or Prometheus is selected, Athena calls `switch_agent` and transfers execution.
 
 ### Example Invocation
 
