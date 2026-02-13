@@ -2,7 +2,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { executeCouncil } from "../../agents/athena/council-orchestrator"
 import type { CouncilConfig, CouncilMemberConfig, CouncilMemberResponse } from "../../agents/athena/types"
 import type { BackgroundManager, BackgroundTask, BackgroundTaskStatus } from "../../features/background-agent"
-import { ATHENA_COUNCIL_TOOL_DESCRIPTION } from "./constants"
+import { ATHENA_COUNCIL_TOOL_DESCRIPTION_TEMPLATE } from "./constants"
 import { createCouncilLauncher } from "./council-launcher"
 import type { AthenaCouncilToolArgs } from "./types"
 
@@ -152,14 +152,23 @@ export function filterCouncilMembers(
   return { members: filteredMembers }
 }
 
+function buildToolDescription(councilConfig: CouncilConfig | undefined): string {
+  const memberList = councilConfig?.members.length
+    ? councilConfig.members.map((m) => `- ${m.name ?? m.model}`).join("\n")
+    : "No members configured."
+
+  return ATHENA_COUNCIL_TOOL_DESCRIPTION_TEMPLATE.replace("{members}", `Available council members:\n${memberList}`)
+}
+
 export function createAthenaCouncilTool(args: {
   backgroundManager: BackgroundManager
   councilConfig: CouncilConfig | undefined
 }): ToolDefinition {
   const { backgroundManager, councilConfig } = args
+  const description = buildToolDescription(councilConfig)
 
   return tool({
-    description: ATHENA_COUNCIL_TOOL_DESCRIPTION,
+    description,
     args: {
       question: tool.schema.string().describe("The question to send to all council members"),
       members: tool.schema

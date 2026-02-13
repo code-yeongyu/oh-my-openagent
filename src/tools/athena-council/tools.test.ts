@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
-import { ATHENA_COUNCIL_TOOL_DESCRIPTION } from "./constants"
+import { ATHENA_COUNCIL_TOOL_DESCRIPTION_TEMPLATE } from "./constants"
 import { createAthenaCouncilTool, filterCouncilMembers } from "./tools"
 
 const mockManager = {
@@ -127,8 +127,9 @@ describe("createAthenaCouncilTool", () => {
       councilConfig: { members: [{ model: "openai/gpt-5.3-codex" }] },
     })
 
-    // #then
-    expect(athenaCouncilTool.description).toBe(ATHENA_COUNCIL_TOOL_DESCRIPTION)
+    // #then - description should be dynamic and include the member model
+    expect(athenaCouncilTool.description).toContain("openai/gpt-5.3-codex")
+    expect(athenaCouncilTool.description).toContain("Available council members:")
     expect((athenaCouncilTool as { args: Record<string, unknown> }).args.question).toBeDefined()
     expect((athenaCouncilTool as { args: Record<string, unknown> }).args.members).toBeDefined()
   })
