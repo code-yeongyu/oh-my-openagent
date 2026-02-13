@@ -99,14 +99,17 @@ export async function executeStopHooks(
              stopHookActiveState.set(ctx.sessionId, output.stop_hook_active)
            }
            const isBlock = output.decision === "block"
-           // Determine inject_prompt: prefer explicit value, fallback to reason if blocking
-           const injectPrompt = output.inject_prompt ?? (isBlock && output.reason ? output.reason : undefined)
-           return {
-             block: isBlock,
-             reason: output.reason,
-             stopHookActive: output.stop_hook_active,
-             permissionMode: output.permission_mode,
-             injectPrompt,
+           // Only return early if the hook explicitly blocks - non-blocking hooks
+           // should not prevent subsequent hooks from executing (matches Claude Code behavior)
+           if (isBlock) {
+             const injectPrompt = output.inject_prompt ?? (output.reason || undefined)
+             return {
+               block: true,
+               reason: output.reason,
+               stopHookActive: output.stop_hook_active,
+               permissionMode: output.permission_mode,
+               injectPrompt,
+             }
            }
          } catch {
            // Ignore JSON parse errors - hook may return non-JSON output
