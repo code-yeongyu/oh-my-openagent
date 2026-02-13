@@ -17,3 +17,5 @@ export const TOAST_DURATION_MS = 900
 export const COUNTDOWN_GRACE_PERIOD_MS = 500
 
 export const ABORT_WINDOW_MS = 3000
+export const CONTINUATION_COOLDOWN_MS = 30_000
+export const MAX_UNCHANGED_CYCLES = 3

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
 import { setMainSession, subagentSessions, _resetForTesting } from "../../features/claude-code-session-state"
 import { createTodoContinuationEnforcer } from "."
+import { CONTINUATION_COOLDOWN_MS } from "./constants"
 
 type TimerCallback = (...args: any[]) => void
 
@@ -507,6 +508,144 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should not inject again when cooldown is active", async () => {
+    //#given
+    const sessionID = "main-cooldown-active"
+    setupMainSessionWithBoulder(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+  })
+
+  test("should inject again when cooldown expires", async () => {
+    //#given
+    const sessionID = "main-cooldown-expired"
+    setupMainSessionWithBoulder(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+  })
+
+  test("should stop after stagnation cap and reset when todo hash changes", async () => {
+    //#given
+    const sessionID = "main-stagnation-cap"
+    setupMainSessionWithBoulder(sessionID)
+    let mutableTodoStatus: "pending" | "in_progress" = "pending"
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: [
+      { id: "1", content: "Task 1", status: mutableTodoStatus, priority: "high" },
+      { id: "2", content: "Task 2", status: "completed", priority: "medium" },
+    ]})
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    mutableTodoStatus = "in_progress"
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(4)
+  })
+
+  test("should skip idle handling while injection is in flight", async () => {
+    //#given
+    const sessionID = "main-in-flight"
+    setupMainSessionWithBoulder(sessionID)
+    let resolvePrompt: (() => void) | undefined
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: any) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      await new Promise<void>((resolve) => {
+        resolvePrompt = resolve
+      })
+      return {}
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2100, true)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(3000, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+
+    resolvePrompt?.()
+    await Promise.resolve()
+  })
+
+  test("should clear cooldown and stagnation state on session deleted", async () => {
+    //#given
+    const sessionID = "main-delete-state-reset"
+    setupMainSessionWithBoulder(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+    await hook.handler({
+      event: { type: "session.deleted", properties: { info: { id: sessionID } } },
+    })
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+  })
+
   test("should accept skipAgents option without error", async () => {
     // given - session with skipAgents configured for Prometheus
     const sessionID = "main-prometheus-option"
@@ -556,16 +695,16 @@ describe("todo-continuation-enforcer", () => {
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
-    await fakeTimers.advanceBy(3500)
+    await fakeTimers.advanceBy(3500, true)
 
     // then - first injection happened
     expect(promptCalls.length).toBe(1)
 
-    // when - immediately trigger second idle (no 10s wait needed)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
-    await fakeTimers.advanceBy(3500)
+    await fakeTimers.advanceBy(3500, true)
 
     // then - second injection also happened (no throttle blocking)
     expect(promptCalls.length).toBe(2)
