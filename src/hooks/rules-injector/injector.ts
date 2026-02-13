@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { relative, resolve } from "node:path";
 import { findProjectRoot, findRuleFiles } from "./finder";
@@ -11,6 +11,7 @@ import {
 import { parseRuleFrontmatter } from "./parser";
 import { saveInjectedRules } from "./storage";
 import type { SessionInjectedRulesCache } from "./cache";
+import type { RuleMetadata } from "./types";
 
 type ToolExecuteOutput = {
   title: string;
@@ -31,6 +32,42 @@ type DynamicTruncator = {
     content: string
   ) => Promise<{ result: string; truncated: boolean }>;
 };
+
+interface ParsedRuleEntry {
+  mtimeMs: number;
+  size: number;
+  metadata: RuleMetadata;
+  body: string;
+}
+
+const parsedRuleCache = new Map<string, ParsedRuleEntry>();
+
+function getCachedParsedRule(
+  filePath: string,
+  realPath: string
+): { metadata: RuleMetadata; body: string } {
+  try {
+    const stat = statSync(filePath);
+    const cached = parsedRuleCache.get(realPath);
+
+    if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+      return { metadata: cached.metadata, body: cached.body };
+    }
+
+    const rawContent = readFileSync(filePath, "utf-8");
+    const { metadata, body } = parseRuleFrontmatter(rawContent);
+    parsedRuleCache.set(realPath, {
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+      metadata,
+      body,
+    });
+    return { metadata, body };
+  } catch {
+    const rawContent = readFileSync(filePath, "utf-8");
+    return parseRuleFrontmatter(rawContent);
+  }
+}
 
 function resolveFilePath(
   workspaceDirectory: string,
@@ -68,13 +105,16 @@ export function createRuleInjectionProcessor(deps: {
 
     const ruleFileCandidates = findRuleFiles(projectRoot, home, resolved);
     const toInject: RuleToInject[] = [];
+    let dirty = false;
 
     for (const candidate of ruleFileCandidates) {
       if (isDuplicateByRealPath(candidate.realPath, cache.realPaths)) continue;
 
       try {
-        const rawContent = readFileSync(candidate.path, "utf-8");
-        const { metadata, body } = parseRuleFrontmatter(rawContent);
+        const { metadata, body } = getCachedParsedRule(
+          candidate.path,
+          candidate.realPath
+        );
 
         let matchReason: string;
         if (candidate.isSingleFile) {
@@ -101,6 +141,7 @@ export function createRuleInjectionProcessor(deps: {
 
         cache.realPaths.add(candidate.realPath);
         cache.contentHashes.add(contentHash);
+        dirty = true;
       } catch {}
     }
 
@@ -119,7 +160,9 @@ export function createRuleInjectionProcessor(deps: {
       output.output += `\n\n[Rule: ${rule.relativePath}]\n[Match: ${rule.matchReason}]\n${result}${truncationNotice}`;
     }
 
-    saveInjectedRules(sessionID, cache);
+    if (dirty) {
+      saveInjectedRules(sessionID, cache);
+    }
   }
 
   return { processFilePathForInjection };
