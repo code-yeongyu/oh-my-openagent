@@ -114,6 +114,11 @@ export async function injectContinuation(args: {
 Remaining tasks:
 ${todoList}`
 
+  const injectionState = sessionStateStore.getExistingState(sessionID)
+  if (injectionState) {
+    injectionState.inFlight = true
+  }
+
   try {
     log(`[${HOOK_NAME}] Injecting continuation`, {
       sessionID,
@@ -133,7 +138,14 @@ ${todoList}`
     })
 
     log(`[${HOOK_NAME}] Injection successful`, { sessionID })
+    if (injectionState) {
+      injectionState.inFlight = false
+      injectionState.lastInjectedAt = Date.now()
+    }
   } catch (error) {
     log(`[${HOOK_NAME}] Injection failed`, { sessionID, error: String(error) })
+    if (injectionState) {
+      injectionState.inFlight = false
+    }
   }
 }
