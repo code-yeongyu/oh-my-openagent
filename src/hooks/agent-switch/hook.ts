@@ -1,10 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { consumePendingHandoff } from "../../features/agent-handoff"
+import { consumePendingSwitch } from "../../features/agent-switch"
 import { log } from "../../shared/logger"
 
-const HOOK_NAME = "agent-handoff" as const
+const HOOK_NAME = "agent-switch" as const
 
-export function createAgentHandoffHook(ctx: PluginInput) {
+export function createAgentSwitchHook(ctx: PluginInput) {
   return {
     event: async (input: { event: { type: string; properties?: Record<string, unknown> } }): Promise<void> => {
       if (input.event.type !== "session.idle") return
@@ -13,24 +13,24 @@ export function createAgentHandoffHook(ctx: PluginInput) {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
 
-      const handoff = consumePendingHandoff(sessionID)
-      if (!handoff) return
+      const pending = consumePendingSwitch(sessionID)
+      if (!pending) return
 
-      log(`[${HOOK_NAME}] Executing handoff to ${handoff.agent}`, { sessionID })
+      log(`[${HOOK_NAME}] Switching to ${pending.agent}`, { sessionID })
 
       try {
         await ctx.client.session.promptAsync({
           path: { id: sessionID },
           body: {
-            agent: handoff.agent,
-            parts: [{ type: "text", text: handoff.context }],
+            agent: pending.agent,
+            parts: [{ type: "text", text: pending.context }],
           },
           query: { directory: ctx.directory },
         })
 
-        log(`[${HOOK_NAME}] Handoff to ${handoff.agent} complete`, { sessionID })
+        log(`[${HOOK_NAME}] Switch to ${pending.agent} complete`, { sessionID })
       } catch (err) {
-        log(`[${HOOK_NAME}] Handoff failed`, { sessionID, error: String(err) })
+        log(`[${HOOK_NAME}] Switch failed`, { sessionID, error: String(err) })
       }
     },
   }

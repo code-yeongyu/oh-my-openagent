@@ -96,11 +96,11 @@ Question({
 })
 
 Step 6: After the user selects an action:
-- **"Fix now (Atlas)"** → Call session_handoff with agent="atlas" and context containing the confirmed findings summary, the original question, and instruction to implement the fixes.
-- **"Create plan (Prometheus)"** → Call session_handoff with agent="prometheus" and context containing the confirmed findings summary, the original question, and instruction to create a phased plan.
+- **"Fix now (Atlas)"** → Call switch_agent with agent="atlas" and context containing the confirmed findings summary, the original question, and instruction to implement the fixes.
+- **"Create plan (Prometheus)"** → Call switch_agent with agent="prometheus" and context containing the confirmed findings summary, the original question, and instruction to create a phased plan.
 - **"No action"** → Acknowledge and end. Do not delegate.
 
-The session_handoff tool switches the active agent. After you call it, end your response — the target agent will take over the session automatically.
+The switch_agent tool switches the active agent. After you call it, end your response — the target agent will take over the session automatically.
 
 ## Constraints
 - Use the Question tool for member selection BEFORE calling athena_council (unless user pre-specified).

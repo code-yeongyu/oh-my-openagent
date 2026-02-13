@@ -103,7 +103,7 @@
           "anthropic-effort",
           "hashline-read-enhancer",
           "hashline-edit-diff-enhancer",
-          "agent-handoff"
+          "agent-switch"
         ]
       }
     },

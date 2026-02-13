@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach } from "bun:test"
-import { createSessionHandoffTool } from "./tools"
-import { consumePendingHandoff, _resetForTesting as resetHandoff } from "../../features/agent-handoff"
+import { createSwitchAgentTool } from "./tools"
+import { consumePendingSwitch, _resetForTesting as resetSwitch } from "../../features/agent-switch"
 import { getSessionAgent, _resetForTesting as resetSession } from "../../features/claude-code-session-state"
 
-describe("session_handoff tool", () => {
+describe("switch_agent tool", () => {
   const sessionID = "test-session-123"
   const messageID = "msg-456"
   const agent = "athena"
@@ -16,25 +16,25 @@ describe("session_handoff tool", () => {
   }
 
   beforeEach(() => {
-    resetHandoff()
+    resetSwitch()
     resetSession()
   })
 
-  //#given valid atlas handoff args
+  //#given valid atlas switch args
   //#when execute is called
-  //#then it stores pending handoff and updates session agent
-  test("should queue handoff to atlas", async () => {
-    const tool = createSessionHandoffTool()
+  //#then it stores pending switch and updates session agent
+  test("should queue switch to atlas", async () => {
+    const tool = createSwitchAgentTool()
     const result = await tool.execute(
       { agent: "atlas", context: "Fix the auth bug based on council findings" },
       toolContext
     )
 
     expect(result).toContain("atlas")
-    expect(result).toContain("Handoff queued")
+    expect(result).toContain("switch")
 
-    const handoff = consumePendingHandoff(sessionID)
-    expect(handoff).toEqual({
+    const entry = consumePendingSwitch(sessionID)
+    expect(entry).toEqual({
       agent: "atlas",
       context: "Fix the auth bug based on council findings",
     })
@@ -42,50 +42,50 @@ describe("session_handoff tool", () => {
     expect(getSessionAgent(sessionID)).toBe("atlas")
   })
 
-  //#given valid prometheus handoff args
+  //#given valid prometheus switch args
   //#when execute is called
-  //#then it stores pending handoff for prometheus
-  test("should queue handoff to prometheus", async () => {
-    const tool = createSessionHandoffTool()
+  //#then it stores pending switch for prometheus
+  test("should queue switch to prometheus", async () => {
+    const tool = createSwitchAgentTool()
     const result = await tool.execute(
       { agent: "Prometheus", context: "Create a plan for the refactoring" },
       toolContext
     )
 
     expect(result).toContain("prometheus")
-    expect(result).toContain("Handoff queued")
+    expect(result).toContain("switch")
 
-    const handoff = consumePendingHandoff(sessionID)
-    expect(handoff?.agent).toBe("prometheus")
+    const entry = consumePendingSwitch(sessionID)
+    expect(entry?.agent).toBe("prometheus")
   })
 
   //#given an invalid agent name
   //#when execute is called
   //#then it returns an error
   test("should reject invalid agent names", async () => {
-    const tool = createSessionHandoffTool()
+    const tool = createSwitchAgentTool()
     const result = await tool.execute(
       { agent: "librarian", context: "Some context" },
       toolContext
     )
 
-    expect(result).toContain("Invalid handoff target")
+    expect(result).toContain("Invalid switch target")
     expect(result).toContain("librarian")
-    expect(consumePendingHandoff(sessionID)).toBeUndefined()
+    expect(consumePendingSwitch(sessionID)).toBeUndefined()
   })
 
   //#given agent name with different casing
   //#when execute is called
   //#then it normalizes to lowercase
   test("should handle case-insensitive agent names", async () => {
-    const tool = createSessionHandoffTool()
+    const tool = createSwitchAgentTool()
     await tool.execute(
       { agent: "ATLAS", context: "Fix things" },
       toolContext
     )
 
-    const handoff = consumePendingHandoff(sessionID)
-    expect(handoff?.agent).toBe("atlas")
+    const entry = consumePendingSwitch(sessionID)
+    expect(entry?.agent).toBe("atlas")
     expect(getSessionAgent(sessionID)).toBe("atlas")
   })
 })
