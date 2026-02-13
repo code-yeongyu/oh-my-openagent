@@ -7,6 +7,8 @@
  * - Extended reasoning context for complex tasks
  */
 
+import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
+
 export function buildDefaultSisyphusJuniorPrompt(
   useTaskSystem: boolean,
   promptAppend?: string
@@ -40,7 +42,7 @@ Task NOT complete without:
 </Style>`
 
   if (!promptAppend) return prompt
-  return prompt + "\n\n" + promptAppend
+  return prompt + "\n\n" + resolvePromptAppend(promptAppend)
 }
 
 function buildConstraintsSection(useTaskSystem: boolean): string {

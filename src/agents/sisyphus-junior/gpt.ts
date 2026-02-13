@@ -16,6 +16,8 @@
  * - Explicit decision criteria needed (model won't infer)
  */
 
+import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
+
 export function buildGptSisyphusJuniorPrompt(
   useTaskSystem: boolean,
   promptAppend?: string
@@ -85,7 +87,7 @@ Task NOT complete without evidence:
 </style_spec>`
 
   if (!promptAppend) return prompt
-  return prompt + "\n\n" + promptAppend
+  return prompt + "\n\n" + resolvePromptAppend(promptAppend)
 }
 
 function buildGptBlockedActionsSection(useTaskSystem: boolean): string {
