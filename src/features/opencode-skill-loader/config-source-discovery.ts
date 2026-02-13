@@ -25,12 +25,16 @@ function isMarkdownPath(path: string): boolean {
   return extname(path).toLowerCase() === ".md"
 }
 
+export function normalizePathForGlob(path: string): string {
+  return path.split("\\").join("/")
+}
+
 function filterByGlob(skills: LoadedSkill[], sourceBaseDir: string, globPattern?: string): LoadedSkill[] {
   if (!globPattern) return skills
 
   return skills.filter((skill) => {
     if (!skill.path) return false
-    const rel = relative(sourceBaseDir, skill.path)
+    const rel = normalizePathForGlob(relative(sourceBaseDir, skill.path))
     return picomatch.isMatch(rel, globPattern, { dot: true, bash: true })
   })
 }
