@@ -553,6 +553,18 @@ describe("BrowserAutomationProviderSchema", () => {
     // then
     expect(result.success).toBe(false)
   })
+
+  test("accepts 'playwright-cli' as valid provider", () => {
+    // given
+    const input = "playwright-cli"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("playwright-cli")
+  })
 })
 
 describe("BrowserAutomationConfigSchema", () => {
@@ -576,6 +588,17 @@ describe("BrowserAutomationConfigSchema", () => {
 
     // then
     expect(result.provider).toBe("agent-browser")
+  })
+
+  test("accepts playwright-cli provider in config", () => {
+    // given
+    const input = { provider: "playwright-cli" }
+
+    // when
+    const result = BrowserAutomationConfigSchema.parse(input)
+
+    // then
+    expect(result.provider).toBe("playwright-cli")
   })
 })
 
@@ -606,6 +629,18 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
     // then
     expect(result.success).toBe(true)
     expect(result.data?.browser_automation_engine).toBeUndefined()
+  })
+
+  test("accepts browser_automation_engine with playwright-cli", () => {
+    // given
+    const input = { browser_automation_engine: { provider: "playwright-cli" } }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data?.browser_automation_engine?.provider).toBe("playwright-cli")
   })
 })
 
