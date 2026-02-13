@@ -14,23 +14,20 @@ export interface AthenaConfig {
   council: CouncilConfig
 }
 
-export type CouncilMemberStatus = "completed" | "timeout" | "error"
-
-export type AgreementLevel = "unanimous" | "majority" | "minority" | "solo"
-
-export interface CouncilMemberResponse {
+export interface CouncilLaunchFailure {
   member: CouncilMemberConfig
-  status: CouncilMemberStatus
-  response?: string
-  error?: string
-  taskId: string
-  durationMs: number
+  error: string
 }
 
-export interface CouncilExecutionResult {
+export interface CouncilLaunchedMember {
+  member: CouncilMemberConfig
+  taskId: string
+}
+
+/** Return type of executeCouncil — only tracks launch outcomes, not task completion */
+export interface CouncilLaunchResult {
   question: string
-  responses: CouncilMemberResponse[]
+  launched: CouncilLaunchedMember[]
+  failures: CouncilLaunchFailure[]
   totalMembers: number
-  completedCount: number
-  failedCount: number
 }

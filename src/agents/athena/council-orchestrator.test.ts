@@ -3,16 +3,6 @@ import { buildCouncilPrompt } from "./council-prompt"
 import { executeCouncil } from "./council-orchestrator"
 import type { CouncilConfig } from "./types"
 
-type MockTaskStatus = "completed" | "error" | "cancelled" | "interrupt"
-
-interface MockTask {
-  id: string
-  status: MockTaskStatus
-  result?: string
-  error?: string
-  completedAt?: Date
-}
-
 interface MockLaunchInput {
   description: string
   prompt: string
@@ -25,20 +15,15 @@ interface MockLaunchInput {
   permission?: Record<string, "ask" | "allow" | "deny">
 }
 
-function createMockTask(task: MockTask, launch: MockLaunchInput): MockTask & {
-  parentSessionID: string
-  parentMessageID: string
-  description: string
-  prompt: string
-  agent: string
-} {
+function createMockTask(id: string, launch: MockLaunchInput) {
   return {
+    id,
+    status: "pending" as const,
     parentSessionID: launch.parentSessionID,
     parentMessageID: launch.parentMessageID,
     description: launch.description,
     prompt: launch.prompt,
     agent: launch.agent,
-    ...task,
   }
 }
 
@@ -51,15 +36,7 @@ describe("executeCouncil", () => {
     const launcher = {
       launch: async (input: MockLaunchInput) => {
         launches.push(input)
-        return createMockTask(
-          {
-            id: `task-${launches.length}`,
-            status: "completed",
-            result: `response-${launches.length}`,
-            completedAt: new Date(),
-          },
-          input
-        )
+        return createMockTask(`task-${launches.length}`, input)
       },
     }
 
@@ -84,8 +61,9 @@ describe("executeCouncil", () => {
     const expectedPrompt = buildCouncilPrompt(question)
 
     expect(launches).toHaveLength(3)
-    expect(result.completedCount).toBe(3)
-    expect(result.failedCount).toBe(0)
+    expect(result.launched).toHaveLength(3)
+    expect(result.failures).toHaveLength(0)
+    expect(result.totalMembers).toBe(3)
 
     for (const launch of launches) {
       expect(launch.prompt).toBe(expectedPrompt)
@@ -98,33 +76,16 @@ describe("executeCouncil", () => {
     expect(launches[2]?.model).toEqual({ providerID: "google", modelID: "gemini-3-pro" })
   })
 
-  //#given a council with 3 members where 1 member fails
+  //#given a council with 3 members where 1 launch throws
   //#when executeCouncil is called
-  //#then partial failures are tolerated and preserved in responses
-  test("returns successful result for partial failures", async () => {
+  //#then launch failures are captured separately from successful launches
+  test("captures launch failures separately from successful launches", async () => {
     const launcher = {
       launch: async (input: MockLaunchInput) => {
         if (input.model?.providerID === "anthropic") {
-          return createMockTask(
-            {
-              id: "task-failed",
-              status: "error",
-              error: "Token limit exceeded",
-              completedAt: new Date(),
-            },
-            input
-          )
+          throw new Error("Provider unavailable")
         }
-
-        return createMockTask(
-          {
-            id: `task-${input.model?.providerID}`,
-            status: "completed",
-            result: `ok-${input.model?.providerID}`,
-            completedAt: new Date(),
-          },
-          input
-        )
+        return createMockTask(`task-${input.model?.providerID}`, input)
       },
     }
 
@@ -142,28 +103,21 @@ describe("executeCouncil", () => {
       parentMessageID: "message-1",
     })
 
-    expect(result.completedCount).toBe(2)
-    expect(result.failedCount).toBe(1)
-    expect(result.responses).toHaveLength(3)
-    expect(result.responses.filter((response) => response.status === "completed")).toHaveLength(2)
-    expect(result.responses.filter((response) => response.status === "error")).toHaveLength(1)
+    expect(result.launched).toHaveLength(2)
+    expect(result.failures).toHaveLength(1)
+    expect(result.totalMembers).toBe(3)
+    expect(result.failures[0]?.member.model).toBe("anthropic/claude-sonnet-4-5")
+    expect(result.failures[0]?.error).toContain("Launch failed")
   })
 
-  //#given a council where all members fail
+  //#given a council where all launches throw
   //#when executeCouncil is called
-  //#then it returns structured error result with zero completions
-  test("returns all failures when every member fails", async () => {
+  //#then all members appear as failures with zero launched
+  test("returns all failures when every launch throws", async () => {
     const launcher = {
-      launch: async (input: MockLaunchInput) =>
-        createMockTask(
-          {
-            id: `task-${input.model?.providerID}`,
-            status: "error",
-            error: "Model unavailable",
-            completedAt: new Date(),
-          },
-          input
-        ),
+      launch: async () => {
+        throw new Error("Model unavailable")
+      },
     }
 
     const result = await executeCouncil({
@@ -179,29 +133,21 @@ describe("executeCouncil", () => {
       parentMessageID: "message-1",
     })
 
-    expect(result.completedCount).toBe(0)
-    expect(result.failedCount).toBe(2)
-    expect(result.responses).toHaveLength(2)
-    expect(result.responses.every((response) => response.status === "error")).toBe(true)
+    expect(result.launched).toHaveLength(0)
+    expect(result.failures).toHaveLength(2)
+    expect(result.totalMembers).toBe(2)
+    expect(result.failures.every((f) => f.error.includes("Launch failed"))).toBe(true)
   })
 
   //#given a council with one invalid model string
   //#when executeCouncil is called
-  //#then invalid member becomes an error response while others still execute
+  //#then invalid member becomes a failure while others still launch
   test("handles invalid model strings without crashing council execution", async () => {
     const launches: MockLaunchInput[] = []
     const launcher = {
       launch: async (input: MockLaunchInput) => {
         launches.push(input)
-        return createMockTask(
-          {
-            id: `task-${launches.length}`,
-            status: "completed",
-            result: "valid-member-response",
-            completedAt: new Date(),
-          },
-          input
-        )
+        return createMockTask(`task-${launches.length}`, input)
       },
     }
 
@@ -219,10 +165,9 @@ describe("executeCouncil", () => {
     })
 
     expect(launches).toHaveLength(1)
-    expect(result.completedCount).toBe(1)
-    expect(result.failedCount).toBe(1)
-    expect(result.responses).toHaveLength(2)
-    expect(result.responses.find((response) => response.member.model === "invalid-model")?.status).toBe("error")
+    expect(result.launched).toHaveLength(1)
+    expect(result.failures).toHaveLength(1)
+    expect(result.failures.find((f) => f.member.model === "invalid-model")?.error).toContain("Launch failed")
   })
 
   //#given members with per-member temperature and variant
@@ -233,15 +178,7 @@ describe("executeCouncil", () => {
     const launcher = {
       launch: async (input: MockLaunchInput) => {
         launches.push(input)
-        return createMockTask(
-          {
-            id: `task-${launches.length}`,
-            status: "completed",
-            result: "ok",
-            completedAt: new Date(),
-          },
-          input
-        )
+        return createMockTask(`task-${launches.length}`, input)
       },
     }
 
@@ -263,5 +200,34 @@ describe("executeCouncil", () => {
     expect(launches[0]?.model?.variant).toBe("high")
     expect(launches[1]?.temperature).toBe(0.3)
     expect(launches[1]?.model?.variant).toBeUndefined()
+  })
+
+  //#given launched members
+  //#when executeCouncil returns
+  //#then each launched member has a taskId for background_output retrieval
+  test("returns task IDs for background_output retrieval", async () => {
+    const launcher = {
+      launch: async (input: MockLaunchInput) =>
+        createMockTask(`bg_${input.model?.providerID}`, input),
+    }
+
+    const result = await executeCouncil({
+      question: "Review error handling",
+      council: {
+        members: [
+          { model: "openai/gpt-5.3-codex", name: "OpenAI" },
+          { model: "google/gemini-3-pro", name: "Gemini" },
+        ],
+      },
+      launcher,
+      parentSessionID: "session-1",
+      parentMessageID: "message-1",
+    })
+
+    expect(result.launched).toHaveLength(2)
+    expect(result.launched[0]?.taskId).toBe("bg_openai")
+    expect(result.launched[0]?.member.name).toBe("OpenAI")
+    expect(result.launched[1]?.taskId).toBe("bg_google")
+    expect(result.launched[1]?.member.name).toBe("Gemini")
   })
 })

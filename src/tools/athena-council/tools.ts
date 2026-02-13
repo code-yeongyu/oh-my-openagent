@@ -113,22 +113,18 @@ export function createAthenaCouncilTool(args: {
         })
 
         const launchResult: AthenaCouncilLaunchResult = {
-          launched: execution.responses.filter((response) => response.taskId.length > 0).length,
-          members: execution.responses
-            .filter((response) => response.taskId.length > 0)
-            .map((response) => ({
-              task_id: response.taskId,
-              name: response.member.name ?? response.member.model,
-              model: response.member.model,
-              status: "running",
-            })),
-          failed: execution.responses
-            .filter((response) => response.taskId.length === 0)
-            .map((response) => ({
-              name: response.member.name ?? response.member.model,
-              model: response.member.model,
-              error: response.error ?? "Launch failed",
-            })),
+          launched: execution.launched.length,
+          members: execution.launched.map((entry) => ({
+            task_id: entry.taskId,
+            name: entry.member.name ?? entry.member.model,
+            model: entry.member.model,
+            status: "running",
+          })),
+          failed: execution.failures.map((entry) => ({
+            name: entry.member.name ?? entry.member.model,
+            model: entry.member.model,
+            error: entry.error,
+          })),
         }
 
         markCouncilDone(toolContext.sessionID)

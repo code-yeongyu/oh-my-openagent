@@ -1,9 +1,8 @@
 import type { LaunchInput, BackgroundTask } from "../../features/background-agent/types"
 import { createAgentToolRestrictions } from "../../shared/permission-compat"
 import { buildCouncilPrompt } from "./council-prompt"
-import { collectCouncilResults } from "./council-result-collector"
 import { parseModelString } from "./model-parser"
-import type { CouncilConfig, CouncilExecutionResult, CouncilMemberConfig, CouncilMemberResponse } from "./types"
+import type { CouncilConfig, CouncilLaunchFailure, CouncilLaunchedMember, CouncilLaunchResult, CouncilMemberConfig } from "./types"
 
 export type CouncilLaunchInput = LaunchInput
 
@@ -20,57 +19,43 @@ export interface CouncilExecutionInput {
   parentAgent?: string
 }
 
-export async function executeCouncil(input: CouncilExecutionInput): Promise<CouncilExecutionResult> {
+/**
+ * Launches all council members in parallel and returns launch outcomes.
+ * Does NOT wait for task completion — actual results are collected by the
+ * agent via background_output calls after this returns.
+ */
+export async function executeCouncil(input: CouncilExecutionInput): Promise<CouncilLaunchResult> {
   const { question, council, launcher, parentSessionID, parentMessageID, parentAgent } = input
   const prompt = buildCouncilPrompt(question)
-  const startTimes = new Map<string, number>()
 
   const launchResults = await Promise.allSettled(
     council.members.map((member) =>
-      launchMember(
-        member,
-        prompt,
-        launcher,
-        parentSessionID,
-        parentMessageID,
-        parentAgent,
-        startTimes
-      )
+      launchMember(member, prompt, launcher, parentSessionID, parentMessageID, parentAgent)
     )
   )
 
-  const launchedTasks: BackgroundTask[] = []
-  const launchedMembers: CouncilMemberConfig[] = []
-  const launchFailures: CouncilMemberResponse[] = []
+  const launched: CouncilLaunchedMember[] = []
+  const failures: CouncilLaunchFailure[] = []
 
   launchResults.forEach((result, index) => {
     const member = council.members[index]
 
     if (result.status === "fulfilled") {
-      launchedTasks.push(result.value)
-      launchedMembers.push(member)
+      launched.push({ member, taskId: result.value.id })
       return
     }
 
-    launchFailures.push({
+    failures.push({
       member,
-      status: "error",
       error: `Launch failed: ${String(result.reason)}`,
-      taskId: "",
-      durationMs: 0,
     })
   })
 
-  const collected = collectCouncilResults(launchedTasks, launchedMembers, startTimes)
-  const responses = [...collected, ...launchFailures]
-  const completedCount = responses.filter((response) => response.status === "completed").length
-
   return {
     question,
-    responses,
+    launched,
+    failures,
     totalMembers: council.members.length,
-    completedCount,
-    failedCount: council.members.length - completedCount,
   }
 }
 
@@ -80,8 +65,7 @@ async function launchMember(
   launcher: CouncilLauncher,
   parentSessionID: string,
   parentMessageID: string,
-  parentAgent: string | undefined,
-  startTimes: Map<string, number>
+  parentAgent: string | undefined
 ): Promise<BackgroundTask> {
   const parsedModel = parseModelString(member.model)
   if (!parsedModel) {
@@ -90,7 +74,7 @@ async function launchMember(
 
   const restrictions = createAgentToolRestrictions(["write", "edit", "task"])
   const memberName = member.name ?? member.model
-  const task = await launcher.launch({
+  return launcher.launch({
     description: `Council member: ${memberName}`,
     prompt,
     agent: "athena",
@@ -105,7 +89,4 @@ async function launchMember(
     ...(member.temperature !== undefined ? { temperature: member.temperature } : {}),
     permission: restrictions.permission,
   })
-
-  startTimes.set(task.id, Date.now())
-  return task
 }
