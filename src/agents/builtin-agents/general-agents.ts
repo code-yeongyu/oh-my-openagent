@@ -84,7 +84,7 @@ export function collectPendingBuiltinAgents(input: {
       config = applyEnvironmentContext(config, directory)
     }
 
-    config = applyOverrides(config, override, mergedCategories)
+    config = applyOverrides(config, override, mergedCategories, directory)
 
     // Store for later - will be added after sisyphus and hephaestus
     pendingAgentConfigs.set(name, config)

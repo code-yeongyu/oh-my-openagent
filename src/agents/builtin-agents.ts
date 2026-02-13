@@ -171,6 +171,7 @@ export async function createBuiltinAgents(
     availableAgents,
     availableSkills,
     mergedCategories,
+    directory,
     userCategories: categories,
   })
   if (atlasConfig) {
