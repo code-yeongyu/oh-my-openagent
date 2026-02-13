@@ -1,153 +1,253 @@
-import { describe, it, expect, spyOn, afterEach } from "bun:test"
-import {
-  runCheck,
-  calculateSummary,
-  determineExitCode,
-  filterChecksByCategory,
-  groupChecksByCategory,
-} from "./runner"
-import type { CheckResult, CheckDefinition, CheckCategory } from "./types"
+import { afterEach, describe, expect, it, mock } from "bun:test"
+import type { CheckDefinition, CheckResult, DoctorResult, ProviderStatus, SystemInfo, ToolsSummary } from "./types"
+
+function createSystemInfo(): SystemInfo {
+  return {
+    opencodeVersion: "1.0.200",
+    opencodePath: "/usr/local/bin/opencode",
+    pluginVersion: "3.4.0",
+    loadedVersion: "3.4.0",
+    bunVersion: "1.2.0",
+    configPath: "/tmp/opencode.json",
+    configValid: true,
+    isLocalDev: false,
+  }
+}
+
+function createProviders(): ProviderStatus[] {
+  return [
+    { id: "anthropic", name: "Anthropic", available: true, hasEnvVar: true, hasPlugin: true },
+    { id: "openai", name: "OpenAI", available: false, hasEnvVar: false, hasPlugin: false },
+  ]
+}
+
+function createTools(): ToolsSummary {
+  return {
+    lspInstalled: 1,
+    lspTotal: 4,
+    astGrepCli: true,
+    astGrepNapi: false,
+    commentChecker: true,
+    ghCli: { installed: true, authenticated: true, username: "yeongyu" },
+    mcpBuiltin: ["context7"],
+    mcpUser: ["custom-mcp"],
+  }
+}
+
+function createPassResult(name: string): CheckResult {
+  return { name, status: "pass", message: "ok", issues: [] }
+}
+
+function createDeferred(): {
+  promise: Promise<CheckResult>
+  resolve: (value: CheckResult) => void
+} {
+  let resolvePromise: (value: CheckResult) => void = () => {}
+  const promise = new Promise<CheckResult>((resolve) => {
+    resolvePromise = resolve
+  })
+  return { promise, resolve: resolvePromise }
+}
 
 describe("runner", () => {
+  afterEach(() => {
+    mock.restore()
+  })
+
   describe("runCheck", () => {
-    it("returns result from check function", async () => {
+    it("returns fail result with issue when check throws", async () => {
+      //#given
       const check: CheckDefinition = {
-        id: "test",
-        name: "Test Check",
-        category: "installation",
-        check: async () => ({ name: "Test Check", status: "pass", message: "OK" }),
-      }
-
-      const result = await runCheck(check)
-
-      expect(result.name).toBe("Test Check")
-      expect(result.status).toBe("pass")
-    })
-
-    it("measures duration", async () => {
-      const check: CheckDefinition = {
-        id: "test",
-        name: "Test Check",
-        category: "installation",
+        id: "system",
+        name: "System",
         check: async () => {
-          await new Promise((r) => setTimeout(r, 50))
-          return { name: "Test", status: "pass", message: "OK" }
+          throw new Error("boom")
         },
       }
+      const { runCheck } = await import(`./runner?run-check-error=${Date.now()}`)
 
+      //#when
       const result = await runCheck(check)
 
-      expect(result.duration).toBeGreaterThanOrEqual(10)
-    })
-
-    it("returns fail on error", async () => {
-      const check: CheckDefinition = {
-        id: "test",
-        name: "Test Check",
-        category: "installation",
-        check: async () => {
-          throw new Error("Test error")
-        },
-      }
-
-      const result = await runCheck(check)
-
+      //#then
       expect(result.status).toBe("fail")
-      expect(result.message).toContain("Test error")
+      expect(result.message).toBe("boom")
+      expect(result.issues[0]?.title).toBe("System")
+      expect(result.issues[0]?.severity).toBe("error")
+      expect(typeof result.duration).toBe("number")
     })
   })
 
   describe("calculateSummary", () => {
-    it("counts each status correctly", () => {
+    it("counts statuses correctly", async () => {
+      //#given
+      const { calculateSummary } = await import(`./runner?summary=${Date.now()}`)
       const results: CheckResult[] = [
-        { name: "1", status: "pass", message: "" },
-        { name: "2", status: "pass", message: "" },
-        { name: "3", status: "fail", message: "" },
-        { name: "4", status: "warn", message: "" },
-        { name: "5", status: "skip", message: "" },
+        { name: "1", status: "pass", message: "", issues: [] },
+        { name: "2", status: "pass", message: "", issues: [] },
+        { name: "3", status: "fail", message: "", issues: [] },
+        { name: "4", status: "warn", message: "", issues: [] },
+        { name: "5", status: "skip", message: "", issues: [] },
       ]
 
-      const summary = calculateSummary(results, 100)
+      //#when
+      const summary = calculateSummary(results, 19.9)
 
+      //#then
       expect(summary.total).toBe(5)
       expect(summary.passed).toBe(2)
       expect(summary.failed).toBe(1)
       expect(summary.warnings).toBe(1)
       expect(summary.skipped).toBe(1)
-      expect(summary.duration).toBe(100)
+      expect(summary.duration).toBe(20)
     })
   })
 
   describe("determineExitCode", () => {
-    it("returns 0 when all pass", () => {
+    it("returns zero when no failures exist", async () => {
+      //#given
+      const { determineExitCode } = await import(`./runner?exit-ok=${Date.now()}`)
       const results: CheckResult[] = [
-        { name: "1", status: "pass", message: "" },
-        { name: "2", status: "pass", message: "" },
+        { name: "1", status: "pass", message: "", issues: [] },
+        { name: "2", status: "warn", message: "", issues: [] },
       ]
 
-      expect(determineExitCode(results)).toBe(0)
+      //#when
+      const code = determineExitCode(results)
+
+      //#then
+      expect(code).toBe(0)
     })
 
-    it("returns 0 when only warnings", () => {
+    it("returns one when any failure exists", async () => {
+      //#given
+      const { determineExitCode } = await import(`./runner?exit-fail=${Date.now()}`)
       const results: CheckResult[] = [
-        { name: "1", status: "pass", message: "" },
-        { name: "2", status: "warn", message: "" },
+        { name: "1", status: "pass", message: "", issues: [] },
+        { name: "2", status: "fail", message: "", issues: [] },
       ]
 
-      expect(determineExitCode(results)).toBe(0)
-    })
+      //#when
+      const code = determineExitCode(results)
 
-    it("returns 1 when any failures", () => {
-      const results: CheckResult[] = [
-        { name: "1", status: "pass", message: "" },
-        { name: "2", status: "fail", message: "" },
-      ]
-
-      expect(determineExitCode(results)).toBe(1)
+      //#then
+      expect(code).toBe(1)
     })
   })
 
-  describe("filterChecksByCategory", () => {
-    const checks: CheckDefinition[] = [
-      { id: "1", name: "Install", category: "installation", check: async () => ({ name: "", status: "pass", message: "" }) },
-      { id: "2", name: "Config", category: "configuration", check: async () => ({ name: "", status: "pass", message: "" }) },
-      { id: "3", name: "Auth", category: "authentication", check: async () => ({ name: "", status: "pass", message: "" }) },
-    ]
+  describe("runDoctor", () => {
+    it("starts all checks in parallel and returns collected result", async () => {
+      //#given
+      const startedChecks: string[] = []
+      const deferredOne = createDeferred()
+      const deferredTwo = createDeferred()
+      const deferredThree = createDeferred()
+      const deferredFour = createDeferred()
+      const deferredFive = createDeferred()
 
-    it("returns all checks when no category", () => {
-      const filtered = filterChecksByCategory(checks)
+      const checks: CheckDefinition[] = [
+        {
+          id: "system",
+          name: "System",
+          check: async () => {
+            startedChecks.push("system")
+            return deferredOne.promise
+          },
+        },
+        {
+          id: "config",
+          name: "Configuration",
+          check: async () => {
+            startedChecks.push("config")
+            return deferredTwo.promise
+          },
+        },
+        {
+          id: "providers",
+          name: "Providers",
+          check: async () => {
+            startedChecks.push("providers")
+            return deferredThree.promise
+          },
+        },
+        {
+          id: "tools",
+          name: "Tools",
+          check: async () => {
+            startedChecks.push("tools")
+            return deferredFour.promise
+          },
+        },
+        {
+          id: "models",
+          name: "Models",
+          check: async () => {
+            startedChecks.push("models")
+            return deferredFive.promise
+          },
+        },
+      ]
 
-      expect(filtered.length).toBe(3)
-    })
+      const expectedResult: DoctorResult = {
+        results: [
+          createPassResult("System"),
+          createPassResult("Configuration"),
+          createPassResult("Providers"),
+          createPassResult("Tools"),
+          createPassResult("Models"),
+        ],
+        systemInfo: createSystemInfo(),
+        providers: createProviders(),
+        tools: createTools(),
+        summary: {
+          total: 5,
+          passed: 5,
+          failed: 0,
+          warnings: 0,
+          skipped: 0,
+          duration: 0,
+        },
+        exitCode: 0,
+      }
 
-    it("filters to specific category", () => {
-      const filtered = filterChecksByCategory(checks, "installation")
+      const formatDoctorOutputMock = mock((result: DoctorResult) => result.summary.total.toString())
+      const formatJsonOutputMock = mock((result: DoctorResult) => JSON.stringify(result))
 
-      expect(filtered.length).toBe(1)
-      expect(filtered[0].name).toBe("Install")
-    })
-  })
+      mock.module("./checks", () => ({
+        getAllCheckDefinitions: () => checks,
+        gatherSystemInfo: async () => expectedResult.systemInfo,
+        gatherProviderStatuses: () => expectedResult.providers,
+        gatherToolsSummary: async () => expectedResult.tools,
+      }))
+      mock.module("./formatter", () => ({
+        formatDoctorOutput: formatDoctorOutputMock,
+        formatJsonOutput: formatJsonOutputMock,
+      }))
 
-  describe("groupChecksByCategory", () => {
-    const checks: CheckDefinition[] = [
-      { id: "1", name: "Install1", category: "installation", check: async () => ({ name: "", status: "pass", message: "" }) },
-      { id: "2", name: "Install2", category: "installation", check: async () => ({ name: "", status: "pass", message: "" }) },
-      { id: "3", name: "Config", category: "configuration", check: async () => ({ name: "", status: "pass", message: "" }) },
-    ]
+      const logSpy = mock(() => {})
+      const originalLog = console.log
+      console.log = logSpy
 
-    it("groups checks by category", () => {
-      const groups = groupChecksByCategory(checks)
+      const { runDoctor } = await import(`./runner?parallel=${Date.now()}`)
+      const runPromise = runDoctor({ mode: "default" })
 
-      expect(groups.get("installation")?.length).toBe(2)
-      expect(groups.get("configuration")?.length).toBe(1)
-    })
+      //#when
+      await Promise.resolve()
+      const startedBeforeResolve = [...startedChecks]
+      deferredOne.resolve(createPassResult("System"))
+      deferredTwo.resolve(createPassResult("Configuration"))
+      deferredThree.resolve(createPassResult("Providers"))
+      deferredFour.resolve(createPassResult("Tools"))
+      deferredFive.resolve(createPassResult("Models"))
+      const result = await runPromise
 
-    it("maintains order within categories", () => {
-      const groups = groupChecksByCategory(checks)
-      const installChecks = groups.get("installation")!
-
-      expect(installChecks[0].name).toBe("Install1")
-      expect(installChecks[1].name).toBe("Install2")
+      //#then
+      console.log = originalLog
+      expect(startedBeforeResolve.sort()).toEqual(["config", "models", "providers", "system", "tools"])
+      expect(result.results.length).toBe(5)
+      expect(result.exitCode).toBe(0)
+      expect(formatDoctorOutputMock).toHaveBeenCalledTimes(1)
+      expect(formatJsonOutputMock).toHaveBeenCalledTimes(0)
     })
   })
 })
