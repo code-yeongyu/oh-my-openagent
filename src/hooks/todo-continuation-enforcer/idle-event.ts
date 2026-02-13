@@ -1,13 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
-import { readMissionState } from "../../features/mission-state"
-import { subagentSessions } from "../../features/claude-code-session-state"
 import type { ToolPermission } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 
 import {
   ABORT_WINDOW_MS,
+  CONTINUATION_COOLDOWN_MS,
   DEFAULT_SKIP_AGENTS,
   HOOK_NAME,
 } from "./constants"
@@ -36,15 +35,6 @@ export async function handleSessionIdle(args: {
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
-   const isBackgroundTaskSession = subagentSessions.has(sessionID)
-   const missionState = readMissionState(ctx.directory)
-   const isMissionSession = missionState?.session_ids.includes(sessionID) ?? false
-
-   // Continuation is restricted to mission/background sessions to prevent accidental continuation in regular sessions, ensuring controlled task resumption.
-   if (!isBackgroundTaskSession && !isMissionSession) {
-     log(`[${HOOK_NAME}] Skipped: not mission or background task session`, { sessionID })
-     return
-   }
 
   const state = sessionStateStore.getState(sessionID)
   if (state.isRecovering) {
@@ -102,6 +92,16 @@ export async function handleSessionIdle(args: {
   const incompleteCount = getIncompleteCount(todos)
   if (incompleteCount === 0) {
     log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
+    return
+  }
+
+  if (state.inFlight) {
+    log(`[${HOOK_NAME}] Skipped: injection in flight`, { sessionID })
+    return
+  }
+
+  if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < CONTINUATION_COOLDOWN_MS) {
+    log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID })
     return
   }
 
