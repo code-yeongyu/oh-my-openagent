@@ -77,27 +77,29 @@ describe("generateCouncilMembers", () => {
   })
 
   //#given only one native provider
-  //#when copilot is also available
-  //#then returns 2 members (native + copilot)
-  test("uses copilot as second member when only one native provider", () => {
+  //#when kimi is also available
+  //#then returns 2 members (native + kimi)
+  test("uses kimi as second member when only one native provider", () => {
     const members = generateCouncilMembers(makeAvail({
       native: { claude: true },
-      copilot: true,
+      kimiForCoding: true,
     }))
 
-    expect(members.length).toBeGreaterThanOrEqual(2)
+    expect(members).toHaveLength(2)
+    expect(members.some(m => m.model.startsWith("anthropic/"))).toBe(true)
+    expect(members.some(m => m.model.startsWith("kimi-for-coding/"))).toBe(true)
   })
 
-  //#given only one native provider
-  //#when opencode zen is also available
-  //#then returns 2 members
-  test("uses opencode zen as second member when only one native provider", () => {
+  //#given all 4 candidates available
+  //#when generating council members
+  //#then returns 4 members
+  test("returns 4 members when all candidates available", () => {
     const members = generateCouncilMembers(makeAvail({
-      native: { gemini: true },
-      opencodeZen: true,
+      native: { claude: true, openai: true, gemini: true },
+      kimiForCoding: true,
     }))
 
-    expect(members.length).toBeGreaterThanOrEqual(2)
+    expect(members).toHaveLength(4)
   })
 
   //#given no providers at all
