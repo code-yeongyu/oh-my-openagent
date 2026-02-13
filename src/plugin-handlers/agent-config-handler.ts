@@ -47,10 +47,10 @@ export async function applyAgentConfig(params: {
     }),
     includeClaudeSkillsForAwareness ? discoverUserClaudeSkills() : Promise.resolve([]),
     includeClaudeSkillsForAwareness
-      ? discoverProjectClaudeSkills()
-      : Promise.resolve([]),
+       ? discoverProjectClaudeSkills(params.ctx.directory)
+       : Promise.resolve([]),
     discoverOpencodeGlobalSkills(),
-    discoverOpencodeProjectSkills(),
+    discoverOpencodeProjectSkills(params.ctx.directory),
   ]);
 
   const allDiscoveredSkills = [
