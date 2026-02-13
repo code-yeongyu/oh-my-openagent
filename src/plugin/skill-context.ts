@@ -7,6 +7,7 @@ import type {
 } from "../features/opencode-skill-loader/types"
 
 import {
+  discoverConfigSourceSkills,
   discoverUserClaudeSkills,
   discoverProjectClaudeSkills,
   discoverOpencodeGlobalSkills,
@@ -54,8 +55,12 @@ export async function createSkillContext(args: {
   })
 
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
-  const [userSkills, globalSkills, projectSkills, opencodeProjectSkills] =
+  const [configSourceSkills, userSkills, globalSkills, projectSkills, opencodeProjectSkills] =
     await Promise.all([
+      discoverConfigSourceSkills({
+        config: pluginConfig.skills,
+        configDir: directory,
+      }),
       includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
       discoverOpencodeGlobalSkills(),
       includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
@@ -65,6 +70,7 @@ export async function createSkillContext(args: {
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
+    configSourceSkills,
     userSkills,
     globalSkills,
     projectSkills,
