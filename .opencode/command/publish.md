@@ -32,8 +32,8 @@ You are the release manager for oh-my-opencode. Execute the FULL publish workflo
   { "id": "run-workflow", "content": "Trigger GitHub Actions publish workflow", "status": "pending", "priority": "high" },
   { "id": "wait-workflow", "content": "Wait for workflow completion (poll every 30s)", "status": "pending", "priority": "high" },
   { "id": "verify-and-preview", "content": "Verify release created + preview auto-generated changelog & contributor thanks", "status": "pending", "priority": "high" },
-  { "id": "draft-summary", "content": "Draft enhanced release summary (minor/major only, skip for patch)", "status": "pending", "priority": "high" },
-  { "id": "apply-summary", "content": "Prepend enhanced summary to release (minor/major only)", "status": "pending", "priority": "high" },
+  { "id": "draft-summary", "content": "Draft enhanced release summary (mandatory for minor/major, optional for patch — ask user)", "status": "pending", "priority": "high" },
+  { "id": "apply-summary", "content": "Prepend enhanced summary to release (if user opted in)", "status": "pending", "priority": "high" },
   { "id": "verify-npm", "content": "Verify npm package published successfully", "status": "pending", "priority": "high" },
   { "id": "wait-platform-workflow", "content": "Wait for publish-platform workflow completion", "status": "pending", "priority": "high" },
   { "id": "verify-platform-binaries", "content": "Verify all 7 platform binary packages published", "status": "pending", "priority": "high" },
@@ -139,8 +139,8 @@ After running the preview, present the output to the user and say:
 >
 > You do NOT need to write any of this. It's handled.
 >
-> **For a patch release**, this is sufficient — no additional notes needed.
-> **For a minor/major release**, I'll draft a human-readable summary to prepend above this content.
+> **For a patch release**, this is usually sufficient on its own. However, if there are notable bug fixes or changes worth highlighting, an enhanced summary can be added.
+> **For a minor/major release**, an enhanced summary is **required** — I'll draft one in the next step.
 
 Wait for the user to acknowledge before proceeding.
 </agent-instruction>
@@ -153,9 +153,9 @@ Wait for the user to acknowledge before proceeding.
 
 | Release Type | Action |
 |-------------|--------|
-| **patch** | SKIP this step entirely. The auto-generated changelog from Step 5 is sufficient. Proceed to Step 8. |
-| **minor** | Draft a concise feature summary. |
-| **major** | Draft a full release narrative with migration notes if applicable. |
+| **patch** | ASK the user: "Would you like me to draft an enhanced summary highlighting the key bug fixes / changes? Or is the auto-generated changelog sufficient?" If user declines → skip to Step 8. If user accepts → draft a concise bug-fix / change summary below. |
+| **minor** | MANDATORY. Draft a concise feature summary. Do NOT proceed without one. |
+| **major** | MANDATORY. Draft a full release narrative with migration notes if applicable. Do NOT proceed without one. |
 
 </decision-gate>
 
@@ -224,7 +224,7 @@ Do NOT proceed to Step 7 without user confirmation.
 
 ## STEP 7: APPLY ENHANCED SUMMARY TO RELEASE
 
-**Skip this step if patch release** — proceed directly to Step 8.
+**Skip this step ONLY if the user opted out of the enhanced summary in Step 6** — proceed directly to Step 8.
 
 <architecture>
 The final release note structure:
