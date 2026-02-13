@@ -5,6 +5,7 @@ import {
   createClaudeCodeHooksHook,
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
+  createTrailingAssistantGuardHook,
 } from "../../hooks"
 import {
   contextCollector,
@@ -17,6 +18,7 @@ export type TransformHooks = {
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
+  trailingAssistantGuard: ReturnType<typeof createTrailingAssistantGuardHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -56,10 +58,19 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const trailingAssistantGuard = isHookEnabled("trailing-assistant-guard")
+    ? safeCreateHook(
+        "trailing-assistant-guard",
+        () => createTrailingAssistantGuardHook(),
+        { enabled: safeHookEnabled },
+      )
+    : null
+
   return {
     claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
+    trailingAssistantGuard,
   }
 }

@@ -1,0 +1,1 @@
+export { createTrailingAssistantGuardHook } from "./hook"
