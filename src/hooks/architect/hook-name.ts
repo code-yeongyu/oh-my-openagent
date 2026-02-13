@@ -1,1 +1,1 @@
-export const HOOK_NAME = "atlas"
+export const HOOK_NAME = "architect"

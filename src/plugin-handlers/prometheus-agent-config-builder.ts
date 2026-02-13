@@ -31,7 +31,7 @@ export async function buildOracleAgentConfig(params: {
     ? resolveCategoryConfig(params.pluginOracleOverride.category, params.userCategories)
     : undefined;
 
-  const requirement = AGENT_MODEL_REQUIREMENTS["prometheus"];
+  const requirement = AGENT_MODEL_REQUIREMENTS["oracle"];
   const connectedProviders = readConnectedProvidersCache();
   const availableModels = await fetchAvailableModels(undefined, {
     connectedProviders: connectedProviders ?? undefined,
@@ -65,7 +65,7 @@ export async function buildOracleAgentConfig(params: {
     params.pluginOracleOverride?.maxTokens ?? categoryConfig?.maxTokens;
 
   const base: Record<string, unknown> = {
-    name: "prometheus",
+    name: "oracle",
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",

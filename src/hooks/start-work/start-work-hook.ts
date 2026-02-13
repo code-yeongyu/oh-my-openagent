@@ -71,7 +71,7 @@ export function createStartWorkHook(ctx: PluginInput) {
         sessionID: input.sessionID,
       })
 
-      updateSessionAgent(input.sessionID, "atlas") // Always switch: fixes #1298
+      updateSessionAgent(input.sessionID, "architect") // Always switch: fixes #1298
 
       const existingState = readMissionState(ctx.directory)
       const sessionId = input.sessionID
@@ -102,7 +102,7 @@ All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
             if (existingState) {
               clearMissionState(ctx.directory)
             }
-            const newState = createMissionState(matchedPlan, sessionId, "atlas")
+            const newState = createMissionState(matchedPlan, sessionId, "architect")
             writeMissionState(ctx.directory, newState)
             
             contextInfo = `
@@ -187,7 +187,7 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
         } else if (incompletePlans.length === 1) {
           const planPath = incompletePlans[0]
           const progress = getPlanProgress(planPath)
-          const newState = createMissionState(planPath, sessionId, "atlas")
+          const newState = createMissionState(planPath, sessionId, "architect")
           writeMissionState(ctx.directory, newState)
 
           contextInfo += `

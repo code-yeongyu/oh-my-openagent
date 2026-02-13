@@ -25,7 +25,7 @@ describe("background-agent spawner.startTask", () => {
     const task = createTask({
       description: "Test task",
       prompt: "Do work",
-      agent: "explore",
+      agent: "trinity",
       parentSessionID: "ses_parent",
       parentMessageID: "msg_parent",
     })

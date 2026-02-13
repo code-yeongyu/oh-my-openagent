@@ -33,8 +33,8 @@ function getAgentFromMessageFiles(sessionID: string): string | undefined {
  *
  * This fixes issue #927 where after interruption:
  * - In-memory map is cleared (process restart)
- * - Message files return "prometheus" (oldest message from /plan)
- * - But mission.json has agent: "atlas" (set by /start-work)
+ * - Message files return "oracle" (oldest message from /plan)
+ * - But mission.json has agent: "architect" (set by /start-work)
  */
 export function getAgentFromSession(sessionID: string, directory: string): string | undefined {
   // Check in-memory first (current session)

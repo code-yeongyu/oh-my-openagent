@@ -19,7 +19,7 @@ describe("sendSyncPrompt", () => {
 
     const input = {
       sessionID: "test-session",
-      agentToUse: "explore",
+      agentToUse: "trinity",
       args: {
         description: "test task",
         prompt: "test prompt",
@@ -59,7 +59,7 @@ describe("sendSyncPrompt", () => {
 
     const input = {
       sessionID: "test-session",
-      agentToUse: "librarian",
+      agentToUse: "operator",
       args: {
         description: "test task",
         prompt: "test prompt",

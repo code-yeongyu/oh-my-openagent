@@ -32,7 +32,7 @@ describe("call-omo-agent createOrGetSession", () => {
     const args = {
       description: "test",
       prompt: "hello",
-      subagent_type: "explore",
+      subagent_type: "trinity",
       run_in_background: true,
     }
 

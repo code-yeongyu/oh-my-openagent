@@ -100,8 +100,8 @@ export function createContinuationHooks(args: {
     ? safeHook("background-notification", () => createBackgroundNotificationHook(backgroundManager))
     : null
 
-  const atlasHook = isHookEnabled("atlas")
-    ? safeHook("atlas", () =>
+  const atlasHook = isHookEnabled("architect")
+    ? safeHook("architect", () =>
         createAtlasHook(ctx, {
           directory: ctx.directory,
           backgroundManager,

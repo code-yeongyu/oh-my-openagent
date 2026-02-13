@@ -3,7 +3,7 @@ import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 export const HOOK_NAME = "prometheus-md-only"
 
-export const PROMETHEUS_AGENT = "prometheus"
+export const ORACLE_AGENT = "oracle"
 
 export const ALLOWED_EXTENSIONS = [".md"]
 
@@ -17,7 +17,7 @@ export const PLANNING_CONSULT_WARNING = `
 
 ${createSystemDirective(SystemDirectiveTypes.PROMETHEUS_READ_ONLY)}
 
-You are being invoked by ${getAgentDisplayName("prometheus")}, a READ-ONLY planning agent.
+You are being invoked by ${getAgentDisplayName("oracle")}, a READ-ONLY planning agent.
 
 **CRITICAL CONSTRAINTS:**
 - DO NOT modify any files (no Write, Edit, or any file mutations)

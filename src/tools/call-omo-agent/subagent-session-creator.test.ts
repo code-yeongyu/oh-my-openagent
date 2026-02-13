@@ -25,7 +25,7 @@ describe("call-omo-agent resolveOrCreateSessionId", () => {
     const args = {
       description: "sync test",
       prompt: "hello",
-      subagent_type: "explore",
+      subagent_type: "trinity",
       run_in_background: false,
     }
 

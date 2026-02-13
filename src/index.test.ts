@@ -11,9 +11,9 @@ describe("look_at tool conditional registration", () => {
     // when checking if agent is enabled
     // then should return false (disabled)
     it("returns false when multimodal-looker is disabled (exact case)", () => {
-      const disabledAgents: string[] = ["multimodal-looker"]
+      const disabledAgents: string[] = ["construct"]
       const isEnabled = !disabledAgents.some(
-        (agent) => agent.toLowerCase() === "multimodal-looker"
+        (agent) => agent.toLowerCase() === "construct"
       )
       expect(isEnabled).toBe(false)
     })
@@ -24,7 +24,7 @@ describe("look_at tool conditional registration", () => {
     it("returns false when multimodal-looker is disabled (case-insensitive)", () => {
       const disabledAgents: string[] = ["Multimodal-Looker"]
       const isEnabled = !disabledAgents.some(
-        (agent) => agent.toLowerCase() === "multimodal-looker"
+        (agent) => agent.toLowerCase() === "construct"
       )
       expect(isEnabled).toBe(false)
     })
@@ -33,9 +33,9 @@ describe("look_at tool conditional registration", () => {
     // when checking if agent is enabled
     // then should return true (enabled)
     it("returns true when multimodal-looker is not disabled", () => {
-      const disabledAgents: string[] = ["oracle", "librarian"]
+      const disabledAgents: string[] = ["oracle", "operator"]
       const isEnabled = !disabledAgents.some(
-        (agent) => agent.toLowerCase() === "multimodal-looker"
+        (agent) => agent.toLowerCase() === "construct"
       )
       expect(isEnabled).toBe(true)
     })
@@ -46,7 +46,7 @@ describe("look_at tool conditional registration", () => {
     it("returns true when disabled_agents is empty", () => {
       const disabledAgents: string[] = []
       const isEnabled = !disabledAgents.some(
-        (agent) => agent.toLowerCase() === "multimodal-looker"
+        (agent) => agent.toLowerCase() === "construct"
       )
       expect(isEnabled).toBe(true)
     })
@@ -58,7 +58,7 @@ describe("look_at tool conditional registration", () => {
       const disabledAgents: string[] | undefined = undefined
       const list: string[] = disabledAgents ?? []
       const isEnabled = !list.some(
-        (agent) => agent.toLowerCase() === "multimodal-looker"
+        (agent) => agent.toLowerCase() === "construct"
       )
       expect(isEnabled).toBe(true)
     })

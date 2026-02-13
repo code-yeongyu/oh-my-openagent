@@ -59,7 +59,7 @@ describe("background_output full_session", () => {
 
     const task = createTask({
       id: "task-1",
-      agent: "explore",
+      agent: "trinity",
       description: "Find how task output is rendered",
       status: "running",
     })
@@ -85,7 +85,7 @@ describe("background_output full_session", () => {
 
     const task = createTask({
       id: "task-1",
-      agent: "sisyphus-junior",
+      agent: "mouse",
       category: "quick",
       description: "Fix flaky test",
       status: "running",

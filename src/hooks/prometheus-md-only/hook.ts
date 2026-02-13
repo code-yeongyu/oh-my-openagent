@@ -54,9 +54,9 @@ export function createOracleMdOnlyHook(ctx: PluginInput) {
            agent: agentName,
          })
          throw new Error(
-           `[${HOOK_NAME}] ${getAgentDisplayName("prometheus")} can only write/edit .md files inside .matrix/ directory. ` +
+           `[${HOOK_NAME}] ${getAgentDisplayName("oracle")} can only write/edit .md files inside .matrix/ directory. ` +
            `Attempted to modify: ${filePath}. ` +
-           `${getAgentDisplayName("prometheus")} is a READ-ONLY planner. Use /start-work to execute the plan. ` +
+           `${getAgentDisplayName("oracle")} is a READ-ONLY planner. Use /start-work to execute the plan. ` +
            `APOLOGIZE TO THE USER, REMIND OF YOUR PLAN WRITING PROCESSES, TELL USER WHAT YOU WILL GOING TO DO AS THE PROCESS, WRITE THE PLAN`
          )
        }

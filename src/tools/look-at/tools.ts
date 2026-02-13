@@ -1,7 +1,7 @@
 import { basename } from "node:path"
 import { pathToFileURL } from "node:url"
 import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
-import { LOOK_AT_DESCRIPTION, MULTIMODAL_LOOKER_AGENT } from "./constants"
+import { LOOK_AT_DESCRIPTION, CONSTRUCT_AGENT } from "./constants"
 import type { LookAtArgs } from "./types"
 import { log, promptSyncWithModelSuggestionRetry } from "../../shared"
 import { extractLatestAssistantText } from "./assistant-message-extractor"
@@ -110,7 +110,7 @@ Original error: ${createResult.error}`
         await promptSyncWithModelSuggestionRetry(ctx.client, {
           path: { id: sessionID },
           body: {
-            agent: MULTIMODAL_LOOKER_AGENT,
+            agent: CONSTRUCT_AGENT,
             tools: {
               task: false,
               call_omo_agent: false,

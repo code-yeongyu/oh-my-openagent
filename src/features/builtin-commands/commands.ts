@@ -57,7 +57,7 @@ ${REFACTOR_TEMPLATE}
   },
   "start-work": {
     description: "(builtin) Start Morpheus work session from Oracle plan",
-    agent: "atlas",
+    agent: "architect",
     template: `<command-instruction>
 ${START_WORK_TEMPLATE}
 </command-instruction>

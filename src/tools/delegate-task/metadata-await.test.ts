@@ -25,7 +25,7 @@ describe("task tool metadata awaiting", () => {
       description: "Test task",
       prompt: "Do something",
       run_in_background: true,
-      subagent_type: "explore",
+      subagent_type: "trinity",
     }
 
     const executorCtx = {
@@ -34,7 +34,7 @@ describe("task tool metadata awaiting", () => {
           id: "task_1",
           description: "Test task",
           prompt: "Do something",
-          agent: "explore",
+          agent: "trinity",
           status: "pending",
           sessionID: "ses_child",
         }),
@@ -53,7 +53,7 @@ describe("task tool metadata awaiting", () => {
       ctx,
       executorCtx,
       parentContext,
-      "explore",
+      "trinity",
       undefined,
       undefined,
     )
