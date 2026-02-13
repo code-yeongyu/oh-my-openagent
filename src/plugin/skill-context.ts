@@ -63,8 +63,8 @@ export async function createSkillContext(args: {
       }),
       includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
       discoverOpencodeGlobalSkills(),
-      includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
-      discoverOpencodeProjectSkills(),
+      includeClaudeSkills ? discoverProjectClaudeSkills(directory) : Promise.resolve([]),
+      discoverOpencodeProjectSkills(directory),
     ])
 
   const mergedSkills = mergeSkills(

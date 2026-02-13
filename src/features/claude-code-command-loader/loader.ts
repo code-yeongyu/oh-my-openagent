@@ -114,8 +114,8 @@ export async function loadUserCommands(): Promise<Record<string, CommandDefiniti
   return commandsToRecord(commands)
 }
 
-export async function loadProjectCommands(): Promise<Record<string, CommandDefinition>> {
-  const projectCommandsDir = join(process.cwd(), ".claude", "commands")
+export async function loadProjectCommands(directory?: string): Promise<Record<string, CommandDefinition>> {
+  const projectCommandsDir = join(directory ?? process.cwd(), ".claude", "commands")
   const commands = await loadCommandsFromDir(projectCommandsDir, "project")
   return commandsToRecord(commands)
 }
@@ -127,18 +127,18 @@ export async function loadOpencodeGlobalCommands(): Promise<Record<string, Comma
   return commandsToRecord(commands)
 }
 
-export async function loadOpencodeProjectCommands(): Promise<Record<string, CommandDefinition>> {
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "command")
+export async function loadOpencodeProjectCommands(directory?: string): Promise<Record<string, CommandDefinition>> {
+  const opencodeProjectDir = join(directory ?? process.cwd(), ".opencode", "command")
   const commands = await loadCommandsFromDir(opencodeProjectDir, "opencode-project")
   return commandsToRecord(commands)
 }
 
-export async function loadAllCommands(): Promise<Record<string, CommandDefinition>> {
+export async function loadAllCommands(directory?: string): Promise<Record<string, CommandDefinition>> {
   const [user, project, global, projectOpencode] = await Promise.all([
     loadUserCommands(),
-    loadProjectCommands(),
+    loadProjectCommands(directory),
     loadOpencodeGlobalCommands(),
-    loadOpencodeProjectCommands(),
+    loadOpencodeProjectCommands(directory),
   ])
   return { ...projectOpencode, ...global, ...project, ...user }
 }
