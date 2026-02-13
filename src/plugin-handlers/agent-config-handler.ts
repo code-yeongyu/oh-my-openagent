@@ -84,7 +84,7 @@ export async function applyAgentConfig(params: {
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
   const userAgents = includeClaudeAgents ? loadUserAgents() : {};
-  const projectAgents = includeClaudeAgents ? loadProjectAgents() : {};
+  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
 
   const rawPluginAgents = params.pluginComponents.agents;
   const pluginAgents = Object.fromEntries(
