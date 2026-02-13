@@ -77,7 +77,7 @@ export function maybeCreateSisyphusConfig(input: {
     sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
   }
 
-  sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories)
+  sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories, directory)
   sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory)
 
   return sisyphusConfig

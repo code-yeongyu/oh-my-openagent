@@ -2,6 +2,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentOverrideConfig } from "../types"
 import type { CategoryConfig } from "../../config/schema"
 import { deepMerge, migrateAgentConfig } from "../../shared"
+import { resolvePromptAppend } from "./resolve-file-uri"
 
 /**
  * Expands a category reference from an agent override into concrete config properties.
@@ -28,19 +29,23 @@ export function applyCategoryOverride(
   if (categoryConfig.maxTokens !== undefined) result.maxTokens = categoryConfig.maxTokens
 
   if (categoryConfig.prompt_append && typeof result.prompt === "string") {
-    result.prompt = result.prompt + "\n" + categoryConfig.prompt_append
+    result.prompt = result.prompt + "\n" + resolvePromptAppend(categoryConfig.prompt_append)
   }
 
   return result as AgentConfig
 }
 
-export function mergeAgentConfig(base: AgentConfig, override: AgentOverrideConfig): AgentConfig {
+export function mergeAgentConfig(
+  base: AgentConfig,
+  override: AgentOverrideConfig,
+  directory?: string
+): AgentConfig {
   const migratedOverride = migrateAgentConfig(override as Record<string, unknown>) as AgentOverrideConfig
   const { prompt_append, ...rest } = migratedOverride
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
 
   if (prompt_append && merged.prompt) {
-    merged.prompt = merged.prompt + "\n" + prompt_append
+    merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append, directory)
   }
 
   return merged
@@ -49,7 +54,8 @@ export function mergeAgentConfig(base: AgentConfig, override: AgentOverrideConfi
 export function applyOverrides(
   config: AgentConfig,
   override: AgentOverrideConfig | undefined,
-  mergedCategories: Record<string, CategoryConfig>
+  mergedCategories: Record<string, CategoryConfig>,
+  directory?: string
 ): AgentConfig {
   let result = config
   const overrideCategory = (override as Record<string, unknown> | undefined)?.category as string | undefined
@@ -58,7 +64,7 @@ export function applyOverrides(
   }
 
   if (override) {
-    result = mergeAgentConfig(result, override)
+    result = mergeAgentConfig(result, override, directory)
   }
 
   return result
