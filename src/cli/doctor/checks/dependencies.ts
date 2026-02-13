@@ -1,3 +1,7 @@
+import { existsSync } from "node:fs"
+import { createRequire } from "node:module"
+import { dirname, join } from "node:path"
+
 import type { DependencyInfo } from "../types"
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
@@ -98,10 +102,24 @@ export async function checkAstGrepNapi(): Promise<DependencyInfo> {
   }
 }
 
+function findCommentCheckerPackageBinary(): string | null {
+  const binaryName = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
+  try {
+    const require = createRequire(import.meta.url)
+    const pkgPath = require.resolve("@code-yeongyu/comment-checker/package.json")
+    const binaryPath = join(dirname(pkgPath), "bin", binaryName)
+    if (existsSync(binaryPath)) return binaryPath
+  } catch {
+    // intentionally empty - package not installed
+  }
+  return null
+}
+
 export async function checkCommentChecker(): Promise<DependencyInfo> {
   const binaryCheck = await checkBinaryExists("comment-checker")
+  const resolvedPath = binaryCheck.exists ? binaryCheck.path : findCommentCheckerPackageBinary()
 
-  if (!binaryCheck.exists) {
+  if (!resolvedPath) {
     return {
       name: "Comment Checker",
       required: false,
@@ -112,14 +130,14 @@ export async function checkCommentChecker(): Promise<DependencyInfo> {
     }
   }
 
-  const version = await getBinaryVersion("comment-checker")
+  const version = await getBinaryVersion(resolvedPath)
 
   return {
     name: "Comment Checker",
     required: false,
     installed: true,
     version,
-    path: binaryCheck.path,
+    path: resolvedPath,
   }
 }
 

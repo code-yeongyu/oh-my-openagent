@@ -2,13 +2,12 @@ import type { CheckDefinition } from "../types"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
 import { checkSystem, gatherSystemInfo } from "./system"
 import { checkConfig } from "./config"
-import { checkProviders, gatherProviderStatuses } from "./providers"
 import { checkTools, gatherToolsSummary } from "./tools"
 import { checkModels } from "./model-resolution"
 
 export type { CheckDefinition }
 export * from "./model-resolution-types"
-export { gatherSystemInfo, gatherProviderStatuses, gatherToolsSummary }
+export { gatherSystemInfo, gatherToolsSummary }
 
 export function getAllCheckDefinitions(): CheckDefinition[] {
   return [
@@ -22,11 +21,6 @@ export function getAllCheckDefinitions(): CheckDefinition[] {
       id: CHECK_IDS.CONFIG,
       name: CHECK_NAMES[CHECK_IDS.CONFIG],
       check: checkConfig,
-    },
-    {
-      id: CHECK_IDS.PROVIDERS,
-      name: CHECK_NAMES[CHECK_IDS.PROVIDERS],
-      check: checkProviders,
     },
     {
       id: CHECK_IDS.TOOLS,
