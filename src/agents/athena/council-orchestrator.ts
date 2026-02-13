@@ -72,7 +72,7 @@ async function launchMember(
     throw new Error(`Invalid model string: "${member.model}"`)
   }
 
-  const restrictions = createAgentToolRestrictions(["write", "edit", "task"])
+  const restrictions = createAgentToolRestrictions(["write", "edit", "task", "athena_council"])
   const memberName = member.name ?? member.model
   return launcher.launch({
     description: `Council member: ${memberName}`,

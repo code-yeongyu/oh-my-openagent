@@ -68,7 +68,7 @@ describe("executeCouncil", () => {
     for (const launch of launches) {
       expect(launch.prompt).toBe(expectedPrompt)
       expect(launch.agent).toBe("athena")
-      expect(launch.permission).toEqual({ write: "deny", edit: "deny", task: "deny" })
+      expect(launch.permission).toEqual({ write: "deny", edit: "deny", task: "deny", athena_council: "deny" })
     }
 
     expect(launches[0]?.model).toEqual({ providerID: "openai", modelID: "gpt-5.3-codex" })
