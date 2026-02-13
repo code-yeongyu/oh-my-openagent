@@ -1,21 +1,7 @@
-import type {
-  DoctorOptions,
-  DoctorResult,
-  CheckDefinition,
-  CheckResult,
-  DoctorSummary,
-  CheckCategory,
-} from "./types"
-import { getAllCheckDefinitions } from "./checks"
-import { EXIT_CODES, CATEGORY_NAMES } from "./constants"
-import {
-  formatHeader,
-  formatCategoryHeader,
-  formatCheckResult,
-  formatSummary,
-  formatFooter,
-  formatJsonOutput,
-} from "./formatter"
+import type { DoctorOptions, DoctorResult, CheckDefinition, CheckResult, DoctorSummary } from "./types"
+import { getAllCheckDefinitions, gatherSystemInfo, gatherProviderStatuses, gatherToolsSummary } from "./checks"
+import { EXIT_CODES } from "./constants"
+import { formatDoctorOutput, formatJsonOutput } from "./formatter"
 
 export async function runCheck(check: CheckDefinition): Promise<CheckResult> {
   const start = performance.now()
@@ -28,6 +14,7 @@ export async function runCheck(check: CheckDefinition): Promise<CheckResult> {
       name: check.name,
       status: "fail",
       message: err instanceof Error ? err.message : "Unknown error",
+      issues: [{ title: check.name, description: String(err), severity: "error" }],
       duration: Math.round(performance.now() - start),
     }
   }
@@ -45,70 +32,19 @@ export function calculateSummary(results: CheckResult[], duration: number): Doct
 }
 
 export function determineExitCode(results: CheckResult[]): number {
-  const hasFailures = results.some((r) => r.status === "fail")
-  return hasFailures ? EXIT_CODES.FAILURE : EXIT_CODES.SUCCESS
+  return results.some((r) => r.status === "fail") ? EXIT_CODES.FAILURE : EXIT_CODES.SUCCESS
 }
-
-export function filterChecksByCategory(
-  checks: CheckDefinition[],
-  category?: CheckCategory
-): CheckDefinition[] {
-  if (!category) return checks
-  return checks.filter((c) => c.category === category)
-}
-
-export function groupChecksByCategory(
-  checks: CheckDefinition[]
-): Map<CheckCategory, CheckDefinition[]> {
-  const groups = new Map<CheckCategory, CheckDefinition[]>()
-
-  for (const check of checks) {
-    const existing = groups.get(check.category) ?? []
-    existing.push(check)
-    groups.set(check.category, existing)
-  }
-
-  return groups
-}
-
-const CATEGORY_ORDER: CheckCategory[] = [
-  "installation",
-  "configuration",
-  "authentication",
-  "dependencies",
-  "tools",
-  "updates",
-]
 
 export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   const start = performance.now()
+
   const allChecks = getAllCheckDefinitions()
-  const filteredChecks = filterChecksByCategory(allChecks, options.category)
-  const groupedChecks = groupChecksByCategory(filteredChecks)
-
-  const results: CheckResult[] = []
-
-  if (!options.json) {
-    console.log(formatHeader())
-  }
-
-  for (const category of CATEGORY_ORDER) {
-    const checks = groupedChecks.get(category)
-    if (!checks || checks.length === 0) continue
-
-    if (!options.json) {
-      console.log(formatCategoryHeader(category))
-    }
-
-    for (const check of checks) {
-      const result = await runCheck(check)
-      results.push(result)
-
-      if (!options.json) {
-        console.log(formatCheckResult(result, options.verbose ?? false))
-      }
-    }
-  }
+  const [results, systemInfo, providers, tools] = await Promise.all([
+    Promise.all(allChecks.map(runCheck)),
+    gatherSystemInfo(),
+    Promise.resolve(gatherProviderStatuses()),
+    gatherToolsSummary(),
+  ])
 
   const duration = performance.now() - start
   const summary = calculateSummary(results, duration)
@@ -116,6 +52,9 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
 
   const doctorResult: DoctorResult = {
     results,
+    systemInfo,
+    providers,
+    tools,
     summary,
     exitCode,
   }
@@ -123,9 +62,7 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   if (options.json) {
     console.log(formatJsonOutput(doctorResult))
   } else {
-    console.log("")
-    console.log(formatSummary(summary))
-    console.log(formatFooter(summary))
+    console.log(formatDoctorOutput(doctorResult, options.mode))
   }
 
   return doctorResult
