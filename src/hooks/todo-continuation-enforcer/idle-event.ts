@@ -1,8 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
-import { readBoulderState } from "../../features/boulder-state"
-import { subagentSessions } from "../../features/claude-code-session-state"
 import type { ToolPermission } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 
@@ -11,7 +9,6 @@ import {
   CONTINUATION_COOLDOWN_MS,
   DEFAULT_SKIP_AGENTS,
   HOOK_NAME,
-  MAX_UNCHANGED_CYCLES,
 } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { getIncompleteCount } from "./todo"
@@ -37,16 +34,6 @@ export async function handleSessionIdle(args: {
   } = args
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
-
-   const isBackgroundTaskSession = subagentSessions.has(sessionID)
-   const boulderState = readBoulderState(ctx.directory)
-   const isBoulderSession = boulderState?.session_ids.includes(sessionID) ?? false
-
-   // Continuation is restricted to boulder/background sessions to prevent accidental continuation in regular sessions, ensuring controlled task resumption.
-   if (!isBackgroundTaskSession && !isBoulderSession) {
-     log(`[${HOOK_NAME}] Skipped: not boulder or background task session`, { sessionID })
-     return
-   }
 
   const state = sessionStateStore.getState(sessionID)
   if (state.isRecovering) {
@@ -116,19 +103,6 @@ export async function handleSessionIdle(args: {
     log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID })
     return
   }
-
-  const incompleteTodos = todos.filter((todo) => todo.status !== "completed" && todo.status !== "cancelled")
-  const todoHash = incompleteTodos.map((todo) => `${todo.id}:${todo.status}`).join("|")
-  if (state.lastTodoHash === todoHash) {
-    state.unchangedCycles = (state.unchangedCycles ?? 0) + 1
-    if (state.unchangedCycles >= MAX_UNCHANGED_CYCLES) {
-      log(`[${HOOK_NAME}] Skipped: stagnation cap reached`, { sessionID, cycles: state.unchangedCycles })
-      return
-    }
-  } else {
-    state.unchangedCycles = 0
-  }
-  state.lastTodoHash = todoHash
 
   let resolvedInfo: ResolvedMessageInfo | undefined
   let hasCompactionMessage = false
