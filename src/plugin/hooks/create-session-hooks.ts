@@ -19,7 +19,6 @@ import {
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
-  createSubagentQuestionBlockerHook,
   createPreemptiveCompactionHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
@@ -49,7 +48,6 @@ export type SessionHooks = {
   prometheusMdOnly: ReturnType<typeof createPrometheusMdOnlyHook> | null
   sisyphusJuniorNotepad: ReturnType<typeof createSisyphusJuniorNotepadHook> | null
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook>
-  subagentQuestionBlocker: ReturnType<typeof createSubagentQuestionBlockerHook>
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
 }
@@ -149,7 +147,6 @@ export function createSessionHooks(args: {
     : null
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook()
-  const subagentQuestionBlocker = createSubagentQuestionBlockerHook()
   const taskResumeInfo = createTaskResumeInfoHook()
 
   const anthropicEffort = isHookEnabled("anthropic-effort")
@@ -174,7 +171,6 @@ export function createSessionHooks(args: {
     prometheusMdOnly,
     sisyphusJuniorNotepad,
     questionLabelTruncator,
-    subagentQuestionBlocker,
     taskResumeInfo,
     anthropicEffort,
   }

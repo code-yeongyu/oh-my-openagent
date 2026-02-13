@@ -35,6 +35,7 @@ export async function executeSync(
         tools: {
           ...getAgentToolRestrictions(args.subagent_type),
           task: false,
+          question: false,
         },
         parts: [{ type: "text", text: args.prompt }],
       },
