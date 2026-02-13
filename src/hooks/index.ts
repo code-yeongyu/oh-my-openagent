@@ -47,4 +47,4 @@ export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
 export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 export { createHashlineEditDiffEnhancerHook } from "./hashline-edit-diff-enhancer";
-
+export { createAgentHandoffHook } from "./agent-handoff";

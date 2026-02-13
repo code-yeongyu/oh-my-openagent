@@ -38,6 +38,7 @@ export { createCallOmoAgent } from "./call-omo-agent"
 export { createAthenaCouncilTool } from "./athena-council"
 export { createLookAt } from "./look-at"
 export { createDelegateTask } from "./delegate-task"
+export { createSessionHandoffTool } from "./session-handoff"
 export {
   createTaskCreateTool,
   createTaskGetTool,
