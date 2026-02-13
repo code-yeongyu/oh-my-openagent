@@ -8,8 +8,10 @@ import { log } from "../../shared/logger"
 
 import {
   ABORT_WINDOW_MS,
+  CONTINUATION_COOLDOWN_MS,
   DEFAULT_SKIP_AGENTS,
   HOOK_NAME,
+  MAX_UNCHANGED_CYCLES,
 } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { getIncompleteCount } from "./todo"
@@ -104,6 +106,29 @@ export async function handleSessionIdle(args: {
     log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
     return
   }
+
+  if (state.inFlight) {
+    log(`[${HOOK_NAME}] Skipped: injection in flight`, { sessionID })
+    return
+  }
+
+  if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < CONTINUATION_COOLDOWN_MS) {
+    log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID })
+    return
+  }
+
+  const incompleteTodos = todos.filter((todo) => todo.status !== "completed" && todo.status !== "cancelled")
+  const todoHash = incompleteTodos.map((todo) => `${todo.id}:${todo.status}`).join("|")
+  if (state.lastTodoHash === todoHash) {
+    state.unchangedCycles = (state.unchangedCycles ?? 0) + 1
+    if (state.unchangedCycles >= MAX_UNCHANGED_CYCLES) {
+      log(`[${HOOK_NAME}] Skipped: stagnation cap reached`, { sessionID, cycles: state.unchangedCycles })
+      return
+    }
+  } else {
+    state.unchangedCycles = 0
+  }
+  state.lastTodoHash = todoHash
 
   let resolvedInfo: ResolvedMessageInfo | undefined
   let hasCompactionMessage = false

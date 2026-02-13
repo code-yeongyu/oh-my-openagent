@@ -27,6 +27,10 @@ export interface SessionState {
   isRecovering?: boolean
   countdownStartedAt?: number
   abortDetectedAt?: number
+  lastInjectedAt?: number
+  inFlight?: boolean
+  lastTodoHash?: string
+  unchangedCycles?: number
 }
 
 export interface MessageInfo {
