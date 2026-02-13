@@ -31,14 +31,13 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
 
   const buildDescription = async (): Promise<string> => {
     if (cachedDescription) return cachedDescription
-    const allItems = await getAllItems()
-    cachedDescription = buildDescriptionFromItems(allItems)
+    const commands = getCommands()
+    cachedDescription = buildDescriptionFromItems(commands)
     return cachedDescription
   }
 
-  if (options.commands !== undefined && options.skills !== undefined) {
-    const allItems = [...options.commands, ...options.skills.map(skillToCommandInfo)]
-    cachedDescription = buildDescriptionFromItems(allItems)
+  if (options.commands !== undefined) {
+    cachedDescription = buildDescriptionFromItems(options.commands)
   } else {
     void buildDescription()
   }
