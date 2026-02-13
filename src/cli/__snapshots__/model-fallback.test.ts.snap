@@ -4,6 +4,9 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "opencode/glm-4.7-free",
+    },
     "atlas": {
       "model": "opencode/big-pickle",
     },
@@ -65,6 +68,10 @@ exports[`generateModelConfig single native provider uses Claude models when only
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "anthropic/claude-sonnet-4-6",
     },
@@ -127,6 +134,10 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "anthropic/claude-sonnet-4-6",
     },
@@ -190,6 +201,10 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "openai/gpt-5.2",
+      "variant": "high",
+    },
     "atlas": {
       "model": "openai/gpt-5.2",
     },
@@ -257,6 +272,10 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "openai/gpt-5.2",
+      "variant": "high",
+    },
     "atlas": {
       "model": "openai/gpt-5.2",
     },
@@ -324,6 +343,10 @@ exports[`generateModelConfig single native provider uses Gemini models when only
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "google/gemini-3-pro",
+      "variant": "high",
+    },
     "atlas": {
       "model": "opencode/big-pickle",
     },
@@ -385,6 +408,10 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "google/gemini-3-pro",
+      "variant": "high",
+    },
     "atlas": {
       "model": "opencode/big-pickle",
     },
@@ -446,6 +473,26 @@ exports[`generateModelConfig all native providers uses preferred models from fal
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "council": {
+        "members": [
+          {
+            "model": "anthropic/claude-sonnet-4-5",
+            "name": "Claude",
+          },
+          {
+            "model": "openai/gpt-5.2",
+            "name": "GPT",
+          },
+          {
+            "model": "google/gemini-3-flash",
+            "name": "Gemini",
+          },
+        ],
+      },
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "anthropic/claude-sonnet-4-6",
     },
@@ -520,6 +567,26 @@ exports[`generateModelConfig all native providers uses preferred models with isM
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "council": {
+        "members": [
+          {
+            "model": "anthropic/claude-sonnet-4-5",
+            "name": "Claude",
+          },
+          {
+            "model": "openai/gpt-5.2",
+            "name": "GPT",
+          },
+          {
+            "model": "google/gemini-3-flash",
+            "name": "Gemini",
+          },
+        ],
+      },
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "anthropic/claude-sonnet-4-6",
     },
@@ -595,6 +662,10 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
@@ -669,6 +740,10 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
@@ -744,6 +819,10 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "github-copilot/claude-sonnet-4.6",
     },
@@ -818,6 +897,10 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "github-copilot/claude-sonnet-4.6",
     },
@@ -893,6 +976,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "zai-coding-plan/glm-4.7",
+    },
     "atlas": {
       "model": "opencode/big-pickle",
     },
@@ -948,6 +1034,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "zai-coding-plan/glm-4.7",
+    },
     "atlas": {
       "model": "opencode/big-pickle",
     },
@@ -1003,6 +1092,22 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "council": {
+        "members": [
+          {
+            "model": "anthropic/claude-sonnet-4-5",
+            "name": "Claude",
+          },
+          {
+            "model": "opencode/claude-sonnet-4-5",
+            "name": "OpenCode Claude",
+          },
+        ],
+      },
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
@@ -1077,6 +1182,22 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "council": {
+        "members": [
+          {
+            "model": "openai/gpt-5.2",
+            "name": "GPT",
+          },
+          {
+            "model": "github-copilot/gpt-5.2",
+            "name": "Copilot GPT",
+          },
+        ],
+      },
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "github-copilot/claude-sonnet-4.6",
     },
@@ -1151,6 +1272,10 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "anthropic/claude-sonnet-4-6",
     },
@@ -1212,6 +1337,22 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "council": {
+        "members": [
+          {
+            "model": "anthropic/claude-sonnet-4-5",
+            "name": "Claude",
+          },
+          {
+            "model": "google/gemini-3-flash",
+            "name": "Gemini",
+          },
+        ],
+      },
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "anthropic/claude-sonnet-4-6",
     },
@@ -1278,6 +1419,22 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "council": {
+        "members": [
+          {
+            "model": "github-copilot/gpt-5.2",
+            "name": "Copilot GPT",
+          },
+          {
+            "model": "opencode/claude-sonnet-4-5",
+            "name": "OpenCode Claude",
+          },
+        ],
+      },
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
@@ -1352,6 +1509,34 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "council": {
+        "members": [
+          {
+            "model": "anthropic/claude-sonnet-4-5",
+            "name": "Claude",
+          },
+          {
+            "model": "openai/gpt-5.2",
+            "name": "GPT",
+          },
+          {
+            "model": "google/gemini-3-flash",
+            "name": "Gemini",
+          },
+          {
+            "model": "github-copilot/gpt-5.2",
+            "name": "Copilot GPT",
+          },
+          {
+            "model": "opencode/claude-sonnet-4-5",
+            "name": "OpenCode Claude",
+          },
+        ],
+      },
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
@@ -1426,6 +1611,34 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
 {
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
+    "athena": {
+      "council": {
+        "members": [
+          {
+            "model": "anthropic/claude-sonnet-4-5",
+            "name": "Claude",
+          },
+          {
+            "model": "openai/gpt-5.2",
+            "name": "GPT",
+          },
+          {
+            "model": "google/gemini-3-flash",
+            "name": "Gemini",
+          },
+          {
+            "model": "github-copilot/gpt-5.2",
+            "name": "Copilot GPT",
+          },
+          {
+            "model": "opencode/claude-sonnet-4-5",
+            "name": "OpenCode Claude",
+          },
+        ],
+      },
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
