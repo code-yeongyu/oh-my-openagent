@@ -29,7 +29,7 @@ function createMockSkill(name: string, description = ""): LoadedSkill {
 }
 
 describe("slashcommand tool - synchronous description", () => {
-  it("includes available_skills immediately when commands and skills are pre-provided", () => {
+  it("includes only commands in description, not skills", () => {
     // given
     const commands = [createMockCommand("commit", "Create a git commit")]
     const skills = [createMockSkill("playwright", "Browser automation via Playwright MCP")]
@@ -38,12 +38,11 @@ describe("slashcommand tool - synchronous description", () => {
     const tool = createSlashcommandTool({ commands, skills })
 
     // then
-    expect(tool.description).toContain("<available_skills>")
     expect(tool.description).toContain("commit")
-    expect(tool.description).toContain("playwright")
+    expect(tool.description).not.toContain("playwright")
   })
 
-  it("includes all pre-provided commands and skills in description immediately", () => {
+  it("lists all commands but excludes skills from description", () => {
     // given
     const commands = [
       createMockCommand("commit", "Git commit"),
@@ -61,9 +60,9 @@ describe("slashcommand tool - synchronous description", () => {
     // then
     expect(tool.description).toContain("commit")
     expect(tool.description).toContain("plan")
-    expect(tool.description).toContain("playwright")
-    expect(tool.description).toContain("frontend-ui-ux")
-    expect(tool.description).toContain("git-master")
+    expect(tool.description).not.toContain("playwright")
+    expect(tool.description).not.toContain("frontend-ui-ux")
+    expect(tool.description).not.toContain("git-master")
   })
 
   it("shows prefix-only description when both commands and skills are empty", () => {
