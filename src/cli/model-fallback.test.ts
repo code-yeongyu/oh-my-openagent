@@ -491,7 +491,7 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then librarian should use ZAI_MODEL
-      expect(result.agents?.librarian?.model).toBe("zai-coding-plan/glm-4.7")
+      expect(result.agents?.librarian?.model).toBe("zai-coding-plan/glm-5")
     })
 
     test("librarian uses claude-sonnet when ZAI not available but Claude is", () => {

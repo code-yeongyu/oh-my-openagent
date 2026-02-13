@@ -44,12 +44,12 @@ agents/
 
 | Agent | Model | Temp | Fallback Chain | Cost |
 |-------|-------|------|----------------|------|
-| Sisyphus | claude-opus-4-6 | 0.1 | kimi-k2.5 → glm-4.7 → gpt-5.3-codex → gemini-3-pro | EXPENSIVE |
+| Sisyphus | claude-opus-4-6 | 0.1 | kimi-k2.5 → glm-5 → gpt-5.3-codex → gemini-3-pro | EXPENSIVE |
 | Hephaestus | gpt-5.3-codex | 0.1 | NONE (required) | EXPENSIVE |
 | Atlas | claude-sonnet-4-5 | 0.1 | kimi-k2.5 → gpt-5.2 | EXPENSIVE |
 | Prometheus | claude-opus-4-6 | 0.1 | kimi-k2.5 → gpt-5.2 | EXPENSIVE |
 | oracle | gpt-5.2 | 0.1 | claude-opus-4-6 | EXPENSIVE |
-| librarian | glm-4.7 | 0.1 | glm-4.7-free | CHEAP |
+| librarian | glm-5 | 0.1 | glm-4.7-free | CHEAP |
 | explore | grok-code-fast-1 | 0.1 | claude-haiku-4-5 → gpt-5-mini → gpt-5-nano | FREE |
 | multimodal-looker | gemini-3-flash | 0.1 | NONE | CHEAP |
 | Metis | claude-opus-4-6 | 0.3 | kimi-k2.5 → gpt-5.2 | EXPENSIVE |
