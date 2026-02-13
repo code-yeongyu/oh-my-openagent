@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test"
-import type { CheckDefinition, CheckResult, DoctorResult, ProviderStatus, SystemInfo, ToolsSummary } from "./types"
+import type { CheckDefinition, CheckResult, DoctorResult, SystemInfo, ToolsSummary } from "./types"
 
 function createSystemInfo(): SystemInfo {
   return {
@@ -12,13 +12,6 @@ function createSystemInfo(): SystemInfo {
     configValid: true,
     isLocalDev: false,
   }
-}
-
-function createProviders(): ProviderStatus[] {
-  return [
-    { id: "anthropic", name: "Anthropic", available: true, hasEnvVar: true, hasPlugin: true },
-    { id: "openai", name: "OpenAI", available: false, hasEnvVar: false, hasPlugin: false },
-  ]
 }
 
 function createTools(): ToolsSummary {
@@ -143,7 +136,6 @@ describe("runner", () => {
       const deferredTwo = createDeferred()
       const deferredThree = createDeferred()
       const deferredFour = createDeferred()
-      const deferredFive = createDeferred()
 
       const checks: CheckDefinition[] = [
         {
@@ -163,19 +155,11 @@ describe("runner", () => {
           },
         },
         {
-          id: "providers",
-          name: "Providers",
-          check: async () => {
-            startedChecks.push("providers")
-            return deferredThree.promise
-          },
-        },
-        {
           id: "tools",
           name: "Tools",
           check: async () => {
             startedChecks.push("tools")
-            return deferredFour.promise
+            return deferredThree.promise
           },
         },
         {
@@ -183,7 +167,7 @@ describe("runner", () => {
           name: "Models",
           check: async () => {
             startedChecks.push("models")
-            return deferredFive.promise
+            return deferredFour.promise
           },
         },
       ]
@@ -192,16 +176,14 @@ describe("runner", () => {
         results: [
           createPassResult("System"),
           createPassResult("Configuration"),
-          createPassResult("Providers"),
           createPassResult("Tools"),
           createPassResult("Models"),
         ],
         systemInfo: createSystemInfo(),
-        providers: createProviders(),
         tools: createTools(),
         summary: {
-          total: 5,
-          passed: 5,
+          total: 4,
+          passed: 4,
           failed: 0,
           warnings: 0,
           skipped: 0,
@@ -216,7 +198,6 @@ describe("runner", () => {
       mock.module("./checks", () => ({
         getAllCheckDefinitions: () => checks,
         gatherSystemInfo: async () => expectedResult.systemInfo,
-        gatherProviderStatuses: () => expectedResult.providers,
         gatherToolsSummary: async () => expectedResult.tools,
       }))
       mock.module("./formatter", () => ({
@@ -236,15 +217,14 @@ describe("runner", () => {
       const startedBeforeResolve = [...startedChecks]
       deferredOne.resolve(createPassResult("System"))
       deferredTwo.resolve(createPassResult("Configuration"))
-      deferredThree.resolve(createPassResult("Providers"))
-      deferredFour.resolve(createPassResult("Tools"))
-      deferredFive.resolve(createPassResult("Models"))
+      deferredThree.resolve(createPassResult("Tools"))
+      deferredFour.resolve(createPassResult("Models"))
       const result = await runPromise
 
       //#then
       console.log = originalLog
-      expect(startedBeforeResolve.sort()).toEqual(["config", "models", "providers", "system", "tools"])
-      expect(result.results.length).toBe(5)
+      expect(startedBeforeResolve.sort()).toEqual(["config", "models", "system", "tools"])
+      expect(result.results.length).toBe(4)
       expect(result.exitCode).toBe(0)
       expect(formatDoctorOutputMock).toHaveBeenCalledTimes(1)
       expect(formatJsonOutputMock).toHaveBeenCalledTimes(0)

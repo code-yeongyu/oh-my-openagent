@@ -46,14 +46,6 @@ export interface SystemInfo {
   isLocalDev: boolean
 }
 
-export interface ProviderStatus {
-  id: string
-  name: string
-  available: boolean
-  hasEnvVar: boolean
-  hasPlugin: boolean
-}
-
 export interface ToolsSummary {
   lspInstalled: number
   lspTotal: number
@@ -77,7 +69,6 @@ export interface DoctorSummary {
 export interface DoctorResult {
   results: CheckResult[]
   systemInfo: SystemInfo
-  providers: ProviderStatus[]
   tools: ToolsSummary
   summary: DoctorSummary
   exitCode: number

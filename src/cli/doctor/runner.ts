@@ -1,5 +1,5 @@
 import type { DoctorOptions, DoctorResult, CheckDefinition, CheckResult, DoctorSummary } from "./types"
-import { getAllCheckDefinitions, gatherSystemInfo, gatherProviderStatuses, gatherToolsSummary } from "./checks"
+import { getAllCheckDefinitions, gatherSystemInfo, gatherToolsSummary } from "./checks"
 import { EXIT_CODES } from "./constants"
 import { formatDoctorOutput, formatJsonOutput } from "./formatter"
 
@@ -39,10 +39,9 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   const start = performance.now()
 
   const allChecks = getAllCheckDefinitions()
-  const [results, systemInfo, providers, tools] = await Promise.all([
+  const [results, systemInfo, tools] = await Promise.all([
     Promise.all(allChecks.map(runCheck)),
     gatherSystemInfo(),
-    Promise.resolve(gatherProviderStatuses()),
     gatherToolsSummary(),
   ])
 
@@ -53,7 +52,6 @@ export async function runDoctor(options: DoctorOptions): Promise<DoctorResult> {
   const doctorResult: DoctorResult = {
     results,
     systemInfo,
-    providers,
     tools,
     summary,
     exitCode,

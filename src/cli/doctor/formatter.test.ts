@@ -17,7 +17,6 @@ function createDoctorResult(): DoctorResult {
       configValid: true,
       isLocalDev: false,
     },
-    providers: [{ id: "anthropic", name: "Anthropic", available: true, hasEnvVar: true, hasPlugin: true }],
     tools: {
       lspInstalled: 2,
       lspTotal: 4,

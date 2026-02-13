@@ -7,7 +7,7 @@ export function formatVerbose(result: DoctorResult): string {
 
   lines.push(formatHeader())
 
-  const { systemInfo, providers, tools, results, summary } = result
+  const { systemInfo, tools, results, summary } = result
 
   lines.push(`${color.bold("System Information")}`)
   lines.push(`${color.dim("\u2500".repeat(40))}`)
@@ -29,16 +29,6 @@ export function formatVerbose(result: DoctorResult): string {
   lines.push(`${color.dim("\u2500".repeat(40))}`)
   const configStatus = systemInfo.configValid ? color.green("valid") : color.red("invalid")
   lines.push(`  ${formatStatusSymbol(systemInfo.configValid ? "pass" : "fail")} ${systemInfo.configPath ?? "unknown"} (${configStatus})`)
-  lines.push("")
-
-  lines.push(`${color.bold("Providers")}`)
-  lines.push(`${color.dim("\u2500".repeat(40))}`)
-  for (const provider of providers) {
-    const availableMark = provider.available ? color.green("✓") : color.red("✗")
-    const pluginMark = provider.hasPlugin ? color.green("plugin") : color.dim("no plugin")
-    const envMark = provider.hasEnvVar ? color.green("env") : color.dim("no env")
-    lines.push(`  ${availableMark} ${provider.name}  ${pluginMark} · ${envMark}`)
-  }
   lines.push("")
 
   lines.push(`${color.bold("Tools")}`)

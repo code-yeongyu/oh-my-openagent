@@ -19,7 +19,6 @@ function createBaseResult(): DoctorResult {
       configValid: true,
       isLocalDev: false,
     },
-    providers: [],
     tools: {
       lspInstalled: 0,
       lspTotal: 0,
