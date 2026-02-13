@@ -4,6 +4,7 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import {
+  discoverConfigSourceSkills,
   discoverOpencodeGlobalSkills,
   discoverOpencodeProjectSkills,
   discoverProjectClaudeSkills,
@@ -34,11 +35,16 @@ export async function applyAgentConfig(params: {
 
   const includeClaudeSkillsForAwareness = params.pluginConfig.claude_code?.skills ?? true;
   const [
+    discoveredConfigSourceSkills,
     discoveredUserSkills,
     discoveredProjectSkills,
     discoveredOpencodeGlobalSkills,
     discoveredOpencodeProjectSkills,
   ] = await Promise.all([
+    discoverConfigSourceSkills({
+      config: params.pluginConfig.skills,
+      configDir: params.ctx.directory,
+    }),
     includeClaudeSkillsForAwareness ? discoverUserClaudeSkills() : Promise.resolve([]),
     includeClaudeSkillsForAwareness
       ? discoverProjectClaudeSkills()
@@ -48,6 +54,7 @@ export async function applyAgentConfig(params: {
   ]);
 
   const allDiscoveredSkills = [
+    ...discoveredConfigSourceSkills,
     ...discoveredOpencodeProjectSkills,
     ...discoveredProjectSkills,
     ...discoveredOpencodeGlobalSkills,
