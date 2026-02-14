@@ -45,10 +45,19 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
       iteration: iterationNum,
       max_iterations: Number(data.max_iterations) || DEFAULT_MAX_ITERATIONS,
       completion_promise: stripQuotes(data.completion_promise) || DEFAULT_COMPLETION_PROMISE,
+      completion_detection_enabled:
+        data.completion_detection_enabled === undefined
+          ? true
+          : data.completion_detection_enabled === true ||
+            data.completion_detection_enabled === "true",
       started_at: stripQuotes(data.started_at) || new Date().toISOString(),
       prompt: body.trim(),
       session_id: data.session_id ? stripQuotes(data.session_id) : undefined,
       ultrawork: data.ultrawork === true || data.ultrawork === "true" ? true : undefined,
+      mode: data.mode ? stripQuotes(data.mode) as RalphLoopState["mode"] : undefined,
+      max_duration_ms: data.max_duration_ms ? Number(data.max_duration_ms) : undefined,
+      deadline_at: data.deadline_at ? stripQuotes(data.deadline_at) : undefined,
+      stop_reason: data.stop_reason ? stripQuotes(data.stop_reason) as RalphLoopState["stop_reason"] : undefined,
     }
   } catch {
     return null
@@ -70,13 +79,21 @@ export function writeState(
 
     const sessionIdLine = state.session_id ? `session_id: "${state.session_id}"\n` : ""
     const ultraworkLine = state.ultrawork !== undefined ? `ultrawork: ${state.ultrawork}\n` : ""
+    const completionDetectionLine =
+      state.completion_detection_enabled !== undefined
+        ? `completion_detection_enabled: ${state.completion_detection_enabled}\n`
+        : ""
+    const modeLine = state.mode ? `mode: "${state.mode}"\n` : ""
+    const maxDurationLine = state.max_duration_ms !== undefined ? `max_duration_ms: ${state.max_duration_ms}\n` : ""
+    const deadlineLine = state.deadline_at ? `deadline_at: "${state.deadline_at}"\n` : ""
+    const stopReasonLine = state.stop_reason ? `stop_reason: "${state.stop_reason}"\n` : ""
     const content = `---
 active: ${state.active}
 iteration: ${state.iteration}
 max_iterations: ${state.max_iterations}
 completion_promise: "${state.completion_promise}"
 started_at: "${state.started_at}"
-${sessionIdLine}${ultraworkLine}---
+${sessionIdLine}${ultraworkLine}${completionDetectionLine}${modeLine}${maxDurationLine}${deadlineLine}${stopReasonLine}---
 ${state.prompt}
 `
 

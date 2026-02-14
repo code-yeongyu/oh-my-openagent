@@ -151,6 +151,21 @@ describe("createAutoSlashCommandHook", () => {
       // then should not modify
       expect(output.parts[0].text).toBe(originalText)
     })
+
+    it("should NOT trigger for audit-loop command", async () => {
+      // given audit-loop command
+      const hook = createAutoSlashCommandHook()
+      const sessionID = `test-session-audit-loop-${Date.now()}`
+      const input = createMockInput(sessionID)
+      const output = createMockOutput("/audit-loop \"run ui audit\" --max-duration=3h")
+      const originalText = output.parts[0].text
+
+      // when hook is called
+      await hook["chat.message"](input, output)
+
+      // then should not modify (excluded command)
+      expect(output.parts[0].text).toBe(originalText)
+    })
   })
 
   describe("already processed", () => {

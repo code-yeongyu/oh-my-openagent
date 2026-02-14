@@ -17,7 +17,6 @@ export function applyToolConfig(params: {
     LspHover: false,
     LspCodeActions: false,
     LspCodeActionResolve: false,
-    "task_*": false,
     teammate: false,
     ...(params.pluginConfig.experimental?.task_system
       ? { todowrite: false, todoread: false }
@@ -40,6 +39,7 @@ export function applyToolConfig(params: {
     agent.permission = {
       ...agent.permission,
       task: "allow",
+      doom_loop: "allow",
       call_omo_agent: "deny",
       "task_*": "allow",
       teammate: "allow",
@@ -52,6 +52,7 @@ export function applyToolConfig(params: {
       ...agent.permission,
       call_omo_agent: "deny",
       task: "allow",
+      doom_loop: "allow",
       question: questionPermission,
       "task_*": "allow",
       teammate: "allow",
@@ -64,6 +65,7 @@ export function applyToolConfig(params: {
       ...agent.permission,
       call_omo_agent: "deny",
       task: "allow",
+      doom_loop: "allow",
       question: questionPermission,
       ...denyTodoTools,
     };
@@ -74,6 +76,7 @@ export function applyToolConfig(params: {
       ...agent.permission,
       call_omo_agent: "deny",
       task: "allow",
+      doom_loop: "allow",
       question: questionPermission,
       "task_*": "allow",
       teammate: "allow",
@@ -85,6 +88,7 @@ export function applyToolConfig(params: {
     agent.permission = {
       ...agent.permission,
       task: "allow",
+      doom_loop: "allow",
       "task_*": "allow",
       teammate: "allow",
       ...denyTodoTools,
@@ -95,6 +99,7 @@ export function applyToolConfig(params: {
     ...(params.config.permission as Record<string, unknown>),
     webfetch: "allow",
     external_directory: "allow",
-    task: "deny",
+    task: "allow",
+    doom_loop: "allow",
   };
 }

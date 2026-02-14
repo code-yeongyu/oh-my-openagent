@@ -10,7 +10,14 @@ export function resolvePromptAppend(promptAppend: string, configDir?: string): s
   let filePath: string
   try {
     const decoded = decodeURIComponent(encoded)
-    const expanded = decoded.startsWith("~/") ? decoded.replace(/^~\//, `${homedir()}/`) : decoded
+    const expanded = decoded.startsWith("~/")
+      ? (() => {
+          const home = homedir().replace(/\\/g, "/")
+          const tail = decoded.slice(2).replace(/\\/g, "/")
+          if (tail.startsWith(`${home}/`)) return tail
+          return `${home}/${tail}`
+        })()
+      : decoded
     filePath = isAbsolute(expanded)
       ? expanded
       : resolve(configDir ?? process.cwd(), expanded)

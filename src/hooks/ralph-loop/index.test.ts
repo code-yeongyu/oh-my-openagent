@@ -171,6 +171,33 @@ describe("ralph-loop", () => {
       // then - multiline prompt preserved
       expect(readResult?.prompt).toBe("Build a feature\nwith multiple lines\nand requirements")
     })
+
+    test("should persist mode and timebox metadata fields", () => {
+      // given - state with audit-loop metadata
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 2,
+        max_iterations: 20,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T02:00:00Z",
+        prompt: "Audit UI",
+        session_id: "session-timebox",
+        mode: "audit-loop",
+        max_duration_ms: 10_800_000,
+        deadline_at: "2025-12-30T05:00:00Z",
+        stop_reason: "timeout",
+      }
+
+      // when - write and read state
+      writeState(TEST_DIR, state)
+      const readResult = readState(TEST_DIR)
+
+      // then - metadata fields should be preserved
+      expect(readResult?.mode).toBe("audit-loop")
+      expect(readResult?.max_duration_ms).toBe(10_800_000)
+      expect(readResult?.deadline_at).toBe("2025-12-30T05:00:00Z")
+      expect(readResult?.stop_reason).toBe("timeout")
+    })
   })
 
   describe("hook", () => {
@@ -219,6 +246,37 @@ describe("ralph-loop", () => {
       expect(state?.ultrawork).toBeUndefined()
     })
 
+    test("should enable completion detection by default", () => {
+      // given - hook instance
+      const hook = createRalphLoopHook(createMockPluginInput())
+
+      // when - start loop with default options
+      hook.startLoop("session-123", "Build something")
+
+      // then - completion detection is enabled
+      const state = hook.getState()
+      expect(state?.completion_detection_enabled).toBe(true)
+    })
+
+    test("should persist audit-loop mode and max duration when startLoop receives timebox options", () => {
+      // given - hook instance
+      const hook = createRalphLoopHook(createMockPluginInput())
+
+      // when - start audit-loop with explicit max duration
+      hook.startLoop("session-123", "Audit and improve UI", {
+        mode: "audit-loop",
+        ultrawork: true,
+        maxDurationMs: 7_200_000,
+      })
+
+      // then - state should carry mode + duration metadata
+      const state = hook.getState()
+      expect(state?.mode).toBe("audit-loop")
+      expect(state?.max_duration_ms).toBe(7_200_000)
+      expect(state?.deadline_at).toBeString()
+      expect(Number.isNaN(Date.parse(state?.deadline_at ?? ""))).toBe(false)
+    })
+
     test("should inject continuation when loop active and no completion detected", async () => {
       // given - active loop state
       const hook = createRalphLoopHook(createMockPluginInput())
@@ -242,6 +300,305 @@ describe("ralph-loop", () => {
       // then - iteration should be incremented
       const state = hook.getState()
       expect(state?.iteration).toBe(2)
+    })
+
+    test("should use audit-loop continuation prompt when mode is audit-loop", async () => {
+      // given - active audit-loop state
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Deep UI audit", {
+        mode: "audit-loop",
+        ultrawork: true,
+        maxIterations: 10,
+      })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - continuation prompt should use audit template
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain("AUDIT LOOP")
+      expect(promptCalls[0].text).toContain("DO NOT modify Supabase")
+      expect(promptCalls[0].text).toContain("AGENTS.md")
+      expect(promptCalls[0].text).toContain("AGENTS.md wins")
+      expect(promptCalls[0].text).toContain("Hardcoded component styling is prohibited")
+      expect(promptCalls[0].text).toContain("Component-token gate")
+      expect(promptCalls[0].text).toContain("Focus-Screen Completion Lock")
+      expect(promptCalls[0].text).toContain("Deterministic validator pipeline")
+      expect(promptCalls[0].text).toContain("Adaptive agent policy")
+      expect(promptCalls[0].text).toContain("Required test delta")
+      expect(promptCalls[0].text).toContain("Objective cap")
+      expect(promptCalls[0].text).toContain("Risk budget")
+      expect(promptCalls[0].text).toContain("Required-skills rule")
+      expect(promptCalls[0].text).toContain("Skill Coverage")
+      expect(promptCalls[0].text).toContain("SAME primary screen")
+      expect(promptCalls[0].text).toContain("85% of file edits")
+      expect(promptCalls[0].text).toContain("BLOCKER REPORT")
+      expect(promptCalls[0].text).toContain("Auto-progression rule")
+      expect(promptCalls[0].text).toContain("SCREEN COMPLETE")
+      expect(promptCalls[0].text).toContain("Gate Status table")
+      expect(promptCalls[0].text).toContain("Required end-of-cycle evidence")
+      expect(promptCalls[0].text).toContain("Deep UI audit")
+    })
+
+    test("should show audit-loop heartbeat toast with remaining time", async () => {
+      // given - active audit-loop state
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Deep UI audit", {
+        mode: "audit-loop",
+        ultrawork: true,
+        maxIterations: 10,
+        maxDurationMs: 3 * 60 * 60 * 1000,
+      })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - heartbeat toast should identify audit-loop and show time-left hint
+      expect(
+        toastCalls.some(
+          (t) =>
+            t.title === "Audit Loop Active" &&
+            t.message.includes("Iteration 2/10") &&
+            t.message.includes("Time left:"),
+        ),
+      ).toBe(true)
+    })
+
+    test("should append stagnation alert when audit evidence repeats across cycles", async () => {
+      // given - transcript with repeated cycle evidence fingerprints
+      const transcriptPath = join(TEST_DIR, "transcript-stagnation.jsonl")
+      writeFileSync(
+        transcriptPath,
+        [
+          JSON.stringify({
+            type: "tool_result",
+            tool_name: "write",
+            tool_output: {
+              output:
+                "Files Changed: lib/screens/settings/settings_screen.dart\nNext-Cycle Targets: refine settings a11y",
+            },
+          }),
+          JSON.stringify({
+            type: "tool_result",
+            tool_name: "write",
+            tool_output: {
+              output:
+                "Files Changed: lib/screens/settings/settings_screen.dart\nNext-Cycle Targets: refine settings a11y",
+            },
+          }),
+        ].join("\n") + "\n",
+      )
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Deep UI audit", {
+        mode: "audit-loop",
+        ultrawork: true,
+        maxIterations: 10,
+      })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - continuation includes stagnation override
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain("STAGNATION ALERT")
+      expect(promptCalls[0].text).toContain("increase parallel research agents")
+    })
+
+    test("should append objective-cap and regression-gate alerts when evidence is missing", async () => {
+      // given - transcript with too many next targets and no regression scan pass
+      const transcriptPath = join(TEST_DIR, "transcript-gate-alerts.jsonl")
+      writeFileSync(
+        transcriptPath,
+        JSON.stringify({
+          type: "tool_result",
+          tool_name: "write",
+          tool_output: {
+            output: [
+              "Focus Screen: lib/screens/settings/settings_screen.dart",
+              "Files Changed: lib/screens/settings/settings_screen.dart",
+              "Commands Run:",
+              "- flutter analyze ... PASS",
+              "- flutter test ... PASS",
+              "- flutter build ... PASS",
+              "Next-Cycle Targets:",
+              "1. item one",
+              "2. item two",
+              "3. item three",
+              "4. item four",
+            ].join("\n"),
+          },
+        }) + "\n",
+      )
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Deep UI audit", {
+        mode: "audit-loop",
+        ultrawork: true,
+        maxIterations: 10,
+      })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - continuation includes policy alerts
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain("OBJECTIVE CAP VIOLATION")
+      expect(promptCalls[0].text).toContain("REGRESSION GATE VIOLATION")
+    })
+
+    test("should append auto-focus progression alert after SCREEN COMPLETE with passing gates", async () => {
+      // given - transcript proving current screen is complete and validated
+      const transcriptPath = join(TEST_DIR, "transcript-auto-focus-progression.jsonl")
+      writeFileSync(
+        transcriptPath,
+        JSON.stringify({
+          type: "tool_result",
+          tool_name: "write",
+          tool_output: {
+            output: [
+              "Focus Screen: lib/screens/settings/settings_screen.dart",
+              "Files Changed: lib/screens/settings/settings_screen.dart",
+              "Commands Run:",
+              "- flutter analyze ... PASS",
+              "- flutter test ... PASS",
+              "- flutter build ... PASS",
+              "- Regression Scan ... PASS",
+              "SCREEN COMPLETE",
+            ].join("\n"),
+          },
+        }) + "\n",
+      )
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Deep UI audit", {
+        mode: "audit-loop",
+        ultrawork: true,
+        maxIterations: 10,
+      })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - continuation includes auto focus progression directive
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain("AUTO FOCUS PROGRESSION")
+      expect(promptCalls[0].text).toContain("do not require BLOCKER REPORT")
+    })
+
+    test("should append rollback trigger after consecutive validation failures", async () => {
+      // given - transcript evidence with failing validation signals
+      const transcriptPath = join(TEST_DIR, "transcript-rollback-trigger.jsonl")
+      writeFileSync(
+        transcriptPath,
+        JSON.stringify({
+          type: "tool_result",
+          tool_name: "write",
+          tool_output: {
+            output: [
+              "Focus Screen: lib/screens/settings/settings_screen.dart",
+              "Files Changed: lib/screens/settings/settings_screen.dart",
+              "Commands Run:",
+              "- flutter analyze ... FAIL",
+              "- flutter test ... FAIL",
+              "- flutter build ... FAIL",
+            ].join("\n"),
+          },
+        }) + "\n",
+      )
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Deep UI audit", {
+        mode: "audit-loop",
+        ultrawork: true,
+        maxIterations: 10,
+      })
+
+      // when - two cycles pass with failed validation
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - second continuation includes rollback trigger
+      expect(promptCalls.length).toBe(2)
+      expect(promptCalls[1].text).toContain("ROLLBACK TRIGGER")
+    })
+
+    test("should stop on expired deadline and inject timeout summary prompt", async () => {
+      // given - active loop with expired deadline
+      const hook = createRalphLoopHook(createMockPluginInput())
+      const expiredState: RalphLoopState = {
+        active: true,
+        iteration: 3,
+        max_iterations: 10,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Deep UI audit",
+        session_id: "session-123",
+        mode: "audit-loop",
+        ultrawork: true,
+        max_duration_ms: 1000,
+        deadline_at: new Date(Date.now() - 30_000).toISOString(),
+      }
+      writeState(TEST_DIR, expiredState)
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - loop should be cleared and timeout summary injected once
+      expect(hook.getState()).toBeNull()
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain("RALPH LOOP TIMEBOX ENDED")
+      expect(promptCalls[0].text).toContain("Audit-loop specific constraints reminder")
+      expect(promptCalls[0].text).toContain("Gate Status table")
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Timed Out")).toBe(true)
     })
 
     test("should stop loop when max iterations reached", async () => {
@@ -485,6 +842,146 @@ describe("ralph-loop", () => {
       expect(hook.getState()).toBeNull()
     })
 
+    test("should block audit-loop completion when completion-lock gates are missing", async () => {
+      // given - active audit loop with completion promise but missing gate evidence
+      const transcriptPath = join(TEST_DIR, "transcript-audit-gate-missing.jsonl")
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Deep UI audit", {
+        mode: "audit-loop",
+        completionPromise: "DONE",
+        completionDetectionEnabled: true,
+        maxIterations: 10,
+      })
+
+      writeFileSync(
+        transcriptPath,
+        JSON.stringify({
+          type: "tool_result",
+          tool_name: "write",
+          tool_output: { output: "Task done <promise>DONE</promise>" },
+        }) + "\n"
+      )
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - completion is blocked and loop continues
+      expect(promptCalls.length).toBe(1)
+      expect(toastCalls.some((t) => t.title === "Audit Completion Blocked")).toBe(true)
+      expect(hook.getState()?.mode).toBe("audit-loop")
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
+    test("should allow audit-loop completion when completion-lock gates pass", async () => {
+      // given - active audit loop with full gate evidence and completion promise
+      const transcriptPath = join(TEST_DIR, "transcript-audit-gate-pass.jsonl")
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Deep UI audit", {
+        mode: "audit-loop",
+        completionPromise: "DONE",
+        completionDetectionEnabled: true,
+        maxIterations: 10,
+      })
+
+      const completionReport = [
+        "Focus Screen: lib/screens/settings/settings_screen.dart",
+        "Files Changed: lib/screens/settings/settings_screen.dart",
+        "Commands Run:",
+        "- flutter analyze ... PASS",
+        "- flutter test ... PASS",
+        "- flutter build ... PASS",
+        "- Regression Scan ... PASS",
+        "Required Skills: flutter-official, accessibility-a11y",
+        "Skills Used: flutter-official, accessibility-a11y",
+        "Skill Coverage: PASS",
+        "A11y Checklist:",
+        "- keyboard: PASS",
+        "- focus: PASS",
+        "- semantics: PASS",
+        "- contrast: PASS",
+        "Test Delta: PASS",
+        "High-Risk Refactors: 1",
+        "Gate Status:",
+        "- Scope Coverage: PASS",
+        "- Issue Closure: PASS",
+        "- Validation: PASS",
+        "- Accessibility: PASS",
+        "- Re-Audit: PASS",
+        "- Evidence: PASS",
+        "Next-Cycle Targets:",
+        "1. Keep documenting stabilized path",
+        "2. Keep tests green",
+        "3. Keep focus lock",
+        "<promise>DONE</promise>",
+      ].join("\n")
+
+      writeFileSync(
+        transcriptPath,
+        JSON.stringify({
+          type: "tool_result",
+          tool_name: "write",
+          tool_output: { output: completionReport },
+        }) + "\n"
+      )
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - completion is accepted
+      expect(promptCalls.length).toBe(0)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(hook.getState()).toBeNull()
+    })
+
+    test("should ignore completion tags when completion detection is disabled", async () => {
+      // given - active loop with transcript containing completion tag
+      const transcriptPath = join(TEST_DIR, "transcript-no-complete.jsonl")
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", {
+        completionPromise: "COMPLETE",
+        completionDetectionEnabled: false,
+        maxIterations: 10,
+      })
+
+      writeFileSync(
+        transcriptPath,
+        JSON.stringify({
+          type: "tool_result",
+          tool_name: "write",
+          tool_output: { output: "Task done <promise>COMPLETE</promise>" },
+        }) + "\n"
+      )
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - it should continue instead of stopping
+      expect(promptCalls.length).toBe(1)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(false)
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
     test("should detect completion promise via session messages API", async () => {
       // given - active loop with assistant message containing completion promise
       mockSessionMessages = [
@@ -635,6 +1132,42 @@ describe("ralph-loop", () => {
 
       // then - loop state should be cleared immediately
       expect(hook.getState()).toBeNull()
+    })
+
+    test("should keep audit-loop state on MessageAbortedError and continue on next idle", async () => {
+      // given - active audit loop
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Deep UI audit", {
+        mode: "audit-loop",
+        ultrawork: true,
+        maxIterations: 5,
+      })
+
+      // when - aborted error is emitted
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID: "session-123",
+            error: { name: "MessageAbortedError", message: "The operation was aborted." },
+          },
+        },
+      })
+
+      // then - audit-loop should remain active
+      expect(hook.getState()).not.toBeNull()
+      expect(hook.getState()?.mode).toBe("audit-loop")
+      expect(hook.getState()?.iteration).toBe(1)
+
+      // when - session goes idle again
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // then - continuation should be injected
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain("AUDIT LOOP")
+      expect(hook.getState()?.iteration).toBe(2)
     })
 
     test("should NOT set recovery mode on user abort", async () => {

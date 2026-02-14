@@ -4,6 +4,7 @@ export const BuiltinCommandNameSchema = z.enum([
   "init-deep",
   "ralph-loop",
   "ulw-loop",
+  "audit-loop",
   "cancel-ralph",
   "refactor",
   "start-work",

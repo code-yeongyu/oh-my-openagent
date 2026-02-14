@@ -2,6 +2,7 @@ import type { CommandDefinition } from "../claude-code-command-loader"
 import type { BuiltinCommandName, BuiltinCommands } from "./types"
 import { INIT_DEEP_TEMPLATE } from "./templates/init-deep"
 import { RALPH_LOOP_TEMPLATE, CANCEL_RALPH_TEMPLATE } from "./templates/ralph-loop"
+import { AUDIT_LOOP_TEMPLATE } from "./templates/audit-loop"
 import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
@@ -28,7 +29,7 @@ ${RALPH_LOOP_TEMPLATE}
 <user-task>
 $ARGUMENTS
 </user-task>`,
-     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N]',
+     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N] [--max-duration=3h]',
    },
    "ulw-loop": {
      description: "(builtin) Start ultrawork loop - continues until completion with ultrawork mode",
@@ -39,7 +40,18 @@ ${RALPH_LOOP_TEMPLATE}
 <user-task>
 $ARGUMENTS
 </user-task>`,
-     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N]',
+     argumentHint: '"task description" [--completion-promise=TEXT] [--max-iterations=N] [--max-duration=3h]',
+   },
+   "audit-loop": {
+     description: "(builtin) Start 3-hour style audit loop with strict UI-first quality and hard timebox",
+     template: `<command-instruction>
+${AUDIT_LOOP_TEMPLATE}
+</command-instruction>
+
+<user-task>
+$ARGUMENTS
+</user-task>`,
+     argumentHint: '"task description" [--max-duration=3h] [--completion-promise=TEXT] [--max-iterations=N]',
    },
   "cancel-ralph": {
     description: "(builtin) Cancel active Ralph Loop",

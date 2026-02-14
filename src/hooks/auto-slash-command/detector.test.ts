@@ -174,12 +174,20 @@ After`
       expect(isExcludedCommand("cancel-ralph")).toBe(true)
     })
 
+    it("should exclude audit-loop", () => {
+      // given audit-loop command
+      // when checking exclusion
+      // then should be excluded
+      expect(isExcludedCommand("audit-loop")).toBe(true)
+    })
+
     it("should be case-insensitive for exclusion", () => {
       // given uppercase variants
       // when checking exclusion
       // then should still be excluded
       expect(isExcludedCommand("RALPH-LOOP")).toBe(true)
       expect(isExcludedCommand("Cancel-Ralph")).toBe(true)
+      expect(isExcludedCommand("Audit-Loop")).toBe(true)
     })
 
     it("should not exclude regular commands", () => {

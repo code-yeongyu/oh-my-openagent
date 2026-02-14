@@ -9,4 +9,5 @@ export const EXCLUDED_COMMANDS = new Set([
   "ralph-loop",
   "cancel-ralph",
   "ulw-loop",
+  "audit-loop",
 ])

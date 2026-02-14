@@ -10,6 +10,10 @@ import { hasConnectedProvidersCache } from "../shared"
 import {
   setSessionAgent,
 } from "../features/claude-code-session-state"
+import {
+  parseLoopCommandArgs,
+  DEFAULT_AUDIT_LOOP_DURATION_MS,
+} from "../hooks/ralph-loop/command-args"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -32,6 +36,24 @@ function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
     const partRecord = part as Record<string, unknown>
     return typeof partRecord["type"] === "string"
   })
+}
+
+function extractLoopTaskFromPrompt(promptText: string): string {
+  const taggedTaskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i)
+  const taggedTask = taggedTaskMatch?.[1]?.trim()
+  if (taggedTask && taggedTask !== "$ARGUMENTS") return taggedTask
+
+  const userArgumentsMatch = promptText.match(/\*\*User Arguments\*\*:\s*(.+)/i)
+  const userArguments = userArgumentsMatch?.[1]?.trim()
+  if (userArguments && userArguments !== "$ARGUMENTS") return userArguments
+
+  const userRequestSectionMatch = promptText.match(
+    /## User Request\s*([\s\S]*?)(?:\n##\s+[^\n]+|$)/i
+  )
+  const userRequestSection = userRequestSectionMatch?.[1]?.trim()
+  if (userRequestSection) return userRequestSection
+
+  return ""
 }
 
 export function createChatMessageHandler(args: {
@@ -107,29 +129,40 @@ export function createChatMessageHandler(args: {
           .trim() || ""
 
       const isRalphLoopTemplate =
-        promptText.includes("You are starting a Ralph Loop") &&
-        promptText.includes("<user-task>")
+        promptText.includes("You are starting a Ralph Loop")
+      const isAuditLoopTemplate =
+        promptText.includes("You are starting an Audit Loop")
       const isCancelRalphTemplate = promptText.includes(
         "Cancel the currently active Ralph Loop",
       )
 
-      if (isRalphLoopTemplate) {
-        const taskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i)
-        const rawTask = taskMatch?.[1]?.trim() || ""
-        const quotedMatch = rawTask.match(/^["'](.+?)["']/)
-        const prompt =
-          quotedMatch?.[1] ||
-          rawTask.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
+      if (isRalphLoopTemplate || isAuditLoopTemplate) {
+        const rawTask = extractLoopTaskFromPrompt(promptText)
 
-        const maxIterMatch = rawTask.match(/--max-iterations=(\d+)/i)
-        const promiseMatch = rawTask.match(
-          /--completion-promise=["']?([^"'\s]+)["']?/i,
-        )
+        const isUlwLoopTemplate =
+          promptText.includes("/ulw-loop Command") ||
+          promptText.includes("Start ultrawork loop")
 
-        hooks.ralphLoop.startLoop(input.sessionID, prompt, {
-          maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
-          completionPromise: promiseMatch?.[1],
+        const mode: "standard" | "ulw" | "audit-loop" = isAuditLoopTemplate
+          ? "audit-loop"
+          : isUlwLoopTemplate
+            ? "ulw"
+            : "standard"
+
+        const parsed = parseLoopCommandArgs(rawTask, {
+          defaultPrompt: "Complete the task as instructed",
+          mode,
+        })
+
+        hooks.ralphLoop.startLoop(input.sessionID, parsed.prompt, {
+          mode,
+          ultrawork: mode !== "standard",
+          maxIterations: parsed.maxIterations,
+          completionPromise: parsed.completionPromise,
+          completionDetectionEnabled: mode === "audit-loop" ? false : true,
+          maxDurationMs:
+            parsed.maxDurationMs ??
+            (mode === "audit-loop" ? DEFAULT_AUDIT_LOOP_DURATION_MS : undefined),
         })
       } else if (isCancelRalphTemplate) {
         hooks.ralphLoop.cancelLoop(input.sessionID)

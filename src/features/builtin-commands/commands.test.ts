@@ -4,6 +4,51 @@ import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import type { BuiltinCommandName } from "./types"
 
 describe("loadBuiltinCommands", () => {
+  test("should include audit-loop command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["audit-loop"]).toBeDefined()
+    expect(commands["audit-loop"].name).toBe("audit-loop")
+    expect(commands["audit-loop"].template).toContain("You are starting an Audit Loop")
+    expect(commands["audit-loop"].template).toContain("PHASE 10 COMPREHENSIVE PLAN")
+    expect(commands["audit-loop"].template).toContain("Focus Lock")
+    expect(commands["audit-loop"].template).toContain("AGENTS.md")
+    expect(commands["audit-loop"].template).toContain("AGENTS.md wins")
+    expect(commands["audit-loop"].template).toContain("Hardcoded component styling is prohibited")
+    expect(commands["audit-loop"].template).toContain("Component-token gate")
+    expect(commands["audit-loop"].template).toContain("Focus-Screen Completion Lock")
+    expect(commands["audit-loop"].template).toContain("Gate Status table")
+    expect(commands["audit-loop"].template).toContain("Deterministic validator pipeline")
+    expect(commands["audit-loop"].template).toContain("Adaptive agent policy")
+    expect(commands["audit-loop"].template).toContain("Required test delta")
+    expect(commands["audit-loop"].template).toContain("objective cap")
+    expect(commands["audit-loop"].template).toContain("Risk budget")
+    expect(commands["audit-loop"].template).toContain("Saturation / Freeze")
+    expect(commands["audit-loop"].template).toContain("Required-skills rule")
+    expect(commands["audit-loop"].template).toContain("Skill Coverage")
+    expect(commands["audit-loop"].template).toContain("at least 85% of edited files/changes")
+    expect(commands["audit-loop"].template).toContain("BLOCKER REPORT")
+    expect(commands["audit-loop"].template).toContain("Auto-progression rule")
+    expect(commands["audit-loop"].template).toContain("SCREEN COMPLETE")
+    expect(commands["audit-loop"].template).toContain("Required Cycle Evidence Format")
+  })
+
+  test("should exclude audit-loop when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["audit-loop"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["audit-loop"]).toBeUndefined()
+  })
+
   test("should include handoff command in loaded commands", () => {
     //#given
     const disabledCommands: BuiltinCommandName[] = []

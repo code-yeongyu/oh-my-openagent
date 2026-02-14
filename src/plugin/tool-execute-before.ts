@@ -4,8 +4,20 @@ import { getMainSessionID } from "../features/claude-code-session-state"
 import { clearBoulderState } from "../features/boulder-state"
 import { log } from "../shared"
 import { resolveSessionAgent } from "./session-agent-resolver"
+import { createAuditLoopGuard } from "./audit-loop-guard"
+import {
+  DEFAULT_AUDIT_LOOP_DURATION_MS,
+  extractRawLoopArgs,
+  parseLoopCommandArgs,
+} from "../hooks/ralph-loop/command-args"
 
 import type { CreatedHooks } from "../create-hooks"
+
+const LOOP_COMMANDS = new Set(["ralph-loop", "ulw-loop", "audit-loop"])
+
+function resolveSlashCommand(rawCommand: string | undefined): string | undefined {
+  return rawCommand?.replace(/^\//, "").trim().split(/\s+/)[0]?.toLowerCase()
+}
 
 export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
@@ -15,6 +27,7 @@ export function createToolExecuteBeforeHandler(args: {
   output: { args: Record<string, unknown> },
 ) => Promise<void> {
   const { ctx, hooks } = args
+  const auditLoopGuard = createAuditLoopGuard(ctx.directory ?? process.cwd())
 
   return async (input, output): Promise<void> => {
     await hooks.writeExistingFileGuard?.["tool.execute.before"]?.(input, output)
@@ -46,54 +59,49 @@ export function createToolExecuteBeforeHandler(args: {
 
     if (hooks.ralphLoop && input.tool === "slashcommand") {
       const rawCommand = typeof output.args.command === "string" ? output.args.command : undefined
-      const command = rawCommand?.replace(/^\//, "").toLowerCase()
+      const command = resolveSlashCommand(rawCommand)
       const sessionID = input.sessionID || getMainSessionID()
 
-      if (command === "ralph-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(ralph-loop)\s*/i, "") || ""
-        const taskMatch = rawArgs.match(/^["'](.+?)["']/)
-        const prompt =
-          taskMatch?.[1] ||
-          rawArgs.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
-
-        const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i)
-        const promiseMatch = rawArgs.match(/--completion-promise=["']?([^"'\s]+)["']?/i)
-
-        hooks.ralphLoop.startLoop(sessionID, prompt, {
-          maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
-          completionPromise: promiseMatch?.[1],
+      if (command && LOOP_COMMANDS.has(command) && sessionID) {
+        const mode =
+          command === "audit-loop" ? "audit-loop" : command === "ulw-loop" ? "ulw" : "standard"
+        const rawArgs = extractRawLoopArgs(rawCommand, command)
+        const parsed = parseLoopCommandArgs(rawArgs, {
+          defaultPrompt: "Complete the task as instructed",
+          mode,
         })
+
+        hooks.ralphLoop.startLoop(sessionID, parsed.prompt, {
+          mode,
+          ultrawork: mode !== "standard",
+          maxIterations: parsed.maxIterations,
+          completionPromise: parsed.completionPromise,
+          completionDetectionEnabled: mode === "audit-loop" ? false : true,
+          maxDurationMs:
+            parsed.maxDurationMs ??
+            (mode === "audit-loop" ? DEFAULT_AUDIT_LOOP_DURATION_MS : undefined),
+        })
+        if (mode === "audit-loop") {
+          auditLoopGuard.resetSession(sessionID)
+        }
       } else if (command === "cancel-ralph" && sessionID) {
         hooks.ralphLoop.cancelLoop(sessionID)
-      } else if (command === "ulw-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(ulw-loop)\s*/i, "") || ""
-        const taskMatch = rawArgs.match(/^["'](.+?)["']/)
-        const prompt =
-          taskMatch?.[1] ||
-          rawArgs.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
-
-        const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i)
-        const promiseMatch = rawArgs.match(/--completion-promise=["']?([^"'\s]+)["']?/i)
-
-        hooks.ralphLoop.startLoop(sessionID, prompt, {
-          ultrawork: true,
-          maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
-          completionPromise: promiseMatch?.[1],
-        })
+        auditLoopGuard.clearSession(sessionID)
       }
     }
 
+    auditLoopGuard.enforce(input, output, hooks)
+
     if (input.tool === "slashcommand") {
       const rawCommand = typeof output.args.command === "string" ? output.args.command : undefined
-      const command = rawCommand?.replace(/^\//, "").toLowerCase()
+      const command = resolveSlashCommand(rawCommand)
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "stop-continuation" && sessionID) {
         hooks.stopContinuationGuard?.stop(sessionID)
         hooks.todoContinuationEnforcer?.cancelAllCountdowns()
         hooks.ralphLoop?.cancelLoop(sessionID)
+        auditLoopGuard.clearSession(sessionID)
         clearBoulderState(ctx.directory)
         log("[stop-continuation] All continuation mechanisms stopped", {
           sessionID,
