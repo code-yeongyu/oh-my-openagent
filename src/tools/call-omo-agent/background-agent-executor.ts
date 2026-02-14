@@ -5,6 +5,7 @@ import { log } from "../../shared"
 import type { CallOmoAgentArgs } from "./types"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
 import { getMessageDir } from "./message-storage-directory"
+import { getSessionTools } from "../../shared/session-tools-store"
 
 export async function executeBackgroundAgent(
 	args: CallOmoAgentArgs,
@@ -36,6 +37,7 @@ export async function executeBackgroundAgent(
 			parentSessionID: toolContext.sessionID,
 			parentMessageID: toolContext.messageID,
 			parentAgent,
+			parentTools: getSessionTools(toolContext.sessionID),
 		})
 
 		const waitStart = Date.now()
