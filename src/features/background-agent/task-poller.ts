@@ -7,6 +7,7 @@ import type { OpencodeClient } from "./opencode-client"
 
 import {
   DEFAULT_STALE_TIMEOUT_MS,
+  DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   MIN_RUNTIME_BEFORE_STALE_MS,
   TASK_TTL_MS,
 } from "./constants"
@@ -56,15 +57,19 @@ export function pruneStaleTasksAndNotifications(args: {
   }
 }
 
+export type SessionStatusMap = Record<string, { type: string }>
+
 export async function checkAndInterruptStaleTasks(args: {
   tasks: Iterable<BackgroundTask>
   client: OpencodeClient
   config: BackgroundTaskConfig | undefined
   concurrencyManager: ConcurrencyManager
   notifyParentSession: (task: BackgroundTask) => Promise<void>
+  sessionStatuses?: SessionStatusMap
 }): Promise<void> {
-  const { tasks, client, config, concurrencyManager, notifyParentSession } = args
+  const { tasks, client, config, concurrencyManager, notifyParentSession, sessionStatuses } = args
   const staleTimeoutMs = config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
+  const messageStalenessMs = config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
   const now = Date.now()
 
   for (const task of tasks) {
@@ -75,7 +80,36 @@ export async function checkAndInterruptStaleTasks(args: {
     const sessionID = task.sessionID
     if (!startedAt || !sessionID) continue
 
+    const sessionIsRunning = sessionStatuses?.[sessionID]?.type === "running"
     const runtime = now - startedAt.getTime()
+
+    if (!task.progress?.lastUpdate) {
+      if (sessionIsRunning) continue
+      if (runtime <= messageStalenessMs) continue
+
+      const staleMinutes = Math.round(runtime / 60000)
+      task.status = "cancelled"
+      task.error = `Stale timeout (no activity for ${staleMinutes}min since start)`
+      task.completedAt = new Date()
+
+      if (task.concurrencyKey) {
+        concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined
+      }
+
+      client.session.abort({ path: { id: sessionID } }).catch(() => {})
+      log(`[background-agent] Task ${task.id} interrupted: no progress since start`)
+
+      try {
+        await notifyParentSession(task)
+      } catch (err) {
+        log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
+      }
+      continue
+    }
+
+    if (sessionIsRunning) continue
+
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 
     const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
