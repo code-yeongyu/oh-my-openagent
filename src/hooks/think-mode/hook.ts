@@ -10,6 +10,45 @@ export function clearThinkModeState(sessionID: string): void {
 }
 
 export function createThinkModeHook() {
+  function isDisabledThinkingConfig(config: Record<string, unknown>): boolean {
+    const thinkingConfig = config.thinking
+    if (
+      typeof thinkingConfig === "object" &&
+      thinkingConfig !== null &&
+      "type" in thinkingConfig &&
+      (thinkingConfig as { type?: string }).type === "disabled"
+    ) {
+      return true
+    }
+
+    const providerOptions = config.providerOptions
+    if (typeof providerOptions !== "object" || providerOptions === null) {
+      return false
+    }
+
+    return Object.values(providerOptions as Record<string, unknown>).some(
+      (providerConfig) => {
+        if (typeof providerConfig !== "object" || providerConfig === null) {
+          return false
+        }
+
+        const providerConfigMap = providerConfig as Record<string, unknown>
+        const extraBody = providerConfigMap.extra_body
+        if (typeof extraBody !== "object" || extraBody === null) {
+          return false
+        }
+
+        const extraBodyMap = extraBody as Record<string, unknown>
+        const extraThinking = extraBodyMap.thinking
+        return (
+          typeof extraThinking === "object" &&
+          extraThinking !== null &&
+          (extraThinking as { type?: string }).type === "disabled"
+        )
+      }
+    )
+  }
+
   return {
     "chat.params": async (output: ThinkModeInput, sessionID: string): Promise<void> => {
       const promptText = extractPromptText(output.parts)
@@ -75,13 +114,20 @@ export function createThinkModeHook() {
             sessionID,
             provider: currentModel.providerID,
           })
-        } else {
+        } else if (
+          !isDisabledThinkingConfig(thinkingConfig as Record<string, unknown>)
+        ) {
           Object.assign(output.message, thinkingConfig)
           state.thinkingConfigInjected = true
           log("Think mode: thinking config injected", {
             sessionID,
             provider: currentModel.providerID,
             config: thinkingConfig,
+          })
+        } else {
+          log("Think mode: skipping disabled thinking config", {
+            sessionID,
+            provider: currentModel.providerID,
           })
         }
       }
