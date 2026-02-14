@@ -115,10 +115,10 @@ export function loadPluginConfig(
   ctx: unknown
 ): MatrixxConfig {
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
-  const userConfigPath = resolveConfigPath(configDir, "matrixx");
+  const userConfigPath = resolveConfigPath(configDir, "oh-my-opencode");
 
   const projectDir = path.join(directory, ".opencode");
-  const projectConfigPath = resolveConfigPath(projectDir, "matrixx");
+  const projectConfigPath = resolveConfigPath(projectDir, "oh-my-opencode");
 
   let config: MatrixxConfig =
     loadConfigFromPath(userConfigPath, ctx) ?? {};
