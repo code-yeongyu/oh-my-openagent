@@ -14,7 +14,7 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
       "-t",
       sourcePaneId,
       "-F",
-      "#{pane_id},#{pane_width},#{pane_height},#{pane_left},#{pane_top},#{pane_title},#{pane_active},#{window_width},#{window_height}",
+      "#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_title}\t#{pane_active}\t#{window_width}\t#{window_height}",
     ],
     { stdout: "pipe", stderr: "pipe" }
   )
@@ -35,7 +35,7 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
   const panes: TmuxPaneInfo[] = []
 
   for (const line of lines) {
-    const [paneId, widthStr, heightStr, leftStr, topStr, title, activeStr, windowWidthStr, windowHeightStr] = line.split(",")
+    const [paneId, widthStr, heightStr, leftStr, topStr, title, activeStr, windowWidthStr, windowHeightStr] = line.split("\t")
     const width = parseInt(widthStr, 10)
     const height = parseInt(heightStr, 10)
     const left = parseInt(leftStr, 10)
@@ -51,9 +51,21 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
 
   panes.sort((a, b) => a.left - b.left || a.top - b.top)
 
-  const mainPane = panes.find((p) => p.paneId === sourcePaneId)
+  const mainPane = panes.reduce<TmuxPaneInfo | null>((selected, pane) => {
+    if (!selected) return pane
+    if (pane.left !== selected.left) {
+      return pane.left < selected.left ? pane : selected
+    }
+    if (pane.width !== selected.width) {
+      return pane.width > selected.width ? pane : selected
+    }
+    if (pane.top !== selected.top) {
+      return pane.top < selected.top ? pane : selected
+    }
+    return pane.paneId === sourcePaneId ? pane : selected
+  }, null)
   if (!mainPane) {
-    log("[pane-state-querier] CRITICAL: sourcePaneId not found in panes", {
+    log("[pane-state-querier] CRITICAL: failed to determine main pane", {
       sourcePaneId,
       availablePanes: panes.map((p) => p.paneId),
     })
