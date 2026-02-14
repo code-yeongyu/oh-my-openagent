@@ -12,8 +12,6 @@ export function createCouncilLauncher(manager: BackgroundManager): CouncilLaunch
         parentMessageID: input.parentMessageID,
         parentAgent: input.parentAgent,
         model: input.model,
-        temperature: input.temperature,
-        permission: input.permission,
       })
     },
   }

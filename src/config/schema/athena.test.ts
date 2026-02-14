@@ -18,7 +18,6 @@ describe("CouncilMemberSchema", () => {
     //#given
     const config = {
       model: "openai/gpt-5.3-codex",
-      temperature: 0.4,
       variant: "high",
       name: "analyst-a",
     }
@@ -32,7 +31,7 @@ describe("CouncilMemberSchema", () => {
 
   test("rejects member config missing model", () => {
     //#given
-    const config = { temperature: 0.5 }
+    const config = { name: "no-model" }
 
     //#when
     const result = CouncilMemberSchema.safeParse(config)
@@ -85,34 +84,11 @@ describe("CouncilMemberSchema", () => {
     expect(result.success).toBe(false)
   })
 
-  test("rejects temperature below 0", () => {
-    //#given
-    const config = { model: "openai/gpt-5.3-codex", temperature: -0.1 }
-
-    //#when
-    const result = CouncilMemberSchema.safeParse(config)
-
-    //#then
-    expect(result.success).toBe(false)
-  })
-
-  test("rejects temperature above 2", () => {
-    //#given
-    const config = { model: "openai/gpt-5.3-codex", temperature: 2.1 }
-
-    //#when
-    const result = CouncilMemberSchema.safeParse(config)
-
-    //#then
-    expect(result.success).toBe(false)
-  })
-
   test("z.infer produces expected type shape", () => {
     //#given
     type InferredCouncilMember = z.infer<typeof CouncilMemberSchema>
     const member: InferredCouncilMember = {
       model: "anthropic/claude-opus-4-6",
-      temperature: 0.1,
       variant: "medium",
       name: "oracle",
     }
@@ -132,7 +108,6 @@ describe("CouncilMemberSchema", () => {
     const parsed = CouncilMemberSchema.parse(config)
 
     //#then
-    expect(parsed.temperature).toBeUndefined()
     expect(parsed.variant).toBeUndefined()
     expect(parsed.name).toBeUndefined()
   })
@@ -156,9 +131,9 @@ describe("CouncilConfigSchema", () => {
     //#given
     const config = {
       members: [
-        { model: "anthropic/claude-opus-4-6", name: "a", temperature: 0.1 },
+        { model: "anthropic/claude-opus-4-6", name: "a" },
         { model: "openai/gpt-5.3-codex", name: "b", variant: "high" },
-        { model: "xai/grok-code-fast-1", name: "c", temperature: 1.2, variant: "low" },
+        { model: "xai/grok-code-fast-1", name: "c", variant: "low" },
       ],
     }
 

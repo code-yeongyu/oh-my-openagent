@@ -1,5 +1,4 @@
 import type { LaunchInput, BackgroundTask } from "../../features/background-agent/types"
-import { createAgentToolRestrictions } from "../../shared/permission-compat"
 import { buildCouncilPrompt } from "./council-prompt"
 import { parseModelString } from "./model-parser"
 import type { CouncilConfig, CouncilLaunchFailure, CouncilLaunchedMember, CouncilLaunchResult, CouncilMemberConfig } from "./types"
@@ -72,7 +71,6 @@ async function launchMember(
     throw new Error(`Invalid model string: "${member.model}"`)
   }
 
-  const restrictions = createAgentToolRestrictions(["write", "edit", "task", "athena_council"])
   const memberName = member.name ?? member.model
   return launcher.launch({
     description: `Council member: ${memberName}`,
@@ -86,7 +84,5 @@ async function launchMember(
       modelID: parsedModel.modelID,
       ...(member.variant ? { variant: member.variant } : {}),
     },
-    ...(member.temperature !== undefined ? { temperature: member.temperature } : {}),
-    permission: restrictions.permission,
   })
 }

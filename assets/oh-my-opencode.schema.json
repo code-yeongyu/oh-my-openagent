@@ -3031,11 +3031,6 @@
                         "type": "string",
                         "minLength": 1
                       },
-                      "temperature": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 2
-                      },
                       "variant": {
                         "type": "string"
                       },

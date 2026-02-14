@@ -11,8 +11,6 @@ interface MockLaunchInput {
   parentMessageID: string
   parentAgent?: string
   model?: { providerID: string; modelID: string; variant?: string }
-  temperature?: number
-  permission?: Record<string, "ask" | "allow" | "deny">
 }
 
 function createMockTask(id: string, launch: MockLaunchInput) {
@@ -68,7 +66,6 @@ describe("executeCouncil", () => {
     for (const launch of launches) {
       expect(launch.prompt).toBe(expectedPrompt)
       expect(launch.agent).toBe("athena")
-      expect(launch.permission).toEqual({ write: "deny", edit: "deny", task: "deny", athena_council: "deny" })
     }
 
     expect(launches[0]?.model).toEqual({ providerID: "openai", modelID: "gpt-5.3-codex" })
@@ -170,10 +167,10 @@ describe("executeCouncil", () => {
     expect(result.failures.find((f) => f.member.model === "invalid-model")?.error).toContain("Launch failed")
   })
 
-  //#given members with per-member temperature and variant
+  //#given members with per-member variant
   //#when executeCouncil is called
-  //#then launch receives those values for each corresponding member
-  test("passes member temperature and variant to launch input", async () => {
+  //#then launch receives variant in model for each corresponding member
+  test("passes member variant to launch input model", async () => {
     const launches: MockLaunchInput[] = []
     const launcher = {
       launch: async (input: MockLaunchInput) => {
@@ -186,8 +183,8 @@ describe("executeCouncil", () => {
       question: "Compare architecture options",
       council: {
         members: [
-          { model: "openai/gpt-5.3-codex", temperature: 0.1, variant: "high" },
-          { model: "anthropic/claude-sonnet-4-5", temperature: 0.3 },
+          { model: "openai/gpt-5.3-codex", variant: "high" },
+          { model: "anthropic/claude-sonnet-4-5" },
         ],
       },
       launcher,
@@ -196,9 +193,7 @@ describe("executeCouncil", () => {
     })
 
     expect(launches).toHaveLength(2)
-    expect(launches[0]?.temperature).toBe(0.1)
     expect(launches[0]?.model?.variant).toBe("high")
-    expect(launches[1]?.temperature).toBe(0.3)
     expect(launches[1]?.model?.variant).toBeUndefined()
   })
 
