@@ -1,5 +1,5 @@
 import { spawn as bunSpawn } from "bun"
-import { spawn as nodeSpawn, spawnSync, type ChildProcess } from "node:child_process"
+import { spawn as nodeSpawn, type ChildProcess } from "node:child_process"
 import { existsSync, statSync } from "fs"
 import { log } from "../../shared/logger"
 // Bun spawn segfaults on Windows (oven-sh/bun#25798) — unfixed as of v1.3.8+
@@ -19,24 +19,6 @@ export function validateCwd(cwd: string): { valid: boolean; error?: string } {
     return { valid: true }
   } catch (err) {
     return { valid: false, error: `Cannot access working directory: ${cwd} (${err instanceof Error ? err.message : String(err)})` }
-  }
-}
-function isBinaryAvailableOnWindows(command: string): boolean {
-  if (process.platform !== "win32") return true
-
-  if (command.includes("/") || command.includes("\\")) {
-    return existsSync(command)
-  }
-
-  try {
-    const result = spawnSync("where", [command], {
-      shell: true,
-      windowsHide: true,
-      timeout: 5000,
-    })
-    return result.status === 0
-  } catch {
-    return true
   }
 }
 interface StreamReader {
@@ -158,13 +140,6 @@ export function spawnProcess(
   }
   if (shouldUseNodeSpawn()) {
     const [cmd, ...args] = command
-    if (!isBinaryAvailableOnWindows(cmd)) {
-      throw new Error(
-        `[LSP] Binary '${cmd}' not found on Windows. ` +
-          `Ensure the LSP server is installed and available in PATH. ` +
-          `For npm packages, try: npm install -g ${cmd}`
-      )
-    }
     log("[LSP] Using Node.js child_process on Windows to avoid Bun spawn segfault")
     const proc = nodeSpawn(cmd, args, {
       cwd: options.cwd,
