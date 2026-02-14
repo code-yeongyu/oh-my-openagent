@@ -57,7 +57,7 @@ export function createNonInteractiveEnvHook(_ctx: PluginInput) {
       const envPrefix = buildEnvPrefix(NON_INTERACTIVE_ENV, "unix")
       
       // Check if the command already starts with the prefix to avoid stacking.
-      // This maintain the non-interactive behaivor but make the operation idempotent.
+      // This maintains the non-interactive behavior and makes the operation idempotent.
       if (command.trim().startsWith(envPrefix.trim())) {
         return
       }
