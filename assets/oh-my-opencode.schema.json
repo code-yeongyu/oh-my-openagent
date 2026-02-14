@@ -3136,6 +3136,10 @@
         "staleTimeoutMs": {
           "type": "number",
           "minimum": 60000
+        },
+        "messageStalenessTimeoutMs": {
+          "type": "number",
+          "minimum": 60000
         }
       },
       "additionalProperties": false
