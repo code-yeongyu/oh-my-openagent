@@ -6,7 +6,7 @@ import { describe, expect, it, spyOn } from "bun:test"
 
 describe("spawnProcess", () => {
   it("proceeds to node spawn on Windows when command is available", async () => {
-    // #given
+    //#given
     const originalPlatform = process.platform
     const rootDir = mkdtempSync(join(tmpdir(), "lsp-process-test-"))
     const childProcess = await import("node:child_process")
@@ -16,7 +16,7 @@ describe("spawnProcess", () => {
       Object.defineProperty(process, "platform", { value: "win32" })
       const { spawnProcess } = await import("./lsp-process")
 
-      // #when
+      //#when
       let result: ReturnType<typeof spawnProcess> | null = null
       expect(() => {
         result = spawnProcess(["node", "--version"], {
@@ -25,7 +25,7 @@ describe("spawnProcess", () => {
         })
       }).not.toThrow(/Binary 'node' not found/)
 
-      // #then
+      //#then
       expect(nodeSpawnSpy).toHaveBeenCalled()
       expect(result).not.toBeNull()
     } finally {
