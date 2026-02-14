@@ -73,8 +73,8 @@ export async function getAllSessions(): Promise<string[]> {
   return [...new Set(sessions)]
 }
 
-export function getMessageDir(sessionID: string): string {
-  if (!existsSync(MESSAGE_STORAGE)) return ""
+export function getMessageDir(sessionID: string): string | null {
+  if (!existsSync(MESSAGE_STORAGE)) return null
 
   const directPath = join(MESSAGE_STORAGE, sessionID)
   if (existsSync(directPath)) {
@@ -89,14 +89,14 @@ export function getMessageDir(sessionID: string): string {
       }
     }
   } catch {
-    return ""
+    return null
   }
 
-  return ""
+  return null
 }
 
 export function sessionExists(sessionID: string): boolean {
-  return getMessageDir(sessionID) !== ""
+  return getMessageDir(sessionID) !== null
 }
 
 export async function readSessionMessages(sessionID: string): Promise<SessionMessage[]> {
