@@ -2,8 +2,14 @@ import { existsSync, readdirSync, readFileSync, unlinkSync } from "node:fs"
 import { join } from "node:path"
 import { PART_STORAGE, THINKING_TYPES } from "../constants"
 import type { StoredPart } from "../types"
+import { log, isSqliteBackend } from "../../../shared"
 
 export function stripThinkingParts(messageID: string): boolean {
+  if (isSqliteBackend()) {
+    log("[session-recovery] Disabled on SQLite backend: stripThinkingParts")
+    return false
+  }
+
   const partDir = join(PART_STORAGE, messageID)
   if (!existsSync(partDir)) return false
 
