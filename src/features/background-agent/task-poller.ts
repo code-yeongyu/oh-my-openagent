@@ -6,6 +6,7 @@ import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient } from "./opencode-client"
 
 import {
+  DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
   MIN_RUNTIME_BEFORE_STALE_MS,
   TASK_TTL_MS,
@@ -67,15 +68,41 @@ export async function checkAndInterruptStaleTasks(args: {
   const staleTimeoutMs = config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
   const now = Date.now()
 
+  const messageStalenessMs = config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
+
   for (const task of tasks) {
     if (task.status !== "running") continue
-    if (!task.progress?.lastUpdate) continue
 
     const startedAt = task.startedAt
     const sessionID = task.sessionID
     if (!startedAt || !sessionID) continue
 
     const runtime = now - startedAt.getTime()
+
+    if (!task.progress?.lastUpdate) {
+      if (runtime <= messageStalenessMs) continue
+
+      const staleMinutes = Math.round(runtime / 60000)
+      task.status = "cancelled"
+      task.error = `Stale timeout (no activity for ${staleMinutes}min since start)`
+      task.completedAt = new Date()
+
+      if (task.concurrencyKey) {
+        concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined
+      }
+
+      client.session.abort({ path: { id: sessionID } }).catch(() => {})
+      log(`[background-agent] Task ${task.id} interrupted: no progress since start`)
+
+      try {
+        await notifyParentSession(task)
+      } catch (err) {
+        log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
+      }
+      continue
+    }
+
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 
     const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
@@ -92,10 +119,7 @@ export async function checkAndInterruptStaleTasks(args: {
       task.concurrencyKey = undefined
     }
 
-    client.session.abort({
-      path: { id: sessionID },
-    }).catch(() => {})
-
+    client.session.abort({ path: { id: sessionID } }).catch(() => {})
     log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
 
     try {
