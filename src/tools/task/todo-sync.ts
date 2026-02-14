@@ -108,7 +108,11 @@ export async function syncTaskTodoUpdate(
     });
     const currentTodos = extractTodos(response);
     const taskTodo = syncTaskToTodo(task);
-    const nextTodos = currentTodos.filter((todo) => !taskTodo || !todosMatch(todo, taskTodo));
+    const nextTodos = currentTodos.filter((todo) =>
+      taskTodo
+        ? !todosMatch(todo, taskTodo)
+        : todo.content !== task.subject
+    );
     const todo = taskTodo;
 
     if (todo) {
