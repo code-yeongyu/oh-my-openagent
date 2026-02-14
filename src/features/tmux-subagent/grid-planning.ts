@@ -1,10 +1,10 @@
+import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH } from "./types"
 import type { TmuxPaneInfo } from "./types"
 import {
 	DIVIDER_SIZE,
 	MAIN_PANE_RATIO,
 	MAX_GRID_SIZE,
 } from "./tmux-grid-constants"
-import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH } from "./types"
 
 export interface GridCapacity {
 	cols: number
@@ -27,6 +27,7 @@ export interface GridPlan {
 export function calculateCapacity(
 	windowWidth: number,
 	windowHeight: number,
+	minPaneWidth: number = MIN_PANE_WIDTH,
 ): GridCapacity {
 	const availableWidth = Math.floor(windowWidth * (1 - MAIN_PANE_RATIO))
 	const cols = Math.min(
@@ -34,7 +35,7 @@ export function calculateCapacity(
 		Math.max(
 			0,
 			Math.floor(
-				(availableWidth + DIVIDER_SIZE) / (MIN_PANE_WIDTH + DIVIDER_SIZE),
+				(availableWidth + DIVIDER_SIZE) / (minPaneWidth + DIVIDER_SIZE),
 			),
 		),
 	)
