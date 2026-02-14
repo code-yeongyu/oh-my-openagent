@@ -10,6 +10,8 @@ type ToolOutput = { args: Record<string, unknown> }
 
 const DATABASE_MUTATION_COMMAND_PATTERNS = [
   /\bdb\s+(push|reset|pull|seed)\b/i,
+  // Provider-agnostic CLI migration subcommands: "<tool> migration <subcommand>"
+  /\b[a-z0-9_.-]+\s+migration\s+[a-z0-9_-]+\b/i,
   /\bprisma\s+(migrate|db\s+push|db\s+pull|db\s+seed)\b/i,
   /\bdrizzle-kit\s+(push|migrate|generate)\b/i,
   /\b(knex|typeorm|sequelize)\b.*\bmigration\b/i,

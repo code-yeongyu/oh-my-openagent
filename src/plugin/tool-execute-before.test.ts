@@ -359,6 +359,28 @@ describe("createToolExecuteBeforeHandler", () => {
       )
     })
 
+    test("blocks migration subcommands regardless of cli vendor during active audit-loop", async () => {
+      //#given
+      const hooks = {
+        ralphLoop: {
+          getState: () => ({ active: true, mode: "audit-loop" }),
+        },
+      }
+
+      const handler = createToolExecuteBeforeHandler({ ctx: createCtx(), hooks })
+
+      //#when
+      const run = handler(
+        { tool: "bash", sessionID: "ses_audit_migration_1", callID: "call_1" },
+        { args: { command: "supabase migration list" } as Record<string, unknown> },
+      )
+
+      //#then
+      await expect(run).rejects.toThrow(
+        "Database mutation is blocked while /audit-loop is active",
+      )
+    })
+
     test("enforces focus lock and blocks cross-path edits without blocker report", async () => {
       //#given
       const hooks = {
