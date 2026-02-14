@@ -37,7 +37,7 @@ export { resolveModelPipeline } from "./model-resolution-pipeline"
 export type {
   ModelResolutionRequest,
   ModelResolutionProvenance,
-  ModelResolutionResult as ModelResolutionPipelineResult,
+  ModelResolutionPipelineResult,
 } from "./model-resolution-types"
 export * from "./model-availability"
 export * from "./connected-providers-cache"
@@ -49,3 +49,4 @@ export * from "./port-utils"
 export * from "./git-worktree"
 export * from "./safe-create-hook"
 export * from "./truncate-description"
+export * from "./opencode-message-dir"

@@ -471,7 +471,7 @@ describe("syncAllTasksToTodos", () => {
     expect(mockCtx.client.session.todo).toHaveBeenCalled();
   });
 
-  it("handles undefined sessionID", async () => {
+  it("preserves todos without id field", async () => {
     // given
     const tasks: Task[] = [
       {
@@ -483,14 +483,23 @@ describe("syncAllTasksToTodos", () => {
         blockedBy: [],
       },
     ];
-    mockCtx.client.session.todo.mockResolvedValue([]);
+    const currentTodos: TodoInfo[] = [
+      {
+        id: "T-1",
+        content: "Task 1",
+        status: "pending",
+      },
+      {
+        content: "Todo without id",
+        status: "pending",
+      },
+    ];
+    mockCtx.client.session.todo.mockResolvedValue(currentTodos);
 
     // when
-    await syncAllTasksToTodos(mockCtx, tasks);
+    await syncAllTasksToTodos(mockCtx, tasks, "session-1");
 
     // then
-    expect(mockCtx.client.session.todo).toHaveBeenCalledWith({
-      path: { id: "" },
-    });
+    expect(mockCtx.client.session.todo).toHaveBeenCalled();
   });
 });

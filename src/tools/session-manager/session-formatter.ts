@@ -44,7 +44,7 @@ export async function formatSessionList(sessionIDs: string[]): Promise<string> {
 export function formatSessionMessages(
   messages: SessionMessage[],
   includeTodos?: boolean,
-  todos?: Array<{ id: string; content: string; status: string }>
+  todos?: Array<{ id?: string; content: string; status: string }>
 ): string {
   if (messages.length === 0) {
     return "No messages found in this session."
