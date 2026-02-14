@@ -17,6 +17,10 @@ export function setStorageClient(client: PluginInput["client"]): void {
   sdkClient = client
 }
 
+export function resetStorageClient(): void {
+  sdkClient = null
+}
+
 export async function getMainSessions(options: GetMainSessionsOptions): Promise<SessionMetadata[]> {
   // Beta mode: use SDK
   if (isSqliteBackend() && sdkClient) {

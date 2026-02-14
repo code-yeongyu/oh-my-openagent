@@ -47,6 +47,13 @@ function extractPriority(
   return undefined;
 }
 
+function todosMatch(todo1: TodoInfo, todo2: TodoInfo): boolean {
+  if (todo1.id && todo2.id) {
+    return todo1.id === todo2.id;
+  }
+  return todo1.content === todo2.content;
+}
+
 export function syncTaskToTodo(task: Task): TodoInfo | null {
   const todoStatus = mapTaskStatusToTodoStatus(task.status);
 
@@ -100,8 +107,9 @@ export async function syncTaskTodoUpdate(
       path: { id: sessionID },
     });
     const currentTodos = extractTodos(response);
-    const nextTodos = currentTodos.filter((todo) => !todo.id || todo.id !== task.id);
-    const todo = syncTaskToTodo(task);
+    const taskTodo = syncTaskToTodo(task);
+    const nextTodos = currentTodos.filter((todo) => !taskTodo || !todosMatch(todo, taskTodo));
+    const todo = taskTodo;
 
     if (todo) {
       nextTodos.push(todo);
@@ -150,10 +158,11 @@ export async function syncAllTasksToTodos(
     }
 
     const finalTodos: TodoInfo[] = [];
-    const newTodoIds = new Set(newTodos.map((t) => t.id).filter((id) => id !== undefined));
 
     for (const existing of currentTodos) {
-      if ((!existing.id || !newTodoIds.has(existing.id)) && !tasksToRemove.has(existing.id || "")) {
+      const isInNewTodos = newTodos.some((newTodo) => todosMatch(existing, newTodo));
+      const isRemoved = existing.id && tasksToRemove.has(existing.id);
+      if (!isInNewTodos && !isRemoved) {
         finalTodos.push(existing);
       }
     }
