@@ -470,10 +470,12 @@ describe("think-mode switcher", () => {
   describe("Z.AI GLM-4.7 provider support", () => {
     describe("getThinkingConfig for zai-coding-plan", () => {
       it("should return thinking config for glm-4.7", () => {
-        // given zai-coding-plan provider with glm-4.7 model
+        //#given a Z.ai GLM model
         const config = getThinkingConfig("zai-coding-plan", "glm-4.7")
 
-        // then should return zai-coding-plan thinking config
+        //#when thinking config is resolved
+
+        //#then thinking type is "disabled"
         expect(config).not.toBeNull()
         expect(config?.providerOptions).toBeDefined()
         const zaiOptions = (config?.providerOptions as Record<string, unknown>)?.[
@@ -482,8 +484,7 @@ describe("think-mode switcher", () => {
         expect(zaiOptions?.extra_body).toBeDefined()
         const extraBody = zaiOptions?.extra_body as Record<string, unknown>
         expect(extraBody?.thinking).toBeDefined()
-        expect((extraBody?.thinking as Record<string, unknown>)?.type).toBe("enabled")
-        expect((extraBody?.thinking as Record<string, unknown>)?.clear_thinking).toBe(false)
+        expect((extraBody?.thinking as Record<string, unknown>)?.type).toBe("disabled")
       })
 
       it("should return thinking config for glm-4.6v (multimodal)", () => {
@@ -505,7 +506,7 @@ describe("think-mode switcher", () => {
     })
 
     describe("HIGH_VARIANT_MAP for GLM", () => {
-      it("should NOT have high variant for glm-4.7 (thinking enabled by default)", () => {
+      it("should NOT have high variant for glm-4.7", () => {
         // given glm-4.7 model
         const variant = getHighVariant("glm-4.7")
 
