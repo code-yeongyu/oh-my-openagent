@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
 import { setMainSession, subagentSessions, _resetForTesting } from "../../features/claude-code-session-state"
 import { createTodoContinuationEnforcer } from "."
-import { CONTINUATION_COOLDOWN_MS } from "./constants"
+import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS } from "./constants"
 
 type TimerCallback = (...args: any[]) => void
 
@@ -910,8 +910,7 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
-  test("should inject when abort flag is stale (>3s old)", async () => {
-    fakeTimers.restore()
+  test("should inject when abort flag is stale (>abort window)", async () => {
     // given - session with incomplete todos and old abort timestamp
     const sessionID = "main-stale-abort"
     setMainSession(sessionID)
@@ -930,18 +929,52 @@ describe("todo-continuation-enforcer", () => {
       },
     })
 
-    // when - wait >3s then idle fires
-    await wait(3100)
+    // when - wait past abort window then idle fires
+    await fakeTimers.advanceBy(ABORT_WINDOW_MS + 100, true)
 
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
 
-    await wait(3000)
+    await fakeTimers.advanceBy(3000, true)
 
     // then - continuation injected (abort flag is stale)
     expect(promptCalls.length).toBeGreaterThan(0)
-  }, { timeout: 15000 })
+  })
+
+  test("should keep skipping when repeated idles occur within abort window", async () => {
+    // given - session with incomplete todos
+    const sessionID = "main-repeat-abort"
+    setMainSession(sessionID)
+    mockMessages = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    // when - abort error event fires
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: { sessionID, error: { name: "MessageAbortedError" } },
+      },
+    })
+
+    // when - session goes idle, then idle again within abort window
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(Math.max(0, ABORT_WINDOW_MS - 500), true)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000, true)
+
+    // then - no continuation injected
+    expect(promptCalls).toHaveLength(0)
+  })
 
   test("should clear abort flag on user message activity", async () => {
     fakeTimers.restore()
