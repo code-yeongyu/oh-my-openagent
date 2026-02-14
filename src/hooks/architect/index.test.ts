@@ -10,18 +10,9 @@ import {
 } from "../../features/mission-state"
 import type { MissionState } from "../../features/mission-state"
 
-const TEST_STORAGE_ROOT = join(tmpdir(), `architect-message-storage-${randomUUID()}`)
-const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
-const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
-
-mock.module("../../features/hook-message-injector/constants", () => ({
-  OPENCODE_STORAGE: TEST_STORAGE_ROOT,
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: TEST_PART_STORAGE,
-}))
-
-const { createAtlasHook } = await import("./index")
-const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
+import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
+import { createAtlasHook } from "./index"
 
 describe("architect hook", () => {
   let TEST_DIR: string
@@ -77,7 +68,6 @@ describe("architect hook", () => {
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
     }
-    rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
   })
 
   describe("tool.execute.after handler", () => {
@@ -631,15 +621,14 @@ describe("architect hook", () => {
     }
 
      beforeEach(() => {
-       mock.module("../../features/claude-code-session-state", () => ({
-         getMainSessionID: () => MAIN_SESSION_ID,
-         subagentSessions: new Set<string>(),
-       }))
+       _resetForTesting()
+       subagentSessions.clear()
        setupMessageStorage(MAIN_SESSION_ID, "architect")
      })
 
     afterEach(() => {
       cleanupMessageStorage(MAIN_SESSION_ID)
+      _resetForTesting()
     })
 
     test("should inject continuation when mission has incomplete tasks", async () => {
