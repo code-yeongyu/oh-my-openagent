@@ -34,7 +34,7 @@ export async function pollRunningTasks(args: {
   tasks: Iterable<BackgroundTask>
   client: OpencodeClient
   pruneStaleTasksAndNotifications: () => void
-  checkAndInterruptStaleTasks: () => Promise<void>
+  checkAndInterruptStaleTasks: (statuses: Record<string, { type: string }>) => Promise<void>
   validateSessionHasOutput: (sessionID: string) => Promise<boolean>
   checkSessionTodos: (sessionID: string) => Promise<boolean>
   tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
@@ -54,10 +54,11 @@ export async function pollRunningTasks(args: {
   } = args
 
   pruneStaleTasksAndNotifications()
-  await checkAndInterruptStaleTasks()
 
   const statusResult = await client.session.status()
   const allStatuses = ((statusResult as { data?: unknown }).data ?? {}) as SessionStatusMap
+
+  await checkAndInterruptStaleTasks(allStatuses)
 
   for (const task of tasks) {
     if (task.status !== "running") continue
