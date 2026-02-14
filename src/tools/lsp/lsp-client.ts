@@ -94,7 +94,6 @@ export class LSPClient extends LSPClientConnection {
     const absPath = resolve(filePath)
     const uri = pathToFileURL(absPath).href
     await this.openFile(absPath)
-    await new Promise((r) => setTimeout(r, 500))
 
     try {
       const result = await this.sendRequest<{ items?: Diagnostic[] }>("textDocument/diagnostic", {
@@ -105,19 +104,7 @@ export class LSPClient extends LSPClientConnection {
       }
     } catch {}
 
-    const POLL_INTERVAL_MS = 200
-    const POLL_TIMEOUT_MS = 3000
-    const startTime = Date.now()
-
-    while (Date.now() - startTime < POLL_TIMEOUT_MS) {
-      const items = this.diagnosticsStore.get(uri)
-      if (items !== undefined) {
-        return { items }
-      }
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS))
-    }
-
-    return { items: this.diagnosticsStore.get(uri) ?? [] }
+    return { items: await this.waitForPushDiagnostics(uri, 3000) }
   }
 
   async prepareRename(filePath: string, line: number, character: number): Promise<unknown> {
