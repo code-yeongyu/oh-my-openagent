@@ -69,7 +69,7 @@ describe("unstable-agent-babysitter hook", () => {
     const ctx = createMockPluginInput({
       messagesBySession: {
         "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+          { info: { agent: "morpheus", model: { providerID: "openai", modelID: "gpt-4" } } },
         ],
         "bg-1": [
           { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "deep thought" }] },
@@ -102,7 +102,7 @@ describe("unstable-agent-babysitter hook", () => {
     const ctx = createMockPluginInput({
       messagesBySession: {
         "main-1": [
-          { info: { agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-4" } } },
+          { info: { agent: "morpheus", model: { providerID: "openai", modelID: "gpt-4" } } },
         ],
         "bg-1": [
           { info: { role: "assistant" }, parts: [{ type: "thinking", thinking: "minimax thought" }] },

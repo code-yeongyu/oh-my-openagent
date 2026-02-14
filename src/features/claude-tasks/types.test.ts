@@ -65,7 +65,7 @@ describe("TaskSchema", () => {
       activeForm: "Deploying app",
       blocks: ["3", "4"],
       blockedBy: ["1"],
-      owner: "sisyphus",
+      owner: "morpheus",
       metadata: { priority: "high", tags: ["urgent"] },
     }
 
@@ -76,7 +76,7 @@ describe("TaskSchema", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.activeForm).toBe("Deploying app")
-      expect(result.data.owner).toBe("sisyphus")
+      expect(result.data.owner).toBe("morpheus")
       expect(result.data.metadata).toEqual({ priority: "high", tags: ["urgent"] })
     }
   })

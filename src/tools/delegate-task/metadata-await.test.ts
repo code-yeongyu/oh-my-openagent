@@ -12,7 +12,7 @@ describe("task tool metadata awaiting", () => {
     const ctx: ToolContextWithMetadata = {
       sessionID: "ses_parent",
       messageID: "msg_parent",
-      agent: "sisyphus",
+      agent: "morpheus",
       abort: abort.signal,
       metadata: async () => {
         await new Promise<void>((resolve) => setTimeout(resolve, 50))

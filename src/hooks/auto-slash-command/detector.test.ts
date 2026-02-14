@@ -178,7 +178,7 @@ After`
       // given uppercase variants
       // when checking exclusion
       // then should still be excluded
-      expect(isExcludedCommand("MATRIX_LOOP-LOOP")).toBe(true)
+      expect(isExcludedCommand("MATRIX-LOOP")).toBe(true)
       expect(isExcludedCommand("Cancel-Loop")).toBe(true)
     })
 

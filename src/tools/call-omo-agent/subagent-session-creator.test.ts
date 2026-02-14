@@ -32,7 +32,7 @@ describe("call-omo-agent resolveOrCreateSessionId", () => {
     const toolContext = {
       sessionID: "ses_parent",
       messageID: "msg_parent",
-      agent: "sisyphus",
+      agent: "morpheus",
       abort: new AbortController().signal,
     }
 

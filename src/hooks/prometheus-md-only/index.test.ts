@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { clearSessionAgent } from "../../features/claude-code-session-state"
 
-const TEST_STORAGE_ROOT = join(tmpdir(), `prometheus-md-only-${randomUUID()}`)
+const TEST_STORAGE_ROOT = join(tmpdir(), `oracle-md-only-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
 const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
 
@@ -19,8 +19,8 @@ mock.module("../../features/hook-message-injector/constants", () => ({
 const { createOracleMdOnlyHook } = await import("./index")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
-describe("prometheus-md-only", () => {
-  const TEST_SESSION_ID = "test-session-prometheus"
+describe("oracle-md-only", () => {
+  const TEST_SESSION_ID = "test-session-oracle"
   let testMessageDir: string
 
   function createMockPluginInput() {
@@ -56,7 +56,7 @@ describe("prometheus-md-only", () => {
   })
 
   describe("agent name matching", () => {
-    test("should enforce md-only restriction for exact prometheus agent name", async () => {
+    test("should enforce md-only restriction for exact oracle agent name", async () => {
       //#given
       setupMessageStorage(TEST_SESSION_ID, "oracle")
       const hook = createOracleMdOnlyHook(createMockPluginInput())
@@ -113,9 +113,9 @@ describe("prometheus-md-only", () => {
       ).rejects.toThrow("can only write/edit .md files")
     })
 
-    test("should enforce md-only restriction for uppercase PROMETHEUS", async () => {
+    test("should enforce md-only restriction for uppercase ORACLE", async () => {
       //#given
-      setupMessageStorage(TEST_SESSION_ID, "PROMETHEUS")
+      setupMessageStorage(TEST_SESSION_ID, "ORACLE")
       const hook = createOracleMdOnlyHook(createMockPluginInput())
       const input = {
         tool: "Write",
@@ -480,14 +480,14 @@ describe("prometheus-md-only", () => {
       rmSync(MISSION_DIR, { recursive: true, force: true })
     })
 
-    //#given session was started with prometheus (first message), but /start-work set mission agent to atlas
+    //#given session was started with oracle (first message), but /start-work set mission agent to architect
     //#when user types "continue" after interruption (memory cleared, falls back to message files)
-    //#then should use mission state agent (atlas), not message file agent (prometheus)
+    //#then should use mission state agent (architect), not message file agent (oracle)
     test("should prioritize mission agent over message file agent", async () => {
-      // given - prometheus in message files (from /plan)
+      // given - oracle in message files (from /plan)
       setupMessageStorage(TEST_SESSION_ID, "oracle")
       
-      // given - atlas in mission state (from /start-work)
+      // given - architect in mission state (from /start-work)
       writeFileSync(MISSION_FILE, JSON.stringify({
         active_plan: "/test/plan.md",
         started_at: new Date().toISOString(),
@@ -510,17 +510,17 @@ describe("prometheus-md-only", () => {
         args: { filePath: "/path/to/code.ts" },
       }
 
-      // when / then - should NOT block because mission says atlas, not prometheus
+      // when / then - should NOT block because mission says architect, not oracle
       await expect(
         hook["tool.execute.before"](input, output)
       ).resolves.toBeUndefined()
     })
 
-    test("should use prometheus from mission state when set", async () => {
-      // given - atlas in message files (from some other agent)
+    test("should use oracle from mission state when set", async () => {
+      // given - architect in message files (from some other agent)
       setupMessageStorage(TEST_SESSION_ID, "architect")
       
-      // given - prometheus in mission state (edge case, but should honor it)
+      // given - oracle in mission state (edge case, but should honor it)
       writeFileSync(MISSION_FILE, JSON.stringify({
         active_plan: "/test/plan.md",
         started_at: new Date().toISOString(),
@@ -543,14 +543,14 @@ describe("prometheus-md-only", () => {
         args: { filePath: "/path/to/code.ts" },
       }
 
-      // when / then - should block because mission says prometheus
+      // when / then - should block because mission says oracle
       await expect(
         hook["tool.execute.before"](input, output)
       ).rejects.toThrow("can only write/edit .md files")
     })
 
     test("should fall back to message files when session not in mission", async () => {
-      // given - prometheus in message files
+      // given - oracle in message files
       setupMessageStorage(TEST_SESSION_ID, "oracle")
       
       // given - mission state exists but for different session
@@ -576,7 +576,7 @@ describe("prometheus-md-only", () => {
         args: { filePath: "/path/to/code.ts" },
       }
 
-      // when / then - should block because falls back to message files (prometheus)
+      // when / then - should block because falls back to message files (oracle)
       await expect(
         hook["tool.execute.before"](input, output)
       ).rejects.toThrow("can only write/edit .md files")
@@ -722,7 +722,7 @@ describe("prometheus-md-only", () => {
        ).rejects.toThrow("can only write/edit .md files inside .matrix/")
      })
 
-     test("should allow case-insensitive .SISYPHUS directory", async () => {
+     test("should allow case-insensitive .MATRIX directory", async () => {
        // given
        setupMessageStorage(TEST_SESSION_ID, "oracle")
        const hook = createOracleMdOnlyHook(createMockPluginInput())
@@ -732,7 +732,7 @@ describe("prometheus-md-only", () => {
          callID: "call-1",
        }
        const output = {
-         args: { filePath: ".SISYPHUS/plans/work-plan.md" },
+         args: { filePath: ".MATRIX/plans/work-plan.md" },
        }
 
        // when / #then

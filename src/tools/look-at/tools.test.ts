@@ -132,12 +132,8 @@ describe("look-at tool", () => {
       const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "sisyphus",
-        directory: "/project",
-        worktree: "/project",
+        agent: "morpheus",
         abort: new AbortController().signal,
-        metadata: () => {},
-        ask: async () => {},
       }
 
       const result = await tool.execute(
@@ -145,7 +141,7 @@ describe("look-at tool", () => {
         toolContext,
       )
       expect(result).toContain("Error")
-      expect(result).toContain("construct")
+      expect(result).toContain("multimodal-looker")
     })
 
     // given sync prompt succeeds
@@ -169,12 +165,8 @@ describe("look-at tool", () => {
       const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "sisyphus",
-        directory: "/project",
-        worktree: "/project",
+        agent: "morpheus",
         abort: new AbortController().signal,
-        metadata: () => {},
-        ask: async () => {},
       }
 
       const result = await tool.execute(
@@ -182,7 +174,7 @@ describe("look-at tool", () => {
         toolContext,
       )
       expect(result).toContain("Error")
-      expect(result).toContain("construct")
+      expect(result).toContain("multimodal-looker")
     })
 
     // given session creation fails
@@ -206,12 +198,8 @@ describe("look-at tool", () => {
       const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "sisyphus",
-        directory: "/project",
-        worktree: "/project",
+        agent: "morpheus",
         abort: new AbortController().signal,
-        metadata: () => {},
-        ask: async () => {},
       }
 
       const result = await tool.execute(
@@ -224,10 +212,10 @@ describe("look-at tool", () => {
   })
 
   describe("createLookAt model passthrough", () => {
-    // given multimodal-looker agent has resolved model info
+    // given construct agent has resolved model info
     // when LookAt tool executed
     // then model info should be passed to sync prompt
-    test("passes multimodal-looker model to sync prompt when available", async () => {
+    test("passes construct model to sync prompt when available", async () => {
       let promptBody: any
 
       const mockClient = {
@@ -265,12 +253,8 @@ describe("look-at tool", () => {
       const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "sisyphus",
-        directory: "/project",
-        worktree: "/project",
+        agent: "morpheus",
         abort: new AbortController().signal,
-        metadata: () => {},
-        ask: async () => {},
       }
 
       await tool.execute(
@@ -320,12 +304,8 @@ describe("look-at tool", () => {
       const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "sisyphus",
-        directory: "/project",
-        worktree: "/project",
+        agent: "morpheus",
         abort: new AbortController().signal,
-        metadata: () => {},
-        ask: async () => {},
       }
 
       const result = await tool.execute(
@@ -369,12 +349,8 @@ describe("look-at tool", () => {
       const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "sisyphus",
-        directory: "/project",
-        worktree: "/project",
+        agent: "morpheus",
         abort: new AbortController().signal,
-        metadata: () => {},
-        ask: async () => {},
       }
 
       const result = await tool.execute(
@@ -411,12 +387,8 @@ describe("look-at tool", () => {
       const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "sisyphus",
-        directory: "/project",
-        worktree: "/project",
+        agent: "morpheus",
         abort: new AbortController().signal,
-        metadata: () => {},
-        ask: async () => {},
       }
 
       const result = await tool.execute(
@@ -425,7 +397,7 @@ describe("look-at tool", () => {
       )
 
       expect(result).toContain("Error")
-      expect(result).toContain("construct")
+      expect(result).toContain("multimodal-looker")
     })
   })
 
@@ -463,12 +435,8 @@ describe("look-at tool", () => {
       const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "sisyphus",
-        directory: "/project",
-        worktree: "/project",
+        agent: "morpheus",
         abort: new AbortController().signal,
-        metadata: () => {},
-        ask: async () => {},
       }
 
       await tool.execute(
@@ -516,12 +484,8 @@ describe("look-at tool", () => {
       const toolContext: ToolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
-        agent: "sisyphus",
-        directory: "/project",
-        worktree: "/project",
+        agent: "morpheus",
         abort: new AbortController().signal,
-        metadata: () => {},
-        ask: async () => {},
       }
 
       await tool.execute(

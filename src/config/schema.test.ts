@@ -383,7 +383,7 @@ describe("CategoryConfigSchema", () => {
 describe("BuiltinCategoryNameSchema", () => {
   test("accepts all builtin category names", () => {
     // given
-    const categories = ["construct", "source", "matrix-bend", "quick", "blue-pill", "red-pill", "writing"]
+    const categories = ["construct", "source", "deep-jack", "matrix-bend", "bullet-time", "blue-pill", "red-pill", "broadcast"]
 
     // when / #then
     for (const cat of categories) {
@@ -417,12 +417,12 @@ describe("Mouse agent override", () => {
     }
   })
 
-  test("schema accepts sisyphus-junior with prompt_append", () => {
+  test("schema accepts mouse with prompt_append", () => {
     // given
     const config = {
       agents: {
         "mouse": {
-          prompt_append: "Additional instructions for sisyphus-junior",
+          prompt_append: "Additional instructions for morpheus-junior",
         },
       },
     }
@@ -434,12 +434,12 @@ describe("Mouse agent override", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.agents?.["mouse"]?.prompt_append).toBe(
-        "Additional instructions for sisyphus-junior"
+        "Additional instructions for morpheus-junior"
       )
     }
   })
 
-  test("schema accepts sisyphus-junior with tools override", () => {
+  test("schema accepts mouse with tools override", () => {
     // given
     const config = {
       agents: {
@@ -465,17 +465,17 @@ describe("Mouse agent override", () => {
     }
   })
 
-  test("schema accepts lowercase agent names (sisyphus, atlas, prometheus)", () => {
+  test("schema accepts lowercase agent names (morpheus, architect, oracle)", () => {
     // given
     const config = {
       agents: {
-        sisyphus: {
+        morpheus: {
           temperature: 0.1,
         },
-        atlas: {
+        architect: {
           temperature: 0.2,
         },
-        prometheus: {
+        oracle: {
           temperature: 0.3,
         },
       },
@@ -487,20 +487,20 @@ describe("Mouse agent override", () => {
     // then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.matrix?.temperature).toBe(0.1)
-      expect(result.data.agents?.atlas?.temperature).toBe(0.2)
-      expect(result.data.agents?.prometheus?.temperature).toBe(0.3)
+      expect(result.data.agents?.morpheus?.temperature).toBe(0.1)
+      expect(result.data.agents?.architect?.temperature).toBe(0.2)
+      expect(result.data.agents?.oracle?.temperature).toBe(0.3)
     }
   })
 
-  test("schema accepts lowercase metis and momus agent names", () => {
+  test("schema accepts lowercase seraph and smith agent names", () => {
     // given
     const config = {
       agents: {
-        metis: {
+        seraph: {
           category: "source",
         },
-        momus: {
+        smith: {
           category: "quick",
         },
       },
@@ -512,8 +512,8 @@ describe("Mouse agent override", () => {
     // then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agents?.metis?.category).toBe("source")
-      expect(result.data.agents?.momus?.category).toBe("quick")
+      expect(result.data.agents?.seraph?.category).toBe("source")
+      expect(result.data.agents?.smith?.category).toBe("quick")
     }
   })
 })

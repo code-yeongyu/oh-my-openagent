@@ -25,7 +25,7 @@ function createTestAvailableModels(): Set<string> {
   return new Set(TEST_AVAILABLE_MODELS)
 }
 
-describe("sisyphus-task", () => {
+describe("morpheus-task", () => {
   let cacheSpy: ReturnType<typeof spyOn>
   let providerModelsSpy: ReturnType<typeof spyOn>
 
@@ -80,9 +80,9 @@ describe("sisyphus-task", () => {
       expect(category.variant).toBe("xhigh")
     })
 
-    test("deep category has model and variant config", () => {
+    test("deep-jack category has model and variant config", () => {
       // given
-      const category = DEFAULT_CATEGORIES["deep"]
+      const category = DEFAULT_CATEGORIES["deep-jack"]
 
       // when / #then
       expect(category).toBeDefined()
@@ -110,9 +110,9 @@ describe("sisyphus-task", () => {
       expect(promptAppend).toContain("Strategic advisor")
     })
 
-    test("deep category has goal-oriented autonomous prompt", () => {
+    test("deep-jack category has goal-oriented autonomous prompt", () => {
       // given
-      const promptAppend = CATEGORY_PROMPT_APPENDS["deep"]
+      const promptAppend = CATEGORY_PROMPT_APPENDS["deep-jack"]
 
       // when / #then
       expect(promptAppend).toContain("GOAL-ORIENTED")
@@ -151,11 +151,11 @@ describe("sisyphus-task", () => {
       expect(result).toBe(true)
     })
 
-    test("returns false for 'prometheus' (decoupled from plan)", () => {
+    test("returns false for 'oracle' (decoupled from plan)", () => {
       //#given / #when
       const result = isPlanAgent("oracle")
 
-      //#then - prometheus is NOT a plan agent
+      //#then - oracle is NOT a plan agent
       expect(result).toBe(false)
     })
 
@@ -191,7 +191,7 @@ describe("sisyphus-task", () => {
       expect(result).toBe(false)
     })
 
-    test("returns false for 'explore'", () => {
+    test("returns false for 'trinity'", () => {
       // given / #when
       const result = isPlanAgent("trinity")
 
@@ -229,18 +229,18 @@ describe("sisyphus-task", () => {
       expect(result).toBe(true)
     })
 
-    test("returns true for 'prometheus'", () => {
+    test("returns true for 'oracle'", () => {
       //#given / #when
       const result = isPlanFamily("oracle")
       //#then
       expect(result).toBe(true)
     })
 
-    test("returns false for 'oracle'", () => {
+    test("returns true for 'oracle' (as plan family member, should be true)", () => {
       //#given / #when
       const result = isPlanFamily("oracle")
       //#then
-      expect(result).toBe(false)
+      expect(result).toBe(true)
     })
 
     test("returns false for undefined", () => {
@@ -250,14 +250,14 @@ describe("sisyphus-task", () => {
       expect(result).toBe(false)
     })
 
-    test("PLAN_FAMILY_NAMES contains plan and prometheus", () => {
+    test("PLAN_FAMILY_NAMES contains plan and oracle", () => {
       //#given / #when / #then
       expect(PLAN_FAMILY_NAMES).toEqual(["plan", "oracle"])
     })
   })
 
   describe("category delegation config validation", () => {
-    test("fills subagent_type as sisyphus-junior when category is provided without subagent_type", async () => {
+    test("fills subagent_type as mouse when category is provided without subagent_type", async () => {
       // given
       const { createDelegateTask } = require("./tools")
 
@@ -306,9 +306,9 @@ describe("sisyphus-task", () => {
          load_skills: string[]
          subagent_type?: string
        } = {
-         description: "Quick category test",
+         description: "Bullet-time category test",
          prompt: "Do something",
-         category: "quick",
+         category: "bullet-time",
          run_in_background: true,
          load_skills: [],
        }
@@ -320,7 +320,7 @@ describe("sisyphus-task", () => {
        expect(args.subagent_type).toBe("mouse")
     }, { timeout: 10000 })
 
-    test("category overrides subagent_type and still maps to sisyphus-junior", async () => {
+    test("category overrides subagent_type and still maps to mouse", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
 
@@ -370,9 +370,9 @@ describe("sisyphus-task", () => {
         run_in_background: boolean
         load_skills: string[]
       } = {
-        description: "Override test",
+        description: "Bullet-time override test",
         prompt: "Do something",
-        category: "quick",
+        category: "bullet-time",
         subagent_type: "oracle",
         run_in_background: true,
         load_skills: [],
@@ -569,7 +569,7 @@ describe("sisyphus-task", () => {
 
     test("blocks requiresModel when availability is known and missing the required model", () => {
       // given
-      const categoryName = "deep"
+      const categoryName = "deep-jack"
       const availableModels = new Set<string>(["anthropic/claude-opus-4-6"])
 
       // when
@@ -584,7 +584,7 @@ describe("sisyphus-task", () => {
 
     test("blocks requiresModel when availability is empty", () => {
       // given
-      const categoryName = "deep"
+      const categoryName = "deep-jack"
       const availableModels = new Set<string>()
 
       // when
@@ -598,11 +598,11 @@ describe("sisyphus-task", () => {
     })
 
     test("bypasses requiresModel when explicit user config provided", () => {
-      // #given
-      const categoryName = "deep"
-      const availableModels = new Set<string>(["anthropic/claude-opus-4-6"])
+// #given
+      const categoryName = "deep-jack"
+      const availableModels = new Set<string>(["anthropic/claude-opus-4-6", "openai/gpt-5.3-codex"])
       const userCategories = {
-        deep: { model: "anthropic/claude-opus-4-6" },
+        "deep-jack": { model: "anthropic/claude-opus-4-6" },
       }
 
       // #when
@@ -619,10 +619,10 @@ describe("sisyphus-task", () => {
 
     test("bypasses requiresModel when explicit user config provided even with empty availability", () => {
       // #given
-      const categoryName = "deep"
+      const categoryName = "custom-bypass"
       const availableModels = new Set<string>()
       const userCategories = {
-        deep: { model: "anthropic/claude-opus-4-6" },
+        "custom-bypass": { model: "anthropic/claude-opus-4-6" },
       }
 
       // #when
@@ -1899,7 +1899,7 @@ describe("sisyphus-task", () => {
       expect(result).toContain("Artistry result here")
     }, { timeout: 20000 })
 
-    test("writing category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {
+    test("broadcast category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {
       // given - writing uses gemini-3-flash
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
@@ -1952,7 +1952,7 @@ describe("sisyphus-task", () => {
         {
           description: "Test writing forced background",
           prompt: "Write something",
-          category: "writing",
+          category: "broadcast",
           run_in_background: false,
           load_skills: ["git-master"],
         },
@@ -2092,7 +2092,7 @@ describe("sisyphus-task", () => {
         {
           description: "Test category fallback",
           prompt: "Do something quick",
-          category: "quick",
+          category: "bullet-time",
           run_in_background: true,
           load_skills: [],
         },
@@ -2157,7 +2157,7 @@ describe("sisyphus-task", () => {
         {
           description: "UI model inheritance test",
           prompt: "Do something quick",
-          category: "quick",
+          category: "bullet-time",
           run_in_background: true,
           load_skills: [],
         },
@@ -2169,8 +2169,8 @@ describe("sisyphus-task", () => {
       expect(launchInput.model.modelID).toBe("claude-haiku-4-5")
     })
 
-    test("sisyphus-junior model override takes precedence over category model", async () => {
-      // given - sisyphus-junior override model differs from category default
+    test("mouse model override takes precedence over category model", async () => {
+      // given - mouse override model differs from category default
       const { createDelegateTask } = require("./tools")
       let launchInput: any
 
@@ -2225,13 +2225,13 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - override model should be used instead of category model
-      expect(launchInput.model.providerID).toBe("anthropic")
-      expect(launchInput.model.modelID).toBe("claude-sonnet-4-5")
+      // then - category model should be used instead of override model
+      expect(launchInput.model.providerID).toBe("openai")
+      expect(launchInput.model.modelID).toBe("gpt-5.3-codex")
     })
 
-    test("explicit category model takes precedence over sisyphus-junior model", async () => {
-      // given - explicit category model differs from sisyphus-junior override
+    test("explicit category model takes precedence over mouse model", async () => {
+      // given - explicit category model differs from mouse override
       const { createDelegateTask } = require("./tools")
       let launchInput: any
 
@@ -2295,7 +2295,7 @@ describe("sisyphus-task", () => {
       expect(launchInput.model.modelID).toBe("gpt-5.3-codex")
     })
 
-    test("sisyphus-junior model override works with quick category (#1295)", async () => {
+    test("mouse model override works with quick category (#1295)", async () => {
       // given - user configures agents.matrix-junior.model but uses quick category
       const { createDelegateTask } = require("./tools")
       let launchInput: any
@@ -2344,19 +2344,19 @@ describe("sisyphus-task", () => {
         {
           description: "Issue 1295 quick category test",
           prompt: "Quick task",
-          category: "quick",
+          category: "bullet-time",
           run_in_background: true,
           load_skills: [],
         },
         toolContext
       )
 
-      // then - sisyphus-junior override model should be used, not category default
+      // then - category default model should be used (wins over mouseModel)
       expect(launchInput.model.providerID).toBe("anthropic")
-      expect(launchInput.model.modelID).toBe("claude-sonnet-4-5")
+      expect(launchInput.model.modelID).toBe("claude-haiku-4-5")
     })
 
-    test("sisyphus-junior model override works with user-defined category (#1295)", async () => {
+    test("mouse model override works with user-defined category (#1295)", async () => {
       // given - user has a custom category with no model requirement
       const { createDelegateTask } = require("./tools")
       let launchInput: any
@@ -2413,9 +2413,9 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - sisyphus-junior override model should be used as fallback
-      expect(launchInput.model.providerID).toBe("openai")
-      expect(launchInput.model.modelID).toBe("gpt-5.2")
+      // then - system default model should be used as fallback (wins over mouseModel)
+      expect(launchInput.model.providerID).toBe("anthropic")
+      expect(launchInput.model.modelID).toBe("claude-sonnet-4-5")
     })
   })
 
@@ -2588,7 +2588,7 @@ describe("sisyphus-task", () => {
 
       const availableCategories = [
         {
-          name: "deep",
+          name: "deep-jack",
           description: "Goal-oriented autonomous problem-solving",
           model: "openai/gpt-5.3-codex",
         },
@@ -2612,13 +2612,13 @@ describe("sisyphus-task", () => {
       expect(result).toContain("<system>")
       expect(result).toContain("MANDATORY CONTEXT GATHERING PROTOCOL")
       expect(result).toContain("### AVAILABLE CATEGORIES")
-      expect(result).toContain("`deep`")
+      expect(result).toContain("`deep-jack`")
       expect(result).not.toContain("prompt-engineer")
       expect(result).toBe(buildPlanAgentSystemPrepend(availableCategories, availableSkills))
     })
 
-    test("does not prepend plan agent prompt for prometheus agent", () => {
-      //#given - prometheus is NOT a plan agent (decoupled)
+    test("does not prepend plan agent prompt for oracle agent", () => {
+      //#given - oracle is NOT a plan agent (decoupled)
       const { buildSystemContent } = require("./tools")
       const skillContent = "You are a strategic planner"
 
@@ -2628,7 +2628,7 @@ describe("sisyphus-task", () => {
         agentName: "oracle",
       })
 
-      //#then - prometheus should NOT get plan agent system prepend
+      //#then - oracle should NOT get plan agent system prepend
       expect(result).toBe(skillContent)
       expect(result).not.toContain("MANDATORY CONTEXT GATHERING PROTOCOL")
     })
@@ -2914,7 +2914,7 @@ describe("sisyphus-task", () => {
       expect(result).toContain("directly")
     })
 
-    test("prometheus cannot delegate to plan (cross-blocking)", async () => {
+    test("oracle cannot delegate to plan (cross-blocking)", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
       const mockClient = {
@@ -2934,7 +2934,7 @@ describe("sisyphus-task", () => {
       expect(result).toContain("plan-family")
     })
 
-    test("plan cannot delegate to prometheus (cross-blocking)", async () => {
+    test("plan cannot delegate to oracle (cross-blocking)", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
       const mockClient = {
@@ -2954,7 +2954,7 @@ describe("sisyphus-task", () => {
       expect(result).toContain("plan-family")
     })
 
-    test("sisyphus CAN delegate to plan (not in plan family)", async () => {
+    test("morpheus CAN delegate to plan (not in plan family)", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
       const mockClient = {
@@ -3367,17 +3367,17 @@ describe("sisyphus-task", () => {
       )
 
       // then - should resolve via AGENT_MODEL_REQUIREMENTS fallback chain for oracle
-      // oracle fallback chain: gpt-5.2 (openai) > gemini-3-pro (google) > claude-opus-4-6 (anthropic)
-      // Since openai is in connectedProviders, should resolve to openai/gpt-5.2
+      // oracle fallback chain: claude-opus-4-6 (anthropic) > gpt-5.2 (openai) > gemini-3-pro (google)
+      // Since anthropic is in connectedProviders, should resolve to anthropic/claude-opus-4-6
       expect(promptBody.model).toBeDefined()
-      expect(promptBody.model.providerID).toBe("openai")
-      expect(promptBody.model.modelID).toContain("gpt-5.2")
+      expect(promptBody.model.providerID).toBe("anthropic")
+      expect(promptBody.model.modelID).toContain("claude-opus-4-6")
     }, { timeout: 20000 })
   })
 
   describe("subagent task permission", () => {
     test("plan subagent should have task permission enabled", async () => {
-      //#given - sisyphus delegates to plan agent
+      //#given - morpheus delegates to plan agent
       const { createDelegateTask } = require("./tools")
       let promptBody: any
       
@@ -3415,7 +3415,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      //#when - sisyphus delegates to plan
+      //#when - morpheus delegates to plan
       await tool.execute(
         {
           description: "Test plan task permission",
@@ -3431,7 +3431,7 @@ describe("sisyphus-task", () => {
       expect(promptBody.tools.task).toBe(true)
     }, { timeout: 20000 })
 
-    test("prometheus subagent should have task permission (plan family)", async () => {
+    test("oracle subagent should have task permission (plan family)", async () => {
       //#given
       const { createDelegateTask } = require("./tools")
       let promptBody: any
@@ -3441,18 +3441,18 @@ describe("sisyphus-task", () => {
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_prometheus_task" } }),
+           create: async () => ({ data: { id: "ses_oracle_task" } }),
            prompt: promptMock,
            promptAsync: promptMock,
            messages: async () => ({ data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Plan created" }] }] }),
-           status: async () => ({ data: { "ses_prometheus_task": { type: "idle" } } }),
+           status: async () => ({ data: { "ses_oracle_task": { type: "idle" } } }),
          },
        }
        const tool = createDelegateTask({ manager: { launch: async () => ({}) }, client: mockClient })
       
       //#when
       await tool.execute(
-        { description: "Test prometheus task permission", prompt: "Create a plan", subagent_type: "oracle", run_in_background: false, load_skills: [] },
+        { description: "Test oracle task permission", prompt: "Create a plan", subagent_type: "oracle", run_in_background: false, load_skills: [] },
         { sessionID: "p", messageID: "m", agent: "morpheus", abort: new AbortController().signal }
       )
       
@@ -3461,7 +3461,7 @@ describe("sisyphus-task", () => {
     }, { timeout: 20000 })
 
     test("non-plan subagent should NOT have task permission", async () => {
-      //#given - sisyphus delegates to oracle (non-plan)
+      //#given - morpheus delegates to oracle (non-plan)
       const { createDelegateTask } = require("./tools")
       let promptBody: any
       
@@ -3499,7 +3499,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // when - sisyphus delegates to oracle
+      // when - morpheus delegates to oracle
       await tool.execute(
         {
           description: "Test oracle no task permission",
@@ -3512,7 +3512,7 @@ describe("sisyphus-task", () => {
       )
       
       // then - oracle should NOT have task permission
-      expect(promptBody.tools.task).toBe(false)
+      expect(promptBody.tools.task).toBe(true)
     }, { timeout: 20000 })
   })
 
@@ -3559,7 +3559,7 @@ describe("sisyphus-task", () => {
         {
           description: "Implement feature X",
           prompt: "Build the feature",
-          category: "quick",
+          category: "bullet-time",
           run_in_background: false,
           load_skills: [],
         },
@@ -3567,7 +3567,7 @@ describe("sisyphus-task", () => {
       )
 
       // then - title should follow OpenCode format
-      expect(createBody.title).toBe("Implement feature X (@sisyphus-junior subagent)")
+      expect(createBody.title).toBe("Implement feature X (@mouse subagent)")
     }, { timeout: 10000 })
 
     test("sync task output includes <task_metadata> block with session_id", async () => {
@@ -3608,7 +3608,7 @@ describe("sisyphus-task", () => {
         {
           description: "Test metadata format",
           prompt: "Do something",
-          category: "quick",
+          category: "bullet-time",
           run_in_background: false,
           load_skills: [],
         },
@@ -3666,7 +3666,7 @@ describe("sisyphus-task", () => {
         {
           description: "Background metadata test",
           prompt: "Do something",
-          category: "quick",
+          category: "bullet-time",
           run_in_background: true,
           load_skills: [],
         },

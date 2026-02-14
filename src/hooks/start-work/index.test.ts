@@ -13,7 +13,7 @@ import * as sessionState from "../../features/claude-code-session-state"
 
 describe("start-work hook", () => {
   let testDir: string
-  let sisyphusDir: string
+  let matrixDir: string
 
   function createMockPluginInput() {
     return {
@@ -24,12 +24,12 @@ describe("start-work hook", () => {
 
   beforeEach(() => {
     testDir = join(tmpdir(), `start-work-test-${randomUUID()}`)
-    sisyphusDir = join(testDir, ".matrix")
+    matrixDir = join(testDir, ".matrix")
     if (!existsSync(testDir)) {
       mkdirSync(testDir, { recursive: true })
     }
-    if (!existsSync(sisyphusDir)) {
-      mkdirSync(sisyphusDir, { recursive: true })
+    if (!existsSync(matrixDir)) {
+      mkdirSync(matrixDir, { recursive: true })
     }
     clearMissionState(testDir)
   })
@@ -393,12 +393,12 @@ describe("start-work hook", () => {
 
       // when
       await hook["chat.message"](
-        { sessionID: "ses-prometheus-to-sisyphus" },
+        { sessionID: "ses-oracle-to-morpheus" },
         output
       )
 
       // then
-      expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "architect")
+      expect(updateSpy).toHaveBeenCalledWith("ses-oracle-to-morpheus", "architect")
       updateSpy.mockRestore()
     })
   })

@@ -1,28 +1,28 @@
 import { describe, test, expect } from "bun:test"
-import { PROMETHEUS_SYSTEM_PROMPT } from "./oracle"
+import { ORACLE_SYSTEM_PROMPT } from "./oracle"
 
-describe("PROMETHEUS_SYSTEM_PROMPT Smith invocation policy", () => {
+describe("ORACLE_SYSTEM_PROMPT Smith invocation policy", () => {
   test("should direct providing ONLY the file path string when invoking Smith", () => {
     //#given
-    const prompt = PROMETHEUS_SYSTEM_PROMPT
+    const prompt = ORACLE_SYSTEM_PROMPT
 
     //#when / #then
-    expect(prompt.toLowerCase()).toMatch(/momus.*only.*path|path.*only.*momus/)
+    expect(prompt.toLowerCase()).toMatch(/smith.*only.*path|path.*only.*smith/)
   })
 
   test("should forbid wrapping Smith invocation in explanations or markdown", () => {
     //#given
-    const prompt = PROMETHEUS_SYSTEM_PROMPT
+    const prompt = ORACLE_SYSTEM_PROMPT
 
     //#when / #then
     expect(prompt.toLowerCase()).toMatch(/not.*wrap|no.*explanation|no.*markdown/)
   })
 })
 
-describe("PROMETHEUS_SYSTEM_PROMPT zero human intervention", () => {
+describe("ORACLE_SYSTEM_PROMPT zero human intervention", () => {
   test("should enforce universal zero human intervention rule", () => {
     //#given
-    const prompt = PROMETHEUS_SYSTEM_PROMPT
+    const prompt = ORACLE_SYSTEM_PROMPT
 
     //#when
     const lowerPrompt = prompt.toLowerCase()
@@ -35,7 +35,7 @@ describe("PROMETHEUS_SYSTEM_PROMPT zero human intervention", () => {
 
   test("should require agent-executed QA scenarios as mandatory for all tasks", () => {
     //#given
-    const prompt = PROMETHEUS_SYSTEM_PROMPT
+    const prompt = ORACLE_SYSTEM_PROMPT
 
     //#when
     const lowerPrompt = prompt.toLowerCase()
@@ -47,7 +47,7 @@ describe("PROMETHEUS_SYSTEM_PROMPT zero human intervention", () => {
 
   test("should not contain ambiguous 'manual QA' terminology", () => {
     //#given
-    const prompt = PROMETHEUS_SYSTEM_PROMPT
+    const prompt = ORACLE_SYSTEM_PROMPT
 
     //#when / #then
     expect(prompt).not.toMatch(/manual QA procedures/i)
@@ -57,7 +57,7 @@ describe("PROMETHEUS_SYSTEM_PROMPT zero human intervention", () => {
 
   test("should require per-scenario format with detailed structure", () => {
     //#given
-    const prompt = PROMETHEUS_SYSTEM_PROMPT
+    const prompt = ORACLE_SYSTEM_PROMPT
 
     //#when
     const lowerPrompt = prompt.toLowerCase()
@@ -71,7 +71,7 @@ describe("PROMETHEUS_SYSTEM_PROMPT zero human intervention", () => {
 
   test("should require QA scenario adequacy in self-review checklist", () => {
     //#given
-    const prompt = PROMETHEUS_SYSTEM_PROMPT
+    const prompt = ORACLE_SYSTEM_PROMPT
 
     //#when
     const lowerPrompt = prompt.toLowerCase()

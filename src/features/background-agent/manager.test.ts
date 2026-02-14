@@ -800,7 +800,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
       parentModel: { providerID: "old", modelID: "old-model" },
     }
     const currentMessage: CurrentMessage = {
-      agent: "sisyphus",
+      agent: "morpheus",
       model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
     }
 
@@ -808,7 +808,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     const promptBody = buildNotificationPromptBody(task, currentMessage)
 
     // then - uses currentMessage values, not task.parentModel/parentAgent
-    expect(promptBody.agent).toBe("sisyphus")
+    expect(promptBody.agent).toBe("morpheus")
     expect(promptBody.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
   })
 
@@ -851,11 +851,11 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
       status: "completed",
       startedAt: new Date(),
       completedAt: new Date(),
-      parentAgent: "sisyphus",
+      parentAgent: "morpheus",
       parentModel: { providerID: "anthropic", modelID: "claude-opus" },
     }
     const currentMessage: CurrentMessage = {
-      agent: "sisyphus",
+      agent: "morpheus",
       model: { providerID: "anthropic" },
     }
 
@@ -863,7 +863,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     const promptBody = buildNotificationPromptBody(task, currentMessage)
 
     // then - model not passed due to incomplete data
-    expect(promptBody.agent).toBe("sisyphus")
+    expect(promptBody.agent).toBe("morpheus")
     expect("model" in promptBody).toBe(false)
   })
 
@@ -880,7 +880,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
       status: "completed",
       startedAt: new Date(),
       completedAt: new Date(),
-      parentAgent: "sisyphus",
+      parentAgent: "morpheus",
       parentModel: { providerID: "anthropic", modelID: "claude-opus" },
     }
 
@@ -888,7 +888,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
     const promptBody = buildNotificationPromptBody(task, null)
 
     // then - falls back to task.parentAgent, no model
-    expect(promptBody.agent).toBe("sisyphus")
+    expect(promptBody.agent).toBe("morpheus")
     expect("model" in promptBody).toBe(false)
   })
 })

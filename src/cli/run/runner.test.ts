@@ -10,7 +10,7 @@ describe("resolveRunAgent", () => {
   it("uses CLI agent over env and config", () => {
     // given
     const config = createConfig({ default_run_agent: "oracle" })
-    const env = { OPENCODE_DEFAULT_AGENT: "Atlas" }
+    const env = { OPENCODE_DEFAULT_AGENT: "Architect" }
 
     // when
     const agent = resolveRunAgent(
@@ -26,7 +26,7 @@ describe("resolveRunAgent", () => {
   it("uses env agent over config", () => {
     // given
     const config = createConfig({ default_run_agent: "oracle" })
-    const env = { OPENCODE_DEFAULT_AGENT: "Atlas" }
+    const env = { OPENCODE_DEFAULT_AGENT: "Architect" }
 
     // when
     const agent = resolveRunAgent({ message: "test" }, config, env)
@@ -46,7 +46,7 @@ describe("resolveRunAgent", () => {
     expect(agent).toBe("oracle")
   })
 
-  it("falls back to sisyphus when none set", () => {
+  it("falls back to morpheus when none set", () => {
     // given
     const config = createConfig()
 
@@ -57,7 +57,7 @@ describe("resolveRunAgent", () => {
     expect(agent).toBe("morpheus")
   })
 
-  it("skips disabled sisyphus for next available core agent", () => {
+  it("skips disabled morpheus for next available core agent", () => {
     // given
     const config = createConfig({ disabled_agents: ["morpheus"] })
 

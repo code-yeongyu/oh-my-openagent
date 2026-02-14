@@ -30,7 +30,7 @@ describe("resolveCategoryExecution", () => {
 	test("returns clear error when category exists but required model is not available", async () => {
 		//#given
 		const args = {
-			category: "deep",
+			category: "deep-jack",
 			prompt: "test prompt",
 			description: "Test task",
 			run_in_background: false,

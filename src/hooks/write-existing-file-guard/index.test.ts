@@ -205,9 +205,9 @@ describe("createWriteExistingFileGuardHook", () => {
     describe(".matrix/*.md exception", () => {
       test("allows write to existing .matrix/plans/plan.md", async () => {
         //#given
-        const sisyphusDir = path.join(tempDir, ".matrix", "plans")
-        fs.mkdirSync(sisyphusDir, { recursive: true })
-        const planFile = path.join(sisyphusDir, "plan.md")
+        const matrixDir = path.join(tempDir, ".matrix", "plans")
+        fs.mkdirSync(matrixDir, { recursive: true })
+        const planFile = path.join(matrixDir, "plan.md")
         fs.writeFileSync(planFile, "# Existing Plan")
         const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
         const output = { args: { filePath: planFile, content: "# Updated Plan" } }
@@ -221,9 +221,9 @@ describe("createWriteExistingFileGuardHook", () => {
 
       test("allows write to existing .matrix/notes.md", async () => {
         //#given
-        const sisyphusDir = path.join(tempDir, ".matrix")
-        fs.mkdirSync(sisyphusDir, { recursive: true })
-        const notesFile = path.join(sisyphusDir, "notes.md")
+        const matrixDir = path.join(tempDir, ".matrix")
+        fs.mkdirSync(matrixDir, { recursive: true })
+        const notesFile = path.join(matrixDir, "notes.md")
         fs.writeFileSync(notesFile, "# Notes")
         const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
         const output = { args: { filePath: notesFile, content: "# Updated Notes" } }
@@ -237,9 +237,9 @@ describe("createWriteExistingFileGuardHook", () => {
 
       test("allows write to existing .matrix/*.md using relative path", async () => {
         //#given
-        const sisyphusDir = path.join(tempDir, ".matrix")
-        fs.mkdirSync(sisyphusDir, { recursive: true })
-        const planFile = path.join(sisyphusDir, "plan.md")
+        const matrixDir = path.join(tempDir, ".matrix")
+        fs.mkdirSync(matrixDir, { recursive: true })
+        const planFile = path.join(matrixDir, "plan.md")
         fs.writeFileSync(planFile, "# Plan")
         const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
         const output = { args: { filePath: ".matrix/plan.md", content: "# Updated" } }
@@ -253,9 +253,9 @@ describe("createWriteExistingFileGuardHook", () => {
 
       test("blocks write to existing .matrix/file.txt (non-markdown)", async () => {
         //#given
-        const sisyphusDir = path.join(tempDir, ".matrix")
-        fs.mkdirSync(sisyphusDir, { recursive: true })
-        const textFile = path.join(sisyphusDir, "file.txt")
+        const matrixDir = path.join(tempDir, ".matrix")
+        fs.mkdirSync(matrixDir, { recursive: true })
+        const textFile = path.join(matrixDir, "file.txt")
         fs.writeFileSync(textFile, "content")
         const input = { tool: "Write", sessionID: "ses_1", callID: "call_1" }
         const output = { args: { filePath: textFile, content: "new content" } }

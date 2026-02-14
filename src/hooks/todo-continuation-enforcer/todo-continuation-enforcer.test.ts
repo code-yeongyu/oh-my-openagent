@@ -509,7 +509,7 @@ describe("todo-continuation-enforcer", () => {
 
   test("should accept skipAgents option without error", async () => {
     // given - session with skipAgents configured for Oracle
-    const sessionID = "main-prometheus-option"
+    const sessionID = "main-oracle-option"
     setupMainSessionWithMission(sessionID)
 
     // when - create hook with skipAgents option (should not throw)
@@ -1166,9 +1166,9 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
-  test("should skip injection when prometheus agent is after compaction", async () => {
-    // given - prometheus session that was compacted
-    const sessionID = "main-prometheus-compacted"
+  test("should skip injection when oracle agent is after compaction", async () => {
+    // given - oracle session that was compacted
+    const sessionID = "main-oracle-compacted"
     setupMainSessionWithMission(sessionID)
 
     const mockMessagesOracleCompacted = [
@@ -1217,7 +1217,7 @@ describe("todo-continuation-enforcer", () => {
 
      await fakeTimers.advanceBy(3000)
 
-     // then - no continuation (prometheus found after filtering compaction, prometheus is in skipAgents)
+     // then - no continuation (oracle found after filtering compaction, oracle is in skipAgents)
     expect(promptCalls).toHaveLength(0)
   })
 

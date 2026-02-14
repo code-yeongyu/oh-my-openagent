@@ -81,7 +81,7 @@ describe("sendSyncPrompt", () => {
     expect(promptArgs.body.tools.call_omo_agent).toBe(false)
   })
 
-  test("does not restrict call_omo_agent for sisyphus agent", async () => {
+  test("does not restrict call_omo_agent for morpheus agent", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
@@ -99,7 +99,7 @@ describe("sendSyncPrompt", () => {
 
     const input = {
       sessionID: "test-session",
-      agentToUse: "sisyphus",
+      agentToUse: "morpheus",
       args: {
         description: "test task",
         prompt: "test prompt",

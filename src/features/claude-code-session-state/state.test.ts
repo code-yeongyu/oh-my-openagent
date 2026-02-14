@@ -102,16 +102,16 @@ describe("claude-code-session-state", () => {
     })
   })
 
-  describe("prometheus-md-only integration scenario", () => {
+  describe("oracle-md-only integration scenario", () => {
     test("should correctly identify Oracle agent for permission checks", () => {
       // given - Oracle session
-      const sessionID = "test-prometheus-session"
-      const prometheusAgent = "Oracle (Planner)"
+      const sessionID = "test-oracle-session"
+      const oracleAgent = "Oracle (Planner)"
 
       // when - agent is set (simulating chat.message hook)
-      setSessionAgent(sessionID, prometheusAgent)
+      setSessionAgent(sessionID, oracleAgent)
 
-      // then - getSessionAgent returns correct agent for prometheus-md-only hook
+      // then - getSessionAgent returns correct agent for oracle-md-only hook
       const agent = getSessionAgent(sessionID)
       expect(agent).toBe("Oracle (Planner)")
       expect(["Oracle (Planner)"].includes(agent!)).toBe(true)
@@ -119,7 +119,7 @@ describe("claude-code-session-state", () => {
 
     test("should return undefined when agent not set (bug scenario)", () => {
       // given - session exists but no agent set (the bug)
-      const sessionID = "test-prometheus-session"
+      const sessionID = "test-oracle-session"
 
       // when / then - this is the bug: agent is undefined
       expect(getSessionAgent(sessionID)).toBeUndefined()

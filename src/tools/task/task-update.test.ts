@@ -329,13 +329,13 @@ describe("task_update tool", () => {
       //#when
       const args = {
         id: taskId,
-        owner: "sisyphus",
+        owner: "morpheus",
       }
       const resultStr = await tool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
-      expect(result.task.owner).toBe("sisyphus")
+      expect(result.task.owner).toBe("morpheus")
     })
 
     test("returns error when task not found", async () => {

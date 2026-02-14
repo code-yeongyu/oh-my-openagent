@@ -35,18 +35,18 @@ describe("getAgentDisplayName", () => {
     expect(result).toBe("custom-agent")
   })
 
-  it("returns display name for atlas", () => {
+  it("returns display name for architect", () => {
     // given config key "architect"
     const configKey = "architect"
 
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "Atlas (Plan Execution Orchestrator)"
-    expect(result).toBe("Atlas (Plan Execution Orchestrator)")
+    // then returns "Architect (Plan Execution Orchestrator)"
+    expect(result).toBe("Architect (Plan Execution Orchestrator)")
   })
 
-  it("returns display name for prometheus", () => {
+  it("returns display name for oracle", () => {
     // given config key "oracle"
     const configKey = "oracle"
 
@@ -57,7 +57,7 @@ describe("getAgentDisplayName", () => {
     expect(result).toBe("Oracle (Plan Builder)")
   })
 
-  it("returns display name for sisyphus-junior", () => {
+  it("returns display name for morpheus-junior", () => {
     // given config key "mouse"
     const configKey = "mouse"
 
@@ -90,18 +90,18 @@ describe("getAgentDisplayName", () => {
     expect(result).toBe("Smith (Plan Reviewer)")
   })
 
-  it("returns display name for oracle", () => {
-    // given config key "oracle"
-    const configKey = "oracle"
+  it("returns display name for merovingian", () => {
+    // given config key "merovingian"
+    const configKey = "merovingian"
 
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "oracle"
-    expect(result).toBe("oracle")
+    // then returns "merovingian"
+    expect(result).toBe("merovingian")
   })
 
-  it("returns display name for librarian", () => {
+  it("returns display name for operator", () => {
     // given config key "operator"
     const configKey = "operator"
 
@@ -112,7 +112,7 @@ describe("getAgentDisplayName", () => {
     expect(result).toBe("operator")
   })
 
-  it("returns display name for explore", () => {
+  it("returns display name for trinity", () => {
     // given config key "trinity"
     const configKey = "trinity"
 
@@ -123,7 +123,7 @@ describe("getAgentDisplayName", () => {
     expect(result).toBe("trinity")
   })
 
-  it("returns display name for multimodal-looker", () => {
+  it("returns display name for construct", () => {
     // given config key "construct"
     const configKey = "construct"
 
@@ -139,16 +139,16 @@ describe("AGENT_DISPLAY_NAMES", () => {
   it("contains all expected agent mappings", () => {
     // given expected mappings
     const expectedMappings = {
-      sisyphus: "Morpheus (Ultraworker)",
-      atlas: "Atlas (Plan Execution Orchestrator)",
-      prometheus: "Oracle (Plan Builder)",
-      "mouse": "Mouse",
-      metis: "Seraph (Plan Consultant)",
-      momus: "Smith (Plan Reviewer)",
-      oracle: "oracle",
-      librarian: "operator",
-      explore: "trinity",
-      "construct": "construct",
+      morpheus: "Morpheus (Ultraworker)",
+      architect: "Architect (Plan Execution Orchestrator)",
+      oracle: "Oracle (Plan Builder)",
+      mouse: "Mouse",
+      seraph: "Seraph (Plan Consultant)",
+      smith: "Smith (Plan Reviewer)",
+      merovingian: "merovingian",
+      operator: "operator",
+      trinity: "trinity",
+      construct: "construct",
     }
 
     // when checking the constant

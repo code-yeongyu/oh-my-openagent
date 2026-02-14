@@ -18,7 +18,7 @@ describe("resolveAgentVariant", () => {
     // given
     const config = {
       agents: {
-        sisyphus: { variant: "low" },
+        morpheus: { variant: "low" },
       },
     } as OhMyOpenCodeConfig
 
@@ -33,7 +33,7 @@ describe("resolveAgentVariant", () => {
     // given
     const config = {
       agents: {
-        sisyphus: { category: "source" },
+        morpheus: { category: "source" },
       },
       categories: {
         source: { model: "openai/gpt-5.2", variant: "xhigh" },
@@ -53,7 +53,7 @@ describe("applyAgentVariant", () => {
     // given
     const config = {
       agents: {
-        sisyphus: { variant: "low" },
+        morpheus: { variant: "low" },
       },
     } as OhMyOpenCodeConfig
     const message: { variant?: string } = {}
@@ -69,7 +69,7 @@ describe("applyAgentVariant", () => {
     // given
     const config = {
       agents: {
-        sisyphus: { variant: "low" },
+        morpheus: { variant: "low" },
       },
     } as OhMyOpenCodeConfig
     const message = { variant: "max" }
@@ -84,11 +84,11 @@ describe("applyAgentVariant", () => {
 
 describe("resolveVariantForModel", () => {
   test("returns agent override variant when configured", () => {
-    // given - use a model in sisyphus chain (claude-opus-4-6 has default variant "max")
+    // given - use a model in morpheus chain (claude-opus-4-6 has default variant "max")
     // to verify override takes precedence over fallback chain
     const config = {
       agents: {
-        sisyphus: { variant: "high" },
+        morpheus: { variant: "high" },
       },
     } as OhMyOpenCodeConfig
     const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
@@ -112,8 +112,8 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBe("max")
   })
 
-  test("returns correct variant for openai provider (hephaestus agent)", () => {
-    // #given hephaestus has openai/gpt-5.3-codex with variant "medium" in its chain
+  test("returns correct variant for openai provider (keymaker agent)", () => {
+    // #given keymaker has openai/gpt-5.3-codex with variant "medium" in its chain
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "openai", modelID: "gpt-5.3-codex" }
 
@@ -124,8 +124,8 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBe("medium")
   })
 
-  test("returns undefined for provider not in sisyphus chain", () => {
-    // #given openai is not in sisyphus fallback chain anymore
+  test("returns undefined for provider not in morpheus chain", () => {
+    // #given openai is not in morpheus fallback chain anymore
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "openai", modelID: "gpt-5.2" }
 

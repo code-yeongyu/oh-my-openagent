@@ -10,7 +10,7 @@ import {
 } from "../../features/mission-state"
 import type { MissionState } from "../../features/mission-state"
 
-const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
+const TEST_STORAGE_ROOT = join(tmpdir(), `architect-message-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
 const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
 
@@ -23,7 +23,7 @@ mock.module("../../features/hook-message-injector/constants", () => ({
 const { createAtlasHook } = await import("./index")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
-describe("atlas hook", () => {
+describe("architect hook", () => {
   let TEST_DIR: string
   let MATRIX_DIR: string
 
@@ -61,7 +61,7 @@ describe("atlas hook", () => {
   }
 
   beforeEach(() => {
-    TEST_DIR = join(tmpdir(), `atlas-test-${randomUUID()}`)
+    TEST_DIR = join(tmpdir(), `architect-test-${randomUUID()}`)
     MATRIX_DIR = join(TEST_DIR, ".matrix")
     if (!existsSync(TEST_DIR)) {
       mkdirSync(TEST_DIR, { recursive: true })
@@ -957,7 +957,7 @@ describe("atlas hook", () => {
      })
 
      test("should inject when last agent matches mission agent even if non-Atlas", async () => {
-       // given - mission state expects sisyphus and last agent is sisyphus
+       // given - mission state expects morpheus and last agent is morpheus
        const planPath = join(TEST_DIR, "test-plan.md")
        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
@@ -984,7 +984,7 @@ describe("atlas hook", () => {
          },
        })
 
-       // then - should call prompt for sisyphus
+       // then - should call prompt for morpheus
        expect(mockInput._promptMock).toHaveBeenCalled()
        const callArgs = mockInput._promptMock.mock.calls[0][0]
        expect(callArgs.body.agent).toBe("morpheus")

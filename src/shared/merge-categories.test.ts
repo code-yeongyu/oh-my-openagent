@@ -17,28 +17,28 @@ describe("mergeCategories", () => {
   it("filters out categories with disable: true", () => {
     //#given
     const userCategories = {
-      "quick": { disable: true },
+      "bullet-time": { disable: true },
     }
 
     //#when
     const result = mergeCategories(userCategories)
 
     //#then
-    expect(result["quick"]).toBeUndefined()
+    expect(result["bullet-time"]).toBeUndefined()
     expect(Object.keys(result).length).toBe(Object.keys(DEFAULT_CATEGORIES).length - 1)
   })
 
   it("keeps categories with disable: false", () => {
     //#given
     const userCategories = {
-      "quick": { disable: false },
+      "bullet-time": { disable: false },
     }
 
     //#when
     const result = mergeCategories(userCategories)
 
     //#then
-    expect(result["quick"]).toBeDefined()
+    expect(result["bullet-time"]).toBeDefined()
   })
 
   it("allows user to add custom categories", () => {

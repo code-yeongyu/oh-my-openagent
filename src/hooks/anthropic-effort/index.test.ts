@@ -26,7 +26,7 @@ function createMockParams(overrides: {
   const providerID = overrides.providerID ?? "anthropic"
   const modelID = overrides.modelID ?? "claude-opus-4-6"
   const variant = "variant" in overrides ? overrides.variant : "max"
-  const agentName = overrides.agentName ?? "sisyphus"
+  const agentName = overrides.agentName ?? "morpheus"
   const existingOptions = overrides.existingOptions ?? {}
 
   return {
@@ -162,7 +162,7 @@ describe("createAnthropicEffortHook", () => {
       const hook = createAnthropicEffortHook()
       const input = {
         sessionID: "test-session",
-        agent: { name: "sisyphus" },
+        agent: { name: "morpheus" },
         model: { providerID: "anthropic", modelID: undefined as unknown as string },
         provider: { id: "anthropic" },
         message: { variant: "max" as const },

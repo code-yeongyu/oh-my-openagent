@@ -5,7 +5,7 @@ import {
   buildRetryGuidance,
 } from "./index"
 
-describe("sisyphus-task-retry", () => {
+describe("morpheus-task-retry", () => {
   describe("DELEGATE_TASK_ERROR_PATTERNS", () => {
     // given error patterns are defined
     // then should include all known task error types

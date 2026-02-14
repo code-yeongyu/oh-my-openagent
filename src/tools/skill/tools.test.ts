@@ -117,9 +117,9 @@ describe("skill tool - agent restriction", () => {
 
   it("allows skill when agent matches restriction", async () => {
     // given
-    const loadedSkills = [createMockSkill("restricted-skill", { agent: "sisyphus" })]
+    const loadedSkills = [createMockSkill("restricted-skill", { agent: "morpheus" })]
     const tool = createSkillTool({ skills: loadedSkills })
-    const context = { ...mockContext, agent: "sisyphus" }
+    const context = { ...mockContext, agent: "morpheus" }
 
     // when
     const result = await tool.execute({ name: "restricted-skill" }, context)
@@ -130,25 +130,25 @@ describe("skill tool - agent restriction", () => {
 
   it("throws error when agent does not match restriction", async () => {
     // given
-    const loadedSkills = [createMockSkill("sisyphus-only-skill", { agent: "sisyphus" })]
+    const loadedSkills = [createMockSkill("morpheus-only-skill", { agent: "morpheus" })]
     const tool = createSkillTool({ skills: loadedSkills })
     const context = { ...mockContext, agent: "oracle" }
 
     // when / #then
-    await expect(tool.execute({ name: "sisyphus-only-skill" }, context)).rejects.toThrow(
-      'Skill "sisyphus-only-skill" is restricted to agent "sisyphus"'
+    await expect(tool.execute({ name: "morpheus-only-skill" }, context)).rejects.toThrow(
+      'Skill "morpheus-only-skill" is restricted to agent "morpheus"'
     )
   })
 
   it("throws error when context agent is undefined for restricted skill", async () => {
     // given
-    const loadedSkills = [createMockSkill("sisyphus-only-skill", { agent: "sisyphus" })]
+    const loadedSkills = [createMockSkill("morpheus-only-skill", { agent: "morpheus" })]
     const tool = createSkillTool({ skills: loadedSkills })
     const contextWithoutAgent = { ...mockContext, agent: undefined as unknown as string }
 
     // when / #then
-    await expect(tool.execute({ name: "sisyphus-only-skill" }, contextWithoutAgent)).rejects.toThrow(
-      'Skill "sisyphus-only-skill" is restricted to agent "sisyphus"'
+    await expect(tool.execute({ name: "morpheus-only-skill" }, contextWithoutAgent)).rejects.toThrow(
+      'Skill "morpheus-only-skill" is restricted to agent "morpheus"'
     )
   })
 

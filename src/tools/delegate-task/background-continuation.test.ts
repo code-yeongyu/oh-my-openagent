@@ -26,7 +26,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     const parentContext = {
       sessionID: "parent-session",
       messageID: "msg-parent",
-      agent: "sisyphus",
+      agent: "morpheus",
     }
 
     const args = {
@@ -72,7 +72,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     const parentContext = {
       sessionID: "parent-session",
       messageID: "msg-parent",
-      agent: "sisyphus",
+      agent: "morpheus",
     }
 
     const args = {

@@ -7,10 +7,10 @@ import { describe, expect, it } from "bun:test"
  */
 describe("look_at tool conditional registration", () => {
   describe("isMultimodalLookerEnabled logic", () => {
-    // given multimodal-looker is in disabled_agents
+    // given construct is in disabled_agents
     // when checking if agent is enabled
     // then should return false (disabled)
-    it("returns false when multimodal-looker is disabled (exact case)", () => {
+    it("returns false when construct is disabled (exact case)", () => {
       const disabledAgents: string[] = ["construct"]
       const isEnabled = !disabledAgents.some(
         (agent) => agent.toLowerCase() === "construct"
@@ -18,21 +18,21 @@ describe("look_at tool conditional registration", () => {
       expect(isEnabled).toBe(false)
     })
 
-    // given multimodal-looker is in disabled_agents with different case
+    // given construct is in disabled_agents with different case
     // when checking if agent is enabled
     // then should return false (case-insensitive match)
-    it("returns false when multimodal-looker is disabled (case-insensitive)", () => {
-      const disabledAgents: string[] = ["Multimodal-Looker"]
+    it("returns false when construct is disabled (case-insensitive)", () => {
+      const disabledAgents: string[] = ["Construct"]
       const isEnabled = !disabledAgents.some(
         (agent) => agent.toLowerCase() === "construct"
       )
       expect(isEnabled).toBe(false)
     })
 
-    // given multimodal-looker is NOT in disabled_agents
+    // given construct is NOT in disabled_agents
     // when checking if agent is enabled
     // then should return true (enabled)
-    it("returns true when multimodal-looker is not disabled", () => {
+    it("returns true when construct is not disabled", () => {
       const disabledAgents: string[] = ["oracle", "operator"]
       const isEnabled = !disabledAgents.some(
         (agent) => agent.toLowerCase() === "construct"
