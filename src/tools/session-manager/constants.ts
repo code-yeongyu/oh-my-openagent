@@ -1,11 +1,7 @@
 import { join } from "node:path"
-import { getOpenCodeStorageDir } from "../../shared/data-path"
 import { getClaudeConfigDir } from "../../shared"
 
-export const OPENCODE_STORAGE = getOpenCodeStorageDir()
-export const MESSAGE_STORAGE = join(OPENCODE_STORAGE, "message")
-export const PART_STORAGE = join(OPENCODE_STORAGE, "part")
-export const SESSION_STORAGE = join(OPENCODE_STORAGE, "session")
+export { OPENCODE_STORAGE, MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE } from "../../shared"
 export const TODO_DIR = join(getClaudeConfigDir(), "todos")
 export const TRANSCRIPT_DIR = join(getClaudeConfigDir(), "transcripts")
 export const SESSION_LIST_DESCRIPTION = `List all OpenCode sessions with optional filtering.
