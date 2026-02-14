@@ -4,8 +4,14 @@ import { PART_STORAGE } from "../constants"
 import type { StoredPart, StoredTextPart } from "../types"
 import { readMessages } from "./messages-reader"
 import { readParts } from "./parts-reader"
+import { log, isSqliteBackend } from "../../../shared"
 
 export function replaceEmptyTextParts(messageID: string, replacementText: string): boolean {
+  if (isSqliteBackend()) {
+    log("[session-recovery] Disabled on SQLite backend: replaceEmptyTextParts")
+    return false
+  }
+
   const partDir = join(PART_STORAGE, messageID)
   if (!existsSync(partDir)) return false
 
