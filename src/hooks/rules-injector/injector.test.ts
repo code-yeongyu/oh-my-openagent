@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import * as fs from "node:fs";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
@@ -102,6 +102,10 @@ function getInjectedRulesPath(sessionID: string): string {
 }
 
 describe("createRuleInjectionProcessor", () => {
+  afterAll(() => {
+    mock.restore();
+  });
+
   let testRoot: string;
   let projectRoot: string;
   let homeRoot: string;
