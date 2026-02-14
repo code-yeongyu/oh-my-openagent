@@ -3,10 +3,11 @@ import { join } from "node:path"
 import { getDataDir } from "./data-path"
 import { isOpenCodeVersionAtLeast, OPENCODE_SQLITE_VERSION } from "./opencode-version"
 
-let cachedResult: boolean | null = null
+const NOT_CACHED = Symbol("NOT_CACHED")
+let cachedResult: boolean | typeof NOT_CACHED = NOT_CACHED
 
 export function isSqliteBackend(): boolean {
-  if (cachedResult !== null) {
+  if (cachedResult !== NOT_CACHED) {
     return cachedResult
   }
   
@@ -19,5 +20,5 @@ export function isSqliteBackend(): boolean {
 }
 
 export function resetSqliteBackendCache(): void {
-  cachedResult = null
+  cachedResult = NOT_CACHED
 }

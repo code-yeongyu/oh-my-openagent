@@ -1,12 +1,22 @@
-import * as path from "node:path"
-import * as os from "node:os"
-import { existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
-import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../features/hook-message-injector"
+import { findNearestMessageWithFields, findNearestMessageWithFieldsFromSDK } from "../features/hook-message-injector"
 import { getMessageDir } from "./opencode-message-dir"
+import { isSqliteBackend } from "./opencode-storage-detection"
+import type { PluginInput } from "@opencode-ai/plugin"
 
-export function isCallerOrchestrator(sessionID?: string): boolean {
+export async function isCallerOrchestrator(sessionID?: string, client?: PluginInput["client"]): Promise<boolean> {
   if (!sessionID) return false
+
+  // Beta mode: use SDK if client provided
+  if (isSqliteBackend() && client) {
+    try {
+      const nearest = await findNearestMessageWithFieldsFromSDK(client, sessionID)
+      return nearest?.agent?.toLowerCase() === "atlas"
+    } catch {
+      return false
+    }
+  }
+
+  // Stable mode: use JSON files
   const messageDir = getMessageDir(sessionID)
   if (!messageDir) return false
   const nearest = findNearestMessageWithFields(messageDir)
