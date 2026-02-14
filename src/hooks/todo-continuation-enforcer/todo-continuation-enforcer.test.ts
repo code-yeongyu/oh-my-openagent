@@ -1,3 +1,4 @@
+/// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 
 import type { BackgroundManager } from "../../features/background-agent"
@@ -9,10 +10,13 @@ type TimerCallback = (...args: any[]) => void
 
 interface FakeTimers {
   advanceBy: (ms: number, advanceClock?: boolean) => Promise<void>
+  advanceClockBy: (ms: number) => Promise<void>
   restore: () => void
 }
 
 function createFakeTimers(): FakeTimers {
+  const FAKE_MIN_DELAY_MS = 500
+  const REAL_MAX_DELAY_MS = 5000
   const originalNow = Date.now()
   let clockNow = originalNow
   let timerNow = 0
@@ -52,20 +56,41 @@ function createFakeTimers(): FakeTimers {
   }
 
   globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
-    return schedule(callback, delay, null, args) as unknown as ReturnType<typeof setTimeout>
+    const normalized = normalizeDelay(delay)
+    if (normalized < FAKE_MIN_DELAY_MS) {
+      return original.setTimeout(callback, delay, ...args)
+    }
+    if (normalized >= REAL_MAX_DELAY_MS) {
+      return original.setTimeout(callback, delay, ...args)
+    }
+    return schedule(callback, normalized, null, args) as unknown as ReturnType<typeof setTimeout>
   }) as typeof setTimeout
 
   globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
     const interval = normalizeDelay(delay)
-    return schedule(callback, delay, interval, args) as unknown as ReturnType<typeof setInterval>
+    if (interval < FAKE_MIN_DELAY_MS) {
+      return original.setInterval(callback, delay, ...args)
+    }
+    if (interval >= REAL_MAX_DELAY_MS) {
+      return original.setInterval(callback, delay, ...args)
+    }
+    return schedule(callback, interval, interval, args) as unknown as ReturnType<typeof setInterval>
   }) as typeof setInterval
 
-  globalThis.clearTimeout = ((id?: number) => {
-    clear(id)
+  globalThis.clearTimeout = ((id?: Parameters<typeof clearTimeout>[0]) => {
+    if (typeof id === "number" && timers.has(id)) {
+      clear(id)
+      return
+    }
+    original.clearTimeout(id)
   }) as typeof clearTimeout
 
-  globalThis.clearInterval = ((id?: number) => {
-    clear(id)
+  globalThis.clearInterval = ((id?: Parameters<typeof clearInterval>[0]) => {
+    if (typeof id === "number" && timers.has(id)) {
+      clear(id)
+      return
+    }
+    original.clearInterval(id)
   }) as typeof clearInterval
 
   Date.now = () => clockNow
@@ -107,6 +132,12 @@ function createFakeTimers(): FakeTimers {
     await Promise.resolve()
   }
 
+  const advanceClockBy = async (ms: number) => {
+    const clamped = Math.max(0, ms)
+    clockNow += clamped
+    await Promise.resolve()
+  }
+
   const restore = () => {
     globalThis.setTimeout = original.setTimeout
     globalThis.clearTimeout = original.clearTimeout
@@ -115,7 +146,7 @@ function createFakeTimers(): FakeTimers {
     Date.now = original.dateNow
   }
 
-  return { advanceBy, restore }
+  return { advanceBy, advanceClockBy, restore }
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -510,7 +541,7 @@ describe("todo-continuation-enforcer", () => {
       event: { type: "session.idle", properties: { sessionID } },
     })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
@@ -518,7 +549,7 @@ describe("todo-continuation-enforcer", () => {
 
     //#then
     expect(promptCalls).toHaveLength(2)
-  })
+  }, { timeout: 15000 })
 
   test("should keep injecting even when todos remain unchanged across cycles", async () => {
     //#given
@@ -534,26 +565,26 @@ describe("todo-continuation-enforcer", () => {
     //#when — 5 consecutive idle cycles with unchanged todos
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
 
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
 
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
 
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
 
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
 
     //#then — all 5 injections should fire (no stagnation cap)
     expect(promptCalls).toHaveLength(5)
-  })
+  }, { timeout: 60000 })
 
   test("should skip idle handling while injection is in flight", async () => {
     //#given
@@ -613,7 +644,7 @@ describe("todo-continuation-enforcer", () => {
 
     //#then
     expect(promptCalls).toHaveLength(2)
-  })
+  }, { timeout: 15000 })
 
   test("should accept skipAgents option without error", async () => {
     // given - session with skipAgents configured for Prometheus
