@@ -662,16 +662,17 @@ export class BackgroundManager {
         this.idleDeferralTimers.delete(task.id)
       }
 
-      if (partInfo?.type === "tool" || partInfo?.tool) {
-        if (!task.progress) {
-          task.progress = {
-            toolCalls: 0,
-            lastUpdate: new Date(),
-          }
+      if (!task.progress) {
+        task.progress = {
+          toolCalls: 0,
+          lastUpdate: new Date(),
         }
+      }
+      task.progress.lastUpdate = new Date()
+
+      if (partInfo?.type === "tool" || partInfo?.tool) {
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
-        task.progress.lastUpdate = new Date()
       }
     }
 

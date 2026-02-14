@@ -69,13 +69,14 @@ export function handleBackgroundEvent(args: {
     const type = getString(props, "type")
     const tool = getString(props, "tool")
 
+    if (!task.progress) {
+      task.progress = { toolCalls: 0, lastUpdate: new Date() }
+    }
+    task.progress.lastUpdate = new Date()
+
     if (type === "tool" || tool) {
-      if (!task.progress) {
-        task.progress = { toolCalls: 0, lastUpdate: new Date() }
-      }
       task.progress.toolCalls += 1
       task.progress.lastTool = tool
-      task.progress.lastUpdate = new Date()
     }
   }
 
