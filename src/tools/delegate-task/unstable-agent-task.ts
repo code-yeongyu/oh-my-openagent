@@ -4,6 +4,7 @@ import { getTimingConfig } from "./timing"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
+import { getSessionTools } from "../../shared/session-tools-store"
 
 export async function executeUnstableAgentTask(
   args: DelegateTaskArgs,
@@ -26,6 +27,7 @@ export async function executeUnstableAgentTask(
       parentMessageID: parentContext.messageID,
       parentModel: parentContext.model,
       parentAgent: parentContext.agent,
+      parentTools: getSessionTools(parentContext.sessionID),
       model: categoryModel,
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
