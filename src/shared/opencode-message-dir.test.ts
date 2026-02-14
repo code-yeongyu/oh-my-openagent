@@ -19,6 +19,12 @@ beforeAll(async () => {
     join: mock((...args: string[]) => args.join("/")),
   }))
 
+  // Mock storage detection to return false (stable mode)
+  mock.module("./opencode-storage-detection", () => ({
+    isSqliteBackend: () => false,
+    resetSqliteBackendCache: () => {},
+  }))
+
   ;({ getMessageDir } = await import("./opencode-message-dir"))
 })
 
@@ -106,6 +112,23 @@ describe("getMessageDir", () => {
 
     // when
     const result = getMessageDir("ses_123")
+
+    // then
+    expect(result).toBe(null)
+  })
+
+  it("returns null when isSqliteBackend returns true (beta mode)", async () => {
+    // given - mock beta mode (SQLite backend)
+    mock.module("./opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    // Re-import to get fresh module with mocked isSqliteBackend
+    const { getMessageDir: getMessageDirBeta } = await import("./opencode-message-dir")
+
+    // when
+    const result = getMessageDirBeta("ses_123")
 
     // then
     expect(result).toBe(null)
