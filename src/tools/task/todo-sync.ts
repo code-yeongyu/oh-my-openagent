@@ -3,7 +3,7 @@ import { log } from "../../shared/logger";
 import type { Task } from "../../features/claude-tasks/types.ts";
 
 export interface TodoInfo {
-  id: string;
+  id?: string;
   content: string;
   status: "pending" | "in_progress" | "completed" | "cancelled";
   priority?: "low" | "medium" | "high";
@@ -100,7 +100,7 @@ export async function syncTaskTodoUpdate(
       path: { id: sessionID },
     });
     const currentTodos = extractTodos(response);
-    const nextTodos = currentTodos.filter((todo) => todo.id !== task.id);
+    const nextTodos = currentTodos.filter((todo) => !todo.id || todo.id !== task.id);
     const todo = syncTaskToTodo(task);
 
     if (todo) {
@@ -150,10 +150,10 @@ export async function syncAllTasksToTodos(
     }
 
     const finalTodos: TodoInfo[] = [];
-    const newTodoIds = new Set(newTodos.map((t) => t.id));
+    const newTodoIds = new Set(newTodos.map((t) => t.id).filter((id) => id !== undefined));
 
     for (const existing of currentTodos) {
-      if (!newTodoIds.has(existing.id) && !tasksToRemove.has(existing.id)) {
+      if ((!existing.id || !newTodoIds.has(existing.id)) && !tasksToRemove.has(existing.id || "")) {
         finalTodos.push(existing);
       }
     }
