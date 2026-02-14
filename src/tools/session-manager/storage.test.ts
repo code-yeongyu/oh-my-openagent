@@ -475,6 +475,10 @@ describe("session-manager storage - SDK path (beta mode)", () => {
       resetSqliteBackendCache: () => {},
     }))
 
+    // Reset client to ensure "client not set" case is exercised
+    const { resetStorageClient } = await import("./storage")
+    resetStorageClient()
+
     // Re-import without setting client
     const { readSessionMessages } = await import("./storage")
 
