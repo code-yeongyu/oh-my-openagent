@@ -33,7 +33,9 @@ describe("waitForEventProcessorShutdown", () => {
     // then
     expect(elapsed).toBeGreaterThanOrEqual(20)
     expect(logSpy).toHaveBeenCalled()
-  })
+
+    // cleanup
+    logSpy.mockRestore()
 })
 
 describe("resolveRunAgent", () => {
