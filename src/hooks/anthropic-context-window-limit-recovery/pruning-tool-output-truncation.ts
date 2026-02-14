@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { getOpenCodeStorageDir } from "../../shared/data-path"
 import { truncateToolResult } from "./storage"
 import { log } from "../../shared/logger"
+import { getMessageDir } from "../../shared/opencode-message-dir"
 
 interface StoredToolPart {
   type?: string
@@ -19,21 +20,6 @@ function getMessageStorage(): string {
 
 function getPartStorage(): string {
   return join(getOpenCodeStorageDir(), "part")
-}
-
-function getMessageDir(sessionID: string): string | null {
-  const messageStorage = getMessageStorage()
-  if (!existsSync(messageStorage)) return null
-
-  const directPath = join(messageStorage, sessionID)
-  if (existsSync(directPath)) return directPath
-
-  for (const dir of readdirSync(messageStorage)) {
-    const sessionPath = join(messageStorage, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
-  }
-
-  return null
 }
 
 function getMessageIds(sessionID: string): string[] {

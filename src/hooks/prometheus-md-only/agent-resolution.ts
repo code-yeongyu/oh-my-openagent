@@ -1,22 +1,7 @@
-import { existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
-import { findNearestMessageWithFields, findFirstMessageWithAgent, MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { findNearestMessageWithFields, findFirstMessageWithAgent } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { readBoulderState } from "../../features/boulder-state"
-
-function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
-
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) return directPath
-
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
-  }
-
-  return null
-}
+import { getMessageDir } from "../../shared/opencode-message-dir"
 
 function getAgentFromMessageFiles(sessionID: string): string | undefined {
   const messageDir = getMessageDir(sessionID)
