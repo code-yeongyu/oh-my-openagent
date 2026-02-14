@@ -3045,3 +3045,161 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
     }
   })
 })
+
+describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
+  test("should update lastUpdate on text-type message.part.updated event", () => {
+    //#given - a running task with stale lastUpdate
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+
+    const oldUpdate = new Date(Date.now() - 300_000)
+    const task: BackgroundTask = {
+      id: "task-text-1",
+      sessionID: "session-text-1",
+      parentSessionID: "parent-1",
+      parentMessageID: "msg-1",
+      description: "Thinking task",
+      prompt: "Think deeply",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(Date.now() - 600_000),
+      progress: {
+        toolCalls: 2,
+        lastUpdate: oldUpdate,
+      },
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - a text-type message.part.updated event arrives
+    manager.handleEvent({
+      type: "message.part.updated",
+      properties: { sessionID: "session-text-1", type: "text" },
+    })
+
+    //#then - lastUpdate should be refreshed, toolCalls should NOT change
+    expect(task.progress!.lastUpdate.getTime()).toBeGreaterThan(oldUpdate.getTime())
+    expect(task.progress!.toolCalls).toBe(2)
+  })
+
+  test("should update lastUpdate on thinking-type message.part.updated event", () => {
+    //#given - a running task with stale lastUpdate
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+
+    const oldUpdate = new Date(Date.now() - 300_000)
+    const task: BackgroundTask = {
+      id: "task-thinking-1",
+      sessionID: "session-thinking-1",
+      parentSessionID: "parent-1",
+      parentMessageID: "msg-1",
+      description: "Reasoning task",
+      prompt: "Reason about architecture",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(Date.now() - 600_000),
+      progress: {
+        toolCalls: 0,
+        lastUpdate: oldUpdate,
+      },
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - a thinking-type message.part.updated event arrives
+    manager.handleEvent({
+      type: "message.part.updated",
+      properties: { sessionID: "session-thinking-1", type: "thinking" },
+    })
+
+    //#then - lastUpdate should be refreshed, toolCalls should remain 0
+    expect(task.progress!.lastUpdate.getTime()).toBeGreaterThan(oldUpdate.getTime())
+    expect(task.progress!.toolCalls).toBe(0)
+  })
+
+  test("should initialize progress on first non-tool event", () => {
+    //#given - a running task with NO progress field
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+
+    const task: BackgroundTask = {
+      id: "task-init-1",
+      sessionID: "session-init-1",
+      parentSessionID: "parent-1",
+      parentMessageID: "msg-1",
+      description: "New task",
+      prompt: "Start thinking",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(Date.now() - 60_000),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - a text-type event arrives before any tool call
+    manager.handleEvent({
+      type: "message.part.updated",
+      properties: { sessionID: "session-init-1", type: "text" },
+    })
+
+    //#then - progress should be initialized with toolCalls: 0 and fresh lastUpdate
+    expect(task.progress).toBeDefined()
+    expect(task.progress!.toolCalls).toBe(0)
+    expect(task.progress!.lastUpdate.getTime()).toBeGreaterThan(Date.now() - 5000)
+  })
+
+  test("should NOT mark thinking model as stale when text events refresh lastUpdate", async () => {
+    //#given - a running task where text events keep lastUpdate fresh
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-alive-1",
+      sessionID: "session-alive-1",
+      parentSessionID: "parent-1",
+      parentMessageID: "msg-1",
+      description: "Long thinking task",
+      prompt: "Deep reasoning",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(Date.now() - 600_000),
+      progress: {
+        toolCalls: 0,
+        lastUpdate: new Date(Date.now() - 300_000),
+      },
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - a text event arrives, then stale check runs
+    manager.handleEvent({
+      type: "message.part.updated",
+      properties: { sessionID: "session-alive-1", type: "text" },
+    })
+    await manager["checkAndInterruptStaleTasks"]()
+
+    //#then - task should still be running (text event refreshed lastUpdate)
+    expect(task.status).toBe("running")
+  })
+})
