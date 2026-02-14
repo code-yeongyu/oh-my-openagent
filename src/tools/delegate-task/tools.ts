@@ -103,6 +103,14 @@ Prompts MUST be in English.`
       if (args.run_in_background === undefined) {
         throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`)
       }
+      if (typeof args.load_skills === "string") {
+        try {
+          const parsed = JSON.parse(args.load_skills)
+          args.load_skills = Array.isArray(parsed) ? parsed : []
+        } catch {
+          args.load_skills = []
+        }
+      }
       if (args.load_skills === undefined) {
         throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like ["playwright"], ["git-master"] for best results.`)
       }

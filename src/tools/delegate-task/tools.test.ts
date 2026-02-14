@@ -3,10 +3,12 @@ const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES, isPlanFamily, PLAN_FAMILY_NAMES } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
+import type { DelegateTaskArgs } from "./types"
 import { __resetModelCache } from "../../shared/model-availability"
 import { clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
+import * as executor from "./executor"
 
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
 
@@ -20,6 +22,10 @@ const TEST_AVAILABLE_MODELS = new Set([
   "openai/gpt-5.2",
   "openai/gpt-5.3-codex",
 ])
+
+type DelegateTaskArgsWithSerializedSkills = Omit<DelegateTaskArgs, "load_skills"> & {
+  load_skills: string
+}
 
 function createTestAvailableModels(): Set<string> {
   return new Set(TEST_AVAILABLE_MODELS)
@@ -254,6 +260,134 @@ describe("sisyphus-task", () => {
       //#given / #when / #then
       expect(PLAN_FAMILY_NAMES).toEqual(["plan", "prometheus"])
     })
+  })
+
+  describe("load_skills parsing", () => {
+    test("parses valid JSON string into array before validation", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = {
+        launch: async () => ({
+          id: "task-123",
+          status: "pending",
+          description: "Parse test",
+          agent: "sisyphus-junior",
+          sessionID: "test-session",
+        }),
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockResolvedValue({
+        content: "resolved skill content",
+        error: null,
+      })
+
+      const args: DelegateTaskArgsWithSerializedSkills = {
+        description: "Parse valid string",
+        prompt: "Load skill parsing test",
+        category: "quick",
+        run_in_background: true,
+        load_skills: '["playwright", "git-master"]',
+      }
+
+      //#when
+      await tool.execute(args as unknown as DelegateTaskArgs, toolContext)
+
+      //#then
+      expect(args.load_skills).toEqual(["playwright", "git-master"])
+      expect(resolveSkillContentSpy).toHaveBeenCalledWith(["playwright", "git-master"], expect.any(Object))
+    }, { timeout: 10000 })
+
+    test("defaults to [] when load_skills is malformed JSON", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = {
+        launch: async () => ({
+          id: "task-456",
+          status: "pending",
+          description: "Parse test",
+          agent: "sisyphus-junior",
+          sessionID: "test-session",
+        }),
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockResolvedValue({
+        content: "resolved skill content",
+        error: null,
+      })
+
+      const args: DelegateTaskArgsWithSerializedSkills = {
+        description: "Parse malformed string",
+        prompt: "Load skill parsing test",
+        category: "quick",
+        run_in_background: true,
+        load_skills: '["playwright", "git-master"',
+      }
+
+      //#when
+      await tool.execute(args as unknown as DelegateTaskArgs, toolContext)
+
+      //#then
+      expect(args.load_skills).toEqual([])
+      expect(resolveSkillContentSpy).toHaveBeenCalledWith([], expect.any(Object))
+    }, { timeout: 10000 })
   })
 
   describe("category delegation config validation", () => {
