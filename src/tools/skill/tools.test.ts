@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test"
+import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import * as fs from "node:fs"
 import { createSkillTool } from "./tools"
@@ -20,6 +20,10 @@ Test skill body content`
     return originalReadFileSync(path, encoding as BufferEncoding)
   },
 }))
+
+afterAll(() => {
+  mock.restore()
+})
 
 function createMockSkill(name: string, options: { agent?: string } = {}): LoadedSkill {
   return {
