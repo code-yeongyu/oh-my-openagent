@@ -5,6 +5,7 @@ import { consumeNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getMessageDir } from "./message-dir"
+import { getSessionTools } from "../../shared/session-tools-store"
 
 export async function executeBackground(
   args: CallOmoAgentArgs,
@@ -41,6 +42,7 @@ export async function executeBackground(
       parentSessionID: toolContext.sessionID,
       parentMessageID: toolContext.messageID,
       parentAgent,
+      parentTools: getSessionTools(toolContext.sessionID),
     })
 
     const WAIT_FOR_SESSION_INTERVAL_MS = 50

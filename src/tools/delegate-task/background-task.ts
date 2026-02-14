@@ -3,6 +3,7 @@ import type { ExecutorContext, ParentContext } from "./executor-types"
 import { getTimingConfig } from "./timing"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
+import { getSessionTools } from "../../shared/session-tools-store"
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
@@ -24,6 +25,7 @@ export async function executeBackgroundTask(
       parentMessageID: parentContext.messageID,
       parentModel: parentContext.model,
       parentAgent: parentContext.agent,
+      parentTools: getSessionTools(parentContext.sessionID),
       model: categoryModel,
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
