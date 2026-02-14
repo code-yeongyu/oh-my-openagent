@@ -29,8 +29,6 @@ export interface SessionState {
   abortDetectedAt?: number
   lastInjectedAt?: number
   inFlight?: boolean
-  lastTodoHash?: string
-  unchangedCycles?: number
 }
 
 export interface MessageInfo {

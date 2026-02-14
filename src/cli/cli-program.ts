@@ -149,29 +149,21 @@ This command shows:
 program
   .command("doctor")
   .description("Check oh-my-opencode installation health and diagnose issues")
+  .option("--status", "Show compact system dashboard")
   .option("--verbose", "Show detailed diagnostic information")
   .option("--json", "Output results in JSON format")
-  .option("--category <category>", "Run only specific category")
   .addHelpText("after", `
 Examples:
-  $ bunx oh-my-opencode doctor
-  $ bunx oh-my-opencode doctor --verbose
-  $ bunx oh-my-opencode doctor --json
-  $ bunx oh-my-opencode doctor --category authentication
-
-Categories:
-  installation     Check OpenCode and plugin installation
-  configuration    Validate configuration files
-  authentication   Check auth provider status
-  dependencies     Check external dependencies
-  tools            Check LSP and MCP servers
-  updates          Check for version updates
+  $ bunx oh-my-opencode doctor            # Show problems only
+  $ bunx oh-my-opencode doctor --status   # Compact dashboard
+  $ bunx oh-my-opencode doctor --verbose  # Deep diagnostics
+  $ bunx oh-my-opencode doctor --json     # JSON output
 `)
   .action(async (options) => {
+    const mode = options.status ? "status" : options.verbose ? "verbose" : "default"
     const doctorOptions: DoctorOptions = {
-      verbose: options.verbose ?? false,
+      mode,
       json: options.json ?? false,
-      category: options.category,
     }
     const exitCode = await doctor(doctorOptions)
     process.exit(exitCode)
