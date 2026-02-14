@@ -14,6 +14,7 @@ export class LSPClientTransport {
   protected readonly stderrBuffer: string[] = []
   protected processExited = false
   protected readonly diagnosticsStore = new Map<string, Diagnostic[]>()
+  protected readonly diagnosticsWaiters = new Map<string, Array<(diagnostics: Diagnostic[]) => void>>()
   protected readonly REQUEST_TIMEOUT = 15000
 
   constructor(protected root: string, protected server: ResolvedServer) {}
@@ -67,9 +68,7 @@ export class LSPClientTransport {
     this.connection = createMessageConnection(new StreamMessageReader(nodeReadable), new StreamMessageWriter(nodeWritable))
 
     this.connection.onNotification("textDocument/publishDiagnostics", (params: { uri?: string; diagnostics?: Diagnostic[] }) => {
-      if (params.uri) {
-        this.diagnosticsStore.set(params.uri, params.diagnostics ?? [])
-      }
+      this.handlePublishDiagnostics(params)
     })
 
     this.connection.onRequest("workspace/configuration", (params: { items?: Array<{ section?: string }> }) => {
@@ -112,6 +111,62 @@ export class LSPClientTransport {
       } catch {}
     }
     read()
+  }
+
+  protected handlePublishDiagnostics(params: { uri?: string; diagnostics?: Diagnostic[] }): void {
+    const uri = params.uri
+    if (!uri) return
+
+    const diagnostics = params.diagnostics ?? []
+    this.diagnosticsStore.set(uri, diagnostics)
+
+    const waiters = this.diagnosticsWaiters.get(uri)
+    if (!waiters) return
+
+    this.diagnosticsWaiters.delete(uri)
+    for (const resolve of waiters) {
+      resolve(diagnostics)
+    }
+  }
+
+  protected waitForPushDiagnostics(uri: string, timeoutMs: number): Promise<Diagnostic[]> {
+    const existing = this.diagnosticsStore.get(uri)
+    if (existing !== undefined) {
+      return Promise.resolve(existing)
+    }
+
+    return new Promise<Diagnostic[]>((resolve) => {
+      let settled = false
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+      const waiter = (diagnostics: Diagnostic[]) => {
+        if (settled) return
+        settled = true
+        if (timeoutId !== undefined) clearTimeout(timeoutId)
+        resolve(diagnostics)
+      }
+
+      const existingWaiters = this.diagnosticsWaiters.get(uri) ?? []
+      existingWaiters.push(waiter)
+      this.diagnosticsWaiters.set(uri, existingWaiters)
+
+      timeoutId = setTimeout(() => {
+        if (settled) return
+        settled = true
+
+        const waiters = this.diagnosticsWaiters.get(uri)
+        if (waiters) {
+          const remaining = waiters.filter((w) => w !== waiter)
+          if (remaining.length === 0) {
+            this.diagnosticsWaiters.delete(uri)
+          } else {
+            this.diagnosticsWaiters.set(uri, remaining)
+          }
+        }
+
+        resolve([])
+      }, timeoutMs)
+    })
   }
 
   protected async sendRequest<T>(method: string, params?: unknown): Promise<T> {
@@ -190,5 +245,11 @@ export class LSPClientTransport {
     }
     this.processExited = true
     this.diagnosticsStore.clear()
+    for (const waiters of this.diagnosticsWaiters.values()) {
+      for (const resolve of waiters) {
+        resolve([])
+      }
+    }
+    this.diagnosticsWaiters.clear()
   }
 }
