@@ -12,6 +12,7 @@ import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
 import {
+  DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
   MIN_IDLE_TIME_MS,
   MIN_RUNTIME_BEFORE_STALE_MS,
@@ -1437,24 +1438,54 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     }
   }
 
-  private async checkAndInterruptStaleTasks(): Promise<void> {
+  private async checkAndInterruptStaleTasks(
+    allStatuses: Record<string, { type: string }> = {},
+  ): Promise<void> {
     const staleTimeoutMs = this.config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
+    const messageStalenessMs = this.config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
     const now = Date.now()
 
     for (const task of this.tasks.values()) {
       if (task.status !== "running") continue
-      if (!task.progress?.lastUpdate) continue
-      
+
       const startedAt = task.startedAt
       const sessionID = task.sessionID
       if (!startedAt || !sessionID) continue
 
+      const sessionIsRunning = allStatuses[sessionID]?.type === "running"
       const runtime = now - startedAt.getTime()
+
+      if (!task.progress?.lastUpdate) {
+        if (sessionIsRunning) continue
+        if (runtime <= messageStalenessMs) continue
+
+        const staleMinutes = Math.round(runtime / 60000)
+        task.status = "cancelled"
+        task.error = `Stale timeout (no activity for ${staleMinutes}min since start)`
+        task.completedAt = new Date()
+
+        if (task.concurrencyKey) {
+          this.concurrencyManager.release(task.concurrencyKey)
+          task.concurrencyKey = undefined
+        }
+
+        this.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+        log(`[background-agent] Task ${task.id} interrupted: no progress since start`)
+
+        try {
+          await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
+        } catch (err) {
+          log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
+        }
+        continue
+      }
+
+      if (sessionIsRunning) continue
+
       if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 
       const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
       if (timeSinceLastUpdate <= staleTimeoutMs) continue
-
       if (task.status !== "running") continue
 
       const staleMinutes = Math.round(timeSinceLastUpdate / 60000)
@@ -1467,10 +1498,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         task.concurrencyKey = undefined
       }
 
-      this.client.session.abort({
-        path: { id: sessionID },
-      }).catch(() => {})
-
+      this.client.session.abort({ path: { id: sessionID } }).catch(() => {})
       log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
 
       try {
@@ -1483,10 +1511,11 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
   private async pollRunningTasks(): Promise<void> {
     this.pruneStaleTasksAndNotifications()
-    await this.checkAndInterruptStaleTasks()
 
     const statusResult = await this.client.session.status()
     const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+
+    await this.checkAndInterruptStaleTasks(allStatuses)
 
     for (const task of this.tasks.values()) {
       if (task.status !== "running") continue
@@ -1497,7 +1526,6 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       try {
         const sessionStatus = allStatuses[sessionID]
         
-        // Don't skip if session not in status - fall through to message-based detection
         if (sessionStatus?.type === "idle") {
           // Edge guard: Validate session has actual output before completing
           const hasValidOutput = await this.validateSessionHasOutput(sessionID)

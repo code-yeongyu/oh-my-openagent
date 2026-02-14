@@ -57,14 +57,17 @@ export function pruneStaleTasksAndNotifications(args: {
   }
 }
 
+export type SessionStatusMap = Record<string, { type: string }>
+
 export async function checkAndInterruptStaleTasks(args: {
   tasks: Iterable<BackgroundTask>
   client: OpencodeClient
   config: BackgroundTaskConfig | undefined
   concurrencyManager: ConcurrencyManager
   notifyParentSession: (task: BackgroundTask) => Promise<void>
+  sessionStatuses?: SessionStatusMap
 }): Promise<void> {
-  const { tasks, client, config, concurrencyManager, notifyParentSession } = args
+  const { tasks, client, config, concurrencyManager, notifyParentSession, sessionStatuses } = args
   const staleTimeoutMs = config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
   const now = Date.now()
 
@@ -77,9 +80,11 @@ export async function checkAndInterruptStaleTasks(args: {
     const sessionID = task.sessionID
     if (!startedAt || !sessionID) continue
 
+    const sessionIsRunning = sessionStatuses?.[sessionID]?.type === "running"
     const runtime = now - startedAt.getTime()
 
     if (!task.progress?.lastUpdate) {
+      if (sessionIsRunning) continue
       if (runtime <= messageStalenessMs) continue
 
       const staleMinutes = Math.round(runtime / 60000)
@@ -102,6 +107,8 @@ export async function checkAndInterruptStaleTasks(args: {
       }
       continue
     }
+
+    if (sessionIsRunning) continue
 
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 
