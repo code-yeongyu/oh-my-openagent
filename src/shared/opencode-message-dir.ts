@@ -1,10 +1,8 @@
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
-import { getOpenCodeStorageDir } from "./data-path"
+import { MESSAGE_STORAGE } from "./opencode-storage-paths"
 import { isSqliteBackend } from "./opencode-storage-detection"
 import { log } from "./logger"
-
-const MESSAGE_STORAGE = join(getOpenCodeStorageDir(), "message")
 
 export function getMessageDir(sessionID: string): string | null {
   if (!sessionID.startsWith("ses_")) return null
