@@ -2,6 +2,7 @@ import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { getOpenCodeStorageDir } from "./data-path"
 import { isSqliteBackend } from "./opencode-storage-detection"
+import { log } from "./logger"
 
 const MESSAGE_STORAGE = join(getOpenCodeStorageDir(), "message")
 
@@ -22,9 +23,10 @@ export function getMessageDir(sessionID: string): string | null {
         return sessionPath
       }
     }
-  } catch {
-    return null
-  }
+} catch (error) {
+  log(`Error reading message directory: ${error}`)
+  return null
+}
 
   return null
 }

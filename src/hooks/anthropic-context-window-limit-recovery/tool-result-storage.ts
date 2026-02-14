@@ -7,6 +7,8 @@ import type { StoredToolPart, ToolResultInfo } from "./tool-part-types"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { log } from "../../shared/logger"
 
+let hasLoggedTruncateWarning = false
+
 export function findToolResultsBySize(sessionID: string): ToolResultInfo[] {
 	const messageIds = getMessageIds(sessionID)
 	const results: ToolResultInfo[] = []
@@ -51,7 +53,10 @@ export function truncateToolResult(partPath: string): {
 	originalSize?: number
 } {
 	if (isSqliteBackend()) {
-		log("[context-window-recovery] Disabled on SQLite backend: truncateToolResult")
+		if (!hasLoggedTruncateWarning) {
+			log("[context-window-recovery] Disabled on SQLite backend: truncateToolResult")
+			hasLoggedTruncateWarning = true
+		}
 		return { success: false }
 	}
 
