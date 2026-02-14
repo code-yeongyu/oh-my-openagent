@@ -4,6 +4,8 @@ import { join } from "node:path"
 import { getMessageIds } from "./message-storage-directory"
 import { PART_STORAGE_DIR, TRUNCATION_MESSAGE } from "./storage-paths"
 import type { StoredToolPart, ToolResultInfo } from "./tool-part-types"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { log } from "../../shared/logger"
 
 export function findToolResultsBySize(sessionID: string): ToolResultInfo[] {
 	const messageIds = getMessageIds(sessionID)
@@ -48,6 +50,11 @@ export function truncateToolResult(partPath: string): {
 	toolName?: string
 	originalSize?: number
 } {
+	if (isSqliteBackend()) {
+		log.warn("[context-window-recovery] Disabled on SQLite backend: truncateToolResult")
+		return { success: false }
+	}
+
 	try {
 		const content = readFileSync(partPath, "utf-8")
 		const part = JSON.parse(content) as StoredToolPart
