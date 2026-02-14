@@ -1,21 +1,15 @@
 const { describe, test, expect, mock } = require("bun:test")
 
-mock.module("./session-creator", () => ({
-  createOrGetSession: mock(async () => ({ sessionID: "ses-test-123" })),
-}))
-
-mock.module("./completion-poller", () => ({
-  waitForCompletion: mock(async () => {}),
-}))
-
-mock.module("./message-processor", () => ({
-  processMessages: mock(async () => "agent response"),
-}))
-
 describe("executeSync", () => {
   test("passes question=false via tools parameter to block question tool", async () => {
     //#given
     const { executeSync } = require("./sync-executor")
+
+    const deps = {
+      createOrGetSession: mock(async () => ({ sessionID: "ses-test-123", isNew: true })),
+      waitForCompletion: mock(async () => {}),
+      processMessages: mock(async () => "agent response"),
+    }
 
     let promptArgs: any
     const promptAsync = mock(async (input: any) => {
@@ -44,7 +38,7 @@ describe("executeSync", () => {
     }
 
     //#when
-    await executeSync(args, toolContext, ctx as any)
+    await executeSync(args, toolContext, ctx as any, deps)
 
     //#then
     expect(promptAsync).toHaveBeenCalled()
@@ -54,6 +48,12 @@ describe("executeSync", () => {
   test("passes task=false via tools parameter", async () => {
     //#given
     const { executeSync } = require("./sync-executor")
+
+    const deps = {
+      createOrGetSession: mock(async () => ({ sessionID: "ses-test-123", isNew: true })),
+      waitForCompletion: mock(async () => {}),
+      processMessages: mock(async () => "agent response"),
+    }
 
     let promptArgs: any
     const promptAsync = mock(async (input: any) => {
@@ -82,7 +82,7 @@ describe("executeSync", () => {
     }
 
     //#when
-    await executeSync(args, toolContext, ctx as any)
+    await executeSync(args, toolContext, ctx as any, deps)
 
     //#then
     expect(promptAsync).toHaveBeenCalled()
