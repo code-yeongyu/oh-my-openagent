@@ -3,8 +3,14 @@ import { join } from "node:path"
 import { PART_STORAGE } from "../constants"
 import type { StoredTextPart } from "../types"
 import { generatePartId } from "./part-id"
+import { log, isSqliteBackend } from "../../../shared"
 
 export function injectTextPart(sessionID: string, messageID: string, text: string): boolean {
+  if (isSqliteBackend()) {
+    log("[session-recovery] Disabled on SQLite backend: injectTextPart")
+    return false
+  }
+
   const partDir = join(PART_STORAGE, messageID)
 
   if (!existsSync(partDir)) {

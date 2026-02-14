@@ -51,7 +51,7 @@ export function truncateToolResult(partPath: string): {
 	originalSize?: number
 } {
 	if (isSqliteBackend()) {
-		log.warn("[context-window-recovery] Disabled on SQLite backend: truncateToolResult")
+		log("[context-window-recovery] Disabled on SQLite backend: truncateToolResult")
 		return { success: false }
 	}
 

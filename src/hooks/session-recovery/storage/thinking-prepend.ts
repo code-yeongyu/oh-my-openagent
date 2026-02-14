@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { PART_STORAGE, THINKING_TYPES } from "../constants"
 import { readMessages } from "./messages-reader"
 import { readParts } from "./parts-reader"
+import { log, isSqliteBackend } from "../../../shared"
 
 function findLastThinkingContent(sessionID: string, beforeMessageID: string): string {
   const messages = readMessages(sessionID)
@@ -31,6 +32,11 @@ function findLastThinkingContent(sessionID: string, beforeMessageID: string): st
 }
 
 export function prependThinkingPart(sessionID: string, messageID: string): boolean {
+  if (isSqliteBackend()) {
+    log("[session-recovery] Disabled on SQLite backend: prependThinkingPart")
+    return false
+  }
+
   const partDir = join(PART_STORAGE, messageID)
 
   if (!existsSync(partDir)) {
