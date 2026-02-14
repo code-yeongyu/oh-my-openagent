@@ -1,4 +1,5 @@
-import { describe, test, expect, beforeAll } from "bun:test"
+import { describe, test, expect, beforeAll, afterAll } from "bun:test"
+import { join } from "node:path"
 import { createBuiltinSkills } from "../builtin-skills/skills"
 import { McbConfigSchema } from "../../config/schema/mcb"
 import { initializeMcbFromConfig } from "./config-gate"
@@ -138,8 +139,18 @@ describe("mcb-integration: availability with config", () => {
 })
 
 describe.skipIf(!mcbAvailable)("mcb-integration: real binary", () => {
+	const configPath = join(import.meta.dir, "test-mcb.toml")
+	const dbPath = join(import.meta.dir, `test-integration-${Date.now()}.db`)
+
 	beforeAll(() => {
 		expect(mcbBinaryPath).not.toBeNull()
+	})
+
+	afterAll(async () => {
+		const { unlink } = await import("node:fs/promises")
+		await unlink(dbPath).catch(() => {})
+		await unlink(`${dbPath}-shm`).catch(() => {})
+		await unlink(`${dbPath}-wal`).catch(() => {})
 	})
 
 	test("mcb binary is the expected version", async () => {
@@ -166,23 +177,24 @@ describe.skipIf(!mcbAvailable)("mcb-integration: real binary", () => {
 		expect(output).toContain("serve")
 	})
 
-	test("mcb serve process starts and accepts stdin", async () => {
-		//#given
-		const proc = Bun.spawn(["mcb", "serve"], {
+	test("mcb serve process starts and accepts stdin with config", async () => {
+		//#given - MCB 0.2.1+ requires config and DB path to stay alive
+		const proc = Bun.spawn(["mcb", "serve", "--config", configPath], {
 			stdin: "pipe",
 			stdout: "pipe",
 			stderr: "pipe",
+			env: { ...process.env, MCP__AUTH__USER_DB_PATH: dbPath },
 		})
 
 		//#when
-		await new Promise((resolve) => setTimeout(resolve, 500))
+		await new Promise((resolve) => setTimeout(resolve, 2000))
 		const exited = proc.exitCode
 
 		proc.stdin.end()
 		proc.kill()
 		await proc.exited
 
-		//#then
+		//#then - process should still be running (exitCode null) after 2s
 		expect(exited).toBeNull()
-	}, 10_000)
+	}, 30_000)
 })
