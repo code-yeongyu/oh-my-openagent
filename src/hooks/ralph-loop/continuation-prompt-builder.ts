@@ -19,7 +19,7 @@ const AUDIT_LOOP_CONTINUATION_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - AUDIT LOOP 
 Continue the audit-improve cycle with UI-first focus.
 
 MANDATORY RULES:
-- DO NOT modify Supabase database-related logic, migrations, SQL schema, or DB commands
+- DO NOT modify database-layer logic, migrations, SQL schema, or DB commands
 - Follow AGENTS.md instructions strictly (root + nearest AGENTS.md files in edited directories); if AGENTS rules conflict, AGENTS.md wins
 - Required-skills rule: identify task-matched skills and use all required skills for the cycle
 - Prioritize top-tier UI quality inspired by production standards (Apple HIG-level rigor)
@@ -73,7 +73,7 @@ const AUDIT_LOOP_CONTINUATION_NO_PROMISE_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - 
 Continue the audit-improve cycle with UI-first focus.
 
 MANDATORY RULES:
-- DO NOT modify Supabase database-related logic, migrations, SQL schema, or DB commands
+- DO NOT modify database-layer logic, migrations, SQL schema, or DB commands
 - Follow AGENTS.md instructions strictly (root + nearest AGENTS.md files in edited directories); if AGENTS rules conflict, AGENTS.md wins
 - Required-skills rule: identify task-matched skills and use all required skills for the cycle
 - Prioritize top-tier UI quality inspired by production standards (Apple HIG-level rigor)
@@ -160,7 +160,7 @@ export function buildTimeoutSummaryPrompt(state: RalphLoopState): string {
     return `${TIMEOUT_SUMMARY_PROMPT}
 
 Audit-loop specific constraints reminder:
-- Confirm that no Supabase DB mutation was performed.
+- Confirm that no database-layer mutation was performed.
 - Keep recommendations UI-first and production-grade.
 - Confirm AGENTS.md instructions were followed for touched paths.
 - Confirm UI styling changes use global tokens/shared components (no hardcoded literal visual values).

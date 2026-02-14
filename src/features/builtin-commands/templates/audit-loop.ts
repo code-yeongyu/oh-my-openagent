@@ -11,7 +11,7 @@ Run a repeated cycle until completion promise OR time limit:
 
 ## Non-Negotiable Constraints
 
-- DO NOT modify Supabase database-related logic, migrations, SQL schema, or DB commands
+- DO NOT modify database-layer logic, migrations, SQL schema, or DB commands
 - UI quality must be top-tier and intentional (Apple HIG-inspired interaction quality)
 - No AI-slop outputs: avoid generic layouts, weak hierarchy, and superficial restyling
 - Keep accessibility, clarity, and visual/system consistency high

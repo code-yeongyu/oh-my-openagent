@@ -8,19 +8,28 @@ import {
 type ToolInput = { tool: string; sessionID: string; callID: string }
 type ToolOutput = { args: Record<string, unknown> }
 
-const SUPABASE_DB_COMMAND_PATTERNS = [
+const DATABASE_MUTATION_COMMAND_PATTERNS = [
   /\bsupabase\s+db\b/i,
   /\bsupabase\s+migration\b/i,
   /\bsupabase\s+seed\b/i,
   /\bsupabase_db_url\b/i,
+  /\bprisma\s+(migrate|db\s+push|db\s+pull|db\s+seed)\b/i,
+  /\bdrizzle-kit\s+(push|migrate|generate)\b/i,
+  /\b(knex|typeorm|sequelize)\b.*\bmigration\b/i,
+  /\bflyway\b/i,
+  /\bliquibase\b/i,
   /\bpostgres(?:ql)?\b.*\b(schema|migration|sql|table|column|policy|rls|insert|update|delete|alter|drop)\b/i,
+  /\b(mysql|mariadb|sqlite|mongodb)\b.*\b(schema|migration|sql|table|column|index|insert|update|delete|alter|drop)\b/i,
   /\b(psql|pg_dump|pg_restore)\b/i,
 ]
 
-const SUPABASE_MUTATION_INTENT_PATTERN =
+const DATABASE_MUTATION_INTENT_PATTERN =
   /\b(migrate|migration|schema|sql|db push|db reset|db pull|table|column|policy|rls|seed|create|alter|drop|insert|update|delete|truncate)\b/i
 
-const SUPABASE_NEGATION_PATTERN =
+const DATABASE_CONTEXT_PATTERN =
+  /\b(database|db|sql|schema|migration|supabase|postgres|postgresql|mysql|mariadb|sqlite|mongodb|prisma|drizzle|typeorm|sequelize|knex|flyway|liquibase)\b/i
+
+const DATABASE_NEGATION_PATTERN =
   /\b(do not|don't|dont|avoid|must not|never)\b.{0,40}\b(modify|change|touch|update|migrate|db|database|schema)\b/i
 
 const HARD_CODED_VISUAL_LITERAL_PATTERNS = [
@@ -55,7 +64,7 @@ const SAFE_SHELL_PATTERN =
   /\b(git\s+status|git\s+diff|rg\b|grep\b|ls\b|cat\b|find\b|pwd\b|flutter\s+analyze|flutter\s+test|flutter\s+build|bun\s+test|bun\s+run\s+build|bun\s+run\s+typecheck|npm\s+run\s+(test|build|lint)|pnpm\s+(test|build|lint)|yarn\s+(test|build|lint))\b/i
 
 const DB_BLOCK_MESSAGE =
-  "[audit-loop guard] Supabase DB mutation is blocked while /audit-loop is active. Keep changes UI-first and never run DB/migration/schema operations."
+  "[audit-loop guard] Database mutation is blocked while /audit-loop is active. Keep changes UI-first and never run DB/migration/schema operations."
 
 const FOCUS_BLOCK_MESSAGE =
   "[audit-loop guard] Focus lock violation. Keep edits inside the current focus path. Submit a BLOCKER REPORT task first to approve a one-time focus switch."
@@ -77,24 +86,25 @@ function getAuditLoopState(hooks: CreatedHooks, sessionID: string): { session_id
   return state
 }
 
-function hasSupabaseDbMutationCommand(command: string): boolean {
-  return SUPABASE_DB_COMMAND_PATTERNS.some((pattern) => pattern.test(command))
+function hasDatabaseMutationCommand(command: string): boolean {
+  return DATABASE_MUTATION_COMMAND_PATTERNS.some((pattern) => pattern.test(command))
 }
 
-function hasSupabaseMutationIntent(text: string): boolean {
+function hasDatabaseMutationIntent(text: string): boolean {
   const lower = text.toLowerCase()
-  if (!lower.includes("supabase")) return false
-  if (SUPABASE_NEGATION_PATTERN.test(lower)) return false
-  return SUPABASE_MUTATION_INTENT_PATTERN.test(lower) || hasSupabaseDbMutationCommand(lower)
+  if (DATABASE_NEGATION_PATTERN.test(lower)) return false
+  if (!DATABASE_CONTEXT_PATTERN.test(lower)) return false
+  return DATABASE_MUTATION_INTENT_PATTERN.test(lower) || hasDatabaseMutationCommand(lower)
 }
 
-function isSupabaseDbPath(pathLike: string): boolean {
+function isDatabaseMutationPath(pathLike: string): boolean {
   const normalized = normalizePath(pathLike).toLowerCase()
-  if (!normalized.includes("/supabase/")) return false
-  if (normalized.includes("/supabase/migrations/")) return true
   if (normalized.endsWith(".sql")) return true
-  if (normalized.includes("/supabase/seed")) return true
-  if (normalized.includes("/supabase/schema")) return true
+  if (/(^|\/)(migrations?|migration)(\/|$)/.test(normalized)) return true
+  if (/(^|\/)(db|database|schema|schemas|seed|seeds)(\/|$)/.test(normalized)) return true
+  if (/(^|\/)(supabase|prisma|drizzle|typeorm|sequelize|knex|flyway|liquibase)(\/|$)/.test(normalized))
+    return true
+  if (normalized.endsWith("schema.prisma")) return true
   return false
 }
 
@@ -213,7 +223,7 @@ export function createAuditLoopGuard(directory: string) {
       const prompt = typeof args.prompt === "string" ? args.prompt : ""
       const description = typeof args.description === "string" ? args.description : ""
       const combined = `${description}\n${prompt}`
-      if (hasSupabaseMutationIntent(combined)) throw new Error(DB_BLOCK_MESSAGE)
+      if (hasDatabaseMutationIntent(combined)) throw new Error(DB_BLOCK_MESSAGE)
       if (BLOCKER_REPORT_PATTERN.test(combined) && FOCUS_SWITCH_INTENT_PATTERN.test(combined)) {
         focusSwitchApprovalBySession.add(input.sessionID)
       }
@@ -230,7 +240,7 @@ export function createAuditLoopGuard(directory: string) {
           : typeof args.tmux_command === "string"
             ? args.tmux_command
             : ""
-      if (command && hasSupabaseDbMutationCommand(command)) throw new Error(DB_BLOCK_MESSAGE)
+      if (command && hasDatabaseMutationCommand(command)) throw new Error(DB_BLOCK_MESSAGE)
       const hasFocus = focusBySession.has(input.sessionID)
       if (hasFocus && MUTATING_SHELL_PATTERN.test(command) && !SAFE_SHELL_PATTERN.test(command)) {
         throw new Error(SHELL_BLOCK_MESSAGE)
@@ -241,7 +251,7 @@ export function createAuditLoopGuard(directory: string) {
     if (toolName !== "write" && toolName !== "edit" && toolName !== "multiedit") return
 
     const filePaths = getFilePathsFromArgs(args)
-    if (filePaths.some((pathLike) => isSupabaseDbPath(pathLike))) throw new Error(DB_BLOCK_MESSAGE)
+    if (filePaths.some((pathLike) => isDatabaseMutationPath(pathLike))) throw new Error(DB_BLOCK_MESSAGE)
     if (filePaths.length === 0) return
 
     const checkpoint = readAuditCheckpoint(directory)

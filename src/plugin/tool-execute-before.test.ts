@@ -167,7 +167,7 @@ describe("createToolExecuteBeforeHandler", () => {
     })
   })
 
-  describe("audit-loop command + Supabase guard", () => {
+  describe("audit-loop command + database guard", () => {
     function createCtx() {
       const directory = join(tmpdir(), `omo-audit-guard-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       mkdirSync(directory, { recursive: true })
@@ -263,7 +263,7 @@ describe("createToolExecuteBeforeHandler", () => {
       expect(started[0].options.maxIterations).toBe(100)
     })
 
-    test("blocks supabase db mutation command during active audit-loop", async () => {
+    test("blocks database mutation command during active audit-loop", async () => {
       //#given
       const hooks = {
         ralphLoop: {
@@ -281,11 +281,11 @@ describe("createToolExecuteBeforeHandler", () => {
 
       //#then
       await expect(run).rejects.toThrow(
-        "Supabase DB mutation is blocked while /audit-loop is active",
+        "Database mutation is blocked while /audit-loop is active",
       )
     })
 
-    test("allows non-db supabase mentions with explicit negation in task prompt", async () => {
+    test("allows explicit do-not-modify database guidance in task prompt", async () => {
       //#given
       const hooks = {
         ralphLoop: {
@@ -301,7 +301,7 @@ describe("createToolExecuteBeforeHandler", () => {
         {
           args: {
             description: "UI polish pass",
-            prompt: "Do not modify supabase database schema. Focus on frontend visual hierarchy.",
+            prompt: "Do not modify database schema (including supabase). Focus on frontend visual hierarchy.",
           } as Record<string, unknown>,
         },
       )
@@ -310,7 +310,7 @@ describe("createToolExecuteBeforeHandler", () => {
       await expect(run).resolves.toBeUndefined()
     })
 
-    test("blocks writing to supabase migration sql path during active audit-loop", async () => {
+    test("blocks writing to migration sql path during active audit-loop", async () => {
       //#given
       const hooks = {
         ralphLoop: {
@@ -333,7 +333,29 @@ describe("createToolExecuteBeforeHandler", () => {
 
       //#then
       await expect(run).rejects.toThrow(
-        "Supabase DB mutation is blocked while /audit-loop is active",
+        "Database mutation is blocked while /audit-loop is active",
+      )
+    })
+
+    test("blocks prisma migrate command during active audit-loop", async () => {
+      //#given
+      const hooks = {
+        ralphLoop: {
+          getState: () => ({ active: true, mode: "audit-loop" }),
+        },
+      }
+
+      const handler = createToolExecuteBeforeHandler({ ctx: createCtx(), hooks })
+
+      //#when
+      const run = handler(
+        { tool: "bash", sessionID: "ses_audit_prisma_1", callID: "call_1" },
+        { args: { command: "prisma migrate deploy" } as Record<string, unknown> },
+      )
+
+      //#then
+      await expect(run).rejects.toThrow(
+        "Database mutation is blocked while /audit-loop is active",
       )
     })
 

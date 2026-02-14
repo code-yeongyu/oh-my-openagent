@@ -322,7 +322,7 @@ describe("ralph-loop", () => {
       // then - continuation prompt should use audit template
       expect(promptCalls.length).toBe(1)
       expect(promptCalls[0].text).toContain("AUDIT LOOP")
-      expect(promptCalls[0].text).toContain("DO NOT modify Supabase")
+      expect(promptCalls[0].text).toContain("DO NOT modify database-layer logic")
       expect(promptCalls[0].text).toContain("AGENTS.md")
       expect(promptCalls[0].text).toContain("AGENTS.md wins")
       expect(promptCalls[0].text).toContain("Hardcoded component styling is prohibited")
