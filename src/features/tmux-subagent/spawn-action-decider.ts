@@ -13,23 +13,23 @@ import {
 } from "./pane-split-availability"
 import { findSpawnTarget } from "./spawn-target-finder"
 import { findOldestAgentPane, type SessionMapping } from "./oldest-agent-pane"
-import { MIN_PANE_WIDTH } from "./types"
 
 export function decideSpawnActions(
 	state: WindowState,
 	sessionId: string,
 	description: string,
-	_config: CapacityConfig,
+	config: CapacityConfig,
 	sessionMappings: SessionMapping[],
 ): SpawnDecision {
 	if (!state.mainPane) {
 		return { canSpawn: false, actions: [], reason: "no main pane found" }
 	}
 
+	const minPaneWidth = config.agentPaneWidth
 	const agentAreaWidth = Math.floor(state.windowWidth * (1 - MAIN_PANE_RATIO))
 	const currentCount = state.agentPanes.length
 
-	if (agentAreaWidth < MIN_PANE_WIDTH) {
+	if (agentAreaWidth < minPaneWidth) {
 		return {
 			canSpawn: false,
 			actions: [],
@@ -44,7 +44,7 @@ export function decideSpawnActions(
 
 	if (currentCount === 0) {
 		const virtualMainPane: TmuxPaneInfo = { ...state.mainPane, width: state.windowWidth }
-		if (canSplitPane(virtualMainPane, "-h")) {
+		if (canSplitPane(virtualMainPane, "-h", minPaneWidth)) {
 			return {
 				canSpawn: true,
 				actions: [
@@ -61,7 +61,7 @@ export function decideSpawnActions(
 		return { canSpawn: false, actions: [], reason: "mainPane too small to split" }
 	}
 
-	if (isSplittableAtCount(agentAreaWidth, currentCount)) {
+	if (isSplittableAtCount(agentAreaWidth, currentCount, minPaneWidth)) {
 		const spawnTarget = findSpawnTarget(state)
 		if (spawnTarget) {
 			return {
@@ -79,7 +79,7 @@ export function decideSpawnActions(
 		}
 	}
 
-	const minEvictions = findMinimalEvictions(agentAreaWidth, currentCount)
+	const minEvictions = findMinimalEvictions(agentAreaWidth, currentCount, minPaneWidth)
 	if (minEvictions === 1 && oldestPane) {
 		return {
 			canSpawn: true,
