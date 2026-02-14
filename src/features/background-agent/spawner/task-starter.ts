@@ -1,5 +1,6 @@
 import type { QueueItem } from "../constants"
 import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../../shared"
+import { setSessionTools } from "../../../shared/session-tools-store"
 import { subagentSessions } from "../../claude-code-session-state"
 import { getTaskToastManager } from "../../task-toast-manager"
 import { createBackgroundSession } from "./background-session-creator"
@@ -79,12 +80,16 @@ export async function startTask(item: QueueItem, ctx: SpawnerContext): Promise<v
       ...(launchModel ? { model: launchModel } : {}),
       ...(launchVariant ? { variant: launchVariant } : {}),
       system: input.skillContent,
-      tools: {
-        ...getAgentToolRestrictions(input.agent),
-        task: false,
-        call_omo_agent: true,
-        question: false,
-      },
+      tools: (() => {
+        const tools = {
+          ...getAgentToolRestrictions(input.agent),
+          task: false,
+          call_omo_agent: true,
+          question: false,
+        }
+        setSessionTools(sessionID, tools)
+        return tools
+      })(),
       parts: [{ type: "text", text: input.prompt }],
     },
   }).catch((error: unknown) => {

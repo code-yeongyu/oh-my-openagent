@@ -2,6 +2,7 @@ import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
+import { getSessionTools } from "../../shared/session-tools-store"
 
 export async function executeBackgroundContinuation(
   args: DelegateTaskArgs,
@@ -19,6 +20,7 @@ export async function executeBackgroundContinuation(
       parentMessageID: parentContext.messageID,
       parentModel: parentContext.model,
       parentAgent: parentContext.agent,
+      parentTools: getSessionTools(parentContext.sessionID),
     })
 
     const bgContMeta = {

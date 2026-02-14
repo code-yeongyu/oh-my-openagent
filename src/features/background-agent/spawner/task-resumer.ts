@@ -1,5 +1,6 @@
 import type { BackgroundTask, ResumeInput } from "../types"
 import { log, getAgentToolRestrictions } from "../../../shared"
+import { setSessionTools } from "../../../shared/session-tools-store"
 import type { SpawnerContext } from "./spawner-context"
 import { subagentSessions } from "../../claude-code-session-state"
 import { getTaskToastManager } from "../../task-toast-manager"
@@ -35,6 +36,9 @@ export async function resumeTask(
   task.parentMessageID = input.parentMessageID
   task.parentModel = input.parentModel
   task.parentAgent = input.parentAgent
+  if (input.parentTools) {
+    task.parentTools = input.parentTools
+  }
   task.startedAt = new Date()
 
   task.progress = {
@@ -75,12 +79,16 @@ export async function resumeTask(
         agent: task.agent,
         ...(resumeModel ? { model: resumeModel } : {}),
         ...(resumeVariant ? { variant: resumeVariant } : {}),
-        tools: {
-          ...getAgentToolRestrictions(task.agent),
-          task: false,
-          call_omo_agent: true,
-          question: false,
-        },
+        tools: (() => {
+          const tools = {
+            ...getAgentToolRestrictions(task.agent),
+            task: false,
+            call_omo_agent: true,
+            question: false,
+          }
+          setSessionTools(task.sessionID!, tools)
+          return tools
+        })(),
         parts: [{ type: "text", text: input.prompt }],
       },
     })

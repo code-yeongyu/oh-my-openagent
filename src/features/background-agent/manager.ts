@@ -7,6 +7,7 @@ import type {
 } from "./types"
 import { TaskHistory } from "./task-history"
 import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import { setSessionTools } from "../../shared/session-tools-store"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -141,6 +142,7 @@ export class BackgroundManager {
       parentMessageID: input.parentMessageID,
       parentModel: input.parentModel,
       parentAgent: input.parentAgent,
+      parentTools: input.parentTools,
       model: input.model,
       category: input.category,
     }
@@ -328,12 +330,16 @@ export class BackgroundManager {
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         system: input.skillContent,
-        tools: {
-          ...getAgentToolRestrictions(input.agent),
-          task: false,
-          call_omo_agent: true,
-          question: false,
-        },
+        tools: (() => {
+          const tools = {
+            ...getAgentToolRestrictions(input.agent),
+            task: false,
+            call_omo_agent: true,
+            question: false,
+          }
+          setSessionTools(sessionID, tools)
+          return tools
+        })(),
         parts: [{ type: "text", text: input.prompt }],
       },
     }).catch((error) => {
@@ -535,6 +541,9 @@ export class BackgroundManager {
     existingTask.parentMessageID = input.parentMessageID
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
+    if (input.parentTools) {
+      existingTask.parentTools = input.parentTools
+    }
     // Reset startedAt on resume to prevent immediate completion
     // The MIN_IDLE_TIME_MS check uses startedAt, so resumed tasks need fresh timing
     existingTask.startedAt = new Date()
@@ -588,12 +597,16 @@ export class BackgroundManager {
         agent: existingTask.agent,
         ...(resumeModel ? { model: resumeModel } : {}),
         ...(resumeVariant ? { variant: resumeVariant } : {}),
-        tools: {
-          ...getAgentToolRestrictions(existingTask.agent),
-          task: false,
-          call_omo_agent: true,
-          question: false,
-        },
+        tools: (() => {
+          const tools = {
+            ...getAgentToolRestrictions(existingTask.agent),
+            task: false,
+            call_omo_agent: true,
+            question: false,
+          }
+          setSessionTools(existingTask.sessionID!, tools)
+          return tools
+        })(),
         parts: [{ type: "text", text: input.prompt }],
       },
     }).catch((error) => {
@@ -1252,6 +1265,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           noReply: !allComplete,
           ...(agent !== undefined ? { agent } : {}),
           ...(model !== undefined ? { model } : {}),
+          ...(task.parentTools ? { tools: task.parentTools } : {}),
           parts: [{ type: "text", text: notification }],
         },
       })

@@ -71,6 +71,7 @@ export async function notifyParentSession(
         noReply: !allComplete,
         ...(agent !== undefined ? { agent } : {}),
         ...(model !== undefined ? { model } : {}),
+        ...(task.parentTools ? { tools: task.parentTools } : {}),
         parts: [{ type: "text", text: notification }],
       },
     })

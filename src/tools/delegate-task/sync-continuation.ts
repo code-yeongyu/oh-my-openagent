@@ -9,6 +9,7 @@ import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-re
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
+import { setSessionTools } from "../../shared/session-tools-store"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
@@ -77,6 +78,13 @@ export async function executeSyncContinuation(
     }
 
     const allowTask = isPlanFamily(resumeAgent)
+    const tools = {
+      ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
+      task: allowTask,
+      call_omo_agent: true,
+      question: false,
+    }
+    setSessionTools(args.session_id!, tools)
 
     await promptWithModelSuggestionRetry(client, {
       path: { id: args.session_id! },
@@ -84,12 +92,7 @@ export async function executeSyncContinuation(
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
         ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
-        tools: {
-          ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
-          task: allowTask,
-          call_omo_agent: true, // Intentionally overrides restrictions - continuation context needs delegation capability even for restricted agents
-          question: false,
-        },
+        tools,
         parts: [{ type: "text", text: args.prompt }],
       },
     })
