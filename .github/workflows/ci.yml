@@ -52,6 +52,8 @@ jobs:
           bun test src/hooks/atlas
           bun test src/hooks/compaction-context-injector
           bun test src/features/tmux-subagent
+          bun test src/cli/doctor/formatter.test.ts
+          bun test src/tools/call-omo-agent/sync-executor.test.ts
 
       - name: Run remaining tests
         run: |
