@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
-import { getMessageDir } from "../../shared/session-utils"
+import { getMessageDir } from "../../shared"
 import type { ModelInfo } from "./types"
 
 export async function resolveRecentModelForSession(

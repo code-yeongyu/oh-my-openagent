@@ -1,3 +1,4 @@
+import { existsSync, readdirSync } from "node:fs"
 import { getMessageDir } from "../../shared/opencode-message-dir"
 
 export { getMessageDir }

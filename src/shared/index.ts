@@ -37,7 +37,7 @@ export { resolveModelPipeline } from "./model-resolution-pipeline"
 export type {
   ModelResolutionRequest,
   ModelResolutionProvenance,
-  ModelResolutionPipelineResult,
+  ModelResolutionResult,
 } from "./model-resolution-types"
 export * from "./model-availability"
 export * from "./connected-providers-cache"
