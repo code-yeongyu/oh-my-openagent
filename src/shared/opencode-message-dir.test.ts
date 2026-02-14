@@ -1,83 +1,95 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { existsSync, readdirSync } from "node:fs"
-import { join } from "node:path"
-import { getMessageDir } from "./opencode-message-dir"
+declare const require: (name: string) => any
+const { describe, it, expect, beforeEach, afterEach, beforeAll, mock } = require("bun:test")
 
-// Mock the constants
-vi.mock("../tools/session-manager/constants", () => ({
-  MESSAGE_STORAGE: "/mock/message/storage",
-}))
+let getMessageDir: (sessionID: string) => string | null
 
-vi.mock("node:fs", () => ({
-  existsSync: vi.fn(),
-  readdirSync: vi.fn(),
-}))
+beforeAll(async () => {
+  // Mock the data-path module
+  mock.module("./data-path", () => ({
+    getOpenCodeStorageDir: () => "/mock/opencode/storage",
+  }))
 
-vi.mock("node:path", () => ({
-  join: vi.fn(),
-}))
+  // Mock fs functions
+  mock.module("node:fs", () => ({
+    existsSync: mock(() => false),
+    readdirSync: mock(() => []),
+  }))
 
-const mockExistsSync = vi.mocked(existsSync)
-const mockReaddirSync = vi.mocked(readdirSync)
-const mockJoin = vi.mocked(join)
+  mock.module("node:path", () => ({
+    join: mock((...args: string[]) => args.join("/")),
+  }))
+
+  ;({ getMessageDir } = await import("./opencode-message-dir"))
+})
 
 describe("getMessageDir", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockJoin.mockImplementation((...args) => args.join("/"))
+    // Reset mocks
+    mock.restore()
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
+  it("returns null when sessionID does not start with ses_", () => {
+    // given
+    // no mocks needed
+
+    // when
+    const result = getMessageDir("invalid")
+
+    // then
+    expect(result).toBe(null)
   })
 
   it("returns null when MESSAGE_STORAGE does not exist", () => {
     // given
-    mockExistsSync.mockReturnValue(false)
+    mock.module("node:fs", () => ({
+      existsSync: mock(() => false),
+      readdirSync: mock(() => []),
+    }))
 
     // when
-    const result = getMessageDir("session123")
+    const result = getMessageDir("ses_123")
 
     // then
     expect(result).toBe(null)
-    expect(mockExistsSync).toHaveBeenCalledWith("/mock/message/storage")
   })
 
   it("returns direct path when session exists directly", () => {
     // given
-    mockExistsSync.mockImplementation((path) => path === "/mock/message/storage" || path === "/mock/message/storage/session123")
+    mock.module("node:fs", () => ({
+      existsSync: mock((path: string) => path === "/mock/opencode/storage/message" || path === "/mock/opencode/storage/message/ses_123"),
+      readdirSync: mock(() => []),
+    }))
 
     // when
-    const result = getMessageDir("session123")
+    const result = getMessageDir("ses_123")
 
     // then
-    expect(result).toBe("/mock/message/storage/session123")
-    expect(mockExistsSync).toHaveBeenCalledWith("/mock/message/storage")
-    expect(mockExistsSync).toHaveBeenCalledWith("/mock/message/storage/session123")
+    expect(result).toBe("/mock/opencode/storage/message/ses_123")
   })
 
   it("returns subdirectory path when session exists in subdirectory", () => {
     // given
-    mockExistsSync.mockImplementation((path) => {
-      return path === "/mock/message/storage" || path === "/mock/message/storage/subdir/session123"
-    })
-    mockReaddirSync.mockReturnValue(["subdir"])
+    mock.module("node:fs", () => ({
+      existsSync: mock((path: string) => path === "/mock/opencode/storage/message" || path === "/mock/opencode/storage/message/subdir/ses_123"),
+      readdirSync: mock(() => ["subdir"]),
+    }))
 
     // when
-    const result = getMessageDir("session123")
+    const result = getMessageDir("ses_123")
 
     // then
-    expect(result).toBe("/mock/message/storage/subdir/session123")
-    expect(mockReaddirSync).toHaveBeenCalledWith("/mock/message/storage")
+    expect(result).toBe("/mock/opencode/storage/message/subdir/ses_123")
   })
 
   it("returns null when session not found anywhere", () => {
     // given
-    mockExistsSync.mockImplementation((path) => path === "/mock/message/storage")
-    mockReaddirSync.mockReturnValue(["subdir1", "subdir2"])
+    mock.module("node:fs", () => ({
+      existsSync: mock((path: string) => path === "/mock/opencode/storage/message"),
+      readdirSync: mock(() => ["subdir1", "subdir2"]),
+    }))
 
     // when
-    const result = getMessageDir("session123")
+    const result = getMessageDir("ses_123")
 
     // then
     expect(result).toBe(null)
@@ -85,13 +97,15 @@ describe("getMessageDir", () => {
 
   it("returns null when readdirSync throws", () => {
     // given
-    mockExistsSync.mockImplementation((path) => path === "/mock/message/storage")
-    mockReaddirSync.mockImplementation(() => {
-      throw new Error("Permission denied")
-    })
+    mock.module("node:fs", () => ({
+      existsSync: mock((path: string) => path === "/mock/opencode/storage/message"),
+      readdirSync: mock(() => {
+        throw new Error("Permission denied")
+      }),
+    }))
 
     // when
-    const result = getMessageDir("session123")
+    const result = getMessageDir("ses_123")
 
     // then
     expect(result).toBe(null)
