@@ -1,6 +1,11 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode } from "./types"
-import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentMode } from "./types";
+import type {
+  AvailableAgent,
+  AvailableTool,
+  AvailableSkill,
+  AvailableCategory,
+} from "./dynamic-agent-prompt-builder";
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -12,9 +17,9 @@ import {
   buildHardBlocksSection,
   buildAntiPatternsSection,
   categorizeTools,
-} from "./dynamic-agent-prompt-builder"
+} from "./dynamic-agent-prompt-builder";
 
-const MODE: AgentMode = "primary"
+const MODE: AgentMode = "primary";
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -52,7 +57,7 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
 | Proceeding without \`in_progress\` | No indication of current work |
 | Finishing without completing tasks | Task appears incomplete |
 
-**NO TASKS ON MULTI-STEP WORK = INCOMPLETE WORK.**`
+**NO TASKS ON MULTI-STEP WORK = INCOMPLETE WORK.**`;
   }
 
   return `## Todo Discipline (NON-NEGOTIABLE)
@@ -89,7 +94,7 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
 | Proceeding without \`in_progress\` | No indication of current work |
 | Finishing without completing todos | Task appears incomplete |
 
-**NO TODOS ON MULTI-STEP WORK = INCOMPLETE WORK.**`
+**NO TODOS ON MULTI-STEP WORK = INCOMPLETE WORK.**`;
 }
 
 /**
@@ -111,18 +116,25 @@ function buildHephaestusPrompt(
   availableTools: AvailableTool[] = [],
   availableSkills: AvailableSkill[] = [],
   availableCategories: AvailableCategory[] = [],
-  useTaskSystem = false
+  useTaskSystem = false,
 ): string {
-  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
-  const toolSelection = buildToolSelectionTable(availableAgents, availableTools, availableSkills)
-  const exploreSection = buildExploreSection(availableAgents)
-  const librarianSection = buildLibrarianSection(availableAgents)
-  const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, availableSkills)
-  const delegationTable = buildDelegationTable(availableAgents)
-  const oracleSection = buildOracleSection(availableAgents)
-  const hardBlocks = buildHardBlocksSection()
-  const antiPatterns = buildAntiPatternsSection()
-  const todoDiscipline = buildTodoDisciplineSection(useTaskSystem)
+  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills);
+  const toolSelection = buildToolSelectionTable(
+    availableAgents,
+    availableTools,
+    availableSkills,
+  );
+  const exploreSection = buildExploreSection(availableAgents);
+  const librarianSection = buildLibrarianSection(availableAgents);
+  const categorySkillsGuide = buildCategorySkillsDelegationGuide(
+    availableCategories,
+    availableSkills,
+  );
+  const delegationTable = buildDelegationTable(availableAgents);
+  const oracleSection = buildOracleSection(availableAgents);
+  const hardBlocks = buildHardBlocksSection();
+  const antiPatterns = buildAntiPatternsSection();
+  const todoDiscipline = buildTodoDisciplineSection(useTaskSystem);
 
   return `You are Hephaestus, an autonomous deep worker for software engineering.
 
@@ -226,6 +238,7 @@ Agent: *runs gh pr list, gh pr view, searches recent commits*
 ### Step 3: Validate Before Acting
 
 **Delegation Check (MANDATORY before acting directly):**
+0. Find relevant skills that you can load, and load them IMMEDIATELY.
 1. Is there a specialized agent that perfectly matches this request?
 2. If not, is there a \`task\` category that best describes this task? What skills are available to equip the agent with?
    - MUST FIND skills to use: \`task(load_skills=[{skill1}, ...])\`
@@ -411,9 +424,13 @@ Every \`task()\` output includes a session_id. **USE IT.**
 
 **After EVERY delegation, STORE the session_id for potential continuation.**
 
-${oracleSection ? `
+${
+  oracleSection
+    ? `
 ${oracleSection}
-` : ""}
+`
+    : ""
+}
 
 ## Role & Agency (CRITICAL - READ CAREFULLY)
 
@@ -591,7 +608,7 @@ When working on long sessions or complex multi-file tasks:
 ## Soft Guidelines
 
 - Prefer existing libraries over new dependencies
-- Prefer small, focused changes over large refactors`
+- Prefer small, focused changes over large refactors`;
 }
 
 export function createHephaestusAgent(
@@ -600,14 +617,20 @@ export function createHephaestusAgent(
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[],
   availableCategories?: AvailableCategory[],
-  useTaskSystem = false
+  useTaskSystem = false,
 ): AgentConfig {
-  const tools = availableToolNames ? categorizeTools(availableToolNames) : []
-  const skills = availableSkills ?? []
-  const categories = availableCategories ?? []
+  const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
+  const skills = availableSkills ?? [];
+  const categories = availableCategories ?? [];
   const prompt = availableAgents
-    ? buildHephaestusPrompt(availableAgents, tools, skills, categories, useTaskSystem)
-    : buildHephaestusPrompt([], tools, skills, categories, useTaskSystem)
+    ? buildHephaestusPrompt(
+        availableAgents,
+        tools,
+        skills,
+        categories,
+        useTaskSystem,
+      )
+    : buildHephaestusPrompt([], tools, skills, categories, useTaskSystem);
 
   return {
     description:
@@ -617,8 +640,11 @@ export function createHephaestusAgent(
     maxTokens: 32000,
     prompt,
     color: "#D97706", // Forged Amber - Golden heated metal, divine craftsman
-    permission: { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"],
+    permission: {
+      question: "allow",
+      call_omo_agent: "deny",
+    } as AgentConfig["permission"],
     reasoningEffort: "medium",
-  }
+  };
 }
-createHephaestusAgent.mode = MODE
+createHephaestusAgent.mode = MODE;

@@ -1,15 +1,20 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
-import { isGptModel } from "./types"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentMode, AgentPromptMetadata } from "./types";
+import { isGptModel } from "./types";
 
-const MODE: AgentMode = "primary"
+const MODE: AgentMode = "primary";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
   category: "utility",
   cost: "EXPENSIVE",
   promptAlias: "Sisyphus",
   triggers: [],
-}
-import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
+};
+import type {
+  AvailableAgent,
+  AvailableTool,
+  AvailableSkill,
+  AvailableCategory,
+} from "./dynamic-agent-prompt-builder";
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -21,7 +26,7 @@ import {
   buildHardBlocksSection,
   buildAntiPatternsSection,
   categorizeTools,
-} from "./dynamic-agent-prompt-builder"
+} from "./dynamic-agent-prompt-builder";
 
 function buildTaskManagementSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -80,7 +85,7 @@ I want to make sure I understand correctly.
 
 Should I proceed with [recommendation], or would you prefer differently?
 \`\`\`
-</Task_Management>`
+</Task_Management>`;
   }
 
   return `<Task_Management>
@@ -138,7 +143,7 @@ I want to make sure I understand correctly.
 
 Should I proceed with [recommendation], or would you prefer differently?
 \`\`\`
-</Task_Management>`
+</Task_Management>`;
 }
 
 function buildDynamicSisyphusPrompt(
@@ -146,21 +151,28 @@ function buildDynamicSisyphusPrompt(
   availableTools: AvailableTool[] = [],
   availableSkills: AvailableSkill[] = [],
   availableCategories: AvailableCategory[] = [],
-  useTaskSystem = false
+  useTaskSystem = false,
 ): string {
-  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
-  const toolSelection = buildToolSelectionTable(availableAgents, availableTools, availableSkills)
-  const exploreSection = buildExploreSection(availableAgents)
-  const librarianSection = buildLibrarianSection(availableAgents)
-  const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, availableSkills)
-  const delegationTable = buildDelegationTable(availableAgents)
-  const oracleSection = buildOracleSection(availableAgents)
-  const hardBlocks = buildHardBlocksSection()
-  const antiPatterns = buildAntiPatternsSection()
-  const taskManagementSection = buildTaskManagementSection(useTaskSystem)
+  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills);
+  const toolSelection = buildToolSelectionTable(
+    availableAgents,
+    availableTools,
+    availableSkills,
+  );
+  const exploreSection = buildExploreSection(availableAgents);
+  const librarianSection = buildLibrarianSection(availableAgents);
+  const categorySkillsGuide = buildCategorySkillsDelegationGuide(
+    availableCategories,
+    availableSkills,
+  );
+  const delegationTable = buildDelegationTable(availableAgents);
+  const oracleSection = buildOracleSection(availableAgents);
+  const hardBlocks = buildHardBlocksSection();
+  const antiPatterns = buildAntiPatternsSection();
+  const taskManagementSection = buildTaskManagementSection(useTaskSystem);
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
-    : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])"
+    : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])";
 
   return `<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
@@ -315,6 +327,7 @@ STOP searching when:
 ## Phase 2B - Implementation
 
 ### Pre-Implementation:
+0. Find relevant skills that you can load, and load them IMMEDIATELY.
 1. If task has 2+ steps → Create todo list IMMEDIATELY, IN SUPER DETAIL. No announcements—just create it.
 2. Mark current task \`in_progress\` before starting
 3. Mark \`completed\` as soon as done (don't batch) - OBSESSIVELY TRACK YOUR WORK USING TODO TOOLS
@@ -497,7 +510,7 @@ ${antiPatterns}
 - Prefer small, focused changes over large refactors
 - When uncertain about scope, ask
 </Constraints>
-`
+`;
 }
 
 export function createSisyphusAgent(
@@ -506,16 +519,25 @@ export function createSisyphusAgent(
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[],
   availableCategories?: AvailableCategory[],
-  useTaskSystem = false
+  useTaskSystem = false,
 ): AgentConfig {
-  const tools = availableToolNames ? categorizeTools(availableToolNames) : []
-  const skills = availableSkills ?? []
-  const categories = availableCategories ?? []
+  const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
+  const skills = availableSkills ?? [];
+  const categories = availableCategories ?? [];
   const prompt = availableAgents
-    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills, categories, useTaskSystem)
-    : buildDynamicSisyphusPrompt([], tools, skills, categories, useTaskSystem)
+    ? buildDynamicSisyphusPrompt(
+        availableAgents,
+        tools,
+        skills,
+        categories,
+        useTaskSystem,
+      )
+    : buildDynamicSisyphusPrompt([], tools, skills, categories, useTaskSystem);
 
-  const permission = { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"]
+  const permission = {
+    question: "allow",
+    call_omo_agent: "deny",
+  } as AgentConfig["permission"];
   const base = {
     description:
       "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
@@ -525,12 +547,12 @@ export function createSisyphusAgent(
     prompt,
     color: "#00CED1",
     permission,
-  }
+  };
 
   if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" }
+    return { ...base, reasoningEffort: "medium" };
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };
 }
-createSisyphusAgent.mode = MODE
+createSisyphusAgent.mode = MODE;
