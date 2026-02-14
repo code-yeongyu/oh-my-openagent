@@ -1,3 +1,4 @@
+import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH } from "./types"
 import type { SplitDirection, TmuxPaneInfo } from "./types"
 import {
 	DIVIDER_SIZE,
@@ -6,6 +7,10 @@ import {
 	MIN_SPLIT_HEIGHT,
 	MIN_SPLIT_WIDTH,
 } from "./tmux-grid-constants"
+
+function minSplitWidthFor(minPaneWidth: number): number {
+	return 2 * minPaneWidth + DIVIDER_SIZE
+}
 
 export function getColumnCount(paneCount: number): number {
 	if (paneCount <= 0) return 1
@@ -21,26 +26,32 @@ export function getColumnWidth(agentAreaWidth: number, paneCount: number): numbe
 export function isSplittableAtCount(
 	agentAreaWidth: number,
 	paneCount: number,
+	minPaneWidth: number = MIN_PANE_WIDTH,
 ): boolean {
 	const columnWidth = getColumnWidth(agentAreaWidth, paneCount)
-	return columnWidth >= MIN_SPLIT_WIDTH
+	return columnWidth >= minSplitWidthFor(minPaneWidth)
 }
 
 export function findMinimalEvictions(
 	agentAreaWidth: number,
 	currentCount: number,
+	minPaneWidth: number = MIN_PANE_WIDTH,
 ): number | null {
 	for (let k = 1; k <= currentCount; k++) {
-		if (isSplittableAtCount(agentAreaWidth, currentCount - k)) {
+		if (isSplittableAtCount(agentAreaWidth, currentCount - k, minPaneWidth)) {
 			return k
 		}
 	}
 	return null
 }
 
-export function canSplitPane(pane: TmuxPaneInfo, direction: SplitDirection): boolean {
+export function canSplitPane(
+	pane: TmuxPaneInfo,
+	direction: SplitDirection,
+	minPaneWidth: number = MIN_PANE_WIDTH,
+): boolean {
 	if (direction === "-h") {
-		return pane.width >= MIN_SPLIT_WIDTH
+		return pane.width >= minSplitWidthFor(minPaneWidth)
 	}
 	return pane.height >= MIN_SPLIT_HEIGHT
 }
