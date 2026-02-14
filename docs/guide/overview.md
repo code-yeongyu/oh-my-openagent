@@ -1,6 +1,6 @@
-# Oh My OpenCode Overview
+# Matrixx Overview
 
-Learn about Oh My OpenCode, a plugin that transforms OpenCode into the best agent harness.
+Learn about Matrixx, a plugin that transforms OpenCode into the best agent harness.
 
 ---
 
@@ -14,7 +14,7 @@ Learn about Oh My OpenCode, a plugin that transforms OpenCode into the best agen
 
 ---
 
-## What Oh My OpenCode Does for You
+## What Matrixx Does for You
 
 - **Build features from descriptions**: Just tell the agent what you want. It makes a plan, writes the code, and ensures it works. Automatically. You don't have to care about the details.
 - **Debug and fix issues**: Describe a bug or paste an error. The agent analyzes your codebase, identifies the problem, and implements a fix.
@@ -90,13 +90,13 @@ The orchestrator is designed to execute work plans created by Prometheus. Using 
 
 ## Model Configuration
 
-Oh My OpenCode automatically configures models based on your available providers. You don't need to manually specify every model.
+Matrixx automatically configures models based on your available providers. You don't need to manually specify every model.
 
 ### How Models Are Determined
 
 **1. At Installation Time (Interactive Installer)**
 
-When you run `bunx oh-my-opencode install`, the installer asks which providers you have:
+When you run `bunx matrixx install`, the installer asks which providers you have:
 - Claude Pro/Max subscription?
 - OpenAI/ChatGPT Plus?
 - Google Gemini?
@@ -104,7 +104,7 @@ When you run `bunx oh-my-opencode install`, the installer asks which providers y
 - OpenCode Zen?
 - Z.ai Coding Plan?
 
-Based on your answers, it generates `~/.config/opencode/oh-my-opencode.json` with optimal model assignments for each agent and category.
+Based on your answers, it generates `~/.config/opencode/matrixx.json` with optimal model assignments for each agent and category.
 
 **2. At Runtime (Fallback Chain)**
 
@@ -125,7 +125,7 @@ Here's a real-world config for a user with **Claude, OpenAI, Gemini, and Z.ai** 
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/matrixx.schema.json",
   "agents": {
     // Override specific agents only - rest use fallback chain
     "atlas": { "model": "anthropic/claude-sonnet-4-5", "variant": "max" },
@@ -162,7 +162,7 @@ For detailed configuration options including per-agent settings, category custom
 ## Next Steps
 
 - [Understanding the Orchestration System](./understanding-orchestration-system.md) - Deep dive into Prometheus → Orchestrator → Junior workflow
-- [Ultrawork Manifesto](../ultrawork-manifesto.md) - Philosophy and principles behind Oh My OpenCode
+- [Ultrawork Manifesto](../ultrawork-manifesto.md) - Philosophy and principles behind Matrixx
 - [Installation Guide](./installation.md) - Detailed installation instructions
 - [Configuration Guide](../configurations.md) - Customize agents, models, and behaviors
 - [Features Reference](../features.md) - Complete feature documentation

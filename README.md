@@ -3,7 +3,7 @@
 >
 > **ohmyopencode.com is NOT affiliated with this project.** We do not operate or endorse that site.
 >
-> OhMyOpenCode is **free and open-source**. Do **not** download installers or enter payment details on third-party sites that claim to be "official."
+> Matrixx is **free and open-source**. Do **not** download installers or enter payment details on third-party sites that claim to be "official."
 >
 > Because the impersonation site is behind a paywall, we **cannot verify what it distributes**. Treat any downloads from it as **potentially unsafe**.
 
@@ -21,13 +21,13 @@
 
 </div>
 
-> This is coding on steroids—`oh-my-opencode` in action. Run background agents, call specialized agents like merovingian, operator, and frontend engineer. Use crafted LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
+> This is coding on steroids—`matrixx` in action. Run background agents, call specialized agents like merovingian, operator, and frontend engineer. Use crafted LSP/AST tools, curated MCPs, and a full Claude Code compatibility layer.
 
 # Claude OAuth Access Notice
 
 ## TL;DR
 
-> Q. Can I use oh-my-opencode?
+> Q. Can I use matrixx?
 
 Yes.
 
@@ -39,7 +39,7 @@ Yes, technically possible. But I cannot recommend using it.
 
 > As of January 2026, Anthropic has restricted third-party OAuth access citing ToS violations.
 >
-> [**Anthropic has cited this project, oh-my-opencode as justification for blocking opencode.**](https://x.com/thdxr/status/2010149530486911014)
+> [**Anthropic has cited this project (formerly oh-my-opencode) as justification for blocking opencode.**](https://x.com/thdxr/status/2010149530486911014)
 >
 > Indeed, some plugins that spoof Claude Code's oauth request signatures exist in the community.
 >
@@ -51,7 +51,7 @@ Yes, technically possible. But I cannot recommend using it.
 <div align="center">
 
 [![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-opencode?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/releases)
-[![npm downloads](https://img.shields.io/npm/dt/oh-my-opencode?color=ff6b35&labelColor=black&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
+[![npm downloads](https://img.shields.io/npm/dt/matrixx?color=ff6b35&labelColor=black&style=flat-square)](https://www.npmjs.com/package/matrixx)
 [![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-opencode?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/graphs/contributors)
 [![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-opencode?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/network/members)
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-opencode?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/stargazers)
@@ -93,7 +93,7 @@ Yes, technically possible. But I cannot recommend using it.
 
 ## Contents
 
-- [Oh My OpenCode](#oh-my-opencode)
+- [Matrixx](#matrixx)
   - [Just Skip Reading This Readme](#just-skip-reading-this-readme)
     - [It's the Age of Agents](#its-the-age-of-agents)
     - [🪄 The Magic Word: `ultrawork`](#-the-magic-word-ultrawork)
@@ -110,7 +110,7 @@ Yes, technically possible. But I cannot recommend using it.
   - [Warnings](#warnings)
   - [Loved by professionals at](#loved-by-professionals-at)
 
-# Oh My OpenCode
+# Matrixx
 
 [Claude Code](https://www.claude.com/product/claude-code) is great.
 But if you're a hacker, you'll fall head over heels for [OpenCode](https://github.com/sst/opencode).
@@ -199,7 +199,7 @@ Just by installing this, you make your agents to work like:
 
 Need to look something up? It scours official docs, your entire codebase history, and public GitHub implementations—using not just grep but built-in LSP tools and AST-Grep.
 3. Stop worrying about context management when delegating to LLMs. I've got it covered.
-    - OhMyOpenCode aggressively leverages multiple agents to lighten the context load.
+    - Matrixx aggressively leverages multiple agents to lighten the context load.
     - **Your agent is now the dev team lead. You're the AI Manager.**
 4. It doesn't stop until the job is done.
 5. Don't want to dive deep into this project? No problem. Just type 'ultrathink'.
@@ -231,7 +231,7 @@ Keymaker is inspired by [AmpCode's deep mode](https://ampcode.com)—autonomous 
 Copy and paste this prompt to your LLM agent (Claude Code, AmpCode, Cursor, etc.):
 
 ```
-Install and configure oh-my-opencode by following the instructions here:
+Install and configure matrixx by following the instructions here:
 https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
 ```
 
@@ -247,15 +247,15 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads
 
 ## Uninstallation
 
-To remove oh-my-opencode:
+To remove matrixx:
 
 1. **Remove the plugin from your OpenCode config**
 
-   Edit `~/.config/opencode/opencode.json` (or `opencode.jsonc`) and remove `"oh-my-opencode"` from the `plugin` array:
+   Edit `~/.config/opencode/opencode.json` (or `opencode.jsonc`) and remove `"matrixx"` from the `plugin` array:
 
    ```bash
    # Using jq
-   jq '.plugin = [.plugin[] | select(. != "oh-my-opencode")]' \
+   jq '.plugin = [.plugin[] | select(. != "matrixx")]' \
        ~/.config/opencode/opencode.json > /tmp/oc.json && \
        mv /tmp/oc.json ~/.config/opencode/opencode.json
    ```
@@ -264,10 +264,10 @@ To remove oh-my-opencode:
 
    ```bash
    # Remove user config
-   rm -f ~/.config/opencode/oh-my-opencode.json
+   rm -f ~/.config/opencode/matrixx.json
 
    # Remove project config (if exists)
-   rm -f .opencode/oh-my-opencode.json
+   rm -f .opencode/matrixx.json
    ```
 
 3. **Verify removal**
@@ -298,7 +298,7 @@ Highly opinionated, but adjustable to taste.
 See the full [Configuration Documentation](docs/configurations.md) for detailed information.
 
 **Quick Overview:**
-- **Config Locations**: `.opencode/oh-my-opencode.json` (project) or `~/.config/opencode/oh-my-opencode.json` (user)
+- **Config Locations**: `.opencode/matrixx.json` (project) or `~/.config/opencode/matrixx.json` (user)
 - **JSONC Support**: Comments and trailing commas supported
 - **Agents**: Override models, temperatures, prompts, and permissions for any agent
 - **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits)
@@ -315,13 +315,13 @@ See the full [Configuration Documentation](docs/configurations.md) for detailed 
 
 **Curious about the philosophy behind this project?** Read the [Ultrawork Manifesto](docs/ultrawork-manifesto.md).
 
-Install Oh My OpenCode.
+Install Matrixx.
 
 I've used LLMs worth $24,000 tokens purely for personal development.
 Tried every tool out there, configured them to death. OpenCode won.
 
 The answers to every problem I hit are baked into this plugin. Just install and go.
-If OpenCode is Debian/Arch, Oh My OpenCode is Ubuntu/[Omarchy](https://omarchy.org/).
+If OpenCode is Debian/Arch, Matrixx is Ubuntu/[Omarchy](https://omarchy.org/).
 
 
 Heavily influenced by [AmpCode](https://ampcode.com) and [Claude Code](https://code.claude.com/docs/overview)—I've ported their features here, often improved. And I'm still building.
@@ -354,7 +354,7 @@ I have no affiliation with any project or model mentioned here. This is purely p
   - Actually, I'll spread the word. Let's see who wins.
 - If you're on [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) or older, an OpenCode bug may break config.
   - [The fix](https://github.com/sst/opencode/pull/5040) was merged after 1.0.132—use a newer version.
-    - Fun fact: That PR was discovered and fixed thanks to OhMyOpenCode's Operator, Trinity, and Merovingian setup.
+    - Fun fact: That PR was discovered and fixed thanks to Matrixx's Operator, Trinity, and Merovingian setup.
 
 ## Loved by professionals at
 

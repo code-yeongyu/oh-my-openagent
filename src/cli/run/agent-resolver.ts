@@ -1,6 +1,6 @@
 import pc from "picocolors"
 import type { RunOptions } from "./types"
-import type { OhMyOpenCodeConfig } from "../../config"
+import type { MatrixxConfig } from "../../config"
 
 const CORE_AGENT_ORDER = ["morpheus", "keymaker", "oracle", "architect"] as const
 const DEFAULT_AGENT = "morpheus"
@@ -16,9 +16,9 @@ const normalizeAgentName = (agent?: string): string | undefined => {
   return coreMatch ?? trimmed
 }
 
-const isAgentDisabled = (agent: string, config: OhMyOpenCodeConfig): boolean => {
+const isAgentDisabled = (agent: string, config: MatrixxConfig): boolean => {
   const lowered = agent.toLowerCase()
-  if (lowered === "morpheus" && config.sisyphus_agent?.disabled === true) {
+  if (lowered === "morpheus" && config.morpheus_agent?.disabled === true) {
     return true
   }
   return (config.disabled_agents ?? []).some(
@@ -26,7 +26,7 @@ const isAgentDisabled = (agent: string, config: OhMyOpenCodeConfig): boolean => 
   )
 }
 
-const pickFallbackAgent = (config: OhMyOpenCodeConfig): string => {
+const pickFallbackAgent = (config: MatrixxConfig): string => {
   for (const agent of CORE_AGENT_ORDER) {
     if (!isAgentDisabled(agent, config)) {
       return agent
@@ -37,7 +37,7 @@ const pickFallbackAgent = (config: OhMyOpenCodeConfig): string => {
 
 export const resolveRunAgent = (
   options: RunOptions,
-  pluginConfig: OhMyOpenCodeConfig,
+  pluginConfig: MatrixxConfig,
   env: EnvVars = process.env
 ): string => {
   const cliAgent = normalizeAgentName(options.agent)

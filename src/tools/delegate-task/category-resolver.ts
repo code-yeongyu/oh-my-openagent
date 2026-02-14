@@ -56,7 +56,7 @@ export async function resolveCategoryExecution(
 
 To use this category:
 1. Connect a provider with this model: ${requirement.requiresModel}
-2. Or configure an alternative model in your oh-my-opencode.json for this category
+2. Or configure an alternative model in your matrixx.json for this category
 
 Available categories: ${allCategoryNames}`,
       }
@@ -159,7 +159,7 @@ Available categories: ${allCategoryNames}`,
 
 Configure in one of:
 1. OpenCode: Set "model" in opencode.json
-2. Oh-My-OpenCode: Set category model in oh-my-opencode.json
+2. Matrixx: Set category model in matrixx.json
 3. Provider: Connect a provider with available models
 
 Current category: ${args.category}

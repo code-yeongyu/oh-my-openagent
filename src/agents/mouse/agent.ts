@@ -92,7 +92,7 @@ export function createMouseAgentWithOverrides(
 
   const base: AgentConfig = {
     description: override?.description ??
-      "Focused task executor. Same discipline, no delegation. (Mouse - OhMyOpenCode)",
+      "Focused task executor. Same discipline, no delegation. (Mouse - Matrixx)",
     mode: MODE,
     model,
     temperature,

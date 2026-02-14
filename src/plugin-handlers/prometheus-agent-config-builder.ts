@@ -71,7 +71,7 @@ export async function buildOracleAgentConfig(params: {
     mode: "all",
     prompt: ORACLE_SYSTEM_PROMPT,
     permission: ORACLE_PERMISSION,
-    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Oracle - OhMyOpenCode)`,
+    description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Oracle - Matrixx)`,
     color: (params.configAgentPlan?.color as string) ?? "#FF5722",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
     ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "bun:test"
-import type { OhMyOpenCodeConfig } from "../../config"
+import type { MatrixxConfig } from "../../config"
 import { resolveRunAgent } from "./runner"
 
-const createConfig = (overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig => ({
+const createConfig = (overrides: Partial<MatrixxConfig> = {}): MatrixxConfig => ({
   ...overrides,
 })
 

@@ -56,7 +56,7 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
     ``,
     `Available servers: ${result.availableServers.slice(0, 10).join(", ")}${result.availableServers.length > 10 ? "..." : ""}`,
     ``,
-    `To add a custom server, configure 'lsp' in oh-my-opencode.json:`,
+    `To add a custom server, configure 'lsp' in matrixx.json:`,
     `  {`,
     `    "lsp": {`,
     `      "my-server": {`,

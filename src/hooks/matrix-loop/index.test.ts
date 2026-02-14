@@ -235,7 +235,7 @@ describe("matrix-loop", () => {
       // then - continuation should be injected
       expect(promptCalls.length).toBe(1)
       expect(promptCalls[0].sessionID).toBe("session-123")
-      expect(promptCalls[0].text).toContain("[SYSTEM DIRECTIVE: OH-MY-OPENCODE - MATRIX LOOP")
+      expect(promptCalls[0].text).toContain("[SYSTEM DIRECTIVE: MATRIXX - MATRIX LOOP")
       expect(promptCalls[0].text).toContain("Build a feature")
       expect(promptCalls[0].text).toContain("2/10")
 

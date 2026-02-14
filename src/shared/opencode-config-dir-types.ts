@@ -12,4 +12,5 @@ export type OpenCodeConfigPaths = {
   configJsonc: string
   packageJson: string
   omoConfig: string
+  matrixxConfig: string
 }

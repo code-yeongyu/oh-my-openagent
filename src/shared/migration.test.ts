@@ -306,19 +306,63 @@ describe("migrateHookNames", () => {
 describe("migrateConfigFile", () => {
   const testConfigPath = "/tmp/nonexistent-path-for-test.json"
 
-  test("migrates omo_agent to sisyphus_agent", () => {
-    // given: Config with legacy omo_agent key
+  test("migrates omo_agent to morpheus_agent", () => {
+    //#given: Config with legacy omo_agent key
     const rawConfig: Record<string, unknown> = {
       omo_agent: { disabled: false },
     }
 
-    // when: Migrate config file
+    //#when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // then: omo_agent should be migrated to sisyphus_agent
+    //#then: omo_agent should be migrated to morpheus_agent
     expect(needsWrite).toBe(true)
-    expect(rawConfig.sisyphus_agent).toEqual({ disabled: false })
+    expect(rawConfig.morpheus_agent).toEqual({ disabled: false })
     expect(rawConfig.omo_agent).toBeUndefined()
+  })
+
+  test("migrates sisyphus_agent to morpheus_agent", () => {
+    //#given: Config with legacy sisyphus_agent key
+    const rawConfig: Record<string, unknown> = {
+      sisyphus_agent: { disabled: true, planner_enabled: false },
+    }
+
+    //#when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    //#then: sisyphus_agent should be migrated to morpheus_agent
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.morpheus_agent).toEqual({ disabled: true, planner_enabled: false })
+    expect(rawConfig.sisyphus_agent).toBeUndefined()
+  })
+
+  test("migrates sisyphus config section to morpheus", () => {
+    //#given: Config with legacy sisyphus config section
+    const rawConfig: Record<string, unknown> = {
+      sisyphus: { tasks: { storage_path: "/tmp/tasks" } },
+    }
+
+    //#when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    //#then: sisyphus should be migrated to morpheus
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.morpheus).toEqual({ tasks: { storage_path: "/tmp/tasks" } })
+    expect(rawConfig.sisyphus).toBeUndefined()
+  })
+
+  test("does not overwrite existing morpheus when sisyphus is present", () => {
+    //#given: Config with both sisyphus and morpheus (morpheus takes priority)
+    const rawConfig: Record<string, unknown> = {
+      sisyphus: { tasks: { storage_path: "/old" } },
+      morpheus: { tasks: { storage_path: "/new" } },
+    }
+
+    //#when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    //#then: morpheus should be preserved, sisyphus kept since morpheus exists
+    expect(rawConfig.morpheus).toEqual({ tasks: { storage_path: "/new" } })
   })
 
   test("migrates legacy agent names in agents object", () => {
@@ -355,24 +399,24 @@ describe("migrateConfigFile", () => {
   })
 
   test("does not write if no migration needed", () => {
-    // given: Config with current names
+    //#given: Config with current names
     const rawConfig: Record<string, unknown> = {
-      sisyphus_agent: { disabled: false },
+      morpheus_agent: { disabled: false },
       agents: {
         morpheus: { model: "test" },
       },
       disabled_hooks: ["anthropic-context-window-limit-recovery"],
     }
 
-    // when: Migrate config file
+    //#when: Migrate config file
     const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-    // then: No write should be needed
+    //#then: No write should be needed
     expect(needsWrite).toBe(false)
   })
 
    test("handles migration of all legacy items together", () => {
-     // given: Config with all legacy items
+     //#given: Config with all legacy items
      const rawConfig: Record<string, unknown> = {
        omo_agent: { disabled: false },
        agents: {
@@ -382,12 +426,12 @@ describe("migrateConfigFile", () => {
        disabled_hooks: ["anthropic-auto-compact"],
      }
 
-     // when: Migrate config file
+     //#when: Migrate config file
      const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
 
-     // then: All legacy items should be migrated
+     //#then: All legacy items should be migrated
      expect(needsWrite).toBe(true)
-    expect(rawConfig.sisyphus_agent).toEqual({ disabled: false })
+     expect(rawConfig.morpheus_agent).toEqual({ disabled: false })
      expect(rawConfig.omo_agent).toBeUndefined()
      const agents = rawConfig.agents as Record<string, unknown>
      expect(agents["morpheus"]).toBeDefined()
@@ -657,7 +701,7 @@ describe("migrateConfigFile _migrations tracking", () => {
   test("records migrations in _migrations field", () => {
     // given: Config with old model, no prior migrations
     const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
-    const configPath = `${tmpDir}/oh-my-opencode.json`
+    const configPath = `${tmpDir}/matrixx.json`
     const rawConfig: Record<string, unknown> = {
       agents: {
         sisyphus: { model: "openai/gpt-5.2-codex" },
@@ -678,7 +722,7 @@ describe("migrateConfigFile _migrations tracking", () => {
   test("skips re-migration when _migrations contains the key", () => {
     // given: Config with old model BUT migration already recorded
     const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
-    const configPath = `${tmpDir}/oh-my-opencode.json`
+    const configPath = `${tmpDir}/matrixx.json`
     const rawConfig: Record<string, unknown> = {
       agents: {
         sisyphus: { model: "openai/gpt-5.2-codex" },
@@ -701,7 +745,7 @@ describe("migrateConfigFile _migrations tracking", () => {
   test("preserves existing _migrations and appends new ones", () => {
     // given: Config with existing migration history and a new migratable model
     const tmpDir = fs.mkdtempSync("/tmp/migration-test-")
-    const configPath = `${tmpDir}/oh-my-opencode.json`
+    const configPath = `${tmpDir}/matrixx.json`
     const rawConfig: Record<string, unknown> = {
       agents: {
         prometheus: { model: "anthropic/claude-opus-4-5" },

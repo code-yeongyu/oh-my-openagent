@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig, HookName } from "../../config"
+import type { MatrixxConfig, HookName } from "../../config"
 import type { PluginContext } from "../types"
 
 import {
@@ -56,7 +56,7 @@ export type SessionHooks = {
 
 export function createSessionHooks(args: {
   ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: MatrixxConfig
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
 }): SessionHooks {
@@ -103,7 +103,7 @@ export function createSessionHooks(args: {
     ? safeHook("auto-update-checker", () =>
         createAutoUpdateCheckerHook(ctx, {
           showStartupToast: isHookEnabled("startup-toast"),
-          isMorpheusEnabled: pluginConfig.sisyphus_agent?.disabled !== true,
+          isMorpheusEnabled: pluginConfig.morpheus_agent?.disabled !== true,
           autoUpdate: pluginConfig.auto_update ?? true,
         }))
     : null

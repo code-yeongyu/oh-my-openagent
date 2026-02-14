@@ -3,7 +3,7 @@ import { createSessionManagerTools } from "./tools"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { PluginInput } from "@opencode-ai/plugin"
 
-const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
+const projectDir = "/Users/yeongyu/local-workspaces/matrixx"
 
 const mockCtx = { directory: projectDir } as PluginInput
 
@@ -45,7 +45,7 @@ describe("session-manager tools", () => {
 
   test("session_list filters by project_path", async () => {
     //#given
-    const projectPath = "/Users/yeongyu/local-workspaces/oh-my-opencode"
+    const projectPath = "/Users/yeongyu/local-workspaces/matrixx"
 
     //#when
     const result = await session_list.execute({ project_path: projectPath }, mockContext)

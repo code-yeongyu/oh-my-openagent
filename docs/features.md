@@ -1,10 +1,10 @@
-# Oh-My-OpenCode Features
+# Matrixx Features
 
 ---
 
 ## Agents: Your AI Team
 
-Oh-My-OpenCode provides 11 specialized AI agents. Each has distinct expertise, optimized models, and tool permissions.
+Matrixx provides 11 specialized AI agents. Each has distinct expertise, optimized models, and tool permissions.
 
 ### Core Agents
 
@@ -84,7 +84,7 @@ When running inside tmux:
 
 See [Tmux Integration](configurations.md#tmux-integration) for full configuration options.
 
-Customize agent models, prompts, and permissions in `oh-my-opencode.json`. See [Configuration](configurations.md#agents).
+Customize agent models, prompts, and permissions in `matrixx.json`. See [Configuration](configurations.md#agents).
 
 ---
 
@@ -104,7 +104,7 @@ Skills provide specialized workflows with embedded MCP servers and detailed inst
 
 **Trigger**: Any browser-related request
 
-Oh-My-OpenCode provides two browser automation providers, configurable via `browser_automation_engine.provider`:
+Matrixx provides two browser automation providers, configurable via `browser_automation_engine.provider`:
 
 #### Option 1: Playwright MCP (Default)
 
@@ -550,7 +550,7 @@ When a skill MCP has `oauth` configured:
 Pre-authenticate via CLI:
 
 ```bash
-bunx oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
+bunx matrixx mcp oauth login <server-name> --server-url https://api.example.com
 ```
 
 ---

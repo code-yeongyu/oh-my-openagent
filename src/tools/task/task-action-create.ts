@@ -1,5 +1,5 @@
 import { join } from "path"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { MatrixxConfig } from "../../config/schema"
 import type { TaskObject } from "./types"
 import { TaskCreateInputSchema, TaskObjectSchema } from "./types"
 import {
@@ -11,7 +11,7 @@ import {
 
 export async function handleCreate(
   args: Record<string, unknown>,
-  config: Partial<OhMyOpenCodeConfig>,
+  config: Partial<MatrixxConfig>,
   context: { sessionID: string }
 ): Promise<string> {
   const validatedArgs = TaskCreateInputSchema.parse(args)

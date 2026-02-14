@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../config";
+import type { MatrixxConfig } from "../config";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { addConfigLoadError, log } from "../shared";
 
@@ -23,7 +23,7 @@ const EMPTY_PLUGIN_COMPONENTS: PluginComponents = {
 };
 
 export async function loadPluginComponents(params: {
-  pluginConfig: OhMyOpenCodeConfig;
+  pluginConfig: MatrixxConfig;
 }): Promise<PluginComponents> {
   const pluginsEnabled = params.pluginConfig.claude_code?.plugins ?? true;
   if (!pluginsEnabled) {

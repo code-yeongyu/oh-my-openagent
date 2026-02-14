@@ -64,7 +64,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given user has pinned a specific version", () => {
     beforeEach(() => {
       mockFindPluginEntry.mockReturnValue({
-        entry: "oh-my-opencode@3.4.0",
+        entry: "matrixx@3.4.0",
         isPinned: true,
         pinnedVersion: "3.4.0",
         configPath: "/test/opencode.json",
@@ -105,7 +105,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given user has NOT pinned a version (unpinned)", () => {
     beforeEach(() => {
       mockFindPluginEntry.mockReturnValue({
-        entry: "oh-my-opencode",
+        entry: "matrixx",
         isPinned: false,
         pinnedVersion: null,
         configPath: "/test/opencode.json",
@@ -133,7 +133,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given autoUpdate is false", () => {
     beforeEach(() => {
       mockFindPluginEntry.mockReturnValue({
-        entry: "oh-my-opencode",
+        entry: "matrixx",
         isPinned: false,
         pinnedVersion: null,
         configPath: "/test/opencode.json",
@@ -154,7 +154,7 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given already on latest version", () => {
     beforeEach(() => {
       mockFindPluginEntry.mockReturnValue({
-        entry: "oh-my-opencode@3.5.0",
+        entry: "matrixx@3.5.0",
         isPinned: true,
         pinnedVersion: "3.5.0",
         configPath: "/test/opencode.json",

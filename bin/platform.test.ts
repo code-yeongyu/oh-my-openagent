@@ -12,7 +12,7 @@ describe("getPlatformPackage", () => {
     const result = getPlatformPackage(input);
 
     // #then returns correct package name
-    expect(result).toBe("oh-my-opencode-darwin-arm64");
+    expect(result).toBe("matrixx-darwin-arm64");
   });
 
   test("returns darwin-x64 for macOS Intel", () => {
@@ -23,7 +23,7 @@ describe("getPlatformPackage", () => {
     const result = getPlatformPackage(input);
 
     // #then returns correct package name
-    expect(result).toBe("oh-my-opencode-darwin-x64");
+    expect(result).toBe("matrixx-darwin-x64");
   });
   // #endregion
 
@@ -36,7 +36,7 @@ describe("getPlatformPackage", () => {
     const result = getPlatformPackage(input);
 
     // #then returns correct package name
-    expect(result).toBe("oh-my-opencode-linux-x64");
+    expect(result).toBe("matrixx-linux-x64");
   });
 
   test("returns linux-arm64 for Linux ARM64 with glibc", () => {
@@ -47,7 +47,7 @@ describe("getPlatformPackage", () => {
     const result = getPlatformPackage(input);
 
     // #then returns correct package name
-    expect(result).toBe("oh-my-opencode-linux-arm64");
+    expect(result).toBe("matrixx-linux-arm64");
   });
   // #endregion
 
@@ -60,7 +60,7 @@ describe("getPlatformPackage", () => {
     const result = getPlatformPackage(input);
 
     // #then returns correct package name with musl suffix
-    expect(result).toBe("oh-my-opencode-linux-x64-musl");
+    expect(result).toBe("matrixx-linux-x64-musl");
   });
 
   test("returns linux-arm64-musl for Alpine ARM64", () => {
@@ -71,7 +71,7 @@ describe("getPlatformPackage", () => {
     const result = getPlatformPackage(input);
 
     // #then returns correct package name with musl suffix
-    expect(result).toBe("oh-my-opencode-linux-arm64-musl");
+    expect(result).toBe("matrixx-linux-arm64-musl");
   });
   // #endregion
 
@@ -84,7 +84,7 @@ describe("getPlatformPackage", () => {
     const result = getPlatformPackage(input);
 
     // #then returns correct package name with 'windows' not 'win32'
-    expect(result).toBe("oh-my-opencode-windows-x64");
+    expect(result).toBe("matrixx-windows-x64");
   });
   // #endregion
 
@@ -112,37 +112,37 @@ describe("getPlatformPackage", () => {
 describe("getBinaryPath", () => {
   test("returns path without .exe for Unix platforms", () => {
     // #given Unix platform package
-    const pkg = "oh-my-opencode-darwin-arm64";
+    const pkg = "matrixx-darwin-arm64";
     const platform = "darwin";
 
     // #when getting binary path
     const result = getBinaryPath(pkg, platform);
 
     // #then returns path without extension
-    expect(result).toBe("oh-my-opencode-darwin-arm64/bin/oh-my-opencode");
+    expect(result).toBe("matrixx-darwin-arm64/bin/matrixx");
   });
 
   test("returns path with .exe for Windows", () => {
     // #given Windows platform package
-    const pkg = "oh-my-opencode-windows-x64";
+    const pkg = "matrixx-windows-x64";
     const platform = "win32";
 
     // #when getting binary path
     const result = getBinaryPath(pkg, platform);
 
     // #then returns path with .exe extension
-    expect(result).toBe("oh-my-opencode-windows-x64/bin/oh-my-opencode.exe");
+    expect(result).toBe("matrixx-windows-x64/bin/matrixx.exe");
   });
 
   test("returns path without .exe for Linux", () => {
     // #given Linux platform package
-    const pkg = "oh-my-opencode-linux-x64";
+    const pkg = "matrixx-linux-x64";
     const platform = "linux";
 
     // #when getting binary path
     const result = getBinaryPath(pkg, platform);
 
     // #then returns path without extension
-    expect(result).toBe("oh-my-opencode-linux-x64/bin/oh-my-opencode");
+    expect(result).toBe("matrixx-linux-x64/bin/matrixx");
   });
 });

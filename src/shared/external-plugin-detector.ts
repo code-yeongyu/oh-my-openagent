@@ -1,5 +1,5 @@
 /**
- * Detects external plugins that may conflict with oh-my-opencode features.
+ * Detects external plugins that may conflict with matrixx features.
  * Used to prevent crashes from concurrent notification plugins.
  */
 
@@ -14,7 +14,7 @@ interface OpencodeConfig {
 }
 
 /**
- * Known notification plugins that conflict with oh-my-opencode's session-notification.
+ * Known notification plugins that conflict with matrixx's session-notification.
  * Both plugins listen to session.idle and send notifications simultaneously,
  * which can cause crashes on Windows due to resource contention.
  */
@@ -124,14 +124,14 @@ export function detectExternalNotificationPlugin(directory: string): ExternalNot
  * Generate a warning message for users with conflicting notification plugins.
  */
 export function getNotificationConflictWarning(pluginName: string): string {
-  return `[oh-my-opencode] External notification plugin detected: ${pluginName}
+  return `[matrixx] External notification plugin detected: ${pluginName}
 
-Both oh-my-opencode and ${pluginName} listen to session.idle events.
+Both matrixx and ${pluginName} listen to session.idle events.
    Running both simultaneously can cause crashes on Windows.
 
-   oh-my-opencode's session-notification has been auto-disabled.
+   matrixx's session-notification has been auto-disabled.
 
-   To use oh-my-opencode's notifications instead, either:
+   To use matrixx's notifications instead, either:
    1. Remove ${pluginName} from your opencode.json plugins
-   2. Or set "notification": { "force_enable": true } in oh-my-opencode.json`
+   2. Or set "notification": { "force_enable": true } in matrixx.json`
 }

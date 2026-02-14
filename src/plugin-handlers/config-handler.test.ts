@@ -3,7 +3,7 @@
 import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import { resolveCategoryConfig, createConfigHandler } from "./config-handler"
 import type { CategoryConfig } from "../config/schema"
-import type { OhMyOpenCodeConfig } from "../config"
+import type { MatrixxConfig } from "../config"
 
 import * as agents from "../agents"
 import * as mouse from "../agents/mouse"
@@ -104,7 +104,7 @@ afterEach(() => {
 describe("Mouse model inheritance", () => {
   test("does not inherit UI-selected model as system default", async () => {
     // #given
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: MatrixxConfig = {}
     const config: Record<string, unknown> = {
       model: "opencode/kimi-k2.5-free",
       agent: {},
@@ -130,7 +130,7 @@ describe("Mouse model inheritance", () => {
 
   test("uses explicitly configured mouse model", async () => {
     // #given
-    const pluginConfig: OhMyOpenCodeConfig = {
+    const pluginConfig: MatrixxConfig = {
       agents: {
         "mouse": {
           model: "openai/gpt-5.3-codex",
@@ -173,8 +173,8 @@ describe("Plan agent demote behavior", () => {
       oracle: { name: "oracle", prompt: "test", mode: "subagent" },
       architect: { name: "architect", prompt: "test", mode: "primary" },
     })
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
       },
     }
@@ -203,8 +203,8 @@ describe("Plan agent demote behavior", () => {
 
   test("plan agent should be demoted to subagent without inheriting oracle prompt", async () => {
     // #given
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
         replace_plan: true,
       },
@@ -241,8 +241,8 @@ describe("Plan agent demote behavior", () => {
 
   test("plan agent remains unchanged when planner is disabled", async () => {
     // #given
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: false,
       },
     }
@@ -280,8 +280,8 @@ describe("Plan agent demote behavior", () => {
 
   test("oracle should have mode 'all' to be callable via task", async () => {
     // given
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
       },
     }
@@ -319,7 +319,7 @@ describe("Agent permission defaults", () => {
       keymaker: { name: "keymaker", prompt: "test", mode: "primary" },
       oracle: { name: "oracle", prompt: "test", mode: "subagent" },
     })
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: MatrixxConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       agent: {},
@@ -446,8 +446,8 @@ describe("Oracle category config resolution", () => {
 describe("Oracle direct override priority over category", () => {
   test("direct reasoningEffort takes priority over category reasoningEffort", async () => {
     // given - category has reasoningEffort=xhigh, direct override says "low"
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
       },
       categories: {
@@ -487,8 +487,8 @@ describe("Oracle direct override priority over category", () => {
 
   test("category reasoningEffort applied when no direct override", async () => {
     // given - category has reasoningEffort but no direct override
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
       },
       categories: {
@@ -527,8 +527,8 @@ describe("Oracle direct override priority over category", () => {
 
   test("direct temperature takes priority over category temperature", async () => {
     // given
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
       },
       categories: {
@@ -569,8 +569,8 @@ describe("Oracle direct override priority over category", () => {
   test("oracle prompt_append is appended to base prompt", async () => {
     // #given - oracle override with prompt_append
     const customInstructions = "## Custom Project Rules\nUse max 2 commits."
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
       },
       agents: {
@@ -612,8 +612,8 @@ describe("Plan agent model inheritance from oracle", () => {
       provenance: "provider-fallback",
       variant: "max",
     })
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
         replace_plan: true,
       },
@@ -656,8 +656,8 @@ describe("Plan agent model inheritance from oracle", () => {
       provenance: "override",
       variant: "high",
     })
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
         replace_plan: true,
       },
@@ -711,8 +711,8 @@ describe("Plan agent model inheritance from oracle", () => {
       provenance: "provider-fallback",
       variant: "max",
     })
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
         replace_plan: true,
       },
@@ -754,8 +754,8 @@ describe("Plan agent model inheritance from oracle", () => {
       provenance: "provider-fallback",
       variant: "max",
     })
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
         replace_plan: true,
       },
@@ -793,8 +793,8 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     // - Server waits for plugin init to complete before handling requests
     const fetchSpy = spyOn(shared, "fetchAvailableModels" as any).mockResolvedValue(new Set<string>())
 
-    const pluginConfig: OhMyOpenCodeConfig = {
-      sisyphus_agent: {
+    const pluginConfig: MatrixxConfig = {
+      morpheus_agent: {
         planner_enabled: true,
       },
     }
@@ -833,7 +833,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     //#given
     ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
     spyOn(pluginLoader, "loadAllPluginComponents" as any).mockRejectedValue(new Error("crash"))
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: MatrixxConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       agent: {},
@@ -860,7 +860,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     spyOn(pluginLoader, "loadAllPluginComponents" as any).mockImplementation(
       () => new Promise(() => {})
     )
-    const pluginConfig: OhMyOpenCodeConfig = {
+    const pluginConfig: MatrixxConfig = {
       experimental: { plugin_load_timeout_ms: 100 },
     }
     const config: Record<string, unknown> = {
@@ -888,7 +888,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
     ;(pluginLoader.loadAllPluginComponents as any).mockRestore?.()
     spyOn(pluginLoader, "loadAllPluginComponents" as any).mockRejectedValue(new Error("crash"))
     const logSpy = shared.log as ReturnType<typeof spyOn>
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: MatrixxConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       agent: {},
@@ -925,7 +925,7 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
       plugins: [{ name: "test-plugin", version: "1.0.0" }],
       errors: [],
     })
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: MatrixxConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       agent: {},
@@ -964,7 +964,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
       "mouse": { name: "mouse", prompt: "test", mode: "subagent" },
     })
 
-    const pluginConfig: OhMyOpenCodeConfig = {
+    const pluginConfig: MatrixxConfig = {
       experimental: { task_system: true },
     }
     const config: Record<string, unknown> = {
@@ -1001,7 +1001,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
       keymaker: { name: "keymaker", prompt: "test", mode: "primary" },
     })
 
-    const pluginConfig: OhMyOpenCodeConfig = {
+    const pluginConfig: MatrixxConfig = {
       experimental: { task_system: false },
     }
     const config: Record<string, unknown> = {
@@ -1037,7 +1037,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
       morpheus: { name: "morpheus", prompt: "test", mode: "primary" },
     })
 
-    const pluginConfig: OhMyOpenCodeConfig = {}
+    const pluginConfig: MatrixxConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
       agent: {},

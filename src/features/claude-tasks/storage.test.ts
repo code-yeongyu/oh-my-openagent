@@ -13,7 +13,7 @@ import {
   resolveTaskListId,
   sanitizePathSegment,
 } from "./storage"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { MatrixxConfig } from "../../config/schema"
 
 const TEST_DIR = ".test-claude-tasks"
 const TEST_DIR_ABS = join(process.cwd(), TEST_DIR)
@@ -52,7 +52,7 @@ describe("getTaskDir", () => {
 
   test("returns global config path for default config", () => {
     //#given
-    const config: Partial<OhMyOpenCodeConfig> = {}
+    const config: Partial<MatrixxConfig> = {}
     const configDir = getOpenCodeConfigDir({ binary: "opencode" })
     const expectedListId = sanitizePathSegment(basename(process.cwd()))
 
@@ -103,8 +103,8 @@ describe("getTaskDir", () => {
 
   test("returns absolute storage_path without joining cwd", () => {
     //#given
-    const config: Partial<OhMyOpenCodeConfig> = {
-      sisyphus: {
+    const config: Partial<MatrixxConfig> = {
+      morpheus: {
         tasks: {
           storage_path: "/tmp/custom-task-path",
           claude_code_compat: false,
@@ -121,8 +121,8 @@ describe("getTaskDir", () => {
 
   test("joins relative storage_path with cwd", () => {
     //#given
-    const config: Partial<OhMyOpenCodeConfig> = {
-      sisyphus: {
+    const config: Partial<MatrixxConfig> = {
+      morpheus: {
         tasks: {
           storage_path: ".custom/tasks",
           claude_code_compat: false,
@@ -263,9 +263,9 @@ describe("listTaskFiles", () => {
 
   test("returns empty array for non-existent directory", () => {
     //#given
-    const config: Partial<OhMyOpenCodeConfig> = {
+    const config: Partial<MatrixxConfig> = {
       new_task_system_enabled: false,
-      sisyphus: { tasks: { storage_path: TEST_DIR, claude_code_compat: false } }
+      morpheus: { tasks: { storage_path: TEST_DIR, claude_code_compat: false } }
     }
 
     //#when
@@ -277,9 +277,9 @@ describe("listTaskFiles", () => {
 
   test("returns empty array for directory with no task files", () => {
     //#given
-    const config: Partial<OhMyOpenCodeConfig> = {
+    const config: Partial<MatrixxConfig> = {
       new_task_system_enabled: false,
-      sisyphus: { tasks: { storage_path: TEST_DIR, claude_code_compat: false } }
+      morpheus: { tasks: { storage_path: TEST_DIR, claude_code_compat: false } }
     }
     mkdirSync(TEST_DIR_ABS, { recursive: true })
     writeFileSync(join(TEST_DIR_ABS, "other.json"), "{}", "utf-8")
@@ -293,9 +293,9 @@ describe("listTaskFiles", () => {
 
   test("lists task files with T- prefix and .json extension", () => {
     //#given
-    const config: Partial<OhMyOpenCodeConfig> = {
+    const config: Partial<MatrixxConfig> = {
       new_task_system_enabled: false,
-      sisyphus: { tasks: { storage_path: TEST_DIR, claude_code_compat: false } }
+      morpheus: { tasks: { storage_path: TEST_DIR, claude_code_compat: false } }
     }
     mkdirSync(TEST_DIR_ABS, { recursive: true })
     writeFileSync(join(TEST_DIR_ABS, "T-abc123.json"), "{}", "utf-8")
@@ -314,9 +314,9 @@ describe("listTaskFiles", () => {
 
   test("returns task IDs without .json extension", () => {
     //#given
-    const config: Partial<OhMyOpenCodeConfig> = {
+    const config: Partial<MatrixxConfig> = {
       new_task_system_enabled: false,
-      sisyphus: { tasks: { storage_path: TEST_DIR, claude_code_compat: false } }
+      morpheus: { tasks: { storage_path: TEST_DIR, claude_code_compat: false } }
     }
     mkdirSync(TEST_DIR_ABS, { recursive: true })
     writeFileSync(join(TEST_DIR_ABS, "T-test-id.json"), "{}", "utf-8")

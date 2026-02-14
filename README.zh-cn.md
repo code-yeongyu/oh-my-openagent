@@ -3,7 +3,7 @@
 >
 > **ohmyopencode.com 与本项目无关。** 我们不运营或认可该网站。
 >
-> OhMyOpenCode 是**免费且开源的**。请**勿**在声称"官方"的第三方网站下载安装程序或输入付款信息。
+> Matrixx 是**免费且开源的**。请**勿**在声称"官方"的第三方网站下载安装程序或输入付款信息。
 >
 > 由于该冒充网站设有付费墙，我们**无法验证其分发的内容**。请将来自该网站的任何下载视为**潜在不安全**。
 >
@@ -21,9 +21,9 @@
 >
 > 加入我们！
 >
-> | [<img alt="Discord 链接" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | 加入我们的 [Discord 社区](https://discord.gg/PUwSMR9XNk)，与贡献者和 `oh-my-opencode` 用户交流。 |
+> | [<img alt="Discord 链接" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | 加入我们的 [Discord 社区](https://discord.gg/PUwSMR9XNk)，与贡献者和 `matrixx` 用户交流。 |
 > | :-----| :----- |
-> | [<img alt="X 链接" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `oh-my-opencode` 的新闻和更新曾在我的 X 账号上发布。<br /> 由于账号被错误封禁，[@justsisyphus](https://x.com/justsisyphus) 现在代为发布更新。 |
+> | [<img alt="X 链接" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `matrixx` 的新闻和更新曾在我的 X 账号上发布。<br /> 由于账号被错误封禁，[@justsisyphus](https://x.com/justsisyphus) 现在代为发布更新。 |
 > | [<img alt="GitHub 关注" src="https://img.shields.io/github/followers/code-yeongyu?style=flat-square&logo=github&labelColor=black&color=24292f" width="156px" />](https://github.com/code-yeongyu) | 在 GitHub 上关注 [@code-yeongyu](https://github.com/code-yeongyu) 获取更多项目。 |
 
 <!-- <居中展示区域> -->
@@ -37,13 +37,13 @@
 
 </div>
 
-> 这是开挂级别的编程——`oh-my-opencode` 实战效果。运行后台智能体，调用专业智能体如 oracle、librarian 和前端工程师。使用精心设计的 LSP/AST 工具、精选的 MCP，以及完整的 Claude Code 兼容层。
+> 这是开挂级别的编程——`matrixx` 实战效果。运行后台智能体，调用专业智能体如 oracle、librarian 和前端工程师。使用精心设计的 LSP/AST 工具、精选的 MCP，以及完整的 Claude Code 兼容层。
 
 # Claude OAuth 访问通知
 
 ## TL;DR
 
-> Q. 我可以使用 oh-my-opencode 吗？
+> Q. 我可以使用 matrixx 吗？
 
 可以。
 
@@ -55,7 +55,7 @@
 
 > 自2026年1月起，Anthropic 以违反服务条款为由限制了第三方 OAuth 访问。
 >
-> [**Anthropic 将本项目 oh-my-opencode 作为封锁 opencode 的理由。**](https://x.com/thdxr/status/2010149530486911014)
+> [**Anthropic 将本项目 (原 oh-my-opencode) 作为封锁 opencode 的理由。**](https://x.com/thdxr/status/2010149530486911014)
 >
 > 事实上，社区中确实存在一些伪造 Claude Code OAuth 请求签名的插件。
 >
@@ -67,7 +67,7 @@
 <div align="center">
 
 [![GitHub 发布](https://img.shields.io/github/v/release/code-yeongyu/oh-my-opencode?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/releases)
-[![npm 下载量](https://img.shields.io/npm/dt/oh-my-opencode?color=ff6b35&labelColor=black&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
+[![npm 下载量](https://img.shields.io/npm/dt/matrixx?color=ff6b35&labelColor=black&style=flat-square)](https://www.npmjs.com/package/matrixx)
 [![GitHub 贡献者](https://img.shields.io/github/contributors/code-yeongyu/oh-my-opencode?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/graphs/contributors)
 [![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-opencode?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/network/members)
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-opencode?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/stargazers)
@@ -109,7 +109,7 @@
 
 ## 目录
 
-- [Oh My OpenCode](#oh-my-opencode)
+- [Matrixx](#matrixx)
   - [直接跳过阅读本文档](#直接跳过阅读本文档)
     - [这是智能体时代](#这是智能体时代)
     - [🪄 魔法词：`ultrawork`](#-魔法词ultrawork)
@@ -244,7 +244,7 @@
 复制以下提示并粘贴到你的 LLM 智能体（Claude Code、AmpCode、Cursor 等）：
 
 ```
-按照以下说明安装和配置 oh-my-opencode：
+按照以下说明安装和配置 matrixx：
 https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
 ```
 
@@ -260,15 +260,15 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads
 
 ## 卸载
 
-要移除 oh-my-opencode：
+要移除 matrixx：
 
 1. **从你的 OpenCode 配置中移除插件**
 
-   编辑 `~/.config/opencode/opencode.json`（或 `opencode.jsonc`）并从 `plugin` 数组中移除 `"oh-my-opencode"`：
+   编辑 `~/.config/opencode/opencode.json`（或 `opencode.jsonc`）并从 `plugin` 数组中移除 `"matrixx"`：
 
    ```bash
    # 使用 jq
-   jq '.plugin = [.plugin[] | select(. != "oh-my-opencode")]' \
+   jq '.plugin = [.plugin[] | select(. != "matrixx")]' \
        ~/.config/opencode/opencode.json > /tmp/oc.json && \
        mv /tmp/oc.json ~/.config/opencode/opencode.json
    ```
@@ -277,10 +277,10 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads
 
    ```bash
    # 移除用户配置
-   rm -f ~/.config/opencode/oh-my-opencode.json
+   rm -f ~/.config/opencode/matrixx.json
 
    # 移除项目配置（如果存在）
-   rm -f .opencode/oh-my-opencode.json
+   rm -f .opencode/matrixx.json
    ```
 
 3. **验证移除**
@@ -312,7 +312,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads
 详细信息请参阅 [Configuration Documentation](docs/configurations.md)。
 
 **概览：**
-- **配置文件位置**: `.opencode/oh-my-opencode.json` (项目级) 或 `~/.config/opencode/oh-my-opencode.json` (用户级)
+- **配置文件位置**: `.opencode/matrixx.json` (项目级) 或 `~/.config/opencode/matrixx.json` (用户级)
 - **JSONC 支持**: 支持注释和尾随逗号
 - **智能体**: 覆盖任何智能体的模型、温度、提示和权限
 - **内置技能**: `playwright` (浏览器自动化), `git-master` (原子提交)

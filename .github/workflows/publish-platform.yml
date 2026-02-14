@@ -59,7 +59,7 @@ jobs:
       - name: Check if already published
         id: check
         run: |
-          PKG_NAME="oh-my-opencode-${{ matrix.platform }}"
+          PKG_NAME="matrixx-${{ matrix.platform }}"
           VERSION="${{ inputs.version }}"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${PKG_NAME}/${VERSION}")
           # Convert platform name for output (replace - with _)
@@ -103,9 +103,9 @@ jobs:
             esac
             
             if [ "$PLATFORM" = "windows-x64" ]; then
-              OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode.exe"
+              OUTPUT="packages/${PLATFORM}/bin/matrixx.exe"
             else
-              OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode"
+              OUTPUT="packages/${PLATFORM}/bin/matrixx"
             fi
             
             bun build src/cli/index.ts --compile --minify --target=$TARGET --outfile=$OUTPUT
@@ -160,7 +160,7 @@ jobs:
       - name: Check if already published
         id: check
         run: |
-          PKG_NAME="oh-my-opencode-${{ matrix.platform }}"
+          PKG_NAME="matrixx-${{ matrix.platform }}"
           VERSION="${{ inputs.version }}"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${PKG_NAME}/${VERSION}")
           if [ "$STATUS" = "200" ]; then

@@ -14,17 +14,17 @@ interface PlatformTarget {
 }
 
 export const PLATFORMS: PlatformTarget[] = [
-  { dir: "darwin-arm64", target: "bun-darwin-arm64", binary: "oh-my-opencode", description: "macOS ARM64" },
-  { dir: "darwin-x64", target: "bun-darwin-x64", binary: "oh-my-opencode", description: "macOS x64" },
-  { dir: "darwin-x64-baseline", target: "bun-darwin-x64-baseline", binary: "oh-my-opencode", description: "macOS x64 (no AVX2)" },
-  { dir: "linux-x64", target: "bun-linux-x64", binary: "oh-my-opencode", description: "Linux x64 (glibc)" },
-  { dir: "linux-x64-baseline", target: "bun-linux-x64-baseline", binary: "oh-my-opencode", description: "Linux x64 (glibc, no AVX2)" },
-  { dir: "linux-arm64", target: "bun-linux-arm64", binary: "oh-my-opencode", description: "Linux ARM64 (glibc)" },
-  { dir: "linux-x64-musl", target: "bun-linux-x64-musl", binary: "oh-my-opencode", description: "Linux x64 (musl)" },
-  { dir: "linux-x64-musl-baseline", target: "bun-linux-x64-musl-baseline", binary: "oh-my-opencode", description: "Linux x64 (musl, no AVX2)" },
-  { dir: "linux-arm64-musl", target: "bun-linux-arm64-musl", binary: "oh-my-opencode", description: "Linux ARM64 (musl)" },
-  { dir: "windows-x64", target: "bun-windows-x64", binary: "oh-my-opencode.exe", description: "Windows x64" },
-  { dir: "windows-x64-baseline", target: "bun-windows-x64-baseline", binary: "oh-my-opencode.exe", description: "Windows x64 (no AVX2)" },
+  { dir: "darwin-arm64", target: "bun-darwin-arm64", binary: "matrixx", description: "macOS ARM64" },
+  { dir: "darwin-x64", target: "bun-darwin-x64", binary: "matrixx", description: "macOS x64" },
+  { dir: "darwin-x64-baseline", target: "bun-darwin-x64-baseline", binary: "matrixx", description: "macOS x64 (no AVX2)" },
+  { dir: "linux-x64", target: "bun-linux-x64", binary: "matrixx", description: "Linux x64 (glibc)" },
+  { dir: "linux-x64-baseline", target: "bun-linux-x64-baseline", binary: "matrixx", description: "Linux x64 (glibc, no AVX2)" },
+  { dir: "linux-arm64", target: "bun-linux-arm64", binary: "matrixx", description: "Linux ARM64 (glibc)" },
+  { dir: "linux-x64-musl", target: "bun-linux-x64-musl", binary: "matrixx", description: "Linux x64 (musl)" },
+  { dir: "linux-x64-musl-baseline", target: "bun-linux-x64-musl-baseline", binary: "matrixx", description: "Linux x64 (musl, no AVX2)" },
+  { dir: "linux-arm64-musl", target: "bun-linux-arm64-musl", binary: "matrixx", description: "Linux ARM64 (musl)" },
+  { dir: "windows-x64", target: "bun-windows-x64", binary: "matrixx.exe", description: "Windows x64" },
+  { dir: "windows-x64-baseline", target: "bun-windows-x64-baseline", binary: "matrixx.exe", description: "Windows x64 (no AVX2)" },
 ];
 
 const ENTRY_POINT = "src/cli/index.ts";
@@ -61,7 +61,7 @@ async function buildPlatform(platform: PlatformTarget): Promise<boolean> {
 }
 
 async function main() {
-  console.log("🔨 Building oh-my-opencode platform binaries");
+  console.log("🔨 Building matrixx platform binaries");
   console.log(`   Entry point: ${ENTRY_POINT}`);
   console.log(`   Platforms: ${PLATFORMS.length}`);
 

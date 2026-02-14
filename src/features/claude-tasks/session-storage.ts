@@ -1,17 +1,17 @@
 import { join } from "path"
 import { existsSync, readdirSync, statSync } from "fs"
 import { getTaskDir } from "./storage"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { MatrixxConfig } from "../../config/schema"
 
 export function getSessionTaskDir(
-  config: Partial<OhMyOpenCodeConfig>,
+  config: Partial<MatrixxConfig>,
   sessionID: string,
 ): string {
   return join(getTaskDir(config), sessionID)
 }
 
 export function listSessionTaskFiles(
-  config: Partial<OhMyOpenCodeConfig>,
+  config: Partial<MatrixxConfig>,
   sessionID: string,
 ): string[] {
   const dir = getSessionTaskDir(config, sessionID)
@@ -22,7 +22,7 @@ export function listSessionTaskFiles(
 }
 
 export function listAllSessionDirs(
-  config: Partial<OhMyOpenCodeConfig>,
+  config: Partial<MatrixxConfig>,
 ): string[] {
   const baseDir = getTaskDir(config)
   if (!existsSync(baseDir)) return []
@@ -38,7 +38,7 @@ export interface TaskLocation {
 }
 
 export function findTaskAcrossSessions(
-  config: Partial<OhMyOpenCodeConfig>,
+  config: Partial<MatrixxConfig>,
   taskId: string,
 ): TaskLocation | null {
   const sessionDirs = listAllSessionDirs(config)

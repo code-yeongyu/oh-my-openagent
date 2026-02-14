@@ -61,7 +61,7 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
     return {
       success: false,
       configPath: omoConfigPath,
-      error: formatErrorWithSuggestion(err, "write oh-my-opencode config"),
+      error: formatErrorWithSuggestion(err, "write matrixx config"),
     }
   }
 }

@@ -3,7 +3,7 @@ import type { ToolDefinition } from "@opencode-ai/plugin"
 import type {
   AvailableCategory,
 } from "../agents/dynamic-agent-prompt-builder"
-import type { OhMyOpenCodeConfig } from "../config"
+import type { MatrixxConfig } from "../config"
 import type { PluginContext, ToolsRecord } from "./types"
 
 import {
@@ -40,7 +40,7 @@ export type ToolRegistryResult = {
 
 export function createToolRegistry(args: {
   ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: MatrixxConfig
   managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager">
   skillContext: SkillContext
   availableCategories: AvailableCategory[]

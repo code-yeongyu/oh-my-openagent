@@ -1,10 +1,10 @@
 import { z } from "zod"
 
-export const SisyphusAgentConfigSchema = z.object({
+export const MorpheusAgentConfigSchema = z.object({
   disabled: z.boolean().optional(),
   default_builder_enabled: z.boolean().optional(),
   planner_enabled: z.boolean().optional(),
   replace_plan: z.boolean().optional(),
 })
 
-export type SisyphusAgentConfig = z.infer<typeof SisyphusAgentConfigSchema>
+export type MorpheusAgentConfig = z.infer<typeof MorpheusAgentConfigSchema>

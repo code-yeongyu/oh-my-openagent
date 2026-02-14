@@ -58,7 +58,7 @@ export async function checkAuthProvider(providerId: AuthProviderId): Promise<Che
       message: "Auth plugin not installed",
       details: [
         `Plugin: ${AUTH_PLUGINS[providerId].plugin}`,
-        "Run: bunx oh-my-opencode install",
+        "Run: bunx matrixx install",
       ],
     }
   }

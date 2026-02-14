@@ -194,7 +194,7 @@ export function createSmithAgent(model: string): AgentConfig {
 
   const base = {
     description:
-      "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards. (Smith - OhMyOpenCode)",
+      "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards. (Smith - Matrixx)",
     mode: MODE,
     model,
     temperature: 0.1,

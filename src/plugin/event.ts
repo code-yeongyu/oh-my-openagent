@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../config"
+import type { MatrixxConfig } from "../config"
 import type { PluginContext } from "./types"
 
 import {
@@ -22,7 +22,7 @@ type FirstMessageVariantGate = {
 
 export function createEventHandler(args: {
   ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: MatrixxConfig
   firstMessageVariantGate: FirstMessageVariantGate
   managers: Managers
   hooks: CreatedHooks

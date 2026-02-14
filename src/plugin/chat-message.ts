@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../config"
+import type { MatrixxConfig } from "../config"
 import type { PluginContext } from "./types"
 
 import {
@@ -36,7 +36,7 @@ function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
 
 export function createChatMessageHandler(args: {
   ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: MatrixxConfig
   firstMessageVariantGate: FirstMessageVariantGate
   hooks: CreatedHooks
 }): (

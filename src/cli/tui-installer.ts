@@ -45,7 +45,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   const config = await promptInstallConfig(detected)
   if (!config) return 1
 
-  spinner.start("Adding oh-my-opencode to OpenCode config")
+  spinner.start("Adding matrixx to OpenCode config")
   const pluginResult = await addPluginToOpenCodeConfig(version)
   if (!pluginResult.success) {
     spinner.stop(`Failed to add plugin: ${pluginResult.error}`)
@@ -74,7 +74,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     spinner.stop(`Provider config added to ${color.cyan(providerResult.configPath)}`)
   }
 
-  spinner.start("Writing oh-my-opencode configuration")
+  spinner.start("Writing matrixx configuration")
   const omoResult = writeOmoConfig(config)
   if (!omoResult.success) {
     spinner.stop(`Failed to write config: ${omoResult.error}`)
@@ -115,7 +115,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
 
   p.log.message(`${color.yellow("★")} If you found this helpful, consider starring the repo!`)
   p.log.message(
-    `  ${color.dim("gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-opencode >/dev/null 2>&1 || true")}`,
+    `  ${color.dim("gh api --silent --method PUT /user/starred/code-yeongyu/matrixx >/dev/null 2>&1 || true")}`,
   )
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))

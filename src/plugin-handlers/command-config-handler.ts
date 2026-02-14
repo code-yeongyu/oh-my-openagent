@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../config";
+import type { MatrixxConfig } from "../config";
 import {
   loadUserCommands,
   loadProjectCommands,
@@ -16,7 +16,7 @@ import type { PluginComponents } from "./plugin-components-loader";
 
 export async function applyCommandConfig(params: {
   config: Record<string, unknown>;
-  pluginConfig: OhMyOpenCodeConfig;
+  pluginConfig: MatrixxConfig;
   pluginComponents: PluginComponents;
 }): Promise<void> {
   const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands);

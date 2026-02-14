@@ -1,17 +1,17 @@
-# Oh-My-OpenCode CLI Guide
+# Matrixx CLI Guide
 
-This document provides a comprehensive guide to using the Oh-My-OpenCode CLI tools.
+This document provides a comprehensive guide to using the Matrixx CLI tools.
 
 ## 1. Overview
 
-Oh-My-OpenCode provides CLI tools accessible via the `bunx oh-my-opencode` command. The CLI supports various features including plugin installation, environment diagnostics, and session execution.
+Matrixx provides CLI tools accessible via the `bunx matrixx` command. The CLI supports various features including plugin installation, environment diagnostics, and session execution.
 
 ```bash
 # Basic execution (displays help)
-bunx oh-my-opencode
+bunx matrixx
 
 # Or run with npx
-npx oh-my-opencode
+npx matrixx
 ```
 
 ---
@@ -30,20 +30,20 @@ npx oh-my-opencode
 
 ## 3. `install` - Interactive Setup Wizard
 
-An interactive installation tool for initial Oh-My-OpenCode setup. Provides a beautiful TUI (Text User Interface) based on `@clack/prompts`.
+An interactive installation tool for initial Matrixx setup. Provides a beautiful TUI (Text User Interface) based on `@clack/prompts`.
 
 ### Usage
 
 ```bash
-bunx oh-my-opencode install
+bunx matrixx install
 ```
 
 ### Installation Process
 
 1. **Provider Selection**: Choose your AI provider from Claude, ChatGPT, or Gemini.
 2. **API Key Input**: Enter the API key for your selected provider.
-3. **Configuration File Creation**: Generates `opencode.json` or `oh-my-opencode.json` files.
-4. **Plugin Registration**: Automatically registers the oh-my-opencode plugin in OpenCode settings.
+3. **Configuration File Creation**: Generates `opencode.json` or `matrixx.json` files.
+4. **Plugin Registration**: Automatically registers the matrixx plugin in OpenCode settings.
 
 ### Options
 
@@ -56,12 +56,12 @@ bunx oh-my-opencode install
 
 ## 4. `doctor` - Environment Diagnostics
 
-Diagnoses your environment to ensure Oh-My-OpenCode is functioning correctly. Performs 17+ health checks.
+Diagnoses your environment to ensure Matrixx is functioning correctly. Performs 17+ health checks.
 
 ### Usage
 
 ```bash
-bunx oh-my-opencode doctor
+bunx matrixx doctor
 ```
 
 ### Diagnostic Categories
@@ -86,10 +86,10 @@ bunx oh-my-opencode doctor
 ### Example Output
 
 ```
-oh-my-opencode doctor
+matrixx doctor
 
 ┌──────────────────────────────────────────────────┐
-│  Oh-My-OpenCode Doctor                           │
+│  Matrixx Doctor                           │
 └──────────────────────────────────────────────────┘
 
 Installation
@@ -97,7 +97,7 @@ Installation
   ✓ Plugin registered in opencode.json
 
 Configuration
-  ✓ oh-my-opencode.json is valid
+  ✓ matrixx.json is valid
   ⚠ categories.visual-engineering: using default model
 
 Authentication
@@ -122,7 +122,7 @@ Executes OpenCode sessions and monitors task completion.
 ### Usage
 
 ```bash
-bunx oh-my-opencode run [prompt]
+bunx matrixx run [prompt]
 ```
 
 ### Options
@@ -142,16 +142,16 @@ Manages OAuth 2.1 authentication for remote MCP servers.
 
 ```bash
 # Login to an OAuth-protected MCP server
-bunx oh-my-opencode mcp oauth login <server-name> --server-url https://api.example.com
+bunx matrixx mcp oauth login <server-name> --server-url https://api.example.com
 
 # Login with explicit client ID and scopes
-bunx oh-my-opencode mcp oauth login my-api --server-url https://api.example.com --client-id my-client --scopes "read,write"
+bunx matrixx mcp oauth login my-api --server-url https://api.example.com --client-id my-client --scopes "read,write"
 
 # Remove stored OAuth tokens
-bunx oh-my-opencode mcp oauth logout <server-name>
+bunx matrixx mcp oauth logout <server-name>
 
 # Check OAuth token status
-bunx oh-my-opencode mcp oauth status [server-name]
+bunx matrixx mcp oauth status [server-name]
 ```
 
 ### Options
@@ -176,13 +176,13 @@ Manages Google Antigravity OAuth authentication. Required for using Gemini model
 
 ```bash
 # Login
-bunx oh-my-opencode auth login
+bunx matrixx auth login
 
 # Logout
-bunx oh-my-opencode auth logout
+bunx matrixx auth logout
 
 # Check current status
-bunx oh-my-opencode auth status
+bunx matrixx auth status
 ```
 
 ---
@@ -191,8 +191,8 @@ bunx oh-my-opencode auth status
 
 The CLI searches for configuration files in the following locations (in priority order):
 
-1. **Project Level**: `.opencode/oh-my-opencode.json`
-2. **User Level**: `~/.config/opencode/oh-my-opencode.json`
+1. **Project Level**: `.opencode/matrixx.json`
+2. **User Level**: `~/.config/opencode/matrixx.json`
 
 ### JSONC Support
 
@@ -232,17 +232,17 @@ bun install -g opencode@latest
 
 ```bash
 # Reinstall plugin
-bunx oh-my-opencode install
+bunx matrixx install
 ```
 
 ### Doctor Check Failures
 
 ```bash
 # Diagnose with detailed information
-bunx oh-my-opencode doctor --verbose
+bunx matrixx doctor --verbose
 
 # Check specific category only
-bunx oh-my-opencode doctor --category authentication
+bunx matrixx doctor --category authentication
 ```
 
 ---
@@ -253,10 +253,10 @@ Use the `--no-tui` option for CI/CD environments.
 
 ```bash
 # Run doctor in CI environment
-bunx oh-my-opencode doctor --no-tui --json
+bunx matrixx doctor --no-tui --json
 
 # Save results to file
-bunx oh-my-opencode doctor --json > doctor-report.json
+bunx matrixx doctor --json > doctor-report.json
 ```
 
 ---

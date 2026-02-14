@@ -1,4 +1,4 @@
-import type { HookName, OhMyOpenCodeConfig } from "../../config"
+import type { HookName, MatrixxConfig } from "../../config"
 import type { PluginContext } from "../types"
 
 import {
@@ -32,7 +32,7 @@ export type ToolGuardHooks = {
 
 export function createToolGuardHooks(args: {
   ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: MatrixxConfig
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
 }): ToolGuardHooks {

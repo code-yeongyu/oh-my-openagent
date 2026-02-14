@@ -218,7 +218,7 @@ export function createCipherAgent(model: string): AgentConfig {
 
   const base = {
     description:
-      "DSL engineering specialist. Grammar design (BNF/EBNF/PEG), type systems, parsers, transpilers, code generators, metamodeling (textX/PyEcore/ANTLR4). (Cipher - OhMyOpenCode)",
+      "DSL engineering specialist. Grammar design (BNF/EBNF/PEG), type systems, parsers, transpilers, code generators, metamodeling (textX/PyEcore/ANTLR4). (Cipher - Matrixx)",
     mode: MODE,
     model,
     temperature: 0.1,

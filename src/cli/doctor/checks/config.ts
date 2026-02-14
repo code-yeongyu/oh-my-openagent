@@ -3,7 +3,7 @@ import { join } from "node:path"
 import type { CheckResult, CheckDefinition, ConfigInfo } from "../types"
 import { CHECK_IDS, CHECK_NAMES, PACKAGE_NAME } from "../constants"
 import { parseJsonc, detectConfigFile, getOpenCodeConfigDir } from "../../../shared"
-import { OhMyOpenCodeConfigSchema } from "../../../config"
+import { MatrixxConfigSchema } from "../../../config"
 
 const USER_CONFIG_DIR = getOpenCodeConfigDir({ binary: "opencode" })
 const USER_CONFIG_BASE = join(USER_CONFIG_DIR, `${PACKAGE_NAME}`)
@@ -27,7 +27,7 @@ export function validateConfig(configPath: string): { valid: boolean; errors: st
   try {
     const content = readFileSync(configPath, "utf-8")
     const rawConfig = parseJsonc<Record<string, unknown>>(content)
-    const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig)
+    const result = MatrixxConfigSchema.safeParse(rawConfig)
 
     if (!result.success) {
       const errors = result.error.issues.map(

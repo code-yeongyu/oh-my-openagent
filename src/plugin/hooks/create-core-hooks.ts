@@ -1,4 +1,4 @@
-import type { HookName, OhMyOpenCodeConfig } from "../../config"
+import type { HookName, MatrixxConfig } from "../../config"
 import type { PluginContext } from "../types"
 
 import { createSessionHooks } from "./create-session-hooks"
@@ -7,7 +7,7 @@ import { createTransformHooks } from "./create-transform-hooks"
 
 export function createCoreHooks(args: {
   ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: MatrixxConfig
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
 }) {

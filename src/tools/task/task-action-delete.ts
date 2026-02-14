@@ -1,13 +1,13 @@
 import { existsSync, unlinkSync } from "fs"
 import { join } from "path"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { MatrixxConfig } from "../../config/schema"
 import { TaskDeleteInputSchema } from "./types"
 import { acquireLock, getTaskDir } from "../../features/claude-tasks/storage"
 import { parseTaskId } from "./task-id-validator"
 
 export async function handleDelete(
   args: Record<string, unknown>,
-  config: Partial<OhMyOpenCodeConfig>
+  config: Partial<MatrixxConfig>
 ): Promise<string> {
   const validatedArgs = TaskDeleteInputSchema.parse(args)
   const taskId = parseTaskId(validatedArgs.id)

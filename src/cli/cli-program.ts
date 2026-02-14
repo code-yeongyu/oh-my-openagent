@@ -15,14 +15,14 @@ const VERSION = packageJson.version
 const program = new Command()
 
 program
-  .name("oh-my-opencode")
+  .name("matrixx")
   .description("The ultimate OpenCode plugin - multi-model orchestration, LSP tools, and more")
   .version(VERSION, "-v, --version", "Show version number")
   .enablePositionalOptions()
 
 program
   .command("install")
-  .description("Install and configure oh-my-opencode with interactive setup")
+  .description("Install and configure matrixx with interactive setup")
   .option("--no-tui", "Run in non-interactive mode (requires all options)")
   .option("--claude <value>", "Claude subscription: no, yes, max20")
   .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
@@ -34,9 +34,9 @@ program
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
-  $ bunx oh-my-opencode install
-  $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
-  $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
+  $ bunx matrixx install
+  $ bunx matrixx install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
+  $ bunx matrixx install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
 Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
@@ -78,19 +78,19 @@ program
   .option("--session-id <id>", "Resume existing session instead of creating new one")
   .addHelpText("after", `
 Examples:
-  $ bunx oh-my-opencode run "Fix the bug in index.ts"
-  $ bunx oh-my-opencode run --agent Morpheus "Implement feature X"
-  $ bunx oh-my-opencode run --timeout 3600000 "Large refactoring task"
-  $ bunx oh-my-opencode run --port 4321 "Fix the bug"
-  $ bunx oh-my-opencode run --attach http://127.0.0.1:4321 "Fix the bug"
-  $ bunx oh-my-opencode run --json "Fix the bug" | jq .sessionId
-  $ bunx oh-my-opencode run --on-complete "notify-send Done" "Fix the bug"
-  $ bunx oh-my-opencode run --session-id ses_abc123 "Continue the work"
+  $ bunx matrixx run "Fix the bug in index.ts"
+  $ bunx matrixx run --agent Morpheus "Implement feature X"
+  $ bunx matrixx run --timeout 3600000 "Large refactoring task"
+  $ bunx matrixx run --port 4321 "Fix the bug"
+  $ bunx matrixx run --attach http://127.0.0.1:4321 "Fix the bug"
+  $ bunx matrixx run --json "Fix the bug" | jq .sessionId
+  $ bunx matrixx run --on-complete "notify-send Done" "Fix the bug"
+  $ bunx matrixx run --session-id ses_abc123 "Continue the work"
 
 Agent resolution order:
   1) --agent flag
   2) OPENCODE_DEFAULT_AGENT
-  3) oh-my-opencode.json "default_run_agent"
+  3) matrixx.json "default_run_agent"
   4) Morpheus (fallback)
 
 Available core agents:
@@ -127,9 +127,9 @@ program
   .option("--json", "Output in JSON format for scripting")
   .addHelpText("after", `
 Examples:
-  $ bunx oh-my-opencode get-local-version
-  $ bunx oh-my-opencode get-local-version --json
-  $ bunx oh-my-opencode get-local-version --directory /path/to/project
+  $ bunx matrixx get-local-version
+  $ bunx matrixx get-local-version --json
+  $ bunx matrixx get-local-version --directory /path/to/project
 
 This command shows:
   - Current installed version
@@ -148,16 +148,16 @@ This command shows:
 
 program
   .command("doctor")
-  .description("Check oh-my-opencode installation health and diagnose issues")
+  .description("Check matrixx installation health and diagnose issues")
   .option("--verbose", "Show detailed diagnostic information")
   .option("--json", "Output results in JSON format")
   .option("--category <category>", "Run only specific category")
   .addHelpText("after", `
 Examples:
-  $ bunx oh-my-opencode doctor
-  $ bunx oh-my-opencode doctor --verbose
-  $ bunx oh-my-opencode doctor --json
-  $ bunx oh-my-opencode doctor --category authentication
+  $ bunx matrixx doctor
+  $ bunx matrixx doctor --verbose
+  $ bunx matrixx doctor --json
+  $ bunx matrixx doctor --category authentication
 
 Categories:
   installation     Check OpenCode and plugin installation
@@ -181,7 +181,7 @@ program
   .command("version")
   .description("Show version information")
   .action(() => {
-    console.log(`oh-my-opencode v${VERSION}`)
+    console.log(`matrixx v${VERSION}`)
   })
 
 program.addCommand(createMcpOAuthCommand())

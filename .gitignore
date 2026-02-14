@@ -6,7 +6,9 @@ node_modules/
 # Build output
 dist/
 
-# Platform binaries (built, not committed)
+# Platform binaries (built by CI, not committed)
+packages/*/bin/matrixx
+packages/*/bin/matrixx.exe
 packages/*/bin/oh-my-opencode
 packages/*/bin/oh-my-opencode.exe
 

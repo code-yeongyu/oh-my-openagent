@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import type { OhMyOpenCodeConfig } from "../config"
+import type { MatrixxConfig } from "../config"
 import { applyAgentVariant, resolveAgentVariant, resolveVariantForModel } from "./agent-variant"
 
 describe("resolveAgentVariant", () => {
   test("returns undefined when agent name missing", () => {
     // given
-    const config = {} as OhMyOpenCodeConfig
+    const config = {} as MatrixxConfig
 
     // when
     const variant = resolveAgentVariant(config)
@@ -20,7 +20,7 @@ describe("resolveAgentVariant", () => {
       agents: {
         morpheus: { variant: "low" },
       },
-    } as OhMyOpenCodeConfig
+    } as MatrixxConfig
 
     // when
     const variant = resolveAgentVariant(config, "morpheus")
@@ -38,7 +38,7 @@ describe("resolveAgentVariant", () => {
       categories: {
         source: { model: "openai/gpt-5.2", variant: "xhigh" },
       },
-    } as OhMyOpenCodeConfig
+    } as MatrixxConfig
 
     // when
     const variant = resolveAgentVariant(config, "morpheus")
@@ -55,7 +55,7 @@ describe("applyAgentVariant", () => {
       agents: {
         morpheus: { variant: "low" },
       },
-    } as OhMyOpenCodeConfig
+    } as MatrixxConfig
     const message: { variant?: string } = {}
 
     // when
@@ -71,7 +71,7 @@ describe("applyAgentVariant", () => {
       agents: {
         morpheus: { variant: "low" },
       },
-    } as OhMyOpenCodeConfig
+    } as MatrixxConfig
     const message = { variant: "max" }
 
     // when
@@ -90,7 +90,7 @@ describe("resolveVariantForModel", () => {
       agents: {
         morpheus: { variant: "high" },
       },
-    } as OhMyOpenCodeConfig
+    } as MatrixxConfig
     const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
     // when
@@ -102,7 +102,7 @@ describe("resolveVariantForModel", () => {
 
   test("returns correct variant for anthropic provider", () => {
     // given
-    const config = {} as OhMyOpenCodeConfig
+    const config = {} as MatrixxConfig
     const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
     // when
@@ -114,7 +114,7 @@ describe("resolveVariantForModel", () => {
 
   test("returns correct variant for openai provider (keymaker agent)", () => {
     // #given keymaker has openai/gpt-5.3-codex with variant "medium" in its chain
-    const config = {} as OhMyOpenCodeConfig
+    const config = {} as MatrixxConfig
     const model = { providerID: "openai", modelID: "gpt-5.3-codex" }
 
     // #when
@@ -126,7 +126,7 @@ describe("resolveVariantForModel", () => {
 
   test("returns undefined for provider not in morpheus chain", () => {
     // #given openai is not in morpheus fallback chain anymore
-    const config = {} as OhMyOpenCodeConfig
+    const config = {} as MatrixxConfig
     const model = { providerID: "openai", modelID: "gpt-5.2" }
 
     // when
@@ -138,7 +138,7 @@ describe("resolveVariantForModel", () => {
 
   test("returns undefined for provider not in chain", () => {
     // given
-    const config = {} as OhMyOpenCodeConfig
+    const config = {} as MatrixxConfig
     const model = { providerID: "unknown-provider", modelID: "some-model" }
 
     // when
@@ -150,7 +150,7 @@ describe("resolveVariantForModel", () => {
 
   test("returns undefined for unknown agent", () => {
     // given
-    const config = {} as OhMyOpenCodeConfig
+    const config = {} as MatrixxConfig
     const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
     // when
@@ -162,7 +162,7 @@ describe("resolveVariantForModel", () => {
 
   test("returns variant for zai-coding-plan provider without variant", () => {
     // given
-    const config = {} as OhMyOpenCodeConfig
+    const config = {} as MatrixxConfig
     const model = { providerID: "zai-coding-plan", modelID: "glm-4.7" }
 
     // when
@@ -178,7 +178,7 @@ describe("resolveVariantForModel", () => {
       agents: {
         "custom-agent": { category: "source" },
       },
-    } as OhMyOpenCodeConfig
+    } as MatrixxConfig
     const model = { providerID: "openai", modelID: "gpt-5.3-codex" }
 
     // when
@@ -190,7 +190,7 @@ describe("resolveVariantForModel", () => {
 
   test("returns correct variant for oracle agent with openai", () => {
     // given
-    const config = {} as OhMyOpenCodeConfig
+    const config = {} as MatrixxConfig
     const model = { providerID: "openai", modelID: "gpt-5.2" }
 
     // when
@@ -202,7 +202,7 @@ describe("resolveVariantForModel", () => {
 
   test("returns correct variant for oracle agent with anthropic", () => {
     // given
-    const config = {} as OhMyOpenCodeConfig
+    const config = {} as MatrixxConfig
     const model = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
     // when

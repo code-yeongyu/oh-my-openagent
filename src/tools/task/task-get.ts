@@ -1,6 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { join } from "path"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { MatrixxConfig } from "../../config/schema"
 import type { TaskGetInput } from "./types"
 import { TaskGetInputSchema, TaskObjectSchema } from "./types"
 import { getTaskDir, readJsonSafe } from "../../features/claude-tasks/storage"
@@ -12,7 +12,7 @@ function parseTaskId(id: string): string | null {
   return id
 }
 
-export function createTaskGetTool(config: Partial<OhMyOpenCodeConfig>): ToolDefinition {
+export function createTaskGetTool(config: Partial<MatrixxConfig>): ToolDefinition {
   return tool({
     description: `Retrieve a task by ID.
 

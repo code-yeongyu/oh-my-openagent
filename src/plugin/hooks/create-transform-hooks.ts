@@ -1,4 +1,4 @@
-import type { OhMyOpenCodeConfig } from "../../config"
+import type { MatrixxConfig } from "../../config"
 import type { PluginContext } from "../types"
 
 import {
@@ -21,7 +21,7 @@ export type TransformHooks = {
 
 export function createTransformHooks(args: {
   ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig: MatrixxConfig
   isHookEnabled: (hookName: string) => boolean
   safeHookEnabled?: boolean
 }): TransformHooks {

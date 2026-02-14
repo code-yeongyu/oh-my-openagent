@@ -200,7 +200,7 @@ export interface ClaudeSettings {
  */
 export interface PluginLoaderOptions {
   /**
-   * Override enabled plugins from oh-my-opencode config.
+   * Override enabled plugins from matrixx config.
    * Key format: "pluginName@marketplace" (e.g., "shell-scripting@claude-code-workflows")
    * Value: true = enabled, false = disabled
    * 

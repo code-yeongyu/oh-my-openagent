@@ -1,4 +1,4 @@
-name: Sisyphus Agent
+name: Morpheus Agent
 
 on:
   workflow_dispatch:
@@ -69,14 +69,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-
 
-      # Build local oh-my-opencode
-      - name: Build oh-my-opencode
+      # Build local matrixx
+      - name: Build matrixx
         run: |
           bun install
           bun run build
 
       # Install OpenCode + configure local plugin + auth in single step
-      - name: Setup OpenCode with oh-my-opencode
+      - name: Setup OpenCode with matrixx
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
@@ -109,7 +109,7 @@ jobs:
           OPENCODE_JSON=~/.config/opencode/opencode.json
           REPO_PATH=$(pwd)
           jq --arg path "file://$REPO_PATH/src/index.ts" '
-            .plugin = [.plugin[] | select(. != "oh-my-opencode")] + [$path]
+            .plugin = [.plugin[] | select(. != "matrixx")] + [$path]
           ' "$OPENCODE_JSON" > /tmp/oc.json && mv /tmp/oc.json "$OPENCODE_JSON"
 
           OPENCODE_JSON=~/.config/opencode/opencode.json
@@ -190,7 +190,7 @@ jobs:
             }
           ' "$OPENCODE_JSON" > /tmp/oc.json && mv /tmp/oc.json "$OPENCODE_JSON"
 
-          OMO_JSON=~/.config/opencode/oh-my-opencode.json
+          OMO_JSON=~/.config/opencode/matrixx.json
           PROMPT_APPEND=$(cat << 'PROMPT_EOF'
           <ultrawork-mode>
           [CODE RED] Maximum precision required. Ultrathink before acting.
@@ -320,7 +320,7 @@ jobs:
           - user.email: sisyphus-dev-ai@users.noreply.github.com
           PROMPT_EOF
           )
-          jq --arg append "$PROMPT_APPEND" '.agents.Sisyphus.prompt_append = $append' "$OMO_JSON" > /tmp/omo.json && mv /tmp/omo.json "$OMO_JSON"
+          jq --arg append "$PROMPT_APPEND" '.agents.Morpheus.prompt_append = $append' "$OMO_JSON" > /tmp/omo.json && mv /tmp/omo.json "$OMO_JSON"
 
           # Add categories configuration for unspecified-low to use GLM 4.7
           jq '.categories["unspecified-low"] = { "model": "zai-coding-plan/glm-4.7" }' "$OMO_JSON" > /tmp/omo.json && mv /tmp/omo.json "$OMO_JSON"
@@ -381,23 +381,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          gh label create "sisyphus: working" \
+          gh label create "morpheus: working" \
             --repo "${{ github.repository }}" \
             --color "fcf2e1" \
-            --description "Sisyphus is currently working on this" \
+            --description "Morpheus is currently working on this" \
             --force || true
           
           if [[ "${{ steps.context.outputs.type }}" == "pr" ]]; then
             gh pr edit "${{ steps.context.outputs.number }}" \
               --repo "${{ github.repository }}" \
-              --add-label "sisyphus: working" || true
+              --add-label "morpheus: working" || true
           else
             gh issue edit "${{ steps.context.outputs.number }}" \
               --repo "${{ github.repository }}" \
-              --add-label "sisyphus: working" || true
+              --add-label "morpheus: working" || true
           fi
 
-      - name: Run oh-my-opencode
+      - name: Run matrixx
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
           USER_COMMENT: ${{ steps.context.outputs.comment }}
@@ -530,10 +530,10 @@ jobs:
             if [[ "${{ steps.context.outputs.type }}" == "pr" ]]; then
               gh pr edit "${{ steps.context.outputs.number }}" \
                 --repo "${{ github.repository }}" \
-                --remove-label "sisyphus: working" || true
+                --remove-label "morpheus: working" || true
             else
               gh issue edit "${{ steps.context.outputs.number }}" \
                 --repo "${{ github.repository }}" \
-                --remove-label "sisyphus: working" || true
+                --remove-label "morpheus: working" || true
             fi
           fi

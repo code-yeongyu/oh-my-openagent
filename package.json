@@ -1,12 +1,12 @@
 {
-  "name": "oh-my-opencode",
+  "name": "matrixx",
   "version": "3.5.3",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
-    "oh-my-opencode": "./bin/oh-my-opencode.js"
+    "matrixx": "./bin/matrixx.js"
   },
   "files": [
     "dist",
@@ -18,7 +18,7 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./schema.json": "./dist/oh-my-opencode.schema.json"
+    "./schema.json": "./dist/matrixx.schema.json"
   },
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --target bun --format esm --external @ast-grep/napi && tsc --emitDeclarationOnly && bun build src/cli/index.ts --outdir dist/cli --target bun --format esm --external @ast-grep/napi && bun run build:schema",
@@ -62,6 +62,7 @@
     "detect-libc": "^2.0.0",
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1",
+    "matrixx": ".",
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.2",
     "vscode-jsonrpc": "^8.2.0",
@@ -74,13 +75,13 @@
     "typescript": "^5.7.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "3.5.3",
-    "oh-my-opencode-darwin-x64": "3.5.3",
-    "oh-my-opencode-linux-arm64": "3.5.3",
-    "oh-my-opencode-linux-arm64-musl": "3.5.3",
-    "oh-my-opencode-linux-x64": "3.5.3",
-    "oh-my-opencode-linux-x64-musl": "3.5.3",
-    "oh-my-opencode-windows-x64": "3.5.3"
+    "matrixx-darwin-arm64": "3.5.3",
+    "matrixx-darwin-x64": "3.5.3",
+    "matrixx-linux-arm64": "3.5.3",
+    "matrixx-linux-arm64-musl": "3.5.3",
+    "matrixx-linux-x64": "3.5.3",
+    "matrixx-linux-x64-musl": "3.5.3",
+    "matrixx-windows-x64": "3.5.3"
   },
   "trustedDependencies": [
     "@ast-grep/cli",

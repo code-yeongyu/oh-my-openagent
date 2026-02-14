@@ -312,7 +312,7 @@ const seraphRestrictions = createAgentToolRestrictions([
 export function createSeraphAgent(model: string): AgentConfig {
   return {
     description:
-      "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Seraph - OhMyOpenCode)",
+      "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Seraph - Matrixx)",
     mode: MODE,
     model,
     temperature: 0.3,

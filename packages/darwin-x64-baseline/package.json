@@ -1,7 +1,7 @@
 {
-  "name": "oh-my-opencode-darwin-x64-baseline",
+  "name": "matrixx-darwin-x64-baseline",
   "version": "3.1.1",
-  "description": "Platform-specific binary for oh-my-opencode (darwin-x64-baseline, no AVX2)",
+  "description": "Platform-specific binary for "matrixx (darwin-x64-baseline, no AVX2)",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,6 +17,6 @@
     "bin"
   ],
   "bin": {
-    "oh-my-opencode": "./bin/oh-my-opencode"
+    "matrixx": "./bin/matrixx"
   }
 }

@@ -1,6 +1,6 @@
 # Task System
 
-Oh My OpenCode's Task system provides structured task management with dependency tracking and parallel execution optimization.
+Matrixx's Task system provides structured task management with dependency tracking and parallel execution optimization.
 
 ## Note on Claude Code Alignment
 
@@ -8,7 +8,7 @@ This implementation follows Claude Code's internal Task tool signatures (`TaskCr
 
 **However, Anthropic has not published official documentation for these tools.** The Task tools exist in Claude Code but are not documented on `docs.anthropic.com` or `code.claude.com`.
 
-This is **Oh My OpenCode's own implementation** based on observed Claude Code behavior and internal specifications.
+This is **Matrixx's own implementation** based on observed Claude Code behavior and internal specifications.
 
 ## Tools
 

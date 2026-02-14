@@ -1,7 +1,7 @@
 {
-  "name": "oh-my-opencode-linux-x64-musl-baseline",
+  "name": "matrixx-linux-x64-musl-baseline",
   "version": "3.1.1",
-  "description": "Platform-specific binary for oh-my-opencode (linux-x64-musl-baseline, no AVX2)",
+  "description": "Platform-specific binary for "matrixx (linux-x64-musl-baseline, no AVX2)",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -20,6 +20,6 @@
     "bin"
   ],
   "bin": {
-    "oh-my-opencode": "./bin/oh-my-opencode"
+    "matrixx": "./bin/matrixx"
   }
 }

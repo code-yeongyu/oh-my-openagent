@@ -1,6 +1,6 @@
 import { createBuiltinAgents } from "../agents";
 import { createMouseAgentWithOverrides } from "../agents/mouse";
-import type { OhMyOpenCodeConfig } from "../config";
+import type { MatrixxConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import {
@@ -22,7 +22,7 @@ type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
 
 export async function applyAgentConfig(params: {
   config: Record<string, unknown>;
-  pluginConfig: OhMyOpenCodeConfig;
+  pluginConfig: MatrixxConfig;
   ctx: { directory: string; client?: any };
   pluginComponents: PluginComponents;
 }): Promise<Record<string, unknown>> {
@@ -87,11 +87,11 @@ export async function applyAgentConfig(params: {
     ]),
   );
 
-  const isMorpheusEnabled = params.pluginConfig.sisyphus_agent?.disabled !== true;
+  const isMorpheusEnabled = params.pluginConfig.morpheus_agent?.disabled !== true;
   const builderEnabled =
-    params.pluginConfig.sisyphus_agent?.default_builder_enabled ?? false;
-  const plannerEnabled = params.pluginConfig.sisyphus_agent?.planner_enabled ?? true;
-  const replacePlan = params.pluginConfig.sisyphus_agent?.replace_plan ?? true;
+    params.pluginConfig.morpheus_agent?.default_builder_enabled ?? false;
+  const plannerEnabled = params.pluginConfig.morpheus_agent?.planner_enabled ?? true;
+  const replacePlan = params.pluginConfig.morpheus_agent?.replace_plan ?? true;
   const shouldDemotePlan = plannerEnabled && replacePlan;
 
   const configAgent = params.config.agent as AgentConfigRecord | undefined;

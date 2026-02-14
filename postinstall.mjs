@@ -32,9 +32,9 @@ function main() {
     
     // Try to resolve the binary
     require.resolve(binPath);
-    console.log(`✓ oh-my-opencode binary installed for ${platform}-${arch}`);
+    console.log(`✓ matrixx binary installed for ${platform}-${arch}`);
   } catch (error) {
-    console.warn(`⚠ oh-my-opencode: ${error.message}`);
+    console.warn(`⚠ matrixx: ${error.message}`);
     console.warn(`  The CLI may not work on this platform.`);
     // Don't fail installation - let user try anyway
   }

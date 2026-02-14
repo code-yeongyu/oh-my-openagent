@@ -4,7 +4,7 @@
 /**
  * Get the platform-specific package name
  * @param {{ platform: string, arch: string, libcFamily?: string | null }} options
- * @returns {string} Package name like "oh-my-opencode-darwin-arm64"
+ * @returns {string} Package name like "matrixx-darwin-arm64"
  * @throws {Error} If libc cannot be detected on Linux
  */
 export function getPlatformPackage({ platform, arch, libcFamily }) {
@@ -23,16 +23,16 @@ export function getPlatformPackage({ platform, arch, libcFamily }) {
   
   // Map platform names: win32 -> windows (for package name)
   const os = platform === "win32" ? "windows" : platform;
-  return `oh-my-opencode-${os}-${arch}${suffix}`;
+  return `matrixx-${os}-${arch}${suffix}`;
 }
 
 /**
  * Get the path to the binary within a platform package
  * @param {string} pkg Package name
  * @param {string} platform Process platform
- * @returns {string} Relative path like "oh-my-opencode-darwin-arm64/bin/oh-my-opencode"
+ * @returns {string} Relative path like "matrixx-darwin-arm64/bin/matrixx"
  */
 export function getBinaryPath(pkg, platform) {
   const ext = platform === "win32" ? ".exe" : "";
-  return `${pkg}/bin/oh-my-opencode${ext}`;
+  return `${pkg}/bin/matrixx${ext}`;
 }

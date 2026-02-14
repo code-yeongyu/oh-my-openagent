@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { OhMyOpenCodeConfigSchema, type OhMyOpenCodeConfig } from "./config";
+import { MatrixxConfigSchema, type MatrixxConfig } from "./config";
 import {
   log,
   deepMerge,
@@ -14,7 +14,7 @@ import {
 export function loadConfigFromPath(
   configPath: string,
   ctx: unknown
-): OhMyOpenCodeConfig | null {
+): MatrixxConfig | null {
   try {
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, "utf-8");
@@ -22,7 +22,7 @@ export function loadConfigFromPath(
 
       migrateConfigFile(configPath, rawConfig);
 
-      const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
+      const result = MatrixxConfigSchema.safeParse(rawConfig);
 
       if (!result.success) {
         const errorMsg = result.error.issues
@@ -48,9 +48,9 @@ export function loadConfigFromPath(
 }
 
 export function mergeConfigs(
-  base: OhMyOpenCodeConfig,
-  override: OhMyOpenCodeConfig
-): OhMyOpenCodeConfig {
+  base: MatrixxConfig,
+  override: MatrixxConfig
+): MatrixxConfig {
   return {
     ...base,
     ...override,
@@ -90,32 +90,39 @@ export function mergeConfigs(
   };
 }
 
+function resolveConfigPath(baseDir: string, configName: string): string {
+  const newBase = path.join(baseDir, "matrixx");
+  const newDetected = detectConfigFile(newBase);
+  if (newDetected.format !== "none") {
+    return newDetected.path;
+  }
+
+  const legacyBase = path.join(baseDir, configName);
+  const legacyDetected = detectConfigFile(legacyBase);
+  if (legacyDetected.format !== "none") {
+    log(
+      `Deprecation: "${path.basename(legacyDetected.path)}" detected. ` +
+        `Rename to "matrixx.json" or "matrixx.jsonc".`
+    );
+    return legacyDetected.path;
+  }
+
+  return newBase + ".json";
+}
+
 export function loadPluginConfig(
   directory: string,
   ctx: unknown
-): OhMyOpenCodeConfig {
-  // User-level config path - prefer .jsonc over .json
+): MatrixxConfig {
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
-  const userBasePath = path.join(configDir, "oh-my-opencode");
-  const userDetected = detectConfigFile(userBasePath);
-  const userConfigPath =
-    userDetected.format !== "none"
-      ? userDetected.path
-      : userBasePath + ".json";
+  const userConfigPath = resolveConfigPath(configDir, "matrixx");
 
-  // Project-level config path - prefer .jsonc over .json
-  const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
-  const projectDetected = detectConfigFile(projectBasePath);
-  const projectConfigPath =
-    projectDetected.format !== "none"
-      ? projectDetected.path
-      : projectBasePath + ".json";
+  const projectDir = path.join(directory, ".opencode");
+  const projectConfigPath = resolveConfigPath(projectDir, "matrixx");
 
-  // Load user config first (base)
-  let config: OhMyOpenCodeConfig =
+  let config: MatrixxConfig =
     loadConfigFromPath(userConfigPath, ctx) ?? {};
 
-  // Override with project config
   const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
   if (projectConfig) {
     config = mergeConfigs(config, projectConfig);

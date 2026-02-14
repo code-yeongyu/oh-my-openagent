@@ -1,12 +1,12 @@
 export {
-  OhMyOpenCodeConfigSchema,
+  MatrixxConfigSchema,
   AgentOverrideConfigSchema,
   AgentOverridesSchema,
   McpNameSchema,
   AgentNameSchema,
   HookNameSchema,
   BuiltinCommandNameSchema,
-  SisyphusAgentConfigSchema,
+  MorpheusAgentConfigSchema,
   ExperimentalConfigSchema,
   MatrixLoopConfigSchema,
   TmuxConfigSchema,
@@ -14,19 +14,19 @@ export {
 } from "./schema"
 
 export type {
-  OhMyOpenCodeConfig,
+  MatrixxConfig,
   AgentOverrideConfig,
   AgentOverrides,
   McpName,
   AgentName,
   HookName,
   BuiltinCommandName,
-  SisyphusAgentConfig,
+  MorpheusAgentConfig,
   ExperimentalConfig,
   DynamicContextPruningConfig,
   MatrixLoopConfig,
   TmuxConfig,
   TmuxLayout,
-  SisyphusConfig,
-  SisyphusTasksConfig,
+  MorpheusConfig,
+  MorpheusTasksConfig,
 } from "./schema"

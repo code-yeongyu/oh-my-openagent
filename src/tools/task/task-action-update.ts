@@ -1,12 +1,12 @@
 import { join } from "path"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { MatrixxConfig } from "../../config/schema"
 import { TaskUpdateInputSchema, TaskObjectSchema } from "./types"
 import { acquireLock, getTaskDir, readJsonSafe, writeJsonAtomic } from "../../features/claude-tasks/storage"
 import { parseTaskId } from "./task-id-validator"
 
 export async function handleUpdate(
   args: Record<string, unknown>,
-  config: Partial<OhMyOpenCodeConfig>
+  config: Partial<MatrixxConfig>
 ): Promise<string> {
   const validatedArgs = TaskUpdateInputSchema.parse(args)
   const taskId = parseTaskId(validatedArgs.id)

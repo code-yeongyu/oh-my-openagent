@@ -1,7 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { join } from "path"
 import { existsSync, readdirSync } from "fs"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { MatrixxConfig } from "../../config/schema"
 import type { TaskObject, TaskStatus } from "./types"
 import { TaskObjectSchema } from "./types"
 import { readJsonSafe, getTaskDir } from "../../features/claude-tasks/storage"
@@ -14,7 +14,7 @@ interface TaskSummary {
   blockedBy: string[]
 }
 
-export function createTaskList(config: Partial<OhMyOpenCodeConfig>): ToolDefinition {
+export function createTaskList(config: Partial<MatrixxConfig>): ToolDefinition {
   return tool({
     description: `List all active tasks with summary information.
     

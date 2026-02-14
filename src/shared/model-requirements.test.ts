@@ -304,15 +304,15 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
   test("matrix-bend has valid fallbackChain with gemini-3-pro as primary", () => {
     // given - matrix-bend category requirement
-    const matrix-bend = CATEGORY_MODEL_REQUIREMENTS["matrix-bend"]
+    const matrixBend = CATEGORY_MODEL_REQUIREMENTS["matrix-bend"]
 
     // when - accessing matrix-bend requirement
     // then - fallbackChain exists with gemini-3-pro as first entry
-    expect(matrix-bend).toBeDefined()
-    expect(matrix-bend.fallbackChain).toBeArray()
-    expect(matrix-bend.fallbackChain.length).toBeGreaterThan(0)
+    expect(matrixBend).toBeDefined()
+    expect(matrixBend.fallbackChain).toBeArray()
+    expect(matrixBend.fallbackChain.length).toBeGreaterThan(0)
 
-    const primary = matrix-bend.fallbackChain[0]
+    const primary = matrixBend.fallbackChain[0]
     expect(primary.model).toBe("gemini-3-pro")
     expect(primary.variant).toBe("high")
     expect(primary.providers[0]).toBe("google")
@@ -470,9 +470,9 @@ describe("requiresModel field in categories", () => {
 
   test("matrix-bend category has requiresModel set to gemini-3-pro", () => {
     // given
-    const matrix-bend = CATEGORY_MODEL_REQUIREMENTS["matrix-bend"]
+    const matrixBend = CATEGORY_MODEL_REQUIREMENTS["matrix-bend"]
 
     // when / #then
-    expect(matrix-bend.requiresModel).toBe("gemini-3-pro")
+    expect(matrixBend.requiresModel).toBe("gemini-3-pro")
   })
 })

@@ -46,7 +46,7 @@ feature branches (your work)
 
 ### This is an OpenCode Plugin
 
-Oh-My-OpenCode is a **plugin for OpenCode**. You will frequently need to examine OpenCode's source code to:
+Matrixx (formerly Oh-My-OpenCode) is a **plugin for OpenCode**. You will frequently need to examine OpenCode's source code to:
 - Understand plugin APIs and hooks
 - Debug integration issues
 - Implement features that interact with OpenCode internals
@@ -102,7 +102,7 @@ Oh-My-OpenCode is a **plugin for OpenCode**. You will frequently need to examine
 
 ## OVERVIEW
 
-OpenCode plugin (v3.4.0): multi-model agent orchestration with 11 specialized agents (Claude Opus 4.6, GPT-5.3 Codex, Gemini 3 Flash, GLM-4.7, Grok). 41 lifecycle hooks across 7 event types, 25+ tools (LSP, AST-Grep, delegation, task management), full Claude Code compatibility layer. "oh-my-zsh" for OpenCode.
+Matrixx (v3.4.0): multi-model agent orchestration with 11 specialized agents (Claude Opus 4.6, GPT-5.3 Codex, Gemini 3 Flash, GLM-4.7, Grok). 41 lifecycle hooks across 7 event types, 25+ tools (LSP, AST-Grep, delegation, task management), full Claude Code compatibility layer. "oh-my-zsh" for OpenCode.
 
 ## STRUCTURE
 
@@ -134,10 +134,10 @@ oh-my-opencode/
 ## INITIALIZATION FLOW
 
 ```
-OhMyOpenCodePlugin(ctx)
+MatrixxPlugin(ctx)
   1. injectServerAuthIntoClient(ctx.client)
   2. startTmuxCheck()
-  3. loadPluginConfig(ctx.directory, ctx)      → OhMyOpenCodeConfig
+  3. loadPluginConfig(ctx.directory, ctx)      → MatrixxConfig
   4. createFirstMessageVariantGate()
   5. createModelCacheState()
   6. createManagers(ctx, config, tmux, cache)  → TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler

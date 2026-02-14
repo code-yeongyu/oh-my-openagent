@@ -38,8 +38,8 @@ export function getConfigPaths(): { project: string; user: string; opencode: str
   const cwd = process.cwd()
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   return {
-    project: join(cwd, ".opencode", "oh-my-opencode.json"),
-    user: join(configDir, "oh-my-opencode.json"),
+    project: join(cwd, ".opencode", "matrixx.json"),
+    user: join(configDir, "matrixx.json"),
     opencode: join(configDir, "opencode.json"),
   }
 }

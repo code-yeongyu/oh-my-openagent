@@ -1,4 +1,4 @@
-# Oh-My-OpenCode Configuration
+# Matrixx Configuration
 
 Highly opinionated, but adjustable to taste.
 
@@ -7,7 +7,7 @@ Highly opinionated, but adjustable to taste.
 **Most users don't need to configure anything manually.** Run the interactive installer:
 
 ```bash
-bunx oh-my-opencode install
+bunx matrixx install
 ```
 
 It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optimal config automatically.
@@ -16,7 +16,7 @@ It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optima
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/matrixx.schema.json",
   
   // Override specific agent models
   "agents": {
@@ -38,36 +38,36 @@ It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optima
 ## Config File Locations
 
 Config file locations (priority order):
-1. `.opencode/oh-my-opencode.json` (project)
+1. `.opencode/matrixx.json` (project)
 2. User config (platform-specific):
 
 | Platform        | User Config Path                                                                                            |
 | --------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Windows**     | `~/.config/opencode/oh-my-opencode.json` (preferred) or `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
-| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json`                                                                    |
+| **Windows**     | `~/.config/opencode/matrixx.json` (preferred) or `%APPDATA%\opencode\matrixx.json` (fallback) |
+| **macOS/Linux** | `~/.config/opencode/matrixx.json`                                                                    |
 
 Schema autocomplete supported:
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/matrixx.schema.json"
 }
 ```
 
 ## JSONC Support
 
-The `oh-my-opencode` configuration file supports JSONC (JSON with Comments):
+The `matrixx` configuration file supports JSONC (JSON with Comments):
 - Line comments: `// comment`
 - Block comments: `/* comment */`
 - Trailing commas: `{ "key": "value", }`
 
-When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc` takes priority.
+When both `matrixx.jsonc` and `matrixx.json` files exist, `.jsonc` takes priority.
 
 **Example with comments:**
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/matrixx.schema.json",
 
   /* Agent overrides - customize models for specific tasks */
   "agents": {
@@ -118,7 +118,7 @@ Ollama returns NDJSON (newline-delimited JSON) when streaming is enabled, but Cl
 
 ### Supported Models
 
-Common Ollama models that work with oh-my-opencode:
+Common Ollama models that work with matrixx:
 
 | Model | Best For | Configuration |
 |-------|----------|---------------|
@@ -237,7 +237,7 @@ Fine-grained control over what agents can do:
 | `doom_loop`          | Allow infinite loop detection override | `ask` / `allow` / `deny`                                                    |
 | `external_directory` | Access files outside project root      | `ask` / `allow` / `deny`                                                    |
 
-Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Or disable via `disabled_agents` in `~/.config/opencode/matrixx.json` or `.opencode/matrixx.json`:
 
 ```json
 {
@@ -249,12 +249,12 @@ Available agents: `sisyphus`, `prometheus`, `oracle`, `librarian`, `explore`, `m
 
 ## Built-in Skills
 
-Oh My OpenCode includes built-in skills that provide additional capabilities:
+Matrixx includes built-in skills that provide additional capabilities:
 
 - **playwright** (default) / **agent-browser**: Browser automation for web scraping, testing, screenshots, and browser interactions. See [Browser Automation](#browser-automation) for switching between providers.
 - **git-master**: Git expert for atomic commits, rebase/squash, and history search (blame, bisect, log -S). STRONGLY RECOMMENDED: Use with `task(category='quick', load_skills=['git-master'], ...)` to save context.
 
-Disable built-in skills via `disabled_skills` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Disable built-in skills via `disabled_skills` in `~/.config/opencode/matrixx.json` or `.opencode/matrixx.json`:
 
 ```json
 {
@@ -344,7 +344,7 @@ Define custom skills directly in your config:
 | `subtask`         | `false`  | Whether to run as a subtask                                                           |
 | `argument-hint`   | -       | Hint for how to use the skill                                                        |
 | `license`          | -       | Skill license                                                                       |
-| `compatibility`    | -       | Required oh-my-opencode version compatibility                                           |
+| `compatibility`    | -       | Required matrixx version compatibility                                           |
 | `metadata`         | -       | Additional metadata as key-value pairs                                                |
 | `allowed-tools`    | -       | Array of tools this skill is allowed to use                                            |
 
@@ -372,7 +372,7 @@ Choose between two browser automation providers:
 | **playwright** (default) | MCP tools | Playwright MCP server with structured tool calls | Auto-installed via npx |
 | **agent-browser** | Bash CLI | Vercel's CLI with session management, parallel browsers | Requires `bun add -g agent-browser` |
 
-**Switch providers** via `browser_automation_engine` in `oh-my-opencode.json`:
+**Switch providers** via `browser_automation_engine` in `matrixx.json`:
 
 ```json
 {
@@ -414,7 +414,7 @@ agent-browser close
 
 Run background subagents in separate tmux panes for **visual multi-agent execution**. See your agents working in parallel, each in their own terminal pane.
 
-**Enable tmux integration** via `tmux` in `oh-my-opencode.json`:
+**Enable tmux integration** via `tmux` in `matrixx.json`:
 
 ```json
 {
@@ -557,7 +557,7 @@ oc() {
 **How subagent panes work**:
 
 1. Main OpenCode starts HTTP server on specified port (e.g., `http://localhost:4096`)
-2. When a background agent spawns, Oh My OpenCode creates a new tmux pane
+2. When a background agent spawns, Matrixx creates a new tmux pane
 3. The pane runs: `opencode attach http://localhost:4096 --session <session-id>`
 4. Each subagent pane shows real-time streaming output
 5. Panes are automatically closed when the subagent completes
@@ -737,7 +737,7 @@ All 7 categories come with optimal model defaults, but **you must configure them
 **Categories DO NOT use their built-in defaults unless configured.** Model resolution follows this priority:
 
 ```
-1. User-configured model (in oh-my-opencode.json)
+1. User-configured model (in matrixx.json)
 2. Category's built-in default (if you add category to config)
 3. System default model (from opencode.json)
 ```
@@ -748,7 +748,7 @@ All 7 categories come with optimal model defaults, but **you must configure them
 // opencode.json
 { "model": "anthropic/claude-sonnet-4-5" }
 
-// oh-my-opencode.json (empty categories section)
+// matrixx.json (empty categories section)
 {}
 
 // Result: ALL categories use claude-sonnet-4-5 (wasteful!)
@@ -836,14 +836,14 @@ Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`
 
 ## Model Resolution System
 
-At runtime, Oh My OpenCode uses a 3-step resolution process to determine which model to use for each agent and category. This happens dynamically based on your configuration and available models.
+At runtime, Matrixx uses a 3-step resolution process to determine which model to use for each agent and category. This happens dynamically based on your configuration and available models.
 
 ### Overview
 
 **Problem**: Users have different provider configurations. The system needs to select the best available model for each task at runtime.
 
 **Solution**: A simple 3-step resolution flow:
-1. **Step 1: User Override** — If you specify a model in `oh-my-opencode.json`, use exactly that
+1. **Step 1: User Override** — If you specify a model in `matrixx.json`, use exactly that
 2. **Step 2: Provider Fallback** — Try each provider in the requirement's priority order until one is available
 3. **Step 3: System Default** — Fall back to OpenCode's configured default model
 
@@ -856,7 +856,7 @@ At runtime, Oh My OpenCode uses a 3-step resolution process to determine which m
 │                                                                 │
 │   Step 1: USER OVERRIDE                                         │
 │   ┌─────────────────────────────────────────────────────────┐   │
-│   │ User specified model in oh-my-opencode.json?            │   │
+│   │ User specified model in matrixx.json?            │   │
 │   │         YES → Use exactly as specified                  │   │
 │   │         NO  → Continue to Step 2                        │   │
 │   └─────────────────────────────────────────────────────────┘   │
@@ -924,7 +924,7 @@ Categories follow the same resolution logic:
 Use the `doctor` command to see how models resolve with your current configuration:
 
 ```bash
-bunx oh-my-opencode doctor --verbose
+bunx matrixx doctor --verbose
 ```
 
 The "Model Resolution" check shows:
@@ -935,7 +935,7 @@ The "Model Resolution" check shows:
 
 ### Manual Override
 
-Override any agent or category model in `oh-my-opencode.json`:
+Override any agent or category model in `matrixx.json`:
 
 ```json
 {
@@ -959,7 +959,7 @@ When you specify a model override, it takes precedence (Step 1) and the provider
 
 ## Hooks
 
-Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/matrixx.json` or `.opencode/matrixx.json`:
 
 ```json
 {
@@ -975,7 +975,7 @@ Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `sessio
 
 ## Disabled Commands
 
-Disable specific built-in commands via `disabled_commands` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Disable specific built-in commands via `disabled_commands` in `~/.config/opencode/matrixx.json` or `.opencode/matrixx.json`:
 
 ```json
 {
@@ -1049,7 +1049,7 @@ Exa, Context7 and grep.app MCP enabled by default.
 - **context7**: Fetches up-to-date official documentation for libraries
 - **grep_app**: Ultra-fast code search across millions of public GitHub repositories via [grep.app](https://grep.app)
 
-Don't want them? Disable via `disabled_mcps` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Don't want them? Disable via `disabled_mcps` in `~/.config/opencode/matrixx.json` or `.opencode/matrixx.json`:
 
 ```json
 {
@@ -1060,10 +1060,10 @@ Don't want them? Disable via `disabled_mcps` in `~/.config/opencode/oh-my-openco
 ## LSP
 
 OpenCode provides LSP tools for analysis.
-Oh My OpenCode adds refactoring tools (rename, code actions).
-All OpenCode LSP configs and custom settings (from opencode.json) are supported, plus additional Oh My OpenCode-specific settings.
+Matrixx adds refactoring tools (rename, code actions).
+All OpenCode LSP configs and custom settings (from opencode.json) are supported, plus additional Matrixx-specific settings.
 
-Add LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Add LSP servers via the `lsp` option in `~/.config/opencode/matrixx.json` or `.opencode/matrixx.json`:
 
 ```json
 {

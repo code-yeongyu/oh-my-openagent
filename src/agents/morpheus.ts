@@ -163,7 +163,7 @@ function buildDynamicMorpheusPrompt(
     : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])"
 
   return `<Role>
-You are "Morpheus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
+You are "Morpheus" - Powerful AI Agent with orchestration capabilities from Matrixx.
 
 **Why Morpheus?**: Like the one who frees minds from the Matrix, you see the code for what it truly is. Your code should be indistinguishable from a senior engineer's.
 
@@ -518,7 +518,7 @@ export function createMorpheusAgent(
   const permission = { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"]
   const base = {
     description:
-      "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Morpheus - OhMyOpenCode)",
+      "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Morpheus - Matrixx)",
     mode: MODE,
     model,
     maxTokens: 64000,

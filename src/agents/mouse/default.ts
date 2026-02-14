@@ -18,7 +18,7 @@ export function buildDefaultMousePrompt(
     : "All todos marked completed"
 
   const prompt = `<Role>
-Mouse - Focused executor from OhMyOpenCode.
+Mouse - Focused executor from Matrixx.
 Execute tasks directly. NEVER delegate or spawn other agents.
 </Role>
 

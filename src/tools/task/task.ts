@@ -1,12 +1,12 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { MatrixxConfig } from "../../config/schema"
 import { handleCreate } from "./task-action-create"
 import { handleDelete } from "./task-action-delete"
 import { handleGet } from "./task-action-get"
 import { handleList } from "./task-action-list"
 import { handleUpdate } from "./task-action-update"
 
-export function createTask(config: Partial<OhMyOpenCodeConfig>): ToolDefinition {
+export function createTask(config: Partial<MatrixxConfig>): ToolDefinition {
   return tool({
     description: `Unified task management tool with create, list, get, update, delete actions.
 

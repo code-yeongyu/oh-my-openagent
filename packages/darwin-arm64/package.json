@@ -1,7 +1,7 @@
 {
-  "name": "oh-my-opencode-darwin-arm64",
+  "name": "matrixx-darwin-arm64",
   "version": "3.5.3",
-  "description": "Platform-specific binary for oh-my-opencode (darwin-arm64)",
+  "description": "Platform-specific binary for matrixx (darwin-arm64)",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,6 +17,6 @@
     "bin"
   ],
   "bin": {
-    "oh-my-opencode": "./bin/oh-my-opencode"
+    "matrixx": "./bin/matrixx"
   }
 }

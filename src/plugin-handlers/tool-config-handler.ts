@@ -1,10 +1,10 @@
-import type { OhMyOpenCodeConfig } from "../config";
+import type { MatrixxConfig } from "../config";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
 export function applyToolConfig(params: {
   config: Record<string, unknown>;
-  pluginConfig: OhMyOpenCodeConfig;
+  pluginConfig: MatrixxConfig;
   agentResult: Record<string, unknown>;
 }): void {
   const denyTodoTools = params.pluginConfig.experimental?.task_system

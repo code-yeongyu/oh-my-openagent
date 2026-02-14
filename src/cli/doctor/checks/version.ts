@@ -94,7 +94,7 @@ export async function checkVersionStatus(): Promise<CheckResult> {
       name: CHECK_NAMES[CHECK_IDS.VERSION_STATUS],
       status: "warn",
       message: "Unable to determine current version",
-      details: ["Run: bunx oh-my-opencode get-local-version"],
+      details: ["Run: bunx matrixx get-local-version"],
     }
   }
 
@@ -112,7 +112,7 @@ export async function checkVersionStatus(): Promise<CheckResult> {
       name: CHECK_NAMES[CHECK_IDS.VERSION_STATUS],
       status: "warn",
       message: `Update available: ${info.currentVersion} -> ${info.latestVersion}`,
-      details: ["Run: cd ~/.config/opencode && bun update oh-my-opencode"],
+      details: ["Run: cd ~/.config/opencode && bun update matrixx"],
     }
   }
 

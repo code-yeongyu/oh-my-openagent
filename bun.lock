@@ -5,6 +5,7 @@
     "": {
       "name": "oh-my-opencode",
       "dependencies": {
+        "oh-my-opencode": ".",
         "@ast-grep/cli": "^0.40.0",
         "@ast-grep/napi": "^0.40.0",
         "@clack/prompts": "^0.11.0",
@@ -225,6 +226,8 @@
     "object-assign": ["object-assign@4.1.1", "", {}, "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg=="],
 
     "object-inspect": ["object-inspect@1.13.4", "", {}, "sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew=="],
+
+    "oh-my-opencode": ["oh-my-opencode@root:", {}],
 
     "oh-my-opencode-darwin-arm64": ["oh-my-opencode-darwin-arm64@3.5.3", "", { "os": "darwin", "cpu": "arm64", "bin": { "oh-my-opencode": "bin/oh-my-opencode" } }, "sha512-Dq0+PC2dyAqG7c3DUnQmdOkKbKmOsRHwoqgLCQNKN1lTRllF8zbWqp5B+LGKxSPxPqJIPS3mKt+wIR2KvkYJVw=="],
 

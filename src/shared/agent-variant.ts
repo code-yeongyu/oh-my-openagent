@@ -1,8 +1,8 @@
-import type { OhMyOpenCodeConfig } from "../config"
+import type { MatrixxConfig } from "../config"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 export function resolveAgentVariant(
-  config: OhMyOpenCodeConfig,
+  config: MatrixxConfig,
   agentName?: string
 ): string | undefined {
   if (!agentName) {
@@ -33,7 +33,7 @@ export function resolveAgentVariant(
 }
 
 export function resolveVariantForModel(
-  config: OhMyOpenCodeConfig,
+  config: MatrixxConfig,
   agentName: string,
   currentModel: { providerID: string; modelID: string },
 ): string | undefined {
@@ -79,7 +79,7 @@ function findVariantInChain(
 }
 
 export function applyAgentVariant(
-  config: OhMyOpenCodeConfig,
+  config: MatrixxConfig,
   agentName: string | undefined,
   message: { variant?: string }
 ): void {

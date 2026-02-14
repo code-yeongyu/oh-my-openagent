@@ -22,7 +22,7 @@ export async function resolveSession(options: {
   for (let attempt = 1; attempt <= SESSION_CREATE_MAX_RETRIES; attempt++) {
     const res = await client.session.create({
       body: {
-        title: "oh-my-opencode run",
+        title: "matrixx run",
         // In CLI run mode there's no TUI to answer questions.
         permission: [
           { permission: "question", action: "deny" as const, pattern: "*" },

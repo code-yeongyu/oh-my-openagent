@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool";
 import { join } from "path";
-import type { OhMyOpenCodeConfig } from "../../config/schema";
+import type { MatrixxConfig } from "../../config/schema";
 import type { TaskObject } from "./types";
 import { TaskObjectSchema, TaskCreateInputSchema } from "./types";
 import {
@@ -13,7 +13,7 @@ import {
 import { syncTaskTodoUpdate } from "./todo-sync";
 
 export function createTaskCreateTool(
-  config: Partial<OhMyOpenCodeConfig>,
+  config: Partial<MatrixxConfig>,
   ctx?: PluginInput,
 ): ToolDefinition {
    return tool({
@@ -58,7 +58,7 @@ Calculate dependencies carefully to maximize parallel execution:
 
 async function handleCreate(
   args: Record<string, unknown>,
-  config: Partial<OhMyOpenCodeConfig>,
+  config: Partial<MatrixxConfig>,
   ctx: PluginInput | undefined,
   context: { sessionID: string },
 ): Promise<string> {

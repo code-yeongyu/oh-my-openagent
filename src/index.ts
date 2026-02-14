@@ -13,8 +13,8 @@ import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log } from "./shared"
 import { startTmuxCheck } from "./tools"
 
-const OhMyOpenCodePlugin: Plugin = async (ctx) => {
-  log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
+const MatrixxPlugin: Plugin = async (ctx) => {
+  log("[MatrixxPlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   })
 
@@ -87,10 +87,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   }
 }
 
-export default OhMyOpenCodePlugin
+export default MatrixxPlugin
 
 export type {
-  OhMyOpenCodeConfig,
+  MatrixxConfig,
   AgentName,
   AgentOverrideConfig,
   AgentOverrides,

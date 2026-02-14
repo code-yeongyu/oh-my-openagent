@@ -3,7 +3,7 @@
 >
 > **ohmyopencode.com은 이 프로젝트와 제휴 관계가 아닙니다.** 우리는 해당 사이트를 운영하거나 지지하지 않습니다.
 >
-> OhMyOpenCode는 **무료 오픈 소스**입니다. "공식"을 표방하는 제3자 사이트에서 설치 프로그램을 다운로드하거나 결제 정보를 입력하지 마십시오.
+> Matrixx는 **무료 오픈 소스**입니다. "공식"을 표방하는 제3자 사이트에서 설치 프로그램을 다운로드하거나 결제 정보를 입력하지 마십시오.
 >
 > 사칭 사이트는 유료 벽 뒤에 있어 **배포하는 내용을 확인할 수 없습니다.** 해당 사이트의 다운로드는 **잠재적으로 위험한 것으로 간주**하세요.
 >
@@ -21,9 +21,9 @@
 >
 > 함께해요!
 >
-> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | 기여자와 동료 `oh-my-opencode` 사용자와 연결하려면 [Discord 커뮤니티](https://discord.gg/PUwSMR9XNk)에 가입하세요. |
+> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | 기여자와 동료 `matrixx` 사용자와 연결하려면 [Discord 커뮤니티](https://discord.gg/PUwSMR9XNk)에 가입하세요. |
 > | :-----| :----- |
-> | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `oh-my-opencode`에 대한 뉴스와 업데이트가 제 X 계정에 게시되었습니다. <br /> 실수로 정지된 이후, [@justsisyphus](https://x.com/justsisyphus)가 제 대신 업데이트를 게시합니다. |
+> | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `matrixx`에 대한 뉴스와 업데이트가 제 X 계정에 게시되었습니다. <br /> 실수로 정지된 이후, [@justsisyphus](https://x.com/justsisyphus)가 제 대신 업데이트를 게시합니다. |
 > | [<img alt="GitHub Follow" src="https://img.shields.io/github/followers/code-yeongyu?style=flat-square&logo=github&labelColor=black&color=24292f" width="156px" />](https://github.com/code-yeongyu) | 더 많은 프로젝트를 위해 GitHub에서 [@code-yeongyu](https://github.com/code-yeongyu)를 팔로우하세요. |
 
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
@@ -37,13 +37,13 @@
 
 </div>
 
-> 이것은 코딩을 스테로이드로 만드는 것 — 실제로 작동하는 `oh-my-opencode`입니다. 백그라운드 에이전트 실행, 오라클, 라이브러리언, 프론트엔드 엔지니어와 같은 전문 에이전트 호출. 정교하게 제작된 LSP/AST 도구, 큐레이팅된 MCP, 완전한 Claude Code 호환 계층 사용.
+> 이것은 코딩을 스테로이드로 만드는 것 — 실제로 작동하는 `matrixx`입니다. 백그라운드 에이전트 실행, 오라클, 라이브러리언, 프론트엔드 엔지니어와 같은 전문 에이전트 호출. 정교하게 제작된 LSP/AST 도구, 큐레이팅된 MCP, 완전한 Claude Code 호환 계층 사용.
 
 # Claude OAuth 액세스 공지
 
 ## TL;DR
 
-> Q. oh-my-opencode를 사용할 수 있나요?
+> Q. matrixx를 사용할 수 있나요?
 
 네.
 
@@ -55,7 +55,7 @@
 
 > 2026년 1월 현재, Anthropic은 ToS 위반을 이유로 제3자 OAuth 액세스를 제한했습니다.
 >
-> [**Anthropic은 이 프로젝트 oh-my-opencode를 opencode 차단의 정당화로 인용했습니다.**](https://x.com/thdxr/status/2010149530486911014)
+> [**Anthropic은 이 프로젝트 (구 oh-my-opencode)를 opencode 차단의 정당화로 인용했습니다.**](https://x.com/thdxr/status/2010149530486911014)
 >
 > 실제로 커뮤니티에는 Claude Code의 oauth 요청 서명을 위조하는 일부 플러그인이 존재합니다.
 >
@@ -67,7 +67,7 @@
 <div align="center">
 
 [![GitHub Release](https://img.shields.io/github/v/release/code-yeongyu/oh-my-opencode?color=369eff&labelColor=black&logo=github&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/releases)
-[![npm downloads](https://img.shields.io/npm/dt/oh-my-opencode?color=ff6b35&labelColor=black&style=flat-square)](https://www.npmjs.com/package/oh-my-opencode)
+[![npm downloads](https://img.shields.io/npm/dt/matrixx?color=ff6b35&labelColor=black&style=flat-square)](https://www.npmjs.com/package/matrixx)
 [![GitHub Contributors](https://img.shields.io/github/contributors/code-yeongyu/oh-my-opencode?color=c4f042&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/graphs/contributors)
 [![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-opencode?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/network/members)
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-opencode?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/stargazers)
@@ -110,7 +110,7 @@
 
 ## 목차
 
-- [Oh My OpenCode](#oh-my-opencode)
+- [Matrixx](#matrixx)
   - [이 README를 읽지 않고 건너뛰세요](#이-readme를-읽지-않고-건너뛰세요)
     - [에이전트의 시대입니다](#에이전트의-시대입니다)
     - [🪄 마법의 단어: `ultrawork`](#-마법의-단어-ultrawork)
@@ -248,7 +248,7 @@ Hey please read this readme and tell me why it is different from other agent har
 이 프롬프트를 LLM 에이전트(Claude Code, AmpCode, Cursor 등)에 복사하여 붙여넣으세요:
 
 ```
-Install and configure oh-my-opencode by following the instructions here:
+Install and configure matrixx by following the instructions here:
 https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
 ```
 
@@ -264,15 +264,15 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads
 
 ## 제거
 
-oh-my-opencode를 제거하려면:
+matrixx를 제거하려면:
 
 1. **OpenCode 구성에서 플러그인 제거**
 
-   `~/.config/opencode/opencode.json`(또는 `opencode.jsonc`)을 편집하고 `plugin` 배열에서 `"oh-my-opencode"`를 제거하세요:
+   `~/.config/opencode/opencode.json`(또는 `opencode.jsonc`)을 편집하고 `plugin` 배열에서 `"matrixx"`를 제거하세요:
 
    ```bash
    # Using jq
-   jq '.plugin = [.plugin[] | select(. != "oh-my-opencode")]' \
+   jq '.plugin = [.plugin[] | select(. != "matrixx")]' \
        ~/.config/opencode/opencode.json > /tmp/oc.json && \
        mv /tmp/oc.json ~/.config/opencode/opencode.json
    ```
@@ -281,10 +281,10 @@ oh-my-opencode를 제거하려면:
 
    ```bash
    # Remove user config
-   rm -f ~/.config/opencode/oh-my-opencode.json
+   rm -f ~/.config/opencode/matrixx.json
 
    # Remove project config (if exists)
-   rm -f .opencode/oh-my-opencode.json
+   rm -f .opencode/matrixx.json
    ```
 
 3. **제거 확인**
@@ -315,7 +315,7 @@ oh-my-opencode를 제거하려면:
 자세한 내용은 전체 [구성 문서](docs/configurations.md)를 참조하세요.
 
 **빠른 개요:**
-- **구성 위치**: `.opencode/oh-my-opencode.json`(프로젝트) 또는 `~/.config/opencode/oh-my-opencode.json`(사용자)
+- **구성 위치**: `.opencode/matrixx.json`(프로젝트) 또는 `~/.config/opencode/matrixx.json`(사용자)
 - **JSONC 지원**: 주석 및 후행 쉼표 지원
 - **에이전트**: 모든 에이전트의 모델, 온도, 프롬프트 및 권한 재정의
 - **내장 스킬**: `playwright`(브라우저 자동화), `git-master`(원자적 커밋)

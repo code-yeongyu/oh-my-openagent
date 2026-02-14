@@ -1,13 +1,13 @@
 import { existsSync } from "fs"
 import { join } from "path"
-import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { MatrixxConfig } from "../../config/schema"
 import type { TaskObject } from "./types"
 import { TaskListInputSchema, TaskObjectSchema } from "./types"
 import { getTaskDir, listTaskFiles, readJsonSafe } from "../../features/claude-tasks/storage"
 
 export async function handleList(
   args: Record<string, unknown>,
-  config: Partial<OhMyOpenCodeConfig>
+  config: Partial<MatrixxConfig>
 ): Promise<string> {
   const validatedArgs = TaskListInputSchema.parse(args)
   const taskDir = getTaskDir(config)
