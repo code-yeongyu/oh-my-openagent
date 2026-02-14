@@ -9,6 +9,30 @@ import { getLastAgentFromSession } from "./session-last-agent"
 import type { AtlasHookOptions, SessionState } from "./types"
 
 const CONTINUATION_COOLDOWN_MS = 5000
+const ABORT_WINDOW_MS = 10_000
+
+function getAbortClearSessionID(event: { type: string; properties?: unknown }): string | undefined {
+  const props = event.properties as Record<string, unknown> | undefined
+  if (!props) return undefined
+
+  if (event.type === "message.updated") {
+    const info = props.info as Record<string, unknown> | undefined
+    return info?.sessionID as string | undefined
+  }
+
+  if (event.type === "message.part.updated") {
+    const info = props.info as Record<string, unknown> | undefined
+    const role = info?.role as string | undefined
+    if (role !== "assistant") return undefined
+    return info?.sessionID as string | undefined
+  }
+
+  if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
+    return props.sessionID as string | undefined
+  }
+
+  return undefined
+}
 
 export function createAtlasEventHandler(input: {
   ctx: PluginInput
@@ -27,7 +51,9 @@ export function createAtlasEventHandler(input: {
 
       const state = getState(sessionID)
       const isAbort = isAbortError(props?.error)
-      state.lastEventWasAbortError = isAbort
+      if (isAbort) {
+        state.abortDetectedAt = Date.now()
+      }
 
       log(`[${HOOK_NAME}] session.error`, { sessionID, isAbort })
       return
@@ -53,10 +79,13 @@ export function createAtlasEventHandler(input: {
 
       const state = getState(sessionID)
 
-      if (state.lastEventWasAbortError) {
-        state.lastEventWasAbortError = false
-        log(`[${HOOK_NAME}] Skipped: abort error immediately before idle`, { sessionID })
-        return
+      if (state.abortDetectedAt) {
+        const timeSinceAbort = Date.now() - state.abortDetectedAt
+        if (timeSinceAbort < ABORT_WINDOW_MS) {
+          log(`[${HOOK_NAME}] Skipped: abort error ${timeSinceAbort}ms before idle`, { sessionID })
+          return
+        }
+        state.abortDetectedAt = undefined
       }
 
       if (state.promptFailureCount >= 2) {
@@ -140,39 +169,11 @@ export function createAtlasEventHandler(input: {
       return
     }
 
-    if (event.type === "message.updated") {
-      const info = props?.info as Record<string, unknown> | undefined
-      const sessionID = info?.sessionID as string | undefined
-      if (!sessionID) return
-
-      const state = sessions.get(sessionID)
+    const clearAbortSessionID = getAbortClearSessionID(event)
+    if (clearAbortSessionID) {
+      const state = sessions.get(clearAbortSessionID)
       if (state) {
-        state.lastEventWasAbortError = false
-      }
-      return
-    }
-
-    if (event.type === "message.part.updated") {
-      const info = props?.info as Record<string, unknown> | undefined
-      const sessionID = info?.sessionID as string | undefined
-      const role = info?.role as string | undefined
-
-      if (sessionID && role === "assistant") {
-        const state = sessions.get(sessionID)
-        if (state) {
-          state.lastEventWasAbortError = false
-        }
-      }
-      return
-    }
-
-    if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
-      const sessionID = props?.sessionID as string | undefined
-      if (sessionID) {
-        const state = sessions.get(sessionID)
-        if (state) {
-          state.lastEventWasAbortError = false
-        }
+        state.abortDetectedAt = undefined
       }
       return
     }

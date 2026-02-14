@@ -23,7 +23,7 @@ export interface ToolExecuteAfterOutput {
 }
 
 export interface SessionState {
-  lastEventWasAbortError?: boolean
+  abortDetectedAt?: number
   lastContinuationInjectedAt?: number
   promptFailureCount: number
 }
