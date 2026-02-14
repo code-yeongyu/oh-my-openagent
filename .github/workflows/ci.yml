@@ -53,13 +53,29 @@ jobs:
           bun test src/hooks/compaction-context-injector
           bun test src/features/tmux-subagent
           bun test src/cli/doctor/formatter.test.ts
+          bun test src/cli/doctor/format-default.test.ts
           bun test src/tools/call-omo-agent/sync-executor.test.ts
+          bun test src/tools/call-omo-agent/session-creator.test.ts
 
       - name: Run remaining tests
         run: |
-          # Run all other tests (mock-heavy ones are re-run but that's acceptable)
-          bun test bin script src/cli src/config src/mcp src/index.test.ts \
-            src/agents src/tools src/shared \
+          # Enumerate subdirectories/files explicitly to EXCLUDE mock-heavy files
+          # that were already run in isolation above.
+          # Excluded from src/cli: doctor/formatter.test.ts, doctor/format-default.test.ts
+          # Excluded from src/tools: call-omo-agent/sync-executor.test.ts, call-omo-agent/session-creator.test.ts
+          bun test bin script src/config src/mcp src/index.test.ts \
+            src/agents src/shared \
+            src/cli/run src/cli/config-manager src/cli/mcp-oauth \
+            src/cli/index.test.ts src/cli/install.test.ts src/cli/model-fallback.test.ts \
+            src/cli/config-manager.test.ts \
+            src/cli/doctor/runner.test.ts src/cli/doctor/checks \
+            src/tools/ast-grep src/tools/background-task src/tools/delegate-task \
+            src/tools/glob src/tools/grep src/tools/interactive-bash \
+            src/tools/look-at src/tools/lsp src/tools/session-manager \
+            src/tools/skill src/tools/skill-mcp src/tools/slashcommand src/tools/task \
+            src/tools/call-omo-agent/background-agent-executor.test.ts \
+            src/tools/call-omo-agent/background-executor.test.ts \
+            src/tools/call-omo-agent/subagent-session-creator.test.ts \
             src/hooks/anthropic-context-window-limit-recovery \
             src/hooks/claude-code-compatibility \
             src/hooks/context-injection \
