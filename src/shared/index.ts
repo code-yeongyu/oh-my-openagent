@@ -22,6 +22,7 @@ export type {
   OpenCodeConfigPaths,
 } from "./opencode-config-dir-types"
 export * from "./opencode-version"
+export * from "./opencode-storage-detection"
 export * from "./permission-compat"
 export * from "./external-plugin-detector"
 export * from "./zip-extractor"
@@ -49,4 +50,5 @@ export * from "./port-utils"
 export * from "./git-worktree"
 export * from "./safe-create-hook"
 export * from "./truncate-description"
+export * from "./opencode-storage-paths"
 export * from "./opencode-message-dir"
