@@ -42,11 +42,11 @@ describe("mcb-integration/mcb-client-helper", () => {
     expect(args).toHaveProperty("token")
   })
 
-  //#given an unknown tool
+  //#given the entity tool
   //#when createDefaultArgs is called
-  //#then an empty object is returned
-  it("returns empty defaults for unsupported tools", () => {
-    const args = createDefaultArgs("org_entity")
+  //#then it returns empty defaults (entity not exercised in these tests)
+  it("returns empty defaults for entity tool", () => {
+    const args = createDefaultArgs("entity")
     expect(args).toEqual({})
   })
 

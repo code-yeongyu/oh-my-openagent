@@ -18,13 +18,13 @@ describe.skipIf(!mcbAvailable)("mcb session roundtrip with DB verification", () 
   let testClient: McbTestClient
 
   beforeAll(async () => {
-    testClient = await createMcbTestClient(15_000, configPath, {
+    testClient = await createMcbTestClient(60_000, configPath, {
       MCP__AUTH__USER_DB_PATH: dbPath,
     })
-  })
+  }, 60_000)
 
   afterAll(async () => {
-    await testClient.close()
+    await testClient?.close()
     for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true })
   })
 

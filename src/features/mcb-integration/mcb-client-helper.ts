@@ -1,7 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import type { McbCallToolResult, McbToolName } from "./types"
-
 export interface McbTestClient {
   client: Client
   transport: StdioClientTransport
@@ -18,7 +17,7 @@ export async function createMcbTestClient(
     command: "mcb",
     args: serveArgs,
     stderr: "pipe",
-    ...(env ? { env: { ...env, PATH: process.env.PATH ?? "" } } : {}),
+    ...(env ? { env: { ...process.env, ...env, PATH: process.env.PATH ?? "" } } : {}),
   })
 
   const client = new Client({ name: "mcb-e2e-test", version: "0.1.0" }, { capabilities: {} })
@@ -44,15 +43,39 @@ export async function callMcbTool(
   args: Record<string, unknown>,
   timeoutMs = 5_000,
 ): Promise<McbCallToolResult> {
-  const result = await withTimeout(client.callTool({ name, arguments: args }), timeoutMs, `mcb_call_timeout:${name}`)
-  const rawContent = Array.isArray(result.content) ? result.content : []
-  return {
-    content: rawContent.map((item) => ({
-      type: typeof item === "object" && item !== null && "type" in item && typeof item.type === "string" ? item.type : "text",
-      text:
-        typeof item === "object" && item !== null && "text" in item && typeof item.text === "string" ? item.text : "",
-    })),
-    isError: result.isError === true,
+  const meta =
+    typeof args._meta === "object" && args._meta !== null
+      ? (args._meta as Record<string, unknown>)
+      : {
+          session_id: "ses_test",
+          project_id: "default",
+          worktree_id: "wt_test",
+          repo_path: process.cwd(),
+          machine_id: "machine_test",
+          agent_program: "oh-my-opencode",
+          model_id: "test-model",
+        }
+  const { _meta: _ignored, ...toolArgs } = args
+  try {
+    const result = await withTimeout(
+      client.callTool({ name, arguments: toolArgs, _meta: meta }),
+      timeoutMs,
+      `mcb_call_timeout:${name}`,
+    )
+    const rawContent = Array.isArray(result.content) ? result.content : []
+    return {
+      content: rawContent.map((item) => ({
+        type: typeof item === "object" && item !== null && "type" in item && typeof item.type === "string" ? item.type : "text",
+        text:
+          typeof item === "object" && item !== null && "text" in item && typeof item.text === "string" ? item.text : "",
+      })),
+      isError: result.isError === true,
+    }
+  } catch (e) {
+    return {
+      content: [{ type: "text", text: e instanceof Error ? e.message : String(e) }],
+      isError: true,
+    }
   }
 }
 
@@ -76,7 +99,7 @@ export function createDefaultArgs(toolName: McbToolName): Record<string, unknown
       resource: "observation",
       data: {},
       ids: [],
-      project_id: "",
+      project_id: "default",
       repo_id: "",
       session_id: "",
       tags: [],
@@ -91,7 +114,6 @@ export function createDefaultArgs(toolName: McbToolName): Record<string, unknown
       org_id: null,
     }
   }
-
   if (toolName === "search") {
     return {
       query: "test",
@@ -107,7 +129,6 @@ export function createDefaultArgs(toolName: McbToolName): Record<string, unknown
       org_id: null,
     }
   }
-
   if (toolName === "index") {
     return {
       action: "status",
@@ -121,7 +142,6 @@ export function createDefaultArgs(toolName: McbToolName): Record<string, unknown
       token: "",
     }
   }
-
   if (toolName === "validate") {
     return {
       action: "list_rules",
@@ -131,7 +151,6 @@ export function createDefaultArgs(toolName: McbToolName): Record<string, unknown
       category: "",
     }
   }
-
   if (toolName === "vcs") {
     return {
       action: "list_repositories",
@@ -147,13 +166,12 @@ export function createDefaultArgs(toolName: McbToolName): Record<string, unknown
       org_id: null,
     }
   }
-
   if (toolName === "session") {
     return {
       action: "list",
       session_id: "",
       data: {},
-      project_id: "",
+      project_id: "default",
       worktree_id: null,
       agent_type: "",
       status: "active",
@@ -161,7 +179,6 @@ export function createDefaultArgs(toolName: McbToolName): Record<string, unknown
       org_id: null,
     }
   }
-
   return {}
 }
 

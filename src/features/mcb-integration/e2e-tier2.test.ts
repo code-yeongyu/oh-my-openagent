@@ -1,35 +1,41 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { resolve } from "path"
 import { callMcbTool, createDefaultArgs, createMcbTestClient, parseMcbToolResponse, type McbTestClient } from "./mcb-client-helper"
 
 const mcbAvailable = Bun.which("mcb") !== null
+const configPath = resolve(import.meta.dir, "test-mcb.toml")
+const dbPath = `/tmp/mcb-e2e-tier2-${Date.now()}.db`
 
 describe.skipIf(!mcbAvailable)("mcb-integration: e2e tier2 core tool invocation", () => {
   let testClient: McbTestClient
 
   beforeAll(async () => {
-    testClient = await createMcbTestClient()
-  })
+    testClient = await createMcbTestClient(60_000, configPath, {
+      MCP__AUTH__USER_DB_PATH: dbPath,
+    })
+  }, 60_000)
 
   afterAll(async () => {
-    await testClient.close()
+    await testClient?.close()
   })
 
-  //#given a memory store call without project_id
+  //#given a memory store call without execution provenance
   //#when store is requested for observation resource
-  //#then mcb returns a validation error requiring project_id
-  test("memory store without project_id returns validation error", async () => {
+  //#then mcb rejects the call with invalid_params provenance error
+  test("memory store without execution provenance returns invalid_params", async () => {
     const args = {
       ...createDefaultArgs("memory"),
       action: "store",
       resource: "observation",
       data: { content: "e2e test observation", source: "oh-my-opencode", observation_type: "code" },
+      _meta: {},
     }
     const result = await callMcbTool(testClient.client, "memory", args)
     expect(Array.isArray(result.content)).toBe(true)
     expect(result.content.length).toBeGreaterThan(0)
     expect(result.content[0]?.type).toBe("text")
     expect(result.isError).toBe(true)
-    expect(result.content[0]?.text).toContain("Project ID")
+    expect(result.content[0]?.text).toContain("Missing execution provenance")
   }, 10_000)
 
   //#given memory list call with empty query

@@ -1,16 +1,13 @@
 export const MCB_TOOL_NAMES = [
-  "index",
-  "search",
-  "validate",
-  "memory",
-  "session",
   "agent",
+  "entity",
+  "index",
+  "memory",
   "project",
+  "search",
+  "session",
+  "validate",
   "vcs",
-  "vcs_entity",
-  "plan_entity",
-  "issue_entity",
-  "org_entity",
 ] as const
 
 export type McbToolName = (typeof MCB_TOOL_NAMES)[number]

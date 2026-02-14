@@ -1,23 +1,27 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
-import { join } from "path"
+import { join, resolve } from "path"
 import { callMcbTool, createDefaultArgs, createMcbTestClient, parseMcbToolResponse, type McbTestClient } from "./mcb-client-helper"
 
 const mcbAvailable = Bun.which("mcb") !== null
+const configPath = resolve(import.meta.dir, "test-mcb.toml")
+const dbPath = `/tmp/mcb-e2e-tier3-${Date.now()}.db`
 
 describe.skipIf(!mcbAvailable)("mcb-integration: e2e tier3 extended operations", () => {
   let testClient: McbTestClient
   let tempDir = ""
 
   beforeAll(async () => {
-    testClient = await createMcbTestClient()
+    testClient = await createMcbTestClient(60_000, configPath, {
+      MCP__AUTH__USER_DB_PATH: dbPath,
+    })
     tempDir = mkdtempSync(join(tmpdir(), "mcb-e2e-"))
     writeFileSync(join(tempDir, "sample.ts"), "export const value = 1\n", "utf-8")
-  })
+  }, 60_000)
 
   afterAll(async () => {
-    await testClient.close()
+    await testClient?.close()
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true })
     }

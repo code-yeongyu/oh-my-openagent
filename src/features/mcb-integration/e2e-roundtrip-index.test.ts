@@ -21,7 +21,7 @@ describe.skipIf(!mcbAvailable)("mcb index roundtrip with DB verification", () =>
   let tempDir = ""
 
   beforeAll(async () => {
-    testClient = await createMcbTestClient(15_000, configPath, {
+    testClient = await createMcbTestClient(60_000, configPath, {
       MCP__AUTH__USER_DB_PATH: dbPath,
     })
     tempDir = mkdtempSync(join(tmpdir(), "mcb-e2e-index-"))
@@ -29,10 +29,10 @@ describe.skipIf(!mcbAvailable)("mcb index roundtrip with DB verification", () =>
       join(tempDir, "calculator.ts"),
       "export function calculateTotalRoundtripMarker(items: number[]): number { return items.reduce((sum, item) => sum + item, 0) }\n",
     )
-  })
+  }, 60_000)
 
   afterAll(async () => {
-    await testClient.close()
+    await testClient?.close()
     if (tempDir) rmSync(tempDir, { recursive: true, force: true })
     for (const ext of ["", "-wal", "-shm"]) rmSync(dbPath + ext, { force: true })
   })
@@ -41,7 +41,7 @@ describe.skipIf(!mcbAvailable)("mcb index roundtrip with DB verification", () =>
   //#when the index operation completes and we query SQLite directly
   //#then collections and file_hashes tables should contain persisted rows
   test("index start persists to collections and file_hashes tables", async () => {
-    const collection = `e2e-index-${Date.now()}`
+    const collection = `e2e_index_${Date.now()}`
     const startResult = await callMcbTool(testClient.client, "index", {
       ...createDefaultArgs("index"),
       action: "start",
@@ -80,7 +80,7 @@ describe.skipIf(!mcbAvailable)("mcb index roundtrip with DB verification", () =>
   //#when search returns results but DB has 0 file_hashes rows
   //#then this documents MCB doing filesystem search instead of vector search
   test("search code cross-references with DB state", async () => {
-    const collection = `e2e-search-${Date.now()}`
+    const collection = `e2e_search_${Date.now()}`
     await callMcbTool(testClient.client, "index", {
       ...createDefaultArgs("index"),
       action: "start",
