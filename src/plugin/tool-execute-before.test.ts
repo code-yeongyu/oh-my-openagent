@@ -276,7 +276,7 @@ describe("createToolExecuteBeforeHandler", () => {
       //#when
       const run = handler(
         { tool: "bash", sessionID: "ses_audit_2", callID: "call_1" },
-        { args: { command: "supabase db push" } as Record<string, unknown> },
+        { args: { command: "db push" } as Record<string, unknown> },
       )
 
       //#then
@@ -301,7 +301,7 @@ describe("createToolExecuteBeforeHandler", () => {
         {
           args: {
             description: "UI polish pass",
-            prompt: "Do not modify database schema (including supabase). Focus on frontend visual hierarchy.",
+            prompt: "Do not modify database schema. Focus on frontend visual hierarchy.",
           } as Record<string, unknown>,
         },
       )
@@ -325,7 +325,7 @@ describe("createToolExecuteBeforeHandler", () => {
         { tool: "write", sessionID: "ses_audit_4", callID: "call_1" },
         {
           args: {
-            filePath: "apps/web/supabase/migrations/202602140001_init.sql",
+            filePath: "apps/web/database/migrations/202602140001_init.sql",
             content: "-- sql",
           } as Record<string, unknown>,
         },

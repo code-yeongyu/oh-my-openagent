@@ -9,10 +9,7 @@ type ToolInput = { tool: string; sessionID: string; callID: string }
 type ToolOutput = { args: Record<string, unknown> }
 
 const DATABASE_MUTATION_COMMAND_PATTERNS = [
-  /\bsupabase\s+db\b/i,
-  /\bsupabase\s+migration\b/i,
-  /\bsupabase\s+seed\b/i,
-  /\bsupabase_db_url\b/i,
+  /\bdb\s+(push|reset|pull|seed)\b/i,
   /\bprisma\s+(migrate|db\s+push|db\s+pull|db\s+seed)\b/i,
   /\bdrizzle-kit\s+(push|migrate|generate)\b/i,
   /\b(knex|typeorm|sequelize)\b.*\bmigration\b/i,
@@ -27,7 +24,7 @@ const DATABASE_MUTATION_INTENT_PATTERN =
   /\b(migrate|migration|schema|sql|db push|db reset|db pull|table|column|policy|rls|seed|create|alter|drop|insert|update|delete|truncate)\b/i
 
 const DATABASE_CONTEXT_PATTERN =
-  /\b(database|db|sql|schema|migration|supabase|postgres|postgresql|mysql|mariadb|sqlite|mongodb|prisma|drizzle|typeorm|sequelize|knex|flyway|liquibase)\b/i
+  /\b(database|db|sql|schema|migration|postgres|postgresql|mysql|mariadb|sqlite|mongodb|prisma|drizzle|typeorm|sequelize|knex|flyway|liquibase)\b/i
 
 const DATABASE_NEGATION_PATTERN =
   /\b(do not|don't|dont|avoid|must not|never)\b.{0,40}\b(modify|change|touch|update|migrate|db|database|schema)\b/i
@@ -102,7 +99,7 @@ function isDatabaseMutationPath(pathLike: string): boolean {
   if (normalized.endsWith(".sql")) return true
   if (/(^|\/)(migrations?|migration)(\/|$)/.test(normalized)) return true
   if (/(^|\/)(db|database|schema|schemas|seed|seeds)(\/|$)/.test(normalized)) return true
-  if (/(^|\/)(supabase|prisma|drizzle|typeorm|sequelize|knex|flyway|liquibase)(\/|$)/.test(normalized))
+  if (/(^|\/)(prisma|drizzle|typeorm|sequelize|knex|flyway|liquibase)(\/|$)/.test(normalized))
     return true
   if (normalized.endsWith("schema.prisma")) return true
   return false
