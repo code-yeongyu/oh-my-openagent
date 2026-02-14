@@ -1,5 +1,5 @@
 import type { CategoryConfig } from "../config/schema";
-import { PROMETHEUS_PERMISSION, PROMETHEUS_SYSTEM_PROMPT } from "../agents/oracle";
+import { ORACLE_PERMISSION, ORACLE_SYSTEM_PROMPT } from "../agents/oracle";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import {
   fetchAvailableModels,
@@ -69,8 +69,8 @@ export async function buildOracleAgentConfig(params: {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",
-    prompt: PROMETHEUS_SYSTEM_PROMPT,
-    permission: PROMETHEUS_PERMISSION,
+    prompt: ORACLE_SYSTEM_PROMPT,
+    permission: ORACLE_PERMISSION,
     description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Oracle - OhMyOpenCode)`,
     color: (params.configAgentPlan?.color as string) ?? "#FF5722",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),

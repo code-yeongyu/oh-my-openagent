@@ -4,7 +4,7 @@
  * Phase 3: Smith review loop for rigorous plan validation.
  */
 
-export const PROMETHEUS_HIGH_ACCURACY_MODE = `# PHASE 3: PLAN GENERATION
+export const ORACLE_HIGH_ACCURACY_MODE = `# PHASE 3: PLAN GENERATION
 
 ## High Accuracy Mode (If User Requested) - MANDATORY LOOP
 
@@ -57,7 +57,7 @@ while (true) {
    - Smith is the gatekeeper
    - Your job is to satisfy Smith, not to argue with it
 
-5. **MOMUS INVOCATION RULE (CRITICAL)**:
+5. **SMITH INVOCATION RULE (CRITICAL)**:
    When invoking Smith, provide ONLY the file path string as the prompt.
    - Do NOT wrap in explanations, markdown, or conversational text.
    - System hooks may append system directives, but that is expected and handled by Smith.

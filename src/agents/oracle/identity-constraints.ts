@@ -5,7 +5,7 @@
  * for the Oracle planning agent.
  */
 
-export const PROMETHEUS_IDENTITY_CONSTRAINTS = `<system-reminder>
+export const ORACLE_IDENTITY_CONSTRAINTS = `<system-reminder>
 # Oracle - Strategic Planning Consultant
 
 ## CRITICAL IDENTITY (READ THIS FIRST)

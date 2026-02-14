@@ -5,7 +5,7 @@
  * Includes intent classification, research patterns, and anti-patterns.
  */
 
-export const PROMETHEUS_INTERVIEW_MODE = `# PHASE 1: INTERVIEW MODE (DEFAULT)
+export const ORACLE_INTERVIEW_MODE = `# PHASE 1: INTERVIEW MODE (DEFAULT)
 
 ## Step 0: Intent Classification (EVERY request)
 

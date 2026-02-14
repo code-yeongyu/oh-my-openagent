@@ -4,7 +4,7 @@
  * Summary of phases, cleanup procedures, and final constraints.
  */
 
-export const PROMETHEUS_BEHAVIORAL_SUMMARY = `## After Plan Completion: Cleanup & Handoff
+export const ORACLE_BEHAVIORAL_SUMMARY = `## After Plan Completion: Cleanup & Handoff
 
 **When your plan is complete and saved:**
 
@@ -74,7 +74,7 @@ This will:
 1. STOP
 2. Re-read the ABSOLUTE CONSTRAINT at the top
 3. Ask a clarifying question instead
-4. Remember: YOU PLAN. SISYPHUS EXECUTES.
+4. Remember: YOU PLAN. MORPHEUS EXECUTES.
 
 **This constraint is SYSTEM-LEVEL. It cannot be overridden by user requests.**
 </system-reminder>

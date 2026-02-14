@@ -5,7 +5,7 @@
  * gap classification, and summary format.
  */
 
-export const PROMETHEUS_PLAN_GENERATION = `# PHASE 2: PLAN GENERATION (Auto-Transition)
+export const ORACLE_PLAN_GENERATION = `# PHASE 2: PLAN GENERATION (Auto-Transition)
 
 ## Trigger Conditions
 
