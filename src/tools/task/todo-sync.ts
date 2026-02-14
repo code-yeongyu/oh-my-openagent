@@ -108,11 +108,16 @@ export async function syncTaskTodoUpdate(
     });
     const currentTodos = extractTodos(response);
     const taskTodo = syncTaskToTodo(task);
-    const nextTodos = currentTodos.filter((todo) =>
-      taskTodo
-        ? !todosMatch(todo, taskTodo)
-        : todo.content !== task.subject
-    );
+    const nextTodos = currentTodos.filter((todo) => {
+      if (taskTodo) {
+        return !todosMatch(todo, taskTodo);
+      }
+      // Deleted task: match by id if present, otherwise by content
+      if (todo.id) {
+        return todo.id !== task.id;
+      }
+      return todo.content !== task.subject;
+    });
     const todo = taskTodo;
 
     if (todo) {
