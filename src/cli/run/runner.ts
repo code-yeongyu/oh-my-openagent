@@ -12,6 +12,25 @@ import { pollForCompletion } from "./poll-for-completion"
 export { resolveRunAgent }
 
 const DEFAULT_TIMEOUT_MS = 600_000
+const EVENT_PROCESSOR_SHUTDOWN_TIMEOUT_MS = 2_000
+
+export async function waitForEventProcessorShutdown(
+  eventProcessor: Promise<void>,
+  timeoutMs = EVENT_PROCESSOR_SHUTDOWN_TIMEOUT_MS,
+): Promise<void> {
+  const completed = await Promise.race([
+    eventProcessor.then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), timeoutMs)),
+  ])
+
+  if (!completed) {
+    console.log(
+      pc.dim(
+        `[run] Event stream did not close within ${timeoutMs}ms after abort; continuing shutdown.`
+      )
+    )
+  }
+}
 
 export async function run(options: RunOptions): Promise<number> {
   process.env.OPENCODE_CLI_RUN_MODE = "true"
@@ -84,11 +103,11 @@ export async function run(options: RunOptions): Promise<number> {
        console.log(pc.dim("Waiting for completion...\n"))
        const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
-       // Abort the event stream to stop the processor
-       abortController.abort()
+      // Abort the event stream to stop the processor
+      abortController.abort()
 
-       await eventProcessor
-       cleanup()
+      await waitForEventProcessorShutdown(eventProcessor)
+      cleanup()
 
       const durationMs = Date.now() - startTime
 

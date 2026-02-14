@@ -1,9 +1,39 @@
-import { describe, it, expect } from "bun:test"
+import { describe, it, expect, spyOn } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../../config"
-import { resolveRunAgent } from "./runner"
+import { resolveRunAgent, waitForEventProcessorShutdown } from "./runner"
 
 const createConfig = (overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig => ({
   ...overrides,
+})
+
+describe("waitForEventProcessorShutdown", () => {
+  it("returns quickly when event processor completes", async () => {
+    // given
+    const eventProcessor = Promise.resolve()
+
+    // when
+    const start = Date.now()
+    await waitForEventProcessorShutdown(eventProcessor, 50)
+    const elapsed = Date.now() - start
+
+    // then
+    expect(elapsed).toBeLessThan(50)
+  })
+
+  it("times out and continues when event processor does not complete", async () => {
+    // given
+    const never = new Promise<void>(() => {})
+    const logSpy = spyOn(console, "log").mockImplementation(() => {})
+
+    // when
+    const start = Date.now()
+    await waitForEventProcessorShutdown(never, 25)
+    const elapsed = Date.now() - start
+
+    // then
+    expect(elapsed).toBeGreaterThanOrEqual(20)
+    expect(logSpy).toHaveBeenCalled()
+  })
 })
 
 describe("resolveRunAgent", () => {
