@@ -13,6 +13,7 @@ export function createTask(input: LaunchInput): BackgroundTask {
     parentMessageID: input.parentMessageID,
     parentModel: input.parentModel,
     parentAgent: input.parentAgent,
+    parentTools: input.parentTools,
     model: input.model,
   }
 }

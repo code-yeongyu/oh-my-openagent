@@ -3,6 +3,7 @@ import { isPlanFamily } from "./constants"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { formatDetailedError } from "./error-formatting"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { setSessionTools } from "../../shared/session-tools-store"
 
 export async function sendSyncPrompt(
   client: OpencodeClient,
@@ -18,17 +19,19 @@ export async function sendSyncPrompt(
 ): Promise<string | null> {
   try {
     const allowTask = isPlanFamily(input.agentToUse)
+    const tools = {
+      task: allowTask,
+      call_omo_agent: true,
+      question: false,
+      ...getAgentToolRestrictions(input.agentToUse),
+    }
+    setSessionTools(input.sessionID, tools)
     await promptWithModelSuggestionRetry(client, {
       path: { id: input.sessionID },
       body: {
         agent: input.agentToUse,
         system: input.systemContent,
-        tools: {
-          task: allowTask,
-          call_omo_agent: true,
-          question: false,
-          ...getAgentToolRestrictions(input.agentToUse),
-        },
+        tools,
         parts: [{ type: "text", text: input.args.prompt }],
         ...(input.categoryModel ? { model: { providerID: input.categoryModel.providerID, modelID: input.categoryModel.modelID } } : {}),
         ...(input.categoryModel?.variant ? { variant: input.categoryModel.variant } : {}),

@@ -37,6 +37,8 @@ export interface BackgroundTask {
   concurrencyGroup?: string
   /** Parent session's agent name for notification */
   parentAgent?: string
+  /** Parent session's tool restrictions for notification prompts */
+  parentTools?: Record<string, boolean>
   /** Marks if the task was launched from an unstable agent/category */
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
@@ -56,6 +58,7 @@ export interface LaunchInput {
   parentMessageID: string
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
+  parentTools?: Record<string, boolean>
   model?: { providerID: string; modelID: string; variant?: string }
   isUnstableAgent?: boolean
   skills?: string[]
@@ -70,4 +73,5 @@ export interface ResumeInput {
   parentMessageID: string
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
+  parentTools?: Record<string, boolean>
 }
