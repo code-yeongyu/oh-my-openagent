@@ -74,8 +74,13 @@ async function findMessagesWithOrphanThinkingFromSDK(
   client: Client,
   sessionID: string
 ): Promise<string[]> {
-  const response = await client.session.messages({ path: { id: sessionID } })
-  const messages = (response.data ?? []) as MessageData[]
+  let messages: MessageData[]
+  try {
+    const response = await client.session.messages({ path: { id: sessionID } })
+    messages = (response.data ?? []) as MessageData[]
+  } catch {
+    return []
+  }
 
   const result: string[] = []
   for (const msg of messages) {
@@ -103,8 +108,13 @@ async function findMessageByIndexNeedingThinkingFromSDK(
   sessionID: string,
   targetIndex: number
 ): Promise<string | null> {
-  const response = await client.session.messages({ path: { id: sessionID } })
-  const messages = (response.data ?? []) as MessageData[]
+  let messages: MessageData[]
+  try {
+    const response = await client.session.messages({ path: { id: sessionID } })
+    messages = (response.data ?? []) as MessageData[]
+  } catch {
+    return null
+  }
 
   if (targetIndex < 0 || targetIndex >= messages.length) return null
 

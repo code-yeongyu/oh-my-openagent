@@ -52,7 +52,7 @@ export async function stripThinkingPartsAsync(
 
     let anyRemoved = false
     for (const part of targetMsg.parts) {
-      if (THINKING_TYPES.has(part.type)) {
+      if (THINKING_TYPES.has(part.type) && part.id) {
         const deleted = await deletePart(client, sessionID, messageID, part.id)
         if (deleted) anyRemoved = true
       }
