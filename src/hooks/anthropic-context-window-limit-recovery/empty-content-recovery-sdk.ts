@@ -32,7 +32,7 @@ function messageHasContentFromSDK(message: SDKMessage): boolean {
 
     if (TOOL_TYPES.has(type)) return true
 
-    continue
+    return true
   }
 
   return false
