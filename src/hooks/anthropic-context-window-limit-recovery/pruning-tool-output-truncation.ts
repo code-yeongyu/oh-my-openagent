@@ -4,6 +4,7 @@ import { getOpenCodeStorageDir } from "../../shared/data-path"
 import { truncateToolResult } from "./storage"
 import { log } from "../../shared/logger"
 import { getMessageDir } from "../../shared/opencode-message-dir"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
 interface StoredToolPart {
   type?: string
@@ -39,6 +40,11 @@ export function truncateToolOutputsByCallId(
   sessionID: string,
   callIds: Set<string>,
 ): { truncatedCount: number } {
+  if (isSqliteBackend()) {
+    log("[auto-compact] Skipping pruning tool outputs on SQLite backend")
+    return { truncatedCount: 0 }
+  }
+
   if (callIds.size === 0) return { truncatedCount: 0 }
 
   const messageIds = getMessageIds(sessionID)

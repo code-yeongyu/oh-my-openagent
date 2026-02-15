@@ -4,6 +4,7 @@ import type { PruningState, ToolCallSignature } from "./pruning-types"
 import { estimateTokens } from "./pruning-types"
 import { log } from "../../shared/logger"
 import { getMessageDir } from "../../shared/opencode-message-dir"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
 export interface DeduplicationConfig {
   enabled: boolean
@@ -44,6 +45,7 @@ function sortObject(obj: unknown): unknown {
 }
 
 function readMessages(sessionID: string): MessagePart[] {
+  if (isSqliteBackend()) return []
   const messageDir = getMessageDir(sessionID)
   if (!messageDir) return []
 
@@ -71,6 +73,11 @@ export function executeDeduplication(
   config: DeduplicationConfig,
   protectedTools: Set<string>
 ): number {
+  if (isSqliteBackend()) {
+    log("[pruning-deduplication] Skipping deduplication on SQLite backend")
+    return 0
+  }
+
   if (!config.enabled) return 0
 
   const messages = readMessages(sessionID)
