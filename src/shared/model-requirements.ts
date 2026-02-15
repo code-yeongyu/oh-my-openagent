@@ -152,10 +152,9 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   writing: {
     fallbackChain: [
+      { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
-      { providers: ["zai-coding-plan"], model: "glm-4.7" },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
     ],
   },
 }
