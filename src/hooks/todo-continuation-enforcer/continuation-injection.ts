@@ -12,7 +12,7 @@ import {
   DEFAULT_SKIP_AGENTS,
   HOOK_NAME,
 } from "./constants"
-import { getMessageDir } from "./message-directory"
+import { getMessageDir } from "../../shared/session-utils"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"

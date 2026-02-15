@@ -4,7 +4,7 @@ import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import type { CallOmoAgentArgs } from "./types"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
-import { getMessageDir } from "./message-storage-directory"
+import { getMessageDir } from "../../shared/session-utils"
 import { getSessionTools } from "../../shared/session-tools-store"
 
 export async function executeBackgroundAgent(

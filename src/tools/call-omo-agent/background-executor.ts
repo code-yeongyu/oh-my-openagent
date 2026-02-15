@@ -4,7 +4,7 @@ import { log } from "../../shared"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import { findFirstMessageWithAgent, findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
-import { getMessageDir } from "./message-dir"
+import { getMessageDir } from "../../shared/session-utils"
 import { getSessionTools } from "../../shared/session-tools-store"
 
 export async function executeBackground(

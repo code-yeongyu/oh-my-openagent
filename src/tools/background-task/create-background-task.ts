@@ -7,7 +7,7 @@ import { getSessionAgent } from "../../features/claude-code-session-state"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { log } from "../../shared/logger"
 import { delay } from "./delay"
-import { getMessageDir } from "./message-dir"
+import { getMessageDir } from "../../shared/session-utils"
 
 type ToolContextWithMetadata = {
   sessionID: string

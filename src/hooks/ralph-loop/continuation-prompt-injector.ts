@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
-import { getMessageDir } from "./message-storage-directory"
+import { getMessageDir } from "../../shared/session-utils"
 import { withTimeout } from "./with-timeout"
 
 type MessageInfo = {
