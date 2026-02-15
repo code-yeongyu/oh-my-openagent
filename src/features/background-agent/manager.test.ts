@@ -3413,4 +3413,44 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
     //#then - task should still be running (text event refreshed lastUpdate)
     expect(task.status).toBe("running")
   })
+
+  test("should refresh lastUpdate on message.part.delta events (OpenCode >=1.2.0)", async () => {
+    //#given - a running task with stale lastUpdate
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput, { staleTimeoutMs: 180_000 })
+    stubNotifyParentSession(manager)
+
+    const task: BackgroundTask = {
+      id: "task-delta-1",
+      sessionID: "session-delta-1",
+      parentSessionID: "parent-1",
+      parentMessageID: "msg-1",
+      description: "Reasoning task with delta events",
+      prompt: "Extended thinking",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(Date.now() - 600_000),
+      progress: {
+        toolCalls: 0,
+        lastUpdate: new Date(Date.now() - 300_000),
+      },
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when - a message.part.delta event arrives (reasoning-delta or text-delta in OpenCode >=1.2.0)
+    manager.handleEvent({
+      type: "message.part.delta",
+      properties: { sessionID: "session-delta-1", field: "text", delta: "thinking..." },
+    })
+    await manager["checkAndInterruptStaleTasks"]()
+
+    //#then - task should still be running (delta event refreshed lastUpdate)
+    expect(task.status).toBe("running")
+  })
 })

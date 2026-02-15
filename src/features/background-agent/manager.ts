@@ -660,7 +660,7 @@ export class BackgroundManager {
   handleEvent(event: Event): void {
     const props = event.properties
 
-    if (event.type === "message.part.updated") {
+    if (event.type === "message.part.updated" || event.type === "message.part.delta") {
       if (!props || typeof props !== "object" || !("sessionID" in props)) return
       const partInfo = props as unknown as MessagePartInfo
       const sessionID = partInfo?.sessionID
