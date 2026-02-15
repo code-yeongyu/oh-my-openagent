@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
+import { existsSync } from "fs"
 import { join } from "path"
 import { log } from "./logger"
 import { getOmoOpenCodeCacheDir } from "./data-path"
+import { readJsonFile, writeJsonFile } from "./json-cache"
 
 const CONNECTED_PROVIDERS_CACHE_FILE = "connected-providers.json"
 const PROVIDER_MODELS_CACHE_FILE = "provider-models.json"
@@ -29,12 +30,7 @@ function getCacheFilePath(filename: string): string {
 	return join(getOmoOpenCodeCacheDir(), filename)
 }
 
-function ensureCacheDir(): void {
-	const cacheDir = getOmoOpenCodeCacheDir()
-	if (!existsSync(cacheDir)) {
-		mkdirSync(cacheDir, { recursive: true })
-	}
-}
+
 
 /**
  * Read the connected providers cache.
@@ -43,20 +39,14 @@ function ensureCacheDir(): void {
 export function readConnectedProvidersCache(): string[] | null {
 	const cacheFile = getCacheFilePath(CONNECTED_PROVIDERS_CACHE_FILE)
 
-	if (!existsSync(cacheFile)) {
+	const data = readJsonFile<ConnectedProvidersCache>(cacheFile)
+	if (!data) {
 		log("[connected-providers-cache] Cache file not found", { cacheFile })
 		return null
 	}
 
-	try {
-		const content = readFileSync(cacheFile, "utf-8")
-		const data = JSON.parse(content) as ConnectedProvidersCache
-		log("[connected-providers-cache] Read cache", { count: data.connected.length, updatedAt: data.updatedAt })
-		return data.connected
-	} catch (err) {
-		log("[connected-providers-cache] Error reading cache", { error: String(err) })
-		return null
-	}
+	log("[connected-providers-cache] Read cache", { count: data.connected.length, updatedAt: data.updatedAt })
+	return data.connected
 }
 
 /**
@@ -71,7 +61,6 @@ export function hasConnectedProvidersCache(): boolean {
  * Write the connected providers cache.
  */
 function writeConnectedProvidersCache(connected: string[]): void {
-	ensureCacheDir()
 	const cacheFile = getCacheFilePath(CONNECTED_PROVIDERS_CACHE_FILE)
 
 	const data: ConnectedProvidersCache = {
@@ -79,12 +68,8 @@ function writeConnectedProvidersCache(connected: string[]): void {
 		updatedAt: new Date().toISOString(),
 	}
 
-	try {
-		writeFileSync(cacheFile, JSON.stringify(data, null, 2))
-		log("[connected-providers-cache] Cache written", { count: connected.length })
-	} catch (err) {
-		log("[connected-providers-cache] Error writing cache", { error: String(err) })
-	}
+	writeJsonFile(cacheFile, data, { ensureDir: true })
+	log("[connected-providers-cache] Cache written", { count: connected.length })
 }
 
 /**
@@ -94,23 +79,17 @@ function writeConnectedProvidersCache(connected: string[]): void {
 export function readProviderModelsCache(): ProviderModelsCache | null {
 	const cacheFile = getCacheFilePath(PROVIDER_MODELS_CACHE_FILE)
 
-	if (!existsSync(cacheFile)) {
+	const data = readJsonFile<ProviderModelsCache>(cacheFile)
+	if (!data) {
 		log("[connected-providers-cache] Provider-models cache file not found", { cacheFile })
 		return null
 	}
 
-	try {
-		const content = readFileSync(cacheFile, "utf-8")
-		const data = JSON.parse(content) as ProviderModelsCache
-		log("[connected-providers-cache] Read provider-models cache", { 
-			providerCount: Object.keys(data.models).length, 
-			updatedAt: data.updatedAt 
-		})
-		return data
-	} catch (err) {
-		log("[connected-providers-cache] Error reading provider-models cache", { error: String(err) })
-		return null
-	}
+	log("[connected-providers-cache] Read provider-models cache", { 
+		providerCount: Object.keys(data.models).length, 
+		updatedAt: data.updatedAt 
+	})
+	return data
 }
 
 /**
@@ -125,7 +104,6 @@ export function hasProviderModelsCache(): boolean {
  * Write the provider-models cache.
  */
 export function writeProviderModelsCache(data: { models: Record<string, string[]>; connected: string[] }): void {
-	ensureCacheDir()
 	const cacheFile = getCacheFilePath(PROVIDER_MODELS_CACHE_FILE)
 
 	const cacheData: ProviderModelsCache = {
@@ -133,14 +111,10 @@ export function writeProviderModelsCache(data: { models: Record<string, string[]
 		updatedAt: new Date().toISOString(),
 	}
 
-	try {
-		writeFileSync(cacheFile, JSON.stringify(cacheData, null, 2))
-		log("[connected-providers-cache] Provider-models cache written", { 
-			providerCount: Object.keys(data.models).length 
-		})
-	} catch (err) {
-		log("[connected-providers-cache] Error writing provider-models cache", { error: String(err) })
-	}
+	writeJsonFile(cacheFile, cacheData, { ensureDir: true })
+	log("[connected-providers-cache] Provider-models cache written", { 
+		providerCount: Object.keys(data.models).length 
+	})
 }
 
 /**

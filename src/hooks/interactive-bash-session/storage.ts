@@ -1,11 +1,6 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  unlinkSync,
-} from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { readJsonFile, writeJsonFile } from "../../shared/json-cache";
 import { INTERACTIVE_BASH_SESSION_STORAGE } from "./constants";
 import type {
   InteractiveBashSessionState,
@@ -20,35 +15,29 @@ export function loadInteractiveBashSessionState(
   sessionID: string,
 ): InteractiveBashSessionState | null {
   const filePath = getStoragePath(sessionID);
-  if (!existsSync(filePath)) return null;
-
-  try {
-    const content = readFileSync(filePath, "utf-8");
-    const serialized = JSON.parse(content) as SerializedInteractiveBashSessionState;
-    return {
-      sessionID: serialized.sessionID,
-      tmuxSessions: new Set(serialized.tmuxSessions),
-      updatedAt: serialized.updatedAt,
-    };
-  } catch {
+  const serialized = readJsonFile<SerializedInteractiveBashSessionState>(filePath);
+  
+  if (!serialized) {
     return null;
   }
+
+  return {
+    sessionID: serialized.sessionID,
+    tmuxSessions: new Set(serialized.tmuxSessions),
+    updatedAt: serialized.updatedAt,
+  };
 }
 
 export function saveInteractiveBashSessionState(
   state: InteractiveBashSessionState,
 ): void {
-  if (!existsSync(INTERACTIVE_BASH_SESSION_STORAGE)) {
-    mkdirSync(INTERACTIVE_BASH_SESSION_STORAGE, { recursive: true });
-  }
-
   const filePath = getStoragePath(state.sessionID);
   const serialized: SerializedInteractiveBashSessionState = {
     sessionID: state.sessionID,
     tmuxSessions: Array.from(state.tmuxSessions),
     updatedAt: state.updatedAt,
   };
-  writeFileSync(filePath, JSON.stringify(serialized, null, 2));
+  writeJsonFile(filePath, serialized, { ensureDir: true });
 }
 
 export function clearInteractiveBashSessionState(sessionID: string): void {

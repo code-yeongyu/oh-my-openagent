@@ -1,11 +1,6 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  unlinkSync,
-} from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { readJsonFile, writeJsonFile } from "../../shared/json-cache";
 import { AGENT_USAGE_REMINDER_STORAGE } from "./constants";
 import type { AgentUsageState } from "./types";
 
@@ -15,23 +10,12 @@ function getStoragePath(sessionID: string): string {
 
 export function loadAgentUsageState(sessionID: string): AgentUsageState | null {
   const filePath = getStoragePath(sessionID);
-  if (!existsSync(filePath)) return null;
-
-  try {
-    const content = readFileSync(filePath, "utf-8");
-    return JSON.parse(content) as AgentUsageState;
-  } catch {
-    return null;
-  }
+  return readJsonFile<AgentUsageState>(filePath);
 }
 
 export function saveAgentUsageState(state: AgentUsageState): void {
-  if (!existsSync(AGENT_USAGE_REMINDER_STORAGE)) {
-    mkdirSync(AGENT_USAGE_REMINDER_STORAGE, { recursive: true });
-  }
-
   const filePath = getStoragePath(state.sessionID);
-  writeFileSync(filePath, JSON.stringify(state, null, 2));
+  writeJsonFile(filePath, state, { ensureDir: true });
 }
 
 export function clearAgentUsageState(sessionID: string): void {

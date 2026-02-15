@@ -1,11 +1,6 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  unlinkSync,
-} from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
+import { readJsonFile, writeJsonFile } from "../../shared/json-cache";
 import { RULES_INJECTOR_STORAGE } from "./constants";
 import type { InjectedRulesData } from "./types";
 
@@ -18,29 +13,22 @@ export function loadInjectedRules(sessionID: string): {
   realPaths: Set<string>;
 } {
   const filePath = getStoragePath(sessionID);
-  if (!existsSync(filePath))
-    return { contentHashes: new Set(), realPaths: new Set() };
-
-  try {
-    const content = readFileSync(filePath, "utf-8");
-    const data: InjectedRulesData = JSON.parse(content);
-    return {
-      contentHashes: new Set(data.injectedHashes),
-      realPaths: new Set(data.injectedRealPaths ?? []),
-    };
-  } catch {
+  const data = readJsonFile<InjectedRulesData>(filePath);
+  
+  if (!data) {
     return { contentHashes: new Set(), realPaths: new Set() };
   }
+
+  return {
+    contentHashes: new Set(data.injectedHashes),
+    realPaths: new Set(data.injectedRealPaths ?? []),
+  };
 }
 
 export function saveInjectedRules(
   sessionID: string,
   data: { contentHashes: Set<string>; realPaths: Set<string> }
 ): void {
-  if (!existsSync(RULES_INJECTOR_STORAGE)) {
-    mkdirSync(RULES_INJECTOR_STORAGE, { recursive: true });
-  }
-
   const storageData: InjectedRulesData = {
     sessionID,
     injectedHashes: [...data.contentHashes],
@@ -48,7 +36,7 @@ export function saveInjectedRules(
     updatedAt: Date.now(),
   };
 
-  writeFileSync(getStoragePath(sessionID), JSON.stringify(storageData, null, 2));
+  writeJsonFile(getStoragePath(sessionID), storageData, { ensureDir: true });
 }
 
 export function clearInjectedRules(sessionID: string): void {
