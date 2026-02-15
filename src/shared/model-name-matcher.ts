@@ -1,6 +1,6 @@
 import { log } from "./logger"
 
-function normalizeModelName(name: string): string {
+export function normalizeModelName(name: string): string {
 	return name
 		.toLowerCase()
 		.replace(/claude-(opus|sonnet|haiku)-(\d+)[.-](\d+)/g, "claude-$1-$2.$3")
