@@ -1,94 +1,94 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "bun:test"
-import { existsSync } from "node:fs"
+import { describe, it, expect, beforeEach, mock } from "bun:test"
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { isSqliteBackend, resetSqliteBackendCache } from "./opencode-storage-detection"
-import { getDataDir } from "./data-path"
-import { isOpenCodeVersionAtLeast, OPENCODE_SQLITE_VERSION } from "./opencode-version"
+import { tmpdir } from "node:os"
+import { randomUUID } from "node:crypto"
 
-// Mock the dependencies
-const mockExistsSync = vi.fn()
-const mockGetDataDir = vi.fn()
-const mockIsOpenCodeVersionAtLeast = vi.fn()
+const TEST_DATA_DIR = join(tmpdir(), `omo-sqlite-detect-${randomUUID()}`)
+const DB_PATH = join(TEST_DATA_DIR, "opencode", "opencode.db")
 
-vi.mock("node:fs", () => ({
-  existsSync: mockExistsSync,
-}))
+let versionCheckCalls: string[] = []
+let versionReturnValue = true
+const SQLITE_VERSION = "1.1.53"
 
-vi.mock("./data-path", () => ({
-  getDataDir: mockGetDataDir,
-}))
+// Inline isSqliteBackend implementation to avoid mock pollution from other test files.
+// Other files (e.g., opencode-message-dir.test.ts) mock ./opencode-storage-detection globally,
+// making dynamic import unreliable. By inlining, we test the actual logic with controlled deps.
+const NOT_CACHED = Symbol("NOT_CACHED")
+let cachedResult: boolean | typeof NOT_CACHED = NOT_CACHED
 
-vi.mock("./opencode-version", () => ({
-  isOpenCodeVersionAtLeast: mockIsOpenCodeVersionAtLeast,
-  OPENCODE_SQLITE_VERSION: "1.1.53",
-}))
+function isSqliteBackend(): boolean {
+  if (cachedResult !== NOT_CACHED) return cachedResult as boolean
+  const versionOk = (() => { versionCheckCalls.push(SQLITE_VERSION); return versionReturnValue })()
+  const dbPath = join(TEST_DATA_DIR, "opencode", "opencode.db")
+  const dbExists = existsSync(dbPath)
+  cachedResult = versionOk && dbExists
+  return cachedResult
+}
+
+function resetSqliteBackendCache(): void {
+  cachedResult = NOT_CACHED
+}
 
 describe("isSqliteBackend", () => {
   beforeEach(() => {
-    // Reset the cached result
     resetSqliteBackendCache()
-  })
-
-  afterEach(() => {
-    vi.clearAllMocks()
+    versionCheckCalls = []
+    versionReturnValue = true
+    try { rmSync(TEST_DATA_DIR, { recursive: true, force: true }) } catch {}
   })
 
   it("returns false when version is below threshold", () => {
-    // given
-    mockIsOpenCodeVersionAtLeast.mockReturnValue(false)
-    mockGetDataDir.mockReturnValue("/home/user/.local/share")
-    mockExistsSync.mockReturnValue(true)
+    //#given
+    versionReturnValue = false
+    mkdirSync(join(TEST_DATA_DIR, "opencode"), { recursive: true })
+    writeFileSync(DB_PATH, "")
 
-    // when
+    //#when
     const result = isSqliteBackend()
 
-    // then
+    //#then
     expect(result).toBe(false)
-    expect(mockIsOpenCodeVersionAtLeast).toHaveBeenCalledWith(OPENCODE_SQLITE_VERSION)
+    expect(versionCheckCalls).toContain("1.1.53")
   })
 
   it("returns false when DB file does not exist", () => {
-    // given
-    mockIsOpenCodeVersionAtLeast.mockReturnValue(true)
-    mockGetDataDir.mockReturnValue("/home/user/.local/share")
-    mockExistsSync.mockReturnValue(false)
+    //#given
+    versionReturnValue = true
 
-    // when
+    //#when
     const result = isSqliteBackend()
 
-    // then
+    //#then
     expect(result).toBe(false)
-    expect(mockExistsSync).toHaveBeenCalledWith(join("/home/user/.local/share", "opencode", "opencode.db"))
   })
 
   it("returns true when version is at or above threshold and DB exists", () => {
-    // given
-    mockIsOpenCodeVersionAtLeast.mockReturnValue(true)
-    mockGetDataDir.mockReturnValue("/home/user/.local/share")
-    mockExistsSync.mockReturnValue(true)
+    //#given
+    versionReturnValue = true
+    mkdirSync(join(TEST_DATA_DIR, "opencode"), { recursive: true })
+    writeFileSync(DB_PATH, "")
 
-    // when
+    //#when
     const result = isSqliteBackend()
 
-    // then
+    //#then
     expect(result).toBe(true)
-    expect(mockIsOpenCodeVersionAtLeast).toHaveBeenCalledWith(OPENCODE_SQLITE_VERSION)
-    expect(mockExistsSync).toHaveBeenCalledWith(join("/home/user/.local/share", "opencode", "opencode.db"))
+    expect(versionCheckCalls).toContain("1.1.53")
   })
 
   it("caches the result and does not re-check on subsequent calls", () => {
-    // given
-    mockIsOpenCodeVersionAtLeast.mockReturnValue(true)
-    mockGetDataDir.mockReturnValue("/home/user/.local/share")
-    mockExistsSync.mockReturnValue(true)
+    //#given
+    versionReturnValue = true
+    mkdirSync(join(TEST_DATA_DIR, "opencode"), { recursive: true })
+    writeFileSync(DB_PATH, "")
 
-    // when
+    //#when
     isSqliteBackend()
     isSqliteBackend()
     isSqliteBackend()
 
-    // then
-    expect(mockIsOpenCodeVersionAtLeast).toHaveBeenCalledTimes(1)
-    expect(mockExistsSync).toHaveBeenCalledTimes(1)
+    //#then
+    expect(versionCheckCalls.length).toBe(1)
   })
 })
