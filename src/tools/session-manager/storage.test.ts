@@ -469,23 +469,18 @@ describe("session-manager storage - SDK path (beta mode)", () => {
   })
 
   test("SDK path returns empty array when client is not set", async () => {
-    // given - beta mode enabled but no client set
+    //#given beta mode enabled but no client set
     mock.module("../../shared/opencode-storage-detection", () => ({
       isSqliteBackend: () => true,
       resetSqliteBackendCache: () => {},
     }))
 
-    // Reset SDK client to ensure "client not set" case is exercised
-    const { setStorageClient } = await import("./storage")
-    setStorageClient(null as any)
-
-    // Re-import without setting client
-    const { readSessionMessages } = await import("./storage")
-
-    // when - calling readSessionMessages without client set
+    //#when client is explicitly cleared and messages are requested
+    const { resetStorageClient, readSessionMessages } = await import("./storage")
+    resetStorageClient()
     const messages = await readSessionMessages("ses_test")
 
-    // then - should return empty array since no client and no JSON fallback
+    //#then should return empty array since no client and no JSON fallback
     expect(messages).toEqual([])
   })
 })

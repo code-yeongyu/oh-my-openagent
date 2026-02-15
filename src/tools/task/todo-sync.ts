@@ -168,10 +168,15 @@ export async function syncAllTasksToTodos(
 
     const finalTodos: TodoInfo[] = [];
 
+    const removedTaskSubjects = new Set(
+      tasks.filter((t) => t.status === "deleted").map((t) => t.subject),
+    );
+
     for (const existing of currentTodos) {
       const isInNewTodos = newTodos.some((newTodo) => todosMatch(existing, newTodo));
-      const isRemoved = existing.id && tasksToRemove.has(existing.id);
-      if (!isInNewTodos && !isRemoved) {
+      const isRemovedById = existing.id ? tasksToRemove.has(existing.id) : false;
+      const isRemovedByContent = !existing.id && removedTaskSubjects.has(existing.content);
+      if (!isInNewTodos && !isRemovedById && !isRemovedByContent) {
         finalTodos.push(existing);
       }
     }
