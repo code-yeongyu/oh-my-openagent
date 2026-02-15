@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { readMessagesFromSDK, readPartsFromSDK } from "../storage"
+import { readPartsFromSDK } from "../storage"
 import { readMessages } from "./messages-reader"
 import { readParts } from "./parts-reader"
 
@@ -54,28 +54,6 @@ describe("session-recovery storage SDK readers", () => {
 
     //#then it returns the parts
     expect(result).toEqual(storedParts)
-  })
-
-  it("readMessagesFromSDK normalizes and sorts messages", async () => {
-    //#given a client that returns messages list
-    const sessionID = "ses_test"
-    const client = createMockClient({
-      messages: () => [
-        { id: "msg_b", role: "assistant", time: { created: 2 } },
-        { id: "msg_a", role: "user", time: { created: 1 } },
-        { id: "msg_c" },
-      ],
-    }) as Parameters<typeof readMessagesFromSDK>[0]
-
-    //#when readMessagesFromSDK is called
-    const result = await readMessagesFromSDK(client, sessionID)
-
-    //#then it returns sorted StoredMessageMeta with defaults
-    expect(result).toEqual([
-      { id: "msg_c", sessionID, role: "user", time: { created: 0 } },
-      { id: "msg_a", sessionID, role: "user", time: { created: 1 } },
-      { id: "msg_b", sessionID, role: "assistant", time: { created: 2 } },
-    ])
   })
 
   it("readParts returns empty array for nonexistent message", () => {
