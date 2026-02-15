@@ -198,7 +198,7 @@ You are NOT an interactive assistant. You are an autonomous problem-solver.
 
 
 export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
-  "visual-engineering": { model: "google/gemini-3-pro" },
+  "visual-engineering": { model: "google/gemini-3-pro", variant: "high" },
   ultrabrain: { model: "openai/gpt-5.3-codex", variant: "xhigh" },
   deep: { model: "openai/gpt-5.3-codex", variant: "medium" },
   artistry: { model: "google/gemini-3-pro", variant: "high" },
