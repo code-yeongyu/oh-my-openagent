@@ -25,12 +25,13 @@ export async function runAggressiveTruncationStrategy(params: {
     targetRatio: TRUNCATE_CONFIG.targetTokenRatio,
   })
 
-  const aggressiveResult = truncateUntilTargetTokens(
+  const aggressiveResult = await truncateUntilTargetTokens(
     params.sessionID,
     params.currentTokens,
     params.maxTokens,
     TRUNCATE_CONFIG.targetTokenRatio,
     TRUNCATE_CONFIG.charsPerToken,
+    params.client,
   )
 
   if (aggressiveResult.truncatedCount <= 0) {
