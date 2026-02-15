@@ -4,7 +4,7 @@ import { findNearestMessageWithFields } from "../hook-message-injector"
 import { getTaskToastManager } from "../task-toast-manager"
 
 import { TASK_CLEANUP_DELAY_MS } from "./constants"
-import { formatDuration } from "./format-duration"
+import { formatDuration } from "../../tools/background-task/time-format"
 import { isAbortedSessionError } from "./error-classifier"
 import { getMessageDir } from "./message-dir"
 import { buildBackgroundTaskNotificationText } from "./notification-builder"

@@ -5,7 +5,7 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
-import { formatDuration } from "./time-formatter"
+import { formatDuration } from "../background-task/time-format"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 
