@@ -1,3 +1,4 @@
+export * from "./ensure-directory"
 export * from "./frontmatter"
 export * from "./command-executor"
 export * from "./file-reference-resolver"

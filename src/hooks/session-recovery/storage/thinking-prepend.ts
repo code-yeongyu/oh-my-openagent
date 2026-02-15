@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { PART_STORAGE, THINKING_TYPES } from "../constants"
 import { readMessages } from "./messages-reader"
 import { readParts } from "./parts-reader"
+import { ensureDirectory } from "../../../shared/ensure-directory"
 
 function findLastThinkingContent(sessionID: string, beforeMessageID: string): string {
   const messages = readMessages(sessionID)
@@ -33,9 +34,7 @@ function findLastThinkingContent(sessionID: string, beforeMessageID: string): st
 export function prependThinkingPart(sessionID: string, messageID: string): boolean {
   const partDir = join(PART_STORAGE, messageID)
 
-  if (!existsSync(partDir)) {
-    mkdirSync(partDir, { recursive: true })
-  }
+  ensureDirectory(partDir)
 
   const previousThinking = findLastThinkingContent(sessionID, messageID)
 

@@ -1,7 +1,8 @@
 import { join, dirname, basename, isAbsolute } from "path"
-import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, readdirSync } from "fs"
+import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync, readdirSync } from "fs"
 import { randomUUID } from "crypto"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
+import { ensureDirectory } from "../../shared/ensure-directory"
 import type { z } from "zod"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 
@@ -36,9 +37,7 @@ export function resolveTaskListId(config: Partial<OhMyOpenCodeConfig> = {}): str
 }
 
 export function ensureDir(dirPath: string): void {
-  if (!existsSync(dirPath)) {
-    mkdirSync(dirPath, { recursive: true })
-  }
+  ensureDirectory(dirPath)
 }
 
 export function readJsonSafe<T>(filePath: string, schema: z.ZodType<T>): T | null {

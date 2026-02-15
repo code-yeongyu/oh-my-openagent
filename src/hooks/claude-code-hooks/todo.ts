@@ -1,6 +1,7 @@
 import { join } from "path"
-import { mkdirSync, writeFileSync, readFileSync, existsSync, unlinkSync } from "fs"
+import { writeFileSync, readFileSync, existsSync, unlinkSync } from "fs"
 import { getClaudeConfigDir } from "../../shared"
+import { ensureDirectory } from "../../shared/ensure-directory"
 import type { TodoFile, TodoItem, ClaudeCodeTodoItem } from "./types"
 
 const TODO_DIR = join(getClaudeConfigDir(), "todos")
@@ -10,9 +11,7 @@ export function getTodoPath(sessionId: string): string {
 }
 
 function ensureTodoDir(): void {
-  if (!existsSync(TODO_DIR)) {
-    mkdirSync(TODO_DIR, { recursive: true })
-  }
+  ensureDirectory(TODO_DIR)
 }
 
 export interface OpenCodeTodo {

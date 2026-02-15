@@ -4,10 +4,11 @@
  * Handles reading/writing boulder.json for active plan tracking.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
 import type { BoulderState, PlanProgress } from "./types"
 import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
+import { ensureDirectory } from "../../shared/ensure-directory"
 
 export function getBoulderFilePath(directory: string): string {
   return join(directory, BOULDER_DIR, BOULDER_FILE)
@@ -40,9 +41,7 @@ export function writeBoulderState(directory: string, state: BoulderState): boole
 
   try {
     const dir = dirname(filePath)
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
-    }
+    ensureDirectory(dir)
 
     writeFileSync(filePath, JSON.stringify(state, null, 2), "utf-8")
     return true

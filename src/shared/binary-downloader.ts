@@ -1,7 +1,8 @@
-import { chmodSync, existsSync, mkdirSync, unlinkSync } from "node:fs";
+import { chmodSync, existsSync, unlinkSync } from "node:fs";
 import * as path from "node:path";
 import { spawn } from "bun";
 import { extractZip } from "./zip-extractor";
+import { ensureDirectory } from "./ensure-directory";
 
 export function getCachedBinaryPath(cacheDir: string, binaryName: string): string | null {
   const binaryPath = path.join(cacheDir, binaryName);
@@ -9,9 +10,7 @@ export function getCachedBinaryPath(cacheDir: string, binaryName: string): strin
 }
 
 export function ensureCacheDir(cacheDir: string): void {
-  if (!existsSync(cacheDir)) {
-    mkdirSync(cacheDir, { recursive: true });
-  }
+  ensureDirectory(cacheDir);
 }
 
 export async function downloadArchive(downloadUrl: string, archivePath: string): Promise<void> {

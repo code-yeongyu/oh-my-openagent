@@ -1,10 +1,11 @@
 import { join } from "path"
-import { mkdirSync, appendFileSync, existsSync, writeFileSync, unlinkSync } from "fs"
+import { appendFileSync, existsSync, writeFileSync, unlinkSync } from "fs"
 import { tmpdir } from "os"
 import { randomUUID } from "crypto"
 import type { TranscriptEntry } from "./types"
 import { transformToolName } from "../../shared/tool-name"
 import { getClaudeConfigDir } from "../../shared"
+import { ensureDirectory } from "../../shared/ensure-directory"
 
 const TRANSCRIPT_DIR = join(getClaudeConfigDir(), "transcripts")
 
@@ -13,9 +14,7 @@ export function getTranscriptPath(sessionId: string): string {
 }
 
 function ensureTranscriptDir(): void {
-  if (!existsSync(TRANSCRIPT_DIR)) {
-    mkdirSync(TRANSCRIPT_DIR, { recursive: true })
-  }
+  ensureDirectory(TRANSCRIPT_DIR)
 }
 
 export function appendTranscriptEntry(

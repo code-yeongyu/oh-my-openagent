@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
+import { ensureDirectory } from "./ensure-directory"
 
 export function readJsonFile<T>(filePath: string): T | null {
 	if (!existsSync(filePath)) {
@@ -16,7 +17,7 @@ export function readJsonFile<T>(filePath: string): T | null {
 
 export function writeJsonFile<T>(filePath: string, data: T, options?: { ensureDir?: boolean }): void {
 	if (options?.ensureDir) {
-		mkdirSync(dirname(filePath), { recursive: true })
+		ensureDirectory(dirname(filePath))
 	}
 
 	writeFileSync(filePath, JSON.stringify(data, null, 2))

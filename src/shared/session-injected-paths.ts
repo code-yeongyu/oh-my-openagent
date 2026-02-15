@@ -1,11 +1,11 @@
 import {
   existsSync,
-  mkdirSync,
   readFileSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { ensureDirectory } from "./ensure-directory";
 
 export interface InjectedPathsData {
   sessionID: string;
@@ -31,9 +31,7 @@ export function createInjectedPathsStorage(storageDir: string) {
   };
 
   const saveInjectedPaths = (sessionID: string, paths: Set<string>): void => {
-    if (!existsSync(storageDir)) {
-      mkdirSync(storageDir, { recursive: true });
-    }
+    ensureDirectory(storageDir);
 
     const data: InjectedPathsData = {
       sessionID,

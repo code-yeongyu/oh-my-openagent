@@ -1,9 +1,7 @@
-import { existsSync, mkdirSync } from "node:fs"
+import { ensureDirectory } from "../../shared/ensure-directory"
 import { getConfigDir } from "./config-context"
 
 export function ensureConfigDirectoryExists(): void {
   const configDir = getConfigDir()
-  if (!existsSync(configDir)) {
-    mkdirSync(configDir, { recursive: true })
-  }
+  ensureDirectory(configDir)
 }

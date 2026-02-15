@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
 import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
 import { log } from "../../shared/logger"
+import { ensureDirectory } from "../../shared/ensure-directory"
 
 export interface StoredMessage {
   agent?: string
@@ -91,9 +92,7 @@ function generatePartId(): string {
 }
 
 function getOrCreateMessageDir(sessionID: string): string {
-  if (!existsSync(MESSAGE_STORAGE)) {
-    mkdirSync(MESSAGE_STORAGE, { recursive: true })
-  }
+  ensureDirectory(MESSAGE_STORAGE)
 
   const directPath = join(MESSAGE_STORAGE, sessionID)
   if (existsSync(directPath)) {
@@ -107,7 +106,7 @@ function getOrCreateMessageDir(sessionID: string): string {
     }
   }
 
-  mkdirSync(directPath, { recursive: true })
+  ensureDirectory(directPath)
   return directPath
 }
 
@@ -192,9 +191,7 @@ export function injectHookMessage(
     writeFileSync(join(messageDir, `${messageID}.json`), JSON.stringify(messageMeta, null, 2))
 
     const partDir = join(PART_STORAGE, messageID)
-    if (!existsSync(partDir)) {
-      mkdirSync(partDir, { recursive: true })
-    }
+    ensureDirectory(partDir)
     writeFileSync(join(partDir, `${partID}.json`), JSON.stringify(textPart, null, 2))
 
     return true
