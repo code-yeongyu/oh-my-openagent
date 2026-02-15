@@ -100,9 +100,10 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
 export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "visual-engineering": {
     fallbackChain: [
-      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
+      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "high" },
+      { providers: ["zai-coding-plan"], model: "glm-5" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
-      { providers: ["zai-coding-plan"], model: "glm-4.7" },
+      { providers: ["kimi-for-coding"], model: "k2p5" },
     ],
   },
   ultrabrain: {
