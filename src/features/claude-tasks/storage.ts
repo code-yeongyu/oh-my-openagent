@@ -4,6 +4,11 @@ import { randomUUID } from "crypto"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 import type { z } from "zod"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
+import type { Task } from "../../tools/task/types"
+import { TaskObjectSchema } from "../../tools/task/types"
+
+/** Maximum depth for hierarchical task trees */
+export const TASK_MAX_DEPTH = 6
 
 export function getTaskDir(config: Partial<OhMyOpenCodeConfig> = {}): string {
   const tasksConfig = config.sisyphus?.tasks
@@ -166,4 +171,28 @@ export function acquireLock(dirPath: string): { acquired: boolean; release: () =
       }
     },
   }
+}
+
+export function loadAllTasks(taskDir: string): Task[] {
+  if (!existsSync(taskDir)) return []
+
+  const files = readdirSync(taskDir).filter(
+    (f) => f.endsWith(".json") && f.startsWith("T-")
+  )
+
+  const tasks: Task[] = []
+  for (const file of files) {
+    try {
+      const content = readFileSync(join(taskDir, file), "utf-8")
+      const parsed = JSON.parse(content)
+      const validated = TaskObjectSchema.safeParse(parsed)
+      if (validated.success) {
+        tasks.push(validated.data)
+      }
+    } catch {
+      // Skip malformed files
+    }
+  }
+
+  return tasks
 }

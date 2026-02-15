@@ -1,0 +1,13 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`createTaskTree snapshot test: complex hierarchy with mixed statuses 1`] = `
+"## Task Tree
+
+- [x] 1. Setup infrastructure (completed)
+- [ ] 2. Implement auth (in_progress)
+  - [x] 2.1. JWT implementation (completed)
+  - [ ] 2.2. OAuth2 integration (in_progress)
+    - [ ] 2.2.1. Google provider (pending)
+    - [x] 2.2.2. GitHub provider (completed)
+- [ ] 3. Write tests (pending)"
+`;
