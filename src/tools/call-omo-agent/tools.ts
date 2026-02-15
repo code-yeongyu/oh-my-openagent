@@ -48,7 +48,7 @@ export function createCallOmoAgent(
         if (args.session_id) {
           return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`
         }
-        return await executeBackground(args, toolCtx, backgroundManager)
+        return await executeBackground(args, toolCtx, backgroundManager, ctx.client)
       }
 
       return await executeSync(args, toolCtx, ctx)
