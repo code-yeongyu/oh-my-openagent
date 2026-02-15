@@ -67,13 +67,14 @@ describe("sisyphus-task", () => {
   })
 
   describe("DEFAULT_CATEGORIES", () => {
-    test("visual-engineering category has model config", () => {
+    test("visual-engineering category has model and variant config", () => {
       // given
       const category = DEFAULT_CATEGORIES["visual-engineering"]
 
       // when / #then
       expect(category).toBeDefined()
       expect(category.model).toBe("google/gemini-3-pro")
+      expect(category.variant).toBe("high")
     })
 
     test("ultrabrain category has model and variant config", () => {

@@ -241,19 +241,32 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("openai")
   })
 
-  test("visual-engineering has valid fallbackChain with gemini-3-pro as primary", () => {
+  test("visual-engineering has valid fallbackChain with gemini-3-pro high as primary", () => {
     // given - visual-engineering category requirement
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // when - accessing visual-engineering requirement
-    // then - fallbackChain exists with gemini-3-pro as first entry
+    // then - fallbackChain: gemini-3-pro(high) → glm-5 → opus-4-6(max) → k2p5
     expect(visualEngineering).toBeDefined()
     expect(visualEngineering.fallbackChain).toBeArray()
-    expect(visualEngineering.fallbackChain.length).toBeGreaterThan(0)
+    expect(visualEngineering.fallbackChain).toHaveLength(4)
 
     const primary = visualEngineering.fallbackChain[0]
     expect(primary.providers[0]).toBe("google")
     expect(primary.model).toBe("gemini-3-pro")
+    expect(primary.variant).toBe("high")
+
+    const second = visualEngineering.fallbackChain[1]
+    expect(second.providers[0]).toBe("zai-coding-plan")
+    expect(second.model).toBe("glm-5")
+
+    const third = visualEngineering.fallbackChain[2]
+    expect(third.model).toBe("claude-opus-4-6")
+    expect(third.variant).toBe("max")
+
+    const fourth = visualEngineering.fallbackChain[3]
+    expect(fourth.providers[0]).toBe("kimi-for-coding")
+    expect(fourth.model).toBe("k2p5")
   })
 
   test("quick has valid fallbackChain with claude-haiku-4-5 as primary", () => {
