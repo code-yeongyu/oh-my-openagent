@@ -87,7 +87,7 @@ export function createAtlasEventHandler(input: {
         return
       }
 
-      const lastAgent = getLastAgentFromSession(sessionID)
+      const lastAgent = await getLastAgentFromSession(sessionID, ctx.client)
       const requiredAgent = (boulderState.agent ?? "atlas").toLowerCase()
       const lastAgentMatchesRequired = lastAgent === requiredAgent
       const boulderAgentWasNotExplicitlySet = boulderState.agent === undefined
