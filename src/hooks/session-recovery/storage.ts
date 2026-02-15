@@ -1,6 +1,7 @@
 export { generatePartId } from "./storage/part-id"
 export { getMessageDir } from "./storage/message-dir"
 export { readMessages } from "./storage/messages-reader"
+export { readMessagesFromSDK } from "./storage/messages-reader"
 export { readParts } from "./storage/parts-reader"
 export { readPartsFromSDK } from "./storage/parts-reader"
 export { hasContent, messageHasContent } from "./storage/part-content"
