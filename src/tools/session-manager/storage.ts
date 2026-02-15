@@ -139,6 +139,7 @@ export function getMessageDir(sessionID: string): string | null {
 }
 
 export function sessionExists(sessionID: string): boolean {
+  if (isSqliteBackend()) return true
   return getMessageDir(sessionID) !== null
 }
 

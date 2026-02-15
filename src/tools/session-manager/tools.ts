@@ -76,6 +76,10 @@ export function createSessionManagerTools(ctx: PluginInput): Record<string, Tool
 
         let messages = await readSessionMessages(args.session_id)
 
+        if (messages.length === 0) {
+          return `Session not found: ${args.session_id}`
+        }
+
         if (args.limit && args.limit > 0) {
           messages = messages.slice(0, args.limit)
         }
