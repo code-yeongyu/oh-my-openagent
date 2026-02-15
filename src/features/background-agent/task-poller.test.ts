@@ -146,14 +146,59 @@ describe("checkAndInterruptStaleTasks", () => {
       },
     })
 
-    //#when — session status is "running"
+    //#when — session status is "busy" (OpenCode's actual status for active LLM processing)
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
       config: { staleTimeoutMs: 180_000 },
       concurrencyManager: mockConcurrencyManager as never,
       notifyParentSession: mockNotify,
-      sessionStatuses: { "ses-1": { type: "running" } },
+      sessionStatuses: { "ses-1": { type: "busy" } },
+    })
+
+    //#then — task should survive because session is actively busy
+    expect(task.status).toBe("running")
+  })
+
+  it("should NOT interrupt busy session task even with very old lastUpdate", async () => {
+    //#given — lastUpdate is 15min old, but session is still busy
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 900_000),
+      progress: {
+        toolCalls: 2,
+        lastUpdate: new Date(Date.now() - 900_000),
+      },
+    })
+
+    //#when — session busy, lastUpdate far exceeds any timeout
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000, messageStalenessTimeoutMs: 600_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "busy" } },
+    })
+
+    //#then — busy sessions are NEVER stale-killed (babysitter + TTL prune handle these)
+    expect(task.status).toBe("running")
+  })
+
+  it("should NOT interrupt busy session even with no progress (undefined lastUpdate)", async () => {
+    //#given — task has no progress at all, but session is busy
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 15 * 60 * 1000),
+      progress: undefined,
+    })
+
+    //#when — session is busy
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { messageStalenessTimeoutMs: 600_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
     //#then — task should survive because session is actively running
@@ -253,6 +298,75 @@ describe("checkAndInterruptStaleTasks", () => {
     //#then — unknown session treated as potentially stale, apply default timeout
     expect(task.status).toBe("cancelled")
     expect(task.error).toContain("Stale timeout")
+  })
+
+  it("should NOT interrupt task when session is busy (OpenCode status), even if lastUpdate exceeds stale timeout", async () => {
+    //#given — lastUpdate is 5min old but session is "busy" (OpenCode's actual status for active sessions)
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 2,
+        lastUpdate: new Date(Date.now() - 300_000),
+      },
+    })
+
+    //#when — session status is "busy" (not "running" — OpenCode uses "busy" for active LLM processing)
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "busy" } },
+    })
+
+    //#then — "busy" sessions must be protected from stale-kill
+    expect(task.status).toBe("running")
+  })
+
+  it("should NOT interrupt task when session is in retry state", async () => {
+    //#given — lastUpdate is 5min old but session is retrying
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 300_000),
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 300_000),
+      },
+    })
+
+    //#when — session status is "retry" (OpenCode retries on transient API errors)
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "retry" } },
+    })
+
+    //#then — retry sessions must be protected from stale-kill
+    expect(task.status).toBe("running")
+  })
+
+  it("should NOT interrupt busy session even with no progress (undefined lastUpdate)", async () => {
+    //#given — no progress at all, session is "busy" (thinking model with no streamed tokens yet)
+    const task = createRunningTask({
+      startedAt: new Date(Date.now() - 15 * 60 * 1000),
+      progress: undefined,
+    })
+
+    //#when — session is busy
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { messageStalenessTimeoutMs: 600_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      sessionStatuses: { "ses-1": { type: "busy" } },
+    })
+
+    //#then — busy sessions with no progress must survive
+    expect(task.status).toBe("running")
   })
 
   it("should release concurrency key when interrupting a never-updated task", async () => {
