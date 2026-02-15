@@ -1,10 +1,14 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { getOpenCodeStorageDir } from "../../shared/data-path"
 import { truncateToolResult } from "./storage"
+import { truncateToolResultAsync } from "./tool-result-storage-sdk"
 import { log } from "../../shared/logger"
 import { getMessageDir } from "../../shared/opencode-message-dir"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+
+type OpencodeClient = PluginInput["client"]
 
 interface StoredToolPart {
   type?: string
@@ -15,8 +19,19 @@ interface StoredToolPart {
   }
 }
 
-function getMessageStorage(): string {
-  return join(getOpenCodeStorageDir(), "message")
+interface SDKToolPart {
+  id: string
+  type: string
+  callID?: string
+  tool?: string
+  state?: { output?: string }
+  truncated?: boolean
+  originalSize?: number
+}
+
+interface SDKMessage {
+  info?: { id?: string }
+  parts?: SDKToolPart[]
 }
 
 function getPartStorage(): string {
@@ -36,16 +51,16 @@ function getMessageIds(sessionID: string): string[] {
   return messageIds
 }
 
-export function truncateToolOutputsByCallId(
+export async function truncateToolOutputsByCallId(
   sessionID: string,
   callIds: Set<string>,
-): { truncatedCount: number } {
-  if (isSqliteBackend()) {
-    log("[auto-compact] Skipping pruning tool outputs on SQLite backend")
-    return { truncatedCount: 0 }
-  }
-
+  client?: OpencodeClient,
+): Promise<{ truncatedCount: number }> {
   if (callIds.size === 0) return { truncatedCount: 0 }
+
+  if (client && isSqliteBackend()) {
+    return truncateToolOutputsByCallIdFromSDK(client, sessionID, callIds)
+  }
 
   const messageIds = getMessageIds(sessionID)
   if (messageIds.length === 0) return { truncatedCount: 0 }
@@ -86,4 +101,43 @@ export function truncateToolOutputsByCallId(
   }
 
   return { truncatedCount }
+}
+
+async function truncateToolOutputsByCallIdFromSDK(
+  client: OpencodeClient,
+  sessionID: string,
+  callIds: Set<string>,
+): Promise<{ truncatedCount: number }> {
+  try {
+    const response = await client.session.messages({ path: { id: sessionID } })
+    const messages = (response.data ?? []) as SDKMessage[]
+    let truncatedCount = 0
+
+    for (const msg of messages) {
+      const messageID = msg.info?.id
+      if (!messageID || !msg.parts) continue
+
+      for (const part of msg.parts) {
+        if (part.type !== "tool" || !part.callID) continue
+        if (!callIds.has(part.callID)) continue
+        if (!part.state?.output || part.truncated) continue
+
+        const result = await truncateToolResultAsync(client, sessionID, messageID, part.id, part)
+        if (result.success) {
+          truncatedCount++
+        }
+      }
+    }
+
+    if (truncatedCount > 0) {
+      log("[auto-compact] pruned duplicate tool outputs (SDK)", {
+        sessionID,
+        truncatedCount,
+      })
+    }
+
+    return { truncatedCount }
+  } catch {
+    return { truncatedCount: 0 }
+  }
 }
