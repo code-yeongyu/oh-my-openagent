@@ -107,7 +107,7 @@ describe("waitForEventProcessorShutdown", () => {
     const eventProcessor = new Promise<void>(() => {})
     const spy = spyOn(console, "log").mockImplementation(() => {})
     consoleLogSpy = spy
-    const timeoutMs = 50
+    const timeoutMs = 500
     const start = performance.now()
 
     try {
