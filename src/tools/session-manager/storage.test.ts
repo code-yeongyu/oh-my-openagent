@@ -78,15 +78,15 @@ describe("session-manager storage", () => {
     expect(result).toBe(sessionPath)
   })
 
-  test("sessionExists returns false for non-existent session", () => {
+  test("sessionExists returns false for non-existent session", async () => {
     // when
-    const exists = sessionExists("ses_nonexistent")
+    const exists = await sessionExists("ses_nonexistent")
 
     // then
     expect(exists).toBe(false)
   })
 
-  test("sessionExists returns true for existing session", () => {
+  test("sessionExists returns true for existing session", async () => {
     // given
     const sessionID = "ses_exists"
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
@@ -94,7 +94,7 @@ describe("session-manager storage", () => {
     writeFileSync(join(sessionPath, "msg_001.json"), JSON.stringify({ id: "msg_001" }))
 
     // when
-    const exists = sessionExists(sessionID)
+    const exists = await sessionExists(sessionID)
 
     // then
     expect(exists).toBe(true)
