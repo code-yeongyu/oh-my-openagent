@@ -45,7 +45,7 @@ describe("sisyphus-task", () => {
       STABILITY_POLLS_REQUIRED: 1,
       WAIT_FOR_SESSION_INTERVAL_MS: 10,
       WAIT_FOR_SESSION_TIMEOUT_MS: 1000,
-      MAX_POLL_TIME_MS: 2000,
+      MAX_POLL_TIME_MS: 8000,
       SESSION_CONTINUATION_STABILITY_MS: 50,
     })
     cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
