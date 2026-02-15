@@ -133,8 +133,12 @@ function sdkMessageHasContent(message: MessageData): boolean {
 }
 
 async function readMessagesFromSDK(client: Client, sessionID: string): Promise<MessageData[]> {
-  const response = await client.session.messages({ path: { id: sessionID } })
-  return (response.data ?? []) as MessageData[]
+  try {
+    const response = await client.session.messages({ path: { id: sessionID } })
+    return (response.data ?? []) as MessageData[]
+  } catch {
+    return []
+  }
 }
 
 function findMessagesWithThinkingOnlyFromSDK(messages: MessageData[]): string[] {
