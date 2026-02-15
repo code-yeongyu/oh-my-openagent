@@ -69,4 +69,7 @@ export type ToolContextWithMetadata = {
   agent: string
   abort: AbortSignal
   metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
+  callID?: string
+  callId?: string
+  call_id?: string
 }

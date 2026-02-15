@@ -1,30 +1,16 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundTask } from "../../features/background-agent"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
-import type { BackgroundOutputArgs } from "./types"
+import type { BackgroundOutputArgs, ToolContextWithMetadata } from "./types"
 import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
 import { BACKGROUND_OUTPUT_DESCRIPTION } from "./constants"
 import { delay } from "./delay"
 import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
+import { resolveToolCallID } from "./resolve-tool-call-id"
 
 const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
-
-type ToolContextWithMetadata = {
-  sessionID: string
-  metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
-  callID?: string
-  callId?: string
-  call_id?: string
-}
-
-function resolveToolCallID(ctx: ToolContextWithMetadata): string | undefined {
-  if (typeof ctx.callID === "string" && ctx.callID.trim() !== "") return ctx.callID
-  if (typeof ctx.callId === "string" && ctx.callId.trim() !== "") return ctx.callId
-  if (typeof ctx.call_id === "string" && ctx.call_id.trim() !== "") return ctx.call_id
-  return undefined
-}
 
 function formatResolvedTitle(task: BackgroundTask): string {
   const label = task.agent === SISYPHUS_JUNIOR_AGENT && task.category ? task.category : task.agent

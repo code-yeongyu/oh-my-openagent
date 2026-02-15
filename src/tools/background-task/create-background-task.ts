@@ -1,6 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { BackgroundTaskArgs } from "./types"
+import type { BackgroundTaskArgs, ToolContextWithMetadata } from "./types"
 import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
 import { findFirstMessageWithAgent, findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
@@ -8,15 +8,6 @@ import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { log } from "../../shared/logger"
 import { delay } from "./delay"
 import { getMessageDir } from "../../shared/session-utils"
-
-type ToolContextWithMetadata = {
-  sessionID: string
-  messageID: string
-  agent: string
-  abort: AbortSignal
-  metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
-  callID?: string
-}
 
 export function createBackgroundTask(manager: BackgroundManager): ToolDefinition {
   return tool({
