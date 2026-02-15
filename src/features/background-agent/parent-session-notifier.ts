@@ -3,7 +3,7 @@ import type { ResultHandlerContext } from "./result-handler-context"
 import { TASK_CLEANUP_DELAY_MS } from "./constants"
 import { log } from "../../shared"
 import { getTaskToastManager } from "../task-toast-manager"
-import { formatDuration } from "./duration-formatter"
+import { formatDuration } from "../../tools/background-task/time-format"
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
 import { resolveParentSessionAgentAndModel } from "./parent-session-context-resolver"
 
