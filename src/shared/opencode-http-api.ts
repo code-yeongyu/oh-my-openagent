@@ -74,7 +74,7 @@ export async function patchPart(
     return false
   }
 
-  const url = `${baseUrl}/session/${sessionID}/message/${messageID}/part/${partID}`
+  const url = `${baseUrl}/session/${encodeURIComponent(sessionID)}/message/${encodeURIComponent(messageID)}/part/${encodeURIComponent(partID)}`
 
   try {
     const response = await fetch(url, {
@@ -117,7 +117,7 @@ export async function deletePart(
     return false
   }
 
-  const url = `${baseUrl}/session/${sessionID}/message/${messageID}/part/${partID}`
+  const url = `${baseUrl}/session/${encodeURIComponent(sessionID)}/message/${encodeURIComponent(messageID)}/part/${encodeURIComponent(partID)}`
 
   try {
     const response = await fetch(url, {
