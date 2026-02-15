@@ -23,6 +23,11 @@ type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   plan?: Record<string, unknown>;
 };
 
+function hasConfiguredDefaultAgent(config: Record<string, unknown>): boolean {
+  const defaultAgent = config.default_agent;
+  return typeof defaultAgent === "string" && defaultAgent.trim().length > 0;
+}
+
 export async function applyAgentConfig(params: {
   config: Record<string, unknown>;
   pluginConfig: OhMyOpenCodeConfig;
@@ -106,7 +111,10 @@ export async function applyAgentConfig(params: {
   const configAgent = params.config.agent as AgentConfigRecord | undefined;
 
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
-    (params.config as { default_agent?: string }).default_agent = getAgentDisplayName("sisyphus");
+    if (!hasConfiguredDefaultAgent(params.config)) {
+      (params.config as { default_agent?: string }).default_agent =
+        getAgentDisplayName("sisyphus");
+    }
 
     const agentConfig: Record<string, unknown> = {
       sisyphus: builtinAgents.sisyphus,
