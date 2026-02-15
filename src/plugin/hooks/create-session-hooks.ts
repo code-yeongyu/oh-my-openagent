@@ -122,7 +122,7 @@ export function createSessionHooks(args: {
     ? safeHook("ralph-loop", () =>
         createRalphLoopHook(ctx, {
           config: pluginConfig.ralph_loop,
-          checkSessionExists: async (sessionId) => sessionExists(sessionId),
+          checkSessionExists: async (sessionId) => await sessionExists(sessionId),
         }))
     : null
 
