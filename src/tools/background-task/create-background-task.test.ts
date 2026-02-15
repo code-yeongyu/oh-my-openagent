@@ -1,20 +1,32 @@
+/// <reference types="bun-types" />
+
 import { describe, test, expect, mock } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { createBackgroundTask } from "./create-background-task"
 
 describe("createBackgroundTask", () => {
+  const launchMock = mock(() => Promise.resolve({
+    id: "test-task-id",
+    sessionID: null,
+    description: "Test task",
+    agent: "test-agent",
+    status: "pending",
+  }))
+  const getTaskMock = mock()
+
   const mockManager = {
-    launch: mock(() => Promise.resolve({
-      id: "test-task-id",
-      sessionID: null,
-      description: "Test task",
-      agent: "test-agent",
-      status: "pending",
-    })),
-    getTask: mock(),
+    launch: launchMock,
+    getTask: getTaskMock,
   } as unknown as BackgroundManager
 
-  const tool = createBackgroundTask(mockManager)
+  const mockClient = {
+    session: {
+      messages: mock(() => Promise.resolve({ data: [] })),
+    },
+  } as unknown as PluginInput["client"]
+
+  const tool = createBackgroundTask(mockManager, mockClient)
 
   const testContext = {
     sessionID: "test-session",
@@ -31,14 +43,14 @@ describe("createBackgroundTask", () => {
 
   test("detects interrupted task as failure", async () => {
     //#given
-    mockManager.launch.mockResolvedValueOnce({
+    launchMock.mockResolvedValueOnce({
       id: "test-task-id",
       sessionID: null,
       description: "Test task",
       agent: "test-agent",
       status: "pending",
     })
-    mockManager.getTask.mockReturnValueOnce({
+    getTaskMock.mockReturnValueOnce({
       id: "test-task-id",
       sessionID: null,
       description: "Test task",
