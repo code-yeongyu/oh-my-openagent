@@ -70,7 +70,7 @@ export function createSessionManagerTools(ctx: PluginInput): Record<string, Tool
     },
     execute: async (args: SessionReadArgs, _context) => {
       try {
-        if (!sessionExists(args.session_id)) {
+        if (!(await sessionExists(args.session_id))) {
           return `Session not found: ${args.session_id}`
         }
 

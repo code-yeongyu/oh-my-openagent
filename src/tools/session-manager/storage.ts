@@ -138,8 +138,16 @@ export function getMessageDir(sessionID: string): string | null {
   return null
 }
 
-export function sessionExists(sessionID: string): boolean {
-  if (isSqliteBackend()) return true
+export async function sessionExists(sessionID: string): Promise<boolean> {
+  if (isSqliteBackend() && sdkClient) {
+    try {
+      const response = await sdkClient.session.messages({ path: { id: sessionID } })
+      const messages = response.data as unknown[] | undefined
+      return Array.isArray(messages) && messages.length > 0
+    } catch {
+      return false
+    }
+  }
   return getMessageDir(sessionID) !== null
 }
 
