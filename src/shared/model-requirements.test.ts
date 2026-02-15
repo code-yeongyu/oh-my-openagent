@@ -331,19 +331,23 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("google")
   })
 
-  test("writing has valid fallbackChain with gemini-3-flash as primary", () => {
+  test("writing has valid fallbackChain with k2p5 as primary (kimi-for-coding)", () => {
     // given - writing category requirement
     const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
     // when - accessing writing requirement
-    // then - fallbackChain exists with gemini-3-flash as first entry
+    // then - fallbackChain: k2p5 → gemini-3-flash → claude-sonnet-4-5
     expect(writing).toBeDefined()
     expect(writing.fallbackChain).toBeArray()
-    expect(writing.fallbackChain.length).toBeGreaterThan(0)
+    expect(writing.fallbackChain).toHaveLength(3)
 
     const primary = writing.fallbackChain[0]
-    expect(primary.model).toBe("gemini-3-flash")
-    expect(primary.providers[0]).toBe("google")
+    expect(primary.model).toBe("k2p5")
+    expect(primary.providers[0]).toBe("kimi-for-coding")
+
+    const second = writing.fallbackChain[1]
+    expect(second.model).toBe("gemini-3-flash")
+    expect(second.providers[0]).toBe("google")
   })
 
   test("all 8 categories have valid fallbackChain arrays", () => {
