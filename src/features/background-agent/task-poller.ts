@@ -80,7 +80,8 @@ export async function checkAndInterruptStaleTasks(args: {
     const sessionID = task.sessionID
     if (!startedAt || !sessionID) continue
 
-    const sessionIsRunning = sessionStatuses?.[sessionID]?.type === "running"
+    const sessionStatus = sessionStatuses?.[sessionID]?.type
+    const sessionIsRunning = sessionStatus !== undefined && sessionStatus !== "idle"
     const runtime = now - startedAt.getTime()
 
     if (!task.progress?.lastUpdate) {

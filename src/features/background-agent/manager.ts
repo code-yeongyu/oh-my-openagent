@@ -1452,7 +1452,8 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       const sessionID = task.sessionID
       if (!startedAt || !sessionID) continue
 
-      const sessionIsRunning = allStatuses[sessionID]?.type === "running"
+      const sessionStatus = allStatuses[sessionID]?.type
+      const sessionIsRunning = sessionStatus !== undefined && sessionStatus !== "idle"
       const runtime = now - startedAt.getTime()
 
       if (!task.progress?.lastUpdate) {
