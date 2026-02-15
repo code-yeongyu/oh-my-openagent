@@ -2794,7 +2794,7 @@ describe("sisyphus-task", () => {
         {
           name: "writing",
           description: "Documentation, prose, technical writing",
-          model: "google/gemini-3-flash",
+          model: "kimi-for-coding/k2p5",
         },
       ]
       const availableSkills = [
