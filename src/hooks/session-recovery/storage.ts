@@ -6,6 +6,7 @@ export { readParts } from "./storage/parts-reader"
 export { readPartsFromSDK } from "./storage/parts-reader"
 export { hasContent, messageHasContent } from "./storage/part-content"
 export { injectTextPart } from "./storage/text-part-injector"
+export { injectTextPartAsync } from "./storage/text-part-injector"
 
 export {
   findEmptyMessages,
@@ -13,6 +14,7 @@ export {
   findFirstEmptyMessage,
 } from "./storage/empty-messages"
 export { findMessagesWithEmptyTextParts } from "./storage/empty-text"
+export { findMessagesWithEmptyTextPartsFromSDK } from "./storage/empty-text"
 
 export {
   findMessagesWithThinkingBlocks,
@@ -26,3 +28,7 @@ export {
 export { prependThinkingPart } from "./storage/thinking-prepend"
 export { stripThinkingParts } from "./storage/thinking-strip"
 export { replaceEmptyTextParts } from "./storage/empty-text"
+
+export { prependThinkingPartAsync } from "./storage/thinking-prepend"
+export { stripThinkingPartsAsync } from "./storage/thinking-strip"
+export { replaceEmptyTextPartsAsync } from "./storage/empty-text"
