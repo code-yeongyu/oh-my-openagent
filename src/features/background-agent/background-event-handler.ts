@@ -52,7 +52,7 @@ export function handleBackgroundEvent(args: {
 
   const props = event.properties
 
-  if (event.type === "message.part.updated") {
+  if (event.type === "message.part.updated" || event.type === "message.part.delta") {
     if (!props || !isRecord(props)) return
     const sessionID = getString(props, "sessionID")
     if (!sessionID) return
