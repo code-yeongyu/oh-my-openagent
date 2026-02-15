@@ -93,6 +93,7 @@ export class BackgroundManager {
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
+  private enableParentSessionNotifications: boolean
   readonly taskHistory = new TaskHistory()
 
   constructor(
@@ -102,6 +103,7 @@ export class BackgroundManager {
       tmuxConfig?: TmuxConfig
       onSubagentSessionCreated?: OnSubagentSessionCreated
       onShutdown?: () => void
+      enableParentSessionNotifications?: boolean
     }
   ) {
     this.tasks = new Map()
@@ -114,6 +116,7 @@ export class BackgroundManager {
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.onShutdown = options?.onShutdown
+    this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.registerProcessCleanup()
   }
 
@@ -1186,19 +1189,22 @@ export class BackgroundManager {
       allComplete = true
     }
 
-    const statusText = task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : "CANCELLED"
-    const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
-    
-    let notification: string
-    let completedTasks: BackgroundTask[] = []
-    if (allComplete) {
-      completedTasks = Array.from(this.tasks.values())
+    const completedTasks = allComplete
+      ? Array.from(this.tasks.values())
         .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
-      const completedTasksText = completedTasks
-        .map(t => `- \`${t.id}\`: ${t.description}`)
-        .join("\n")
+      : []
 
-      notification = `<system-reminder>
+    if (this.enableParentSessionNotifications) {
+      const statusText = task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : "CANCELLED"
+      const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
+
+      let notification: string
+      if (allComplete) {
+        const completedTasksText = completedTasks
+          .map(t => `- \`${t.id}\`: ${t.description}`)
+          .join("\n")
+
+        notification = `<system-reminder>
 [ALL BACKGROUND TASKS COMPLETE]
 
 **Completed:**
@@ -1206,9 +1212,9 @@ ${completedTasksText || `- \`${task.id}\`: ${task.description}`}
 
 Use \`background_output(task_id="<id>")\` to retrieve each result.
 </system-reminder>`
-    } else {
-      // Individual completion - silent notification
-      notification = `<system-reminder>
+      } else {
+        // Individual completion - silent notification
+        notification = `<system-reminder>
 [BACKGROUND TASK ${statusText}]
 **ID:** \`${task.id}\`
 **Description:** ${task.description}
@@ -1219,71 +1225,77 @@ Do NOT poll - continue productive work.
 
 Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.
 </system-reminder>`
-    }
+      }
 
-    let agent: string | undefined = task.parentAgent
-    let model: { providerID: string; modelID: string } | undefined
+      let agent: string | undefined = task.parentAgent
+      let model: { providerID: string; modelID: string } | undefined
 
-    try {
-      const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
-      const messages = (messagesResp.data ?? []) as Array<{
-        info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
-      }>
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const info = messages[i].info
-        if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
-          agent = info.agent ?? task.parentAgent
-          model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
-          break
+      try {
+        const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
+        const messages = (messagesResp.data ?? []) as Array<{
+          info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
+        }>
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const info = messages[i].info
+          if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
+            agent = info.agent ?? task.parentAgent
+            model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+            break
+          }
         }
+      } catch (error) {
+        if (this.isAbortedSessionError(error)) {
+          log("[background-agent] Parent session aborted, skipping notification:", {
+            taskId: task.id,
+            parentSessionID: task.parentSessionID,
+          })
+          return
+        }
+        const messageDir = getMessageDir(task.parentSessionID)
+        const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+        agent = currentMessage?.agent ?? task.parentAgent
+        model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+          ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+          : undefined
       }
-    } catch (error) {
-      if (this.isAbortedSessionError(error)) {
-        log("[background-agent] Parent session aborted, skipping notification:", {
-          taskId: task.id,
-          parentSessionID: task.parentSessionID,
-        })
-        return
-      }
-      const messageDir = getMessageDir(task.parentSessionID)
-      const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-      agent = currentMessage?.agent ?? task.parentAgent
-      model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
-        ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
-        : undefined
-    }
 
-    log("[background-agent] notifyParentSession context:", {
-      taskId: task.id,
-      resolvedAgent: agent,
-      resolvedModel: model,
-    })
-
-    try {
-      await this.client.session.promptAsync({
-        path: { id: task.parentSessionID },
-        body: {
-          noReply: !allComplete,
-          ...(agent !== undefined ? { agent } : {}),
-          ...(model !== undefined ? { model } : {}),
-          ...(task.parentTools ? { tools: task.parentTools } : {}),
-          parts: [{ type: "text", text: notification }],
-        },
-      })
-      log("[background-agent] Sent notification to parent session:", {
+      log("[background-agent] notifyParentSession context:", {
         taskId: task.id,
-        allComplete,
-        noReply: !allComplete,
+        resolvedAgent: agent,
+        resolvedModel: model,
       })
-    } catch (error) {
-      if (this.isAbortedSessionError(error)) {
-        log("[background-agent] Parent session aborted, skipping notification:", {
-          taskId: task.id,
-          parentSessionID: task.parentSessionID,
+
+      try {
+        await this.client.session.promptAsync({
+          path: { id: task.parentSessionID },
+          body: {
+            noReply: !allComplete,
+            ...(agent !== undefined ? { agent } : {}),
+            ...(model !== undefined ? { model } : {}),
+            ...(task.parentTools ? { tools: task.parentTools } : {}),
+            parts: [{ type: "text", text: notification }],
+          },
         })
-        return
+        log("[background-agent] Sent notification to parent session:", {
+          taskId: task.id,
+          allComplete,
+          noReply: !allComplete,
+        })
+      } catch (error) {
+        if (this.isAbortedSessionError(error)) {
+          log("[background-agent] Parent session aborted, skipping notification:", {
+            taskId: task.id,
+            parentSessionID: task.parentSessionID,
+          })
+          return
+        }
+        log("[background-agent] Failed to send notification:", error)
       }
-      log("[background-agent] Failed to send notification:", error)
+    } else {
+      log("[background-agent] Parent session notifications disabled, skipping prompt injection:", {
+        taskId: task.id,
+        parentSessionID: task.parentSessionID,
+      })
     }
 
     if (allComplete) {
