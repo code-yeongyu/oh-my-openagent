@@ -269,9 +269,9 @@ export function injectHookMessage(
   }
 
   if (isSqliteBackend()) {
-    log("[hook-message-injector] WARNING: Skipping message injection on beta/SQLite backend. " +
-        "Injected messages are not visible to SQLite storage. " +
-        "Features affected: continuation prompts, context injection.", {
+    log("[hook-message-injector] Skipping JSON message injection on SQLite backend. " +
+        "In-flight injection is handled via experimental.chat.messages.transform hook. " +
+        "JSON write path is not needed when SQLite is the storage backend.", {
       sessionID,
       agent: originalMessage.agent,
     })
