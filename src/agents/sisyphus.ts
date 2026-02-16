@@ -310,7 +310,7 @@ result = task(..., run_in_background=false)  // Never wait synchronously for exp
 1. Launch parallel agents → receive task_ids
 2. Continue immediate work
 3. When results needed: \`background_output(task_id="...")\`
-4. BEFORE final answer: \`background_cancel(all=true)\`
+4. Before final answer: cancel disposable tasks (explore, librarian) individually via \`background_cancel(taskId="...")\`. Always wait for Oracle — collect its result via \`background_output\` before answering.
 
 ### Search Stop Conditions
 
@@ -449,8 +449,9 @@ If verification fails:
 3. Report: "Done. Note: found N pre-existing lint errors unrelated to my changes."
 
 ### Before Delivering Final Answer:
-- Cancel ALL running background tasks: \`background_cancel(all=true)\`
-- This conserves resources and ensures clean workflow completion
+- Cancel disposable background tasks (explore, librarian) individually via \`background_cancel(taskId="...")\`
+- **Always wait for Oracle**: Oracle takes 20+ min by design and always provides valuable independent analysis from a different angle — even when you already have enough context. Collect Oracle results via \`background_output\` before answering.
+- When Oracle is running, cancel disposable tasks individually instead of using \`background_cancel(all=true)\`.
 </Behavior_Instructions>
 
 ${oracleSection}

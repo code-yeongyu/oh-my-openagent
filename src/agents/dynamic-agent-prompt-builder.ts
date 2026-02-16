@@ -336,6 +336,10 @@ ${avoidWhen.map((w) => `- ${w}`).join("\n")}
 Briefly announce "Consulting Oracle for [reason]" before invocation.
 
 **Exception**: This is the ONLY case where you announce before acting. For all other work, start immediately without status updates.
+
+### Oracle Background Task Policy:
+- Oracle takes 20+ min by design. Always wait for Oracle results via \`background_output\` before final answer.
+- Oracle provides independent analysis from a different angle that catches blind spots — even when you believe you already have sufficient context, Oracle's perspective is worth the wait.
 </Oracle_Usage>`
 }
 
