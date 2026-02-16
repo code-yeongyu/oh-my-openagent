@@ -428,7 +428,7 @@ describe("createBuiltinAgents with model overrides", () => {
       )
 
       // #then
-      const matches = agents.sisyphus.prompt.match(/Custom agent: researcher/gi) ?? []
+      const matches = (agents.sisyphus?.prompt ?? "").match(/Custom agent: researcher/gi) ?? []
       expect(matches.length).toBe(1)
     } finally {
       fetchSpy.mockRestore()
@@ -525,6 +525,34 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
 })
 
 describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => {
+  test("hephaestus is created when provider-models cache connected list includes required provider", async () => {
+    // #given
+    const connectedCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
+    const providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      connected: ["openai"],
+      models: {},
+      updatedAt: new Date().toISOString(),
+    })
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockImplementation(async (_, options) => {
+      const providers = options?.connectedProviders ?? []
+      return providers.includes("openai")
+        ? new Set(["openai/gpt-5.3-codex"])
+        : new Set(["anthropic/claude-opus-4-6"])
+    })
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
+
+      // #then
+      expect(agents.hephaestus).toBeDefined()
+    } finally {
+      connectedCacheSpy.mockRestore()
+      providerModelsSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
+  })
+
   test("hephaestus is not created when no required provider is connected", async () => {
     // #given - only anthropic models available, not in hephaestus requiresProvider
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
