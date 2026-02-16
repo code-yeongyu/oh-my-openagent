@@ -140,4 +140,35 @@ describe("createBuiltinSkills", () => {
 		// #then
 		expect(skills.length).toBe(4)
 	})
+
+	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {
+		// given
+		const options = { browserProvider: "playwright-cli" as const }
+
+		// when
+		const skills = createBuiltinSkills(options)
+
+		// then
+		const playwrightSkill = skills.find((s) => s.name === "playwright")
+		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
+		expect(playwrightSkill).toBeDefined()
+		expect(playwrightSkill!.description).toContain("browser")
+		expect(playwrightSkill!.allowedTools).toContain("Bash(playwright-cli:*)")
+		expect(playwrightSkill!.mcpConfig).toBeUndefined()
+		expect(agentBrowserSkill).toBeUndefined()
+	})
+
+	test("playwright-cli skill template contains CLI commands", () => {
+		// given
+		const options = { browserProvider: "playwright-cli" as const }
+
+		// when
+		const skills = createBuiltinSkills(options)
+		const skill = skills.find((s) => s.name === "playwright")
+
+		// then
+		expect(skill!.template).toContain("playwright-cli open")
+		expect(skill!.template).toContain("playwright-cli snapshot")
+		expect(skill!.template).toContain("playwright-cli click")
+	})
 })
