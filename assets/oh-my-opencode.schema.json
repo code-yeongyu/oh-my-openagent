@@ -98,7 +98,9 @@
           "stop-continuation-guard",
           "tasks-todowrite-disabler",
           "write-existing-file-guard",
-          "anthropic-effort"
+          "anthropic-effort",
+          "hashline-edit-disabler",
+          "hashline-read-enhancer"
         ]
       }
     },
