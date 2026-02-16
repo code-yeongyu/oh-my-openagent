@@ -27,6 +27,10 @@ interface CachedTokenState {
   tokens: TokenInfo
 }
 
+function isAnthropicProvider(providerID: string): boolean {
+  return providerID === "anthropic" || providerID === "google-vertex-anthropic"
+}
+
 export function createContextWindowMonitorHook(_ctx: PluginInput) {
   const remindedSessions = new Set<string>()
   const tokenCache = new Map<string, CachedTokenState>()
@@ -42,7 +46,7 @@ export function createContextWindowMonitorHook(_ctx: PluginInput) {
     const cached = tokenCache.get(sessionID)
     if (!cached) return
 
-    if (cached.providerID !== "anthropic") return
+    if (!isAnthropicProvider(cached.providerID)) return
 
     const lastTokens = cached.tokens
     const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)

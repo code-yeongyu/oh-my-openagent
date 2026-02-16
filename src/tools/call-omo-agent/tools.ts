@@ -9,9 +9,8 @@ import { executeSync } from "./sync-executor"
 export function createCallOmoAgent(
   ctx: PluginInput,
   backgroundManager: BackgroundManager,
-  disabledAgents: string[] = [],
+  disabledAgents: string[] = []
 ): ToolDefinition {
-  const disabledAgentSet = new Set(disabledAgents.map((name) => name.toLowerCase()))
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`
   ).join("\n")
@@ -43,13 +42,13 @@ export function createCallOmoAgent(
         return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`
       }
 
-      const normalizedAgentName = args.subagent_type.toLowerCase()
-      if (disabledAgentSet.has(normalizedAgentName)) {
-        return `Error: Agent "${args.subagent_type}" is disabled via disabled_agents config.`
-      }
-
-      const normalizedAgent = normalizedAgentName as AllowedAgentType
+      const normalizedAgent = args.subagent_type.toLowerCase() as AllowedAgentType
       args = { ...args, subagent_type: normalizedAgent }
+
+      // Check if agent is disabled
+      if (disabledAgents.some((disabled) => disabled.toLowerCase() === normalizedAgent)) {
+        return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your oh-my-opencode.json to use it.`
+      }
 
       if (args.run_in_background) {
         if (args.session_id) {
