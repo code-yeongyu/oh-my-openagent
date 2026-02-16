@@ -2,6 +2,7 @@ import { describe, it, expect, mock, beforeEach, afterEach, afterAll } from "bun
 
 import * as originalSdk from "@opencode-ai/sdk"
 import * as originalPortUtils from "../../shared/port-utils"
+import * as originalBinaryResolver from "./opencode-binary-resolver"
 
 const originalConsole = globalThis.console
 
@@ -16,6 +17,7 @@ const mockCreateOpencodeClient = mock(() => ({ session: {} }))
 const mockIsPortAvailable = mock(() => Promise.resolve(true))
 const mockGetAvailableServerPort = mock(() => Promise.resolve({ port: 4096, wasAutoSelected: false }))
 const mockConsoleLog = mock(() => {})
+const mockWithWorkingOpencodePath = mock((startServer: () => Promise<unknown>) => startServer())
 
 mock.module("@opencode-ai/sdk", () => ({
   createOpencode: mockCreateOpencode,
@@ -28,9 +30,14 @@ mock.module("../../shared/port-utils", () => ({
   DEFAULT_SERVER_PORT: 4096,
 }))
 
+mock.module("./opencode-binary-resolver", () => ({
+  withWorkingOpencodePath: mockWithWorkingOpencodePath,
+}))
+
 afterAll(() => {
   mock.module("@opencode-ai/sdk", () => originalSdk)
   mock.module("../../shared/port-utils", () => originalPortUtils)
+  mock.module("./opencode-binary-resolver", () => originalBinaryResolver)
 })
 
 const { createServerConnection } = await import("./server-connection")
@@ -43,6 +50,7 @@ describe("createServerConnection", () => {
     mockGetAvailableServerPort.mockClear()
     mockServerClose.mockClear()
     mockConsoleLog.mockClear()
+    mockWithWorkingOpencodePath.mockClear()
     globalThis.console = { ...console, log: mockConsoleLog } as typeof console
   })
 
@@ -60,6 +68,7 @@ describe("createServerConnection", () => {
 
     // then
     expect(mockCreateOpencodeClient).toHaveBeenCalledWith({ baseUrl: attachUrl })
+    expect(mockWithWorkingOpencodePath).not.toHaveBeenCalled()
     expect(result.client).toBeDefined()
     expect(result.cleanup).toBeDefined()
     result.cleanup()
@@ -77,6 +86,7 @@ describe("createServerConnection", () => {
 
     // then
     expect(mockIsPortAvailable).toHaveBeenCalledWith(8080, "127.0.0.1")
+    expect(mockWithWorkingOpencodePath).toHaveBeenCalledTimes(1)
     expect(mockCreateOpencode).toHaveBeenCalledWith({ signal, port: 8080, hostname: "127.0.0.1" })
     expect(mockCreateOpencodeClient).not.toHaveBeenCalled()
     expect(result.client).toBeDefined()
@@ -114,6 +124,7 @@ describe("createServerConnection", () => {
 
     // then
     expect(mockGetAvailableServerPort).toHaveBeenCalledWith(4096, "127.0.0.1")
+    expect(mockWithWorkingOpencodePath).toHaveBeenCalledTimes(1)
     expect(mockCreateOpencode).toHaveBeenCalledWith({ signal, port: 4100, hostname: "127.0.0.1" })
     expect(mockCreateOpencodeClient).not.toHaveBeenCalled()
     expect(result.client).toBeDefined()
