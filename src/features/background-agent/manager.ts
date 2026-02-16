@@ -783,6 +783,10 @@ export class BackgroundManager {
       this.cleanupPendingByParent(task)
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
+      const toastManager = getTaskToastManager()
+      if (toastManager) {
+        toastManager.removeTask(task.id)
+      }
       if (task.sessionID) {
         subagentSessions.delete(task.sessionID)
       }
@@ -830,6 +834,10 @@ export class BackgroundManager {
         this.cleanupPendingByParent(task)
         this.tasks.delete(task.id)
         this.clearNotificationsForTask(task.id)
+        const toastManager = getTaskToastManager()
+        if (toastManager) {
+          toastManager.removeTask(task.id)
+        }
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
         }
@@ -1000,6 +1008,10 @@ export class BackgroundManager {
     }
 
     if (options?.skipNotification) {
+      const toastManager = getTaskToastManager()
+      if (toastManager) {
+        toastManager.removeTask(task.id)
+      }
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
       return true
     }
@@ -1413,6 +1425,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           }
         }
         this.clearNotificationsForTask(taskId)
+        const toastManager = getTaskToastManager()
+        if (toastManager) {
+          toastManager.removeTask(taskId)
+        }
         this.tasks.delete(taskId)
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
