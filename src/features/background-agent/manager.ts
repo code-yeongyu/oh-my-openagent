@@ -8,7 +8,7 @@ import type {
 import { TaskHistory } from "./task-history"
 import {
   log,
-  getAgentToolRestrictions,
+  buildSubagentTools,
   normalizePromptTools,
   normalizeSDKResponse,
   promptWithModelSuggestionRetry,
@@ -356,12 +356,7 @@ export class BackgroundManager {
         ...(launchVariant ? { variant: launchVariant } : {}),
         system: input.skillContent,
         tools: (() => {
-          const tools = {
-            task: false,
-            call_omo_agent: true,
-            question: false,
-            ...getAgentToolRestrictions(input.agent),
-          }
+          const tools = buildSubagentTools(input.agent)
           setSessionTools(sessionID, tools)
           return tools
         })(),
@@ -629,12 +624,7 @@ export class BackgroundManager {
         ...(resumeModel ? { model: resumeModel } : {}),
         ...(resumeVariant ? { variant: resumeVariant } : {}),
         tools: (() => {
-          const tools = {
-            task: false,
-            call_omo_agent: true,
-            question: false,
-            ...getAgentToolRestrictions(existingTask.agent),
-          }
+          const tools = buildSubagentTools(existingTask.agent)
           setSessionTools(existingTask.sessionID!, tools)
           return tools
         })(),
