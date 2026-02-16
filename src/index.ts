@@ -10,6 +10,7 @@ import { createPluginInterface } from "./plugin-interface"
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
+import { initializeMcbFromConfig } from "./features/mcb-integration"
 import { injectServerAuthIntoClient, log } from "./shared"
 import { startTmuxCheck } from "./tools"
 
@@ -22,6 +23,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   startTmuxCheck()
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
+  initializeMcbFromConfig(pluginConfig.mcb)
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
 
   const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)

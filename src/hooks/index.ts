@@ -21,6 +21,7 @@ export { createAutoUpdateCheckerHook } from "./auto-update-checker";
 
 export { createAgentUsageReminderHook } from "./agent-usage-reminder";
 export { createKeywordDetectorHook } from "./keyword-detector";
+export { createAmbiguityDetectorHook } from "./ambiguity-detector";
 export { createNonInteractiveEnvHook } from "./non-interactive-env";
 export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 
@@ -43,3 +44,4 @@ export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
 export { createPreemptiveCompactionHook } from "./preemptive-compaction";
 export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
 export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
+export { createWisdomCaptureHook } from "./wisdom-capture";

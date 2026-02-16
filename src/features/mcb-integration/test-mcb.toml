@@ -1,0 +1,40 @@
+[logging]
+level = "WARN"
+
+[mode]
+type = "standalone"
+
+[server]
+transport_mode = "stdio"
+
+[server.network]
+host = "127.0.0.1"
+port = 18080
+
+[providers.embedding]
+provider = "fastembed"
+
+[providers.embedding.configs.default]
+provider = "fastembed"
+model = "AllMiniLML6V2"
+dimensions = 384
+
+[providers.vector_store]
+provider = "edgevec"
+
+[providers.vector_store.configs.default]
+provider = "edgevec"
+dimensions = 384
+
+[system.infrastructure.cache]
+enabled = true
+provider = "Moka"
+default_ttl_secs = 3600
+max_size = 100000
+
+[system.infrastructure.event_bus]
+provider = "tokio"
+capacity = 1024
+
+[auth]
+enabled = false

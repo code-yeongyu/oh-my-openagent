@@ -12,6 +12,7 @@ import { BuiltinCommandNameSchema } from "./commands"
 import { ExperimentalConfigSchema } from "./experimental"
 import { GitMasterConfigSchema } from "./git-master"
 import { HookNameSchema } from "./hooks"
+import { McbConfigSchema } from "./mcb"
 import { NotificationConfigSchema } from "./notification"
 import { RalphLoopConfigSchema } from "./ralph-loop"
 import { SkillsConfigSchema } from "./skills"
@@ -50,6 +51,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
+  mcb: McbConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })

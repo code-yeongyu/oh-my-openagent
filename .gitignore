@@ -35,3 +35,8 @@ test-injection/
 notepad.md
 oauth-success.html
 *.bun-build
+
+# Runtime data
+.arbor/
+.oc-state/
+/mcb.*

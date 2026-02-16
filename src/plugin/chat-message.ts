@@ -78,6 +78,7 @@ export function createChatMessageHandler(args: {
     }
 
     await hooks.stopContinuationGuard?.["chat.message"]?.(input)
+    await hooks.ambiguityDetector?.["chat.message"]?.(input, output)
     await hooks.keywordDetector?.["chat.message"]?.(input, output)
     await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)

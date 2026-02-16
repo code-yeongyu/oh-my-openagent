@@ -20,6 +20,8 @@ import {
   createSisyphusJuniorNotepadHook,
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
+  createAmbiguityDetectorHook,
+  createWisdomCaptureHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
@@ -50,6 +52,8 @@ export type SessionHooks = {
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook>
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
+  ambiguityDetector: ReturnType<typeof createAmbiguityDetectorHook> | null
+  wisdomCapture: ReturnType<typeof createWisdomCaptureHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -153,6 +157,14 @@ export function createSessionHooks(args: {
     ? safeHook("anthropic-effort", () => createAnthropicEffortHook())
     : null
 
+  const ambiguityDetector = isHookEnabled("ambiguity-detector")
+    ? safeHook("ambiguity-detector", () => createAmbiguityDetectorHook(ctx))
+    : null
+
+  const wisdomCapture = isHookEnabled("wisdom-capture")
+    ? safeHook("wisdom-capture", () => createWisdomCaptureHook(ctx))
+    : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -173,5 +185,7 @@ export function createSessionHooks(args: {
     questionLabelTruncator,
     taskResumeInfo,
     anthropicEffort,
+    ambiguityDetector,
+    wisdomCapture,
   }
 }
