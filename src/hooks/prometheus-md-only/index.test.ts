@@ -1,16 +1,21 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { clearSessionAgent } from "../../features/claude-code-session-state"
+// Force stable (JSON) mode for tests that rely on message file storage
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => false,
+  resetSqliteBackendCache: () => {},
+}))
 
-import { createPrometheusMdOnlyHook } from "./index"
-import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
+const { createPrometheusMdOnlyHook } = await import("./index")
+const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
 describe("prometheus-md-only", () => {
-  const TEST_SESSION_ID = "test-session-prometheus"
+  const TEST_SESSION_ID = "ses_test_prometheus"
   let testMessageDir: string
 
   function createMockPluginInput() {
@@ -546,7 +551,7 @@ describe("prometheus-md-only", () => {
       writeFileSync(BOULDER_FILE, JSON.stringify({
         active_plan: "/test/plan.md",
         started_at: new Date().toISOString(),
-        session_ids: ["other-session-id"],
+        session_ids: ["ses_other_session_id"],
         plan_name: "test-plan",
         agent: "atlas"
       }))
@@ -578,7 +583,7 @@ describe("prometheus-md-only", () => {
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
         tool: "Write",
-        sessionID: "non-existent-session",
+        sessionID: "ses_non_existent_session",
         callID: "call-1",
       }
       const output = {

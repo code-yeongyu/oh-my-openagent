@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Claude Code compatible task schema and storage. Core task management with file-based persistence and atomic writes.
+Claude Code compatible task schema and storage. Core task management with file-based persistence, atomic writes, and OpenCode todo sync.
 
 ## STRUCTURE
 ```
@@ -50,39 +50,16 @@ interface Task {
 
 ## TODO SYNC
 
-Automatic bidirectional synchronization between tasks and OpenCode's todo system.
-
-| Function | Purpose |
-|----------|---------|
-| `syncTaskToTodo(task)` | Convert Task to TodoInfo, returns `null` for deleted tasks |
-| `syncTaskTodoUpdate(ctx, task, sessionID, writer?)` | Fetch current todos, update specific task, write back |
-| `syncAllTasksToTodos(ctx, tasks, sessionID?)` | Bulk sync multiple tasks to todos |
-
-### Status Mapping
+Automatic bidirectional sync between tasks and OpenCode's todo system.
 
 | Task Status | Todo Status |
 |-------------|-------------|
 | `pending` | `pending` |
 | `in_progress` | `in_progress` |
 | `completed` | `completed` |
-| `deleted` | `null` (removed from todos) |
+| `deleted` | `null` (removed) |
 
-### Field Mapping
-
-| Task Field | Todo Field |
-|------------|------------|
-| `task.id` | `todo.id` |
-| `task.subject` | `todo.content` |
-| `task.status` (mapped) | `todo.status` |
-| `task.metadata.priority` | `todo.priority` |
-
-Priority values: `"low"`, `"medium"`, `"high"`
-
-### Automatic Sync Triggers
-
-Sync occurs automatically on:
-- `task_create` — new task added to todos
-- `task_update` — task changes reflected in todos
+Sync triggers: `task_create`, `task_update`.
 
 ## ANTI-PATTERNS
 

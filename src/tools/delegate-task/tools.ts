@@ -129,7 +129,7 @@ Prompts MUST be in English.`
         return skillError
       }
 
-      const parentContext = resolveParentContext(ctx)
+      const parentContext = await resolveParentContext(ctx, options.client)
 
       if (args.session_id) {
         if (runInBackground) {

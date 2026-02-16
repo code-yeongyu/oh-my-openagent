@@ -313,7 +313,7 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockReturnValue({
+    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockResolvedValue({
       success: true,
       sufficient: false,
       truncatedCount: 3,
@@ -354,7 +354,7 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockReturnValue({
+    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockResolvedValue({
       success: true,
       sufficient: true,
       truncatedCount: 5,

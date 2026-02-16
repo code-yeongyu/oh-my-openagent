@@ -1267,52 +1267,58 @@ describe("sisyphus-task", () => {
       launch: async () => mockTask,
     }
     
-     let messagesCallCount = 0
+      let messagesCallCount = 0
 
-     const mockClient = {
-        session: {
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => {
-            messagesCallCount++
-            const now = Date.now()
+      const mockClient = {
+         session: {
+           prompt: async () => ({ data: {} }),
+           promptAsync: async () => ({ data: {} }),
+           messages: async (args?: { path?: { id?: string } }) => {
+             const sessionID = args?.path?.id
+             // Only track calls for the target session (ses_continue_test),
+             // not for parent-session calls from resolveParentContext
+             if (sessionID !== "ses_continue_test") {
+               return { data: [] }
+             }
+             messagesCallCount++
+             const now = Date.now()
 
-            const beforeContinuation = [
-              {
-                info: { id: "msg_001", role: "user", time: { created: now } },
-                parts: [{ type: "text", text: "Previous context" }],
-              },
-              {
-                info: { id: "msg_002", role: "assistant", time: { created: now + 1 }, finish: "end_turn" },
-                parts: [{ type: "text", text: "Previous result" }],
-              },
-            ]
+             const beforeContinuation = [
+               {
+                 info: { id: "msg_001", role: "user", time: { created: now } },
+                 parts: [{ type: "text", text: "Previous context" }],
+               },
+               {
+                 info: { id: "msg_002", role: "assistant", time: { created: now + 1 }, finish: "end_turn" },
+                 parts: [{ type: "text", text: "Previous result" }],
+               },
+             ]
 
-            if (messagesCallCount === 1) {
-              return { data: beforeContinuation }
-            }
+             if (messagesCallCount === 1) {
+               return { data: beforeContinuation }
+             }
 
-            return {
-              data: [
-                ...beforeContinuation,
-                {
-                  info: { id: "msg_003", role: "user", time: { created: now + 2 } },
-                  parts: [{ type: "text", text: "Continue the task" }],
-                },
-                {
-                  info: { id: "msg_004", role: "assistant", time: { created: now + 3 }, finish: "end_turn" },
-                  parts: [{ type: "text", text: "This is the continued task result" }],
-                },
-              ],
-            }
-          },
-          status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
+             return {
+               data: [
+                 ...beforeContinuation,
+                 {
+                   info: { id: "msg_003", role: "user", time: { created: now + 2 } },
+                   parts: [{ type: "text", text: "Continue the task" }],
+                 },
+                 {
+                   info: { id: "msg_004", role: "assistant", time: { created: now + 3 }, finish: "end_turn" },
+                   parts: [{ type: "text", text: "This is the continued task result" }],
+                 },
+               ],
+             }
+           },
+           status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
+         },
+         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+         app: {
+           agents: async () => ({ data: [] }),
         },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        app: {
-          agents: async () => ({ data: [] }),
-       },
-     }
+      }
      
      const tool = createDelegateTask({
        manager: mockManager,

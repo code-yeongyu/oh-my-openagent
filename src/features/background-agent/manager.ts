@@ -875,7 +875,7 @@ export class BackgroundManager {
         path: { id: sessionID },
       })
 
-      const messages = response.data ?? []
+      const messages = ((response.data ?? response) as unknown as Array<{ info?: { role?: string } }>) ?? []
       
       // Check for at least one assistant or tool message
       const hasAssistantOrToolMessage = messages.some(

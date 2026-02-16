@@ -1,6 +1,7 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 import type { MessageData } from "./types"
 import { readParts } from "./storage"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -20,6 +21,26 @@ function extractToolUseIds(parts: MessagePart[]): string[] {
   return parts.filter((part): part is ToolUsePart => part.type === "tool_use" && !!part.id).map((part) => part.id)
 }
 
+async function readPartsFromSDKFallback(
+  client: Client,
+  sessionID: string,
+  messageID: string
+): Promise<MessagePart[]> {
+  try {
+    const response = await client.session.messages({ path: { id: sessionID } })
+    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
+    const target = messages.find((m) => m.info?.id === messageID)
+    if (!target?.parts) return []
+
+    return target.parts.map((part) => ({
+      type: part.type === "tool" ? "tool_use" : part.type,
+      id: "callID" in part ? (part as { callID?: string }).callID : part.id,
+    }))
+  } catch {
+    return []
+  }
+}
+
 export async function recoverToolResultMissing(
   client: Client,
   sessionID: string,
@@ -27,11 +48,15 @@ export async function recoverToolResultMissing(
 ): Promise<boolean> {
   let parts = failedAssistantMsg.parts || []
   if (parts.length === 0 && failedAssistantMsg.info?.id) {
-    const storedParts = readParts(failedAssistantMsg.info.id)
-    parts = storedParts.map((part) => ({
-      type: part.type === "tool" ? "tool_use" : part.type,
-      id: "callID" in part ? (part as { callID?: string }).callID : part.id,
-    }))
+    if (isSqliteBackend()) {
+      parts = await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
+    } else {
+      const storedParts = readParts(failedAssistantMsg.info.id)
+      parts = storedParts.map((part) => ({
+        type: part.type === "tool" ? "tool_use" : part.type,
+        id: "callID" in part ? (part as { callID?: string }).callID : part.id,
+      }))
+    }
   }
 
   const toolUseIds = extractToolUseIds(parts)
