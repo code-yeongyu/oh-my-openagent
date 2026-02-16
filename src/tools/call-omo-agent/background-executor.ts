@@ -1,11 +1,18 @@
 import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { consumeNewMessages } from "../../shared/session-cursor"
-import { findFirstMessageWithAgent, findNearestMessageWithFields } from "../../features/hook-message-injector"
+import {
+  findFirstMessageWithAgent,
+  findFirstMessageWithAgentFromSDK,
+  findNearestMessageWithFields,
+  findNearestMessageWithFieldsFromSDK,
+} from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getMessageDir } from "./message-dir"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
 export async function executeBackground(
   args: CallOmoAgentArgs,
@@ -16,12 +23,22 @@ export async function executeBackground(
     abort: AbortSignal
     metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   },
-  manager: BackgroundManager
+  manager: BackgroundManager,
+  client: PluginInput["client"]
 ): Promise<string> {
   try {
     const messageDir = getMessageDir(toolContext.sessionID)
-    const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-    const firstMessageAgent = messageDir ? findFirstMessageWithAgent(messageDir) : null
+
+    const [prevMessage, firstMessageAgent] = isSqliteBackend()
+      ? await Promise.all([
+          findNearestMessageWithFieldsFromSDK(client, toolContext.sessionID),
+          findFirstMessageWithAgentFromSDK(client, toolContext.sessionID),
+        ])
+      : [
+          messageDir ? findNearestMessageWithFields(messageDir) : null,
+          messageDir ? findFirstMessageWithAgent(messageDir) : null,
+        ]
+
     const sessionAgent = getSessionAgent(toolContext.sessionID)
     const parentAgent = toolContext.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
     

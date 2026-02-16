@@ -1,13 +1,19 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { BackgroundTaskArgs } from "./types"
 import { BACKGROUND_TASK_DESCRIPTION } from "./constants"
-import { findFirstMessageWithAgent, findNearestMessageWithFields } from "../../features/hook-message-injector"
+import {
+  findFirstMessageWithAgent,
+  findFirstMessageWithAgentFromSDK,
+  findNearestMessageWithFields,
+  findNearestMessageWithFieldsFromSDK,
+} from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { log } from "../../shared/logger"
 import { delay } from "./delay"
 import { getMessageDir } from "./message-dir"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
 type ToolContextWithMetadata = {
   sessionID: string
@@ -18,7 +24,10 @@ type ToolContextWithMetadata = {
   callID?: string
 }
 
-export function createBackgroundTask(manager: BackgroundManager): ToolDefinition {
+export function createBackgroundTask(
+  manager: BackgroundManager,
+  client: PluginInput["client"]
+): ToolDefinition {
   return tool({
     description: BACKGROUND_TASK_DESCRIPTION,
     args: {
@@ -35,8 +44,17 @@ export function createBackgroundTask(manager: BackgroundManager): ToolDefinition
 
       try {
         const messageDir = getMessageDir(ctx.sessionID)
-        const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-        const firstMessageAgent = messageDir ? findFirstMessageWithAgent(messageDir) : null
+
+        const [prevMessage, firstMessageAgent] = isSqliteBackend()
+          ? await Promise.all([
+              findNearestMessageWithFieldsFromSDK(client, ctx.sessionID),
+              findFirstMessageWithAgentFromSDK(client, ctx.sessionID),
+            ])
+          : [
+              messageDir ? findNearestMessageWithFields(messageDir) : null,
+              messageDir ? findFirstMessageWithAgent(messageDir) : null,
+            ]
+
         const sessionAgent = getSessionAgent(ctx.sessionID)
         const parentAgent = ctx.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
 

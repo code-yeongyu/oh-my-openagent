@@ -15,10 +15,10 @@ export interface TodoContinuationEnforcer {
 }
 
 export interface Todo {
-  content: string
-  status: string
-  priority: string
-  id: string
+  content: string;
+  status: string;
+  priority: string;
+  id?: string;
 }
 
 export interface SessionState {

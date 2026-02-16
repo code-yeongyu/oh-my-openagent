@@ -34,10 +34,10 @@ export interface SessionInfo {
 }
 
 export interface TodoItem {
-  id: string
-  content: string
-  status: "pending" | "in_progress" | "completed" | "cancelled"
-  priority?: string
+  id?: string;
+  content: string;
+  status: "pending" | "in_progress" | "completed" | "cancelled";
+  priority?: string;
 }
 
 export interface SearchResult {

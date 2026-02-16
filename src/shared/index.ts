@@ -22,6 +22,7 @@ export type {
   OpenCodeConfigPaths,
 } from "./opencode-config-dir-types"
 export * from "./opencode-version"
+export * from "./opencode-storage-detection"
 export * from "./permission-compat"
 export * from "./external-plugin-detector"
 export * from "./zip-extractor"
@@ -37,7 +38,7 @@ export { resolveModelPipeline } from "./model-resolution-pipeline"
 export type {
   ModelResolutionRequest,
   ModelResolutionProvenance,
-  ModelResolutionResult as ModelResolutionPipelineResult,
+  ModelResolutionResult,
 } from "./model-resolution-types"
 export * from "./model-availability"
 export * from "./connected-providers-cache"
@@ -45,7 +46,10 @@ export * from "./session-utils"
 export * from "./tmux"
 export * from "./model-suggestion-retry"
 export * from "./opencode-server-auth"
+export * from "./opencode-http-api"
 export * from "./port-utils"
 export * from "./git-worktree"
 export * from "./safe-create-hook"
 export * from "./truncate-description"
+export * from "./opencode-storage-paths"
+export * from "./opencode-message-dir"
