@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { HOOK_NAME } from "./hook-name"
 import { isAbortError } from "./is-abort-error"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
@@ -88,11 +89,12 @@ export function createAtlasEventHandler(input: {
       }
 
       const lastAgent = await getLastAgentFromSession(sessionID, ctx.client)
-      const requiredAgent = (boulderState.agent ?? "atlas").toLowerCase()
-      const lastAgentMatchesRequired = lastAgent === requiredAgent
+      const lastAgentKey = getAgentConfigKey(lastAgent ?? "")
+      const requiredAgent = getAgentConfigKey(boulderState.agent ?? "atlas")
+      const lastAgentMatchesRequired = lastAgentKey === requiredAgent
       const boulderAgentWasNotExplicitlySet = boulderState.agent === undefined
       const boulderAgentDefaultsToAtlas = requiredAgent === "atlas"
-      const lastAgentIsSisyphus = lastAgent === "sisyphus"
+      const lastAgentIsSisyphus = lastAgentKey === "sisyphus"
       const allowSisyphusWhenDefaultAtlas = boulderAgentWasNotExplicitlySet && boulderAgentDefaultsToAtlas && lastAgentIsSisyphus
       const agentMatches = lastAgentMatchesRequired || allowSisyphusWhenDefaultAtlas
       if (!agentMatches) {
