@@ -62,7 +62,7 @@ export async function readMessagesFromSDK(
 ): Promise<StoredMessageMeta[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const data: unknown = response.data
+    const data: unknown = response.data ?? response
     if (!Array.isArray(data)) return []
 
     const messages = data
