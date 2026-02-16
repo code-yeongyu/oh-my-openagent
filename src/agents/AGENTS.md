@@ -7,36 +7,22 @@
 ## STRUCTURE
 ```
 agents/
-├── sisyphus.ts                 # Main orchestrator (530 lines)
-├── hephaestus.ts               # Autonomous deep worker (624 lines)
-├── oracle.ts                   # Strategic advisor (170 lines)
-├── librarian.ts                # Multi-repo research (328 lines)
-├── explore.ts                  # Fast codebase grep (124 lines)
-├── multimodal-looker.ts        # Media analyzer (58 lines)
+├── sisyphus.ts                 # Main orchestrator (559 lines)
+├── hephaestus.ts               # Autonomous deep worker (651 lines)
+├── oracle.ts                   # Strategic advisor (171 lines)
+├── librarian.ts                # Multi-repo research (329 lines)
+├── explore.ts                  # Fast codebase grep (125 lines)
+├── multimodal-looker.ts        # Media analyzer (59 lines)
 ├── metis.ts                    # Pre-planning analysis (347 lines)
 ├── momus.ts                    # Plan validator (244 lines)
-├── atlas/                      # Master orchestrator
-│   ├── agent.ts                # Atlas factory
-│   ├── default.ts              # Claude-optimized prompt
-│   ├── gpt.ts                  # GPT-optimized prompt
-│   └── utils.ts
-├── prometheus/                 # Planning agent
-│   ├── index.ts
-│   ├── system-prompt.ts        # 6-section prompt assembly
-│   ├── plan-template.ts        # Work plan structure (423 lines)
-│   ├── interview-mode.ts       # Interview flow (335 lines)
-│   ├── plan-generation.ts
-│   ├── high-accuracy-mode.ts
-│   ├── identity-constraints.ts # Identity rules (301 lines)
-│   └── behavioral-summary.ts
-├── sisyphus-junior/            # Delegated task executor
-│   ├── agent.ts
-│   ├── default.ts              # Claude prompt
-│   └── gpt.ts                  # GPT prompt
-├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation (431 lines)
-├── builtin-agents/             # Agent registry (8 files)
+├── atlas/                      # Master orchestrator (agent.ts + default.ts + gpt.ts)
+├── prometheus/                 # Planning agent (8 files, plan-template 423 lines)
+├── sisyphus-junior/            # Delegated task executor (agent.ts + default.ts + gpt.ts)
+├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation (433 lines)
+├── builtin-agents/             # Agent registry + model resolution
+├── agent-builder.ts            # Agent construction with category merging (51 lines)
 ├── utils.ts                    # Agent creation, model fallback resolution (571 lines)
-├── types.ts                    # AgentModelConfig, AgentPromptMetadata
+├── types.ts                    # AgentModelConfig, AgentPromptMetadata (106 lines)
 └── index.ts                    # Exports
 ```
 
@@ -78,19 +64,18 @@ agents/
 | Momus | 32k budget tokens | reasoningEffort: "medium" |
 | Sisyphus-Junior | 32k budget tokens | reasoningEffort: "medium" |
 
+## KEY PROMPT PATTERNS
+
+- **Sisyphus/Hephaestus**: Dynamic prompts via `dynamic-agent-prompt-builder.ts` injecting available tools/skills/categories
+- **Atlas, Sisyphus-Junior**: Model-specific prompts (Claude vs GPT variants)
+- **Prometheus**: 6-section modular prompt (identity → interview → plan-generation → high-accuracy → template → behavioral)
+
 ## HOW TO ADD
 
 1. Create `src/agents/my-agent.ts` exporting factory + metadata
 2. Add to `agentSources` in `src/agents/builtin-agents/`
 3. Update `AgentNameSchema` in `src/config/schema/agent-names.ts`
 4. Register in `src/plugin-handlers/agent-config-handler.ts`
-
-## KEY PATTERNS
-
-- **Factory**: `createXXXAgent(model): AgentConfig`
-- **Metadata**: `XXX_PROMPT_METADATA` with category, cost, triggers
-- **Model-specific prompts**: Atlas, Sisyphus-Junior have GPT vs Claude variants
-- **Dynamic prompts**: Sisyphus, Hephaestus use `dynamic-agent-prompt-builder.ts` to inject available tools/skills/categories
 
 ## ANTI-PATTERNS
 

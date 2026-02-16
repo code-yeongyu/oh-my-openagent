@@ -8,18 +8,18 @@
 ```
 hooks/
 ├── agent-usage-reminder/         # Specialized agent hints (109 lines)
-├── anthropic-context-window-limit-recovery/ # Auto-summarize on limit (2232 lines)
+├── anthropic-context-window-limit-recovery/ # Auto-summarize on limit (2232 lines, 29 files)
 ├── anthropic-effort/             # Effort=max for Opus max variant (56 lines)
-├── atlas/                        # Main orchestration hook (1976 lines)
+├── atlas/                        # Main orchestration hook (1976 lines, 17 files)
 ├── auto-slash-command/           # Detects /command patterns (1134 lines)
-├── auto-update-checker/          # Plugin update check (1140 lines)
+├── auto-update-checker/          # Plugin update check (1140 lines, 20 files)
 ├── background-notification/      # OS notifications (33 lines)
 ├── category-skill-reminder/      # Category+skill delegation reminders (597 lines)
-├── claude-code-hooks/            # settings.json compat (2110 lines) - see AGENTS.md
+├── claude-code-hooks/            # settings.json compat (2110 lines) — see AGENTS.md
 ├── comment-checker/              # Prevents AI slop comments (710 lines)
 ├── compaction-context-injector/  # Injects context on compaction (128 lines)
 ├── compaction-todo-preserver/    # Preserves todos during compaction (203 lines)
-├── context-window-monitor.ts     # Reminds of headroom at 70% (99 lines)
+├── context-window-monitor.ts     # Reminds of headroom at 70% (100 lines)
 ├── delegate-task-retry/          # Retries failed delegations (266 lines)
 ├── directory-agents-injector/    # Auto-injects AGENTS.md (195 lines)
 ├── directory-readme-injector/    # Auto-injects README.md (190 lines)
@@ -34,7 +34,7 @@ hooks/
 ├── ralph-loop/                   # Self-referential dev loop (1687 lines)
 ├── rules-injector/               # Conditional .sisyphus/rules injection (1604 lines)
 ├── session-notification.ts       # OS idle notifications (108 lines)
-├── session-recovery/             # Auto-recovers from crashes (1279 lines)
+├── session-recovery/             # Auto-recovers from crashes (1279 lines, 14 files)
 ├── sisyphus-junior-notepad/      # Junior notepad directive (76 lines)
 ├── start-work/                   # Sisyphus work session starter (648 lines)
 ├── stop-continuation-guard/      # Guards stop continuation (214 lines)
@@ -57,10 +57,10 @@ hooks/
 | UserPromptSubmit | `chat.message` | Yes | 4 |
 | ChatParams | `chat.params` | No | 2 |
 | PreToolUse | `tool.execute.before` | Yes | 13 |
-| PostToolUse | `tool.execute.after` | No | 18 |
+| PostToolUse | `tool.execute.after` | No | 15 |
 | SessionEvent | `event` | No | 17 |
 | MessagesTransform | `experimental.chat.messages.transform` | No | 1 |
-| Compaction | `onSummarize` | No | 1 |
+| Compaction | `onSummarize` | No | 2 |
 
 ## BLOCKING HOOKS (8)
 
@@ -78,7 +78,7 @@ hooks/
 ## EXECUTION ORDER
 
 **UserPromptSubmit**: keywordDetector → claudeCodeHooks → autoSlashCommand → startWork
-**PreToolUse**: subagentQuestionBlocker → questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → prometheusMdOnly → sisyphusJuniorNotepad → writeExistingFileGuard → atlasHook
+**PreToolUse**: subagentQuestionBlocker → questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → prometheusMdOnly → sisyphusJuniorNotepad → writeExistingFileGuard → tasksToDoWriteDisabler → atlasHook
 **PostToolUse**: claudeCodeHooks → toolOutputTruncator → contextWindowMonitor → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → emptyTaskResponseDetector → agentUsageReminder → interactiveBashSession → editErrorRecovery → delegateTaskRetry → atlasHook → taskResumeInfo → taskReminder
 
 ## HOW TO ADD
