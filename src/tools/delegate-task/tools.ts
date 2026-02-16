@@ -1,6 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
-import { DEFAULT_CATEGORIES, CATEGORY_DESCRIPTIONS } from "./constants"
+import { CATEGORY_DESCRIPTIONS } from "./constants"
+import { mergeCategories } from "../../shared/merge-categories"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
 import type {
@@ -26,7 +27,7 @@ export { buildSystemContent } from "./prompt-builder"
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
   const { userCategories } = options
 
-  const allCategories = { ...DEFAULT_CATEGORIES, ...userCategories }
+  const allCategories = mergeCategories(userCategories)
   const categoryNames = Object.keys(allCategories)
   const categoryExamples = categoryNames.map(k => `'${k}'`).join(", ")
 
@@ -102,6 +103,14 @@ Prompts MUST be in English.`
       if (args.run_in_background === undefined) {
         throw new Error(`Invalid arguments: 'run_in_background' parameter is REQUIRED. Use run_in_background=false for task delegation, run_in_background=true only for parallel exploration.`)
       }
+      if (typeof args.load_skills === "string") {
+        try {
+          const parsed = JSON.parse(args.load_skills)
+          args.load_skills = Array.isArray(parsed) ? parsed : []
+        } catch {
+          args.load_skills = []
+        }
+      }
       if (args.load_skills === undefined) {
         throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like ["playwright"], ["git-master"] for best results.`)
       }
@@ -120,7 +129,7 @@ Prompts MUST be in English.`
         return skillError
       }
 
-      const parentContext = resolveParentContext(ctx)
+      const parentContext = await resolveParentContext(ctx, options.client)
 
       if (args.session_id) {
         if (runInBackground) {

@@ -4,7 +4,7 @@ import { join } from "path"
 import { BUILTIN_SERVERS } from "./constants"
 import type { ResolvedServer } from "./types"
 import { getOpenCodeConfigDir } from "../../shared"
-import { parseJsonc } from "../../shared/jsonc-parser"
+import { parseJsonc, detectConfigFile } from "../../shared/jsonc-parser"
 
 interface LspEntry {
   disabled?: boolean
@@ -38,9 +38,9 @@ export function getConfigPaths(): { project: string; user: string; opencode: str
   const cwd = process.cwd()
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   return {
-    project: join(cwd, ".opencode", "oh-my-opencode.json"),
-    user: join(configDir, "oh-my-opencode.json"),
-    opencode: join(configDir, "opencode.json"),
+    project: detectConfigFile(join(cwd, ".opencode", "oh-my-opencode")).path,
+    user: detectConfigFile(join(configDir, "oh-my-opencode")).path,
+    opencode: detectConfigFile(join(configDir, "opencode")).path,
   }
 }
 

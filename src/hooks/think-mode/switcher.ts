@@ -154,8 +154,7 @@ export const THINKING_CONFIGS = {
       "zai-coding-plan": {
         extra_body: {
           thinking: {
-            type: "enabled",
-            clear_thinking: false,
+            type: "disabled",
           },
         },
       },

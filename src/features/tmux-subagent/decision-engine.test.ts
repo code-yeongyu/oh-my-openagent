@@ -351,4 +351,47 @@ describe("calculateCapacity", () => {
     expect(capacity.rows).toBe(4)
     expect(capacity.total).toBe(12)
   })
+
+  it("#given a smaller minPaneWidth #when calculating capacity #then fits more columns", () => {
+    //#given
+    const smallMinWidth = 30
+
+    //#when
+    const defaultCapacity = calculateCapacity(212, 44)
+    const customCapacity = calculateCapacity(212, 44, smallMinWidth)
+
+    //#then
+    expect(customCapacity.cols).toBeGreaterThanOrEqual(defaultCapacity.cols)
+  })
+})
+
+describe("decideSpawnActions with custom agentPaneWidth", () => {
+  const createWindowState = (
+    windowWidth: number,
+    windowHeight: number,
+    agentPanes: Array<{ paneId: string; width: number; height: number; left: number; top: number }> = []
+  ): WindowState => ({
+    windowWidth,
+    windowHeight,
+    mainPane: { paneId: "%0", width: Math.floor(windowWidth / 2), height: windowHeight, left: 0, top: 0, title: "main", isActive: true },
+    agentPanes: agentPanes.map((p, i) => ({
+      ...p,
+      title: `agent-${i}`,
+      isActive: false,
+    })),
+  })
+
+  it("#given a smaller agentPaneWidth #when window would be too small for default #then spawns with custom config", () => {
+    //#given
+    const smallConfig: CapacityConfig = { mainPaneMinWidth: 120, agentPaneWidth: 25 }
+    const state = createWindowState(100, 30)
+
+    //#when
+    const defaultResult = decideSpawnActions(state, "ses1", "test", { mainPaneMinWidth: 120, agentPaneWidth: 52 }, [])
+    const customResult = decideSpawnActions(state, "ses1", "test", smallConfig, [])
+
+    //#then
+    expect(defaultResult.canSpawn).toBe(false)
+    expect(customResult.canSpawn).toBe(true)
+  })
 })

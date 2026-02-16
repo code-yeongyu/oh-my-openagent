@@ -1,4 +1,4 @@
-import { log } from "../../shared"
+import { log, normalizeSDKResponse } from "../../shared"
 
 import {
   MIN_STABILITY_TIME_MS,
@@ -34,7 +34,7 @@ export async function pollRunningTasks(args: {
   tasks: Iterable<BackgroundTask>
   client: OpencodeClient
   pruneStaleTasksAndNotifications: () => void
-  checkAndInterruptStaleTasks: () => Promise<void>
+  checkAndInterruptStaleTasks: (statuses: Record<string, { type: string }>) => Promise<void>
   validateSessionHasOutput: (sessionID: string) => Promise<boolean>
   checkSessionTodos: (sessionID: string) => Promise<boolean>
   tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
@@ -54,10 +54,11 @@ export async function pollRunningTasks(args: {
   } = args
 
   pruneStaleTasksAndNotifications()
-  await checkAndInterruptStaleTasks()
 
   const statusResult = await client.session.status()
-  const allStatuses = ((statusResult as { data?: unknown }).data ?? {}) as SessionStatusMap
+  const allStatuses = normalizeSDKResponse(statusResult, {} as SessionStatusMap)
+
+  await checkAndInterruptStaleTasks(allStatuses)
 
   for (const task of tasks) {
     if (task.status !== "running") continue
@@ -94,10 +95,9 @@ export async function pollRunningTasks(args: {
         continue
       }
 
-      const messagesPayload = Array.isArray(messagesResult)
-        ? messagesResult
-        : (messagesResult as { data?: unknown }).data
-      const messages = asSessionMessages(messagesPayload)
+      const messages = asSessionMessages(normalizeSDKResponse(messagesResult, [] as SessionMessage[], {
+        preferResponseOnMissingData: true,
+      }))
       const assistantMsgs = messages.filter((m) => m.info?.role === "assistant")
 
       let toolCalls = 0
@@ -138,7 +138,7 @@ export async function pollRunningTasks(args: {
           task.stablePolls = (task.stablePolls ?? 0) + 1
           if (task.stablePolls >= 3) {
             const recheckStatus = await client.session.status()
-            const recheckData = ((recheckStatus as { data?: unknown }).data ?? {}) as SessionStatusMap
+            const recheckData = normalizeSDKResponse(recheckStatus, {} as SessionStatusMap)
             const currentStatus = recheckData[sessionID]
 
             if (currentStatus?.type !== "idle") {

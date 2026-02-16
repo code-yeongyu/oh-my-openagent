@@ -85,7 +85,7 @@ export function maybeCreateHephaestusConfig(input: {
   }
 
   if (hephaestusOverride) {
-    hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride)
+    hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride, directory)
   }
   return hephaestusConfig
 }

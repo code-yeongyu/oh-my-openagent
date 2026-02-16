@@ -33,6 +33,7 @@ export async function processFilePathForReadmeInjection(input: {
   const cache = getSessionCache(input.sessionCaches, input.sessionID);
   const readmePaths = findReadmeMdUp({ startDir: dir, rootDir: input.ctx.directory });
 
+  let dirty = false;
   for (const readmePath of readmePaths) {
     const readmeDir = dirname(readmePath);
     if (cache.has(readmeDir)) continue;
@@ -48,8 +49,11 @@ export async function processFilePathForReadmeInjection(input: {
         : "";
       input.output.output += `\n\n[Project README: ${readmePath}]\n${result}${truncationNotice}`;
       cache.add(readmeDir);
+      dirty = true;
     } catch {}
   }
 
-  saveInjectedPaths(input.sessionID, cache);
+  if (dirty) {
+    saveInjectedPaths(input.sessionID, cache);
+  }
 }

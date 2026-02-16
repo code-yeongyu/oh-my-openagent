@@ -15,6 +15,12 @@ export const MINIMUM_OPENCODE_VERSION = "1.1.1"
  */
 export const OPENCODE_NATIVE_AGENTS_INJECTION_VERSION = "1.1.37"
 
+/**
+ * OpenCode version that introduced SQLite backend for storage.
+ * When this version is detected AND opencode.db exists, SQLite backend is used.
+ */
+export const OPENCODE_SQLITE_VERSION = "1.1.53"
+
 const NOT_CACHED = Symbol("NOT_CACHED")
 let cachedVersion: string | null | typeof NOT_CACHED = NOT_CACHED
 

@@ -247,7 +247,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "model": "opencode/glm-4.7-free",
     },
     "writing": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
   },
 }
@@ -314,7 +314,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "model": "opencode/glm-4.7-free",
     },
     "writing": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
   },
 }
@@ -372,6 +372,7 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     },
     "visual-engineering": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "writing": {
       "model": "google/gemini-3-flash",
@@ -432,6 +433,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
     },
     "visual-engineering": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "writing": {
       "model": "google/gemini-3-flash",
@@ -505,6 +507,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
     },
     "visual-engineering": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "writing": {
       "model": "google/gemini-3-flash",
@@ -579,6 +582,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
     },
     "visual-engineering": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "writing": {
       "model": "google/gemini-3-flash",
@@ -652,6 +656,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     },
     "visual-engineering": {
       "model": "opencode/gemini-3-pro",
+      "variant": "high",
     },
     "writing": {
       "model": "opencode/gemini-3-flash",
@@ -726,6 +731,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     },
     "visual-engineering": {
       "model": "opencode/gemini-3-pro",
+      "variant": "high",
     },
     "writing": {
       "model": "opencode/gemini-3-flash",
@@ -799,6 +805,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     },
     "visual-engineering": {
       "model": "github-copilot/gemini-3-pro-preview",
+      "variant": "high",
     },
     "writing": {
       "model": "github-copilot/gemini-3-flash-preview",
@@ -873,6 +880,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     },
     "visual-engineering": {
       "model": "github-copilot/gemini-3-pro-preview",
+      "variant": "high",
     },
     "writing": {
       "model": "github-copilot/gemini-3-flash-preview",
@@ -927,10 +935,10 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "opencode/glm-4.7-free",
     },
     "visual-engineering": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
     "writing": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "opencode/glm-4.7-free",
     },
   },
 }
@@ -982,10 +990,10 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/glm-4.7-free",
     },
     "visual-engineering": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
     "writing": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "opencode/glm-4.7-free",
     },
   },
 }
@@ -1056,6 +1064,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     },
     "visual-engineering": {
       "model": "opencode/gemini-3-pro",
+      "variant": "high",
     },
     "writing": {
       "model": "opencode/gemini-3-flash",
@@ -1129,6 +1138,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     },
     "visual-engineering": {
       "model": "github-copilot/gemini-3-pro-preview",
+      "variant": "high",
     },
     "writing": {
       "model": "github-copilot/gemini-3-flash-preview",
@@ -1189,8 +1199,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "anthropic/claude-opus-4-6",
-      "variant": "max",
+      "model": "zai-coding-plan/glm-5",
     },
     "writing": {
       "model": "anthropic/claude-sonnet-4-5",
@@ -1256,6 +1265,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
     },
     "visual-engineering": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "writing": {
       "model": "google/gemini-3-flash",
@@ -1329,6 +1339,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     },
     "visual-engineering": {
       "model": "github-copilot/gemini-3-pro-preview",
+      "variant": "high",
     },
     "writing": {
       "model": "github-copilot/gemini-3-flash-preview",
@@ -1402,6 +1413,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     },
     "visual-engineering": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "writing": {
       "model": "google/gemini-3-flash",
@@ -1476,6 +1488,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     },
     "visual-engineering": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "writing": {
       "model": "google/gemini-3-flash",

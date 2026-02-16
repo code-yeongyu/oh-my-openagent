@@ -31,14 +31,13 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
 
   const buildDescription = async (): Promise<string> => {
     if (cachedDescription) return cachedDescription
-    const allItems = await getAllItems()
-    cachedDescription = buildDescriptionFromItems(allItems)
+    const commands = getCommands()
+    cachedDescription = buildDescriptionFromItems(commands)
     return cachedDescription
   }
 
-  if (options.commands !== undefined && options.skills !== undefined) {
-    const allItems = [...options.commands, ...options.skills.map(skillToCommandInfo)]
-    cachedDescription = buildDescriptionFromItems(allItems)
+  if (options.commands !== undefined) {
+    cachedDescription = buildDescriptionFromItems(options.commands)
   } else {
     void buildDescription()
   }
@@ -88,7 +87,9 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
         return `No exact match for "/${commandName}". Did you mean: ${matchList}?\n\n${formatCommandList(allItems)}`
       }
 
-      return `Command or skill "/${commandName}" not found.\n\n${formatCommandList(allItems)}\n\nTry a different name.`
+      return commandName.includes(":") 
+        ? `Marketplace plugin commands like "/${commandName}" are not supported. Use .claude/commands/ for custom commands.\n\n${formatCommandList(allItems)}`
+        : `Command or skill "/${commandName}" not found.\n\n${formatCommandList(allItems)}\n\nTry a different name.`
     },
   })
 }

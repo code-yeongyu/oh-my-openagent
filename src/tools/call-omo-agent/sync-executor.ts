@@ -6,6 +6,18 @@ import { createOrGetSession } from "./session-creator"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 
+type ExecuteSyncDeps = {
+  createOrGetSession: typeof createOrGetSession
+  waitForCompletion: typeof waitForCompletion
+  processMessages: typeof processMessages
+}
+
+const defaultDeps: ExecuteSyncDeps = {
+  createOrGetSession,
+  waitForCompletion,
+  processMessages,
+}
+
 export async function executeSync(
   args: CallOmoAgentArgs,
   toolContext: {
@@ -15,17 +27,18 @@ export async function executeSync(
     abort: AbortSignal
     metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   },
-  ctx: PluginInput
+  ctx: PluginInput,
+  deps: ExecuteSyncDeps = defaultDeps
 ): Promise<string> {
-  const { sessionID } = await createOrGetSession(args, toolContext, ctx)
+  const { sessionID } = await deps.createOrGetSession(args, toolContext, ctx)
 
   await toolContext.metadata?.({
     title: args.description,
     metadata: { sessionId: sessionID },
   })
 
-  log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
-  log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
+   log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
+   log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
 
    try {
      await (ctx.client.session as any).promptAsync({
@@ -35,11 +48,12 @@ export async function executeSync(
          tools: {
            ...getAgentToolRestrictions(args.subagent_type),
            task: false,
+           question: false,
          },
          parts: [{ type: "text", text: args.prompt }],
        },
      })
-  } catch (error) {
+   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
     log(`[call_omo_agent] Prompt error:`, errorMessage)
     if (errorMessage.includes("agent.name") || errorMessage.includes("undefined")) {
@@ -48,9 +62,9 @@ export async function executeSync(
     return `Error: Failed to send prompt: ${errorMessage}\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
   }
 
-  await waitForCompletion(sessionID, toolContext, ctx)
+  await deps.waitForCompletion(sessionID, toolContext, ctx)
 
-  const responseText = await processMessages(sessionID, ctx)
+  const responseText = await deps.processMessages(sessionID, ctx)
 
   const output =
     responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")

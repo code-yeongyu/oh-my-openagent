@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Configuration orchestration layer. Runs once at plugin init — transforms raw OpenCode config into resolved agent/tool/permission structures.
+Configuration orchestration layer. Runs once at plugin init — transforms raw OpenCode config into resolved agent/tool/permission structures via 6-phase sequential loading.
 
 ## STRUCTURE
 ```

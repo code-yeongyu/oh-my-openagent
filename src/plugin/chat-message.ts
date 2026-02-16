@@ -56,12 +56,14 @@ export function createChatMessageHandler(args: {
     const message = output.message
 
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-      const variant =
-        input.model && input.agent
-          ? resolveVariantForModel(pluginConfig, input.agent, input.model)
-          : resolveAgentVariant(pluginConfig, input.agent)
-      if (variant !== undefined) {
-        message["variant"] = variant
+      if (message["variant"] === undefined) {
+        const variant =
+          input.model && input.agent
+            ? resolveVariantForModel(pluginConfig, input.agent, input.model)
+            : resolveAgentVariant(pluginConfig, input.agent)
+        if (variant !== undefined) {
+          message["variant"] = variant
+        }
       }
       firstMessageVariantGate.markApplied(input.sessionID)
     } else {

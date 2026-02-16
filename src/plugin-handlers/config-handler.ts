@@ -35,7 +35,7 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     applyToolConfig({ config, pluginConfig, agentResult });
     rekeyAgentsByDisplayNames({ config, agentResult, displayNames: pluginConfig.agent_display_names });
     await applyMcpConfig({ config, pluginConfig, pluginComponents });
-    await applyCommandConfig({ config, pluginConfig, pluginComponents });
+    await applyCommandConfig({ config, pluginConfig, ctx, pluginComponents });
 
     log("[config-handler] config handler applied", {
       agentCount: Object.keys(agentResult).length,

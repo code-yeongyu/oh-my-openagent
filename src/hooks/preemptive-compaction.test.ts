@@ -1,132 +1,204 @@
-import { describe, expect, mock, test } from "bun:test"
-import { createPreemptiveCompactionHook } from "./preemptive-compaction.ts"
+import { describe, it, expect, mock, beforeEach } from "bun:test"
+
+const logMock = mock(() => {})
+
+mock.module("../shared/logger", () => ({
+  log: logMock,
+}))
+
+const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
+
+function createMockCtx() {
+  return {
+    client: {
+      session: {
+        messages: mock(() => Promise.resolve({ data: [] })),
+        summarize: mock(() => Promise.resolve({})),
+      },
+      tui: {
+        showToast: mock(() => Promise.resolve()),
+      },
+    },
+    directory: "/tmp/test",
+  }
+}
 
 describe("preemptive-compaction", () => {
-  const sessionID = "preemptive-compaction-session"
+  let ctx: ReturnType<typeof createMockCtx>
 
-  function createMockCtx(overrides?: {
-    messages?: ReturnType<typeof mock>
-    summarize?: ReturnType<typeof mock>
-  }) {
-    const messages = overrides?.messages ?? mock(() => Promise.resolve({ data: [] }))
-    const summarize = overrides?.summarize ?? mock(() => Promise.resolve())
+  beforeEach(() => {
+    ctx = createMockCtx()
+    logMock.mockClear()
+  })
 
-    return {
-      client: {
-        session: {
-          messages,
-          summarize,
-        },
-        tui: {
-          showToast: mock(() => Promise.resolve()),
-        },
-      },
-      directory: "/tmp/test",
-    } as never
-  }
+  // #given event caches token info from message.updated
+  // #when tool.execute.after is called
+  // #then session.messages() should NOT be called
+  it("should use cached token info instead of fetching session.messages()", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never)
+    const sessionID = "ses_test1"
 
-  test("triggers summarize when usage exceeds threshold", async () => {
-    // #given
-    const messages = mock(() =>
-      Promise.resolve({
-        data: [
-          {
-            info: {
-              role: "assistant",
-              providerID: "anthropic",
-              modelID: "claude-opus-4-6",
-              tokens: {
-                input: 180000,
-                output: 0,
-                reasoning: 0,
-                cache: { read: 0, write: 0 },
-              },
+    // Simulate message.updated with token info below threshold
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-5",
+            finish: true,
+            tokens: {
+              input: 50000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 5000, write: 0 },
             },
           },
-        ],
-      })
-    )
-    const summarize = mock(() => Promise.resolve())
-    const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }))
-    const output = { title: "", output: "", metadata: {} }
+        },
+      },
+    })
 
-    // #when
+    const output = { title: "", output: "test", metadata: null }
     await hook["tool.execute.after"](
-      { tool: "Read", sessionID, callID: "call-1" },
+      { tool: "bash", sessionID, callID: "call_1" },
       output
     )
 
-    // #then
-    expect(summarize).toHaveBeenCalled()
+    expect(ctx.client.session.messages).not.toHaveBeenCalled()
   })
 
-  test("triggers summarize for non-anthropic providers when usage exceeds threshold", async () => {
-    //#given
-    const messages = mock(() =>
-      Promise.resolve({
-        data: [
-          {
-            info: {
-              role: "assistant",
-              providerID: "openai",
-              modelID: "gpt-5.2",
-              tokens: {
-                input: 180000,
-                output: 0,
-                reasoning: 0,
-                cache: { read: 0, write: 0 },
-              },
+  // #given no cached token info
+  // #when tool.execute.after is called
+  // #then should skip without fetching
+  it("should skip gracefully when no cached token info exists", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never)
+
+    const output = { title: "", output: "test", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID: "ses_none", callID: "call_1" },
+      output
+    )
+
+    expect(ctx.client.session.messages).not.toHaveBeenCalled()
+  })
+
+  // #given usage above 78% threshold
+  // #when tool.execute.after runs
+  // #then should trigger summarize
+  it("should trigger compaction when usage exceeds threshold", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never)
+    const sessionID = "ses_high"
+
+    // 170K input + 10K cache = 180K → 90% of 200K
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-5",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
             },
           },
-        ],
-      })
+        },
+      },
+    })
+
+    const output = { title: "", output: "test", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
     )
-    const summarize = mock(() => Promise.resolve())
-    const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }))
-    const output = { title: "", output: "", metadata: {} }
+
+    expect(ctx.client.session.messages).not.toHaveBeenCalled()
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
+
+  // #given session deleted
+  // #then cache should be cleaned up
+  it("should clean up cache on session.deleted", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never)
+    const sessionID = "ses_del"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-5",
+            finish: true,
+            tokens: { input: 180000, output: 0, reasoning: 0, cache: { read: 10000, write: 0 } },
+          },
+        },
+      },
+    })
+
+    await hook.event({
+      event: {
+        type: "session.deleted",
+        properties: { info: { id: sessionID } },
+      },
+    })
+
+    const output = { title: "", output: "test", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+  })
+
+  it("should log summarize errors instead of swallowing them", async () => {
+    //#given
+    const hook = createPreemptiveCompactionHook(ctx as never)
+    const sessionID = "ses_log_error"
+    const summarizeError = new Error("summarize failed")
+    ctx.client.session.summarize.mockRejectedValueOnce(summarizeError)
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-5",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
 
     //#when
     await hook["tool.execute.after"](
-      { tool: "Read", sessionID, callID: "call-3" },
-      output
+      { tool: "bash", sessionID, callID: "call_log" },
+      { title: "", output: "test", metadata: null }
     )
 
     //#then
-    expect(summarize).toHaveBeenCalled()
-  })
-
-  test("does not summarize when usage is below threshold", async () => {
-    // #given
-    const messages = mock(() =>
-      Promise.resolve({
-        data: [
-          {
-            info: {
-              role: "assistant",
-              providerID: "anthropic",
-              modelID: "claude-opus-4-6",
-              tokens: {
-                input: 100000,
-                output: 0,
-                reasoning: 0,
-                cache: { read: 0, write: 0 },
-              },
-            },
-          },
-        ],
-      })
-    )
-    const summarize = mock(() => Promise.resolve())
-    const hook = createPreemptiveCompactionHook(createMockCtx({ messages, summarize }))
-    const output = { title: "", output: "", metadata: {} }
-
-    // #when
-    await hook["tool.execute.after"](
-      { tool: "Read", sessionID, callID: "call-2" },
-      output
-    )
-
-    // #then
-    expect(summarize).not.toHaveBeenCalled()
+    expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
+      sessionID,
+      error: String(summarizeError),
+    })
   })
 })

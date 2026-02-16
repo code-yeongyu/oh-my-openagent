@@ -88,7 +88,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       if (!hooks.compactionContextInjector) {
         return
       }
-      output.context.push(hooks.compactionContextInjector())
+      output.context.push(hooks.compactionContextInjector(_input.sessionID))
     },
   }
 }

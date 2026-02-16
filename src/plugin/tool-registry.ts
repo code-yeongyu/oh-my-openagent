@@ -101,7 +101,7 @@ export function createToolRegistry(args: {
     getSessionID: getSessionIDForMcp,
   })
 
-  const commands = discoverCommandsSync()
+  const commands = discoverCommandsSync(ctx.directory)
   const slashcommandTool = createSlashcommandTool({
     commands,
     skills: skillContext.mergedSkills,

@@ -48,12 +48,12 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
   return commands
 }
 
-export function discoverCommandsSync(): CommandInfo[] {
+export function discoverCommandsSync(directory?: string): CommandInfo[] {
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
-  const projectCommandsDir = join(process.cwd(), ".claude", "commands")
+  const projectCommandsDir = join(directory ?? process.cwd(), ".claude", "commands")
   const opencodeGlobalDir = join(configDir, "command")
-  const opencodeProjectDir = join(process.cwd(), ".opencode", "command")
+  const opencodeProjectDir = join(directory ?? process.cwd(), ".opencode", "command")
 
   const userCommands = discoverCommandsFromDir(userCommandsDir, "user")
   const opencodeGlobalCommands = discoverCommandsFromDir(opencodeGlobalDir, "opencode")

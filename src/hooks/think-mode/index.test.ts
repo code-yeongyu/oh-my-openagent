@@ -352,6 +352,25 @@ describe("createThinkModeHook integration", () => {
   })
 
   describe("Agent-level thinking configuration respect", () => {
+    it("should omit Z.ai GLM disabled thinking config", async () => {
+      //#given a Z.ai GLM model with think prompt
+      const hook = createThinkModeHook()
+      const input = createMockInput(
+        "zai-coding-plan",
+        "glm-4.7",
+        "ultrathink mode"
+      )
+
+      //#when think mode resolves Z.ai thinking configuration
+      await hook["chat.params"](input, sessionID)
+
+      //#then thinking config should be omitted from request
+      const message = input.message as MessageWithInjectedProps
+      expect(input.message.model?.modelID).toBe("glm-4.7")
+      expect(message.thinking).toBeUndefined()
+      expect(message.providerOptions).toBeUndefined()
+    })
+
     it("should NOT inject thinking config when agent has thinking disabled", async () => {
       // given agent with thinking explicitly disabled
       const hook = createThinkModeHook()

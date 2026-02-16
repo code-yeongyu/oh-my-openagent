@@ -93,10 +93,10 @@ describe("Agent Config Integration", () => {
 
       // then - display names are correct
       expect(displayNames).toContain("Sisyphus (Ultraworker)")
-      expect(displayNames).toContain("Atlas (Plan Execution Orchestrator)")
+      expect(displayNames).toContain("Atlas (Plan Executor)")
       expect(displayNames).toContain("Prometheus (Plan Builder)")
       expect(displayNames).toContain("Metis (Plan Consultant)")
-      expect(displayNames).toContain("Momus (Plan Reviewer)")
+      expect(displayNames).toContain("Momus (Plan Critic)")
       expect(displayNames).toContain("oracle")
       expect(displayNames).toContain("librarian")
       expect(displayNames).toContain("explore")
@@ -112,9 +112,9 @@ describe("Agent Config Integration", () => {
 
       // then - correct display names are returned
       expect(displayNames[0]).toBe("Sisyphus (Ultraworker)")
-      expect(displayNames[1]).toBe("Atlas (Plan Execution Orchestrator)")
+      expect(displayNames[1]).toBe("Atlas (Plan Executor)")
       expect(displayNames[2]).toBe("Sisyphus (Ultraworker)")
-      expect(displayNames[3]).toBe("Atlas (Plan Execution Orchestrator)")
+      expect(displayNames[3]).toBe("Atlas (Plan Executor)")
       expect(displayNames[4]).toBe("Prometheus (Plan Builder)")
       expect(displayNames[5]).toBe("Prometheus (Plan Builder)")
     })
@@ -216,73 +216,74 @@ describe("Agent Config Integration", () => {
       const sisyphusDisplay = getAgentDisplayName("sisyphus")
       const atlasDisplay = getAgentDisplayName("atlas")
 
-      // then - display names are correct
-     expect(sisyphusDisplay).toBe("Sisyphus (Ultraworker)")
-     expect(atlasDisplay).toBe("Atlas (Plan Execution Orchestrator)")
-    })
-  })
+       // then - display names are correct
+      expect(sisyphusDisplay).toBe("Sisyphus (Ultraworker)")
+       expect(atlasDisplay).toBe("Atlas (Plan Executor)")
+     })
+   })
 
-  describe("Plugin initialization flow", () => {
-    afterEach(() => {
-      resetAgentDisplayNames()
-    })
+   describe("Plugin initialization flow", () => {
+     afterEach(() => {
+       resetAgentDisplayNames()
+     })
 
-    test("initializeAgentDisplayNames applies user overrides", () => {
-      // given - user-provided display name overrides
-      const userOverrides = {
-        sisyphus: "My Custom Sisyphus",
-        oracle: "My Custom Oracle",
-      }
+     test("initializeAgentDisplayNames applies user overrides", () => {
+       // given - user-provided display name overrides
+       const userOverrides = {
+         sisyphus: "My Custom Sisyphus",
+         oracle: "My Custom Oracle",
+       }
 
-      // when - initialization is called
-      initializeAgentDisplayNames(userOverrides)
+       // when - initialization is called
+       initializeAgentDisplayNames(userOverrides)
 
-      // then - overrides are applied
-      expect(getAgentDisplayName("sisyphus")).toBe("My Custom Sisyphus")
-      expect(getAgentDisplayName("oracle")).toBe("My Custom Oracle")
+       // then - overrides are applied
+       expect(getAgentDisplayName("sisyphus")).toBe("My Custom Sisyphus")
+       expect(getAgentDisplayName("oracle")).toBe("My Custom Oracle")
 
-      // then - non-overridden agents still use defaults
-      expect(getAgentDisplayName("atlas")).toBe("Atlas (Plan Execution Orchestrator)")
-    })
+       // then - non-overridden agents still use defaults
+       expect(getAgentDisplayName("atlas")).toBe("Atlas (Plan Executor)")
+     })
 
-    test("initializeAgentDisplayNames handles empty overrides", () => {
-      // given - empty overrides
-      const emptyOverrides = {}
+     test("initializeAgentDisplayNames handles empty overrides", () => {
+       // given - empty overrides
+       const emptyOverrides = {}
 
-      // when - initialization is called
-      initializeAgentDisplayNames(emptyOverrides)
+       // when - initialization is called
+       initializeAgentDisplayNames(emptyOverrides)
 
-      // then - defaults are still used
-      expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
-      expect(getAgentDisplayName("atlas")).toBe("Atlas (Plan Execution Orchestrator)")
-    })
+       // then - defaults are still used
+       expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
+       expect(getAgentDisplayName("atlas")).toBe("Atlas (Plan Executor)")
+     })
 
-    test("initializeAgentDisplayNames case-insensitive override matching", () => {
-      // given - overrides with different case
-      const overrides = {
-        Sisyphus: "Custom Sisyphus",
-        ATLAS: "Custom Atlas",
-      }
+     test("initializeAgentDisplayNames case-insensitive override matching", () => {
+       // given - overrides with different case
+       const overrides = {
+         Sisyphus: "Custom Sisyphus",
+         ATLAS: "Custom Atlas",
+       }
 
-      // when - initialization is called
-      initializeAgentDisplayNames(overrides)
+       // when - initialization is called
+       initializeAgentDisplayNames(overrides)
 
-      // then - case-insensitive matching works
-      expect(getAgentDisplayName("sisyphus")).toBe("Custom Sisyphus")
-      expect(getAgentDisplayName("atlas")).toBe("Custom Atlas")
-      expect(getAgentDisplayName("SISYPHUS")).toBe("Custom Sisyphus")
-    })
+       // then - case-insensitive matching works
+       expect(getAgentDisplayName("sisyphus")).toBe("Custom Sisyphus")
+       expect(getAgentDisplayName("atlas")).toBe("Custom Atlas")
+       expect(getAgentDisplayName("SISYPHUS")).toBe("Custom Sisyphus")
+     })
 
-    test("resetAgentDisplayNames clears overrides", () => {
-      // given - initialized overrides
-      initializeAgentDisplayNames({ sisyphus: "Custom" })
-      expect(getAgentDisplayName("sisyphus")).toBe("Custom")
+     test("resetAgentDisplayNames clears overrides", () => {
+       // given - initialized overrides
+       initializeAgentDisplayNames({ sisyphus: "Custom" })
+       expect(getAgentDisplayName("sisyphus")).toBe("Custom")
 
-      // when - reset is called
-      resetAgentDisplayNames()
+       // when - reset is called
+       resetAgentDisplayNames()
 
-      // then - defaults are restored
-      expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
-    })
+       // then - defaults are restored
+       expect(getAgentDisplayName("sisyphus")).toBe("Sisyphus (Ultraworker)")
+       expect(getAgentDisplayName("atlas")).toBe("Atlas (Plan Executor)")
+     })
   })
 })

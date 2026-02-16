@@ -13,9 +13,6 @@ export async function createSyncSession(
     body: {
       parentID: input.parentSessionID,
       title: `${input.description} (@${input.agentToUse} subagent)`,
-      permission: [
-        { permission: "question", action: "deny" as const, pattern: "*" },
-      ],
     } as any,
     query: {
       directory: parentDirectory,

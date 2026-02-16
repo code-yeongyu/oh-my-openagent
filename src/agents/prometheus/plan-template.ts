@@ -70,108 +70,25 @@ Generate plan to: \`.sisyphus/plans/{name}.md\`
 
 ## Verification Strategy (MANDATORY)
 
-> **UNIVERSAL RULE: ZERO HUMAN INTERVENTION**
->
-> ALL tasks in this plan MUST be verifiable WITHOUT any human action.
-> This is NOT conditional — it applies to EVERY task, regardless of test strategy.
->
-> **FORBIDDEN** — acceptance criteria that require:
-> - "User manually tests..." / "사용자가 직접 테스트..."
-> - "User visually confirms..." / "사용자가 눈으로 확인..."
-> - "User interacts with..." / "사용자가 직접 조작..."
-> - "Ask user to verify..." / "사용자에게 확인 요청..."
-> - ANY step where a human must perform an action
->
-> **ALL verification is executed by the agent** using tools (Playwright, interactive_bash, curl, etc.). No exceptions.
+> **ZERO HUMAN INTERVENTION** — ALL verification is agent-executed. No exceptions.
+> Acceptance criteria requiring "user manually tests/confirms" are FORBIDDEN.
 
 ### Test Decision
 - **Infrastructure exists**: [YES/NO]
 - **Automated tests**: [TDD / Tests-after / None]
 - **Framework**: [bun test / vitest / jest / pytest / none]
+- **If TDD**: Each task follows RED (failing test) → GREEN (minimal impl) → REFACTOR
 
-### If TDD Enabled
+### QA Policy
+Every task MUST include agent-executed QA scenarios (see TODO template below).
+Evidence saved to \`.sisyphus/evidence/task-{N}-{scenario-slug}.{ext}\`.
 
-Each TODO follows RED-GREEN-REFACTOR:
-
-**Task Structure:**
-1. **RED**: Write failing test first
-   - Test file: \`[path].test.ts\`
-   - Test command: \`bun test [file]\`
-   - Expected: FAIL (test exists, implementation doesn't)
-2. **GREEN**: Implement minimum code to pass
-   - Command: \`bun test [file]\`
-   - Expected: PASS
-3. **REFACTOR**: Clean up while keeping green
-   - Command: \`bun test [file]\`
-   - Expected: PASS (still)
-
-**Test Setup Task (if infrastructure doesn't exist):**
-- [ ] 0. Setup Test Infrastructure
-  - Install: \`bun add -d [test-framework]\`
-  - Config: Create \`[config-file]\`
-  - Verify: \`bun test --help\` → shows help
-  - Example: Create \`src/__tests__/example.test.ts\`
-  - Verify: \`bun test\` → 1 test passes
-
-### Agent-Executed QA Scenarios (MANDATORY — ALL tasks)
-
-> Whether TDD is enabled or not, EVERY task MUST include Agent-Executed QA Scenarios.
-> - **With TDD**: QA scenarios complement unit tests at integration/E2E level
-> - **Without TDD**: QA scenarios are the PRIMARY verification method
->
-> These describe how the executing agent DIRECTLY verifies the deliverable
-> by running it — opening browsers, executing commands, sending API requests.
-> The agent performs what a human tester would do, but automated via tools.
-
-**Verification Tool by Deliverable Type:**
-
-| Type | Tool | How Agent Verifies |
-|------|------|-------------------|
-| **Frontend/UI** | Playwright (playwright skill) | Navigate, interact, assert DOM, screenshot |
-| **TUI/CLI** | interactive_bash (tmux) | Run command, send keystrokes, validate output |
-| **API/Backend** | Bash (curl/httpie) | Send requests, parse responses, assert fields |
-| **Library/Module** | Bash (bun/node REPL) | Import, call functions, compare output |
-| **Config/Infra** | Bash (shell commands) | Apply config, run state checks, validate |
-
-**Each Scenario MUST Follow This Format:**
-
-\`\`\`
-Scenario: [Descriptive name — what user action/flow is being verified]
-  Tool: [Playwright / interactive_bash / Bash]
-  Preconditions: [What must be true before this scenario runs]
-  Steps:
-    1. [Exact action with specific selector/command/endpoint]
-    2. [Next action with expected intermediate state]
-    3. [Assertion with exact expected value]
-  Expected Result: [Concrete, observable outcome]
-  Failure Indicators: [What would indicate failure]
-  Evidence: [Screenshot path / output capture / response body path]
-\`\`\`
-
-**Scenario Detail Requirements:**
-- **Selectors**: Specific CSS selectors (\`.login-button\`, not "the login button")
-- **Data**: Concrete test data (\`"test@example.com"\`, not \`"[email]"\`)
-- **Assertions**: Exact values (\`text contains "Welcome back"\`, not "verify it works")
-- **Timing**: Include wait conditions where relevant (\`Wait for .dashboard (timeout: 10s)\`)
-- **Negative Scenarios**: At least ONE failure/error scenario per feature
-- **Evidence Paths**: Specific file paths (\`.sisyphus/evidence/task-N-scenario-name.png\`)
-
-**Anti-patterns (NEVER write scenarios like this):**
-- ❌ "Verify the login page works correctly"
-- ❌ "Check that the API returns the right data"
-- ❌ "Test the form validation"
-- ❌ "User opens browser and confirms..."
-
-**Write scenarios like this instead:**
-- ✅ \`Navigate to /login → Fill input[name="email"] with "test@example.com" → Fill input[name="password"] with "Pass123!" → Click button[type="submit"] → Wait for /dashboard → Assert h1 contains "Welcome"\`
-- ✅ \`POST /api/users {"name":"Test","email":"new@test.com"} → Assert status 201 → Assert response.id is UUID → GET /api/users/{id} → Assert name equals "Test"\`
-- ✅ \`Run ./cli --config test.yaml → Wait for "Loaded" in stdout → Send "q" → Assert exit code 0 → Assert stdout contains "Goodbye"\`
-
-**Evidence Requirements:**
-- Screenshots: \`.sisyphus/evidence/\` for all UI verifications
-- Terminal output: Captured for CLI/TUI verifications
-- Response bodies: Saved for API verifications
-- All evidence referenced by specific file path in acceptance criteria
+| Deliverable Type | Verification Tool | Method |
+|------------------|-------------------|--------|
+| Frontend/UI | Playwright (playwright skill) | Navigate, interact, assert DOM, screenshot |
+| TUI/CLI | interactive_bash (tmux) | Run command, send keystrokes, validate output |
+| API/Backend | Bash (curl) | Send requests, assert status + response fields |
+| Library/Module | Bash (bun/node REPL) | Import, call functions, compare output |
 
 ---
 
@@ -181,49 +98,82 @@ Scenario: [Descriptive name — what user action/flow is being verified]
 
 > Maximize throughput by grouping independent tasks into parallel waves.
 > Each wave completes before the next begins.
+> Target: 5-8 tasks per wave. Fewer than 3 per wave (except final) = under-splitting.
 
 \`\`\`
-Wave 1 (Start Immediately):
-├── Task 1: [no dependencies]
-└── Task 5: [no dependencies]
+Wave 1 (Start Immediately — foundation + scaffolding):
+├── Task 1: Project scaffolding + config [quick]
+├── Task 2: Design system tokens [quick]
+├── Task 3: Type definitions [quick]
+├── Task 4: Schema definitions [quick]
+├── Task 5: Storage interface + in-memory impl [quick]
+├── Task 6: Auth middleware [quick]
+└── Task 7: Client module [quick]
 
-Wave 2 (After Wave 1):
-├── Task 2: [depends: 1]
-├── Task 3: [depends: 1]
-└── Task 6: [depends: 5]
+Wave 2 (After Wave 1 — core modules, MAX PARALLEL):
+├── Task 8: Core business logic (depends: 3, 5, 7) [deep]
+├── Task 9: API endpoints (depends: 4, 5) [unspecified-high]
+├── Task 10: Secondary storage impl (depends: 5) [unspecified-high]
+├── Task 11: Retry/fallback logic (depends: 8) [deep]
+├── Task 12: UI layout + navigation (depends: 2) [visual-engineering]
+├── Task 13: API client + hooks (depends: 4) [quick]
+└── Task 14: Telemetry middleware (depends: 5, 10) [unspecified-high]
 
-Wave 3 (After Wave 2):
-└── Task 4: [depends: 2, 3]
+Wave 3 (After Wave 2 — integration + UI):
+├── Task 15: Main route combining modules (depends: 6, 11, 14) [deep]
+├── Task 16: UI data visualization (depends: 12, 13) [visual-engineering]
+├── Task 17: Deployment config A (depends: 15) [quick]
+├── Task 18: Deployment config B (depends: 15) [quick]
+├── Task 19: Deployment config C (depends: 15) [quick]
+└── Task 20: UI request log + build (depends: 16) [visual-engineering]
 
-Critical Path: Task 1 → Task 2 → Task 4
-Parallel Speedup: ~40% faster than sequential
+Wave 4 (After Wave 3 — verification):
+├── Task 21: Integration tests (depends: 15) [deep]
+├── Task 22: UI QA - Playwright (depends: 20) [unspecified-high]
+├── Task 23: E2E QA (depends: 21) [deep]
+└── Task 24: Git cleanup + tagging (depends: 21) [git]
+
+Wave FINAL (After ALL tasks — independent review, 4 parallel):
+├── Task F1: Plan compliance audit (oracle)
+├── Task F2: Code quality review (unspecified-high)
+├── Task F3: Real manual QA (unspecified-high)
+└── Task F4: Scope fidelity check (deep)
+
+Critical Path: Task 1 → Task 5 → Task 8 → Task 11 → Task 15 → Task 21 → F1-F4
+Parallel Speedup: ~70% faster than sequential
+Max Concurrent: 7 (Waves 1 & 2)
 \`\`\`
 
-### Dependency Matrix
+### Dependency Matrix (abbreviated — show ALL tasks in your generated plan)
 
-| Task | Depends On | Blocks | Can Parallelize With |
-|------|------------|--------|---------------------|
-| 1 | None | 2, 3 | 5 |
-| 2 | 1 | 4 | 3, 6 |
-| 3 | 1 | 4 | 2, 6 |
-| 4 | 2, 3 | None | None (final) |
-| 5 | None | 6 | 1 |
-| 6 | 5 | None | 2, 3 |
+| Task | Depends On | Blocks | Wave |
+|------|------------|--------|------|
+| 1-7 | — | 8-14 | 1 |
+| 8 | 3, 5, 7 | 11, 15 | 2 |
+| 11 | 8 | 15 | 2 |
+| 14 | 5, 10 | 15 | 2 |
+| 15 | 6, 11, 14 | 17-19, 21 | 3 |
+| 21 | 15 | 23, 24 | 4 |
+
+> This is abbreviated for reference. YOUR generated plan must include the FULL matrix for ALL tasks.
 
 ### Agent Dispatch Summary
 
-| Wave | Tasks | Recommended Agents |
-|------|-------|-------------------|
-| 1 | 1, 5 | task(category="...", load_skills=[...], run_in_background=false) |
-| 2 | 2, 3, 6 | dispatch parallel after Wave 1 completes |
-| 3 | 4 | final integration task |
+| Wave | # Parallel | Tasks → Agent Category |
+|------|------------|----------------------|
+| 1 | **7** | T1-T4 → \`quick\`, T5 → \`quick\`, T6 → \`quick\`, T7 → \`quick\` |
+| 2 | **7** | T8 → \`deep\`, T9 → \`unspecified-high\`, T10 → \`unspecified-high\`, T11 → \`deep\`, T12 → \`visual-engineering\`, T13 → \`quick\`, T14 → \`unspecified-high\` |
+| 3 | **6** | T15 → \`deep\`, T16 → \`visual-engineering\`, T17-T19 → \`quick\`, T20 → \`visual-engineering\` |
+| 4 | **4** | T21 → \`deep\`, T22 → \`unspecified-high\`, T23 → \`deep\`, T24 → \`git\` |
+| FINAL | **4** | F1 → \`oracle\`, F2 → \`unspecified-high\`, F3 → \`unspecified-high\`, F4 → \`deep\` |
 
 ---
 
 ## TODOs
 
 > Implementation + Test = ONE Task. Never separate.
-> EVERY task MUST have: Recommended Agent Profile + Parallelization info.
+> EVERY task MUST have: Recommended Agent Profile + Parallelization info + QA Scenarios.
+> **A task WITHOUT QA Scenarios is INCOMPLETE. No exceptions.**
 
 - [ ] 1. [Task Title]
 
@@ -257,22 +207,15 @@ Parallel Speedup: ~40% faster than sequential
 
   **Pattern References** (existing code to follow):
   - \`src/services/auth.ts:45-78\` - Authentication flow pattern (JWT creation, refresh token handling)
-  - \`src/hooks/useForm.ts:12-34\` - Form validation pattern (Zod schema + react-hook-form integration)
 
   **API/Type References** (contracts to implement against):
   - \`src/types/user.ts:UserDTO\` - Response shape for user endpoints
-  - \`src/api/schema.ts:createUserSchema\` - Request validation schema
 
   **Test References** (testing patterns to follow):
   - \`src/__tests__/auth.test.ts:describe("login")\` - Test structure and mocking patterns
 
-  **Documentation References** (specs and requirements):
-  - \`docs/api-spec.md#authentication\` - API contract details
-  - \`ARCHITECTURE.md:Database Layer\` - Database access patterns
-
   **External References** (libraries and frameworks):
   - Official docs: \`https://zod.dev/?id=basic-usage\` - Zod validation syntax
-  - Example repo: \`github.com/example/project/src/auth\` - Reference implementation
 
   **WHY Each Reference Matters** (explain the relevance):
   - Don't just list files - explain what pattern/information the executor should extract
@@ -283,118 +226,87 @@ Parallel Speedup: ~40% faster than sequential
 
   > **AGENT-EXECUTABLE VERIFICATION ONLY** — No human action permitted.
   > Every criterion MUST be verifiable by running a command or using a tool.
-  > REPLACE all placeholders with actual values from task context.
 
   **If TDD (tests enabled):**
   - [ ] Test file created: src/auth/login.test.ts
-  - [ ] Test covers: successful login returns JWT token
   - [ ] bun test src/auth/login.test.ts → PASS (3 tests, 0 failures)
 
-  **Agent-Executed QA Scenarios (MANDATORY — per-scenario, ultra-detailed):**
+  **QA Scenarios (MANDATORY — task is INCOMPLETE without these):**
 
-  > Write MULTIPLE named scenarios per task: happy path AND failure cases.
-  > Each scenario = exact tool + steps with real selectors/data + evidence path.
-
-  **Example — Frontend/UI (Playwright):**
-
-  \\\`\\\`\\\`
-  Scenario: Successful login redirects to dashboard
-    Tool: Playwright (playwright skill)
-    Preconditions: Dev server running on localhost:3000, test user exists
-    Steps:
-      1. Navigate to: http://localhost:3000/login
-      2. Wait for: input[name="email"] visible (timeout: 5s)
-      3. Fill: input[name="email"] → "test@example.com"
-      4. Fill: input[name="password"] → "ValidPass123!"
-      5. Click: button[type="submit"]
-      6. Wait for: navigation to /dashboard (timeout: 10s)
-      7. Assert: h1 text contains "Welcome back"
-      8. Assert: cookie "session_token" exists
-      9. Screenshot: .sisyphus/evidence/task-1-login-success.png
-    Expected Result: Dashboard loads with welcome message
-    Evidence: .sisyphus/evidence/task-1-login-success.png
-
-  Scenario: Login fails with invalid credentials
-    Tool: Playwright (playwright skill)
-    Preconditions: Dev server running, no valid user with these credentials
-    Steps:
-      1. Navigate to: http://localhost:3000/login
-      2. Fill: input[name="email"] → "wrong@example.com"
-      3. Fill: input[name="password"] → "WrongPass"
-      4. Click: button[type="submit"]
-      5. Wait for: .error-message visible (timeout: 5s)
-      6. Assert: .error-message text contains "Invalid credentials"
-      7. Assert: URL is still /login (no redirect)
-      8. Screenshot: .sisyphus/evidence/task-1-login-failure.png
-    Expected Result: Error message shown, stays on login page
-    Evidence: .sisyphus/evidence/task-1-login-failure.png
-  \\\`\\\`\\\`
-
-  **Example — API/Backend (curl):**
+  > **This is NOT optional. A task without QA scenarios WILL BE REJECTED.**
+  >
+  > Write scenario tests that verify the ACTUAL BEHAVIOR of what you built.
+  > Minimum: 1 happy path + 1 failure/edge case per task.
+  > Each scenario = exact tool + exact steps + exact assertions + evidence path.
+  >
+  > **The executing agent MUST run these scenarios after implementation.**
+  > **The orchestrator WILL verify evidence files exist before marking task complete.**
 
   \\\`\\\`\\\`
-  Scenario: Create user returns 201 with UUID
-    Tool: Bash (curl)
-    Preconditions: Server running on localhost:8080
+  Scenario: [Happy path — what SHOULD work]
+    Tool: [Playwright / interactive_bash / Bash (curl)]
+    Preconditions: [Exact setup state]
     Steps:
-      1. curl -s -w "\\n%{http_code}" -X POST http://localhost:8080/api/users \\
-           -H "Content-Type: application/json" \\
-           -d '{"email":"new@test.com","name":"Test User"}'
-      2. Assert: HTTP status is 201
-      3. Assert: response.id matches UUID format
-      4. GET /api/users/{returned-id} → Assert name equals "Test User"
-    Expected Result: User created and retrievable
-    Evidence: Response bodies captured
+      1. [Exact action — specific command/selector/endpoint, no vagueness]
+      2. [Next action — with expected intermediate state]
+      3. [Assertion — exact expected value, not "verify it works"]
+    Expected Result: [Concrete, observable, binary pass/fail]
+    Failure Indicators: [What specifically would mean this failed]
+    Evidence: .sisyphus/evidence/task-{N}-{scenario-slug}.{ext}
 
-  Scenario: Duplicate email returns 409
-    Tool: Bash (curl)
-    Preconditions: User with email "new@test.com" already exists
+  Scenario: [Failure/edge case — what SHOULD fail gracefully]
+    Tool: [same format]
+    Preconditions: [Invalid input / missing dependency / error state]
     Steps:
-      1. Repeat POST with same email
-      2. Assert: HTTP status is 409
-      3. Assert: response.error contains "already exists"
-    Expected Result: Conflict error returned
-    Evidence: Response body captured
+      1. [Trigger the error condition]
+      2. [Assert error is handled correctly]
+    Expected Result: [Graceful failure with correct error message/code]
+    Evidence: .sisyphus/evidence/task-{N}-{scenario-slug}-error.{ext}
   \\\`\\\`\\\`
 
-  **Example — TUI/CLI (interactive_bash):**
-
-  \\\`\\\`\\\`
-  Scenario: CLI loads config and displays menu
-    Tool: interactive_bash (tmux)
-    Preconditions: Binary built, test config at ./test.yaml
-    Steps:
-      1. tmux new-session: ./my-cli --config test.yaml
-      2. Wait for: "Configuration loaded" in output (timeout: 5s)
-      3. Assert: Menu items visible ("1. Create", "2. List", "3. Exit")
-      4. Send keys: "3" then Enter
-      5. Assert: "Goodbye" in output
-      6. Assert: Process exited with code 0
-    Expected Result: CLI starts, shows menu, exits cleanly
-    Evidence: Terminal output captured
-
-  Scenario: CLI handles missing config gracefully
-    Tool: interactive_bash (tmux)
-    Preconditions: No config file at ./nonexistent.yaml
-    Steps:
-      1. tmux new-session: ./my-cli --config nonexistent.yaml
-      2. Wait for: output (timeout: 3s)
-      3. Assert: stderr contains "Config file not found"
-      4. Assert: Process exited with code 1
-    Expected Result: Meaningful error, non-zero exit
-    Evidence: Error output captured
-  \\\`\\\`\\\`
+  > **Specificity requirements — every scenario MUST use:**
+  > - **Selectors**: Specific CSS selectors (\`.login-button\`, not "the login button")
+  > - **Data**: Concrete test data (\`"test@example.com"\`, not \`"[email]"\`)
+  > - **Assertions**: Exact values (\`text contains "Welcome back"\`, not "verify it works")
+  > - **Timing**: Wait conditions where relevant (\`timeout: 10s\`)
+  > - **Negative**: At least ONE failure/error scenario per task
+  >
+  > **Anti-patterns (your scenario is INVALID if it looks like this):**
+  > - ❌ "Verify it works correctly" — HOW? What does "correctly" mean?
+  > - ❌ "Check the API returns data" — WHAT data? What fields? What values?
+  > - ❌ "Test the component renders" — WHERE? What selector? What content?
+  > - ❌ Any scenario without an evidence path
 
   **Evidence to Capture:**
-  - [ ] Screenshots in .sisyphus/evidence/ for UI scenarios
-  - [ ] Terminal output for CLI/TUI scenarios
-  - [ ] Response bodies for API scenarios
   - [ ] Each evidence file named: task-{N}-{scenario-slug}.{ext}
+  - [ ] Screenshots for UI, terminal output for CLI, response bodies for API
 
   **Commit**: YES | NO (groups with N)
   - Message: \`type(scope): desc\`
   - Files: \`path/to/file\`
   - Pre-commit: \`test command\`
+
+---
+
+## Final Verification Wave (MANDATORY — after ALL implementation tasks)
+
+> 4 review agents run in PARALLEL. ALL must APPROVE. Rejection → fix → re-run.
+
+- [ ] F1. **Plan Compliance Audit** — \`oracle\`
+  Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, curl endpoint, run command). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
+  Output: \`Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT\`
+
+- [ ] F2. **Code Quality Review** — \`unspecified-high\`
+  Run \`tsc --noEmit\` + linter + \`bun test\`. Review all changed files for: \`as any\`/\`@ts-ignore\`, empty catches, console.log in prod, commented-out code, unused imports. Check AI slop: excessive comments, over-abstraction, generic names (data/result/item/temp).
+  Output: \`Build [PASS/FAIL] | Lint [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT\`
+
+- [ ] F3. **Real Manual QA** — \`unspecified-high\` (+ \`playwright\` skill if UI)
+  Start from clean state. Execute EVERY QA scenario from EVERY task — follow exact steps, capture evidence. Test cross-task integration (features working together, not isolation). Test edge cases: empty state, invalid input, rapid actions. Save to \`.sisyphus/evidence/final-qa/\`.
+  Output: \`Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT\`
+
+- [ ] F4. **Scope Fidelity Check** — \`deep\`
+  For each task: read "What to do", read actual diff (git log/diff). Verify 1:1 — everything in spec was built (no missing), nothing beyond spec was built (no creep). Check "Must NOT do" compliance. Detect cross-task contamination: Task N touching Task M's files. Flag unaccounted changes.
+  Output: \`Tasks [N/N compliant] | Contamination [CLEAN/N issues] | Unaccounted [CLEAN/N files] | VERDICT\`
 
 ---
 
