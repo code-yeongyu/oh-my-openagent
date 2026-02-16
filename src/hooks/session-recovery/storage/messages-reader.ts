@@ -4,12 +4,9 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { StoredMessageMeta } from "../types"
 import { getMessageDir } from "./message-dir"
 import { isSqliteBackend } from "../../../shared"
+import { isRecord } from "../../../shared/record-type-guard"
 
 type OpencodeClient = PluginInput["client"]
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
 
 function normalizeSDKMessage(
   sessionID: string,
