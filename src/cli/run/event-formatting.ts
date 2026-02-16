@@ -57,7 +57,11 @@ export function serializeError(error: unknown): string {
 function getSessionTag(ctx: RunContext, payload: EventPayload): string {
   const props = payload.properties as Record<string, unknown> | undefined
   const info = props?.info as Record<string, unknown> | undefined
-  const sessionID = props?.sessionID ?? info?.sessionID
+  const part = props?.part as Record<string, unknown> | undefined
+  const sessionID =
+    props?.sessionID ?? props?.sessionId ??
+    info?.sessionID ?? info?.sessionId ??
+    part?.sessionID ?? part?.sessionId
   const isMainSession = sessionID === ctx.sessionID
   if (isMainSession) return pc.green("[MAIN]")
   if (sessionID) return pc.yellow(`[${String(sessionID).slice(0, 8)}]`)
@@ -79,9 +83,9 @@ export function logEventVerbose(ctx: RunContext, payload: EventPayload): void {
     case "message.part.updated": {
       const partProps = props as MessagePartUpdatedProps | undefined
       const part = partProps?.part
-      if (part?.type === "tool-invocation") {
-        const toolPart = part as { toolName?: string; state?: string }
-        console.error(pc.dim(`${sessionTag} message.part (tool): ${toolPart.toolName} [${toolPart.state}]`))
+      if (part?.type === "tool") {
+        const status = part.state?.status ?? "unknown"
+        console.error(pc.dim(`${sessionTag} message.part (tool): ${part.tool ?? part.name ?? "?"} [${status}]`))
       } else if (part?.type === "text" && part.text) {
         const preview = part.text.slice(0, 80).replace(/\n/g, "\\n")
         console.error(pc.dim(`${sessionTag} message.part (text): "${preview}${part.text.length > 80 ? "..." : ""}"`))

@@ -20,7 +20,10 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
 }
 
 async function areAllTodosComplete(ctx: RunContext): Promise<boolean> {
-  const todosRes = await ctx.client.session.todo({ path: { id: ctx.sessionID } })
+  const todosRes = await ctx.client.session.todo({
+    path: { id: ctx.sessionID },
+    query: { directory: ctx.directory },
+  })
   const todos = normalizeSDKResponse(todosRes, [] as Todo[])
 
   const incompleteTodos = todos.filter(
@@ -43,7 +46,9 @@ async function areAllChildrenIdle(ctx: RunContext): Promise<boolean> {
 async function fetchAllStatuses(
   ctx: RunContext
 ): Promise<Record<string, SessionStatus>> {
-  const statusRes = await ctx.client.session.status()
+  const statusRes = await ctx.client.session.status({
+    query: { directory: ctx.directory },
+  })
   return normalizeSDKResponse(statusRes, {} as Record<string, SessionStatus>)
 }
 
@@ -54,6 +59,7 @@ async function areAllDescendantsIdle(
 ): Promise<boolean> {
   const childrenRes = await ctx.client.session.children({
     path: { id: sessionID },
+    query: { directory: ctx.directory },
   })
   const children = normalizeSDKResponse(childrenRes, [] as ChildSession[])
 

@@ -10,6 +10,7 @@ import {
   handleMessageUpdated,
   handleToolExecute,
   handleToolResult,
+  handleTuiToast,
 } from "./event-handlers"
 
 export async function processEvents(
@@ -36,6 +37,7 @@ export async function processEvents(
       handleMessageUpdated(ctx, payload, state)
       handleToolExecute(ctx, payload, state)
       handleToolResult(ctx, payload, state)
+      handleTuiToast(ctx, payload, state)
     } catch (err) {
       console.error(pc.red(`[event error] ${err}`))
     }

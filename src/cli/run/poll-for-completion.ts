@@ -2,6 +2,7 @@ import pc from "picocolors"
 import type { RunContext } from "./types"
 import type { EventState } from "./events"
 import { checkCompletionConditions } from "./completion"
+import { normalizeSDKResponse } from "../../shared"
 
 const DEFAULT_POLL_INTERVAL_MS = 500
 const DEFAULT_REQUIRED_CONSECUTIVE = 3
@@ -28,6 +29,7 @@ export async function pollForCompletion(
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
   let firstWorkTimestamp: number | null = null
+  const pollStartTimestamp = Date.now()
 
   while (!abortController.signal.aborted) {
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
@@ -51,6 +53,13 @@ export async function pollForCompletion(
       errorCycleCount = 0
     }
 
+    const mainSessionStatus = await getMainSessionStatus(ctx)
+    if (mainSessionStatus === "busy" || mainSessionStatus === "retry") {
+      eventState.mainSessionIdle = false
+    } else if (mainSessionStatus === "idle") {
+      eventState.mainSessionIdle = true
+    }
+
     if (!eventState.mainSessionIdle) {
       consecutiveCompleteChecks = 0
       continue
@@ -62,8 +71,11 @@ export async function pollForCompletion(
     }
 
     if (!eventState.hasReceivedMeaningfulWork) {
+      if (Date.now() - pollStartTimestamp < minStabilizationMs) {
+        consecutiveCompleteChecks = 0
+        continue
+      }
       consecutiveCompleteChecks = 0
-      continue
     }
 
     // Track when first meaningful work was received
@@ -90,4 +102,25 @@ export async function pollForCompletion(
   }
 
   return 130
+}
+
+async function getMainSessionStatus(
+  ctx: RunContext
+): Promise<"idle" | "busy" | "retry" | null> {
+  try {
+    const statusesRes = await ctx.client.session.status({
+      query: { directory: ctx.directory },
+    })
+    const statuses = normalizeSDKResponse(
+      statusesRes,
+      {} as Record<string, { type?: string }>
+    )
+    const status = statuses[ctx.sessionID]?.type
+    if (status === "idle" || status === "busy" || status === "retry") {
+      return status
+    }
+    return null
+  } catch {
+    return null
+  }
 }

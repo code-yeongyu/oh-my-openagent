@@ -207,6 +207,52 @@ describe("pollForCompletion", () => {
     expect(todoCallCount).toBe(0)
   })
 
+  it("falls back to session.status API when idle event is missing", async () => {
+    //#given - mainSessionIdle not set by events, but status API says idle
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext({
+      statuses: {
+        "test-session": { type: "idle" },
+      },
+    })
+    const eventState = createEventState()
+    eventState.mainSessionIdle = false
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 2,
+      minStabilizationMs: 0,
+    })
+
+    //#then - completion succeeds without idle event
+    expect(result).toBe(0)
+  })
+
+  it("allows silent completion after stabilization when no meaningful work is received", async () => {
+    //#given - session is idle and stable but no assistant message/tool event arrived
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.hasReceivedMeaningfulWork = false
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+      minStabilizationMs: 30,
+    })
+
+    //#then - completion succeeds after stabilization window
+    expect(result).toBe(0)
+  })
+
   it("simulates race condition: brief idle with 0 todos does not cause immediate exit", async () => {
     //#given - simulate Sisyphus outputting text, session goes idle briefly, then tool fires
     spyOn(console, "log").mockImplementation(() => {})
