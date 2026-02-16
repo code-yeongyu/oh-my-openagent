@@ -55,6 +55,7 @@ export const AgentOverridesSchema = z.object({
   trinity: AgentOverrideConfigSchema.optional(),
   construct: AgentOverrideConfigSchema.optional(),
   architect: AgentOverrideConfigSchema.optional(),
+  cipher: AgentOverrideConfigSchema.optional(),
 })
 
 export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>
