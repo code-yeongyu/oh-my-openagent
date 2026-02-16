@@ -191,6 +191,10 @@ function getPendingByParent(manager: BackgroundManager): Map<string, Set<string>
   return (manager as unknown as { pendingByParent: Map<string, Set<string>> }).pendingByParent
 }
 
+function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+  return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
+}
+
 function getQueuesByKey(
   manager: BackgroundManager
 ): Map<string, Array<{ task: BackgroundTask; input: import("./types").LaunchInput }>> {
@@ -912,7 +916,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
 })
 
 describe("BackgroundManager.notifyParentSession - aborted parent", () => {
-  test("should skip notification when parent session is aborted", async () => {
+  test("should fall back and still notify when parent session messages are aborted", async () => {
     //#given
     let promptCalled = false
     const promptMock = async () => {
@@ -951,7 +955,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
       .notifyParentSession(task)
 
     //#then
-    expect(promptCalled).toBe(false)
+    expect(promptCalled).toBe(true)
 
     manager.shutdown()
   })
@@ -3058,10 +3062,6 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
 })
 
 describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
-  function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
-    return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
-  }
-
   function setCompletionTimer(manager: BackgroundManager, taskId: string): void {
     const completionTimers = getCompletionTimers(manager)
     const timer = setTimeout(() => {
@@ -3585,5 +3585,95 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
 
     //#then - task should still be running (delta event refreshed lastUpdate)
     expect(task.status).toBe("running")
+  })
+})
+
+describe("BackgroundManager regression fixes - resume and aborted notification", () => {
+  test("should keep resumed task in memory after previous completion timer deadline", async () => {
+    //#given
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+
+    const task: BackgroundTask = {
+      id: "task-resume-timer-regression",
+      sessionID: "session-resume-timer-regression",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "resume timer regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      concurrencyGroup: "explore",
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    const completionTimers = getCompletionTimers(manager)
+    const timer = setTimeout(() => {
+      completionTimers.delete(task.id)
+      getTaskMap(manager).delete(task.id)
+    }, 25)
+    completionTimers.set(task.id, timer)
+
+    //#when
+    await manager.resume({
+      sessionId: "session-resume-timer-regression",
+      prompt: "resume task",
+      parentSessionID: "parent-session-2",
+      parentMessageID: "msg-2",
+    })
+    await new Promise((resolve) => setTimeout(resolve, 60))
+
+    //#then
+    expect(getTaskMap(manager).has(task.id)).toBe(true)
+    expect(completionTimers.has(task.id)).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("should start cleanup timer even when promptAsync aborts", async () => {
+    //#given
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => {
+          const error = new Error("User aborted")
+          error.name = "MessageAbortedError"
+          throw error
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-aborted-cleanup-regression",
+      sessionID: "session-aborted-cleanup-regression",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "aborted prompt cleanup regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionID, new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> }).notifyParentSession(task)
+
+    //#then
+    expect(getCompletionTimers(manager).has(task.id)).toBe(true)
+
+    manager.shutdown()
   })
 })
