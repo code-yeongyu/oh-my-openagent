@@ -5,8 +5,6 @@ import { log, normalizeSDKResponse } from "../../shared"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
-  POLL_INTERVAL_BACKGROUND_MS,
-  SESSION_MISSING_GRACE_MS,
   SESSION_READY_POLL_INTERVAL_MS,
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
@@ -30,13 +28,6 @@ const defaultTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: defaultIsInsideTmux,
   getCurrentPaneId: defaultGetCurrentPaneId,
 }
-
-const SESSION_TIMEOUT_MS = 10 * 60 * 1000
-
-// Stability detection constants (prevents premature closure - see issue #1330)
-// Mirrors the proven pattern from background-agent/manager.ts
-const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
-const STABLE_POLLS_REQUIRED = 3          // 3 consecutive idle polls (~6s with 2s poll interval)
 
 /**
  * State-first Tmux Session Manager
@@ -125,12 +116,6 @@ export class TmuxSessionManager {
       timeoutMs: SESSION_READY_TIMEOUT_MS,
     })
     return false
-  }
-
-  // NOTE: Exposed (via `as any`) for test stability checks.
-  // Actual polling is owned by TmuxPollingManager.
-  private async pollSessions(): Promise<void> {
-    await (this.pollingManager as any).pollSessions()
   }
 
   async onSessionCreated(event: SessionCreatedEvent): Promise<void> {
