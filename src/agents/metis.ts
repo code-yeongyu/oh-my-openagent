@@ -311,6 +311,7 @@ const metisRestrictions = createAgentToolRestrictions([
 
 export function createMetisAgent(model: string): AgentConfig {
   return {
+    name: "Metis (Plan Consultant)",
     description:
       "Pre-planning consultant that analyzes requests to identify hidden intentions, ambiguities, and AI failure points. (Metis - OhMyOpenCode)",
     mode: MODE,
