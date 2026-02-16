@@ -7,6 +7,9 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
     "architect": {
       "model": "opencode/glm-4.7-free",
     },
+    "cipher": {
+      "model": "opencode/glm-4.7-free",
+    },
     "construct": {
       "model": "opencode/glm-4.7-free",
     },
@@ -67,6 +70,10 @@ exports[`generateModelConfig single native provider uses Claude models when only
   "agents": {
     "architect": {
       "model": "anthropic/claude-sonnet-4-5",
+    },
+    "cipher": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
       "model": "anthropic/claude-haiku-4-5",
@@ -130,6 +137,10 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
     "architect": {
       "model": "anthropic/claude-sonnet-4-5",
     },
+    "cipher": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "construct": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -192,6 +203,10 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
   "agents": {
     "architect": {
       "model": "openai/gpt-5.2",
+    },
+    "cipher": {
+      "model": "openai/gpt-5.2",
+      "variant": "high",
     },
     "construct": {
       "model": "openai/gpt-5.2",
@@ -260,6 +275,10 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
     "architect": {
       "model": "openai/gpt-5.2",
     },
+    "cipher": {
+      "model": "openai/gpt-5.2",
+      "variant": "high",
+    },
     "construct": {
       "model": "openai/gpt-5.2",
     },
@@ -327,6 +346,9 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     "architect": {
       "model": "google/gemini-3-pro",
     },
+    "cipher": {
+      "model": "google/gemini-3-pro",
+    },
     "construct": {
       "model": "google/gemini-3-flash",
     },
@@ -385,6 +407,9 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/matrixx.schema.json",
   "agents": {
     "architect": {
+      "model": "google/gemini-3-pro",
+    },
+    "cipher": {
       "model": "google/gemini-3-pro",
     },
     "construct": {
@@ -446,6 +471,10 @@ exports[`generateModelConfig all native providers uses preferred models from fal
   "agents": {
     "architect": {
       "model": "anthropic/claude-sonnet-4-5",
+    },
+    "cipher": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
       "model": "google/gemini-3-flash",
@@ -519,6 +548,10 @@ exports[`generateModelConfig all native providers uses preferred models with isM
   "agents": {
     "architect": {
       "model": "anthropic/claude-sonnet-4-5",
+    },
+    "cipher": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
       "model": "google/gemini-3-flash",
@@ -594,6 +627,10 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "architect": {
       "model": "opencode/kimi-k2.5-free",
     },
+    "cipher": {
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
+    },
     "construct": {
       "model": "opencode/gemini-3-flash",
     },
@@ -666,6 +703,10 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
   "agents": {
     "architect": {
       "model": "opencode/kimi-k2.5-free",
+    },
+    "cipher": {
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
       "model": "opencode/gemini-3-flash",
@@ -741,6 +782,10 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "architect": {
       "model": "github-copilot/claude-sonnet-4.5",
     },
+    "cipher": {
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
+    },
     "construct": {
       "model": "github-copilot/gemini-3-flash-preview",
     },
@@ -813,6 +858,10 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
   "agents": {
     "architect": {
       "model": "github-copilot/claude-sonnet-4.5",
+    },
+    "cipher": {
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "construct": {
       "model": "github-copilot/gemini-3-flash-preview",
@@ -888,6 +937,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     "architect": {
       "model": "opencode/glm-4.7-free",
     },
+    "cipher": {
+      "model": "opencode/glm-4.7-free",
+    },
     "construct": {
       "model": "zai-coding-plan/glm-4.6v",
     },
@@ -941,6 +993,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/matrixx.schema.json",
   "agents": {
     "architect": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "cipher": {
       "model": "opencode/glm-4.7-free",
     },
     "construct": {
@@ -997,6 +1052,10 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
   "agents": {
     "architect": {
       "model": "opencode/kimi-k2.5-free",
+    },
+    "cipher": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
       "model": "opencode/gemini-3-flash",
@@ -1071,6 +1130,10 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "architect": {
       "model": "github-copilot/claude-sonnet-4.5",
     },
+    "cipher": {
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
+    },
     "construct": {
       "model": "github-copilot/gemini-3-flash-preview",
     },
@@ -1144,6 +1207,10 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
     "architect": {
       "model": "anthropic/claude-sonnet-4-5",
     },
+    "cipher": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "construct": {
       "model": "zai-coding-plan/glm-4.6v",
     },
@@ -1205,6 +1272,10 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
   "agents": {
     "architect": {
       "model": "anthropic/claude-sonnet-4-5",
+    },
+    "cipher": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
       "model": "google/gemini-3-flash",
@@ -1270,6 +1341,10 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
   "agents": {
     "architect": {
       "model": "opencode/kimi-k2.5-free",
+    },
+    "cipher": {
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
     },
     "construct": {
       "model": "github-copilot/gemini-3-flash-preview",
@@ -1344,6 +1419,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "architect": {
       "model": "opencode/kimi-k2.5-free",
     },
+    "cipher": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "construct": {
       "model": "google/gemini-3-flash",
     },
@@ -1416,6 +1495,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
   "agents": {
     "architect": {
       "model": "opencode/kimi-k2.5-free",
+    },
+    "cipher": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "construct": {
       "model": "google/gemini-3-flash",

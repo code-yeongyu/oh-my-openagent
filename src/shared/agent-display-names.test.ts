@@ -141,6 +141,7 @@ describe("AGENT_DISPLAY_NAMES", () => {
     const expectedMappings = {
       morpheus: "Morpheus (Ultraworker)",
       architect: "Architect (Plan Execution Orchestrator)",
+      cipher: "Cipher (DSL Expert)",
       oracle: "Oracle (Plan Builder)",
       mouse: "Mouse",
       seraph: "Seraph (Plan Consultant)",
