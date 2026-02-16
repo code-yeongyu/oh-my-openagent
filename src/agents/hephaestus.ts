@@ -633,7 +633,6 @@ export function createHephaestusAgent(
     : buildHephaestusPrompt([], tools, skills, categories, useTaskSystem);
 
   return {
-    name: "Hephaestus (Deep Agent)",
     description:
       "Autonomous Deep Worker - goal-oriented execution with GPT 5.2 Codex. Explores thoroughly before acting, uses explore/librarian agents for comprehensive context, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
     mode: MODE,
