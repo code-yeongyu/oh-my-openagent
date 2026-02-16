@@ -9,7 +9,9 @@ import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
 
-const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
+
+const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
 
 type ToolContextWithMetadata = {
   sessionID: string

@@ -8,7 +8,9 @@ import { storeToolMetadata } from "../../../features/tool-metadata-store"
 import type { BackgroundTask } from "../../../features/background-agent"
 import type { ToolContextWithMetadata } from "./utils"
 
-const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
+import { getAgentDisplayName } from "../../../shared/agent-display-names"
+
+const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
 
 type ToolContextWithCallId = ToolContextWithMetadata & {
   callID?: string
