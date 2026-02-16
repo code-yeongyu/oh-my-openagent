@@ -66,7 +66,7 @@ describe("executeAction", () => {
 		mockSpawnTmuxPane.mockImplementation(async () => ({ success: true, paneId: "%7" }))
 	})
 
-	test("applies configured tmux layout after successful spawn", async () => {
+	test("enforces main pane width with configured percentage after successful spawn", async () => {
 		// given
 		// when
 		const result = await executeActionWithDeps(
@@ -83,8 +83,7 @@ describe("executeAction", () => {
 
 		// then
 		expect(result).toEqual({ success: true, paneId: "%7" })
-		expect(mockApplyLayout).toHaveBeenCalledTimes(1)
-		expect(mockApplyLayout).toHaveBeenCalledWith("main-horizontal", 55)
+		expect(mockApplyLayout).not.toHaveBeenCalled()
 		expect(mockEnforceMainPaneWidth).toHaveBeenCalledTimes(1)
 		expect(mockEnforceMainPaneWidth).toHaveBeenCalledWith("%0", 220, 55)
 	})
