@@ -30,7 +30,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
   const allCategories = mergeCategories(userCategories)
   const categoryNames = Object.keys(allCategories)
-  const categoryExamples = categoryNames.map(k => `'${k}'`).join(", ")
+  const categoryExamples = categoryNames.join(", ")
 
   const availableCategories: AvailableCategory[] = options.availableCategories
     ?? Object.entries(allCategories).map(([name, categoryConfig]) => {
@@ -55,13 +55,16 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
   const description = `Spawn agent task with category-based or direct agent selection.
 
-MUTUALLY EXCLUSIVE: Provide EITHER category OR subagent_type, not both (unless continuing a session).
+REQUIRED: You MUST provide EITHER category OR subagent_type (one of them is REQUIRED, but not both).
+- If using a predefined category → provide category
+- If using a specific agent → provide subagent_type
+- Providing NEITHER is INVALID and will fail.
 
-- load_skills: ALWAYS REQUIRED. Pass at least one skill name (e.g., ["playwright"], ["git-master", "frontend-ui-ux"]).
+- load_skills: ALWAYS REQUIRED. Pass at least one skill name.
 - category: Use predefined category → Spawns Sisyphus-Junior with category config
   Available categories:
 ${categoryList}
-- subagent_type: Use specific agent directly (e.g., "oracle", "explore")
+- subagent_type: Use specific agent directly
 - run_in_background: true=async (returns task_id), false=sync (waits for result). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
 - session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
 - command: The command that triggered this task (optional, for slash command tracking).
@@ -76,12 +79,12 @@ Prompts MUST be in English.`
   return tool({
     description,
     args: {
-      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like [\"playwright\"], [\"git-master\"] for best results."),
+      load_skills: tool.schema.array(tool.schema.string()).describe("Skill names to inject. REQUIRED - pass [] if no skills needed."),
       description: tool.schema.string().describe("Short task description (3-5 words)"),
       prompt: tool.schema.string().describe("Full detailed prompt for the agent"),
       run_in_background: tool.schema.boolean().describe("true=async (returns task_id), false=sync (waits). Default: false"),
-      category: tool.schema.string().optional().describe(`Category (e.g., ${categoryExamples}). Mutually exclusive with subagent_type.`),
-      subagent_type: tool.schema.string().optional().describe("Agent name (e.g., 'oracle', 'explore'). Mutually exclusive with category."),
+      category: tool.schema.string().optional().describe(`REQUIRED if subagent_type not provided. Do NOT provide both category and subagent_type.`),
+      subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
       session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
       command: tool.schema.string().optional().describe("The command that triggered this task"),
     },
@@ -113,10 +116,10 @@ Prompts MUST be in English.`
         }
       }
       if (args.load_skills === undefined) {
-        throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills like ["playwright"], ["git-master"] for best results.`)
+        throw new Error(`Invalid arguments: 'load_skills' parameter is REQUIRED. Pass [] if no skills needed.`)
       }
       if (args.load_skills === null) {
-        throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed, but IT IS HIGHLY RECOMMENDED to pass proper skills.`)
+        throw new Error(`Invalid arguments: load_skills=null is not allowed. Pass [] if no skills needed.`)
       }
 
       const runInBackground = args.run_in_background === true
