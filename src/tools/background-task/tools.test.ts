@@ -232,7 +232,7 @@ describe("background_output full_session", () => {
     expect(output).toContain("Has more: true")
   })
 
-  test("keeps legacy status output when full_session is false", async () => {
+  test("defaults to full_session when task is running", async () => {
     // #given
     const task = createTask({ status: "running" })
     const manager = createMockManager(task)
@@ -241,6 +241,20 @@ describe("background_output full_session", () => {
 
     // #when
     const output = await tool.execute({ task_id: "task-1" }, mockContext)
+
+    // #then
+    expect(output).toContain("# Full Session Output")
+  })
+
+  test("keeps legacy status output when full_session is explicitly false on running task", async () => {
+    // #given
+    const task = createTask({ status: "running" })
+    const manager = createMockManager(task)
+    const client = createMockClient({})
+    const tool = createBackgroundOutput(manager, client)
+
+    // #when
+    const output = await tool.execute({ task_id: "task-1", full_session: false }, mockContext)
 
     // #then
     expect(output).toContain("# Task Status")
