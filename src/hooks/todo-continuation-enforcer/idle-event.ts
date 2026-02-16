@@ -9,6 +9,7 @@ import {
   CONTINUATION_COOLDOWN_MS,
   DEFAULT_SKIP_AGENTS,
   HOOK_NAME,
+  MAX_CONSECUTIVE_FAILURES,
 } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { getIncompleteCount } from "./todo"
@@ -99,8 +100,23 @@ export async function handleSessionIdle(args: {
     return
   }
 
-  if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < CONTINUATION_COOLDOWN_MS) {
-    log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID })
+  if (state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+    log(`[${HOOK_NAME}] Skipped: max consecutive failures reached`, {
+      sessionID,
+      consecutiveFailures: state.consecutiveFailures,
+      maxConsecutiveFailures: MAX_CONSECUTIVE_FAILURES,
+    })
+    return
+  }
+
+  const effectiveCooldown =
+    CONTINUATION_COOLDOWN_MS * Math.pow(2, Math.min(state.consecutiveFailures, 5))
+  if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < effectiveCooldown) {
+    log(`[${HOOK_NAME}] Skipped: cooldown active`, {
+      sessionID,
+      effectiveCooldown,
+      consecutiveFailures: state.consecutiveFailures,
+    })
     return
   }
 
