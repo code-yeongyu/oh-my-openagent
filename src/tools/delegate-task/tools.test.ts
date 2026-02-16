@@ -1714,17 +1714,19 @@ describe("sisyphus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-unstable",
+        sessionID: "ses_unstable_gemini",
+        description: "Unstable gemini task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-unstable",
-            sessionID: "ses_unstable_gemini",
-            description: "Unstable gemini task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
        const mockClient = {
@@ -1839,17 +1841,19 @@ describe("sisyphus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
 
+      const launchedTask = {
+        id: "task-unstable-minimax",
+        sessionID: "ses_unstable_minimax",
+        description: "Unstable minimax task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-unstable-minimax",
-            sessionID: "ses_unstable_minimax",
-            description: "Unstable minimax task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
 
        const mockClient = {
@@ -1973,17 +1977,19 @@ describe("sisyphus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-artistry",
+        sessionID: "ses_artistry_gemini",
+        description: "Artistry gemini task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-artistry",
-            sessionID: "ses_artistry_gemini",
-            description: "Artistry gemini task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
        const mockClient = {
@@ -2039,17 +2045,19 @@ describe("sisyphus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-writing",
+        sessionID: "ses_writing_gemini",
+        description: "Writing gemini task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-writing",
-            sessionID: "ses_writing_gemini",
-            description: "Writing gemini task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
        const mockClient = {
@@ -2105,17 +2113,19 @@ describe("sisyphus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-custom-unstable",
+        sessionID: "ses_custom_unstable",
+        description: "Custom unstable task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-custom-unstable",
-            sessionID: "ses_custom_unstable",
-            description: "Custom unstable task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
       const mockClient = {
