@@ -228,7 +228,7 @@ describe("decideSpawnActions", () => {
       expect(result.actions[0].type).toBe("spawn")
     })
 
-    it("closes oldest pane when existing panes are too small to split", () => {
+    it("replaces oldest pane when existing panes are too small to split", () => {
       // given - existing pane is below minimum splittable size
       const state = createWindowState(220, 30, [
         { paneId: "%1", width: 50, height: 15, left: 110, top: 0 },
@@ -242,9 +242,8 @@ describe("decideSpawnActions", () => {
 
       // then
       expect(result.canSpawn).toBe(true)
-      expect(result.actions.length).toBe(2)
-      expect(result.actions[0].type).toBe("close")
-      expect(result.actions[1].type).toBe("spawn")
+      expect(result.actions.length).toBe(1)
+      expect(result.actions[0].type).toBe("replace")
     })
 
     it("can spawn when existing pane is large enough to split", () => {
@@ -393,5 +392,28 @@ describe("decideSpawnActions with custom agentPaneWidth", () => {
     //#then
     expect(defaultResult.canSpawn).toBe(false)
     expect(customResult.canSpawn).toBe(true)
+  })
+
+  it("#given custom agentPaneWidth and splittable existing pane #when deciding spawn #then uses spawn without eviction", () => {
+    //#given
+    const customConfig: CapacityConfig = { mainPaneMinWidth: 120, agentPaneWidth: 40 }
+    const state = createWindowState(220, 44, [
+      { paneId: "%1", width: 90, height: 30, left: 110, top: 0 },
+    ])
+    const mappings: SessionMapping[] = [
+      { sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") },
+    ]
+
+    //#when
+    const result = decideSpawnActions(state, "ses1", "test", customConfig, mappings)
+
+    //#then
+    expect(result.canSpawn).toBe(true)
+    expect(result.actions.length).toBe(1)
+    expect(result.actions[0].type).toBe("spawn")
+    if (result.actions[0].type === "spawn") {
+      expect(result.actions[0].targetPaneId).toBe("%1")
+      expect(result.actions[0].splitDirection).toBe("-h")
+    }
   })
 })

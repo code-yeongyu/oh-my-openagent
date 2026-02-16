@@ -434,6 +434,53 @@ describe('TmuxSessionManager', () => {
   })
 
   describe('onSessionDeleted', () => {
+    test('does not track session when readiness timed out', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      let stateCallCount = 0
+      mockQueryWindowState.mockImplementation(async () => {
+        stateCallCount++
+        if (stateCallCount === 1) {
+          return createWindowState()
+        }
+        return createWindowState({
+          agentPanes: [
+            {
+              paneId: '%mock',
+              width: 40,
+              height: 44,
+              left: 100,
+              top: 0,
+              title: 'omo-subagent-Timeout Task',
+              isActive: false,
+            },
+          ],
+        })
+      })
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext({ sessionStatusResult: { data: {} } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_timeout', 'ses_parent', 'Timeout Task')
+      )
+      mockExecuteAction.mockClear()
+
+      // when
+      await manager.onSessionDeleted({ sessionID: 'ses_timeout' })
+
+      // then
+      expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+    })
+
     test('closes pane when tracked session is deleted', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
@@ -521,8 +568,13 @@ describe('TmuxSessionManager', () => {
       mockIsInsideTmux.mockReturnValue(true)
 
       let callCount = 0
-      mockExecuteActions.mockImplementation(async () => {
+      mockExecuteActions.mockImplementation(async (actions) => {
         callCount++
+        for (const action of actions) {
+          if (action.type === 'spawn') {
+            trackedSessions.add(action.sessionId)
+          }
+        }
         return {
           success: true,
           spawnedPaneId: `%${callCount}`,
