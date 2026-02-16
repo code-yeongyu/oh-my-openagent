@@ -28,7 +28,7 @@ async function readPartsFromSDKFallback(
 ): Promise<MessagePart[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as MessageData[]
+    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
     const target = messages.find((m) => m.info?.id === messageID)
     if (!target?.parts) return []
 

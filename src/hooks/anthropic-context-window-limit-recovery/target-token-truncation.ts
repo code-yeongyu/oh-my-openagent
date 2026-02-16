@@ -66,7 +66,7 @@ export async function truncateUntilTargetTokens(
 			const response = (await client.session.messages({
 				path: { id: sessionID },
 			})) as { data?: SDKMessage[] }
-			const messages = response.data ?? []
+			const messages = (response.data ?? response) as SDKMessage[]
 			toolPartsByKey = new Map<string, SDKToolPart>()
 
 			for (const message of messages) {

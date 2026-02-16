@@ -17,7 +17,7 @@ export async function getMessageIdsFromSDK(
 ): Promise<string[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as SDKMessage[]
+    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
     return messages.map(msg => msg.info.id)
   } catch {
     return []

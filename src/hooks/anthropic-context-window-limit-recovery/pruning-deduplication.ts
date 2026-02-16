@@ -72,7 +72,7 @@ function readMessages(sessionID: string): MessagePart[] {
 async function readMessagesFromSDK(client: OpencodeClient, sessionID: string): Promise<MessagePart[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const rawMessages = (response.data ?? []) as Array<{ parts?: ToolPart[] }>
+    const rawMessages = ((response.data ?? response) as unknown as Array<{ parts?: ToolPart[] }>) ?? []
     return rawMessages.filter((m) => m.parts) as MessagePart[]
   } catch {
     return []

@@ -51,7 +51,7 @@ export async function replaceEmptyTextPartsAsync(
 ): Promise<boolean> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as MessageData[]
+    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
 
     const targetMsg = messages.find((m) => m.info?.id === messageID)
     if (!targetMsg?.parts) return false
@@ -101,7 +101,7 @@ export async function findMessagesWithEmptyTextPartsFromSDK(
 ): Promise<string[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as MessageData[]
+    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
     const result: string[] = []
 
     for (const msg of messages) {
