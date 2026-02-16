@@ -28,6 +28,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
 ) {
   const autoCompactState = createRecoveryState()
   const experimental = options?.experimental
+  const pendingCompactionTimeoutBySession = new Map<string, ReturnType<typeof setTimeout>>()
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
     const props = event.properties as Record<string, unknown> | undefined
@@ -35,6 +36,12 @@ export function createAnthropicContextWindowLimitRecoveryHook(
     if (event.type === "session.deleted") {
       const sessionInfo = props?.info as { id?: string } | undefined
       if (sessionInfo?.id) {
+        const timeoutID = pendingCompactionTimeoutBySession.get(sessionInfo.id)
+        if (timeoutID !== undefined) {
+          clearTimeout(timeoutID)
+          pendingCompactionTimeoutBySession.delete(sessionInfo.id)
+        }
+
         autoCompactState.pendingCompact.delete(sessionInfo.id)
         autoCompactState.errorDataBySession.delete(sessionInfo.id)
         autoCompactState.retryStateBySession.delete(sessionInfo.id)
@@ -76,7 +83,8 @@ export function createAnthropicContextWindowLimitRecoveryHook(
           })
           .catch(() => {})
 
-        setTimeout(() => {
+        const timeoutID = setTimeout(() => {
+          pendingCompactionTimeoutBySession.delete(sessionID)
           executeCompact(
             sessionID,
             { providerID, modelID },
@@ -86,6 +94,8 @@ export function createAnthropicContextWindowLimitRecoveryHook(
             experimental,
           )
         }, 300)
+
+        pendingCompactionTimeoutBySession.set(sessionID, timeoutID)
       }
       return
     }
@@ -113,6 +123,12 @@ export function createAnthropicContextWindowLimitRecoveryHook(
       if (!sessionID) return
 
       if (!autoCompactState.pendingCompact.has(sessionID)) return
+
+      const timeoutID = pendingCompactionTimeoutBySession.get(sessionID)
+      if (timeoutID !== undefined) {
+        clearTimeout(timeoutID)
+        pendingCompactionTimeoutBySession.delete(sessionID)
+      }
 
       const errorData = autoCompactState.errorDataBySession.get(sessionID)
       const lastAssistant = await getLastAssistant(sessionID, ctx.client, ctx.directory)
