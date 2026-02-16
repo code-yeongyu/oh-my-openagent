@@ -22,9 +22,17 @@ export interface ActionExecutorDeps {
 	enforceMainPaneWidth: typeof enforceMainPaneWidth
 }
 
-async function enforceMainPane(windowState: WindowState, deps: ActionExecutorDeps): Promise<void> {
+async function enforceMainPane(
+	windowState: WindowState,
+	config: TmuxConfig,
+	deps: ActionExecutorDeps,
+): Promise<void> {
 	if (!windowState.mainPane) return
-	await deps.enforceMainPaneWidth(windowState.mainPane.paneId, windowState.windowWidth)
+	await deps.enforceMainPaneWidth(
+		windowState.mainPane.paneId,
+		windowState.windowWidth,
+		config.main_pane_size,
+	)
 }
 
 export async function executeActionWithDeps(
@@ -35,7 +43,7 @@ export async function executeActionWithDeps(
 	if (action.type === "close") {
 		const success = await deps.closeTmuxPane(action.paneId)
 		if (success) {
-			await enforceMainPane(ctx.windowState, deps)
+			await enforceMainPane(ctx.windowState, ctx.config, deps)
 		}
 		return { success }
 	}
@@ -65,7 +73,7 @@ export async function executeActionWithDeps(
 
 	if (result.success) {
 		await deps.applyLayout(ctx.config.layout, ctx.config.main_pane_size)
-		await enforceMainPane(ctx.windowState, deps)
+		await enforceMainPane(ctx.windowState, ctx.config, deps)
 	}
 
 	return {
