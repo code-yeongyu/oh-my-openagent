@@ -4,8 +4,16 @@ import { grep_app } from "./grep-app"
 import type { McpName } from "./types"
 import type { OhMyOpenCodeConfig } from "../config/schema"
 import { log } from "../shared/logger"
+import { resolveMcpTemplates } from "./templates"
+import { createLazyMcpRegistry } from "./lazy-loader"
+import { createMcpHealthChecker } from "./health-checker"
+import { createPostHookTrigger } from "./post-hook-trigger"
 
 export { McpNameSchema, type McpName } from "./types"
+export { resolveMcpTemplates } from "./templates"
+export { createLazyMcpRegistry } from "./lazy-loader"
+export { createMcpHealthChecker } from "./health-checker"
+export { createPostHookTrigger } from "./post-hook-trigger"
 
 type RemoteMcpConfig = {
   type: "remote"
@@ -56,5 +64,33 @@ export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpen
     mcps.grep_app = grep_app
   }
 
+  // Add template-based MCPs if configured
+  if (config?.mcp?.templates) {
+    const templateMcps = resolveMcpTemplates(config.mcp.templates)
+    for (const [name, mcpConfig] of Object.entries(templateMcps)) {
+      if (!disabledMcps.includes(name)) {
+        mcps[name] = mcpConfig
+      }
+    }
+  }
+
   return mcps
 }
+
+/**
+ * Registry for lazy-loaded MCPs
+ */
+export const lazyMcpRegistry = createLazyMcpRegistry()
+
+/**
+ * Health checker for remote MCPs
+ */
+export const mcpHealthChecker = createMcpHealthChecker()
+
+/**
+ * Global instance of MCP post-hook trigger
+ */
+export const mcpPostHookTrigger = createPostHookTrigger({
+  enabled: true,
+  timeoutMs: 10000,
+})

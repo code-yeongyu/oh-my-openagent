@@ -17,6 +17,12 @@ import {
 } from "./storage";
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { getRuleInjectionFilePath } from "./output-path";
+import {
+  classifySecurityTier,
+  getSecurityAnalysisPrompt,
+} from "./security-tiers";
+import { getRulesForRole } from "./role-rules";
+import { getSessionAgent } from "../../features/claude-code-session-state/state";
 
 interface ToolExecuteInput {
   tool: string;
@@ -55,6 +61,7 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     string,
     { contentHashes: Set<string>; realPaths: Set<string> }
   >();
+  const pendingArgs = new Map<string, Record<string, unknown>>();
   const truncator = createDynamicTruncator(ctx);
 
   function getSessionCache(sessionID: string): {
@@ -73,17 +80,16 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     return resolve(ctx.directory, path);
   }
 
-
   async function processFilePathForInjection(
     filePath: string,
     sessionID: string,
-    output: ToolExecuteOutput
+    output: ToolExecuteOutput,
+    cache: { contentHashes: Set<string>; realPaths: Set<string> },
   ): Promise<void> {
     const resolved = resolveFilePath(filePath);
     if (!resolved) return;
 
     const projectRoot = findProjectRoot(resolved);
-    const cache = getSessionCache(sessionID);
     const home = homedir();
 
     const ruleFileCandidates = findRuleFiles(projectRoot, home, resolved);
@@ -129,36 +135,83 @@ export function createRulesInjectorHook(ctx: PluginInput) {
     toInject.sort((a, b) => a.distance - b.distance);
 
     for (const rule of toInject) {
-      const { result, truncated } = await truncator.truncate(sessionID, rule.content);
+      const { result, truncated } = await truncator.truncate(
+        sessionID,
+        rule.content,
+      );
       const truncationNotice = truncated
         ? `\n\n[Note: Content was truncated to save context window space. For full context, please read the file directly: ${rule.relativePath}]`
         : "";
       output.output += `\n\n[Rule: ${rule.relativePath}]\n[Match: ${rule.matchReason}]\n${result}${truncationNotice}`;
     }
-
-    saveInjectedRules(sessionID, cache);
   }
 
   const toolExecuteAfter = async (
     input: ToolExecuteInput,
-    output: ToolExecuteOutput
+    output: ToolExecuteOutput,
   ) => {
     const toolName = input.tool.toLowerCase();
+    const sessionID = input.sessionID;
+    const cache = getSessionCache(sessionID);
 
+    // 1. Role-aware rules injection (once per unique agent in session)
+    const agentName = getSessionAgent(sessionID);
+    if (agentName) {
+      const roleRules = getRulesForRole(agentName);
+      if (roleRules) {
+        const roleRulesHash = createContentHash(roleRules);
+        if (!isDuplicateByContentHash(roleRulesHash, cache.contentHashes)) {
+          const { result, truncated } = await truncator.truncate(
+            sessionID,
+            roleRules,
+          );
+          const truncationNotice = truncated
+            ? `\n\n[Note: Role rules were truncated to save context window space.]`
+            : "";
+
+          output.output += `\n\n[Role Rules: ${agentName}]\n${result}${truncationNotice}`;
+          cache.contentHashes.add(roleRulesHash);
+        }
+      }
+    }
+
+    // 2. Security tier analysis (per high-risk operation)
+    const args = pendingArgs.get(input.callID);
+    if (args) {
+      const tier = classifySecurityTier(input.tool, args);
+      if (tier === "HIGH") {
+        const command = (args.command ?? args.cmd) as string | undefined;
+        const prompt = getSecurityAnalysisPrompt(input.tool, tier, command);
+        if (prompt) {
+          const promptHash = createContentHash(prompt);
+          // Inject if not already injected (prevents spamming same warning for same command)
+          if (!isDuplicateByContentHash(promptHash, cache.contentHashes)) {
+            output.output += `\n\n${prompt}`;
+            cache.contentHashes.add(promptHash);
+          }
+        }
+      }
+      pendingArgs.delete(input.callID);
+    }
+
+    // 3. File-based rules injection
     if (TRACKED_TOOLS.includes(toolName)) {
       const filePath = getRuleInjectionFilePath(output);
-      if (!filePath) return;
-      await processFilePathForInjection(filePath, input.sessionID, output);
-      return;
+      if (filePath) {
+        await processFilePathForInjection(filePath, sessionID, output, cache);
+      }
     }
+
+    saveInjectedRules(sessionID, cache);
   };
 
   const toolExecuteBefore = async (
     input: ToolExecuteInput,
-    output: ToolExecuteBeforeOutput
+    output: ToolExecuteBeforeOutput,
   ): Promise<void> => {
-    void input;
-    void output;
+    if (output.args && typeof output.args === "object") {
+      pendingArgs.set(input.callID, output.args as Record<string, unknown>);
+    }
   };
 
   const eventHandler = async ({ event }: EventInput) => {
@@ -169,6 +222,8 @@ export function createRulesInjectorHook(ctx: PluginInput) {
       if (sessionInfo?.id) {
         sessionCaches.delete(sessionInfo.id);
         clearInjectedRules(sessionInfo.id);
+        // Clear all pending args to avoid leak
+        pendingArgs.clear();
       }
     }
 
