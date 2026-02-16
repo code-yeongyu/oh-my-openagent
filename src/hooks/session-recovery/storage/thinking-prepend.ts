@@ -49,7 +49,7 @@ export function prependThinkingPart(sessionID: string, messageID: string): boole
 
   const previousThinking = findLastThinkingContent(sessionID, messageID)
 
-  const partId = "prt_0000000000_thinking"
+  const partId = `prt_0000000000_${messageID}_thinking`
   const part = {
     id: partId,
     sessionID,
@@ -104,7 +104,7 @@ export async function prependThinkingPartAsync(
 ): Promise<boolean> {
   const previousThinking = await findLastThinkingContentFromSDK(client, sessionID, messageID)
 
-  const partId = "prt_0000000000_thinking"
+  const partId = `prt_0000000000_${messageID}_thinking`
   const part: Record<string, unknown> = {
     id: partId,
     sessionID,

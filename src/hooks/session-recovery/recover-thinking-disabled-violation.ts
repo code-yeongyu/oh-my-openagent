@@ -4,6 +4,7 @@ import { findMessagesWithThinkingBlocks, stripThinkingParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { stripThinkingPartsAsync } from "./storage/thinking-strip"
 import { THINKING_TYPES } from "./constants"
+import { log } from "../../shared/logger"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -35,31 +36,39 @@ async function recoverThinkingDisabledViolationFromSDK(
   client: Client,
   sessionID: string
 ): Promise<boolean> {
-  const response = await client.session.messages({ path: { id: sessionID } })
-  const messages = (response.data ?? []) as MessageData[]
+  try {
+    const response = await client.session.messages({ path: { id: sessionID } })
+    const messages = (response.data ?? []) as MessageData[]
 
-  const messageIDsWithThinking: string[] = []
-  for (const msg of messages) {
-    if (msg.info?.role !== "assistant") continue
-    if (!msg.info?.id) continue
-    if (!msg.parts) continue
+    const messageIDsWithThinking: string[] = []
+    for (const msg of messages) {
+      if (msg.info?.role !== "assistant") continue
+      if (!msg.info?.id) continue
+      if (!msg.parts) continue
 
-    const hasThinking = msg.parts.some((part) => THINKING_TYPES.has(part.type))
-    if (hasThinking) {
-      messageIDsWithThinking.push(msg.info.id)
+      const hasThinking = msg.parts.some((part) => THINKING_TYPES.has(part.type))
+      if (hasThinking) {
+        messageIDsWithThinking.push(msg.info.id)
+      }
     }
-  }
 
-  if (messageIDsWithThinking.length === 0) {
+    if (messageIDsWithThinking.length === 0) {
+      return false
+    }
+
+    let anySuccess = false
+    for (const messageID of messageIDsWithThinking) {
+      if (await stripThinkingPartsAsync(client, sessionID, messageID)) {
+        anySuccess = true
+      }
+    }
+
+    return anySuccess
+  } catch (error) {
+    log("[session-recovery] recoverThinkingDisabledViolationFromSDK failed", {
+      sessionID,
+      error: String(error),
+    })
     return false
   }
-
-  let anySuccess = false
-  for (const messageID of messageIDsWithThinking) {
-    if (await stripThinkingPartsAsync(client, sessionID, messageID)) {
-      anySuccess = true
-    }
-  }
-
-  return anySuccess
 }

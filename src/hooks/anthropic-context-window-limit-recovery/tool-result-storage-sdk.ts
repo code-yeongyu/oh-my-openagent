@@ -19,8 +19,6 @@ interface SDKToolPart {
     error?: string
     time?: { start?: number; end?: number; compacted?: number }
   }
-  truncated?: boolean
-  originalSize?: number
 }
 
 interface SDKMessage {
@@ -42,7 +40,7 @@ export async function findToolResultsBySizeFromSDK(
       if (!messageID || !msg.parts) continue
 
       for (const part of msg.parts) {
-        if (part.type === "tool" && part.state?.output && !part.truncated && part.tool) {
+        if (part.type === "tool" && part.state?.output && !part.state?.time?.compacted && part.tool) {
           results.push({
             partPath: "",
             partId: part.id,
@@ -74,8 +72,6 @@ export async function truncateToolResultAsync(
 
   const updatedPart: Record<string, unknown> = {
     ...part,
-    truncated: true,
-    originalSize,
     state: {
       ...part.state,
       output: TRUNCATION_MESSAGE,
@@ -108,7 +104,7 @@ export async function countTruncatedResultsFromSDK(
     for (const msg of messages) {
       if (!msg.parts) continue
       for (const part of msg.parts) {
-        if (part.truncated === true) count++
+        if (part.state?.time?.compacted) count++
       }
     }
 
