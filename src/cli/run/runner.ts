@@ -79,6 +79,7 @@ export async function run(options: RunOptions): Promise<number> {
       const sessionID = await resolveSession({
         client,
         sessionId: options.sessionId,
+        directory,
       })
 
       console.log(pc.dim(`Session: ${sessionID}`))

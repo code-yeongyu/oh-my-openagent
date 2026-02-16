@@ -22,7 +22,7 @@ describe("resolveRunAgent", () => {
     )
 
     // then
-    expect(agent).toBe("hephaestus")
+    expect(agent).toBe("Hephaestus (Deep Agent)")
   })
 
   it("uses env agent over config", () => {
@@ -34,7 +34,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, env)
 
     // then
-    expect(agent).toBe("atlas")
+    expect(agent).toBe("Atlas (Plan Executor)")
   })
 
   it("uses config agent over default", () => {
@@ -45,7 +45,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, {})
 
     // then
-    expect(agent).toBe("prometheus")
+    expect(agent).toBe("Prometheus (Plan Builder)")
   })
 
   it("falls back to sisyphus when none set", () => {
@@ -56,7 +56,7 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, {})
 
     // then
-    expect(agent).toBe("sisyphus")
+    expect(agent).toBe("Sisyphus (Ultraworker)")
   })
 
   it("skips disabled sisyphus for next available core agent", () => {
@@ -67,7 +67,18 @@ describe("resolveRunAgent", () => {
     const agent = resolveRunAgent({ message: "test" }, config, {})
 
     // then
-    expect(agent).toBe("hephaestus")
+    expect(agent).toBe("Hephaestus (Deep Agent)")
+  })
+
+  it("maps display-name style default_run_agent values to canonical display names", () => {
+    // given
+    const config = createConfig({ default_run_agent: "Sisyphus (Ultraworker)" })
+
+    // when
+    const agent = resolveRunAgent({ message: "test" }, config, {})
+
+    // then
+    expect(agent).toBe("Sisyphus (Ultraworker)")
   })
 })
 

@@ -170,6 +170,28 @@ describe("event handling", () => {
     expect(state.hasReceivedMeaningfulWork).toBe(true)
   })
 
+  it("message.updated with camelCase sessionId sets hasReceivedMeaningfulWork", async () => {
+    //#given - assistant message uses sessionId key
+    const ctx = createMockContext("my-session")
+    const state = createEventState()
+
+    const payload: EventPayload = {
+      type: "message.updated",
+      properties: {
+        info: { sessionId: "my-session", role: "assistant" },
+      },
+    }
+
+    const events = toAsyncIterable([payload])
+    const { processEvents } = await import("./events")
+
+    //#when
+    await processEvents(ctx, events, state)
+
+    //#then
+    expect(state.hasReceivedMeaningfulWork).toBe(true)
+  })
+
   it("message.updated with user role does not set hasReceivedMeaningfulWork", async () => {
     // given - user message should not count as meaningful work
     const ctx = createMockContext("my-session")
@@ -251,6 +273,7 @@ describe("event handling", () => {
       lastPartText: "",
       currentTool: null,
       hasReceivedMeaningfulWork: false,
+      messageCount: 0,
     }
 
     const payload: EventPayload = {
