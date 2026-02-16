@@ -91,7 +91,8 @@ export async function recoverEmptyContentMessageFromSDK(
     }
   }
 
-  const emptyMessageIDs = findEmptyMessagesFromSDK(messages)
+  const freshMessages = await readMessagesFromSDK(client, sessionID)
+  const emptyMessageIDs = findEmptyMessagesFromSDK(freshMessages)
   for (const messageID of emptyMessageIDs) {
     if (
       await dependencies.replaceEmptyTextPartsAsync(
