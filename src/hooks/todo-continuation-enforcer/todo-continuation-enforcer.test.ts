@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
 import { setMainSession, subagentSessions, _resetForTesting } from "../../features/claude-code-session-state"
 import { createTodoContinuationEnforcer } from "."
-import { CONTINUATION_COOLDOWN_MS } from "./constants"
+import { CONTINUATION_COOLDOWN_MS, MAX_CONSECUTIVE_FAILURES } from "./constants"
 
 type TimerCallback = (...args: any[]) => void
 
@@ -161,6 +161,15 @@ describe("todo-continuation-enforcer", () => {
       id: string
       role: "user" | "assistant"
       error?: { name: string; data?: { message: string } }
+    }
+  }
+
+  interface PromptRequestOptions {
+    path: { id: string }
+    body: {
+      agent?: string
+      model?: { providerID?: string; modelID?: string }
+      parts: Array<{ text: string }>
     }
   }
 
@@ -550,6 +559,126 @@ describe("todo-continuation-enforcer", () => {
     //#then
     expect(promptCalls).toHaveLength(2)
   }, { timeout: 15000 })
+
+  test("should apply cooldown even after injection failure", async () => {
+    //#given
+    const sessionID = "main-failure-cooldown"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+  })
+
+  test("should stop retries after max consecutive failures", async () => {
+    //#given
+    const sessionID = "main-max-consecutive-failures"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      await fakeTimers.advanceClockBy(1_000_000)
+    }
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES)
+  }, { timeout: 30000 })
+
+  test("should increase cooldown exponentially after consecutive failures", async () => {
+    //#given
+    const sessionID = "main-exponential-backoff"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+  }, { timeout: 30000 })
+
+  test("should reset consecutive failure count after successful injection", async () => {
+    //#given
+    const sessionID = "main-reset-consecutive-failures"
+    setMainSession(sessionID)
+    let shouldFail = true
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      if (shouldFail) {
+        shouldFail = false
+        throw new Error("simulated auth failure")
+      }
+      return {}
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS * 2)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(3)
+  }, { timeout: 30000 })
 
   test("should keep injecting even when todos remain unchanged across cycles", async () => {
     //#given
