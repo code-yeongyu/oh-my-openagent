@@ -902,3 +902,107 @@ describe("skills schema", () => {
     expect(result.success).toBe(true)
   })
 })
+
+describe("agent overrides schema - coeus and sub-prometheus", () => {
+  test("accepts coeus override key with AgentOverrideConfigSchema", () => {
+    //#given
+    const config = {
+      agents: {
+        coeus: {
+          model: "anthropic/claude-opus-4-6",
+          temperature: 0.1,
+        },
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.coeus).toBeDefined()
+      expect(result.data.agents?.coeus?.model).toBe("anthropic/claude-opus-4-6")
+    }
+  })
+
+  test("accepts sub-prometheus override key with AgentOverrideConfigSchema", () => {
+    //#given
+    const config = {
+      agents: {
+        "sub-prometheus": {
+          category: "deep",
+          skills: ["git-master"],
+        },
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.["sub-prometheus"]).toBeDefined()
+      expect(result.data.agents?.["sub-prometheus"]?.category).toBe("deep")
+    }
+  })
+
+  test("accepts both coeus and sub-prometheus overrides together", () => {
+    //#given
+    const config = {
+      agents: {
+        coeus: {
+          temperature: 0.2,
+        },
+        "sub-prometheus": {
+          temperature: 0.1,
+        },
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.agents?.coeus).toBeDefined()
+      expect(result.data.agents?.["sub-prometheus"]).toBeDefined()
+    }
+  })
+})
+
+describe("hook name schema - coeus-md-only", () => {
+  test("accepts coeus-md-only as valid hook name", () => {
+    //#given
+    const config = {
+      disabled_hooks: ["coeus-md-only"],
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disabled_hooks).toContain("coeus-md-only")
+    }
+  })
+
+  test("accepts coeus-md-only mixed with other hook names", () => {
+    //#given
+    const config = {
+      disabled_hooks: ["prometheus-md-only", "coeus-md-only", "sisyphus-junior-notepad"],
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disabled_hooks).toContain("coeus-md-only")
+    }
+  })
+})

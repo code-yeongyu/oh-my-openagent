@@ -133,6 +133,28 @@ describe("getAgentDisplayName", () => {
     // then returns "multimodal-looker"
     expect(result).toBe("multimodal-looker")
   })
+
+  it("returns display name for coeus", () => {
+    // given config key "coeus"
+    const configKey = "coeus"
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName(configKey)
+
+    // then returns "Coeus (Recursive Planner)"
+    expect(result).toBe("Coeus (Recursive Planner)")
+  })
+
+  it("returns display name for sub-prometheus", () => {
+    // given config key "sub-prometheus"
+    const configKey = "sub-prometheus"
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName(configKey)
+
+    // then returns "sub-prometheus"
+    expect(result).toBe("sub-prometheus")
+  })
 })
 
 describe("getAgentConfigKey", () => {
@@ -191,6 +213,8 @@ describe("AGENT_DISPLAY_NAMES", () => {
       librarian: "librarian",
       explore: "explore",
       "multimodal-looker": "multimodal-looker",
+      coeus: "Coeus (Recursive Planner)",
+      "sub-prometheus": "sub-prometheus",
     }
 
     // when checking the constant

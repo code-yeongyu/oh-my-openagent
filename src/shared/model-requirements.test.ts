@@ -179,8 +179,54 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(hephaestus.requiresModel).toBeUndefined()
   })
 
-  test("all 10 builtin agents have valid fallbackChain arrays", () => {
-    // #given - list of 10 agent names
+  test("coeus has claude-opus-4-6 as primary (same as prometheus)", () => {
+    // #given - coeus agent requirement
+    const coeus = AGENT_MODEL_REQUIREMENTS["coeus"]
+
+    // #when - accessing Coeus requirement
+    // #then - claude-opus-4-6 is first, kimi-k2.5 second, kimi-k2.5-free third, gpt-5.2 fourth
+    expect(coeus).toBeDefined()
+    expect(coeus.fallbackChain).toBeArray()
+    expect(coeus.fallbackChain.length).toBeGreaterThan(0)
+
+    const primary = coeus.fallbackChain[0]
+    expect(primary.model).toBe("claude-opus-4-6")
+    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
+    expect(primary.variant).toBe("max")
+
+    const secondary = coeus.fallbackChain[1]
+    expect(secondary.model).toBe("k2p5")
+
+    const tertiary = coeus.fallbackChain[2]
+    expect(tertiary.model).toBe("kimi-k2.5-free")
+
+    const quaternary = coeus.fallbackChain[3]
+    expect(quaternary.model).toBe("gpt-5.2")
+  })
+
+  test("sub-prometheus has claude-sonnet-4-5 as primary (one tier down)", () => {
+    // #given - sub-prometheus agent requirement
+    const subPrometheus = AGENT_MODEL_REQUIREMENTS["sub-prometheus"]
+
+    // #when - accessing sub-prometheus requirement
+    // #then - claude-sonnet-4-5 is first, gpt-5.2 second, gemini-3-pro third
+    expect(subPrometheus).toBeDefined()
+    expect(subPrometheus.fallbackChain).toBeArray()
+    expect(subPrometheus.fallbackChain.length).toBeGreaterThan(0)
+
+    const primary = subPrometheus.fallbackChain[0]
+    expect(primary.model).toBe("claude-sonnet-4-5")
+    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
+
+    const secondary = subPrometheus.fallbackChain[1]
+    expect(secondary.model).toBe("gpt-5.2")
+
+    const tertiary = subPrometheus.fallbackChain[2]
+    expect(tertiary.model).toBe("gemini-3-pro")
+  })
+
+  test("all 12 builtin agents have valid fallbackChain arrays", () => {
+    // #given - list of 12 agent names
     const expectedAgents = [
       "sisyphus",
       "hephaestus",
@@ -192,13 +238,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       "metis",
       "momus",
       "atlas",
+      "coeus",
+      "sub-prometheus",
     ]
 
     // when - checking AGENT_MODEL_REQUIREMENTS
     const definedAgents = Object.keys(AGENT_MODEL_REQUIREMENTS)
 
     // #then - all agents present with valid fallbackChain
-    expect(definedAgents).toHaveLength(10)
+    expect(definedAgents).toHaveLength(12)
     for (const agent of expectedAgents) {
       const requirement = AGENT_MODEL_REQUIREMENTS[agent]
       expect(requirement).toBeDefined()
