@@ -1,6 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { DelegateTaskArgs, ToolContextWithMetadata, DelegateTaskToolOptions } from "./types"
 import { CATEGORY_DESCRIPTIONS } from "./constants"
+import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { mergeCategories } from "../../shared/merge-categories"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
@@ -88,13 +89,13 @@ Prompts MUST be in English.`
       const ctx = toolContext as ToolContextWithMetadata
 
       if (args.category) {
-        if (args.subagent_type && args.subagent_type !== "sisyphus-junior") {
+        if (args.subagent_type && args.subagent_type !== SISYPHUS_JUNIOR_AGENT) {
           log("[task] category provided - overriding subagent_type to sisyphus-junior", {
             category: args.category,
             subagent_type: args.subagent_type,
           })
         }
-        args.subagent_type = "sisyphus-junior"
+        args.subagent_type = SISYPHUS_JUNIOR_AGENT
       }
       await ctx.metadata?.({
         title: args.description,

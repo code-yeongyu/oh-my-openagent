@@ -452,7 +452,7 @@ describe("sisyphus-task", () => {
        await tool.execute(args, toolContext)
 
        // then
-       expect(args.subagent_type).toBe("sisyphus-junior")
+       expect(args.subagent_type).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
     test("category overrides subagent_type and still maps to sisyphus-junior", async () => {
@@ -517,7 +517,7 @@ describe("sisyphus-task", () => {
       const result = await tool.execute(args, toolContext)
 
       //#then
-      expect(args.subagent_type).toBe("sisyphus-junior")
+      expect(args.subagent_type).toBe("Sisyphus-Junior")
       expect(result).toContain("Background task launched")
     }, { timeout: 10000 })
 
@@ -3718,7 +3718,7 @@ describe("sisyphus-task", () => {
       )
 
       // then - title should follow OpenCode format
-      expect(createBody.title).toBe("Implement feature X (@sisyphus-junior subagent)")
+      expect(createBody.title).toBe("Implement feature X (@Sisyphus-Junior subagent)")
     }, { timeout: 10000 })
 
     test("sync task output includes <task_metadata> block with session_id", async () => {

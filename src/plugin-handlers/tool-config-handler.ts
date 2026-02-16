@@ -4,7 +4,9 @@ import { getAgentDisplayName } from "../shared/agent-display-names";
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
 function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWithPermission | undefined {
-  return agentResult[getAgentDisplayName(key)] as AgentWithPermission | undefined;
+  return (agentResult[key] ?? agentResult[getAgentDisplayName(key)]) as
+    | AgentWithPermission
+    | undefined;
 }
 
 export function applyToolConfig(params: {
