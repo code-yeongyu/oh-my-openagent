@@ -197,6 +197,7 @@ export function createMomusAgent(model: string): AgentConfig {
   ])
 
   const base = {
+    name: "Momus (Plan Critic)",
     description:
       "Expert reviewer for evaluating work plans against rigorous clarity, verifiability, and completeness standards. (Momus - OhMyOpenCode)",
     mode: MODE,
