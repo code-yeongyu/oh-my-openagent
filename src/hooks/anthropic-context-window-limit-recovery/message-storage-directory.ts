@@ -1,6 +1,7 @@
 import { existsSync, readdirSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { getMessageDir } from "../../shared/opencode-message-dir"
+import { normalizeSDKResponse } from "../../shared"
 
 export { getMessageDir }
 
@@ -17,7 +18,7 @@ export async function getMessageIdsFromSDK(
 ): Promise<string[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
     return messages.map(msg => msg.info.id)
   } catch {
     return []

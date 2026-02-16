@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
 import type { ToolPermission } from "../../features/hook-message-injector"
+import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 
 import {
@@ -67,7 +68,7 @@ export async function handleSessionIdle(args: {
       path: { id: sessionID },
       query: { directory: ctx.directory },
     })
-    const messages = (messagesResp as { data?: Array<{ info?: MessageInfo }> }).data ?? []
+    const messages = normalizeSDKResponse(messagesResp, [] as Array<{ info?: MessageInfo }>)
     if (isLastAssistantMessageAborted(messages)) {
       log(`[${HOOK_NAME}] Skipped: last assistant message was aborted (API fallback)`, { sessionID })
       return
@@ -79,7 +80,7 @@ export async function handleSessionIdle(args: {
   let todos: Todo[] = []
   try {
     const response = await ctx.client.session.todo({ path: { id: sessionID } })
-    todos = (response.data ?? response) as Todo[]
+    todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
   } catch (error) {
     log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: String(error) })
     return
@@ -139,7 +140,7 @@ export async function handleSessionIdle(args: {
     const messagesResp = await ctx.client.session.messages({
       path: { id: sessionID },
     })
-    const messages = (messagesResp.data ?? []) as Array<{ info?: MessageInfo }>
+    const messages = normalizeSDKResponse(messagesResp, [] as Array<{ info?: MessageInfo }>)
     for (let i = messages.length - 1; i >= 0; i--) {
       const info = messages[i].info
       if (info?.agent === "compaction") {

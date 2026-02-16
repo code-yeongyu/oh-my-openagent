@@ -5,6 +5,7 @@ import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { normalizeSDKResponse } from "../../shared"
 
 export async function executeUnstableAgentTask(
   args: DelegateTaskArgs,
@@ -93,7 +94,7 @@ export async function executeUnstableAgentTask(
       }
 
       const statusResult = await client.session.status()
-      const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+      const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
       const sessionStatus = allStatuses[sessionID]
 
       if (sessionStatus && sessionStatus.type !== "idle") {
@@ -105,7 +106,9 @@ export async function executeUnstableAgentTask(
       if (Date.now() - pollStart < timingCfg.MIN_STABILITY_TIME_MS) continue
 
       const messagesCheck = await client.session.messages({ path: { id: sessionID } })
-      const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
+      const msgs = normalizeSDKResponse(messagesCheck, [] as Array<unknown>, {
+        preferResponseOnMissingData: true,
+      })
       const currentMsgCount = msgs.length
 
       if (currentMsgCount === lastMsgCount) {
@@ -136,7 +139,9 @@ session_id: ${sessionID}
     }
 
     const messagesResult = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as SessionMessage[]
+    const messages = normalizeSDKResponse(messagesResult, [] as SessionMessage[], {
+      preferResponseOnMissingData: true,
+    })
 
     const assistantMessages = messages
       .filter((m) => m.info?.role === "assistant")

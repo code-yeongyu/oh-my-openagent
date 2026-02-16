@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig } from "./types"
+import { log, normalizeSDKResponse } from "../../shared"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
@@ -9,7 +10,6 @@ import {
   SESSION_READY_POLL_INTERVAL_MS,
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
-import { log } from "../../shared"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeActions, executeAction } from "./action-executor"
@@ -103,7 +103,7 @@ export class TmuxSessionManager {
     while (Date.now() - startTime < SESSION_READY_TIMEOUT_MS) {
       try {
         const statusResult = await this.client.session.status({ path: undefined })
-        const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+        const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
         
         if (allStatuses[sessionId]) {
           log("[tmux-session-manager] session ready", {
