@@ -55,6 +55,7 @@ mock.module('./pane-state-querier', () => ({
 mock.module('./action-executor', () => ({
   executeActions: mockExecuteActions,
   executeAction: mockExecuteAction,
+  executeActionWithDeps: mockExecuteAction,
 }))
 
 mock.module('../../shared/tmux', () => {
