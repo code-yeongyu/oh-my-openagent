@@ -4,6 +4,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import type { ToolPermission } from "../../features/hook-message-injector"
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 import {
   ABORT_WINDOW_MS,
@@ -162,8 +163,9 @@ export async function handleSessionIdle(args: {
 
   log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents, hasCompactionMessage })
 
-  if (resolvedInfo?.agent && skipAgents.includes(resolvedInfo.agent)) {
-    log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedInfo.agent })
+  const resolvedAgentName = resolvedInfo?.agent
+  if (resolvedAgentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(resolvedAgentName))) {
+    log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedAgentName })
     return
   }
   if (hasCompactionMessage && !resolvedInfo?.agent) {
