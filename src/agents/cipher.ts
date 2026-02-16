@@ -289,9 +289,9 @@ export function createCipherAgent(model: string): AgentConfig {
   } as AgentConfig
 
   if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
+    return { ...base, maxTokens: 64000, reasoningEffort: "medium", textVerbosity: "high" } as AgentConfig
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
+  return { ...base, maxTokens: 64000, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
 }
 createCipherAgent.mode = MODE
