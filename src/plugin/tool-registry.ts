@@ -48,7 +48,11 @@ export function createToolRegistry(args: {
   const { ctx, pluginConfig, managers, skillContext, availableCategories } = args
 
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
-  const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager)
+  const callOmoAgent = createCallOmoAgent(
+    ctx,
+    managers.backgroundManager,
+    pluginConfig.disabled_agents ?? [],
+  )
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
