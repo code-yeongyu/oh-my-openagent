@@ -123,6 +123,12 @@
         "type": "string"
       }
     },
+    "agent_display_names": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
     "agents": {
       "type": "object",
       "properties": {
