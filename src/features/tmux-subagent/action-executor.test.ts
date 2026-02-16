@@ -86,6 +86,7 @@ describe("executeAction", () => {
 		expect(mockApplyLayout).toHaveBeenCalledTimes(1)
 		expect(mockApplyLayout).toHaveBeenCalledWith("main-horizontal", 55)
 		expect(mockEnforceMainPaneWidth).toHaveBeenCalledTimes(1)
+		expect(mockEnforceMainPaneWidth).toHaveBeenCalledWith("%0", 220, 55)
 	})
 
 	test("does not apply layout when spawn fails", async () => {
