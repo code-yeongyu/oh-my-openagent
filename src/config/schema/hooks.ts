@@ -45,7 +45,6 @@ export const HookNameSchema = z.enum([
   "tasks-todowrite-disabler",
   "write-existing-file-guard",
   "anthropic-effort",
-  "hashline-edit-disabler",
   "hashline-read-enhancer",
 ])
 

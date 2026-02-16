@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, beforeEach } from "bun:test"
 import { createHashlineReadEnhancerHook } from "./hook"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { setProvider, clearProvider } from "../../features/hashline-provider-state"
 
 //#given - Test setup helpers
 function createMockContext(): PluginInput {
@@ -27,11 +26,6 @@ describe("createHashlineReadEnhancerHook", () => {
 
   beforeEach(() => {
     mockCtx = createMockContext()
-    clearProvider(sessionID)
-  })
-
-  afterEach(() => {
-    clearProvider(sessionID)
   })
 
   describe("tool name matching", () => {
@@ -117,51 +111,6 @@ describe("createHashlineReadEnhancerHook", () => {
 
       //#then
       expect(output.output).toBe(originalOutput)
-    })
-  })
-
-  describe("provider check", () => {
-    it("should skip when provider is OpenAI", async () => {
-      //#given
-      setProvider(sessionID, "openai")
-      const hook = createHashlineReadEnhancerHook(mockCtx, createMockConfig(true))
-      const input = { tool: "read", sessionID, callID: "call-1" }
-      const originalOutput = "1: hello\n2: world"
-      const output = { title: "Read", output: originalOutput, metadata: {} }
-
-      //#when
-      await hook["tool.execute.after"](input, output)
-
-      //#then
-      expect(output.output).toBe(originalOutput)
-    })
-
-    it("should process when provider is Claude", async () => {
-      //#given
-      setProvider(sessionID, "anthropic")
-      const hook = createHashlineReadEnhancerHook(mockCtx, createMockConfig(true))
-      const input = { tool: "read", sessionID, callID: "call-1" }
-      const output = { title: "Read", output: "1: hello\n2: world", metadata: {} }
-
-      //#when
-      await hook["tool.execute.after"](input, output)
-
-      //#then
-      expect(output.output).toContain("|")
-    })
-
-    it("should process when provider is unknown (undefined)", async () => {
-      //#given
-      // Provider not set, getProvider returns undefined
-      const hook = createHashlineReadEnhancerHook(mockCtx, createMockConfig(true))
-      const input = { tool: "read", sessionID, callID: "call-1" }
-      const output = { title: "Read", output: "1: hello\n2: world", metadata: {} }
-
-      //#when
-      await hook["tool.execute.after"](input, output)
-
-      //#then
-      expect(output.output).toContain("|")
     })
   })
 

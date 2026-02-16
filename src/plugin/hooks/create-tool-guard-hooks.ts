@@ -10,7 +10,6 @@ import {
   createRulesInjectorHook,
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
-  createHashlineEditDisablerHook,
   createHashlineReadEnhancerHook,
 } from "../../hooks"
 import {
@@ -30,7 +29,6 @@ export type ToolGuardHooks = {
   rulesInjector: ReturnType<typeof createRulesInjectorHook> | null
   tasksTodowriteDisabler: ReturnType<typeof createTasksTodowriteDisablerHook> | null
   writeExistingFileGuard: ReturnType<typeof createWriteExistingFileGuardHook> | null
-  hashlineEditDisabler: ReturnType<typeof createHashlineEditDisablerHook> | null
   hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
 }
 
@@ -89,10 +87,6 @@ export function createToolGuardHooks(args: {
     ? safeHook("write-existing-file-guard", () => createWriteExistingFileGuardHook(ctx))
     : null
 
-  const hashlineEditDisabler = isHookEnabled("hashline-edit-disabler")
-    ? safeHook("hashline-edit-disabler", () => createHashlineEditDisablerHook(pluginConfig))
-    : null
-
   const hashlineReadEnhancer = isHookEnabled("hashline-read-enhancer")
     ? safeHook("hashline-read-enhancer", () => createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.experimental?.hashline_edit ?? false } }))
     : null
@@ -106,7 +100,6 @@ export function createToolGuardHooks(args: {
     rulesInjector,
     tasksTodowriteDisabler,
     writeExistingFileGuard,
-    hashlineEditDisabler,
     hashlineReadEnhancer,
   }
 }

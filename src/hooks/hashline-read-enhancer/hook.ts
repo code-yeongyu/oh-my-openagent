@@ -1,5 +1,4 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getProvider } from "../../features/hashline-provider-state"
 import { computeLineHash } from "../../tools/hashline-edit/hash-computation"
 
 interface HashlineReadEnhancerConfig {
@@ -12,15 +11,8 @@ function isReadTool(toolName: string): boolean {
   return toolName.toLowerCase() === "read"
 }
 
-function shouldProcess(sessionID: string, config: HashlineReadEnhancerConfig): boolean {
-  if (!config.hashline_edit?.enabled) {
-    return false
-  }
-  const providerID = getProvider(sessionID)
-  if (providerID === "openai") {
-    return false
-  }
-  return true
+function shouldProcess(config: HashlineReadEnhancerConfig): boolean {
+  return config.hashline_edit?.enabled ?? false
 }
 
 function isTextFile(output: string): boolean {
@@ -65,7 +57,7 @@ export function createHashlineReadEnhancerHook(
       if (typeof output.output !== "string") {
         return
       }
-      if (!shouldProcess(input.sessionID, config)) {
+      if (!shouldProcess(config)) {
         return
       }
       output.output = transformOutput(output.output)
