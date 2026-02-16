@@ -148,7 +148,7 @@ ${todoList}`
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
-      injectionState.consecutiveFailures += 1
+      injectionState.consecutiveFailures = (injectionState.consecutiveFailures ?? 0) + 1
     }
   }
 }
