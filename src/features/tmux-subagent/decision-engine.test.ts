@@ -112,6 +112,21 @@ describe("canSplitPaneAnyDirection", () => {
     // then
     expect(result).toBe(false)
   })
+
+  it("#given custom minPaneWidth #when pane fits smaller width #then returns true", () => {
+    //#given - pane too small for default MIN_PANE_WIDTH(52) but fits custom 30
+    const customMin = 30
+    const customMinSplitW = 2 * customMin + 1
+    const pane = createPane(customMinSplitW, MIN_SPLIT_HEIGHT - 1)
+
+    //#when
+    const defaultResult = canSplitPaneAnyDirection(pane)
+    const customResult = canSplitPaneAnyDirection(pane, customMin)
+
+    //#then
+    expect(defaultResult).toBe(false)
+    expect(customResult).toBe(true)
+  })
 })
 
 describe("getBestSplitDirection", () => {
@@ -178,6 +193,21 @@ describe("getBestSplitDirection", () => {
 
     // then
     expect(result).toBe("-v")
+  })
+
+  it("#given custom minPaneWidth #when pane width below default but above custom #then returns -h", () => {
+    //#given
+    const customMin = 30
+    const customMinSplitW = 2 * customMin + 1
+    const pane = createPane(customMinSplitW, MIN_SPLIT_HEIGHT - 1)
+
+    //#when
+    const defaultResult = getBestSplitDirection(pane)
+    const customResult = getBestSplitDirection(pane, customMin)
+
+    //#then
+    expect(defaultResult).toBe(null)
+    expect(customResult).toBe("-h")
   })
 })
 
@@ -362,6 +392,20 @@ describe("calculateCapacity", () => {
     //#then
     expect(customCapacity.cols).toBeGreaterThanOrEqual(defaultCapacity.cols)
   })
+
+	it("#given non-50 main pane width #when calculating capacity #then uses real agent area width", () => {
+		//#given
+		const windowWidth = 220
+		const windowHeight = 44
+		const mainPaneWidth = 132
+
+		//#when
+		const capacity = calculateCapacity(windowWidth, windowHeight, 52, mainPaneWidth)
+
+		//#then
+		expect(capacity.cols).toBe(1)
+		expect(capacity.total).toBe(3)
+	})
 })
 
 describe("decideSpawnActions with custom agentPaneWidth", () => {
@@ -416,4 +460,40 @@ describe("decideSpawnActions with custom agentPaneWidth", () => {
       expect(result.actions[0].splitDirection).toBe("-h")
     }
   })
+
+	it("#given wider main pane #when capacity needs two evictions #then replace is chosen", () => {
+		//#given
+		const config: CapacityConfig = { mainPaneMinWidth: 120, agentPaneWidth: 40 }
+		const state = createWindowState(220, 44, [
+			{ paneId: "%1", width: 43, height: 44, left: 133, top: 0 },
+			{ paneId: "%2", width: 43, height: 44, left: 177, top: 0 },
+			{ paneId: "%3", width: 43, height: 21, left: 133, top: 22 },
+			{ paneId: "%4", width: 43, height: 21, left: 177, top: 22 },
+			{ paneId: "%5", width: 43, height: 21, left: 133, top: 33 },
+		])
+		state.mainPane = {
+			paneId: "%0",
+			width: 132,
+			height: 44,
+			left: 0,
+			top: 0,
+			title: "main",
+			isActive: true,
+		}
+		const mappings: SessionMapping[] = [
+			{ sessionId: "old-1", paneId: "%1", createdAt: new Date("2024-01-01") },
+			{ sessionId: "old-2", paneId: "%2", createdAt: new Date("2024-01-02") },
+			{ sessionId: "old-3", paneId: "%3", createdAt: new Date("2024-01-03") },
+			{ sessionId: "old-4", paneId: "%4", createdAt: new Date("2024-01-04") },
+			{ sessionId: "old-5", paneId: "%5", createdAt: new Date("2024-01-05") },
+		]
+
+		//#when
+		const result = decideSpawnActions(state, "ses-new", "new task", config, mappings)
+
+		//#then
+		expect(result.canSpawn).toBe(true)
+		expect(result.actions).toHaveLength(1)
+		expect(result.actions[0].type).toBe("replace")
+	})
 })

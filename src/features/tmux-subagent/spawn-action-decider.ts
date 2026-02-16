@@ -5,7 +5,7 @@ import type {
 	TmuxPaneInfo,
 	WindowState,
 } from "./types"
-import { MAIN_PANE_RATIO } from "./tmux-grid-constants"
+import { DIVIDER_SIZE } from "./tmux-grid-constants"
 import {
 	canSplitPane,
 	findMinimalEvictions,
@@ -26,7 +26,10 @@ export function decideSpawnActions(
 	}
 
 	const minPaneWidth = config.agentPaneWidth
-	const agentAreaWidth = Math.floor(state.windowWidth * (1 - MAIN_PANE_RATIO))
+	const agentAreaWidth = Math.max(
+		0,
+		state.windowWidth - state.mainPane.width - DIVIDER_SIZE,
+	)
 	const currentCount = state.agentPanes.length
 
 	if (agentAreaWidth < minPaneWidth) {
