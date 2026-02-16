@@ -2830,6 +2830,9 @@
         },
         "safe_hook_creation": {
           "type": "boolean"
+        },
+        "hashline_edit": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
