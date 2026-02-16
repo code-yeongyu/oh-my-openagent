@@ -5,6 +5,7 @@ import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { normalizeSDKResponse } from "../../shared"
 
 export async function executeUnstableAgentTask(
   args: DelegateTaskArgs,
@@ -77,6 +78,7 @@ export async function executeUnstableAgentTask(
     const pollStart = Date.now()
     let lastMsgCount = 0
     let stablePolls = 0
+    let terminalStatus: { status: string; error?: string } | undefined
 
     while (Date.now() - pollStart < timingCfg.MAX_POLL_TIME_MS) {
       if (ctx.abort?.aborted) {
@@ -85,8 +87,14 @@ export async function executeUnstableAgentTask(
 
       await new Promise(resolve => setTimeout(resolve, timingCfg.POLL_INTERVAL_MS))
 
+      const currentTask = manager.getTask(task.id)
+      if (currentTask && (currentTask.status === "interrupt" || currentTask.status === "error" || currentTask.status === "cancelled")) {
+        terminalStatus = { status: currentTask.status, error: currentTask.error }
+        break
+      }
+
       const statusResult = await client.session.status()
-      const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+      const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
       const sessionStatus = allStatuses[sessionID]
 
       if (sessionStatus && sessionStatus.type !== "idle") {
@@ -98,7 +106,9 @@ export async function executeUnstableAgentTask(
       if (Date.now() - pollStart < timingCfg.MIN_STABILITY_TIME_MS) continue
 
       const messagesCheck = await client.session.messages({ path: { id: sessionID } })
-      const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
+      const msgs = normalizeSDKResponse(messagesCheck, [] as Array<unknown>, {
+        preferResponseOnMissingData: true,
+      })
       const currentMsgCount = msgs.length
 
       if (currentMsgCount === lastMsgCount) {
@@ -110,8 +120,28 @@ export async function executeUnstableAgentTask(
       }
     }
 
+    if (terminalStatus) {
+      const duration = formatDuration(startTime)
+      return `SUPERVISED TASK FAILED (${terminalStatus.status})
+
+Task was interrupted/failed while running in monitored background mode.
+${terminalStatus.error ? `Error: ${terminalStatus.error}` : ""}
+
+Duration: ${duration}
+Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
+Model: ${actualModel}
+
+The task session may contain partial results.
+
+<task_metadata>
+session_id: ${sessionID}
+</task_metadata>`
+    }
+
     const messagesResult = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as SessionMessage[]
+    const messages = normalizeSDKResponse(messagesResult, [] as SessionMessage[], {
+      preferResponseOnMissingData: true,
+    })
 
     const assistantMessages = messages
       .filter((m) => m.info?.role === "assistant")

@@ -25,12 +25,13 @@ export async function runAggressiveTruncationStrategy(params: {
     targetRatio: TRUNCATE_CONFIG.targetTokenRatio,
   })
 
-  const aggressiveResult = truncateUntilTargetTokens(
+  const aggressiveResult = await truncateUntilTargetTokens(
     params.sessionID,
     params.currentTokens,
     params.maxTokens,
     TRUNCATE_CONFIG.targetTokenRatio,
     TRUNCATE_CONFIG.charsPerToken,
+    params.client,
   )
 
   if (aggressiveResult.truncatedCount <= 0) {
@@ -60,7 +61,7 @@ export async function runAggressiveTruncationStrategy(params: {
     clearSessionState(params.autoCompactState, params.sessionID)
     setTimeout(async () => {
       try {
-        await params.client.session.prompt_async({
+        await params.client.session.promptAsync({
           path: { id: params.sessionID },
           body: { auto: true } as never,
           query: { directory: params.directory },

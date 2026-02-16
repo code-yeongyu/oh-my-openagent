@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin";
+import { normalizeSDKResponse } from "./normalize-sdk-response"
 
 const ANTHROPIC_ACTUAL_LIMIT =
   process.env.ANTHROPIC_1M_CONTEXT === "true" ||
@@ -119,7 +120,7 @@ export async function getContextWindowUsage(
 			path: { id: sessionID },
 		});
 
-		const messages = (response.data ?? response) as MessageWrapper[];
+		const messages = normalizeSDKResponse(response, [] as MessageWrapper[], { preferResponseOnMissingData: true })
 
 		const assistantMessages = messages
 			.filter((m) => m.info.role === "assistant")

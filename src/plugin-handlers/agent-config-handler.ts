@@ -3,6 +3,7 @@ import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junio
 import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
+import { getAgentDisplayName } from "../shared/agent-display-names";
 import {
   discoverConfigSourceSkills,
   discoverOpencodeGlobalSkills,
@@ -13,6 +14,7 @@ import {
 import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent-loader";
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
+import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 
@@ -104,7 +106,7 @@ export async function applyAgentConfig(params: {
   const configAgent = params.config.agent as AgentConfigRecord | undefined;
 
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
-    (params.config as { default_agent?: string }).default_agent = "sisyphus";
+    (params.config as { default_agent?: string }).default_agent = getAgentDisplayName("sisyphus");
 
     const agentConfig: Record<string, unknown> = {
       sisyphus: builtinAgents.sisyphus,
@@ -193,6 +195,9 @@ export async function applyAgentConfig(params: {
   }
 
   if (params.config.agent) {
+    params.config.agent = remapAgentKeysToDisplayNames(
+      params.config.agent as Record<string, unknown>,
+    );
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,
     );

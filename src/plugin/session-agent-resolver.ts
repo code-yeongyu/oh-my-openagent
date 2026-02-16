@@ -1,4 +1,5 @@
 import { log } from "../shared"
+import { normalizeSDKResponse } from "../shared"
 
 interface SessionMessage {
   info?: {
@@ -19,7 +20,7 @@ export async function resolveSessionAgent(
 ): Promise<string | undefined> {
   try {
     const messagesResp = await client.session.messages({ path: { id: sessionId } })
-    const messages = (messagesResp.data ?? []) as SessionMessage[]
+    const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
 
     for (const msg of messages) {
       if (msg.info?.agent) {

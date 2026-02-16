@@ -1,6 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { findNearestMessageWithFields } from "../../features/hook-message-injector"
-import { getMessageDir } from "../../shared/session-utils"
+import {
+  findNearestMessageWithFields,
+  findNearestMessageWithFieldsFromSDK,
+} from "../../features/hook-message-injector"
+import { getMessageDir, isSqliteBackend, normalizeSDKResponse } from "../../shared"
 import type { ModelInfo } from "./types"
 
 export async function resolveRecentModelForSession(
@@ -9,9 +12,9 @@ export async function resolveRecentModelForSession(
 ): Promise<ModelInfo | undefined> {
   try {
     const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
-    const messages = (messagesResp.data ?? []) as Array<{
+    const messages = normalizeSDKResponse(messagesResp, [] as Array<{
       info?: { model?: ModelInfo; modelID?: string; providerID?: string }
-    }>
+    }>)
 
     for (let i = messages.length - 1; i >= 0; i--) {
       const info = messages[i].info
@@ -28,8 +31,13 @@ export async function resolveRecentModelForSession(
     // ignore - fallback to message storage
   }
 
-  const messageDir = getMessageDir(sessionID)
-  const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+  let currentMessage = null
+  if (isSqliteBackend()) {
+    currentMessage = await findNearestMessageWithFieldsFromSDK(ctx.client, sessionID)
+  } else {
+    const messageDir = getMessageDir(sessionID)
+    currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+  }
   const model = currentMessage?.model
   if (!model?.providerID || !model?.modelID) {
     return undefined
