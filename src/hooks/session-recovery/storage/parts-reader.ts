@@ -4,12 +4,9 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { PART_STORAGE } from "../constants"
 import type { StoredPart } from "../types"
 import { isSqliteBackend } from "../../../shared"
+import { isRecord } from "../../../shared/record-type-guard"
 
 type OpencodeClient = PluginInput["client"]
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
 
 function isStoredPart(value: unknown): value is StoredPart {
   if (!isRecord(value)) return false
@@ -57,7 +54,12 @@ export async function readPartsFromSDK(
     const rawParts = data.parts
     if (!Array.isArray(rawParts)) return []
 
-    return rawParts.filter(isStoredPart)
+    return rawParts
+      .map((part: unknown) => {
+        if (!isRecord(part) || typeof part.id !== "string" || typeof part.type !== "string") return null
+        return { ...part, sessionID, messageID } as StoredPart
+      })
+      .filter((part): part is StoredPart => part !== null)
   } catch {
     return []
   }

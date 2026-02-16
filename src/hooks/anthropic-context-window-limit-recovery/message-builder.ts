@@ -64,7 +64,7 @@ async function findEmptyMessageIdsFromSDK(
     const response = (await client.session.messages({
       path: { id: sessionID },
     })) as { data?: SDKMessage[] }
-    const messages = response.data ?? []
+    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
 
     const emptyIds: string[] = []
     for (const message of messages) {

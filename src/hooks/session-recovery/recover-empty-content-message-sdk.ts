@@ -126,7 +126,7 @@ function sdkPartHasContent(part: SdkPart): boolean {
     return true
   }
 
-  return false
+  return true
 }
 
 function sdkMessageHasContent(message: MessageData): boolean {
@@ -136,7 +136,7 @@ function sdkMessageHasContent(message: MessageData): boolean {
 async function readMessagesFromSDK(client: Client, sessionID: string): Promise<MessageData[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    return (response.data ?? []) as MessageData[]
+    return ((response.data ?? response) as unknown as MessageData[]) ?? []
   } catch {
     return []
   }

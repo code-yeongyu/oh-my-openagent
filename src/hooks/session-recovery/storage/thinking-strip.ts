@@ -42,7 +42,7 @@ export async function stripThinkingPartsAsync(
 ): Promise<boolean> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as Array<{ parts?: Array<{ type: string; id: string }> }>
+    const messages = ((response.data ?? response) as unknown as Array<{ parts?: Array<{ type: string; id: string }> }>) ?? []
 
     const targetMsg = messages.find((m) => {
       const info = (m as Record<string, unknown>)["info"] as Record<string, unknown> | undefined

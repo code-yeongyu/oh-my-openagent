@@ -74,7 +74,7 @@ async function findLastThinkingContentFromSDK(
 ): Promise<string> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as MessageData[]
+    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
 
     const currentIndex = messages.findIndex((m) => m.info?.id === beforeMessageID)
     if (currentIndex === -1) return ""

@@ -32,7 +32,7 @@ export async function findToolResultsBySizeFromSDK(
 ): Promise<ToolResultInfo[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as SDKMessage[]
+    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
     const results: ToolResultInfo[] = []
 
     for (const msg of messages) {
@@ -98,7 +98,7 @@ export async function countTruncatedResultsFromSDK(
 ): Promise<number> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as SDKMessage[]
+    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
     let count = 0
 
     for (const msg of messages) {

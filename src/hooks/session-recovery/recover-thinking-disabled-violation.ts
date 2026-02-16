@@ -38,7 +38,7 @@ async function recoverThinkingDisabledViolationFromSDK(
 ): Promise<boolean> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as MessageData[]
+    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
 
     const messageIDsWithThinking: string[] = []
     for (const msg of messages) {

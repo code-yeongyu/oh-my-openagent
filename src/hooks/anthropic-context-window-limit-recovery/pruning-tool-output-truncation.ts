@@ -108,7 +108,7 @@ async function truncateToolOutputsByCallIdFromSDK(
 ): Promise<{ truncatedCount: number }> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as SDKMessage[]
+    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
     let truncatedCount = 0
 
     for (const msg of messages) {
