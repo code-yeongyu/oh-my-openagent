@@ -104,7 +104,7 @@ export async function countTruncatedResultsFromSDK(
     for (const msg of messages) {
       if (!msg.parts) continue
       for (const part of msg.parts) {
-        if (part.state?.time?.compacted) count++
+        if (part.type === "tool" && part.state?.time?.compacted) count++
       }
     }
 

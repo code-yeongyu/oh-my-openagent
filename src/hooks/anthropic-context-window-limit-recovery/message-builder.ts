@@ -51,8 +51,9 @@ function messageHasContentFromSDK(message: SDKMessage): boolean {
     return true
   }
 
-  // Messages with only thinking/meta parts are NOT empty — they have content
-  return hasIgnoredParts
+  // Messages with only thinking/meta parts are treated as empty
+  // to align with file-based logic (messageHasContent)
+  return false
 }
 
 async function findEmptyMessageIdsFromSDK(
