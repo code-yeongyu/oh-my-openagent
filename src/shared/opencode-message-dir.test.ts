@@ -71,6 +71,30 @@ describe("getMessageDir", () => {
     expect(result).toBe(sessionDir)
   })
 
+  it("returns null for path traversal attempts with ..", () => {
+    //#given - sessionID containing path traversal
+    //#when
+    const result = getMessageDir("ses_../etc/passwd")
+    //#then
+    expect(result).toBe(null)
+  })
+
+  it("returns null for path traversal attempts with forward slash", () => {
+    //#given - sessionID containing forward slash
+    //#when
+    const result = getMessageDir("ses_foo/bar")
+    //#then
+    expect(result).toBe(null)
+  })
+
+  it("returns null for path traversal attempts with backslash", () => {
+    //#given - sessionID containing backslash
+    //#when
+    const result = getMessageDir("ses_foo\\bar")
+    //#then
+    expect(result).toBe(null)
+  })
+
   it("returns null when session not found anywhere", () => {
     //#given
     mkdirSync(join(TEST_MESSAGE_STORAGE, "subdir1"), { recursive: true })
