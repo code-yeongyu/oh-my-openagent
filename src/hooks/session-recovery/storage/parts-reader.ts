@@ -8,16 +8,6 @@ import { isRecord } from "../../../shared/record-type-guard"
 
 type OpencodeClient = PluginInput["client"]
 
-function isStoredPart(value: unknown): value is StoredPart {
-  if (!isRecord(value)) return false
-  return (
-    typeof value.id === "string" &&
-    typeof value.sessionID === "string" &&
-    typeof value.messageID === "string" &&
-    typeof value.type === "string"
-  )
-}
-
 export function readParts(messageID: string): StoredPart[] {
   if (isSqliteBackend()) return []
 
