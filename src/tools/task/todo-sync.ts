@@ -139,6 +139,7 @@ export async function syncAllTasksToTodos(
   ctx: PluginInput,
   tasks: Task[],
   sessionID?: string,
+  writer?: TodoWriter,
 ): Promise<void> {
   try {
     let currentTodos: TodoInfo[] = [];
@@ -156,8 +157,10 @@ export async function syncAllTasksToTodos(
 
     const newTodos: TodoInfo[] = [];
     const tasksToRemove = new Set<string>();
+    const allTaskSubjects = new Set<string>();
 
     for (const task of tasks) {
+      allTaskSubjects.add(task.subject);
       const todo = syncTaskToTodo(task);
       if (todo === null) {
         tasksToRemove.add(task.id);
@@ -176,12 +179,18 @@ export async function syncAllTasksToTodos(
       const isInNewTodos = newTodos.some((newTodo) => todosMatch(existing, newTodo));
       const isRemovedById = existing.id ? tasksToRemove.has(existing.id) : false;
       const isRemovedByContent = !existing.id && removedTaskSubjects.has(existing.content);
-      if (!isInNewTodos && !isRemovedById && !isRemovedByContent) {
+      const isReplacedByTask = !existing.id && allTaskSubjects.has(existing.content);
+      if (!isInNewTodos && !isRemovedById && !isRemovedByContent && !isReplacedByTask) {
         finalTodos.push(existing);
       }
     }
 
     finalTodos.push(...newTodos);
+
+    const resolvedWriter = writer ?? (await resolveTodoWriter());
+    if (resolvedWriter && sessionID) {
+      await resolvedWriter({ sessionID, todos: finalTodos });
+    }
 
     log("[todo-sync] Synced todos", {
       count: finalTodos.length,
