@@ -1,0 +1,8 @@
+# Auto-generated .gitattributes for cross-platform line ending consistency
+# Default: LF for all text files
+* text=auto eol=lf
+
+# Binary files
+*.jpg binary
+*.png binary
+
