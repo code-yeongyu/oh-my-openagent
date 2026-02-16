@@ -1003,6 +1003,52 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
   })
 })
 
+describe("BackgroundManager.notifyParentSession - notifications toggle", () => {
+  test("should skip parent prompt injection when notifications are disabled", async () => {
+    //#given
+    let promptCalled = false
+    const promptMock = async () => {
+      promptCalled = true
+      return {}
+    }
+    const client = {
+      session: {
+        prompt: promptMock,
+        promptAsync: promptMock,
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager(
+      { client, directory: tmpdir() } as unknown as PluginInput,
+      undefined,
+      { enableParentSessionNotifications: false },
+    )
+    const task: BackgroundTask = {
+      id: "task-no-parent-notification",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task notifications disabled",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalled).toBe(false)
+
+    manager.shutdown()
+  })
+})
+
 function buildNotificationPromptBody(
   task: BackgroundTask,
   currentMessage: CurrentMessage | null

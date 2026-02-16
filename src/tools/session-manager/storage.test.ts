@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test"
-import { mkdirSync, writeFileSync, rmSync, existsSync } from "node:fs"
+import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
@@ -38,6 +38,27 @@ mock.module("../../shared/opencode-storage-paths", () => ({
   SESSION_STORAGE: TEST_SESSION_STORAGE,
 }))
 
+mock.module("../../shared/opencode-message-dir", () => ({
+  getMessageDir: (sessionID: string) => {
+    if (!sessionID.startsWith("ses_")) return null
+    if (/[/\\]|\.\./.test(sessionID)) return null
+    if (!existsSync(TEST_MESSAGE_STORAGE)) return null
+
+    const directPath = join(TEST_MESSAGE_STORAGE, sessionID)
+    if (existsSync(directPath)) {
+      return directPath
+    }
+
+    for (const dir of readdirSync(TEST_MESSAGE_STORAGE)) {
+      const nestedPath = join(TEST_MESSAGE_STORAGE, dir, sessionID)
+      if (existsSync(nestedPath)) {
+        return nestedPath
+      }
+    }
+
+    return null
+  },
+}))
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
   await import("./storage")
 

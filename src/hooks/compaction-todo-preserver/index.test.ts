@@ -1,5 +1,7 @@
-import { describe, expect, it, mock } from "bun:test"
+import { describe, expect, it, afterAll, mock } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
+import { createOpencodeClient } from "@opencode-ai/sdk"
+import type { Todo } from "@opencode-ai/sdk"
 import { createCompactionTodoPreserverHook } from "./index"
 
 const updateMock = mock(async () => {})
@@ -10,27 +12,37 @@ mock.module("opencode/session/todo", () => ({
   },
 }))
 
-type TodoSnapshot = {
-  id: string
-  content: string
-  status: "pending" | "in_progress" | "completed" | "cancelled"
-  priority?: "low" | "medium" | "high"
-}
-
-function createMockContext(todoResponses: TodoSnapshot[][]): PluginInput {
-  let callIndex = 0
-  return {
-    client: {
-      session: {
-        todo: async () => {
-          const current = todoResponses[Math.min(callIndex, todoResponses.length - 1)] ?? []
-          callIndex += 1
-          return { data: current }
-        },
-      },
+afterAll(() => {
+  mock.module("opencode/session/todo", () => ({
+    Todo: {
+      update: async () => {},
     },
+  }))
+})
+
+function createMockContext(todoResponses: Array<Todo>[]): PluginInput {
+  let callIndex = 0
+
+  const client = createOpencodeClient({ directory: "/tmp/test" })
+  type SessionTodoOptions = Parameters<typeof client.session.todo>[0]
+  type SessionTodoResult = ReturnType<typeof client.session.todo>
+
+  const request = new Request("http://localhost")
+  const response = new Response()
+  client.session.todo = mock((_: SessionTodoOptions): SessionTodoResult => {
+    const current = todoResponses[Math.min(callIndex, todoResponses.length - 1)] ?? []
+    callIndex += 1
+    return Promise.resolve({ data: current, error: undefined, request, response })
+  })
+
+  return {
+    client,
+    project: { id: "test-project", worktree: "/tmp/test", time: { created: Date.now() } },
     directory: "/tmp/test",
-  } as PluginInput
+    worktree: "/tmp/test",
+    serverUrl: new URL("http://localhost"),
+    $: Bun.$,
+  }
 }
 
 describe("compaction-todo-preserver", () => {
@@ -38,7 +50,7 @@ describe("compaction-todo-preserver", () => {
     //#given
     updateMock.mockClear()
     const sessionID = "session-compaction-missing"
-    const todos = [
+    const todos: Todo[] = [
       { id: "1", content: "Task 1", status: "pending", priority: "high" },
       { id: "2", content: "Task 2", status: "in_progress", priority: "medium" },
     ]
@@ -58,7 +70,7 @@ describe("compaction-todo-preserver", () => {
     //#given
     updateMock.mockClear()
     const sessionID = "session-compaction-present"
-    const todos = [
+    const todos: Todo[] = [
       { id: "1", content: "Task 1", status: "pending", priority: "high" },
     ]
     const ctx = createMockContext([todos, todos])

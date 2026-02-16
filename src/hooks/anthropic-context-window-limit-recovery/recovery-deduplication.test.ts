@@ -1,12 +1,17 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test"
+import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ExperimentalConfig } from "../../config"
+import * as originalDeduplicationRecovery from "./deduplication-recovery"
 
 const attemptDeduplicationRecoveryMock = mock(async () => {})
 
 mock.module("./deduplication-recovery", () => ({
   attemptDeduplicationRecovery: attemptDeduplicationRecoveryMock,
 }))
+
+afterAll(() => {
+  mock.module("./deduplication-recovery", () => originalDeduplicationRecovery)
+})
 
 function createImmediateTimeouts(): () => void {
   const originalSetTimeout = globalThis.setTimeout
