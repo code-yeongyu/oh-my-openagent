@@ -55,16 +55,19 @@ export interface EventPayload {
 
 export interface SessionIdleProps {
   sessionID?: string
+  sessionId?: string
 }
 
 export interface SessionStatusProps {
   sessionID?: string
+  sessionId?: string
   status?: { type?: string }
 }
 
 export interface MessageUpdatedProps {
   info?: {
     sessionID?: string
+    sessionId?: string
     role?: string
     modelID?: string
     providerID?: string
@@ -73,28 +76,47 @@ export interface MessageUpdatedProps {
 }
 
 export interface MessagePartUpdatedProps {
-  info?: { sessionID?: string; role?: string }
+  /** @deprecated Legacy structure — current OpenCode puts sessionID inside part */
+  info?: { sessionID?: string; sessionId?: string; role?: string }
   part?: {
+    id?: string
+    sessionID?: string
+    sessionId?: string
+    messageID?: string
     type?: string
     text?: string
+    /** Tool name (for part.type === "tool") */
+    tool?: string
+    /** Tool state (for part.type === "tool") */
+    state?: { status?: string; input?: Record<string, unknown>; output?: string }
     name?: string
     input?: unknown
+    time?: { start?: number; end?: number }
   }
 }
 
 export interface ToolExecuteProps {
   sessionID?: string
+  sessionId?: string
   name?: string
   input?: Record<string, unknown>
 }
 
 export interface ToolResultProps {
   sessionID?: string
+  sessionId?: string
   name?: string
   output?: string
 }
 
 export interface SessionErrorProps {
   sessionID?: string
+  sessionId?: string
   error?: unknown
+}
+
+export interface TuiToastShowProps {
+  title?: string
+  message?: string
+  variant?: "info" | "success" | "warning" | "error"
 }

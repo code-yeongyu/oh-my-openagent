@@ -127,11 +127,14 @@ describe("integration: --session-id", () => {
     const mockClient = createMockClient({ data: { id: sessionId } })
 
     // when
-    const result = await resolveSession({ client: mockClient, sessionId })
+    const result = await resolveSession({ client: mockClient, sessionId, directory: "/test" })
 
     // then
     expect(result).toBe(sessionId)
-    expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: sessionId } })
+    expect(mockClient.session.get).toHaveBeenCalledWith({
+      path: { id: sessionId },
+      query: { directory: "/test" },
+    })
     expect(mockClient.session.create).not.toHaveBeenCalled()
   })
 
@@ -141,11 +144,14 @@ describe("integration: --session-id", () => {
     const mockClient = createMockClient({ error: { message: "Session not found" } })
 
     // when
-    const result = resolveSession({ client: mockClient, sessionId })
+    const result = resolveSession({ client: mockClient, sessionId, directory: "/test" })
 
     // then
     await expect(result).rejects.toThrow(`Session not found: ${sessionId}`)
-    expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: sessionId } })
+    expect(mockClient.session.get).toHaveBeenCalledWith({
+      path: { id: sessionId },
+      query: { directory: "/test" },
+    })
     expect(mockClient.session.create).not.toHaveBeenCalled()
   })
 })
