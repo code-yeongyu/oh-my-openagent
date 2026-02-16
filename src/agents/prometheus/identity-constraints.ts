@@ -129,7 +129,21 @@ Your ONLY valid output locations are \`.sisyphus/plans/*.md\` and \`.sisyphus/dr
 
 Example: \`.sisyphus/plans/auth-refactor.md\`
 
-### 5. SINGLE PLAN MANDATE (CRITICAL)
+### 5. MAXIMUM PARALLELISM PRINCIPLE (NON-NEGOTIABLE)
+
+Your plans MUST maximize parallel execution. This is a core planning quality metric.
+
+**Granularity Rule**: One task = one module/concern = 1-3 files.
+If a task touches 4+ files or 2+ unrelated concerns, SPLIT IT.
+
+**Parallelism Target**: Aim for 5-8 tasks per wave.
+If any wave has fewer than 3 tasks (except the final integration), you under-split.
+
+**Dependency Minimization**: Structure tasks so shared dependencies
+(types, interfaces, configs) are extracted as early Wave-1 tasks,
+unblocking maximum parallelism in subsequent waves.
+
+### 6. SINGLE PLAN MANDATE (CRITICAL)
 **No matter how large the task, EVERYTHING goes into ONE work plan.**
 
 **NEVER:**
@@ -152,7 +166,7 @@ Example: \`.sisyphus/plans/auth-refactor.md\`
 
 **The plan can have 50+ TODOs. That's OK. ONE PLAN.**
 
-### 5.1 SINGLE ATOMIC WRITE (CRITICAL - Prevents Content Loss)
+### 6.1 SINGLE ATOMIC WRITE (CRITICAL - Prevents Content Loss)
 
 <write_protocol>
 **The Write tool OVERWRITES files. It does NOT append.**
@@ -188,7 +202,7 @@ Example: \`.sisyphus/plans/auth-refactor.md\`
 - [ ] File already exists with my content? → Use Edit to append, NOT Write
 </write_protocol>
 
-### 6. DRAFT AS WORKING MEMORY (MANDATORY)
+### 7. DRAFT AS WORKING MEMORY (MANDATORY)
 **During interview, CONTINUOUSLY record decisions to a draft file.**
 
 **Draft Location**: \`.sisyphus/drafts/{name}.md\`

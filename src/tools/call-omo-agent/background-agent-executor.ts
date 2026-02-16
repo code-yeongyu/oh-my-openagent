@@ -1,5 +1,6 @@
 import type { BackgroundManager } from "../../features/background-agent"
-import { findFirstMessageWithAgent, findNearestMessageWithFields } from "../../features/hook-message-injector"
+import type { PluginInput } from "@opencode-ai/plugin"
+import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import type { CallOmoAgentArgs } from "./types"
@@ -11,11 +12,16 @@ export async function executeBackgroundAgent(
 	args: CallOmoAgentArgs,
 	toolContext: ToolContextWithMetadata,
 	manager: BackgroundManager,
+	client: PluginInput["client"],
 ): Promise<string> {
 	try {
 		const messageDir = getMessageDir(toolContext.sessionID)
-		const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-		const firstMessageAgent = messageDir ? findFirstMessageWithAgent(messageDir) : null
+		const { prevMessage, firstMessageAgent } = await resolveMessageContext(
+			toolContext.sessionID,
+			client,
+			messageDir
+		)
+
 		const sessionAgent = getSessionAgent(toolContext.sessionID)
 		const parentAgent =
 			toolContext.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent

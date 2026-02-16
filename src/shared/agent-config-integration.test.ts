@@ -93,10 +93,10 @@ describe("Agent Config Integration", () => {
 
       // then - display names are correct
       expect(displayNames).toContain("Sisyphus (Ultraworker)")
-      expect(displayNames).toContain("Atlas (Plan Execution Orchestrator)")
+      expect(displayNames).toContain("Atlas (Plan Executor)")
       expect(displayNames).toContain("Prometheus (Plan Builder)")
       expect(displayNames).toContain("Metis (Plan Consultant)")
-      expect(displayNames).toContain("Momus (Plan Reviewer)")
+      expect(displayNames).toContain("Momus (Plan Critic)")
       expect(displayNames).toContain("oracle")
       expect(displayNames).toContain("librarian")
       expect(displayNames).toContain("explore")
@@ -112,9 +112,9 @@ describe("Agent Config Integration", () => {
 
       // then - correct display names are returned
       expect(displayNames[0]).toBe("Sisyphus (Ultraworker)")
-      expect(displayNames[1]).toBe("Atlas (Plan Execution Orchestrator)")
+      expect(displayNames[1]).toBe("Atlas (Plan Executor)")
       expect(displayNames[2]).toBe("Sisyphus (Ultraworker)")
-      expect(displayNames[3]).toBe("Atlas (Plan Execution Orchestrator)")
+      expect(displayNames[3]).toBe("Atlas (Plan Executor)")
       expect(displayNames[4]).toBe("Prometheus (Plan Builder)")
       expect(displayNames[5]).toBe("Prometheus (Plan Builder)")
     })
@@ -218,7 +218,7 @@ describe("Agent Config Integration", () => {
 
       // then - display names are correct
       expect(sisyphusDisplay).toBe("Sisyphus (Ultraworker)")
-      expect(atlasDisplay).toBe("Atlas (Plan Execution Orchestrator)")
+      expect(atlasDisplay).toBe("Atlas (Plan Executor)")
     })
   })
 })

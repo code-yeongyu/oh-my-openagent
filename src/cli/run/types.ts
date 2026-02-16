@@ -34,10 +34,10 @@ export interface RunContext {
 }
 
 export interface Todo {
-  id: string
-  content: string
-  status: string
-  priority: string
+  id?: string;
+  content: string;
+  status: string;
+  priority: string;
 }
 
 export interface SessionStatus {

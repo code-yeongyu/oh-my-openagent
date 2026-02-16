@@ -4,6 +4,8 @@ import { isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { parseModelString } from "./model-string-parser"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { getAgentDisplayName, getAgentConfigKey } from "../../shared/agent-display-names"
+import { normalizeSDKResponse } from "../../shared"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 
@@ -47,17 +49,22 @@ Create the work plan directly - that's your job as the planning agent.`,
   try {
     const agentsResult = await client.app.agents()
     type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all"; model?: { providerID: string; modelID: string } }
-    const agents = (agentsResult as { data?: AgentInfo[] }).data ?? agentsResult as unknown as AgentInfo[]
+    const agents = normalizeSDKResponse(agentsResult, [] as AgentInfo[], {
+      preferResponseOnMissingData: true,
+    })
 
     const callableAgents = agents.filter((a) => a.mode !== "primary")
 
+    const resolvedDisplayName = getAgentDisplayName(agentToUse)
     const matchedAgent = callableAgents.find(
       (agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
+        || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase()
     )
     if (!matchedAgent) {
       const isPrimaryAgent = agents
         .filter((a) => a.mode === "primary")
-        .find((agent) => agent.name.toLowerCase() === agentToUse.toLowerCase())
+        .find((agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
+          || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase())
 
       if (isPrimaryAgent) {
         return {
@@ -80,10 +87,10 @@ Create the work plan directly - that's your job as the planning agent.`,
 
     agentToUse = matchedAgent.name
 
-    const agentNameLower = agentToUse.toLowerCase()
-    const agentOverride = agentOverrides?.[agentNameLower as keyof typeof agentOverrides]
-      ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentNameLower)?.[1] : undefined)
-    const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentNameLower]
+    const agentConfigKey = getAgentConfigKey(agentToUse)
+    const agentOverride = agentOverrides?.[agentConfigKey as keyof typeof agentOverrides]
+      ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1] : undefined)
+    const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentConfigKey]
 
     if (agentOverride?.model || agentRequirement || matchedAgent.model) {
       const availableModels = await getAvailableModelsForDelegateTask(client)

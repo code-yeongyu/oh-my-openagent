@@ -1,1 +1,1 @@
-export { getMessageDir } from "./message-storage-locator"
+export { getMessageDir } from "../../shared"

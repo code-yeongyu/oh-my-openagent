@@ -66,7 +66,6 @@ export async function buildPrometheusAgentConfig(params: {
     params.pluginPrometheusOverride?.maxTokens ?? categoryConfig?.maxTokens;
 
   const base: Record<string, unknown> = {
-    name: "prometheus",
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",

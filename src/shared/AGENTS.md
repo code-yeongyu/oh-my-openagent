@@ -2,21 +2,21 @@
 
 ## OVERVIEW
 
-84 cross-cutting utilities across 6 subdirectories. Import via barrel: `import { log, deepMerge } from "../../shared"`
+96 cross-cutting utilities across 4 subdirectories. Import via barrel: `import { log, deepMerge } from "../../shared"`
 
 ## STRUCTURE
 ```
 shared/
 ├── logger.ts                  # File logging (/tmp/oh-my-opencode.log) — 62 imports
-├── dynamic-truncator.ts       # Token-aware context window management (201 lines)
-├── model-resolver.ts          # 3-step resolution (Override → Fallback → Default)
-├── model-availability.ts      # Provider model fetching & fuzzy matching (358 lines)
-├── model-requirements.ts      # Agent/category fallback chains (160 lines)
-├── model-resolution-pipeline.ts # Pipeline orchestration (175 lines)
+├── dynamic-truncator.ts       # Token-aware context window management (202 lines)
+├── model-resolver.ts          # 3-step resolution entry point (65 lines)
+├── model-availability.ts      # Provider model fetching & fuzzy matching (359 lines)
+├── model-requirements.ts      # Agent/category fallback chains (161 lines) — 11 imports
+├── model-resolution-pipeline.ts # Pipeline orchestration (176 lines)
 ├── model-resolution-types.ts  # Resolution request/provenance types
 ├── model-sanitizer.ts         # Model name sanitization
 ├── model-name-matcher.ts      # Model name matching (91 lines)
-├── model-suggestion-retry.ts  # Suggest models on failure (129 lines)
+├── model-suggestion-retry.ts  # Suggest models on failure (144 lines)
 ├── model-cache-availability.ts # Cache availability checking
 ├── fallback-model-availability.ts # Fallback model logic (67 lines)
 ├── available-models-fetcher.ts # Fetch models from providers (114 lines)
@@ -27,42 +27,34 @@ shared/
 ├── session-utils.ts           # Session cursor, orchestrator detection
 ├── session-cursor.ts          # Message cursor tracking (85 lines)
 ├── session-injected-paths.ts  # Injected file path tracking
-├── permission-compat.ts       # Tool restriction enforcement (86 lines)
+├── permission-compat.ts       # Tool restriction enforcement (87 lines) — 9 imports
 ├── agent-tool-restrictions.ts # Tool restriction definitions
 ├── agent-variant.ts           # Agent variant from config (91 lines)
 ├── agent-display-names.ts     # Agent display name mapping
 ├── first-message-variant.ts   # First message variant types
 ├── opencode-config-dir.ts     # ~/.config/opencode resolution (138 lines)
 ├── claude-config-dir.ts       # ~/.claude resolution
-├── data-path.ts               # XDG-compliant storage (47 lines)
+├── data-path.ts               # XDG-compliant storage (47 lines) — 11 imports
 ├── jsonc-parser.ts            # JSONC with comment support (66 lines)
 ├── frontmatter.ts             # YAML frontmatter extraction (31 lines) — 10 imports
 ├── deep-merge.ts              # Recursive merge (proto-pollution safe, MAX_DEPTH=50)
 ├── shell-env.ts               # Cross-platform shell environment (111 lines)
-├── opencode-version.ts        # Semantic version comparison (74 lines)
+├── opencode-version.ts        # Semantic version comparison (80 lines)
 ├── external-plugin-detector.ts # Plugin conflict detection (137 lines)
-├── opencode-server-auth.ts    # Authentication utilities (69 lines)
+├── opencode-server-auth.ts    # Authentication utilities (190 lines)
 ├── safe-create-hook.ts        # Hook error wrapper (24 lines)
 ├── pattern-matcher.ts         # Pattern matching (40 lines)
-├── file-utils.ts              # File operations (40 lines) — 9 imports
+├── file-utils.ts              # File operations (34 lines) — 9 imports
 ├── file-reference-resolver.ts # File reference resolution (85 lines)
 ├── snake-case.ts              # Case conversion (44 lines)
 ├── tool-name.ts               # Tool naming conventions
-├── truncate-description.ts    # Description truncation
 ├── port-utils.ts              # Port management (48 lines)
 ├── zip-extractor.ts           # ZIP extraction (83 lines)
 ├── binary-downloader.ts       # Binary download (60 lines)
-├── skill-path-resolver.ts     # Skill path resolution
-├── hook-disabled.ts           # Hook disable checking
-├── config-errors.ts           # Config error types
-├── disabled-tools.ts          # Disabled tools tracking
-├── record-type-guard.ts       # Record type guard
-├── open-code-client-accessors.ts # Client accessor utilities
-├── open-code-client-shapes.ts # Client shape types
 ├── command-executor/          # Shell execution (6 files, 213 lines)
 ├── git-worktree/              # Git status/diff parsing (8 files, 311 lines)
 ├── migration/                 # Legacy config migration (5 files, 341 lines)
-│   ├── config-migration.ts    # Migration orchestration (126 lines)
+│   ├── config-migration.ts    # Migration orchestration (133 lines)
 │   ├── agent-names.ts         # Agent name mapping (70 lines)
 │   ├── hook-names.ts          # Hook name mapping (36 lines)
 │   └── model-versions.ts      # Model version migration (49 lines)
@@ -86,9 +78,9 @@ shared/
 ## KEY PATTERNS
 
 **3-Step Model Resolution** (Override → Fallback → Default):
-```typescript
-resolveModelWithFallback({ userModel, fallbackChain, availableModels })
-```
+1. **Override**: UI-selected or user-configured model
+2. **Fallback**: Provider/model chain with availability checking
+3. **Default**: System fallback when no matches found
 
 **System Directive Filtering**:
 ```typescript

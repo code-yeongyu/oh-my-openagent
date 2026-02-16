@@ -6,7 +6,7 @@ import type {
   ResumeInput,
 } from "./types"
 import { TaskHistory } from "./task-history"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, normalizeSDKResponse, promptWithModelSuggestionRetry } from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
@@ -531,6 +531,12 @@ export class BackgroundManager {
       return existingTask
     }
 
+    const completionTimer = this.completionTimers.get(existingTask.id)
+    if (completionTimer) {
+      clearTimeout(completionTimer)
+      this.completionTimers.delete(existingTask.id)
+    }
+
     // Re-acquire concurrency using the persisted concurrency group
     const concurrencyKey = existingTask.concurrencyGroup ?? existingTask.agent
     await this.concurrencyManager.acquire(concurrencyKey)
@@ -648,7 +654,7 @@ export class BackgroundManager {
       const response = await this.client.session.todo({
         path: { id: sessionID },
       })
-      const todos = (response.data ?? response) as Todo[]
+      const todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
       if (!todos || todos.length === 0) return false
 
       const incomplete = todos.filter(
@@ -786,6 +792,10 @@ export class BackgroundManager {
       this.cleanupPendingByParent(task)
       this.tasks.delete(task.id)
       this.clearNotificationsForTask(task.id)
+      const toastManager = getTaskToastManager()
+      if (toastManager) {
+        toastManager.removeTask(task.id)
+      }
       if (task.sessionID) {
         subagentSessions.delete(task.sessionID)
       }
@@ -833,6 +843,10 @@ export class BackgroundManager {
         this.cleanupPendingByParent(task)
         this.tasks.delete(task.id)
         this.clearNotificationsForTask(task.id)
+        const toastManager = getTaskToastManager()
+        if (toastManager) {
+          toastManager.removeTask(task.id)
+        }
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
         }
@@ -864,7 +878,7 @@ export class BackgroundManager {
         path: { id: sessionID },
       })
 
-      const messages = response.data ?? []
+      const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
       
       // Check for at least one assistant or tool message
       const hasAssistantOrToolMessage = messages.some(
@@ -1003,6 +1017,10 @@ export class BackgroundManager {
     }
 
     if (options?.skipNotification) {
+      const toastManager = getTaskToastManager()
+      if (toastManager) {
+        toastManager.removeTask(task.id)
+      }
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
       return true
     }
@@ -1232,9 +1250,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
       try {
         const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
-        const messages = (messagesResp.data ?? []) as Array<{
+        const messages = normalizeSDKResponse(messagesResp, [] as Array<{
           info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
-        }>
+        }>)
         for (let i = messages.length - 1; i >= 0; i--) {
           const info = messages[i].info
           if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
@@ -1245,11 +1263,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         }
       } catch (error) {
         if (this.isAbortedSessionError(error)) {
-          log("[background-agent] Parent session aborted, skipping notification:", {
+          log("[background-agent] Parent session aborted while loading messages; using messageDir fallback:", {
             taskId: task.id,
             parentSessionID: task.parentSessionID,
           })
-          return
         }
         const messageDir = getMessageDir(task.parentSessionID)
         const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
@@ -1283,13 +1300,13 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         })
       } catch (error) {
         if (this.isAbortedSessionError(error)) {
-          log("[background-agent] Parent session aborted, skipping notification:", {
+          log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
             taskId: task.id,
             parentSessionID: task.parentSessionID,
           })
-          return
+        } else {
+          log("[background-agent] Failed to send notification:", error)
         }
-        log("[background-agent] Failed to send notification:", error)
       }
     } else {
       log("[background-agent] Parent session notifications disabled, skipping prompt injection:", {
@@ -1425,6 +1442,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           }
         }
         this.clearNotificationsForTask(taskId)
+        const toastManager = getTaskToastManager()
+        if (toastManager) {
+          toastManager.removeTask(taskId)
+        }
         this.tasks.delete(taskId)
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
@@ -1526,7 +1547,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.pruneStaleTasksAndNotifications()
 
     const statusResult = await this.client.session.status()
-    const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+    const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
 
     await this.checkAndInterruptStaleTasks(allStatuses)
 
