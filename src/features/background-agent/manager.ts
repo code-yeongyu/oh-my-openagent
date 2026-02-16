@@ -80,6 +80,7 @@ export class BackgroundManager {
   private client: OpencodeClient
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
+  private pollingInFlight = false
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
@@ -1546,6 +1547,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
   }
 
   private async pollRunningTasks(): Promise<void> {
+    if (this.pollingInFlight) return
+    this.pollingInFlight = true
+    try {
     this.pruneStaleTasksAndNotifications()
 
     const statusResult = await this.client.session.status()
@@ -1600,6 +1604,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     if (!this.hasRunningTasks()) {
       this.stopPolling()
+    }
+    } finally {
+      this.pollingInFlight = false
     }
   }
 

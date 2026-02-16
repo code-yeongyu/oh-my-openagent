@@ -11,6 +11,7 @@ const STABLE_POLLS_REQUIRED = 3
 
 export class TmuxPollingManager {
   private pollInterval?: ReturnType<typeof setInterval>
+  private pollingInFlight = false
 
   constructor(
     private client: OpencodeClient,
@@ -37,12 +38,14 @@ export class TmuxPollingManager {
   }
 
   private async pollSessions(): Promise<void> {
-    if (this.sessions.size === 0) {
-      this.stopPolling()
-      return
-    }
-
+    if (this.pollingInFlight) return
+    this.pollingInFlight = true
     try {
+      if (this.sessions.size === 0) {
+        this.stopPolling()
+        return
+      }
+
       const statusResult = await this.client.session.status({ path: undefined })
       const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
 
@@ -135,6 +138,8 @@ export class TmuxPollingManager {
       }
     } catch (err) {
       log("[tmux-session-manager] poll error", { error: String(err) })
+    } finally {
+      this.pollingInFlight = false
     }
   }
 }
