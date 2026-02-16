@@ -99,7 +99,7 @@ describe("executeCompact lock management", () => {
         messages: mock(() => Promise.resolve({ data: [] })),
         summarize: mock(() => Promise.resolve()),
         revert: mock(() => Promise.resolve()),
-        prompt_async: mock(() => Promise.resolve()),
+        promptAsync: mock(() => Promise.resolve()),
       },
       tui: {
         showToast: mock(() => Promise.resolve()),
@@ -283,9 +283,9 @@ describe("executeCompact lock management", () => {
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 
-  test("clears lock when prompt_async in continuation throws", async () => {
-    // given: prompt_async will fail during continuation
-    mockClient.session.prompt_async = mock(() =>
+  test("clears lock when promptAsync in continuation throws", async () => {
+    // given: promptAsync will fail during continuation
+    mockClient.session.promptAsync = mock(() =>
       Promise.reject(new Error("Prompt failed")),
     )
     autoCompactState.errorDataBySession.set(sessionID, {
@@ -313,7 +313,7 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockReturnValue({
+    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockResolvedValue({
       success: true,
       sufficient: false,
       truncatedCount: 3,
@@ -354,7 +354,7 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockReturnValue({
+    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockResolvedValue({
       success: true,
       sufficient: true,
       truncatedCount: 5,
@@ -378,8 +378,8 @@ describe("executeCompact lock management", () => {
     // then: Summarize should NOT be called (early return from sufficient truncation)
     expect(mockClient.session.summarize).not.toHaveBeenCalled()
 
-    // then: prompt_async should be called (Continue after successful truncation)
-    expect(mockClient.session.prompt_async).toHaveBeenCalled()
+    // then: promptAsync should be called (Continue after successful truncation)
+    expect(mockClient.session.promptAsync).toHaveBeenCalled()
 
     // then: Lock should be cleared
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)

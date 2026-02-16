@@ -1,5 +1,12 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test"
-import { createPreemptiveCompactionHook } from "./preemptive-compaction"
+
+const logMock = mock(() => {})
+
+mock.module("../shared/logger", () => ({
+  log: logMock,
+}))
+
+const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 
 function createMockCtx() {
   return {
@@ -21,6 +28,7 @@ describe("preemptive-compaction", () => {
 
   beforeEach(() => {
     ctx = createMockCtx()
+    logMock.mockClear()
   })
 
   // #given event caches token info from message.updated
@@ -151,5 +159,46 @@ describe("preemptive-compaction", () => {
     )
 
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+  })
+
+  it("should log summarize errors instead of swallowing them", async () => {
+    //#given
+    const hook = createPreemptiveCompactionHook(ctx as never)
+    const sessionID = "ses_log_error"
+    const summarizeError = new Error("summarize failed")
+    ctx.client.session.summarize.mockRejectedValueOnce(summarizeError)
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-5",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_log" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    //#then
+    expect(logMock).toHaveBeenCalledWith("[preemptive-compaction] Compaction failed", {
+      sessionID,
+      error: String(summarizeError),
+    })
   })
 })

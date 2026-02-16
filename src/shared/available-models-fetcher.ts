@@ -2,6 +2,7 @@ import { addModelsFromModelsJsonCache } from "./models-json-cache-reader"
 import { getModelListFunction, getProviderListFunction } from "./open-code-client-accessors"
 import { addModelsFromProviderModelsCache } from "./provider-models-cache-model-reader"
 import { log } from "./logger"
+import { normalizeSDKResponse } from "./normalize-sdk-response"
 
 export async function getConnectedProviders(client: unknown): Promise<string[]> {
 	const providerList = getProviderListFunction(client)
@@ -53,7 +54,7 @@ export async function fetchAvailableModels(
 			const modelSet = new Set<string>()
 			try {
 				const modelsResult = await modelList()
-				const models = modelsResult.data ?? []
+				const models = normalizeSDKResponse(modelsResult, [] as Array<{ provider?: string; id?: string }>)
 				for (const model of models) {
 					if (model.provider && model.id) {
 						modelSet.add(`${model.provider}/${model.id}`)
@@ -92,7 +93,7 @@ export async function fetchAvailableModels(
 	if (modelList) {
 		try {
 			const modelsResult = await modelList()
-			const models = modelsResult.data ?? []
+			const models = normalizeSDKResponse(modelsResult, [] as Array<{ provider?: string; id?: string }>)
 
 			for (const model of models) {
 				if (!model.provider || !model.id) continue

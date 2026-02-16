@@ -6,6 +6,7 @@ import type { BackgroundTask, ResumeInput } from "./types"
 import { MIN_IDLE_TIME_MS } from "./constants"
 import { BackgroundManager } from "./manager"
 import { ConcurrencyManager } from "./concurrency"
+import { initTaskToastManager, _resetTaskToastManagerForTesting } from "../task-toast-manager/manager"
 
 
 const TASK_TTL_MS = 30 * 60 * 1000
@@ -190,6 +191,10 @@ function getPendingByParent(manager: BackgroundManager): Map<string, Set<string>
   return (manager as unknown as { pendingByParent: Map<string, Set<string>> }).pendingByParent
 }
 
+function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+  return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
+}
+
 function getQueuesByKey(
   manager: BackgroundManager
 ): Map<string, Array<{ task: BackgroundTask; input: import("./types").LaunchInput }>> {
@@ -213,6 +218,23 @@ async function tryCompleteTaskForTest(manager: BackgroundManager, task: Backgrou
 
 function stubNotifyParentSession(manager: BackgroundManager): void {
   ;(manager as unknown as { notifyParentSession: () => Promise<void> }).notifyParentSession = async () => {}
+}
+
+function createToastRemoveTaskTracker(): { removeTaskCalls: string[]; resetToastManager: () => void } {
+  _resetTaskToastManagerForTesting()
+  const toastManager = initTaskToastManager({
+    tui: { showToast: async () => {} },
+  } as unknown as PluginInput["client"])
+  const removeTaskCalls: string[] = []
+  const originalRemoveTask = toastManager.removeTask.bind(toastManager)
+  toastManager.removeTask = (taskId: string): void => {
+    removeTaskCalls.push(taskId)
+    originalRemoveTask(taskId)
+  }
+  return {
+    removeTaskCalls,
+    resetToastManager: _resetTaskToastManagerForTesting,
+  }
 }
 
 function getCleanupSignals(): Array<NodeJS.Signals | "beforeExit" | "exit"> {
@@ -894,7 +916,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
 })
 
 describe("BackgroundManager.notifyParentSession - aborted parent", () => {
-  test("should skip notification when parent session is aborted", async () => {
+  test("should fall back and still notify when parent session messages are aborted", async () => {
     //#given
     let promptCalled = false
     const promptMock = async () => {
@@ -933,7 +955,7 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
       .notifyParentSession(task)
 
     //#then
-    expect(promptCalled).toBe(false)
+    expect(promptCalled).toBe(true)
 
     manager.shutdown()
   })
@@ -1815,6 +1837,32 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       const pendingSet = pendingByParent.get(task.parentSessionID)
       expect(pendingSet?.has(task.id) ?? false).toBe(false)
+    })
+
+    test("should remove task from toast manager when notification is skipped", async () => {
+      //#given
+      const { removeTaskCalls, resetToastManager } = createToastRemoveTaskTracker()
+      const manager = createBackgroundManager()
+      const task = createMockTask({
+        id: "task-cancel-skip-notification",
+        sessionID: "session-cancel-skip-notification",
+        parentSessionID: "parent-cancel-skip-notification",
+        status: "running",
+      })
+      getTaskMap(manager).set(task.id, task)
+
+      //#when
+      const cancelled = await manager.cancelTask(task.id, {
+        source: "test",
+        skipNotification: true,
+      })
+
+      //#then
+      expect(cancelled).toBe(true)
+      expect(removeTaskCalls).toContain(task.id)
+
+      manager.shutdown()
+      resetToastManager()
     })
   })
 
@@ -2776,6 +2824,43 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
 
     manager.shutdown()
   })
+
+  test("should remove tasks from toast manager when session is deleted", () => {
+    //#given
+    const { removeTaskCalls, resetToastManager } = createToastRemoveTaskTracker()
+    const manager = createBackgroundManager()
+    const parentSessionID = "session-parent-toast"
+    const childTask = createMockTask({
+      id: "task-child-toast",
+      sessionID: "session-child-toast",
+      parentSessionID,
+      status: "running",
+    })
+    const grandchildTask = createMockTask({
+      id: "task-grandchild-toast",
+      sessionID: "session-grandchild-toast",
+      parentSessionID: "session-child-toast",
+      status: "pending",
+      startedAt: undefined,
+      queuedAt: new Date(),
+    })
+    const taskMap = getTaskMap(manager)
+    taskMap.set(childTask.id, childTask)
+    taskMap.set(grandchildTask.id, grandchildTask)
+
+    //#when
+    manager.handleEvent({
+      type: "session.deleted",
+      properties: { info: { id: parentSessionID } },
+    })
+
+    //#then
+    expect(removeTaskCalls).toContain(childTask.id)
+    expect(removeTaskCalls).toContain(grandchildTask.id)
+
+    manager.shutdown()
+    resetToastManager()
+  })
 })
 
 describe("BackgroundManager.handleEvent - session.error", () => {
@@ -2821,6 +2906,35 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(getPendingByParent(manager).get(task.parentSessionID)).toBeUndefined()
 
     manager.shutdown()
+  })
+
+  test("removes errored task from toast manager", () => {
+    //#given
+    const { removeTaskCalls, resetToastManager } = createToastRemoveTaskTracker()
+    const manager = createBackgroundManager()
+    const sessionID = "ses_error_toast"
+    const task = createMockTask({
+      id: "task-session-error-toast",
+      sessionID,
+      parentSessionID: "parent-session",
+      status: "running",
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID,
+        error: { name: "UnknownError", message: "boom" },
+      },
+    })
+
+    //#then
+    expect(removeTaskCalls).toContain(task.id)
+
+    manager.shutdown()
+    resetToastManager()
   })
 
   test("ignores session.error for non-running tasks", () => {
@@ -2968,13 +3082,32 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications - removes pruned tas
 
     manager.shutdown()
   })
+
+  test("removes stale task from toast manager", () => {
+    //#given
+    const { removeTaskCalls, resetToastManager } = createToastRemoveTaskTracker()
+    const manager = createBackgroundManager()
+    const staleTask = createMockTask({
+      id: "task-stale-toast",
+      sessionID: "session-stale-toast",
+      parentSessionID: "parent-session",
+      status: "running",
+      startedAt: new Date(Date.now() - 31 * 60 * 1000),
+    })
+    getTaskMap(manager).set(staleTask.id, staleTask)
+
+    //#when
+    pruneStaleTasksAndNotificationsForTest(manager)
+
+    //#then
+    expect(removeTaskCalls).toContain(staleTask.id)
+
+    manager.shutdown()
+    resetToastManager()
+  })
 })
 
 describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
-  function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
-    return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
-  }
-
   function setCompletionTimer(manager: BackgroundManager, taskId: string): void {
     const completionTimers = getCompletionTimers(manager)
     const timer = setTimeout(() => {
@@ -3498,5 +3631,95 @@ describe("BackgroundManager.handleEvent - non-tool event lastUpdate", () => {
 
     //#then - task should still be running (delta event refreshed lastUpdate)
     expect(task.status).toBe("running")
+  })
+})
+
+describe("BackgroundManager regression fixes - resume and aborted notification", () => {
+  test("should keep resumed task in memory after previous completion timer deadline", async () => {
+    //#given
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+
+    const task: BackgroundTask = {
+      id: "task-resume-timer-regression",
+      sessionID: "session-resume-timer-regression",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "resume timer regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      concurrencyGroup: "explore",
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    const completionTimers = getCompletionTimers(manager)
+    const timer = setTimeout(() => {
+      completionTimers.delete(task.id)
+      getTaskMap(manager).delete(task.id)
+    }, 25)
+    completionTimers.set(task.id, timer)
+
+    //#when
+    await manager.resume({
+      sessionId: "session-resume-timer-regression",
+      prompt: "resume task",
+      parentSessionID: "parent-session-2",
+      parentMessageID: "msg-2",
+    })
+    await new Promise((resolve) => setTimeout(resolve, 60))
+
+    //#then
+    expect(getTaskMap(manager).has(task.id)).toBe(true)
+    expect(completionTimers.has(task.id)).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("should start cleanup timer even when promptAsync aborts", async () => {
+    //#given
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => {
+          const error = new Error("User aborted")
+          error.name = "MessageAbortedError"
+          throw error
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-aborted-cleanup-regression",
+      sessionID: "session-aborted-cleanup-regression",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "aborted prompt cleanup regression",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionID, new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> }).notifyParentSession(task)
+
+    //#then
+    expect(getCompletionTimers(manager).has(task.id)).toBe(true)
+
+    manager.shutdown()
   })
 })

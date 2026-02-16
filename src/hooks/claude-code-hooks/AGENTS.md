@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-Full Claude Code `settings.json` hook compatibility layer. Intercepts OpenCode events to execute external scripts/commands.
+Full Claude Code `settings.json` hook compatibility layer. Intercepts OpenCode events to execute external scripts/commands defined in settings.json.
 
 **Config Sources** (priority): `.claude/settings.local.json` > `.claude/settings.json` (project) > `~/.claude/settings.json` (global)
 
@@ -10,21 +10,26 @@ Full Claude Code `settings.json` hook compatibility layer. Intercepts OpenCode e
 ```
 claude-code-hooks/
 ├── index.ts              # Barrel export
-├── claude-code-hooks-hook.ts  # Main factory
-├── config.ts             # Claude settings.json loader
-├── config-loader.ts      # Extended plugin config
-├── pre-tool-use.ts       # PreToolUse hook executor
-├── post-tool-use.ts      # PostToolUse hook executor
-├── user-prompt-submit.ts # UserPromptSubmit executor
-├── stop.ts               # Stop hook executor
-├── pre-compact.ts        # PreCompact executor
-├── transcript.ts         # Tool use recording
-├── tool-input-cache.ts   # Pre→post input caching
+├── claude-code-hooks-hook.ts  # Main factory (22 lines)
+├── config.ts             # Claude settings.json loader (105 lines)
+├── config-loader.ts      # Extended plugin config (107 lines)
+├── pre-tool-use.ts       # PreToolUse hook executor (173 lines)
+├── post-tool-use.ts      # PostToolUse hook executor (200 lines)
+├── user-prompt-submit.ts # UserPromptSubmit executor (125 lines)
+├── stop.ts               # Stop hook executor (122 lines)
+├── pre-compact.ts        # PreCompact executor (110 lines)
+├── transcript.ts         # Tool use recording (235 lines)
+├── tool-input-cache.ts   # Pre→post input caching (51 lines)
 ├── todo.ts               # Todo integration
-├── session-hook-state.ts # Active state tracking
-├── types.ts              # Hook & IO type definitions
-├── plugin-config.ts      # Default config constants
+├── session-hook-state.ts # Active state tracking (11 lines)
+├── types.ts              # Hook & IO type definitions (204 lines)
+├── plugin-config.ts      # Default config constants (12 lines)
 └── handlers/             # Event handlers (5 files)
+    ├── pre-compact-handler.ts
+    ├── tool-execute-before-handler.ts
+    ├── tool-execute-after-handler.ts
+    ├── chat-message-handler.ts
+    └── session-event-handler.ts
 ```
 
 ## HOOK LIFECYCLE

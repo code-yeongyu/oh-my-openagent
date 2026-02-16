@@ -61,7 +61,7 @@ export async function runSummarizeRetryStrategy(params: {
 
     if (providerID && modelID) {
       try {
-        sanitizeEmptyMessagesBeforeSummarize(params.sessionID)
+        await sanitizeEmptyMessagesBeforeSummarize(params.sessionID, params.client)
 
         await params.client.tui
           .showToast({

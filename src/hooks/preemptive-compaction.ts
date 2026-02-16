@@ -1,3 +1,5 @@
+import { log } from "../shared/logger"
+
 const DEFAULT_ACTUAL_LIMIT = 200_000
 
 const ANTHROPIC_ACTUAL_LIMIT =
@@ -76,8 +78,8 @@ export function createPreemptiveCompactionHook(ctx: PluginInput) {
       })
 
       compactedSessions.add(sessionID)
-    } catch {
-      // best-effort; do not disrupt tool execution
+    } catch (error) {
+      log("[preemptive-compaction] Compaction failed", { sessionID, error: String(error) })
     } finally {
       compactionInProgress.delete(sessionID)
     }

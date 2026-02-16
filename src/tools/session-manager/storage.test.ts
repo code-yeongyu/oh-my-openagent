@@ -26,6 +26,18 @@ mock.module("./constants", () => ({
   TOOL_NAME_PREFIX: "session_",
 }))
 
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => false,
+  resetSqliteBackendCache: () => {},
+}))
+
+mock.module("../../shared/opencode-storage-paths", () => ({
+  OPENCODE_STORAGE: TEST_DIR,
+  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
+  PART_STORAGE: TEST_PART_STORAGE,
+  SESSION_STORAGE: TEST_SESSION_STORAGE,
+}))
+
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
   await import("./storage")
 
@@ -73,15 +85,15 @@ describe("session-manager storage", () => {
     expect(result).toBe(sessionPath)
   })
 
-  test("sessionExists returns false for non-existent session", () => {
+  test("sessionExists returns false for non-existent session", async () => {
     // when
-    const exists = sessionExists("ses_nonexistent")
+    const exists = await sessionExists("ses_nonexistent")
 
     // then
     expect(exists).toBe(false)
   })
 
-  test("sessionExists returns true for existing session", () => {
+  test("sessionExists returns true for existing session", async () => {
     // given
     const sessionID = "ses_exists"
     const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
@@ -89,7 +101,7 @@ describe("session-manager storage", () => {
     writeFileSync(join(sessionPath, "msg_001.json"), JSON.stringify({ id: "msg_001" }))
 
     // when
-    const exists = sessionExists(sessionID)
+    const exists = await sessionExists(sessionID)
 
     // then
     expect(exists).toBe(true)
@@ -312,5 +324,170 @@ describe("session-manager storage - getMainSessions", () => {
 
     // then
     expect(sessions.length).toBe(2)
+  })
+})
+
+describe("session-manager storage - SDK path (beta mode)", () => {
+  const mockClient = {
+    session: {
+      list: mock(() => Promise.resolve({ data: [] })),
+      messages: mock(() => Promise.resolve({ data: [] })),
+      todo: mock(() => Promise.resolve({ data: [] })),
+    },
+  }
+
+  beforeEach(() => {
+    // Reset mocks
+    mockClient.session.list.mockClear()
+    mockClient.session.messages.mockClear()
+    mockClient.session.todo.mockClear()
+  })
+
+  test("getMainSessions uses SDK when beta mode is enabled", async () => {
+    // given
+    const mockSessions = [
+      { id: "ses_1", directory: "/test", parentID: null, time: { created: 1000, updated: 2000 } },
+      { id: "ses_2", directory: "/test", parentID: "ses_1", time: { created: 1000, updated: 1500 } },
+    ]
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
+
+    // Mock isSqliteBackend to return true
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    // Re-import to get fresh module with mocked isSqliteBackend
+    const { setStorageClient, getMainSessions } = await import("./storage")
+    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+
+    // when
+    const sessions = await getMainSessions({ directory: "/test" })
+
+    // then
+    expect(mockClient.session.list).toHaveBeenCalled()
+    expect(sessions.length).toBe(1)
+    expect(sessions[0].id).toBe("ses_1")
+  })
+
+  test("getAllSessions uses SDK when beta mode is enabled", async () => {
+    // given
+    const mockSessions = [
+      { id: "ses_1", directory: "/test", time: { created: 1000, updated: 2000 } },
+      { id: "ses_2", directory: "/test", time: { created: 1000, updated: 1500 } },
+    ]
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
+
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    const { setStorageClient, getAllSessions } = await import("./storage")
+    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+
+    // when
+    const sessionIDs = await getAllSessions()
+
+    // then
+    expect(mockClient.session.list).toHaveBeenCalled()
+    expect(sessionIDs).toEqual(["ses_1", "ses_2"])
+  })
+
+  test("readSessionMessages uses SDK when beta mode is enabled", async () => {
+    // given
+    const mockMessages = [
+      {
+        info: { id: "msg_1", role: "user", agent: "test", time: { created: 1000 } },
+        parts: [{ id: "part_1", type: "text", text: "Hello" }],
+      },
+      {
+        info: { id: "msg_2", role: "assistant", agent: "oracle", time: { created: 2000 } },
+        parts: [{ id: "part_2", type: "text", text: "Hi there" }],
+      },
+    ]
+    mockClient.session.messages.mockImplementation(() => Promise.resolve({ data: mockMessages }))
+
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    const { setStorageClient, readSessionMessages } = await import("./storage")
+    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+
+    // when
+    const messages = await readSessionMessages("ses_test")
+
+    // then
+    expect(mockClient.session.messages).toHaveBeenCalledWith({ path: { id: "ses_test" } })
+    expect(messages.length).toBe(2)
+    expect(messages[0].id).toBe("msg_1")
+    expect(messages[1].id).toBe("msg_2")
+    expect(messages[0].role).toBe("user")
+    expect(messages[1].role).toBe("assistant")
+  })
+
+  test("readSessionTodos uses SDK when beta mode is enabled", async () => {
+    // given
+    const mockTodos = [
+      { id: "todo_1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "todo_2", content: "Task 2", status: "completed", priority: "medium" },
+    ]
+    mockClient.session.todo.mockImplementation(() => Promise.resolve({ data: mockTodos }))
+
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    const { setStorageClient, readSessionTodos } = await import("./storage")
+    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+
+    // when
+    const todos = await readSessionTodos("ses_test")
+
+    // then
+    expect(mockClient.session.todo).toHaveBeenCalledWith({ path: { id: "ses_test" } })
+    expect(todos.length).toBe(2)
+    expect(todos[0].content).toBe("Task 1")
+    expect(todos[1].content).toBe("Task 2")
+    expect(todos[0].status).toBe("pending")
+    expect(todos[1].status).toBe("completed")
+  })
+
+  test("SDK path returns empty array on error", async () => {
+    // given
+    mockClient.session.messages.mockImplementation(() => Promise.reject(new Error("API error")))
+
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    const { setStorageClient, readSessionMessages } = await import("./storage")
+    setStorageClient(mockClient as unknown as Parameters<typeof setStorageClient>[0])
+
+    // when
+    const messages = await readSessionMessages("ses_test")
+
+    // then
+    expect(messages).toEqual([])
+  })
+
+  test("SDK path returns empty array when client is not set", async () => {
+    //#given beta mode enabled but no client set
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    //#when client is explicitly cleared and messages are requested
+    const { resetStorageClient, readSessionMessages } = await import("./storage")
+    resetStorageClient()
+    const messages = await readSessionMessages("ses_test")
+
+    //#then should return empty array since no client and no JSON fallback
+    expect(messages).toEqual([])
   })
 })

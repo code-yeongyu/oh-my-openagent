@@ -6,7 +6,7 @@ import {
   SESSION_SEARCH_DESCRIPTION,
   SESSION_INFO_DESCRIPTION,
 } from "./constants"
-import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists } from "./storage"
+import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists, setStorageClient } from "./storage"
 import {
   filterSessionsByDate,
   formatSessionInfo,
@@ -28,6 +28,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number, operation: string): Pro
 }
 
 export function createSessionManagerTools(ctx: PluginInput): Record<string, ToolDefinition> {
+  // Initialize storage client for SDK-based operations (beta mode)
+  setStorageClient(ctx.client)
+
   const session_list: ToolDefinition = tool({
     description: SESSION_LIST_DESCRIPTION,
     args: {
@@ -67,11 +70,15 @@ export function createSessionManagerTools(ctx: PluginInput): Record<string, Tool
     },
     execute: async (args: SessionReadArgs, _context) => {
       try {
-        if (!sessionExists(args.session_id)) {
+        if (!(await sessionExists(args.session_id))) {
           return `Session not found: ${args.session_id}`
         }
 
         let messages = await readSessionMessages(args.session_id)
+
+        if (messages.length === 0) {
+          return `Session not found: ${args.session_id}`
+        }
 
         if (args.limit && args.limit > 0) {
           messages = messages.slice(0, args.limit)

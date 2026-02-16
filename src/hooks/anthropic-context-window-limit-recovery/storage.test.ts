@@ -21,7 +21,7 @@ describe("truncateUntilTargetTokens", () => {
     truncateToolResult.mockReset()
   })
 
-  test("truncates only until target is reached", () => {
+  test("truncates only until target is reached", async () => {
     const { findToolResultsBySize, truncateToolResult } = require("./storage")
     
     // given: Two tool results, each 1000 chars. Target reduction is 500 chars.
@@ -39,7 +39,7 @@ describe("truncateUntilTargetTokens", () => {
 
     // when: currentTokens=1000, maxTokens=1000, targetRatio=0.5 (target=500, reduce=500)
     // charsPerToken=1 for simplicity in test
-    const result = truncateUntilTargetTokens(sessionID, 1000, 1000, 0.5, 1)
+    const result = await truncateUntilTargetTokens(sessionID, 1000, 1000, 0.5, 1)
 
     // then: Should only truncate the first tool
     expect(result.truncatedCount).toBe(1)
@@ -49,7 +49,7 @@ describe("truncateUntilTargetTokens", () => {
     expect(result.sufficient).toBe(true)
   })
 
-  test("truncates all if target not reached", () => {
+  test("truncates all if target not reached", async () => {
     const { findToolResultsBySize, truncateToolResult } = require("./storage")
     
     // given: Two tool results, each 100 chars. Target reduction is 500 chars.
@@ -66,7 +66,7 @@ describe("truncateUntilTargetTokens", () => {
     }))
 
     // when: reduce 500 chars
-    const result = truncateUntilTargetTokens(sessionID, 1000, 1000, 0.5, 1)
+    const result = await truncateUntilTargetTokens(sessionID, 1000, 1000, 0.5, 1)
 
     // then: Should truncate both
     expect(result.truncatedCount).toBe(2)

@@ -2,9 +2,7 @@
 
 ## OVERVIEW
 
-CLI entry: `bunx oh-my-opencode`. 107+ files with Commander.js + @clack/prompts TUI.
-
-**Commands**: install, run, doctor, get-local-version, mcp-oauth
+CLI entry: `bunx oh-my-opencode`. 107+ files with Commander.js + @clack/prompts TUI. 5 commands: install, run, doctor, get-local-version, mcp-oauth.
 
 ## STRUCTURE
 ```
@@ -14,20 +12,22 @@ cli/
 ├── install.ts               # TTY routing (TUI or CLI installer)
 ├── cli-installer.ts         # Non-interactive installer (164 lines)
 ├── tui-installer.ts         # Interactive TUI with @clack/prompts (140 lines)
-├── config-manager/          # 17 config utilities
+├── config-manager/          # 20 config utilities
 │   ├── add-plugin-to-opencode-config.ts  # Plugin registration
-│   ├── add-provider-config.ts            # Provider setup
-│   ├── detect-current-config.ts          # Project vs user config
+│   ├── add-provider-config.ts            # Provider setup (Google/Antigravity)
+│   ├── detect-current-config.ts          # Installed providers detection
 │   ├── write-omo-config.ts               # JSONC writing
-│   └── ...
-├── doctor/                  # 14 health checks
-│   ├── runner.ts            # Check orchestration
-│   ├── formatter.ts         # Colored output
-│   └── checks/              # 29 files: auth, config, dependencies, gh, lsp, mcp, opencode, plugin, version, model-resolution (6 sub-checks)
+│   ├── generate-omo-config.ts            # Config generation
+│   ├── jsonc-provider-editor.ts          # JSONC editing
+│   └── ...                               # 14 more utilities
+├── doctor/                  # 4 check categories, 21 check files
+│   ├── runner.ts            # Parallel check execution + result aggregation
+│   ├── formatter.ts         # Colored output (default/status/verbose/JSON)
+│   └── checks/              # system (4), config (1), tools (4), models (6 sub-checks)
 ├── run/                     # Session launcher (24 files)
 │   ├── runner.ts            # Run orchestration (126 lines)
-│   ├── agent-resolver.ts    # Agent selection: flag → env → config → fallback
-│   ├── session-resolver.ts  # Session creation or resume
+│   ├── agent-resolver.ts    # Agent: flag → env → config → Sisyphus
+│   ├── session-resolver.ts  # Session create or resume with retries
 │   ├── event-handlers.ts    # Event processing (125 lines)
 │   ├── completion.ts        # Completion detection
 │   └── poll-for-completion.ts # Polling with timeout
@@ -43,20 +43,17 @@ cli/
 |---------|---------|-----------|
 | `install` | Interactive setup | Provider selection → config generation → plugin registration |
 | `run` | Session launcher | Agent: flag → env → config → Sisyphus. Enforces todo completion. |
-| `doctor` | 14 health checks | installation, config, auth, deps, tools, updates |
+| `doctor` | 4-category health checks | system, config, tools, models (6 sub-checks) |
 | `get-local-version` | Version check | Detects installed, compares with npm latest |
 | `mcp-oauth` | OAuth tokens | login (PKCE flow), logout, status |
 
-## DOCTOR CHECK CATEGORIES
+## RUN SESSION LIFECYCLE
 
-| Category | Checks |
-|----------|--------|
-| installation | opencode, plugin |
-| configuration | config validity, Zod, model-resolution (6 sub-checks) |
-| authentication | anthropic, openai, google |
-| dependencies | ast-grep, comment-checker, gh-cli |
-| tools | LSP, MCP, MCP-OAuth |
-| updates | version comparison |
+1. Load config, resolve agent (CLI > env > config > Sisyphus)
+2. Create server connection (port/attach), setup cleanup/signal handlers
+3. Resolve session (create new or resume with retries)
+4. Send prompt, start event processing, poll for completion
+5. Execute on-complete hook, output JSON if requested, cleanup
 
 ## HOW TO ADD CHECK
 

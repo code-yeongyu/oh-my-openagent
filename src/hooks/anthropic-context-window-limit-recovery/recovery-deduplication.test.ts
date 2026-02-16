@@ -53,7 +53,7 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
         messages: mock(() => Promise.resolve({ data: [] })),
         summarize: mock(() => summarizePromise),
         revert: mock(() => Promise.resolve()),
-        prompt_async: mock(() => Promise.resolve()),
+        promptAsync: mock(() => Promise.resolve()),
       },
       tui: {
         showToast: mock(() => Promise.resolve()),
@@ -97,7 +97,7 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
         messages: mock(() => Promise.resolve({ data: [] })),
         summarize: mock(() => Promise.resolve()),
         revert: mock(() => Promise.resolve()),
-        prompt_async: mock(() => Promise.resolve()),
+        promptAsync: mock(() => Promise.resolve()),
       },
       tui: {
         showToast: mock(() => Promise.resolve()),
