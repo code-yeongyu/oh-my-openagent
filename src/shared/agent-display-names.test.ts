@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentDisplayName } from "./agent-display-names"
+import { AGENT_DISPLAY_NAMES, getAgentDisplayName, getAgentConfigKey } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -132,6 +132,47 @@ describe("getAgentDisplayName", () => {
 
     // then returns "multimodal-looker"
     expect(result).toBe("multimodal-looker")
+  })
+})
+
+describe("getAgentConfigKey", () => {
+  it("resolves display name to config key", () => {
+    // given display name "Sisyphus (Ultraworker)"
+    // when getAgentConfigKey called
+    // then returns "sisyphus"
+    expect(getAgentConfigKey("Sisyphus (Ultraworker)")).toBe("sisyphus")
+  })
+
+  it("resolves display name case-insensitively", () => {
+    // given display name in different case
+    // when getAgentConfigKey called
+    // then returns "atlas"
+    expect(getAgentConfigKey("atlas (plan executor)")).toBe("atlas")
+  })
+
+  it("passes through lowercase config keys unchanged", () => {
+    // given lowercase config key "prometheus"
+    // when getAgentConfigKey called
+    // then returns "prometheus"
+    expect(getAgentConfigKey("prometheus")).toBe("prometheus")
+  })
+
+  it("returns lowercased unknown agents", () => {
+    // given unknown agent name
+    // when getAgentConfigKey called
+    // then returns lowercased
+    expect(getAgentConfigKey("Custom-Agent")).toBe("custom-agent")
+  })
+
+  it("resolves all core agent display names", () => {
+    // given all core display names
+    // when/then each resolves to its config key
+    expect(getAgentConfigKey("Hephaestus (Deep Agent)")).toBe("hephaestus")
+    expect(getAgentConfigKey("Prometheus (Plan Builder)")).toBe("prometheus")
+    expect(getAgentConfigKey("Atlas (Plan Executor)")).toBe("atlas")
+    expect(getAgentConfigKey("Metis (Plan Consultant)")).toBe("metis")
+    expect(getAgentConfigKey("Momus (Plan Critic)")).toBe("momus")
+    expect(getAgentConfigKey("Sisyphus-Junior")).toBe("sisyphus-junior")
   })
 })
 
