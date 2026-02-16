@@ -31,6 +31,34 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   resetSqliteBackendCache: () => {},
 }))
 
+// getMessageDir was moved to shared/opencode-message-dir which imports MESSAGE_STORAGE
+// from shared/opencode-storage-paths (not ./constants). Mock it to use the test directory.
+mock.module("../../shared/opencode-message-dir", () => {
+  const { existsSync, readdirSync } = require("node:fs")
+  const { join } = require("node:path")
+  return {
+    getMessageDir: (sessionID: string): string | null => {
+      if (!sessionID.startsWith("ses_")) return null
+      if (/[/\\]|\.\./.test(sessionID)) return null
+      if (!existsSync(TEST_MESSAGE_STORAGE)) return null
+
+      const directPath = join(TEST_MESSAGE_STORAGE, sessionID)
+      if (existsSync(directPath)) return directPath
+
+      try {
+        for (const dir of readdirSync(TEST_MESSAGE_STORAGE)) {
+          const sessionPath = join(TEST_MESSAGE_STORAGE, dir, sessionID)
+          if (existsSync(sessionPath)) return sessionPath
+        }
+      } catch {
+        return null
+      }
+
+      return null
+    },
+  }
+})
+
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
   await import("./storage")
 
