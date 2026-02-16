@@ -1,3 +1,5 @@
+import { setProvider } from "../features/hashline-provider-state"
+
 type ChatParamsInput = {
   sessionID: string
   agent: { name?: string }
@@ -65,6 +67,8 @@ export function createChatParamsHandler(args: {
     const normalizedInput = buildChatParamsInput(input)
     if (!normalizedInput) return
     if (!isChatParamsOutput(output)) return
+
+    setProvider(normalizedInput.sessionID, normalizedInput.model.providerID)
 
     await args.anthropicEffort?.["chat.params"]?.(normalizedInput, output)
   }

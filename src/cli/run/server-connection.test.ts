@@ -1,4 +1,7 @@
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, mock, beforeEach, afterEach, afterAll } from "bun:test"
+
+import * as originalSdk from "@opencode-ai/sdk"
+import * as originalPortUtils from "../../shared/port-utils"
 
 const originalConsole = globalThis.console
 
@@ -24,6 +27,11 @@ mock.module("../../shared/port-utils", () => ({
   getAvailableServerPort: mockGetAvailableServerPort,
   DEFAULT_SERVER_PORT: 4096,
 }))
+
+afterAll(() => {
+  mock.module("@opencode-ai/sdk", () => originalSdk)
+  mock.module("../../shared/port-utils", () => originalPortUtils)
+})
 
 const { createServerConnection } = await import("./server-connection")
 
