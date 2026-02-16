@@ -4,7 +4,7 @@ import type { BackgroundManager } from "../../../features/background-agent"
 import type { BackgroundCancelArgs } from "../types"
 import { BACKGROUND_CANCEL_DESCRIPTION } from "../constants"
 
-export function createBackgroundCancel(manager: BackgroundManager, client: BackgroundCancelClient): ToolDefinition {
+export function createBackgroundCancel(manager: BackgroundManager, _client: BackgroundCancelClient): ToolDefinition {
   return tool({
     description: BACKGROUND_CANCEL_DESCRIPTION,
     args: {
