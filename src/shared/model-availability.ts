@@ -28,8 +28,7 @@ import { normalizeSDKResponse } from "./normalize-sdk-response"
 function normalizeModelName(name: string): string {
 	return name
 		.toLowerCase()
-		.replace(/claude-(opus|sonnet|haiku)-4-5/g, "claude-$1-4.5")
-		.replace(/claude-(opus|sonnet|haiku)-4\.5/g, "claude-$1-4.5")
+		.replace(/claude-(opus|sonnet|haiku)-(\d+)[.-](\d+)/g, "claude-$1-$2.$3")
 }
 
 export function fuzzyMatchModel(
