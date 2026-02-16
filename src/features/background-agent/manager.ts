@@ -528,6 +528,12 @@ export class BackgroundManager {
       return existingTask
     }
 
+    const completionTimer = this.completionTimers.get(existingTask.id)
+    if (completionTimer) {
+      clearTimeout(completionTimer)
+      this.completionTimers.delete(existingTask.id)
+    }
+
     // Re-acquire concurrency using the persisted concurrency group
     const concurrencyKey = existingTask.concurrencyGroup ?? existingTask.agent
     await this.concurrencyManager.acquire(concurrencyKey)
@@ -1251,11 +1257,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       }
     } catch (error) {
       if (this.isAbortedSessionError(error)) {
-        log("[background-agent] Parent session aborted, skipping notification:", {
+        log("[background-agent] Parent session aborted while loading messages; using messageDir fallback:", {
           taskId: task.id,
           parentSessionID: task.parentSessionID,
         })
-        return
       }
       const messageDir = getMessageDir(task.parentSessionID)
       const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
@@ -1289,13 +1294,13 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       })
     } catch (error) {
       if (this.isAbortedSessionError(error)) {
-        log("[background-agent] Parent session aborted, skipping notification:", {
+        log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
           taskId: task.id,
           parentSessionID: task.parentSessionID,
         })
-        return
+      } else {
+        log("[background-agent] Failed to send notification:", error)
       }
-      log("[background-agent] Failed to send notification:", error)
     }
 
     if (allComplete) {
