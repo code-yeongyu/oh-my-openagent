@@ -77,7 +77,7 @@ async function findMessagesWithOrphanThinkingFromSDK(
   let messages: MessageData[]
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    messages = (response.data ?? []) as MessageData[]
+    messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
   } catch {
     return []
   }
@@ -111,7 +111,7 @@ async function findMessageByIndexNeedingThinkingFromSDK(
   let messages: MessageData[]
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    messages = (response.data ?? []) as MessageData[]
+    messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
   } catch {
     return null
   }
