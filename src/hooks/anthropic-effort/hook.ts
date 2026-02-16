@@ -7,7 +7,7 @@ function normalizeModelID(modelID: string): string {
 }
 
 function isClaudeProvider(providerID: string, modelID: string): boolean {
-  if (["anthropic", "opencode"].includes(providerID)) return true
+  if (["anthropic", "google-vertex-anthropic", "opencode"].includes(providerID)) return true
   if (providerID === "github-copilot" && modelID.toLowerCase().includes("claude")) return true
   return false
 }
