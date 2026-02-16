@@ -121,13 +121,9 @@ export { getMessageDir } from "../../shared/opencode-message-dir"
 
 export async function sessionExists(sessionID: string): Promise<boolean> {
   if (isSqliteBackend() && sdkClient) {
-    try {
-      const response = await sdkClient.session.list()
-      const sessions = (response.data || []) as Array<{ id?: string }>
-      return sessions.some((s) => s.id === sessionID)
-    } catch {
-      return false
-    }
+    const response = await sdkClient.session.list()
+    const sessions = (response.data || []) as Array<{ id?: string }>
+    return sessions.some((s) => s.id === sessionID)
   }
   return getMessageDir(sessionID) !== null
 }
