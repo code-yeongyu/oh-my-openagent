@@ -15,9 +15,31 @@ describe("session-directory-resolver", () => {
       expect(result).toBe(true)
     })
 
+    test("returns true when path ends with AppData directory segment", () => {
+      //#given
+      const directory = "C:/Users/test/AppData/Local"
+
+      //#when
+      const result = isWindowsAppDataDirectory(directory)
+
+      //#then
+      expect(result).toBe(true)
+    })
+
     test("returns false when path is outside AppData", () => {
       //#given
       const directory = "D:/projects/oh-my-opencode"
+
+      //#when
+      const result = isWindowsAppDataDirectory(directory)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("returns false for lookalike non-AppData segment", () => {
+      //#given
+      const directory = "D:/projects/appdata/local-tools"
 
       //#when
       const result = isWindowsAppDataDirectory(directory)
