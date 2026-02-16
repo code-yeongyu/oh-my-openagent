@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process"
-import { existsSync, mkdtempSync, unlinkSync } from "node:fs"
+import { existsSync, mkdtempSync, unlinkSync, writeFileSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { log } from "../../shared"
@@ -110,5 +110,40 @@ export function cleanupConvertedImage(filePath: string): void {
     }
   } catch (error) {
     log(`[image-converter] Failed to cleanup ${filePath}: ${error}`)
+  }
+}
+
+export function convertBase64ImageToJpeg(
+  base64Data: string,
+  mimeType: string
+): { base64: string; tempFiles: string[] } {
+  const tempDir = mkdtempSync(join(tmpdir(), "opencode-b64-"))
+  const inputExt = mimeType.split("/")[1] || "bin"
+  const inputPath = join(tempDir, `input.${inputExt}`)
+  const tempFiles: string[] = [inputPath]
+
+  try {
+    const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "")
+    const buffer = Buffer.from(cleanBase64, "base64")
+    writeFileSync(inputPath, buffer)
+
+    log(`[image-converter] Converting Base64 ${mimeType} to JPEG`)
+    
+    const outputPath = convertImageToJpeg(inputPath, mimeType)
+    tempFiles.push(outputPath)
+
+    const convertedBuffer = readFileSync(outputPath)
+    const convertedBase64 = convertedBuffer.toString("base64")
+
+    log(`[image-converter] Base64 conversion successful`)
+    
+    return { base64: convertedBase64, tempFiles }
+  } catch (error) {
+    tempFiles.forEach(file => {
+      try {
+        if (existsSync(file)) unlinkSync(file)
+      } catch {}
+    })
+    throw error
   }
 }
