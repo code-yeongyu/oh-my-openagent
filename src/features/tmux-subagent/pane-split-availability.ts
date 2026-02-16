@@ -57,11 +57,21 @@ export function canSplitPane(
 }
 
 export function canSplitPaneAnyDirection(pane: TmuxPaneInfo): boolean {
-	return pane.width >= MIN_SPLIT_WIDTH || pane.height >= MIN_SPLIT_HEIGHT
+	return canSplitPaneAnyDirectionWithMinWidth(pane, MIN_PANE_WIDTH)
 }
 
-export function getBestSplitDirection(pane: TmuxPaneInfo): SplitDirection | null {
-	const canH = pane.width >= MIN_SPLIT_WIDTH
+export function canSplitPaneAnyDirectionWithMinWidth(
+	pane: TmuxPaneInfo,
+	minPaneWidth: number = MIN_PANE_WIDTH,
+): boolean {
+	return pane.width >= minSplitWidthFor(minPaneWidth) || pane.height >= MIN_SPLIT_HEIGHT
+}
+
+export function getBestSplitDirection(
+	pane: TmuxPaneInfo,
+	minPaneWidth: number = MIN_PANE_WIDTH,
+): SplitDirection | null {
+	const canH = pane.width >= minSplitWidthFor(minPaneWidth)
 	const canV = pane.height >= MIN_SPLIT_HEIGHT
 
 	if (!canH && !canV) return null
