@@ -45,7 +45,9 @@ export function createSessionStateStore(): SessionStateStore {
       return existing.state
     }
 
-    const state: SessionState = {}
+    const state: SessionState = {
+      consecutiveFailures: 0,
+    }
     sessions.set(sessionID, { state, lastAccessedAt: Date.now() })
     return state
   }
