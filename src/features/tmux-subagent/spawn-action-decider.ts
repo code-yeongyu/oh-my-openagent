@@ -62,7 +62,7 @@ export function decideSpawnActions(
 	}
 
 	if (isSplittableAtCount(agentAreaWidth, currentCount, minPaneWidth)) {
-		const spawnTarget = findSpawnTarget(state)
+		const spawnTarget = findSpawnTarget(state, minPaneWidth)
 		if (spawnTarget) {
 			return {
 				canSpawn: true,
@@ -85,19 +85,14 @@ export function decideSpawnActions(
 			canSpawn: true,
 			actions: [
 				{
-					type: "close",
+					type: "replace",
 					paneId: oldestPane.paneId,
-					sessionId: oldestMapping?.sessionId || "",
-				},
-				{
-					type: "spawn",
-					sessionId,
+					oldSessionId: oldestMapping?.sessionId || "",
+					newSessionId: sessionId,
 					description,
-					targetPaneId: state.mainPane.paneId,
-					splitDirection: "-h",
 				},
 			],
-			reason: "closed 1 pane to make room for split",
+			reason: "replaced oldest pane to avoid split churn",
 		}
 	}
 

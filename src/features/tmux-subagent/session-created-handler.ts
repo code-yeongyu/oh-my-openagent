@@ -135,10 +135,21 @@ export async function handleSessionCreated(
 
     const sessionReady = await deps.waitForSessionReady(sessionId)
     if (!sessionReady) {
-      log("[tmux-session-manager] session not ready after timeout, tracking anyway", {
+      log("[tmux-session-manager] session not ready after timeout, closing spawned pane", {
         sessionId,
         paneId: result.spawnedPaneId,
       })
+
+      await executeActions(
+        [{ type: "close", paneId: result.spawnedPaneId, sessionId }],
+        {
+          config: deps.tmuxConfig,
+          serverUrl: deps.serverUrl,
+          windowState: state,
+        },
+      )
+
+      return
     }
 
     const now = Date.now()
