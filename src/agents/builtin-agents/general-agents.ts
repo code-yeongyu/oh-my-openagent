@@ -3,7 +3,8 @@ import type { BuiltinAgentName, AgentOverrides, AgentPromptMetadata } from "../t
 import type { CategoryConfig, GitMasterConfig } from "../../config/schema"
 import type { BrowserAutomationProvider } from "../../config/schema"
 import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
-import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
+import type { ModelRequirement } from "../../shared"
+import { isModelAvailable } from "../../shared"
 import { buildAgent, isFactory } from "../agent-builder"
 import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
@@ -23,6 +24,7 @@ export function collectPendingBuiltinAgents(input: {
   availableModels: Set<string>
   disabledSkills?: Set<string>
   useTaskSystem?: boolean
+  profileRequirements: Record<string, ModelRequirement>
 }): { pendingAgentConfigs: Map<string, AgentConfig>; availableAgents: AvailableAgent[] } {
   const {
     agentSources,
@@ -37,6 +39,7 @@ export function collectPendingBuiltinAgents(input: {
     uiSelectedModel,
     availableModels,
     disabledSkills,
+    profileRequirements,
   } = input
 
   const availableAgents: AvailableAgent[] = []
@@ -52,7 +55,7 @@ export function collectPendingBuiltinAgents(input: {
 
     const override = agentOverrides[agentName]
       ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
-    const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
+    const requirement = profileRequirements[agentName]
 
     // Check if agent requires a specific model
     if (requirement?.requiresModel && availableModels) {

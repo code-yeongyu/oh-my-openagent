@@ -80,6 +80,7 @@ export async function applyAgentConfig(params: {
     currentModel,
     disabledSkills,
     useTaskSystem,
+    params.pluginConfig.performanceProfile,
   );
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
