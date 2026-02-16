@@ -20,13 +20,10 @@ function messageHasContentFromSDK(message: SDKMessage): boolean {
   const parts = message.parts
   if (!parts || parts.length === 0) return false
 
-  let hasIgnoredParts = false
-
   for (const part of parts) {
     const type = part.type
     if (!type) continue
     if (IGNORE_TYPES.has(type)) {
-      hasIgnoredParts = true
       continue
     }
 
