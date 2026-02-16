@@ -2,6 +2,7 @@ import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
 import { getTimingConfig } from "./timing"
 import { log } from "../../shared/logger"
+import { normalizeSDKResponse } from "../../shared"
 
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 
@@ -58,7 +59,7 @@ export async function pollSyncSession(
       log("[task] Poll status fetch failed, retrying", { sessionID: input.sessionID, error: String(error) })
       continue
     }
-    const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+    const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
     const sessionStatus = allStatuses[input.sessionID]
 
     if (pollCount % 10 === 0) {

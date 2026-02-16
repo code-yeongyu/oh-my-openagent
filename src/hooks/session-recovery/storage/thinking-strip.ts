@@ -4,6 +4,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { PART_STORAGE, THINKING_TYPES } from "../constants"
 import type { StoredPart } from "../types"
 import { log, isSqliteBackend, deletePart } from "../../../shared"
+import { normalizeSDKResponse } from "../../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -42,7 +43,7 @@ export async function stripThinkingPartsAsync(
 ): Promise<boolean> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as Array<{ parts?: Array<{ type: string; id: string }> }>) ?? []
+    const messages = normalizeSDKResponse(response, [] as Array<{ parts?: Array<{ type: string; id: string }> }>, { preferResponseOnMissingData: true })
 
     const targetMsg = messages.find((m) => {
       const info = (m as Record<string, unknown>)["info"] as Record<string, unknown> | undefined

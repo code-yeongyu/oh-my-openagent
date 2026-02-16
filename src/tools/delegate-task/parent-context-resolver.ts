@@ -1,32 +1,21 @@
 import type { ToolContextWithMetadata } from "./types"
 import type { OpencodeClient } from "./types"
 import type { ParentContext } from "./executor-types"
-import {
-  findFirstMessageWithAgent,
-  findFirstMessageWithAgentFromSDK,
-  findNearestMessageWithFields,
-  findNearestMessageWithFieldsFromSDK,
-} from "../../features/hook-message-injector"
+import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { getMessageDir } from "../../shared/opencode-message-dir"
-import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
 export async function resolveParentContext(
   ctx: ToolContextWithMetadata,
   client: OpencodeClient
 ): Promise<ParentContext> {
   const messageDir = getMessageDir(ctx.sessionID)
-
-  const [prevMessage, firstMessageAgent] = isSqliteBackend()
-    ? await Promise.all([
-        findNearestMessageWithFieldsFromSDK(client, ctx.sessionID),
-        findFirstMessageWithAgentFromSDK(client, ctx.sessionID),
-      ])
-    : [
-        messageDir ? findNearestMessageWithFields(messageDir) : null,
-        messageDir ? findFirstMessageWithAgent(messageDir) : null,
-      ]
+  const { prevMessage, firstMessageAgent } = await resolveMessageContext(
+    ctx.sessionID,
+    client,
+    messageDir
+  )
 
   const sessionAgent = getSessionAgent(ctx.sessionID)
   const parentAgent = ctx.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent

@@ -6,6 +6,7 @@ import { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE, TODO_DIR, TRANSCRIPT_DI
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { getMessageDir } from "../../shared/opencode-message-dir"
 import type { SessionMessage, SessionInfo, TodoItem, SessionMetadata } from "./types"
+import { normalizeSDKResponse } from "../../shared"
 
 export interface GetMainSessionsOptions {
   directory?: string
@@ -27,7 +28,7 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
   if (isSqliteBackend() && sdkClient) {
     try {
       const response = await sdkClient.session.list()
-      const sessions = (response.data || []) as SessionMetadata[]
+      const sessions = normalizeSDKResponse(response, [] as SessionMetadata[])
       const mainSessions = sessions.filter((s) => !s.parentID)
       if (options.directory) {
         return mainSessions
@@ -82,7 +83,7 @@ export async function getAllSessions(): Promise<string[]> {
   if (isSqliteBackend() && sdkClient) {
     try {
       const response = await sdkClient.session.list()
-      const sessions = (response.data || []) as SessionMetadata[]
+      const sessions = normalizeSDKResponse(response, [] as SessionMetadata[])
       return sessions.map((s) => s.id)
     } catch {
       return []
@@ -121,13 +122,9 @@ export { getMessageDir } from "../../shared/opencode-message-dir"
 
 export async function sessionExists(sessionID: string): Promise<boolean> {
   if (isSqliteBackend() && sdkClient) {
-    try {
-      const response = await sdkClient.session.list()
-      const sessions = (response.data || []) as Array<{ id?: string }>
-      return sessions.some((s) => s.id === sessionID)
-    } catch {
-      return false
-    }
+    const response = await sdkClient.session.list()
+    const sessions = normalizeSDKResponse(response, [] as Array<{ id?: string }>)
+    return sessions.some((s) => s.id === sessionID)
   }
   return getMessageDir(sessionID) !== null
 }
@@ -137,7 +134,7 @@ export async function readSessionMessages(sessionID: string): Promise<SessionMes
   if (isSqliteBackend() && sdkClient) {
     try {
       const response = await sdkClient.session.messages({ path: { id: sessionID } })
-      const rawMessages = (response.data || []) as Array<{
+      const rawMessages = normalizeSDKResponse(response, [] as Array<{
         info?: {
           id?: string
           role?: string
@@ -155,7 +152,7 @@ export async function readSessionMessages(sessionID: string): Promise<SessionMes
           output?: string
           error?: string
         }>
-      }>
+      }>)
       const messages: SessionMessage[] = rawMessages
         .filter((m) => m.info?.id)
         .map((m) => ({
@@ -258,12 +255,12 @@ export async function readSessionTodos(sessionID: string): Promise<TodoItem[]> {
   if (isSqliteBackend() && sdkClient) {
     try {
       const response = await sdkClient.session.todo({ path: { id: sessionID } })
-      const data = (response.data || []) as Array<{
+      const data = normalizeSDKResponse(response, [] as Array<{
         id?: string
         content?: string
         status?: string
         priority?: string
-      }>
+      }>)
       return data.map((item) => ({
         id: item.id || "",
         content: item.content || "",

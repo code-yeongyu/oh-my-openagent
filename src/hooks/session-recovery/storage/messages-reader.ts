@@ -3,7 +3,7 @@ import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { StoredMessageMeta } from "../types"
 import { getMessageDir } from "./message-dir"
-import { isSqliteBackend } from "../../../shared"
+import { isSqliteBackend, normalizeSDKResponse } from "../../../shared"
 import { isRecord } from "../../../shared/record-type-guard"
 
 type OpencodeClient = PluginInput["client"]
@@ -62,7 +62,9 @@ export async function readMessagesFromSDK(
 ): Promise<StoredMessageMeta[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const data: unknown = response.data ?? response
+    const data = normalizeSDKResponse(response, [] as unknown[], {
+      preferResponseOnMissingData: true,
+    })
     if (!Array.isArray(data)) return []
 
     const messages = data

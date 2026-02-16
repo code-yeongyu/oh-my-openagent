@@ -1,4 +1,4 @@
-import { log } from "../../shared"
+import { log, normalizeSDKResponse } from "../../shared"
 
 import { findNearestMessageWithFields } from "../hook-message-injector"
 import { getTaskToastManager } from "../task-toast-manager"
@@ -106,7 +106,7 @@ export async function notifyParentSession(args: {
     const messagesResp = await client.session.messages({
       path: { id: task.parentSessionID },
     })
-    const raw = (messagesResp as { data?: unknown }).data ?? []
+    const raw = normalizeSDKResponse(messagesResp, [] as unknown[])
     const messages = Array.isArray(raw) ? raw : []
 
     for (let i = messages.length - 1; i >= 0; i--) {

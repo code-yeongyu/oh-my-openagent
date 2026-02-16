@@ -5,6 +5,8 @@ import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
 import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { getMessageDir } from "../../shared/opencode-message-dir"
+import { normalizeSDKResponse } from "../../shared"
 
 export interface StoredMessage {
   agent?: string
@@ -64,7 +66,7 @@ export async function findNearestMessageWithFieldsFromSDK(
 ): Promise<StoredMessage | null> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
 
     for (let i = messages.length - 1; i >= 0; i--) {
       const stored = convertSDKMessageToStoredMessage(messages[i])
@@ -97,7 +99,7 @@ export async function findFirstMessageWithAgentFromSDK(
 ): Promise<string | null> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
 
     for (const msg of messages) {
       const stored = convertSDKMessageToStoredMessage(msg)
@@ -353,4 +355,22 @@ export function injectHookMessage(
   } catch {
     return false
   }
+}
+
+export async function resolveMessageContext(
+  sessionID: string,
+  client: OpencodeClient,
+  messageDir: string | null
+): Promise<{ prevMessage: StoredMessage | null; firstMessageAgent: string | null }> {
+  const [prevMessage, firstMessageAgent] = isSqliteBackend()
+    ? await Promise.all([
+        findNearestMessageWithFieldsFromSDK(client, sessionID),
+        findFirstMessageWithAgentFromSDK(client, sessionID),
+      ])
+    : [
+        messageDir ? findNearestMessageWithFields(messageDir) : null,
+        messageDir ? findFirstMessageWithAgent(messageDir) : null,
+      ]
+
+  return { prevMessage, firstMessageAgent }
 }
