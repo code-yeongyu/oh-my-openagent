@@ -121,6 +121,13 @@ export const THINKING_CONFIGS = {
     },
     maxTokens: 128000,
   },
+  "google-vertex-anthropic": {
+    thinking: {
+      type: "enabled",
+      budgetTokens: 64000,
+    },
+    maxTokens: 128000,
+  },
   "amazon-bedrock": {
     reasoningConfig: {
       type: "enabled",
@@ -164,6 +171,7 @@ export const THINKING_CONFIGS = {
 
 const THINKING_CAPABLE_MODELS = {
   anthropic: ["claude-sonnet-4", "claude-opus-4", "claude-3"],
+  "google-vertex-anthropic": ["claude-sonnet-4", "claude-opus-4", "claude-3"],
   "amazon-bedrock": ["claude", "anthropic"],
   google: ["gemini-2", "gemini-3"],
   "google-vertex": ["gemini-2", "gemini-3"],
