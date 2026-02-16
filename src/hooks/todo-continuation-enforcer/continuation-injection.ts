@@ -141,11 +141,14 @@ ${todoList}`
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
+      injectionState.consecutiveFailures = 0
     }
   } catch (error) {
     log(`[${HOOK_NAME}] Injection failed`, { sessionID, error: String(error) })
     if (injectionState) {
       injectionState.inFlight = false
+      injectionState.lastInjectedAt = Date.now()
+      injectionState.consecutiveFailures += 1
     }
   }
 }
