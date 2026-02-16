@@ -1,4 +1,4 @@
-import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH } from "./types"
+import { MIN_PANE_WIDTH } from "./types"
 import type { SplitDirection, TmuxPaneInfo } from "./types"
 import {
 	DIVIDER_SIZE,
