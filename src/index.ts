@@ -136,6 +136,7 @@ import {
   isOpenCodeVersionAtLeast,
   OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
   injectServerAuthIntoClient,
+  createContextDetector,
 } from "./shared";
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
@@ -150,7 +151,23 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   startTmuxCheck();
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
-  const disabledHooks = new Set(pluginConfig.disabled_hooks ?? []);
+  const detector = createContextDetector();
+  const projectContext = detector.detect(ctx.directory);
+  const disabledHooks = new Set<HookName>();
+  
+  if (pluginConfig.disabled_hooks) {
+    for (const hookConfig of pluginConfig.disabled_hooks) {
+      if (typeof hookConfig === "string") {
+        disabledHooks.add(hookConfig);
+      } else {
+        const name = hookConfig.name;
+        const condition = hookConfig.when;
+        if (!condition || detector.matchesCondition(projectContext, condition)) {
+          disabledHooks.add(name);
+        }
+      }
+    }
+  }
   const firstMessageVariantGate = createFirstMessageVariantGate();
 
   const tmuxConfig = {

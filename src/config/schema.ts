@@ -144,6 +144,21 @@ export const HookNameSchema = z.enum([
   "commit-size-checker",
 ])
 
+export const HookConditionSchema = z.object({
+  packageManager: z.enum(["npm", "yarn", "pnpm", "bun", "unknown"]).optional(),
+  framework: z.enum(["react", "nextjs", "vue", "angular", "svelte", "unknown"]).optional(),
+  hasTypeScript: z.boolean().optional(),
+  hasTesting: z.boolean().optional(),
+})
+
+export const HookConfigSchema = z.union([
+  HookNameSchema,
+  z.object({
+    name: HookNameSchema,
+    when: HookConditionSchema.optional(),
+  }),
+])
+
 export const BuiltinCommandNameSchema = z.enum([
   "init-deep",
   "start-work",
@@ -492,7 +507,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
-  disabled_hooks: z.array(HookNameSchema).optional(),
+  disabled_hooks: z.array(HookConfigSchema).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
   disabled_tools: z.array(z.string()).optional(),
@@ -524,6 +539,8 @@ export type AgentOverrides = z.infer<typeof AgentOverridesSchema>
 export type BackgroundTaskConfig = z.infer<typeof BackgroundTaskConfigSchema>
 export type AgentName = z.infer<typeof AgentNameSchema>
 export type HookName = z.infer<typeof HookNameSchema>
+export type HookCondition = z.infer<typeof HookConditionSchema>
+export type HookConfig = z.infer<typeof HookConfigSchema>
 export type BuiltinCommandName = z.infer<typeof BuiltinCommandNameSchema>
 export type BuiltinSkillName = z.infer<typeof BuiltinSkillNameSchema>
 export type SisyphusAgentConfig = z.infer<typeof SisyphusAgentConfigSchema>

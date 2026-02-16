@@ -7,25 +7,12 @@
 /**
  * Package manager enumeration
  */
-export enum PackageManager {
-  BUN = "bun",
-  NPM = "npm",
-  YARN = "yarn",
-  PNPM = "pnpm",
-  UNKNOWN = "unknown",
-}
+export type PackageManager = "npm" | "yarn" | "pnpm" | "bun" | "unknown";
 
 /**
  * Framework enumeration
  */
-export enum Framework {
-  REACT = "react",
-  NEXTJS = "nextjs",
-  VUE = "vue",
-  ANGULAR = "angular",
-  SVELTE = "svelte",
-  UNKNOWN = "unknown",
-}
+export type Framework = "react" | "nextjs" | "vue" | "angular" | "svelte" | "unknown";
 
 /**
  * Project context information
@@ -51,33 +38,33 @@ export interface HookCondition {
  * Lock file to package manager mapping
  */
 const LOCK_FILE_MAP: Record<string, PackageManager> = {
-  "bun.lockb": PackageManager.BUN,
-  "package-lock.json": PackageManager.NPM,
-  "yarn.lock": PackageManager.YARN,
-  "pnpm-lock.yaml": PackageManager.PNPM,
+  "bun.lockb": "bun",
+  "package-lock.json": "npm",
+  "yarn.lock": "yarn",
+  "pnpm-lock.yaml": "pnpm",
 }
 
 /**
  * Config file to framework mapping
  */
 const FRAMEWORK_CONFIG_MAP: Record<string, Framework> = {
-  "next.config.js": Framework.NEXTJS,
-  "next.config.mjs": Framework.NEXTJS,
-  "next.config.ts": Framework.NEXTJS,
-  "vue.config.js": Framework.VUE,
-  "angular.json": Framework.ANGULAR,
-  "svelte.config.js": Framework.SVELTE,
+  "next.config.js": "nextjs",
+  "next.config.mjs": "nextjs",
+  "next.config.ts": "nextjs",
+  "vue.config.js": "vue",
+  "angular.json": "angular",
+  "svelte.config.js": "svelte",
 }
 
 /**
  * Dependency to framework mapping
  */
 const FRAMEWORK_DEP_MAP: Record<string, Framework> = {
-  next: Framework.NEXTJS,
-  react: Framework.REACT,
-  vue: Framework.VUE,
-  "@angular/core": Framework.ANGULAR,
-  svelte: Framework.SVELTE,
+  next: "nextjs",
+  react: "react",
+  vue: "vue",
+  "@angular/core": "angular",
+  svelte: "svelte",
 }
 
 /**
@@ -119,7 +106,7 @@ class ContextDetectorImpl implements ContextDetector {
         return pm
       }
     }
-    return PackageManager.UNKNOWN
+    return "unknown"
   }
 
   private detectFramework(files: string[], deps: Record<string, string>): Framework {
@@ -137,7 +124,7 @@ class ContextDetectorImpl implements ContextDetector {
       }
     }
 
-    return Framework.UNKNOWN
+    return "unknown"
   }
 
   private detectTypeScript(files: string[]): boolean {
