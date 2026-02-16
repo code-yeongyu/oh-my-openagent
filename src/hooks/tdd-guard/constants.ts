@@ -10,7 +10,7 @@ import type { TddGuardConfig, TestFilePattern, SupportedLanguage } from "./types
  * Default configuration for TDD Guard
  */
 export const DEFAULT_TDD_GUARD_CONFIG: TddGuardConfig = {
-  enabled: false,
+  enabled: true,
   risk_tier_enabled: true,
   min_enforce_tier: 2,
   ignore_patterns: ["*.md", "*.json", "*.yaml", "*.css"],

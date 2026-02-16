@@ -14,7 +14,7 @@ export interface RiskTierResult {
 }
 
 export interface TddGuardConfig {
-  /** Enable TDD Guard Hook (default: false) */
+  /** Enable TDD Guard Hook (default: true) */
   enabled: boolean
   /** Enable Risk Tier based validation (default: true) */
   risk_tier_enabled: boolean
