@@ -213,10 +213,17 @@ export class TmuxSessionManager {
         const sessionReady = await this.waitForSessionReady(sessionId)
         
         if (!sessionReady) {
-          log("[tmux-session-manager] session not ready after timeout, tracking anyway", {
+          log("[tmux-session-manager] session not ready after timeout, closing spawned pane", {
             sessionId,
             paneId: result.spawnedPaneId,
           })
+
+          await executeAction(
+            { type: "close", paneId: result.spawnedPaneId, sessionId },
+            { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
+          )
+
+          return
         }
         
         const now = Date.now()
