@@ -123,6 +123,43 @@ describe("preemptive-compaction", () => {
     expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
 
+  it("should trigger compaction for google-vertex-anthropic provider", async () => {
+    //#given google-vertex-anthropic usage above threshold
+    const hook = createPreemptiveCompactionHook(ctx as never)
+    const sessionID = "ses_vertex_anthropic_high"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "google-vertex-anthropic",
+            modelID: "claude-sonnet-4-5",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    //#when tool.execute.after runs
+    const output = { title: "", output: "test", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    //#then summarize should be triggered
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
+
   // #given session deleted
   // #then cache should be cleaned up
   it("should clean up cache on session.deleted", async () => {
