@@ -40,7 +40,17 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
     const providers = (newConfig.provider ?? {}) as Record<string, unknown>
 
     if (config.hasGemini) {
-      providers.google = ANTIGRAVITY_PROVIDER_CONFIG.google
+      const existingGoogle = (providers.google ?? {}) as Record<string, unknown>
+      const antigravityGoogle = ANTIGRAVITY_PROVIDER_CONFIG.google as Record<string, unknown>
+
+      providers.google = {
+        ...existingGoogle,
+        ...antigravityGoogle,
+        models: {
+          ...((existingGoogle.models ?? {}) as Record<string, unknown>),
+          ...((antigravityGoogle.models ?? {}) as Record<string, unknown>),
+        },
+      }
     }
 
     if (Object.keys(providers).length > 0) {
