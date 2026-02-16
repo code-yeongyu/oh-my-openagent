@@ -2,6 +2,7 @@ import type { SplitDirection, TmuxPaneInfo, WindowState } from "./types"
 import { MAIN_PANE_RATIO } from "./tmux-grid-constants"
 import { computeGridPlan, mapPaneToSlot } from "./grid-planning"
 import { canSplitPane, getBestSplitDirection } from "./pane-split-availability"
+import { MIN_PANE_WIDTH } from "./types"
 
 export interface SpawnTarget {
 	targetPaneId: string
@@ -37,6 +38,7 @@ function findFirstEmptySlot(
 
 function findSplittableTarget(
 	state: WindowState,
+	minPaneWidth: number,
 	_preferredDirection?: SplitDirection,
 ): SpawnTarget | null {
 	if (!state.mainPane) return null
@@ -44,7 +46,7 @@ function findSplittableTarget(
 
 	if (existingCount === 0) {
 		const virtualMainPane: TmuxPaneInfo = { ...state.mainPane, width: state.windowWidth }
-		if (canSplitPane(virtualMainPane, "-h")) {
+		if (canSplitPane(virtualMainPane, "-h", minPaneWidth)) {
 			return { targetPaneId: state.mainPane.paneId, splitDirection: "-h" }
 		}
 		return null
@@ -56,17 +58,17 @@ function findSplittableTarget(
 	const targetSlot = findFirstEmptySlot(occupancy, plan)
 
 	const leftPane = occupancy.get(`${targetSlot.row}:${targetSlot.col - 1}`)
-	if (leftPane && canSplitPane(leftPane, "-h")) {
+	if (leftPane && canSplitPane(leftPane, "-h", minPaneWidth)) {
 		return { targetPaneId: leftPane.paneId, splitDirection: "-h" }
 	}
 
 	const abovePane = occupancy.get(`${targetSlot.row - 1}:${targetSlot.col}`)
-	if (abovePane && canSplitPane(abovePane, "-v")) {
+	if (abovePane && canSplitPane(abovePane, "-v", minPaneWidth)) {
 		return { targetPaneId: abovePane.paneId, splitDirection: "-v" }
 	}
 
 	const splittablePanes = state.agentPanes
-		.map((pane) => ({ pane, direction: getBestSplitDirection(pane) }))
+		.map((pane) => ({ pane, direction: getBestSplitDirection(pane, minPaneWidth) }))
 		.filter(
 			(item): item is { pane: TmuxPaneInfo; direction: SplitDirection } =>
 				item.direction !== null,
@@ -81,6 +83,9 @@ function findSplittableTarget(
 	return null
 }
 
-export function findSpawnTarget(state: WindowState): SpawnTarget | null {
-	return findSplittableTarget(state)
+export function findSpawnTarget(
+	state: WindowState,
+	minPaneWidth: number = MIN_PANE_WIDTH,
+): SpawnTarget | null {
+	return findSplittableTarget(state, minPaneWidth)
 }
