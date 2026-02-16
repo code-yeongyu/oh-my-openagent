@@ -99,6 +99,7 @@ export function createAtlasAgent(ctx: OrchestratorContext): AgentConfig {
   ])
 
   const baseConfig = {
+    name: "Atlas (Plan Executor)",
     description:
       "Orchestrates work via task() to complete ALL tasks in a todo list until fully done. (Atlas - OhMyOpenCode)",
     mode: MODE,
