@@ -113,7 +113,7 @@ export function loadPluginConfig(
 
   // Load user config first (base)
   let config: OhMyOpenCodeConfig =
-    loadConfigFromPath(userConfigPath, ctx) ?? {};
+    loadConfigFromPath(userConfigPath, ctx) ?? (OhMyOpenCodeConfigSchema.parse({}) as OhMyOpenCodeConfig);
 
   // Override with project config
   const projectConfig = loadConfigFromPath(projectConfigPath, ctx);
@@ -121,9 +121,7 @@ export function loadPluginConfig(
     config = mergeConfigs(config, projectConfig);
   }
 
-  config = {
-    ...config,
-  };
+  config = OhMyOpenCodeConfigSchema.parse(config) as OhMyOpenCodeConfig;
 
   log("Final merged config", {
     agents: config.agents,
