@@ -2,6 +2,7 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import type { MessageData } from "./types"
 import { readParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { normalizeSDKResponse } from "../../shared"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -28,7 +29,7 @@ async function readPartsFromSDKFallback(
 ): Promise<MessagePart[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as MessageData[], { preferResponseOnMissingData: true })
     const target = messages.find((m) => m.info?.id === messageID)
     if (!target?.parts) return []
 

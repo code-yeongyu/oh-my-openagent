@@ -3,7 +3,7 @@ import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
 } from "../../features/hook-message-injector"
-import { getMessageDir, isSqliteBackend } from "../../shared"
+import { getMessageDir, isSqliteBackend, normalizeSDKResponse } from "../../shared"
 import type { ModelInfo } from "./types"
 
 export async function resolveRecentModelForSession(
@@ -12,9 +12,9 @@ export async function resolveRecentModelForSession(
 ): Promise<ModelInfo | undefined> {
   try {
     const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
-    const messages = (messagesResp.data ?? []) as Array<{
+    const messages = normalizeSDKResponse(messagesResp, [] as Array<{
       info?: { model?: ModelInfo; modelID?: string; providerID?: string }
-    }>
+    }>)
 
     for (let i = messages.length - 1; i >= 0; i--) {
       const info = messages[i].info

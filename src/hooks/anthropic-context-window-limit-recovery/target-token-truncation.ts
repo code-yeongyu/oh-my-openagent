@@ -3,6 +3,7 @@ import type { AggressiveTruncateResult } from "./tool-part-types"
 import { findToolResultsBySize, truncateToolResult } from "./tool-result-storage"
 import { truncateToolResultAsync } from "./tool-result-storage-sdk"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { normalizeSDKResponse } from "../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -66,7 +67,7 @@ export async function truncateUntilTargetTokens(
 			const response = (await client.session.messages({
 				path: { id: sessionID },
 			})) as { data?: SDKMessage[] }
-			const messages = (response.data ?? response) as SDKMessage[]
+			const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
 			toolPartsByKey = new Map<string, SDKToolPart>()
 
 			for (const message of messages) {
