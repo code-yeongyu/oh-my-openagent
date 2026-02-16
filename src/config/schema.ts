@@ -140,6 +140,8 @@ export const HookNameSchema = z.enum([
   "tasks-todowrite-disabler",
   "write-existing-file-guard",
   "tasks-md-creation-guard",
+  "session-scorer",
+  "commit-size-checker",
 ])
 
 export const BuiltinCommandNameSchema = z.enum([

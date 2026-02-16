@@ -72,7 +72,9 @@ import {
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
   createTasksMdCreationGuardHook,
+  createCommitSizeChecker,
 } from "./hooks";
+import { createSessionScorer } from "./features/session-scorer";
 import {
   contextCollector,
   createContextInjectorMessagesTransformHook,
@@ -347,6 +349,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   const tasksMdCreationGuard = isHookEnabled("tasks-md-creation-guard")
     ? createTasksMdCreationGuardHook(ctx)
+    : null;
+
+  const sessionScorer = isHookEnabled("session-scorer")
+    ? createSessionScorer()
+    : null;
+
+  const commitSizeChecker = isHookEnabled("commit-size-checker")
+    ? createCommitSizeChecker()
     : null;
 
   // TDD Guard hook - enforces Test-Driven Development
@@ -821,6 +831,9 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await categorySkillReminder?.event(input);
       await interactiveBashSession?.event(input);
       await ralphLoop?.event(input);
+      if (sessionScorer && sessionScorer.event) {
+        await sessionScorer.event(input);
+      }
       await tddGuard?.event?.(input);
       await planReorganizer?.handler(input);
       await stopContinuationGuard?.event(input);
@@ -922,6 +935,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await directoryAgentsInjector?.["tool.execute.before"]?.(input, output);
       await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
       await rulesInjector?.["tool.execute.before"]?.(input, output);
+      await commitSizeChecker?.["tool.execute.before"]?.(input, output);
       // Note: tasksTodowriteDisabler NOT registered to keep TodoWrite available
       await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
       await tddGuard?.["tool.execute.before"]?.(input, output);

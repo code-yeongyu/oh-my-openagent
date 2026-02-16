@@ -84,7 +84,11 @@ export interface SessionScorer {
   getDisplayString(): string
   /** Reset scorer */
   reset(): void
+  /** Session stop event handler */
+  event?(input: any): Promise<void> | void
 }
+
+import { log } from "../../shared";
 
 /**
  * Session Scorer implementation
@@ -175,6 +179,12 @@ class SessionScorerImpl implements SessionScorer {
       typeErrors: 0,
       tasksCompleted: 0,
       tasksTotal: 0,
+    }
+  }
+
+  async event(input: any): Promise<void> {
+    if (input.event.type === "session.stop") {
+      log(this.getDisplayString())
     }
   }
 }
