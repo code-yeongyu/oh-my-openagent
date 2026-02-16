@@ -64,7 +64,7 @@ export async function findNearestMessageWithFieldsFromSDK(
 ): Promise<StoredMessage | null> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as SDKMessage[]
+    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
 
     for (let i = messages.length - 1; i >= 0; i--) {
       const stored = convertSDKMessageToStoredMessage(messages[i])
@@ -97,7 +97,7 @@ export async function findFirstMessageWithAgentFromSDK(
 ): Promise<string | null> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = (response.data ?? []) as SDKMessage[]
+    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
 
     for (const msg of messages) {
       const stored = convertSDKMessageToStoredMessage(msg)

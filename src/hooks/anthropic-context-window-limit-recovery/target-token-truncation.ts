@@ -10,8 +10,10 @@ interface SDKToolPart {
 	id: string
 	type: string
 	tool?: string
-	state?: { output?: string }
-	truncated?: boolean
+	state?: {
+		output?: string
+		time?: { start?: number; end?: number; compacted?: number }
+	}
 	originalSize?: number
 }
 
@@ -81,7 +83,7 @@ export async function truncateUntilTargetTokens(
 
 		const results: import("./tool-part-types").ToolResultInfo[] = []
 		for (const [key, part] of toolPartsByKey) {
-			if (part.type === "tool" && part.state?.output && !part.truncated && part.tool) {
+			if (part.type === "tool" && part.state?.output && !part.state?.time?.compacted && part.tool) {
 				results.push({
 					partPath: "",
 					partId: part.id,
