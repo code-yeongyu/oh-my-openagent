@@ -79,8 +79,8 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
 
         const isActive = task.status === "pending" || task.status === "running"
         const fullSession = args.full_session ?? isActive
-        const includeThinking = args.include_thinking ?? isActive
-        const includeToolResults = args.include_tool_results ?? isActive
+        const includeThinking = isActive || (args.include_thinking ?? false)
+        const includeToolResults = isActive || (args.include_tool_results ?? false)
 
         if (fullSession) {
           return await formatFullSession(task, client, {
