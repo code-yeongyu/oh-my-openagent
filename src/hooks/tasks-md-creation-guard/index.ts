@@ -1,7 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync } from "node:fs"
 import { isAbsolute, relative, resolve } from "node:path"
-import { PLANNING_FILE_PATTERNS, ERROR_MESSAGE, INTERCEPTED_TOOLS, BASH_FILE_CREATION_PATTERNS } from "./constants"
+import { getMainSessionID, subagentSessions } from "../../features/claude-code-session-state"
+import { BASH_FILE_CREATION_PATTERNS, ERROR_MESSAGE, INTERCEPTED_TOOLS, PLANNING_FILE_PATTERNS } from "./constants"
 
 export * from "./constants"
 
@@ -36,8 +37,9 @@ function extractFilePathsFromBashCommand(command: string): string[] {
   const paths: string[] = []
   for (const pattern of BASH_FILE_CREATION_PATTERNS) {
     const match = command.match(pattern)
-    if (match && match[1]) {
-      paths.push(match[1])
+    const pathMatch = match?.[1]
+    if (pathMatch) {
+      paths.push(pathMatch)
     }
   }
   return paths
@@ -81,6 +83,26 @@ function getFilePaths(args: ToolArgs, toolName: string): string[] {
 export function createTasksMdCreationGuardHook(ctx: PluginInput) {
   const skillUsedSessions = new Set<string>()
 
+  function hasSkillAuthorization(sessionID?: string): boolean {
+    if (!sessionID) return false
+    if (skillUsedSessions.has(sessionID)) return true
+
+    const mainSessionID = getMainSessionID()
+    if (!mainSessionID) return false
+
+    const isMainSession = sessionID === mainSessionID
+    const isSubagentSession = subagentSessions.has(sessionID)
+    if (!isMainSession && !isSubagentSession) return false
+
+    if (skillUsedSessions.has(mainSessionID)) return true
+
+    for (const subagentSession of subagentSessions) {
+      if (skillUsedSessions.has(subagentSession)) return true
+    }
+
+    return false
+  }
+
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID?: string },
@@ -104,8 +126,7 @@ export function createTasksMdCreationGuardHook(ctx: PluginInput) {
         return
       }
 
-      const hasSkill = input.sessionID ? skillUsedSessions.has(input.sessionID) : false
-      if (hasSkill) {
+      if (hasSkillAuthorization(input.sessionID)) {
         return
       }
 
@@ -120,14 +141,20 @@ export function createTasksMdCreationGuardHook(ctx: PluginInput) {
     },
 
     "tool.execute.after": async (
-      input: { tool: string; sessionID?: string },
+      input: { tool: string; sessionID?: string; args?: Record<string, unknown> },
       output: { metadata?: Record<string, unknown> }
     ): Promise<void> => {
-      if (input.tool.toLowerCase() !== "skill") {
+      const toolLower = input.tool.toLowerCase()
+      // Recognize both "skill" and "slashcommand" tools
+      if (toolLower !== "skill" && toolLower !== "slashcommand") {
         return
       }
 
-      const skillName = (output.metadata?.name ?? output.metadata?.skillName ?? "") as string
+      // Check both output metadata (for tools that provide it) and input args (for skill name)
+      const outputSkillName = (output.metadata?.name ?? output.metadata?.skillName ?? "") as string
+      const inputSkillName = (input.args?.name ?? input.args?.skillName ?? "") as string
+      const skillName = outputSkillName || inputSkillName
+
       if (!skillName.toLowerCase().includes("creating-changes")) {
         return
       }
