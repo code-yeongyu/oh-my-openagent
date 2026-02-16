@@ -70,108 +70,25 @@ Generate plan to: \`.sisyphus/plans/{name}.md\`
 
 ## Verification Strategy (MANDATORY)
 
-> **UNIVERSAL RULE: ZERO HUMAN INTERVENTION**
->
-> ALL tasks in this plan MUST be verifiable WITHOUT any human action.
-> This is NOT conditional — it applies to EVERY task, regardless of test strategy.
->
-> **FORBIDDEN** — acceptance criteria that require:
-> - "User manually tests..." / "사용자가 직접 테스트..."
-> - "User visually confirms..." / "사용자가 눈으로 확인..."
-> - "User interacts with..." / "사용자가 직접 조작..."
-> - "Ask user to verify..." / "사용자에게 확인 요청..."
-> - ANY step where a human must perform an action
->
-> **ALL verification is executed by the agent** using tools (Playwright, interactive_bash, curl, etc.). No exceptions.
+> **ZERO HUMAN INTERVENTION** — ALL verification is agent-executed. No exceptions.
+> Acceptance criteria requiring "user manually tests/confirms" are FORBIDDEN.
 
 ### Test Decision
 - **Infrastructure exists**: [YES/NO]
 - **Automated tests**: [TDD / Tests-after / None]
 - **Framework**: [bun test / vitest / jest / pytest / none]
+- **If TDD**: Each task follows RED (failing test) → GREEN (minimal impl) → REFACTOR
 
-### If TDD Enabled
+### QA Policy
+Every task MUST include agent-executed QA scenarios (see TODO template below).
+Evidence saved to \`.sisyphus/evidence/task-{N}-{scenario-slug}.{ext}\`.
 
-Each TODO follows RED-GREEN-REFACTOR:
-
-**Task Structure:**
-1. **RED**: Write failing test first
-   - Test file: \`[path].test.ts\`
-   - Test command: \`bun test [file]\`
-   - Expected: FAIL (test exists, implementation doesn't)
-2. **GREEN**: Implement minimum code to pass
-   - Command: \`bun test [file]\`
-   - Expected: PASS
-3. **REFACTOR**: Clean up while keeping green
-   - Command: \`bun test [file]\`
-   - Expected: PASS (still)
-
-**Test Setup Task (if infrastructure doesn't exist):**
-- [ ] 0. Setup Test Infrastructure
-  - Install: \`bun add -d [test-framework]\`
-  - Config: Create \`[config-file]\`
-  - Verify: \`bun test --help\` → shows help
-  - Example: Create \`src/__tests__/example.test.ts\`
-  - Verify: \`bun test\` → 1 test passes
-
-### Agent-Executed QA Scenarios (MANDATORY — ALL tasks)
-
-> Whether TDD is enabled or not, EVERY task MUST include Agent-Executed QA Scenarios.
-> - **With TDD**: QA scenarios complement unit tests at integration/E2E level
-> - **Without TDD**: QA scenarios are the PRIMARY verification method
->
-> These describe how the executing agent DIRECTLY verifies the deliverable
-> by running it — opening browsers, executing commands, sending API requests.
-> The agent performs what a human tester would do, but automated via tools.
-
-**Verification Tool by Deliverable Type:**
-
-| Type | Tool | How Agent Verifies |
-|------|------|-------------------|
-| **Frontend/UI** | Playwright (playwright skill) | Navigate, interact, assert DOM, screenshot |
-| **TUI/CLI** | interactive_bash (tmux) | Run command, send keystrokes, validate output |
-| **API/Backend** | Bash (curl/httpie) | Send requests, parse responses, assert fields |
-| **Library/Module** | Bash (bun/node REPL) | Import, call functions, compare output |
-| **Config/Infra** | Bash (shell commands) | Apply config, run state checks, validate |
-
-**Each Scenario MUST Follow This Format:**
-
-\`\`\`
-Scenario: [Descriptive name — what user action/flow is being verified]
-  Tool: [Playwright / interactive_bash / Bash]
-  Preconditions: [What must be true before this scenario runs]
-  Steps:
-    1. [Exact action with specific selector/command/endpoint]
-    2. [Next action with expected intermediate state]
-    3. [Assertion with exact expected value]
-  Expected Result: [Concrete, observable outcome]
-  Failure Indicators: [What would indicate failure]
-  Evidence: [Screenshot path / output capture / response body path]
-\`\`\`
-
-**Scenario Detail Requirements:**
-- **Selectors**: Specific CSS selectors (\`.login-button\`, not "the login button")
-- **Data**: Concrete test data (\`"test@example.com"\`, not \`"[email]"\`)
-- **Assertions**: Exact values (\`text contains "Welcome back"\`, not "verify it works")
-- **Timing**: Include wait conditions where relevant (\`Wait for .dashboard (timeout: 10s)\`)
-- **Negative Scenarios**: At least ONE failure/error scenario per feature
-- **Evidence Paths**: Specific file paths (\`.sisyphus/evidence/task-N-scenario-name.png\`)
-
-**Anti-patterns (NEVER write scenarios like this):**
-- ❌ "Verify the login page works correctly"
-- ❌ "Check that the API returns the right data"
-- ❌ "Test the form validation"
-- ❌ "User opens browser and confirms..."
-
-**Write scenarios like this instead:**
-- ✅ \`Navigate to /login → Fill input[name="email"] with "test@example.com" → Fill input[name="password"] with "Pass123!" → Click button[type="submit"] → Wait for /dashboard → Assert h1 contains "Welcome"\`
-- ✅ \`POST /api/users {"name":"Test","email":"new@test.com"} → Assert status 201 → Assert response.id is UUID → GET /api/users/{id} → Assert name equals "Test"\`
-- ✅ \`Run ./cli --config test.yaml → Wait for "Loaded" in stdout → Send "q" → Assert exit code 0 → Assert stdout contains "Goodbye"\`
-
-**Evidence Requirements:**
-- Screenshots: \`.sisyphus/evidence/\` for all UI verifications
-- Terminal output: Captured for CLI/TUI verifications
-- Response bodies: Saved for API verifications
-- All evidence referenced by specific file path in acceptance criteria
+| Deliverable Type | Verification Tool | Method |
+|------------------|-------------------|--------|
+| Frontend/UI | Playwright (playwright skill) | Navigate, interact, assert DOM, screenshot |
+| TUI/CLI | interactive_bash (tmux) | Run command, send keystrokes, validate output |
+| API/Backend | Bash (curl) | Send requests, assert status + response fields |
+| Library/Module | Bash (bun/node REPL) | Import, call functions, compare output |
 
 ---
 
@@ -347,6 +264,13 @@ Max Concurrent: 7 (Waves 1 & 2)
     Evidence: .sisyphus/evidence/task-{N}-{scenario-slug}-error.{ext}
   \\\`\\\`\\\`
 
+  > **Specificity requirements — every scenario MUST use:**
+  > - **Selectors**: Specific CSS selectors (\`.login-button\`, not "the login button")
+  > - **Data**: Concrete test data (\`"test@example.com"\`, not \`"[email]"\`)
+  > - **Assertions**: Exact values (\`text contains "Welcome back"\`, not "verify it works")
+  > - **Timing**: Wait conditions where relevant (\`timeout: 10s\`)
+  > - **Negative**: At least ONE failure/error scenario per task
+  >
   > **Anti-patterns (your scenario is INVALID if it looks like this):**
   > - ❌ "Verify it works correctly" — HOW? What does "correctly" mean?
   > - ❌ "Check the API returns data" — WHAT data? What fields? What values?
@@ -366,153 +290,23 @@ Max Concurrent: 7 (Waves 1 & 2)
 
 ## Final Verification Wave (MANDATORY — after ALL implementation tasks)
 
-> **ALL 4 review agents run in PARALLEL after every implementation task is complete.**
-> **ALL 4 must APPROVE before the plan is considered done.**
-> **If ANY agent rejects, fix issues and re-run the rejecting agent(s).**
+> 4 review agents run in PARALLEL. ALL must APPROVE. Rejection → fix → re-run.
 
-- [ ] F1. Plan Compliance Audit
+- [ ] F1. **Plan Compliance Audit** — \`oracle\`
+  Read the plan end-to-end. For each "Must Have": verify implementation exists (read file, curl endpoint, run command). For each "Must NOT Have": search codebase for forbidden patterns — reject with file:line if found. Check evidence files exist in .sisyphus/evidence/. Compare deliverables against plan.
+  Output: \`Must Have [N/N] | Must NOT Have [N/N] | Tasks [N/N] | VERDICT: APPROVE/REJECT\`
 
-  **Agent**: oracle (read-only consultation)
+- [ ] F2. **Code Quality Review** — \`unspecified-high\`
+  Run \`tsc --noEmit\` + linter + \`bun test\`. Review all changed files for: \`as any\`/\`@ts-ignore\`, empty catches, console.log in prod, commented-out code, unused imports. Check AI slop: excessive comments, over-abstraction, generic names (data/result/item/temp).
+  Output: \`Build [PASS/FAIL] | Lint [PASS/FAIL] | Tests [N pass/N fail] | Files [N clean/N issues] | VERDICT\`
 
-  **What this agent does**:
-  Read the original work plan (.sisyphus/plans/{name}.md) and verify EVERY requirement was fulfilled.
+- [ ] F3. **Real Manual QA** — \`unspecified-high\` (+ \`playwright\` skill if UI)
+  Start from clean state. Execute EVERY QA scenario from EVERY task — follow exact steps, capture evidence. Test cross-task integration (features working together, not isolation). Test edge cases: empty state, invalid input, rapid actions. Save to \`.sisyphus/evidence/final-qa/\`.
+  Output: \`Scenarios [N/N pass] | Integration [N/N] | Edge Cases [N tested] | VERDICT\`
 
-  **Exact verification steps**:
-  1. Read the plan file end-to-end
-  2. For EACH item in "Must Have": verify the implementation exists and works
-     - Run the verification command listed in "Definition of Done"
-     - Check the file/endpoint/feature actually exists (read the file, curl the endpoint)
-  3. For EACH item in "Must NOT Have": verify it was NOT implemented
-     - Search codebase for forbidden patterns (grep, ast_grep_search)
-     - If found → REJECT with specific file:line reference
-  4. For EACH TODO task: verify acceptance criteria were met
-     - Check evidence files exist in .sisyphus/evidence/
-     - Verify test results match expected outcomes
-  5. Compare final deliverables against "Concrete Deliverables" list
-
-  **Output format**:
-  \\\`\\\`\\\`
-  ## Plan Compliance Report
-  ### Must Have: [N/N passed]
-  - [✅/❌] [requirement]: [evidence]
-  ### Must NOT Have: [N/N clean]
-  - [✅/❌] [guardrail]: [evidence]
-  ### Task Completion: [N/N verified]
-  - [✅/❌] Task N: [criteria status]
-  ### VERDICT: APPROVE / REJECT
-  ### Rejection Reasons (if any): [specific issues]
-  \\\`\\\`\\\`
-
-- [ ] F2. Code Quality Review
-
-  **Agent**: unspecified-high
-
-  **What this agent does**:
-  Review ALL changed/created files for production readiness. This is NOT a rubber stamp.
-
-  **Exact verification steps**:
-  1. Run full type check: \`bunx tsc --noEmit\` (or project equivalent) → must exit 0
-  2. Run linter if configured: \`bunx biome check .\` / \`bunx eslint .\` → must pass
-  3. Run full test suite: \`bun test\` → all tests pass, zero failures
-  4. For EACH new/modified file, check:
-     - No \`as any\`, \`@ts-ignore\`, \`@ts-expect-error\`
-     - No empty catch blocks \`catch(e) {}\`
-     - No console.log left in production code (unless intentional logging)
-     - No commented-out code blocks
-     - No TODO/FIXME/HACK comments without linked issue
-     - Consistent naming with existing codebase conventions
-     - Imports are clean (no unused imports)
-  5. Check for AI slop patterns:
-     - Excessive inline comments explaining obvious code
-     - Over-abstraction (unnecessary wrapper functions)
-     - Generic variable names (data, result, item, temp)
-
-  **Output format**:
-  \\\`\\\`\\\`
-  ## Code Quality Report
-  ### Build: [PASS/FAIL] — tsc exit code, error count
-  ### Lint: [PASS/FAIL] — linter output summary
-  ### Tests: [PASS/FAIL] — N passed, N failed, N skipped
-  ### File Review: [N files reviewed]
-  - [file]: [issues found or "clean"]
-  ### AI Slop Check: [N issues]
-  - [file:line]: [pattern detected]
-  ### VERDICT: APPROVE / REJECT
-  \\\`\\\`\\\`
-
-- [ ] F3. Real Manual QA
-
-  **Agent**: unspecified-high (with \`playwright\` skill if UI involved)
-
-  **What this agent does**:
-  Actually RUN the deliverable end-to-end as a real user would. No mocks, no shortcuts.
-
-  **Exact verification steps**:
-  1. Start the application/service from scratch (clean state)
-  2. Execute EVERY QA scenario from EVERY task in the plan sequentially:
-     - Follow the exact steps written in each task's QA Scenarios section
-     - Capture evidence (screenshots, terminal output, response bodies)
-     - Compare actual behavior against expected results
-  3. Test cross-task integration:
-     - Does feature A work correctly WITH feature B? (not just in isolation)
-     - Does the full user flow work end-to-end?
-  4. Test edge cases not covered by individual tasks:
-     - Empty state / first-time use
-     - Rapid repeated actions
-     - Invalid/malformed input
-     - Network interruption (if applicable)
-  5. Save ALL evidence to .sisyphus/evidence/final-qa/
-
-  **Output format**:
-  \\\`\\\`\\\`
-  ## Manual QA Report
-  ### Scenarios Executed: [N/N passed]
-  - [✅/❌] Task N - Scenario name: [result]
-  ### Integration Tests: [N/N passed]
-  - [✅/❌] [flow name]: [result]
-  ### Edge Cases: [N tested]
-  - [✅/❌] [case]: [result]
-  ### Evidence: .sisyphus/evidence/final-qa/
-  ### VERDICT: APPROVE / REJECT
-  \\\`\\\`\\\`
-
-- [ ] F4. Scope Fidelity Check
-
-  **Agent**: deep
-
-  **What this agent does**:
-  Verify that EACH task implemented EXACTLY what was specified — no more, no less.
-  Catches scope creep, missing features, and unauthorized additions.
-
-  **Exact verification steps**:
-  1. For EACH completed task in the plan:
-     a. Read the task's "What to do" section
-     b. Read the actual diff/files created for that task (git log, git diff, file reads)
-     c. Verify 1:1 correspondence:
-        - Everything in "What to do" was implemented → no missing features
-        - Nothing BEYOND "What to do" was implemented → no scope creep
-     d. Read the task's "Must NOT do" section
-     e. Verify NONE of the forbidden items were implemented
-  2. Check for unauthorized cross-task contamination:
-     - Did Task 5 accidentally implement something that belongs to Task 8?
-     - Are there files modified that don't belong to any task?
-  3. Verify each task's boundaries are respected:
-     - No task touches files outside its stated scope
-     - No task implements functionality assigned to a different task
-
-  **Output format**:
-  \\\`\\\`\\\`
-  ## Scope Fidelity Report
-  ### Task-by-Task Audit: [N/N compliant]
-  - [✅/❌] Task N: [compliance status]
-    - Implemented: [list of what was done]
-    - Missing: [anything from "What to do" not found]
-    - Excess: [anything done that wasn't in "What to do"]
-    - "Must NOT do" violations: [list or "none"]
-  ### Cross-Task Contamination: [CLEAN / N issues]
-  ### Unaccounted Changes: [CLEAN / N files]
-  ### VERDICT: APPROVE / REJECT
-  \\\`\\\`\\\`
+- [ ] F4. **Scope Fidelity Check** — \`deep\`
+  For each task: read "What to do", read actual diff (git log/diff). Verify 1:1 — everything in spec was built (no missing), nothing beyond spec was built (no creep). Check "Must NOT do" compliance. Detect cross-task contamination: Task N touching Task M's files. Flag unaccounted changes.
+  Output: \`Tasks [N/N compliant] | Contamination [CLEAN/N issues] | Unaccounted [CLEAN/N files] | VERDICT\`
 
 ---
 
