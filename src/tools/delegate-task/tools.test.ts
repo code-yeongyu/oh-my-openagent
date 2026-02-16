@@ -1147,7 +1147,7 @@ describe("sisyphus-task", () => {
           run_in_background: false,
         },
         toolContext
-      )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
+      )).rejects.toThrow("Invalid arguments: 'load_skills' parameter is REQUIRED")
     })
 
      test("null skills throws error", async () => {
@@ -1189,7 +1189,7 @@ describe("sisyphus-task", () => {
            load_skills: null,
          },
          toolContext
-       )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
+        )).rejects.toThrow("Invalid arguments: load_skills=null is not allowed")
     })
 
      test("empty array [] is allowed and proceeds without skill content", async () => {
