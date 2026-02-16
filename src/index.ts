@@ -44,6 +44,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     pluginConfig,
     tmuxConfig,
     modelCacheState,
+    backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
   })
 
   const toolsResult = await createTools({
