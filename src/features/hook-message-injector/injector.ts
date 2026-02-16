@@ -5,7 +5,6 @@ import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
 import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { getMessageDir } from "../../shared/opencode-message-dir"
 import { normalizeSDKResponse } from "../../shared"
 
 export interface StoredMessage {
