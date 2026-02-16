@@ -15,6 +15,8 @@ export const ExperimentalConfigSchema = z.object({
   plugin_load_timeout_ms: z.number().min(1000).optional(),
   /** Wrap hook creation in try/catch to prevent one failing hook from crashing the plugin (default: true at call site) */
   safe_hook_creation: z.boolean().optional(),
+  /** Enable hashline_edit tool for improved file editing with hash-based line anchors */
+  hashline_edit: z.boolean().optional(),
 })
 
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>
