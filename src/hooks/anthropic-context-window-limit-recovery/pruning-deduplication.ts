@@ -6,6 +6,7 @@ import { estimateTokens } from "./pruning-types"
 import { log } from "../../shared/logger"
 import { getMessageDir } from "../../shared/opencode-message-dir"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { normalizeSDKResponse } from "../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -72,7 +73,7 @@ function readMessages(sessionID: string): MessagePart[] {
 async function readMessagesFromSDK(client: OpencodeClient, sessionID: string): Promise<MessagePart[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const rawMessages = ((response.data ?? response) as unknown as Array<{ parts?: ToolPart[] }>) ?? []
+    const rawMessages = normalizeSDKResponse(response, [] as Array<{ parts?: ToolPart[] }>, { preferResponseOnMissingData: true })
     return rawMessages.filter((m) => m.parts) as MessagePart[]
   } catch {
     return []

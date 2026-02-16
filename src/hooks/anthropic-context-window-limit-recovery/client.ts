@@ -2,7 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 export type Client = PluginInput["client"] & {
   session: {
-    prompt_async: (opts: {
+    promptAsync: (opts: {
       path: { id: string }
       body: { parts: Array<{ type: string; text: string }> }
       query: { directory: string }

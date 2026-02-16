@@ -5,6 +5,7 @@ import { findMessageByIndexNeedingThinking, findMessagesWithOrphanThinking, prep
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { prependThinkingPartAsync } from "./storage/thinking-prepend"
 import { THINKING_TYPES } from "./constants"
+import { normalizeSDKResponse } from "../../shared"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -77,7 +78,7 @@ async function findMessagesWithOrphanThinkingFromSDK(
   let messages: MessageData[]
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
+    messages = normalizeSDKResponse(response, [] as MessageData[], { preferResponseOnMissingData: true })
   } catch {
     return []
   }
@@ -111,7 +112,7 @@ async function findMessageByIndexNeedingThinkingFromSDK(
   let messages: MessageData[]
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
+    messages = normalizeSDKResponse(response, [] as MessageData[], { preferResponseOnMissingData: true })
   } catch {
     return null
   }
