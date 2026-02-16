@@ -8,8 +8,10 @@ import { executeSync } from "./sync-executor"
 
 export function createCallOmoAgent(
   ctx: PluginInput,
-  backgroundManager: BackgroundManager
+  backgroundManager: BackgroundManager,
+  disabledAgents: string[] = [],
 ): ToolDefinition {
+  const disabledAgentSet = new Set(disabledAgents.map((name) => name.toLowerCase()))
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`
   ).join("\n")
@@ -41,7 +43,12 @@ export function createCallOmoAgent(
         return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`
       }
 
-      const normalizedAgent = args.subagent_type.toLowerCase() as AllowedAgentType
+      const normalizedAgentName = args.subagent_type.toLowerCase()
+      if (disabledAgentSet.has(normalizedAgentName)) {
+        return `Error: Agent "${args.subagent_type}" is disabled via disabled_agents config.`
+      }
+
+      const normalizedAgent = normalizedAgentName as AllowedAgentType
       args = { ...args, subagent_type: normalizedAgent }
 
       if (args.run_in_background) {
