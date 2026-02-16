@@ -181,42 +181,67 @@ Scenario: [Descriptive name — what user action/flow is being verified]
 
 > Maximize throughput by grouping independent tasks into parallel waves.
 > Each wave completes before the next begins.
+> Target: 5-8 tasks per wave. Fewer than 3 per wave (except final) = under-splitting.
 
 \`\`\`
-Wave 1 (Start Immediately):
-├── Task 1: [no dependencies]
-└── Task 5: [no dependencies]
+Wave 1 (Start Immediately — foundation + scaffolding):
+├── Task 1: Project scaffolding + config [quick]
+├── Task 2: Design system tokens [quick]
+├── Task 3: Type definitions [quick]
+├── Task 4: Schema definitions [quick]
+├── Task 5: Storage interface + in-memory impl [quick]
+├── Task 6: Auth middleware [quick]
+└── Task 7: Client module [quick]
 
-Wave 2 (After Wave 1):
-├── Task 2: [depends: 1]
-├── Task 3: [depends: 1]
-└── Task 6: [depends: 5]
+Wave 2 (After Wave 1 — core modules, MAX PARALLEL):
+├── Task 8: Core business logic (depends: 3, 5, 7) [deep]
+├── Task 9: API endpoints (depends: 4, 5) [unspecified-high]
+├── Task 10: Secondary storage impl (depends: 5) [unspecified-high]
+├── Task 11: Retry/fallback logic (depends: 8) [deep]
+├── Task 12: UI layout + navigation (depends: 2) [visual-engineering]
+├── Task 13: API client + hooks (depends: 4) [quick]
+└── Task 14: Telemetry middleware (depends: 5, 10) [unspecified-high]
 
-Wave 3 (After Wave 2):
-└── Task 4: [depends: 2, 3]
+Wave 3 (After Wave 2 — integration + UI):
+├── Task 15: Main route combining modules (depends: 6, 11, 14) [deep]
+├── Task 16: UI data visualization (depends: 12, 13) [visual-engineering]
+├── Task 17: Deployment config A (depends: 15) [quick]
+├── Task 18: Deployment config B (depends: 15) [quick]
+├── Task 19: Deployment config C (depends: 15) [quick]
+└── Task 20: UI request log + build (depends: 16) [visual-engineering]
 
-Critical Path: Task 1 → Task 2 → Task 4
-Parallel Speedup: ~40% faster than sequential
+Wave 4 (After Wave 3 — verification):
+├── Task 21: Integration tests (depends: 15) [deep]
+├── Task 22: UI QA - Playwright (depends: 20) [unspecified-high]
+├── Task 23: E2E QA (depends: 21) [deep]
+└── Task 24: Git cleanup + tagging (depends: 21) [git]
+
+Critical Path: Task 1 → Task 5 → Task 8 → Task 11 → Task 15 → Task 21
+Parallel Speedup: ~70% faster than sequential
+Max Concurrent: 7 (Waves 1 & 2)
 \`\`\`
 
-### Dependency Matrix
+### Dependency Matrix (abbreviated — show ALL tasks in your generated plan)
 
-| Task | Depends On | Blocks | Can Parallelize With |
-|------|------------|--------|---------------------|
-| 1 | None | 2, 3 | 5 |
-| 2 | 1 | 4 | 3, 6 |
-| 3 | 1 | 4 | 2, 6 |
-| 4 | 2, 3 | None | None (final) |
-| 5 | None | 6 | 1 |
-| 6 | 5 | None | 2, 3 |
+| Task | Depends On | Blocks | Wave |
+|------|------------|--------|------|
+| 1-7 | — | 8-14 | 1 |
+| 8 | 3, 5, 7 | 11, 15 | 2 |
+| 11 | 8 | 15 | 2 |
+| 14 | 5, 10 | 15 | 2 |
+| 15 | 6, 11, 14 | 17-19, 21 | 3 |
+| 21 | 15 | 23, 24 | 4 |
+
+> This is abbreviated for reference. YOUR generated plan must include the FULL matrix for ALL tasks.
 
 ### Agent Dispatch Summary
 
-| Wave | Tasks | Recommended Agents |
-|------|-------|-------------------|
-| 1 | 1, 5 | task(category="...", load_skills=[...], run_in_background=false) |
-| 2 | 2, 3, 6 | dispatch parallel after Wave 1 completes |
-| 3 | 4 | final integration task |
+| Wave | # Parallel | Tasks → Agent Category |
+|------|------------|----------------------|
+| 1 | **7** | T1-T4 → \`quick\`, T5 → \`quick\`, T6 → \`quick\`, T7 → \`quick\` |
+| 2 | **7** | T8 → \`deep\`, T9 → \`unspecified-high\`, T10 → \`unspecified-high\`, T11 → \`deep\`, T12 → \`visual-engineering\`, T13 → \`quick\`, T14 → \`unspecified-high\` |
+| 3 | **6** | T15 → \`deep\`, T16 → \`visual-engineering\`, T17-T19 → \`quick\`, T20 → \`visual-engineering\` |
+| 4 | **4** | T21 → \`deep\`, T22 → \`unspecified-high\`, T23 → \`deep\`, T24 → \`git\` |
 
 ---
 
