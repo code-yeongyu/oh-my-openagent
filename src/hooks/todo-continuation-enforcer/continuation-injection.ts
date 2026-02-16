@@ -3,9 +3,11 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import {
   findNearestMessageWithFields,
+  findNearestMessageWithFieldsFromSDK,
   type ToolPermission,
 } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
 import {
   CONTINUATION_PROMPT,
@@ -78,8 +80,13 @@ export async function injectContinuation(args: {
   let tools = resolvedInfo?.tools
 
   if (!agentName || !model) {
-    const messageDir = getMessageDir(sessionID)
-    const previousMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+    let previousMessage = null
+    if (isSqliteBackend()) {
+      previousMessage = await findNearestMessageWithFieldsFromSDK(ctx.client, sessionID)
+    } else {
+      const messageDir = getMessageDir(sessionID)
+      previousMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+    }
     agentName = agentName ?? previousMessage?.agent
     model =
       model ??

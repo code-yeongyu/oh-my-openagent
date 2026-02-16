@@ -1,9 +1,13 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { PruningState, ToolCallSignature } from "./pruning-types"
 import { estimateTokens } from "./pruning-types"
 import { log } from "../../shared/logger"
-import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
+import { getMessageDir } from "../../shared/opencode-message-dir"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+
+type OpencodeClient = PluginInput["client"]
 
 export interface DeduplicationConfig {
   enabled: boolean
@@ -43,20 +47,6 @@ function sortObject(obj: unknown): unknown {
   return sorted
 }
 
-function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
-
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) return directPath
-
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
-  }
-
-  return null
-}
-
 function readMessages(sessionID: string): MessagePart[] {
   const messageDir = getMessageDir(sessionID)
   if (!messageDir) return []
@@ -64,7 +54,7 @@ function readMessages(sessionID: string): MessagePart[] {
   const messages: MessagePart[] = []
   
   try {
-    const files = readdirSync(messageDir).filter(f => f.endsWith(".json"))
+    const files = readdirSync(messageDir).filter((f: string) => f.endsWith(".json"))
     for (const file of files) {
       const content = readFileSync(join(messageDir, file), "utf-8")
       const data = JSON.parse(content)
@@ -79,15 +69,29 @@ function readMessages(sessionID: string): MessagePart[] {
   return messages
 }
 
-export function executeDeduplication(
+async function readMessagesFromSDK(client: OpencodeClient, sessionID: string): Promise<MessagePart[]> {
+  try {
+    const response = await client.session.messages({ path: { id: sessionID } })
+    const rawMessages = ((response.data ?? response) as unknown as Array<{ parts?: ToolPart[] }>) ?? []
+    return rawMessages.filter((m) => m.parts) as MessagePart[]
+  } catch {
+    return []
+  }
+}
+
+export async function executeDeduplication(
   sessionID: string,
   state: PruningState,
   config: DeduplicationConfig,
-  protectedTools: Set<string>
-): number {
+  protectedTools: Set<string>,
+  client?: OpencodeClient,
+): Promise<number> {
   if (!config.enabled) return 0
 
-  const messages = readMessages(sessionID)
+  const messages = (client && isSqliteBackend())
+    ? await readMessagesFromSDK(client, sessionID)
+    : readMessages(sessionID)
+
   const signatures = new Map<string, ToolCallSignature[]>()
   
   let currentTurn = 0

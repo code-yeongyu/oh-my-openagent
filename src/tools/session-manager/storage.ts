@@ -1,14 +1,46 @@
-import { existsSync, readdirSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE, TODO_DIR, TRANSCRIPT_DIR } from "./constants"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { getMessageDir } from "../../shared/opencode-message-dir"
 import type { SessionMessage, SessionInfo, TodoItem, SessionMetadata } from "./types"
 
 export interface GetMainSessionsOptions {
   directory?: string
 }
 
+// SDK client reference for beta mode
+let sdkClient: PluginInput["client"] | null = null
+
+export function setStorageClient(client: PluginInput["client"]): void {
+  sdkClient = client
+}
+
+export function resetStorageClient(): void {
+  sdkClient = null
+}
+
 export async function getMainSessions(options: GetMainSessionsOptions): Promise<SessionMetadata[]> {
+  // Beta mode: use SDK
+  if (isSqliteBackend() && sdkClient) {
+    try {
+      const response = await sdkClient.session.list()
+      const sessions = (response.data || []) as SessionMetadata[]
+      const mainSessions = sessions.filter((s) => !s.parentID)
+      if (options.directory) {
+        return mainSessions
+          .filter((s) => s.directory === options.directory)
+          .sort((a, b) => b.time.updated - a.time.updated)
+      }
+      return mainSessions.sort((a, b) => b.time.updated - a.time.updated)
+    } catch {
+      return []
+    }
+  }
+
+  // Stable mode: use JSON files
   if (!existsSync(SESSION_STORAGE)) return []
 
   const sessions: SessionMetadata[] = []
@@ -46,6 +78,18 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
 }
 
 export async function getAllSessions(): Promise<string[]> {
+  // Beta mode: use SDK
+  if (isSqliteBackend() && sdkClient) {
+    try {
+      const response = await sdkClient.session.list()
+      const sessions = (response.data || []) as SessionMetadata[]
+      return sessions.map((s) => s.id)
+    } catch {
+      return []
+    }
+  }
+
+  // Stable mode: use JSON files
   if (!existsSync(MESSAGE_STORAGE)) return []
 
   const sessions: string[] = []
@@ -73,33 +117,82 @@ export async function getAllSessions(): Promise<string[]> {
   return [...new Set(sessions)]
 }
 
-export function getMessageDir(sessionID: string): string {
-  if (!existsSync(MESSAGE_STORAGE)) return ""
+export { getMessageDir } from "../../shared/opencode-message-dir"
 
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) {
-    return directPath
-  }
-
-  try {
-    for (const dir of readdirSync(MESSAGE_STORAGE)) {
-      const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-      if (existsSync(sessionPath)) {
-        return sessionPath
-      }
+export async function sessionExists(sessionID: string): Promise<boolean> {
+  if (isSqliteBackend() && sdkClient) {
+    try {
+      const response = await sdkClient.session.list()
+      const sessions = (response.data || []) as Array<{ id?: string }>
+      return sessions.some((s) => s.id === sessionID)
+    } catch {
+      return false
     }
-  } catch {
-    return ""
   }
-
-  return ""
-}
-
-export function sessionExists(sessionID: string): boolean {
-  return getMessageDir(sessionID) !== ""
+  return getMessageDir(sessionID) !== null
 }
 
 export async function readSessionMessages(sessionID: string): Promise<SessionMessage[]> {
+  // Beta mode: use SDK
+  if (isSqliteBackend() && sdkClient) {
+    try {
+      const response = await sdkClient.session.messages({ path: { id: sessionID } })
+      const rawMessages = (response.data || []) as Array<{
+        info?: {
+          id?: string
+          role?: string
+          agent?: string
+          time?: { created?: number; updated?: number }
+        }
+        parts?: Array<{
+          id?: string
+          type?: string
+          text?: string
+          thinking?: string
+          tool?: string
+          callID?: string
+          input?: Record<string, unknown>
+          output?: string
+          error?: string
+        }>
+      }>
+      const messages: SessionMessage[] = rawMessages
+        .filter((m) => m.info?.id)
+        .map((m) => ({
+          id: m.info!.id!,
+          role: (m.info!.role as "user" | "assistant") || "user",
+          agent: m.info!.agent,
+          time: m.info!.time?.created
+            ? {
+                created: m.info!.time.created,
+                updated: m.info!.time.updated,
+              }
+            : undefined,
+          parts:
+            m.parts?.map((p) => ({
+              id: p.id || "",
+              type: p.type || "text",
+              text: p.text,
+              thinking: p.thinking,
+              tool: p.tool,
+              callID: p.callID,
+              input: p.input,
+              output: p.output,
+              error: p.error,
+            })) || [],
+        }))
+      return messages.sort((a, b) => {
+        const aTime = a.time?.created ?? 0
+        const bTime = b.time?.created ?? 0
+        if (aTime !== bTime) return aTime - bTime
+        return a.id.localeCompare(b.id)
+      })
+    } catch {
+      return []
+    }
+  }
+
+  // Stable mode: use JSON files
   const messageDir = getMessageDir(sessionID)
   if (!messageDir || !existsSync(messageDir)) return []
 
@@ -161,6 +254,28 @@ async function readParts(messageID: string): Promise<Array<{ id: string; type: s
 }
 
 export async function readSessionTodos(sessionID: string): Promise<TodoItem[]> {
+  // Beta mode: use SDK
+  if (isSqliteBackend() && sdkClient) {
+    try {
+      const response = await sdkClient.session.todo({ path: { id: sessionID } })
+      const data = (response.data || []) as Array<{
+        id?: string
+        content?: string
+        status?: string
+        priority?: string
+      }>
+      return data.map((item) => ({
+        id: item.id || "",
+        content: item.content || "",
+        status: (item.status as TodoItem["status"]) || "pending",
+        priority: item.priority,
+      }))
+    } catch {
+      return []
+    }
+  }
+
+  // Stable mode: use JSON files
   if (!existsSync(TODO_DIR)) return []
 
   try {
