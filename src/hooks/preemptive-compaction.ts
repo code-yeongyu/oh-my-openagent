@@ -23,6 +23,10 @@ interface CachedCompactionState {
   tokens: TokenInfo
 }
 
+function isAnthropicProvider(providerID: string): boolean {
+  return providerID === "anthropic" || providerID === "google-vertex-anthropic"
+}
+
 type PluginInput = {
   client: {
     session: {
@@ -55,7 +59,7 @@ export function createPreemptiveCompactionHook(ctx: PluginInput) {
     if (!cached) return
 
     const actualLimit =
-      cached.providerID === "anthropic"
+      isAnthropicProvider(cached.providerID)
         ? ANTHROPIC_ACTUAL_LIMIT
         : DEFAULT_ACTUAL_LIMIT
 
