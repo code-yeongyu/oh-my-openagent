@@ -77,12 +77,17 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           storeToolMetadata(ctx.sessionID, callID, meta)
         }
 
-        if (args.full_session === true) {
+        const isActive = task.status === "pending" || task.status === "running"
+        const fullSession = args.full_session ?? isActive
+        const includeThinking = args.include_thinking ?? isActive
+        const includeToolResults = args.include_tool_results ?? isActive
+
+        if (fullSession) {
           return await formatFullSession(task, client, {
-            includeThinking: args.include_thinking === true,
+            includeThinking,
             messageLimit: args.message_limit,
             sinceMessageId: args.since_message_id,
-            includeToolResults: args.include_tool_results === true,
+            includeToolResults,
             thinkingMaxChars: args.thinking_max_chars,
           })
         }
