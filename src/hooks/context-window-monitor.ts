@@ -27,7 +27,7 @@ interface CachedTokenState {
   tokens: TokenInfo
 }
 
-export function createContextWindowMonitorHook(ctx: PluginInput) {
+export function createContextWindowMonitorHook(_ctx: PluginInput) {
   const remindedSessions = new Set<string>()
   const tokenCache = new Map<string, CachedTokenState>()
 

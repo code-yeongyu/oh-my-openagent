@@ -14,7 +14,7 @@ export const lsp_diagnostics: ToolDefinition = tool({
       .optional()
       .describe("Filter by severity level"),
   },
-  execute: async (args, context) => {
+  execute: async (args, _context) => {
     try {
       const result = await withLspClient(args.filePath, async (client) => {
         return (await client.diagnostics(args.filePath)) as { items?: Diagnostic[] } | Diagnostic[] | null
