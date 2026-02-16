@@ -349,6 +349,55 @@ describe("Agent permission defaults", () => {
   })
 })
 
+describe("default_agent behavior with Sisyphus orchestration", () => {
+  test("preserves existing default_agent when already set", async () => {
+    // #given
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      default_agent: "hephaestus",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    expect(config.default_agent).toBe("hephaestus")
+  })
+
+  test("sets default_agent to sisyphus when missing", async () => {
+    // #given
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    expect(config.default_agent).toBe(getAgentDisplayName("sisyphus"))
+  })
+})
+
 describe("Prometheus category config resolution", () => {
   test("resolves ultrabrain category config", () => {
     // given
