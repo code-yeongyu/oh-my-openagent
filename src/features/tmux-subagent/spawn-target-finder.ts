@@ -1,5 +1,4 @@
 import type { SplitDirection, TmuxPaneInfo, WindowState } from "./types"
-import { MAIN_PANE_RATIO } from "./tmux-grid-constants"
 import { computeGridPlan, mapPaneToSlot } from "./grid-planning"
 import { canSplitPane, getBestSplitDirection } from "./pane-split-availability"
 import { MIN_PANE_WIDTH } from "./types"
@@ -52,8 +51,14 @@ function findSplittableTarget(
 		return null
 	}
 
-	const plan = computeGridPlan(state.windowWidth, state.windowHeight, existingCount + 1)
-	const mainPaneWidth = Math.floor(state.windowWidth * MAIN_PANE_RATIO)
+	const plan = computeGridPlan(
+		state.windowWidth,
+		state.windowHeight,
+		existingCount + 1,
+		state.mainPane.width,
+		minPaneWidth,
+	)
+	const mainPaneWidth = state.mainPane.width
 	const occupancy = buildOccupancy(state.agentPanes, plan, mainPaneWidth)
 	const targetSlot = findFirstEmptySlot(occupancy, plan)
 
