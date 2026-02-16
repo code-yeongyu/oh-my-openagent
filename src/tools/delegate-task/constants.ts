@@ -563,7 +563,7 @@ export function isPlanAgent(agentName: string | undefined): boolean {
  * Plan family: plan + prometheus. Shares mutual delegation blocking and task tool permission.
  * Does NOT share system prompt (only isPlanAgent controls that).
  */
-export const PLAN_FAMILY_NAMES = ["plan", "prometheus"]
+export const PLAN_FAMILY_NAMES = ["plan", "prometheus", "coeus"]
 
 /**
  * Check if the given agent belongs to the plan family (blocking + task permission).
@@ -576,4 +576,16 @@ export function isPlanFamily(category: string | undefined): boolean {
   return PLAN_FAMILY_NAMES.some(
     (name) => lowerCategory === name || lowerCategory.includes(name)
   )
+}
+
+const COEUS_CAN_DELEGATE_TO = ["sub-prometheus"]
+
+function isCoeus(name: string): boolean {
+  return name.toLowerCase().trim() === "coeus"
+}
+
+export function canDelegateTo(parent: string | undefined, child: string): boolean {
+  if (!isPlanFamily(parent) || !isPlanFamily(child)) return true
+  if (isCoeus(parent!) && COEUS_CAN_DELEGATE_TO.some(t => child.toLowerCase().includes(t))) return true
+  return false
 }

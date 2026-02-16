@@ -1,6 +1,6 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
-import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES, isPlanFamily, PLAN_FAMILY_NAMES } from "./constants"
+import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES, isPlanFamily, PLAN_FAMILY_NAMES, canDelegateTo } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
 import type { DelegateTaskArgs } from "./types"
@@ -257,9 +257,102 @@ describe("sisyphus-task", () => {
       expect(result).toBe(false)
     })
 
-    test("PLAN_FAMILY_NAMES contains plan and prometheus", () => {
+    test("PLAN_FAMILY_NAMES contains plan, prometheus, and coeus", () => {
       //#given / #when / #then
-      expect(PLAN_FAMILY_NAMES).toEqual(["plan", "prometheus"])
+      expect(PLAN_FAMILY_NAMES).toEqual(["plan", "prometheus", "coeus"])
+    })
+
+    test("returns true for 'coeus'", () => {
+      //#given / #when
+      const result = isPlanFamily("coeus")
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("returns true for 'sub-prometheus' via .includes('prometheus')", () => {
+      //#given / #when
+      const result = isPlanFamily("sub-prometheus")
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("returns true for 'Coeus' (case-insensitive)", () => {
+      //#given / #when
+      const result = isPlanFamily("Coeus")
+      //#then
+      expect(result).toBe(true)
+    })
+  })
+
+  describe("canDelegateTo", () => {
+    test("coeus → sub-prometheus is ALLOWED", () => {
+      //#given / #when
+      const result = canDelegateTo("coeus", "sub-prometheus")
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("Coeus → sub-prometheus is ALLOWED (case-insensitive)", () => {
+      //#given / #when
+      const result = canDelegateTo("Coeus", "sub-prometheus")
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("prometheus → sub-prometheus is BLOCKED", () => {
+      //#given / #when
+      const result = canDelegateTo("prometheus", "sub-prometheus")
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("sub-prometheus → sub-prometheus is BLOCKED", () => {
+      //#given / #when
+      const result = canDelegateTo("sub-prometheus", "sub-prometheus")
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("prometheus → explore is ALLOWED (non-plan-family child)", () => {
+      //#given / #when
+      const result = canDelegateTo("prometheus", "explore")
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("coeus → explore is ALLOWED (non-plan-family child)", () => {
+      //#given / #when
+      const result = canDelegateTo("coeus", "explore")
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("oracle → explore is ALLOWED (non-plan-family parent)", () => {
+      //#given / #when
+      const result = canDelegateTo("oracle", "explore")
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("plan → sub-prometheus is BLOCKED", () => {
+      //#given / #when
+      const result = canDelegateTo("plan", "sub-prometheus")
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("undefined parent → sub-prometheus is ALLOWED", () => {
+      //#given / #when
+      const result = canDelegateTo(undefined, "sub-prometheus")
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("coeus → prometheus is BLOCKED (not in COEUS_CAN_DELEGATE_TO)", () => {
+      //#given / #when
+      const result = canDelegateTo("coeus", "prometheus")
+      //#then
+      expect(result).toBe(false)
     })
   })
 
