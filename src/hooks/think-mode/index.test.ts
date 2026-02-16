@@ -214,6 +214,27 @@ describe("createThinkModeHook integration", () => {
       expect(message.thinking).toBeDefined()
     })
 
+    it("should work for direct google-vertex-anthropic provider", async () => {
+      //#given direct google-vertex-anthropic provider
+      const hook = createThinkModeHook()
+      const input = createMockInput(
+        "google-vertex-anthropic",
+        "claude-opus-4-6",
+        "think deeply"
+      )
+
+      //#when the chat.params hook is called
+      await hook["chat.params"](input, sessionID)
+
+      //#then should upgrade model and inject Claude thinking config
+      const message = input.message as MessageWithInjectedProps
+      expect(input.message.model?.modelID).toBe("claude-opus-4-6-high")
+      expect(message.thinking).toBeDefined()
+      expect((message.thinking as Record<string, unknown>)?.budgetTokens).toBe(
+        64000
+      )
+    })
+
     it("should still work for direct google provider", async () => {
       // given direct google provider
       const hook = createThinkModeHook()
