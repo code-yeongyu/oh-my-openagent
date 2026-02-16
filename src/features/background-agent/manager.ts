@@ -18,6 +18,7 @@ import {
   TASK_CLEANUP_DELAY_MS,
   TASK_TTL_MS,
 } from "./constants"
+import { parseHandover, formatHandover } from "./handover-protocol"
 
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
@@ -1023,6 +1024,32 @@ export class BackgroundManager {
       task.concurrencyKey = undefined
     }
 
+    // Capture final output and parse handover if possible
+    if (task.sessionID) {
+      try {
+        const messagesResult = await this.client.session.messages({
+          path: { id: task.sessionID },
+        })
+        const messages = (messagesResult.data ?? []) as any[]
+        const assistantMessages = messages.filter(m => m.info?.role === "assistant")
+        const lastMessage = assistantMessages[assistantMessages.length - 1]
+        
+        if (lastMessage) {
+          const textParts = (lastMessage.parts ?? [])
+            .filter((p: any) => p.type === "text" && p.text)
+            .map((p: any) => p.text)
+          
+          const fullText = textParts.join("\n\n").trim()
+          if (fullText) {
+            const handover = parseHandover(fullText)
+            task.result = formatHandover(handover)
+          }
+        }
+      } catch (error) {
+        log("[background-agent] Failed to parse handover output:", error)
+      }
+    }
+
     this.markForNotification(task)
 
     if (task.sessionID) {
@@ -1074,6 +1101,7 @@ export class BackgroundManager {
 
     const statusText = task.status === "completed" ? "COMPLETED" : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
+    const resultInfo = task.result ? `\n\n${task.result}` : ""
     
     let notification: string
     let completedTasks: BackgroundTask[] = []
@@ -1081,14 +1109,14 @@ export class BackgroundManager {
       completedTasks = Array.from(this.tasks.values())
         .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
       const completedTasksText = completedTasks
-        .map(t => `- \`${t.id}\`: ${t.description}`)
+        .map(t => `- \`${t.id}\`: ${t.description}${t.result ? `\n\n${t.result}\n` : ""}`)
         .join("\n")
 
       notification = `<system-reminder>
 [ALL BACKGROUND TASKS COMPLETE]
 
 **Completed:**
-${completedTasksText || `- \`${task.id}\`: ${task.description}`}
+${completedTasksText || `- \`${task.id}\`: ${task.description}${resultInfo}`}
 
 Use \`background_output(task_id="<id>")\` to retrieve each result.
 </system-reminder>`
@@ -1098,7 +1126,7 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
 [BACKGROUND TASK ${statusText}]
 **ID:** \`${task.id}\`
 **Description:** ${task.description}
-**Duration:** ${duration}${errorInfo}
+**Duration:** ${duration}${errorInfo}${resultInfo}
 
 **${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
 Do NOT poll - continue productive work.
