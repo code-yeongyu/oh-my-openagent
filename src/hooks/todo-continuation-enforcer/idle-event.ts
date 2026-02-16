@@ -8,6 +8,7 @@ import {
   ABORT_WINDOW_MS,
   CONTINUATION_COOLDOWN_MS,
   DEFAULT_SKIP_AGENTS,
+  FAILURE_RESET_WINDOW_MS,
   HOOK_NAME,
   MAX_CONSECUTIVE_FAILURES,
 } from "./constants"
@@ -98,6 +99,18 @@ export async function handleSessionIdle(args: {
   if (state.inFlight) {
     log(`[${HOOK_NAME}] Skipped: injection in flight`, { sessionID })
     return
+  }
+
+  if (
+    state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
+    && state.lastInjectedAt
+    && Date.now() - state.lastInjectedAt >= FAILURE_RESET_WINDOW_MS
+  ) {
+    state.consecutiveFailures = 0
+    log(`[${HOOK_NAME}] Reset consecutive failures after recovery window`, {
+      sessionID,
+      failureResetWindowMs: FAILURE_RESET_WINDOW_MS,
+    })
   }
 
   if (state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {

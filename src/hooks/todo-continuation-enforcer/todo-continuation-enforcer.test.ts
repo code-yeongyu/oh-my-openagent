@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
 import { setMainSession, subagentSessions, _resetForTesting } from "../../features/claude-code-session-state"
 import { createTodoContinuationEnforcer } from "."
-import { CONTINUATION_COOLDOWN_MS, MAX_CONSECUTIVE_FAILURES } from "./constants"
+import {
+  CONTINUATION_COOLDOWN_MS,
+  FAILURE_RESET_WINDOW_MS,
+  MAX_CONSECUTIVE_FAILURES,
+} from "./constants"
 
 type TimerCallback = (...args: any[]) => void
 
@@ -606,13 +610,51 @@ describe("todo-continuation-enforcer", () => {
     for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
       await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
       await fakeTimers.advanceBy(2500, true)
-      await fakeTimers.advanceClockBy(1_000_000)
+      if (index < MAX_CONSECUTIVE_FAILURES - 1) {
+        await fakeTimers.advanceClockBy(1_000_000)
+      }
     }
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
 
     //#then
     expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES)
+  }, { timeout: 30000 })
+
+  test("should resume retries after reset window when max failures reached", async () => {
+    //#given
+    const sessionID = "main-recovery-after-max-failures"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      if (index < MAX_CONSECUTIVE_FAILURES - 1) {
+        await fakeTimers.advanceClockBy(1_000_000)
+      }
+    }
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    await fakeTimers.advanceClockBy(FAILURE_RESET_WINDOW_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES + 1)
   }, { timeout: 30000 })
 
   test("should increase cooldown exponentially after consecutive failures", async () => {
