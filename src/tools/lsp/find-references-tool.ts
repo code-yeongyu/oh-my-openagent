@@ -13,7 +13,7 @@ export const lsp_find_references: ToolDefinition = tool({
     character: tool.schema.number().min(0).describe("0-based"),
     includeDeclaration: tool.schema.boolean().optional().describe("Include the declaration itself"),
   },
-  execute: async (args, context) => {
+  execute: async (args, _context) => {
     try {
       const result = await withLspClient(args.filePath, async (client) => {
         return (await client.references(args.filePath, args.line, args.character, args.includeDeclaration ?? true)) as
