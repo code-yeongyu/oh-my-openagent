@@ -13,6 +13,7 @@ import { INSTINCT_EXPORT_TEMPLATE } from "./templates/instinct-export"
 import { INSTINCT_STATUS_TEMPLATE } from "./templates/instinct-status"
 import { BUILD_FIX_TEMPLATE } from "./templates/build-fix"
 import { LEARN_TEMPLATE } from "./templates/learn"
+import { createPresetManager } from "./presets"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -167,11 +168,49 @@ export function loadBuiltinCommands(
 ): BuiltinCommands {
   const disabled = new Set(disabledCommands ?? [])
   const commands: BuiltinCommands = {}
+  const presetManager = createPresetManager()
 
   for (const [name, definition] of Object.entries(BUILTIN_COMMAND_DEFINITIONS)) {
     if (!disabled.has(name as BuiltinCommandName)) {
       const { argumentHint: _argumentHint, ...openCodeCompatible } = definition
-      commands[name] = { ...openCodeCompatible, name } as CommandDefinition
+      
+      // Wrap template to handle presets
+      const originalTemplate = definition.template
+      
+      const wrappedTemplate = (args: { user_message?: string }) => {
+        let template = originalTemplate
+        const userMessage = args.user_message || ""
+        
+        // Match --mode=value or --mode value
+        const modeMatch = userMessage.match(/--mode[= ](\S+)/)
+        const mode = modeMatch ? modeMatch[1] : null
+        
+        if (mode && presetManager.hasPreset(mode)) {
+          const preset = presetManager.getPreset(mode)
+          const presetContext = `
+<preset-context>
+Mode: ${preset.mode}
+Run Tests: ${preset.runTests}
+Run Lint: ${preset.runLint}
+Run Typecheck: ${preset.runTypecheck}
+Run Build: ${preset.runBuild}
+Run Dead Code Check: ${preset.runDeadCodeCheck}
+Check Git Status: ${preset.checkGitStatus}
+Timeout: ${preset.timeout}ms
+</preset-context>
+`
+          // Inject preset context after command-instruction
+          template = template.replace("</command-instruction>", `</command-instruction>\n${presetContext}`)
+        }
+        
+        return template
+      }
+
+      commands[name] = { 
+        ...openCodeCompatible, 
+        name,
+        template: wrappedTemplate as any // Cast to any because CommandDefinition expects string, but our loader supports lazy templates
+      } as CommandDefinition
     }
   }
 

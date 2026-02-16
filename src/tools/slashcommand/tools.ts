@@ -146,6 +146,7 @@ async function formatLoadedCommand(cmd: CommandInfo, userMessage?: string): Prom
   let finalContent = resolvedContent.trim()
   if (userMessage) {
     finalContent = finalContent.replace(/\$\{user_message\}/g, userMessage)
+    finalContent = finalContent.replace(/\$ARGUMENTS/g, userMessage)
   }
   
   sections.push(finalContent)
