@@ -698,6 +698,59 @@ describe("ExperimentalConfigSchema feature flags", () => {
       expect(result.data.safe_hook_creation).toBeUndefined()
     }
   })
+
+  test("accepts hashline_edit as true", () => {
+    //#given
+    const config = { hashline_edit: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.hashline_edit).toBe(true)
+    }
+  })
+
+  test("accepts hashline_edit as false", () => {
+    //#given
+    const config = { hashline_edit: false }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.hashline_edit).toBe(false)
+    }
+  })
+
+  test("hashline_edit is optional", () => {
+    //#given
+    const config = { safe_hook_creation: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.hashline_edit).toBeUndefined()
+    }
+  })
+
+  test("rejects non-boolean hashline_edit", () => {
+    //#given
+    const config = { hashline_edit: "true" }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("GitMasterConfigSchema", () => {
