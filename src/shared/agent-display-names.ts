@@ -5,11 +5,12 @@
  */
 export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   sisyphus: "Sisyphus (Ultraworker)",
-  atlas: "Atlas (Plan Execution Orchestrator)",
+  hephaestus: "Hephaestus (Deep Agent)",
   prometheus: "Prometheus (Plan Builder)",
+  atlas: "Atlas (Plan Executor)",
   "sisyphus-junior": "Sisyphus-Junior",
   metis: "Metis (Plan Consultant)",
-  momus: "Momus (Plan Reviewer)",
+  momus: "Momus (Plan Critic)",
   oracle: "oracle",
   librarian: "librarian",
   explore: "explore",
