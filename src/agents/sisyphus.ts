@@ -539,7 +539,6 @@ export function createSisyphusAgent(
     call_omo_agent: "deny",
   } as AgentConfig["permission"];
   const base = {
-    name: "Sisyphus (Ultraworker)",
     description:
       "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
     mode: MODE,
