@@ -83,9 +83,3 @@ export function fuzzyMatchModel(
 	return result
 }
 
-export function isModelAvailable(
-	targetModel: string,
-	availableModels: Set<string>,
-): boolean {
-	return fuzzyMatchModel(targetModel, availableModels) !== null
-}
