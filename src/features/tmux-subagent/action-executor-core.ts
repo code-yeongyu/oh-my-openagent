@@ -72,7 +72,6 @@ export async function executeActionWithDeps(
 	)
 
 	if (result.success) {
-		await deps.applyLayout(ctx.config.layout, ctx.config.main_pane_size)
 		await enforceMainPane(ctx.windowState, ctx.config, deps)
 	}
 
