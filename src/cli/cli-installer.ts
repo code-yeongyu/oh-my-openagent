@@ -77,7 +77,9 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
   )
 
-  if (config.hasGemini) {
+  const needsProviderSetup = config.hasGemini || config.hasOpenAI || config.hasCopilot
+
+  if (needsProviderSetup) {
     printStep(step++, totalSteps, "Adding auth plugins...")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
