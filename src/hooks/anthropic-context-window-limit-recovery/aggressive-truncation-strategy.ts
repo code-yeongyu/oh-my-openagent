@@ -61,7 +61,7 @@ export async function runAggressiveTruncationStrategy(params: {
     clearSessionState(params.autoCompactState, params.sessionID)
     setTimeout(async () => {
       try {
-        await params.client.session.prompt_async({
+        await params.client.session.promptAsync({
           path: { id: params.sessionID },
           body: { auto: true } as never,
           query: { directory: params.directory },
