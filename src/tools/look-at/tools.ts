@@ -13,6 +13,11 @@ import {
   inferMimeTypeFromFilePath,
 } from "./mime-type-inference"
 import { resolveMultimodalLookerAgentMetadata } from "./multimodal-agent-metadata"
+import {
+  needsConversion,
+  convertImageToJpeg,
+  cleanupConvertedImage,
+} from "./image-converter"
 
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
 
@@ -41,8 +46,10 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
 
       let mimeType: string
       let filePart: { type: "file"; mime: string; url: string; filename: string }
+      let tempFilePath: string | null = null
 
-      if (imageData) {
+      try {
+        if (imageData) {
         mimeType = inferMimeTypeFromBase64(imageData)
         filePart = {
           type: "file",
@@ -52,11 +59,26 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
         }
       } else if (filePath) {
         mimeType = inferMimeTypeFromFilePath(filePath)
+        
+        let actualFilePath = filePath
+        if (needsConversion(mimeType)) {
+          log(`[look_at] Detected unsupported format: ${mimeType}, converting to JPEG...`)
+          try {
+            tempFilePath = convertImageToJpeg(filePath, mimeType)
+            actualFilePath = tempFilePath
+            mimeType = "image/jpeg"
+            log(`[look_at] Conversion successful: ${tempFilePath}`)
+          } catch (conversionError) {
+            log(`[look_at] Conversion failed: ${conversionError}`)
+            return `Error: Failed to convert image format. ${conversionError}`
+          }
+        }
+
         filePart = {
           type: "file",
           mime: mimeType,
-          url: pathToFileURL(filePath).href,
-          filename: basename(filePath),
+          url: pathToFileURL(actualFilePath).href,
+          filename: basename(actualFilePath),
         }
       } else {
         return "Error: Must provide either 'file_path' or 'image_data'."
@@ -149,8 +171,13 @@ Original error: ${createResult.error}`
         return "Error: No response from multimodal-looker agent"
       }
 
-      log(`[look_at] Got response, length: ${responseText.length}`)
-      return responseText
+        log(`[look_at] Got response, length: ${responseText.length}`)
+        return responseText
+      } finally {
+        if (tempFilePath) {
+          cleanupConvertedImage(tempFilePath)
+        }
+      }
     },
   })
 }
