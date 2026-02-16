@@ -98,7 +98,8 @@
           "stop-continuation-guard",
           "tasks-todowrite-disabler",
           "write-existing-file-guard",
-          "anthropic-effort"
+          "anthropic-effort",
+          "hashline-read-enhancer"
         ]
       }
     },
@@ -2829,6 +2830,9 @@
           "minimum": 1000
         },
         "safe_hook_creation": {
+          "type": "boolean"
+        },
+        "hashline_edit": {
           "type": "boolean"
         }
       },
