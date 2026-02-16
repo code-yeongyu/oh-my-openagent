@@ -31,6 +31,13 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   resetSqliteBackendCache: () => {},
 }))
 
+mock.module("../../shared/opencode-storage-paths", () => ({
+  OPENCODE_STORAGE: TEST_DIR,
+  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
+  PART_STORAGE: TEST_PART_STORAGE,
+  SESSION_STORAGE: TEST_SESSION_STORAGE,
+}))
+
 const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readSessionTodos, getSessionInfo } =
   await import("./storage")
 
