@@ -87,14 +87,15 @@ describe("patchPart", () => {
     expect(result).toBe(true)
     expect(mockFetch).toHaveBeenCalledWith(
       "https://api.example.com/session/ses123/message/msg456/part/part789",
-      {
+      expect.objectContaining({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Basic b3BlbmNvZGU6dGVzdHBhc3N3b3Jk",
         },
         body: JSON.stringify(body),
-      }
+        signal: expect.any(AbortSignal),
+      })
     )
   })
 
@@ -145,12 +146,13 @@ describe("deletePart", () => {
     expect(result).toBe(true)
     expect(mockFetch).toHaveBeenCalledWith(
       "https://api.example.com/session/ses123/message/msg456/part/part789",
-      {
+      expect.objectContaining({
         method: "DELETE",
         headers: {
           "Authorization": "Basic b3BlbmNvZGU6dGVzdHBhc3N3b3Jk",
         },
-      }
+        signal: expect.any(AbortSignal),
+      })
     )
   })
 

@@ -24,9 +24,7 @@ interface SDKToolPart {
   type: string
   callID?: string
   tool?: string
-  state?: { output?: string }
-  truncated?: boolean
-  originalSize?: number
+  state?: { output?: string; time?: { compacted?: number } }
 }
 
 interface SDKMessage {
@@ -120,7 +118,7 @@ async function truncateToolOutputsByCallIdFromSDK(
       for (const part of msg.parts) {
         if (part.type !== "tool" || !part.callID) continue
         if (!callIds.has(part.callID)) continue
-        if (!part.state?.output || part.truncated) continue
+        if (!part.state?.output || part.state?.time?.compacted) continue
 
         const result = await truncateToolResultAsync(client, sessionID, messageID, part.id, part)
         if (result.success) {

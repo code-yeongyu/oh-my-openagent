@@ -20,10 +20,15 @@ function messageHasContentFromSDK(message: SDKMessage): boolean {
   const parts = message.parts
   if (!parts || parts.length === 0) return false
 
+  let hasIgnoredParts = false
+
   for (const part of parts) {
     const type = part.type
     if (!type) continue
-    if (IGNORE_TYPES.has(type)) continue
+    if (IGNORE_TYPES.has(type)) {
+      hasIgnoredParts = true
+      continue
+    }
 
     if (type === "text") {
       if (part.text?.trim()) return true
@@ -31,9 +36,12 @@ function messageHasContentFromSDK(message: SDKMessage): boolean {
     }
 
     if (TOOL_TYPES.has(type)) return true
+
+    return true
   }
 
-  return false
+  // Messages with only thinking/meta parts are NOT empty — they have content
+  return hasIgnoredParts
 }
 
 function getSdkMessages(response: unknown): SDKMessage[] {
