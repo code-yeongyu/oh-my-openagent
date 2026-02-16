@@ -47,9 +47,11 @@ function messageHasContentFromSDK(message: SDKMessage): boolean {
 
 function getSdkMessages(response: unknown): SDKMessage[] {
   if (typeof response !== "object" || response === null) return []
+  if (Array.isArray(response)) return response as SDKMessage[]
   const record = response as Record<string, unknown>
   const data = record["data"]
-  return Array.isArray(data) ? (data as SDKMessage[]) : []
+  if (Array.isArray(data)) return data as SDKMessage[]
+  return Array.isArray(record) ? (record as SDKMessage[]) : []
 }
 
 async function findEmptyMessagesFromSDK(client: Client, sessionID: string): Promise<string[]> {

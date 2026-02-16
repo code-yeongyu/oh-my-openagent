@@ -1,9 +1,10 @@
-import { existsSync, readdirSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { MESSAGE_STORAGE, PART_STORAGE, SESSION_STORAGE, TODO_DIR, TRANSCRIPT_DIR } from "./constants"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { getMessageDir } from "../../shared/opencode-message-dir"
 import type { SessionMessage, SessionInfo, TodoItem, SessionMetadata } from "./types"
 
 export interface GetMainSessionsOptions {
@@ -116,27 +117,7 @@ export async function getAllSessions(): Promise<string[]> {
   return [...new Set(sessions)]
 }
 
-export function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
-
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) {
-    return directPath
-  }
-
-  try {
-    for (const dir of readdirSync(MESSAGE_STORAGE)) {
-      const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-      if (existsSync(sessionPath)) {
-        return sessionPath
-      }
-    }
-  } catch {
-    return null
-  }
-
-  return null
-}
+export { getMessageDir } from "../../shared/opencode-message-dir"
 
 export async function sessionExists(sessionID: string): Promise<boolean> {
   if (isSqliteBackend() && sdkClient) {
