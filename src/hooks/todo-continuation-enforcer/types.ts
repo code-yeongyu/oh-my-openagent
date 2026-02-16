@@ -29,6 +29,7 @@ export interface SessionState {
   abortDetectedAt?: number
   lastInjectedAt?: number
   inFlight?: boolean
+  consecutiveFailures: number
 }
 
 export interface MessageInfo {
