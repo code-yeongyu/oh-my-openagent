@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
+import { resolveSessionDirectory } from "../../shared"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import type { CallOmoAgentArgs } from "./types"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
@@ -27,11 +28,14 @@ export async function resolveOrCreateSessionId(
 	log(`[call_omo_agent] Creating new session with parent: ${toolContext.sessionID}`)
 	const parentSession = await ctx.client.session
 		.get({ path: { id: toolContext.sessionID } })
-		.catch((err) => {
+		.catch((err: unknown) => {
 			log("[call_omo_agent] Failed to get parent session", { error: String(err) })
 			return null
 		})
-	const parentDirectory = parentSession?.data?.directory ?? ctx.directory
+	const parentDirectory = resolveSessionDirectory({
+		parentDirectory: parentSession?.data?.directory,
+		fallbackDirectory: ctx.directory,
+	})
 
 	const body = {
 		parentID: toolContext.sessionID,
