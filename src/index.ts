@@ -930,8 +930,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
       await notepadWriteGuard?.["tool.execute.before"]?.(input, output);
       await observationWriteGuard?.["tool.execute.before"]?.(input, output);
-      // TEMPORARILY DISABLED FOR DEBUGGING - Phase 3 hook
-      // await secretScanner?.["tool.execute.before"]?.(input, output);
+      await secretScanner?.["tool.execute.before"]?.(input, output);
       
       // Check if any hook blocked the operation
       if ((output as { blocked?: boolean }).blocked) {
@@ -941,8 +940,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       
       await instinctTrigger?.["tool.execute.before"]?.(input, output);
       await planUpdateReminder?.["tool.execute.before"]?.(input, output);
-      // TEMPORARILY DISABLED FOR DEBUGGING - Phase 3 hook
-      // await knowledgeInjection?.["tool.execute.before"]?.(input, output);
+      await knowledgeInjection?.["tool.execute.before"]?.(input, output);
       await atlasHook?.["tool.execute.before"]?.(input, output);
 
       if (input.tool === "task") {
@@ -1059,9 +1057,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       await observationRecorder?.["tool.execute.after"]?.(input, output);
       await observerDetector?.["tool.execute.after"]?.(input, output);
       await instinctLearner?.["tool.execute.after"]?.(input, output);
-      // TEMPORARILY DISABLED FOR DEBUGGING - Phase 3 hooks
-      // await behaviorAnchor?.["tool.execute.after"]?.(input, output);
-      // await verbosityController?.["tool.execute.after"]?.(input, output);
+      await behaviorAnchor?.["tool.execute.after"]?.(input, output);
+      await verbosityController?.["tool.execute.after"]?.(input, output);
     },
 
     "experimental.session.compacting": async (input: { sessionID: string }) => {
