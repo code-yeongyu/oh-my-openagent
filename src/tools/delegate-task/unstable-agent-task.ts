@@ -77,6 +77,7 @@ export async function executeUnstableAgentTask(
     const pollStart = Date.now()
     let lastMsgCount = 0
     let stablePolls = 0
+    let terminalStatus: { status: string; error?: string } | undefined
 
     while (Date.now() - pollStart < timingCfg.MAX_POLL_TIME_MS) {
       if (ctx.abort?.aborted) {
@@ -84,6 +85,12 @@ export async function executeUnstableAgentTask(
       }
 
       await new Promise(resolve => setTimeout(resolve, timingCfg.POLL_INTERVAL_MS))
+
+      const currentTask = manager.getTask(task.id)
+      if (currentTask && (currentTask.status === "interrupt" || currentTask.status === "error" || currentTask.status === "cancelled")) {
+        terminalStatus = { status: currentTask.status, error: currentTask.error }
+        break
+      }
 
       const statusResult = await client.session.status()
       const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
@@ -108,6 +115,24 @@ export async function executeUnstableAgentTask(
         stablePolls = 0
         lastMsgCount = currentMsgCount
       }
+    }
+
+    if (terminalStatus) {
+      const duration = formatDuration(startTime)
+      return `SUPERVISED TASK FAILED (${terminalStatus.status})
+
+Task was interrupted/failed while running in monitored background mode.
+${terminalStatus.error ? `Error: ${terminalStatus.error}` : ""}
+
+Duration: ${duration}
+Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
+Model: ${actualModel}
+
+The task session may contain partial results.
+
+<task_metadata>
+session_id: ${sessionID}
+</task_metadata>`
     }
 
     const messagesResult = await client.session.messages({ path: { id: sessionID } })
