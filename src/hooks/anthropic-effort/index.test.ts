@@ -88,6 +88,21 @@ describe("createAnthropicEffortHook", () => {
       expect(output.options.effort).toBe("max")
     })
 
+    it("should inject effort max for google-vertex-anthropic provider", async () => {
+      //#given google-vertex-anthropic provider with claude-opus-4-6
+      const hook = createAnthropicEffortHook()
+      const { input, output } = createMockParams({
+        providerID: "google-vertex-anthropic",
+        modelID: "claude-opus-4-6",
+      })
+
+      //#when chat.params hook is called
+      await hook["chat.params"](input, output)
+
+      //#then effort should be injected
+      expect(output.options.effort).toBe("max")
+    })
+
     it("should handle normalized model ID with dots (opus-4.6)", async () => {
       //#given model ID with dots instead of hyphens
       const hook = createAnthropicEffortHook()

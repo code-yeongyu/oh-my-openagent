@@ -3,7 +3,9 @@ import { createMouseAgentWithOverrides } from "../agents/mouse";
 import type { MatrixxConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
+import { getAgentDisplayName } from "../shared/agent-display-names";
 import {
+  discoverConfigSourceSkills,
   discoverOpencodeGlobalSkills,
   discoverOpencodeProjectSkills,
   discoverProjectClaudeSkills,
@@ -12,6 +14,7 @@ import {
 import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent-loader";
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
+import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
 import { buildOracleAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 
@@ -19,6 +22,11 @@ type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
   plan?: Record<string, unknown>;
 };
+
+function hasConfiguredDefaultAgent(config: Record<string, unknown>): boolean {
+  const defaultAgent = config.default_agent;
+  return typeof defaultAgent === "string" && defaultAgent.trim().length > 0;
+}
 
 export async function applyAgentConfig(params: {
   config: Record<string, unknown>;
@@ -34,20 +42,26 @@ export async function applyAgentConfig(params: {
 
   const includeClaudeSkillsForAwareness = params.pluginConfig.claude_code?.skills ?? true;
   const [
+    discoveredConfigSourceSkills,
     discoveredUserSkills,
     discoveredProjectSkills,
     discoveredOpencodeGlobalSkills,
     discoveredOpencodeProjectSkills,
   ] = await Promise.all([
+    discoverConfigSourceSkills({
+      config: params.pluginConfig.skills,
+      configDir: params.ctx.directory,
+    }),
     includeClaudeSkillsForAwareness ? discoverUserClaudeSkills() : Promise.resolve([]),
     includeClaudeSkillsForAwareness
-      ? discoverProjectClaudeSkills()
-      : Promise.resolve([]),
+       ? discoverProjectClaudeSkills(params.ctx.directory)
+       : Promise.resolve([]),
     discoverOpencodeGlobalSkills(),
-    discoverOpencodeProjectSkills(),
+    discoverOpencodeProjectSkills(params.ctx.directory),
   ]);
 
   const allDiscoveredSkills = [
+    ...discoveredConfigSourceSkills,
     ...discoveredOpencodeProjectSkills,
     ...discoveredProjectSkills,
     ...discoveredOpencodeGlobalSkills,
@@ -77,7 +91,7 @@ export async function applyAgentConfig(params: {
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
   const userAgents = includeClaudeAgents ? loadUserAgents() : {};
-  const projectAgents = includeClaudeAgents ? loadProjectAgents() : {};
+  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
 
   const rawPluginAgents = params.pluginComponents.agents;
   const pluginAgents = Object.fromEntries(
@@ -97,7 +111,10 @@ export async function applyAgentConfig(params: {
   const configAgent = params.config.agent as AgentConfigRecord | undefined;
 
   if (isMorpheusEnabled && builtinAgents.morpheus) {
-    (params.config as { default_agent?: string }).default_agent = "morpheus";
+    if (!hasConfiguredDefaultAgent(params.config)) {
+      (params.config as { default_agent?: string }).default_agent =
+        getAgentDisplayName("morpheus");
+    }
 
     const agentConfig: Record<string, unknown> = {
       morpheus: builtinAgents.morpheus,
@@ -186,6 +203,9 @@ export async function applyAgentConfig(params: {
   }
 
   if (params.config.agent) {
+    params.config.agent = remapAgentKeysToDisplayNames(
+      params.config.agent as Record<string, unknown>,
+    );
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,
     );

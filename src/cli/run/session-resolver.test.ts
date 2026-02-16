@@ -26,6 +26,8 @@ const createMockClient = (overrides: {
 }
 
 describe("resolveSession", () => {
+  const directory = "/test-project"
+
   beforeEach(() => {
     spyOn(console, "log").mockImplementation(() => {})
     spyOn(console, "error").mockImplementation(() => {})
@@ -39,12 +41,13 @@ describe("resolveSession", () => {
     })
 
     // when
-    const result = await resolveSession({ client: mockClient, sessionId })
+    const result = await resolveSession({ client: mockClient, sessionId, directory })
 
     // then
     expect(result).toBe(sessionId)
     expect(mockClient.session.get).toHaveBeenCalledWith({
       path: { id: sessionId },
+      query: { directory },
     })
     expect(mockClient.session.create).not.toHaveBeenCalled()
   })
@@ -57,7 +60,7 @@ describe("resolveSession", () => {
     })
 
     // when
-    const result = resolveSession({ client: mockClient, sessionId })
+    const result = resolveSession({ client: mockClient, sessionId, directory })
 
     // then
     await Promise.resolve(
@@ -65,6 +68,7 @@ describe("resolveSession", () => {
     )
     expect(mockClient.session.get).toHaveBeenCalledWith({
       path: { id: sessionId },
+      query: { directory },
     })
     expect(mockClient.session.create).not.toHaveBeenCalled()
   })
@@ -76,7 +80,7 @@ describe("resolveSession", () => {
     })
 
     // when
-    const result = await resolveSession({ client: mockClient })
+    const result = await resolveSession({ client: mockClient, directory })
 
     // then
     expect(result).toBe("new-session-id")
@@ -87,6 +91,7 @@ describe("resolveSession", () => {
           { permission: "question", action: "deny", pattern: "*" },
         ],
       },
+      query: { directory },
     })
     expect(mockClient.session.get).not.toHaveBeenCalled()
   })
@@ -101,7 +106,7 @@ describe("resolveSession", () => {
     })
 
     // when
-    const result = await resolveSession({ client: mockClient })
+    const result = await resolveSession({ client: mockClient, directory })
 
     // then
     expect(result).toBe("retried-session-id")
@@ -113,6 +118,7 @@ describe("resolveSession", () => {
           { permission: "question", action: "deny", pattern: "*" },
         ],
       },
+      query: { directory },
     })
   })
 
@@ -127,7 +133,7 @@ describe("resolveSession", () => {
     })
 
     // when
-    const result = resolveSession({ client: mockClient })
+    const result = resolveSession({ client: mockClient, directory })
 
     // then
     await Promise.resolve(
@@ -147,7 +153,7 @@ describe("resolveSession", () => {
     })
 
     // when
-    const result = resolveSession({ client: mockClient })
+    const result = resolveSession({ client: mockClient, directory })
 
     // then
     await Promise.resolve(

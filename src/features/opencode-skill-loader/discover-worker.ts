@@ -18,8 +18,6 @@ interface WorkerOutputError {
   error: { message: string; stack?: string }
 }
 
-type WorkerOutput = WorkerOutputSuccess | WorkerOutputError
-
 const { signal } = workerData as { signal: Int32Array }
 
 if (!parentPort) {

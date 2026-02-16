@@ -7,10 +7,13 @@ import type {
 } from "../features/opencode-skill-loader/types"
 
 import {
+  discoverConfigSourceSkills,
   discoverUserClaudeSkills,
   discoverProjectClaudeSkills,
   discoverOpencodeGlobalSkills,
   discoverOpencodeProjectSkills,
+  discoverProjectAgentsSkills,
+  discoverGlobalAgentsSkills,
   mergeSkills,
 } from "../features/opencode-skill-loader"
 import { createBuiltinSkills } from "../features/builtin-skills"
@@ -54,20 +57,27 @@ export async function createSkillContext(args: {
   })
 
   const includeClaudeSkills = pluginConfig.claude_code?.skills !== false
-  const [userSkills, globalSkills, projectSkills, opencodeProjectSkills] =
+  const [configSourceSkills, userSkills, globalSkills, projectSkills, opencodeProjectSkills, agentsProjectSkills, agentsGlobalSkills] =
     await Promise.all([
+      discoverConfigSourceSkills({
+        config: pluginConfig.skills,
+        configDir: directory,
+      }),
       includeClaudeSkills ? discoverUserClaudeSkills() : Promise.resolve([]),
       discoverOpencodeGlobalSkills(),
-      includeClaudeSkills ? discoverProjectClaudeSkills() : Promise.resolve([]),
-      discoverOpencodeProjectSkills(),
+      includeClaudeSkills ? discoverProjectClaudeSkills(directory) : Promise.resolve([]),
+      discoverOpencodeProjectSkills(directory),
+      discoverProjectAgentsSkills(directory),
+      discoverGlobalAgentsSkills(),
     ])
 
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
-    userSkills,
+    configSourceSkills,
+    [...userSkills, ...agentsGlobalSkills],
     globalSkills,
-    projectSkills,
+    [...projectSkills, ...agentsProjectSkills],
     opencodeProjectSkills,
     { configDir: directory },
   )

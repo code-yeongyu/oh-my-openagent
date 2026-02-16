@@ -9,7 +9,7 @@ import {
 import { getToolInput } from "../tool-input-cache"
 import { appendTranscriptEntry, getTranscriptPath } from "../transcript"
 import type { PluginConfig } from "../types"
-import { isHookDisabled, log } from "../../../shared"
+import { isHookDisabled } from "../../../shared"
 
 export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginConfig) {
 	return async (

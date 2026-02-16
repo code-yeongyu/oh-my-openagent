@@ -2,13 +2,17 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
 import type { ToolPermission } from "../../features/hook-message-injector"
+import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 import {
   ABORT_WINDOW_MS,
   CONTINUATION_COOLDOWN_MS,
   DEFAULT_SKIP_AGENTS,
+  FAILURE_RESET_WINDOW_MS,
   HOOK_NAME,
+  MAX_CONSECUTIVE_FAILURES,
 } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { getIncompleteCount } from "./todo"
@@ -34,7 +38,6 @@ export async function handleSessionIdle(args: {
   } = args
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
-
 
   const state = sessionStateStore.getState(sessionID)
   if (state.isRecovering) {
@@ -66,7 +69,7 @@ export async function handleSessionIdle(args: {
       path: { id: sessionID },
       query: { directory: ctx.directory },
     })
-    const messages = (messagesResp as { data?: Array<{ info?: MessageInfo }> }).data ?? []
+    const messages = normalizeSDKResponse(messagesResp, [] as Array<{ info?: MessageInfo }>)
     if (isLastAssistantMessageAborted(messages)) {
       log(`[${HOOK_NAME}] Skipped: last assistant message was aborted (API fallback)`, { sessionID })
       return
@@ -78,7 +81,7 @@ export async function handleSessionIdle(args: {
   let todos: Todo[] = []
   try {
     const response = await ctx.client.session.todo({ path: { id: sessionID } })
-    todos = (response.data ?? response) as Todo[]
+    todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
   } catch (error) {
     log(`[${HOOK_NAME}] Todo fetch failed`, { sessionID, error: String(error) })
     return
@@ -100,8 +103,38 @@ export async function handleSessionIdle(args: {
     return
   }
 
-  if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < CONTINUATION_COOLDOWN_MS) {
-    log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID })
+  if (
+    state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
+    && state.lastInjectedAt
+    && Date.now() - state.lastInjectedAt >= FAILURE_RESET_WINDOW_MS
+  ) {
+    state.consecutiveFailures = 0
+    log(`[${HOOK_NAME}] Reset consecutive failures after recovery window`, {
+      sessionID,
+      failureResetWindowMs: FAILURE_RESET_WINDOW_MS,
+    })
+  }
+
+  if (state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+    log(`[${HOOK_NAME}] Skipped: max consecutive failures reached`, {
+      sessionID,
+      consecutiveFailures: state.consecutiveFailures,
+      maxConsecutiveFailures: MAX_CONSECUTIVE_FAILURES,
+    })
+    return
+  }
+
+  const effectiveCooldown =
+    CONTINUATION_COOLDOWN_MS * Math.pow(2, Math.min(state.consecutiveFailures, 5))
+  if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < effectiveCooldown) {
+    log(`[${HOOK_NAME}] Skipped: cooldown active`, {
+      sessionID,
+      effectiveCooldown,
+      consecutiveFailures: state.consecutiveFailures,
+    })
+
+
+
     return
   }
 
@@ -111,7 +144,7 @@ export async function handleSessionIdle(args: {
     const messagesResp = await ctx.client.session.messages({
       path: { id: sessionID },
     })
-    const messages = (messagesResp.data ?? []) as Array<{ info?: MessageInfo }>
+    const messages = normalizeSDKResponse(messagesResp, [] as Array<{ info?: MessageInfo }>)
     for (let i = messages.length - 1; i >= 0; i--) {
       const info = messages[i].info
       if (info?.agent === "compaction") {
@@ -133,8 +166,9 @@ export async function handleSessionIdle(args: {
 
   log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents, hasCompactionMessage })
 
-  if (resolvedInfo?.agent && skipAgents.includes(resolvedInfo.agent)) {
-    log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedInfo.agent })
+  const resolvedAgentName = resolvedInfo?.agent
+  if (resolvedAgentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(resolvedAgentName))) {
+    log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedAgentName })
     return
   }
   if (hasCompactionMessage && !resolvedInfo?.agent) {

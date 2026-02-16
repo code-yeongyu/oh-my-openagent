@@ -244,7 +244,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "broadcast": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "bullet-time": {
       "model": "opencode/glm-4.7-free",
@@ -315,7 +315,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "broadcast": {
-      "model": "openai/gpt-5.2",
+      "model": "opencode/glm-4.7-free",
     },
     "bullet-time": {
       "model": "opencode/glm-4.7-free",
@@ -386,6 +386,7 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     },
     "construct": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "matrix-bend": {
       "model": "google/gemini-3-pro",
@@ -449,6 +450,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
     },
     "construct": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "matrix-bend": {
       "model": "google/gemini-3-pro",
@@ -522,6 +524,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
     },
     "construct": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "openai/gpt-5.3-codex",
@@ -599,6 +602,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
     },
     "construct": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "openai/gpt-5.3-codex",
@@ -677,6 +681,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     },
     "construct": {
       "model": "opencode/gemini-3-pro",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "opencode/gpt-5.3-codex",
@@ -754,6 +759,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     },
     "construct": {
       "model": "opencode/gemini-3-pro",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "opencode/gpt-5.3-codex",
@@ -832,6 +838,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     },
     "construct": {
       "model": "github-copilot/gemini-3-pro-preview",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "github-copilot/gpt-5.3-codex",
@@ -909,6 +916,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     },
     "construct": {
       "model": "github-copilot/gemini-3-pro-preview",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "github-copilot/gpt-5.3-codex",
@@ -970,13 +978,13 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "opencode/glm-4.7-free",
     },
     "broadcast": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "opencode/glm-4.7-free",
     },
     "bullet-time": {
       "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
     "red-pill": {
       "model": "opencode/glm-4.7-free",
@@ -1028,13 +1036,13 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/glm-4.7-free",
     },
     "broadcast": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "opencode/glm-4.7-free",
     },
     "bullet-time": {
       "model": "opencode/glm-4.7-free",
     },
     "construct": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
     "red-pill": {
       "model": "opencode/glm-4.7-free",
@@ -1103,6 +1111,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     },
     "construct": {
       "model": "opencode/gemini-3-pro",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "opencode/gpt-5.3-codex",
@@ -1180,6 +1189,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     },
     "construct": {
       "model": "github-copilot/gemini-3-pro-preview",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "openai/gpt-5.3-codex",
@@ -1252,8 +1262,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-haiku-4-5",
     },
     "construct": {
-      "model": "anthropic/claude-opus-4-6",
-      "variant": "max",
+      "model": "zai-coding-plan/glm-5",
     },
     "red-pill": {
       "model": "anthropic/claude-sonnet-4-5",
@@ -1319,6 +1328,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
     },
     "construct": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "matrix-bend": {
       "model": "google/gemini-3-pro",
@@ -1392,6 +1402,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     },
     "construct": {
       "model": "github-copilot/gemini-3-pro-preview",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "github-copilot/gpt-5.3-codex",
@@ -1469,6 +1480,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     },
     "construct": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "openai/gpt-5.3-codex",
@@ -1546,6 +1558,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     },
     "construct": {
       "model": "google/gemini-3-pro",
+      "variant": "high",
     },
     "deep-jack": {
       "model": "openai/gpt-5.3-codex",

@@ -1,5 +1,6 @@
 import pc from "picocolors"
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
+import { normalizeSDKResponse } from "../../shared"
 
 export async function checkCompletionConditions(ctx: RunContext): Promise<boolean> {
   try {
@@ -19,8 +20,11 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
 }
 
 async function areAllTodosComplete(ctx: RunContext): Promise<boolean> {
-  const todosRes = await ctx.client.session.todo({ path: { id: ctx.sessionID } })
-  const todos = (todosRes.data ?? []) as Todo[]
+  const todosRes = await ctx.client.session.todo({
+    path: { id: ctx.sessionID },
+    query: { directory: ctx.directory },
+  })
+  const todos = normalizeSDKResponse(todosRes, [] as Todo[])
 
   const incompleteTodos = todos.filter(
     (t) => t.status !== "completed" && t.status !== "cancelled"
@@ -42,8 +46,10 @@ async function areAllChildrenIdle(ctx: RunContext): Promise<boolean> {
 async function fetchAllStatuses(
   ctx: RunContext
 ): Promise<Record<string, SessionStatus>> {
-  const statusRes = await ctx.client.session.status()
-  return (statusRes.data ?? {}) as Record<string, SessionStatus>
+  const statusRes = await ctx.client.session.status({
+    query: { directory: ctx.directory },
+  })
+  return normalizeSDKResponse(statusRes, {} as Record<string, SessionStatus>)
 }
 
 async function areAllDescendantsIdle(
@@ -53,8 +59,9 @@ async function areAllDescendantsIdle(
 ): Promise<boolean> {
   const childrenRes = await ctx.client.session.children({
     path: { id: sessionID },
+    query: { directory: ctx.directory },
   })
-  const children = (childrenRes.data ?? []) as ChildSession[]
+  const children = normalizeSDKResponse(childrenRes, [] as ChildSession[])
 
   for (const child of children) {
     const status = allStatuses[child.id]

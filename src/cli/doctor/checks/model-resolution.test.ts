@@ -165,16 +165,4 @@ describe("model-resolution check", () => {
     })
   })
 
-  describe("getModelResolutionCheckDefinition", () => {
-    it("returns valid check definition", async () => {
-      const { getModelResolutionCheckDefinition } = await import("./model-resolution")
-
-      const def = getModelResolutionCheckDefinition()
-
-      expect(def.id).toBe("model-resolution")
-      expect(def.name).toBe("Model Resolution")
-      expect(def.category).toBe("configuration")
-      expect(typeof def.check).toBe("function")
-    })
-  })
 })

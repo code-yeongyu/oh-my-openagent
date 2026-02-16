@@ -16,6 +16,7 @@ export function maybeCreateAtlasConfig(input: {
   availableAgents: AvailableAgent[]
   availableSkills: AvailableSkill[]
   mergedCategories: Record<string, CategoryConfig>
+  directory?: string
   userCategories?: CategoriesConfig
   useTaskSystem?: boolean
 }): AgentConfig | undefined {
@@ -28,6 +29,7 @@ export function maybeCreateAtlasConfig(input: {
     availableAgents,
     availableSkills,
     mergedCategories,
+    directory,
     userCategories,
   } = input
 
@@ -58,7 +60,7 @@ export function maybeCreateAtlasConfig(input: {
     orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
   }
 
-  orchestratorConfig = applyOverrides(orchestratorConfig, orchestratorOverride, mergedCategories)
+  orchestratorConfig = applyOverrides(orchestratorConfig, orchestratorOverride, mergedCategories, directory)
 
   return orchestratorConfig
 }

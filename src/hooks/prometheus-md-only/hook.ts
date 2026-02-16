@@ -15,7 +15,7 @@ export function createOracleMdOnlyHook(ctx: PluginInput) {
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown>; message?: string }
     ): Promise<void> => {
-      const agentName = getAgentFromSession(input.sessionID, ctx.directory)
+      const agentName = await getAgentFromSession(input.sessionID, ctx.directory, ctx.client)
 
       if (!isOracleAgent(agentName)) {
         return

@@ -109,6 +109,7 @@ export async function checkAndInterruptStaleTasks(args: {
     }
 
     if (sessionIsRunning) continue
+
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 
     const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()

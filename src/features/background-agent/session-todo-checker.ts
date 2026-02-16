@@ -4,7 +4,7 @@ function isTodo(value: unknown): value is Todo {
   if (typeof value !== "object" || value === null) return false
   const todo = value as Record<string, unknown>
   return (
-    typeof todo["id"] === "string" &&
+    (typeof todo["id"] === "string" || todo["id"] === undefined) &&
     typeof todo["content"] === "string" &&
     typeof todo["status"] === "string" &&
     typeof todo["priority"] === "string"

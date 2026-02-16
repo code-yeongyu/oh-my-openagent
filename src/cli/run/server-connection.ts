@@ -2,12 +2,16 @@ import { createOpencode, createOpencodeClient } from "@opencode-ai/sdk"
 import pc from "picocolors"
 import type { ServerConnection } from "./types"
 import { getAvailableServerPort, isPortAvailable, DEFAULT_SERVER_PORT } from "../../shared/port-utils"
+import { withWorkingOpencodePath } from "./opencode-binary-resolver"
+import { prependResolvedOpencodeBinToPath } from "./opencode-bin-path"
 
 export async function createServerConnection(options: {
   port?: number
   attach?: string
   signal: AbortSignal
 }): Promise<ServerConnection> {
+  prependResolvedOpencodeBinToPath()
+
   const { port, attach, signal } = options
 
   if (attach !== undefined) {
@@ -25,7 +29,9 @@ export async function createServerConnection(options: {
 
     if (available) {
       console.log(pc.dim("Starting server on port"), pc.cyan(port.toString()))
-      const { client, server } = await createOpencode({ signal, port, hostname: "127.0.0.1" })
+      const { client, server } = await withWorkingOpencodePath(() =>
+        createOpencode({ signal, port, hostname: "127.0.0.1" }),
+      )
       console.log(pc.dim("Server listening at"), pc.cyan(server.url))
       return { client, cleanup: () => server.close() }
     }
@@ -41,7 +47,9 @@ export async function createServerConnection(options: {
   } else {
     console.log(pc.dim("Starting server on port"), pc.cyan(selectedPort.toString()))
   }
-  const { client, server } = await createOpencode({ signal, port: selectedPort, hostname: "127.0.0.1" })
+  const { client, server } = await withWorkingOpencodePath(() =>
+    createOpencode({ signal, port: selectedPort, hostname: "127.0.0.1" }),
+  )
   console.log(pc.dim("Server listening at"), pc.cyan(server.url))
   return { client, cleanup: () => server.close() }
 }

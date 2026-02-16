@@ -1,6 +1,13 @@
 import type { MatrixxConfig } from "../config";
+import { getAgentDisplayName } from "../shared/agent-display-names";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
+
+function agentByKey(agentResult: Record<string, unknown>, key: string): AgentWithPermission | undefined {
+  return (agentResult[key] ?? agentResult[getAgentDisplayName(key)]) as
+    | AgentWithPermission
+    | undefined;
+}
 
 export function applyToolConfig(params: {
   config: Record<string, unknown>;
@@ -27,18 +34,18 @@ export function applyToolConfig(params: {
   const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true";
   const questionPermission = isCliRunMode ? "deny" : "allow";
 
-  if (params.agentResult.operator) {
-    const agent = params.agentResult.operator as AgentWithPermission;
-    agent.permission = { ...agent.permission, "grep_app_*": "allow" };
+  const operator = agentByKey(params.agentResult, "operator");
+  if (operator) {
+    operator.permission = { ...operator.permission, "grep_app_*": "allow" };
   }
-  if (params.agentResult["construct"]) {
-    const agent = params.agentResult["construct"] as AgentWithPermission;
-    agent.permission = { ...agent.permission, task: "deny", look_at: "deny" };
+  const construct = agentByKey(params.agentResult, "construct");
+  if (construct) {
+    construct.permission = { ...construct.permission, task: "deny", look_at: "deny" };
   }
-  if (params.agentResult["architect"]) {
-    const agent = params.agentResult["architect"] as AgentWithPermission;
-    agent.permission = {
-      ...agent.permission,
+  const architect = agentByKey(params.agentResult, "architect");
+  if (architect) {
+    architect.permission = {
+      ...architect.permission,
       task: "allow",
       call_omo_agent: "deny",
       "task_*": "allow",
@@ -46,10 +53,10 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
-  if (params.agentResult.morpheus) {
-    const agent = params.agentResult.morpheus as AgentWithPermission;
-    agent.permission = {
-      ...agent.permission,
+  const morpheus = agentByKey(params.agentResult, "morpheus");
+  if (morpheus) {
+    morpheus.permission = {
+      ...morpheus.permission,
       call_omo_agent: "deny",
       task: "allow",
       question: questionPermission,
@@ -58,20 +65,20 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
-  if (params.agentResult.keymaker) {
-    const agent = params.agentResult.keymaker as AgentWithPermission;
-    agent.permission = {
-      ...agent.permission,
+  const keymaker = agentByKey(params.agentResult, "keymaker");
+  if (keymaker) {
+    keymaker.permission = {
+      ...keymaker.permission,
       call_omo_agent: "deny",
       task: "allow",
       question: questionPermission,
       ...denyTodoTools,
     };
   }
-  if (params.agentResult["oracle"]) {
-    const agent = params.agentResult["oracle"] as AgentWithPermission;
-    agent.permission = {
-      ...agent.permission,
+  const oracle = agentByKey(params.agentResult, "oracle");
+  if (oracle) {
+    oracle.permission = {
+      ...oracle.permission,
       call_omo_agent: "deny",
       task: "allow",
       question: questionPermission,
@@ -80,10 +87,10 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
-  if (params.agentResult["mouse"]) {
-    const agent = params.agentResult["mouse"] as AgentWithPermission;
-    agent.permission = {
-      ...agent.permission,
+  const mouse = agentByKey(params.agentResult, "mouse");
+  if (mouse) {
+    mouse.permission = {
+      ...mouse.permission,
       task: "allow",
       "task_*": "allow",
       teammate: "allow",

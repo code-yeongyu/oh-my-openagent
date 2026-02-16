@@ -1,3 +1,4 @@
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { ParsedTokenLimitError } from "./types"
 import type { ExperimentalConfig } from "../../config"
 import type { DeduplicationConfig } from "./pruning-deduplication"
@@ -5,6 +6,8 @@ import type { PruningState } from "./pruning-types"
 import { executeDeduplication } from "./pruning-deduplication"
 import { truncateToolOutputsByCallId } from "./pruning-tool-output-truncation"
 import { log } from "../../shared/logger"
+
+type OpencodeClient = PluginInput["client"]
 
 function createPruningState(): PruningState {
   return {
@@ -43,6 +46,7 @@ export async function attemptDeduplicationRecovery(
   sessionID: string,
   parsed: ParsedTokenLimitError,
   experimental: ExperimentalConfig | undefined,
+  client?: OpencodeClient,
 ): Promise<void> {
   if (!isPromptTooLongError(parsed)) return
 
@@ -50,15 +54,17 @@ export async function attemptDeduplicationRecovery(
   if (!plan) return
 
   const pruningState = createPruningState()
-  const prunedCount = executeDeduplication(
+  const prunedCount = await executeDeduplication(
     sessionID,
     pruningState,
     plan.config,
     plan.protectedTools,
+    client,
   )
-  const { truncatedCount } = truncateToolOutputsByCallId(
+  const { truncatedCount } = await truncateToolOutputsByCallId(
     sessionID,
     pruningState.toolIdsToPrune,
+    client,
   )
 
   if (prunedCount > 0 || truncatedCount > 0) {

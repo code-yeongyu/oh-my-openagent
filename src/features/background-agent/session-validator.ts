@@ -1,4 +1,4 @@
-import { log } from "../../shared"
+import { log, normalizeSDKResponse } from "../../shared"
 
 import type { OpencodeClient } from "./opencode-client"
 
@@ -51,7 +51,9 @@ export async function validateSessionHasOutput(
       path: { id: sessionID },
     })
 
-    const messages = asSessionMessages((response as { data?: unknown }).data ?? response)
+    const messages = asSessionMessages(normalizeSDKResponse(response, [] as SessionMessage[], {
+      preferResponseOnMissingData: true,
+    }))
 
     const hasAssistantOrToolMessage = messages.some(
       (m) => m.info?.role === "assistant" || m.info?.role === "tool"
@@ -97,8 +99,9 @@ export async function checkSessionTodos(
       path: { id: sessionID },
     })
 
-    const raw = (response as { data?: unknown }).data ?? response
-    const todos = Array.isArray(raw) ? (raw as Todo[]) : []
+    const todos = normalizeSDKResponse(response, [] as Todo[], {
+      preferResponseOnMissingData: true,
+    })
     if (todos.length === 0) return false
 
     const incomplete = todos.filter(

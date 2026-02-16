@@ -149,29 +149,21 @@ This command shows:
 program
   .command("doctor")
   .description("Check matrixx installation health and diagnose issues")
+  .option("--status", "Show compact system dashboard")
   .option("--verbose", "Show detailed diagnostic information")
   .option("--json", "Output results in JSON format")
-  .option("--category <category>", "Run only specific category")
   .addHelpText("after", `
 Examples:
-  $ bunx matrixx doctor
-  $ bunx matrixx doctor --verbose
-  $ bunx matrixx doctor --json
-  $ bunx matrixx doctor --category authentication
-
-Categories:
-  installation     Check OpenCode and plugin installation
-  configuration    Validate configuration files
-  authentication   Check auth provider status
-  dependencies     Check external dependencies
-  tools            Check LSP and MCP servers
-  updates          Check for version updates
+  $ bunx matrixx doctor            # Show problems only
+  $ bunx matrixx doctor --status   # Compact dashboard
+  $ bunx matrixx doctor --verbose  # Deep diagnostics
+  $ bunx matrixx doctor --json     # JSON output
 `)
   .action(async (options) => {
+    const mode = options.status ? "status" : options.verbose ? "verbose" : "default"
     const doctorOptions: DoctorOptions = {
-      verbose: options.verbose ?? false,
+      mode,
       json: options.json ?? false,
-      category: options.category,
     }
     const exitCode = await doctor(doctorOptions)
     process.exit(exitCode)

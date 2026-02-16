@@ -3,6 +3,7 @@ import { log } from "../../shared/logger"
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { getMessageDir } from "./message-storage-directory"
 import { withTimeout } from "./with-timeout"
+import { normalizeSDKResponse } from "../../shared"
 
 type MessageInfo = {
 	agent?: string
@@ -25,7 +26,7 @@ export async function injectContinuationPrompt(
 			}),
 			options.apiTimeoutMs,
 		)
-		const messages = (messagesResp.data ?? []) as Array<{ info?: MessageInfo }>
+		const messages = normalizeSDKResponse(messagesResp, [] as Array<{ info?: MessageInfo }>)
 		for (let i = messages.length - 1; i >= 0; i--) {
 			const info = messages[i]?.info
 			if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {

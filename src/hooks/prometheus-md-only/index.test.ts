@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test"
 
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -6,9 +6,14 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { clearSessionAgent } from "../../features/claude-code-session-state"
+// Force stable (JSON) mode for tests that rely on message file storage
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => false,
+  resetSqliteBackendCache: () => {},
+}))
 
-import { createOracleMdOnlyHook } from "./index"
-import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
+const { createOracleMdOnlyHook } = await import("./index")
+const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
 describe("oracle-md-only", () => {
   const TEST_SESSION_ID = "test-session-oracle"
@@ -547,7 +552,7 @@ describe("oracle-md-only", () => {
       writeFileSync(MISSION_FILE, JSON.stringify({
         active_plan: "/test/plan.md",
         started_at: new Date().toISOString(),
-        session_ids: ["other-session-id"],
+        session_ids: ["ses_other_session_id"],
         plan_name: "test-plan",
         agent: "architect"
       }))
@@ -579,7 +584,7 @@ describe("oracle-md-only", () => {
       const hook = createOracleMdOnlyHook(createMockPluginInput())
       const input = {
         tool: "Write",
-        sessionID: "non-existent-session",
+        sessionID: "ses_non_existent_session",
         callID: "call-1",
       }
       const output = {

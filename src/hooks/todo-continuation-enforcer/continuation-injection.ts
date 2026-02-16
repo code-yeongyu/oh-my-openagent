@@ -1,11 +1,15 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
+import { normalizeSDKResponse } from "../../shared"
 import {
   findNearestMessageWithFields,
+  findNearestMessageWithFieldsFromSDK,
   type ToolPermission,
 } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
+import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 import {
   CONTINUATION_PROMPT,
@@ -61,7 +65,7 @@ export async function injectContinuation(args: {
   let todos: Todo[] = []
   try {
     const response = await ctx.client.session.todo({ path: { id: sessionID } })
-    todos = (response.data ?? response) as Todo[]
+    todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
   } catch (error) {
     log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: String(error) })
     return
@@ -78,8 +82,13 @@ export async function injectContinuation(args: {
   let tools = resolvedInfo?.tools
 
   if (!agentName || !model) {
-    const messageDir = getMessageDir(sessionID)
-    const previousMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+    let previousMessage = null
+    if (isSqliteBackend()) {
+      previousMessage = await findNearestMessageWithFieldsFromSDK(ctx.client, sessionID)
+    } else {
+      const messageDir = getMessageDir(sessionID)
+      previousMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
+    }
     agentName = agentName ?? previousMessage?.agent
     model =
       model ??
@@ -95,7 +104,7 @@ export async function injectContinuation(args: {
     tools = tools ?? previousMessage?.tools
   }
 
-  if (agentName && skipAgents.includes(agentName)) {
+  if (agentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(agentName))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
     return
   }
@@ -141,11 +150,14 @@ ${todoList}`
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
+      injectionState.consecutiveFailures = 0
     }
   } catch (error) {
     log(`[${HOOK_NAME}] Injection failed`, { sessionID, error: String(error) })
     if (injectionState) {
       injectionState.inFlight = false
+      injectionState.lastInjectedAt = Date.now()
+      injectionState.consecutiveFailures = (injectionState.consecutiveFailures ?? 0) + 1
     }
   }
 }

@@ -13,7 +13,6 @@ export const HookNameSchema = z.enum([
   "directory-readme-injector",
   "empty-task-response-detector",
   "think-mode",
-  "subagent-question-blocker",
   "anthropic-context-window-limit-recovery",
   "preemptive-compaction",
   "rules-injector",
@@ -46,6 +45,7 @@ export const HookNameSchema = z.enum([
   "tasks-todowrite-disabler",
   "write-existing-file-guard",
   "anthropic-effort",
+  "hashline-read-enhancer",
 ])
 
 export type HookName = z.infer<typeof HookNameSchema>

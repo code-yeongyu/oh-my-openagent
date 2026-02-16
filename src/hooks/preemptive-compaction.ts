@@ -1,3 +1,5 @@
+import { log } from "../shared/logger"
+
 const DEFAULT_ACTUAL_LIMIT = 200_000
 
 const ANTHROPIC_ACTUAL_LIMIT =
@@ -19,6 +21,10 @@ interface CachedCompactionState {
   providerID: string
   modelID: string
   tokens: TokenInfo
+}
+
+function isAnthropicProvider(providerID: string): boolean {
+  return providerID === "anthropic" || providerID === "google-vertex-anthropic"
 }
 
 type PluginInput = {
@@ -53,7 +59,7 @@ export function createPreemptiveCompactionHook(ctx: PluginInput) {
     if (!cached) return
 
     const actualLimit =
-      cached.providerID === "anthropic"
+      isAnthropicProvider(cached.providerID)
         ? ANTHROPIC_ACTUAL_LIMIT
         : DEFAULT_ACTUAL_LIMIT
 
@@ -76,8 +82,8 @@ export function createPreemptiveCompactionHook(ctx: PluginInput) {
       })
 
       compactedSessions.add(sessionID)
-    } catch {
-      // best-effort; do not disrupt tool execution
+    } catch (error) {
+      log("[preemptive-compaction] Compaction failed", { sessionID, error: String(error) })
     } finally {
       compactionInProgress.delete(sessionID)
     }

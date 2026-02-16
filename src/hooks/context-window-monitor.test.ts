@@ -113,6 +113,42 @@ describe("context-window-monitor", () => {
     expect(ctx.client.session.messages).not.toHaveBeenCalled()
   })
 
+  it("should append context reminder for google-vertex-anthropic provider", async () => {
+    //#given cached usage for google-vertex-anthropic above threshold
+    const hook = createContextWindowMonitorHook(ctx as never)
+    const sessionID = "ses_vertex_anthropic_high_usage"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "google-vertex-anthropic",
+            finish: true,
+            tokens: {
+              input: 150000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    //#when tool.execute.after runs
+    const output = { title: "", output: "original", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    //#then context reminder should be appended
+    expect(output.output).toContain("context remaining")
+  })
+
   // #given session is deleted
   // #when session.deleted event fires
   // #then cached data should be cleaned up

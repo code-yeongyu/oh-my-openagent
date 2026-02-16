@@ -3,10 +3,12 @@ import type { TmuxLayout } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 
 export async function applyLayout(
-	tmux: string,
 	layout: TmuxLayout,
 	mainPaneSize: number,
 ): Promise<void> {
+	const tmux = await getTmuxPath()
+	if (!tmux) return
+
 	const layoutProc = spawn([tmux, "select-layout", layout], {
 		stdout: "ignore",
 		stderr: "ignore",

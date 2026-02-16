@@ -67,13 +67,14 @@ describe("morpheus-task", () => {
   })
 
   describe("DEFAULT_CATEGORIES", () => {
-    test("construct category has model config", () => {
+    test("construct category has model and variant config", () => {
       // given
       const category = DEFAULT_CATEGORIES["construct"]
 
       // when / #then
       expect(category).toBeDefined()
       expect(category.model).toBe("google/gemini-3-pro")
+      expect(category.variant).toBe("high")
     })
 
     test("source category has model and variant config", () => {
@@ -272,7 +273,7 @@ describe("morpheus-task", () => {
           id: "task-123",
           status: "pending",
           description: "Parse test",
-          agent: "sisyphus-junior",
+          agent: "mouse",
           sessionID: "test-session",
         }),
       }
@@ -1146,7 +1147,7 @@ describe("morpheus-task", () => {
           run_in_background: false,
         },
         toolContext
-      )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
+      )).rejects.toThrow("Invalid arguments: 'load_skills' parameter is REQUIRED")
     })
 
      test("null skills throws error", async () => {
@@ -1188,7 +1189,7 @@ describe("morpheus-task", () => {
            load_skills: null,
          },
          toolContext
-       )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
+        )).rejects.toThrow("Invalid arguments: load_skills=null is not allowed")
     })
 
      test("empty array [] is allowed and proceeds without skill content", async () => {
@@ -1266,52 +1267,58 @@ describe("morpheus-task", () => {
       launch: async () => mockTask,
     }
     
-     let messagesCallCount = 0
+      let messagesCallCount = 0
 
-     const mockClient = {
-        session: {
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => {
-            messagesCallCount++
-            const now = Date.now()
+      const mockClient = {
+         session: {
+           prompt: async () => ({ data: {} }),
+           promptAsync: async () => ({ data: {} }),
+           messages: async (args?: { path?: { id?: string } }) => {
+             const sessionID = args?.path?.id
+             // Only track calls for the target session (ses_continue_test),
+             // not for parent-session calls from resolveParentContext
+             if (sessionID !== "ses_continue_test") {
+               return { data: [] }
+             }
+             messagesCallCount++
+             const now = Date.now()
 
-            const beforeContinuation = [
-              {
-                info: { id: "msg_001", role: "user", time: { created: now } },
-                parts: [{ type: "text", text: "Previous context" }],
-              },
-              {
-                info: { id: "msg_002", role: "assistant", time: { created: now + 1 }, finish: "end_turn" },
-                parts: [{ type: "text", text: "Previous result" }],
-              },
-            ]
+             const beforeContinuation = [
+               {
+                 info: { id: "msg_001", role: "user", time: { created: now } },
+                 parts: [{ type: "text", text: "Previous context" }],
+               },
+               {
+                 info: { id: "msg_002", role: "assistant", time: { created: now + 1 }, finish: "end_turn" },
+                 parts: [{ type: "text", text: "Previous result" }],
+               },
+             ]
 
-            if (messagesCallCount === 1) {
-              return { data: beforeContinuation }
-            }
+             if (messagesCallCount === 1) {
+               return { data: beforeContinuation }
+             }
 
-            return {
-              data: [
-                ...beforeContinuation,
-                {
-                  info: { id: "msg_003", role: "user", time: { created: now + 2 } },
-                  parts: [{ type: "text", text: "Continue the task" }],
-                },
-                {
-                  info: { id: "msg_004", role: "assistant", time: { created: now + 3 }, finish: "end_turn" },
-                  parts: [{ type: "text", text: "This is the continued task result" }],
-                },
-              ],
-            }
-          },
-          status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
+             return {
+               data: [
+                 ...beforeContinuation,
+                 {
+                   info: { id: "msg_003", role: "user", time: { created: now + 2 } },
+                   parts: [{ type: "text", text: "Continue the task" }],
+                 },
+                 {
+                   info: { id: "msg_004", role: "assistant", time: { created: now + 3 }, finish: "end_turn" },
+                   parts: [{ type: "text", text: "This is the continued task result" }],
+                 },
+               ],
+             }
+           },
+           status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
+         },
+         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+         app: {
+           agents: async () => ({ data: [] }),
         },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        app: {
-          agents: async () => ({ data: [] }),
-       },
-     }
+      }
      
      const tool = createDelegateTask({
        manager: mockManager,
@@ -1713,17 +1720,19 @@ describe("morpheus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-unstable",
+        sessionID: "ses_unstable_gemini",
+        description: "Unstable gemini task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-unstable",
-            sessionID: "ses_unstable_gemini",
-            description: "Unstable gemini task",
-            agent: "mouse",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
        const mockClient = {
@@ -1838,17 +1847,19 @@ describe("morpheus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
 
+      const launchedTask = {
+        id: "task-unstable-minimax",
+        sessionID: "ses_unstable_minimax",
+        description: "Unstable minimax task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-unstable-minimax",
-            sessionID: "ses_unstable_minimax",
-            description: "Unstable minimax task",
-            agent: "mouse",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
 
        const mockClient = {
@@ -1972,17 +1983,19 @@ describe("morpheus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-artistry",
+        sessionID: "ses_artistry_gemini",
+        description: "Artistry gemini task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-matrix-bend",
-            sessionID: "ses_matrix-bend_gemini",
-            description: "Artistry gemini task",
-            agent: "mouse",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
        const mockClient = {
@@ -2038,17 +2051,19 @@ describe("morpheus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-writing",
+        sessionID: "ses_writing_gemini",
+        description: "Writing gemini task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-writing",
-            sessionID: "ses_writing_gemini",
-            description: "Writing gemini task",
-            agent: "mouse",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
        const mockClient = {
@@ -2104,17 +2119,19 @@ describe("morpheus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-custom-unstable",
+        sessionID: "ses_custom_unstable",
+        description: "Custom unstable task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-custom-unstable",
-            sessionID: "ses_custom_unstable",
-            description: "Custom unstable task",
-            agent: "mouse",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
       const mockClient = {
@@ -2793,7 +2810,7 @@ describe("morpheus-task", () => {
         {
           name: "writing",
           description: "Documentation, prose, technical writing",
-          model: "google/gemini-3-flash",
+          model: "kimi-for-coding/k2p5",
         },
       ]
       const availableSkills = [

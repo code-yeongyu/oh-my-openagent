@@ -19,7 +19,6 @@ import {
   createOracleMdOnlyHook,
   createMouseNotepadHook,
   createQuestionLabelTruncatorHook,
-  createSubagentQuestionBlockerHook,
   createPreemptiveCompactionHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
@@ -49,7 +48,6 @@ export type SessionHooks = {
   prometheusMdOnly: ReturnType<typeof createOracleMdOnlyHook> | null
   sisyphusJuniorNotepad: ReturnType<typeof createMouseNotepadHook> | null
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook>
-  subagentQuestionBlocker: ReturnType<typeof createSubagentQuestionBlockerHook>
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
 }
@@ -124,7 +122,7 @@ export function createSessionHooks(args: {
     ? safeHook("matrix-loop", () =>
         createMatrixLoopHook(ctx, {
           config: pluginConfig.matrix_loop,
-          checkSessionExists: async (sessionId) => sessionExists(sessionId),
+          checkSessionExists: async (sessionId) => await sessionExists(sessionId),
         }))
     : null
 
@@ -149,7 +147,6 @@ export function createSessionHooks(args: {
     : null
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook()
-  const subagentQuestionBlocker = createSubagentQuestionBlockerHook()
   const taskResumeInfo = createTaskResumeInfoHook()
 
   const anthropicEffort = isHookEnabled("anthropic-effort")
@@ -174,7 +171,6 @@ export function createSessionHooks(args: {
     prometheusMdOnly,
     sisyphusJuniorNotepad,
     questionLabelTruncator,
-    subagentQuestionBlocker,
     taskResumeInfo,
     anthropicEffort,
   }

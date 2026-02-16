@@ -53,7 +53,7 @@ export function createContinuationHooks(args: {
     : null
 
   const compactionContextInjector = isHookEnabled("compaction-context-injector")
-    ? safeHook("compaction-context-injector", () => createCompactionContextInjector())
+    ? safeHook("compaction-context-injector", () => createCompactionContextInjector(backgroundManager))
     : null
 
   const compactionTodoPreserver = isHookEnabled("compaction-todo-preserver")

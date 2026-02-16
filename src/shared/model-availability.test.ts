@@ -233,6 +233,27 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("anthropic/claude-opus-4-6")
 	})
 
+	// given github-copilot serves claude versions with dot notation
+	// when fallback chain uses hyphen notation in requested model
+	// then normalize both forms and match github-copilot model
+	it("should match github-copilot claude-opus-4-6 to claude-opus-4.6", () => {
+		const available = new Set([
+			"github-copilot/claude-opus-4.6",
+			"opencode/glm-4.7-free",
+		])
+		const result = fuzzyMatchModel("claude-opus-4-6", available, ["github-copilot"])
+		expect(result).toBe("github-copilot/claude-opus-4.6")
+	})
+
+	// given claude models can evolve to newer version numbers
+	// when matching across dot and hyphen version separators
+	// then normalize generically without hardcoding specific versions
+	it("should normalize claude version separators for future versions", () => {
+		const available = new Set(["github-copilot/claude-sonnet-5.1"])
+		const result = fuzzyMatchModel("claude-sonnet-5-1", available, ["github-copilot"])
+		expect(result).toBe("github-copilot/claude-sonnet-5.1")
+	})
+
 	// given available models from multiple providers
 	// when providers filter is specified
 	// then only search models from specified providers

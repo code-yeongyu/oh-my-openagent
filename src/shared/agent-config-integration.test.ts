@@ -90,7 +90,7 @@ describe("Agent Config Integration", () => {
   describe("Display name resolution", () => {
     test("returns correct display names for all builtin agents", () => {
       // given - lowercase config keys
-      const agents = ["morpheus", "architect", "oracle", "seraph", "smith", "oracle", "operator", "trinity", "construct"]
+      const agents = ["morpheus", "architect", "oracle", "seraph", "smith", "merovingian", "operator", "trinity", "construct"]
 
       // when - display names are requested
       const displayNames = agents.map((agent) => getAgentDisplayName(agent))
@@ -101,7 +101,7 @@ describe("Agent Config Integration", () => {
       expect(displayNames).toContain("Oracle (Plan Builder)")
       expect(displayNames).toContain("Seraph (Plan Consultant)")
       expect(displayNames).toContain("Smith (Plan Reviewer)")
-      // expect(displayNames).toContain("oracle") // Display name is "Oracle (Plan Builder)"
+      expect(displayNames).toContain("Merovingian (Consultation Expert)")
       expect(displayNames).toContain("operator")
       expect(displayNames).toContain("trinity")
       expect(displayNames).toContain("construct")

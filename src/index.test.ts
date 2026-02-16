@@ -1,4 +1,119 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, it, mock } from "bun:test"
+
+describe("experimental.session.compacting handler", () => {
+  function createCompactingHandler(hooks: {
+    compactionTodoPreserver?: { capture: (sessionID: string) => Promise<void> }
+    claudeCodeHooks?: {
+      "experimental.session.compacting"?: (
+        input: { sessionID: string },
+        output: { context: string[] },
+      ) => Promise<void>
+    }
+    compactionContextInjector?: (sessionID: string) => string
+  }) {
+    return async (
+      _input: { sessionID: string },
+      output: { context: string[] },
+    ): Promise<void> => {
+      await hooks.compactionTodoPreserver?.capture(_input.sessionID)
+      await hooks.claudeCodeHooks?.["experimental.session.compacting"]?.(
+        _input,
+        output,
+      )
+      if (hooks.compactionContextInjector) {
+        output.context.push(hooks.compactionContextInjector(_input.sessionID))
+      }
+    }
+  }
+
+  //#given all three hooks are present
+  //#when compacting handler is invoked
+  //#then all hooks are called in order: capture → PreCompact → contextInjector
+  it("calls claudeCodeHooks PreCompact alongside other hooks", async () => {
+    const callOrder: string[] = []
+
+    const handler = createCompactingHandler({
+      compactionTodoPreserver: {
+        capture: mock(async () => { callOrder.push("capture") }),
+      },
+      claudeCodeHooks: {
+        "experimental.session.compacting": mock(async () => {
+          callOrder.push("preCompact")
+        }),
+      },
+      compactionContextInjector: mock((sessionID: string) => {
+        callOrder.push("contextInjector")
+        return `context-for-${sessionID}`
+      }),
+    })
+
+    const output = { context: [] as string[] }
+    await handler({ sessionID: "ses_test" }, output)
+
+    expect(callOrder).toEqual(["capture", "preCompact", "contextInjector"])
+    expect(output.context).toEqual(["context-for-ses_test"])
+  })
+
+  //#given claudeCodeHooks injects context during PreCompact
+  //#when compacting handler is invoked
+  //#then injected context from PreCompact is preserved in output
+  it("preserves context injected by PreCompact hooks", async () => {
+    const handler = createCompactingHandler({
+      claudeCodeHooks: {
+        "experimental.session.compacting": async (_input, output) => {
+          output.context.push("precompact-injected-context")
+        },
+      },
+    })
+
+    const output = { context: [] as string[] }
+    await handler({ sessionID: "ses_test" }, output)
+
+    expect(output.context).toContain("precompact-injected-context")
+  })
+
+  //#given claudeCodeHooks is null (no claude code hooks configured)
+  //#when compacting handler is invoked
+  //#then handler completes without error and other hooks still run
+  it("handles null claudeCodeHooks gracefully", async () => {
+    const captureMock = mock(async () => {})
+    const contextMock = mock(() => "injected-context")
+
+    const handler = createCompactingHandler({
+      compactionTodoPreserver: { capture: captureMock },
+      claudeCodeHooks: undefined,
+      compactionContextInjector: contextMock,
+    })
+
+    const output = { context: [] as string[] }
+    await handler({ sessionID: "ses_test" }, output)
+
+    expect(captureMock).toHaveBeenCalledWith("ses_test")
+    expect(contextMock).toHaveBeenCalledWith("ses_test")
+    expect(output.context).toEqual(["injected-context"])
+  })
+
+  //#given compactionContextInjector is null
+  //#when compacting handler is invoked
+  //#then handler does not early-return, PreCompact hooks still execute
+  it("does not early-return when compactionContextInjector is null", async () => {
+    const preCompactMock = mock(async () => {})
+
+    const handler = createCompactingHandler({
+      claudeCodeHooks: {
+        "experimental.session.compacting": preCompactMock,
+      },
+      compactionContextInjector: undefined,
+    })
+
+    const output = { context: [] as string[] }
+    await handler({ sessionID: "ses_test" }, output)
+
+    expect(preCompactMock).toHaveBeenCalled()
+    expect(output.context).toEqual([])
+  })
+})
+
 /**
  * Tests for conditional tool registration logic in index.ts
  * 

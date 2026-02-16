@@ -9,10 +9,31 @@ import {
   readMissionState,
 } from "../../features/mission-state"
 import type { MissionState } from "../../features/mission-state"
-
-import { MESSAGE_STORAGE } from "../../features/hook-message-injector"
 import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
-import { createAtlasHook } from "./index"
+
+const TEST_STORAGE_ROOT = join(tmpdir(), `architect-test-storage-${randomUUID()}`)
+const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "messages")
+const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "parts")
+
+mock.module("../../features/hook-message-injector/constants", () => ({
+  OPENCODE_STORAGE: TEST_STORAGE_ROOT,
+  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
+  PART_STORAGE: TEST_PART_STORAGE,
+}))
+
+mock.module("../../shared/opencode-message-dir", () => ({
+  getMessageDir: (sessionID: string) => {
+    const dir = join(TEST_MESSAGE_STORAGE, sessionID)
+    return existsSync(dir) ? dir : null
+  },
+}))
+
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => false,
+}))
+
+const { createAtlasHook } = await import("./index")
+const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
 describe("architect hook", () => {
   let TEST_DIR: string

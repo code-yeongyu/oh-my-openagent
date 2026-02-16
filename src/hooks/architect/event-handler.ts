@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { getPlanProgress, readMissionState } from "../../features/mission-state"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { HOOK_NAME } from "./hook-name"
 import { isAbortError } from "./is-abort-error"
 import { injectMissionContinuation } from "./mission-continuation-injector"
@@ -87,12 +88,13 @@ export function createAtlasEventHandler(input: {
         return
       }
 
-      const lastAgent = getLastAgentFromSession(sessionID)
-      const requiredAgent = (missionState.agent ?? "architect").toLowerCase()
-      const lastAgentMatchesRequired = lastAgent === requiredAgent
+      const lastAgent = await getLastAgentFromSession(sessionID, ctx.client)
+      const lastAgentKey = getAgentConfigKey(lastAgent ?? "")
+      const requiredAgent = getAgentConfigKey(missionState.agent ?? "architect")
+      const lastAgentMatchesRequired = lastAgentKey === requiredAgent
       const missionAgentWasNotExplicitlySet = missionState.agent === undefined
       const missionAgentDefaultsToArchitect = requiredAgent === "architect"
-      const lastAgentIsMorpheus = lastAgent === "morpheus"
+      const lastAgentIsMorpheus = lastAgentKey === "morpheus"
       const allowMorpheusWhenDefaultArchitect = missionAgentWasNotExplicitlySet && missionAgentDefaultsToArchitect && lastAgentIsMorpheus
       const agentMatches = lastAgentMatchesRequired || allowMorpheusWhenDefaultArchitect
       if (!agentMatches) {

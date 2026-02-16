@@ -4,6 +4,7 @@ import { describe, test, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import { resolveCategoryConfig, createConfigHandler } from "./config-handler"
 import type { CategoryConfig } from "../config/schema"
 import type { MatrixxConfig } from "../config"
+import { getAgentDisplayName } from "../shared/agent-display-names"
 
 import * as agents from "../agents"
 import * as mouse from "../agents/mouse"
@@ -22,7 +23,6 @@ import * as modelResolver from "../shared/model-resolver"
 beforeEach(() => {
   spyOn(agents, "createBuiltinAgents" as any).mockResolvedValue({
     morpheus: { name: "morpheus", prompt: "test", mode: "primary" },
-    oracle: { name: "oracle", prompt: "Oracle is the planner agent.", mode: "subagent" },
   })
 
   spyOn(commandLoader, "loadUserCommands" as any).mockResolvedValue({})
@@ -123,7 +123,7 @@ describe("Mouse model inheritance", () => {
 
     // #then
     const agentConfig = config.agent as Record<string, { model?: string }>
-    expect(agentConfig["mouse"]?.model).toBe(
+    expect(agentConfig[getAgentDisplayName("mouse")]?.model).toBe(
       mouse.MOUSE_DEFAULTS.model
     )
   })
@@ -155,7 +155,7 @@ describe("Mouse model inheritance", () => {
 
     // #then
     const agentConfig = config.agent as Record<string, { model?: string }>
-    expect(agentConfig["mouse"]?.model).toBe(
+    expect(agentConfig[getAgentDisplayName("mouse")]?.model).toBe(
       "openai/gpt-5.3-codex"
     )
   })
@@ -196,7 +196,12 @@ describe("Plan agent demote behavior", () => {
 
     // #then
     const keys = Object.keys(config.agent as Record<string, unknown>)
-    const coreAgents = ["morpheus", "keymaker", "oracle", "architect"]
+    const coreAgents = [
+      getAgentDisplayName("morpheus"),
+      getAgentDisplayName("keymaker"),
+      getAgentDisplayName("oracle"),
+      getAgentDisplayName("architect"),
+    ]
     const ordered = keys.filter((key) => coreAgents.includes(key))
     expect(ordered).toEqual(coreAgents)
   })
@@ -236,7 +241,7 @@ describe("Plan agent demote behavior", () => {
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("subagent")
     expect(agents.plan.prompt).toBeUndefined()
-    expect(agents.oracle?.prompt).toBeDefined()
+    expect(agents[getAgentDisplayName("oracle")]?.prompt).toBeDefined()
   })
 
   test("plan agent remains unchanged when planner is disabled", async () => {
@@ -270,9 +275,7 @@ describe("Plan agent demote behavior", () => {
 
     // #then - plan is not touched, oracle is not created
     const agents = config.agent as Record<string, { mode?: string; name?: string; prompt?: string }>
-    expect(agents.oracle).toBeDefined()
-    expect(agents.oracle.mode).toBe("subagent")
-    expect(agents.oracle.prompt).toBe("Oracle is the planner agent.")
+    expect(agents[getAgentDisplayName("oracle")]).toBeUndefined()
     expect(agents.plan).toBeDefined()
     expect(agents.plan.mode).toBe("primary")
     expect(agents.plan.prompt).toBe("original plan prompt")
@@ -303,8 +306,9 @@ describe("Plan agent demote behavior", () => {
 
     // then
     const agents = config.agent as Record<string, { mode?: string }>
-    expect(agents.oracle).toBeDefined()
-    expect(agents.oracle.mode).toBe("subagent")
+    const oracleKey = getAgentDisplayName("oracle")
+    expect(agents[oracleKey]).toBeDefined()
+    expect(agents[oracleKey].mode).toBe("all")
   })
 })
 
@@ -338,8 +342,58 @@ describe("Agent permission defaults", () => {
 
     // #then
     const agentConfig = config.agent as Record<string, { permission?: Record<string, string> }>
-    expect(agentConfig.keymaker).toBeDefined()
-    expect(agentConfig.keymaker.permission?.task).toBe("allow")
+    const keymakerKey = getAgentDisplayName("keymaker")
+    expect(agentConfig[keymakerKey]).toBeDefined()
+    expect(agentConfig[keymakerKey].permission?.task).toBe("allow")
+  })
+})
+
+describe("default_agent behavior with Morpheus orchestration", () => {
+  test("preserves existing default_agent when already set", async () => {
+    // #given
+    const pluginConfig: MatrixxConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      default_agent: "keymaker",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    expect(config.default_agent).toBe("keymaker")
+  })
+
+  test("sets default_agent to morpheus when missing", async () => {
+    // #given
+    const pluginConfig: MatrixxConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    expect(config.default_agent).toBe(getAgentDisplayName("morpheus"))
   })
 })
 
@@ -481,8 +535,9 @@ describe("Oracle direct override priority over category", () => {
 
     // then - direct override's reasoningEffort wins
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
-    expect(agents.oracle).toBeDefined()
-    // expect(agents.oracle.reasoningEffort).toBe("low") // Merging of reasoningEffort seems broken
+    const pKey = getAgentDisplayName("oracle")
+    expect(agents[pKey]).toBeDefined()
+    expect(agents[pKey].reasoningEffort).toBe("low")
   })
 
   test("category reasoningEffort applied when no direct override", async () => {
@@ -521,8 +576,9 @@ describe("Oracle direct override priority over category", () => {
 
     // then - category's reasoningEffort is applied
     const agents = config.agent as Record<string, { reasoningEffort?: string }>
-    expect(agents.oracle).toBeDefined()
-    // expect(agents.oracle.reasoningEffort).toBe("high") // Merging of reasoningEffort seems broken
+    const pKey = getAgentDisplayName("oracle")
+    expect(agents[pKey]).toBeDefined()
+    expect(agents[pKey].reasoningEffort).toBe("high")
   })
 
   test("direct temperature takes priority over category temperature", async () => {
@@ -562,8 +618,9 @@ describe("Oracle direct override priority over category", () => {
 
     // then - direct temperature wins over category
     const agents = config.agent as Record<string, { temperature?: number }>
-    expect(agents.oracle).toBeDefined()
-    // expect(agents.oracle.temperature).toBe(0.1) // Merging of temperature seems broken
+    const pKey = getAgentDisplayName("oracle")
+    expect(agents[pKey]).toBeDefined()
+    expect(agents[pKey].temperature).toBe(0.1)
   })
 
   test("oracle prompt_append is appended to base prompt", async () => {
@@ -597,10 +654,11 @@ describe("Oracle direct override priority over category", () => {
 
     // #then - prompt_append is appended to base prompt, not overwriting it
     const agents = config.agent as Record<string, { prompt?: string }>
-    expect(agents.oracle).toBeDefined()
-    expect(agents.oracle.prompt).toContain("Oracle")
-    // expect(agents.oracle.prompt).toContain(customInstructions) // Merging of prompt_append seems broken
-    // expect(agents.oracle.prompt!.endsWith(customInstructions)).toBe(true) // Merging of prompt_append seems broken
+    const pKey = getAgentDisplayName("oracle")
+    expect(agents[pKey]).toBeDefined()
+    expect(agents[pKey].prompt).toContain("Oracle")
+    expect(agents[pKey].prompt).toContain(customInstructions)
+    expect(agents[pKey].prompt!.endsWith(customInstructions)).toBe(true)
   })
 })
 
@@ -949,7 +1007,13 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 })
 
 describe("per-agent todowrite/todoread deny when task_system enabled", () => {
-  const PRIMARY_AGENTS = ["morpheus", "keymaker", "architect", "oracle", "mouse"]
+  const PRIMARY_AGENTS = [
+    getAgentDisplayName("morpheus"),
+    getAgentDisplayName("keymaker"),
+    getAgentDisplayName("architect"),
+    getAgentDisplayName("oracle"),
+    getAgentDisplayName("mouse"),
+  ]
 
   test("denies todowrite and todoread for primary agents when task_system is enabled", async () => {
     //#given
@@ -1022,10 +1086,10 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 
     //#then
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    expect(agentResult.matrix?.permission?.todowrite).toBeUndefined()
-    expect(agentResult.matrix?.permission?.todoread).toBeUndefined()
-    expect(agentResult.keymaker?.permission?.todowrite).toBeUndefined()
-    expect(agentResult.keymaker?.permission?.todoread).toBeUndefined()
+    expect(agentResult[getAgentDisplayName("morpheus")]?.permission?.todowrite).toBeUndefined()
+    expect(agentResult[getAgentDisplayName("morpheus")]?.permission?.todoread).toBeUndefined()
+    expect(agentResult[getAgentDisplayName("keymaker")]?.permission?.todowrite).toBeUndefined()
+    expect(agentResult[getAgentDisplayName("keymaker")]?.permission?.todoread).toBeUndefined()
   })
 
   test("does not deny todowrite/todoread when task_system is undefined", async () => {
@@ -1056,7 +1120,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 
     //#then
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    expect(agentResult.matrix?.permission?.todowrite).toBeUndefined()
-    expect(agentResult.matrix?.permission?.todoread).toBeUndefined()
+    expect(agentResult[getAgentDisplayName("morpheus")]?.permission?.todowrite).toBeUndefined()
+    expect(agentResult[getAgentDisplayName("morpheus")]?.permission?.todoread).toBeUndefined()
   })
 })

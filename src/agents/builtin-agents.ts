@@ -14,7 +14,11 @@ import { createSmithAgent, smithPromptMetadata } from "./smith"
 import { createCipherAgent, CIPHER_PROMPT_METADATA } from "./cipher"
 import { createKeymakerAgent } from "./keymaker"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
-import { fetchAvailableModels, readConnectedProvidersCache } from "../shared"
+import {
+  fetchAvailableModels,
+  readConnectedProvidersCache,
+  readProviderModelsCache,
+} from "../shared"
 import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { mergeCategories } from "../shared/merge-categories"
 import { buildAvailableSkills } from "./builtin-agents/available-skills"
@@ -69,14 +73,20 @@ export async function createBuiltinAgents(
   useTaskSystem = false
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
+  const providerModelsConnected = connectedProviders
+    ? (readProviderModelsCache()?.connected ?? [])
+    : []
+  const mergedConnectedProviders = Array.from(
+    new Set([...(connectedProviders ?? []), ...providerModelsConnected])
+  )
   // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
   // This function is called from config handler, and calling client API causes deadlock.
   // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1301
   const availableModels = await fetchAvailableModels(undefined, {
-    connectedProviders: connectedProviders ?? undefined,
+    connectedProviders: mergedConnectedProviders.length > 0 ? mergedConnectedProviders : undefined,
   })
   const isFirstRunNoCache =
-    availableModels.size === 0 && (!connectedProviders || connectedProviders.length === 0)
+    availableModels.size === 0 && mergedConnectedProviders.length === 0
 
   const result: Record<string, AgentConfig> = {}
 
@@ -172,6 +182,7 @@ export async function createBuiltinAgents(
     availableAgents,
     availableSkills,
     mergedCategories,
+    directory,
     userCategories: categories,
   })
   if (atlasConfig) {

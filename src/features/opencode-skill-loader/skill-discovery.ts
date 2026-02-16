@@ -20,7 +20,7 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 	}
 
 	const [discoveredSkills, builtinSkillDefinitions] = await Promise.all([
-		discoverSkills({ includeClaudeCodePaths: true }),
+		discoverSkills({ includeClaudeCodePaths: true, directory: options?.directory }),
 		Promise.resolve(
 			createBuiltinSkills({
 				browserProvider: options?.browserProvider,

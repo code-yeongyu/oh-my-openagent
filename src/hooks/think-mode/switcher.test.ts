@@ -266,6 +266,24 @@ describe("think-mode switcher", () => {
       expect((config?.thinking as Record<string, unknown>)?.type).toBe("enabled")
     })
 
+    it("should work for direct google-vertex-anthropic provider", () => {
+      //#given direct google-vertex-anthropic provider
+      const config = getThinkingConfig(
+        "google-vertex-anthropic",
+        "claude-opus-4-6"
+      )
+
+      //#when thinking config is resolved
+
+      //#then it should return anthropic-style thinking config
+      expect(config).not.toBeNull()
+      expect(config?.thinking).toBeDefined()
+      expect((config?.thinking as Record<string, unknown>)?.type).toBe("enabled")
+      expect((config?.thinking as Record<string, unknown>)?.budgetTokens).toBe(
+        64000
+      )
+    })
+
     it("should still work for direct google provider", () => {
       // given direct google provider
       const config = getThinkingConfig("google", "gemini-3-pro")
@@ -310,6 +328,17 @@ describe("think-mode switcher", () => {
   describe("THINKING_CONFIGS structure", () => {
     it("should have correct structure for anthropic", () => {
       const config = THINKING_CONFIGS.anthropic
+      expect(config.thinking).toBeDefined()
+      expect(config.maxTokens).toBe(128000)
+    })
+
+    it("should have correct structure for google-vertex-anthropic", () => {
+      //#given google-vertex-anthropic config entry
+      const config = THINKING_CONFIGS["google-vertex-anthropic"]
+
+      //#when structure is validated
+
+      //#then it should match anthropic style structure
       expect(config.thinking).toBeDefined()
       expect(config.maxTokens).toBe(128000)
     })

@@ -1,5 +1,5 @@
 import type { OpencodeClient } from "../constants"
-import { log } from "../../../shared"
+import { log, resolveSessionDirectory } from "../../../shared"
 
 export async function resolveParentDirectory(options: {
   client: OpencodeClient
@@ -15,7 +15,10 @@ export async function resolveParentDirectory(options: {
       return null
     })
 
-  const parentDirectory = parentSession?.data?.directory ?? defaultDirectory
+  const parentDirectory = resolveSessionDirectory({
+    parentDirectory: parentSession?.data?.directory,
+    fallbackDirectory: defaultDirectory,
+  })
   log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
   return parentDirectory
 }

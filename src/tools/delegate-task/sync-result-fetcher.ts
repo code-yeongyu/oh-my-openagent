@@ -1,5 +1,6 @@
 import type { OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
+import { normalizeSDKResponse } from "../../shared"
 
 export async function fetchSyncResult(
   client: OpencodeClient,
@@ -14,7 +15,9 @@ export async function fetchSyncResult(
     return { ok: false, error: `Error fetching result: ${(messagesResult as { error: unknown }).error}\n\nSession ID: ${sessionID}` }
   }
 
-  const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as SessionMessage[]
+  const messages = normalizeSDKResponse(messagesResult, [] as SessionMessage[], {
+    preferResponseOnMissingData: true,
+  })
 
   const messagesAfterAnchor = anchorMessageCount !== undefined ? messages.slice(anchorMessageCount) : messages
 

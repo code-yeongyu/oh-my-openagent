@@ -90,6 +90,17 @@ describe("getAgentDisplayName", () => {
     expect(result).toBe("Smith (Plan Reviewer)")
   })
 
+  it("returns display name for keymaker", () => {
+    // given config key "keymaker"
+    const configKey = "keymaker"
+
+    // when getAgentDisplayName called
+    const result = getAgentDisplayName(configKey)
+
+    // then returns "Keymaker (Deep Agent)"
+    expect(result).toBe("Keymaker (Deep Agent)")
+  })
+
   it("returns display name for merovingian", () => {
     // given config key "merovingian"
     const configKey = "merovingian"
@@ -97,8 +108,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "merovingian"
-    expect(result).toBe("merovingian")
+    // then returns "Merovingian (Consultation Expert)"
+    expect(result).toBe("Merovingian (Consultation Expert)")
   })
 
   it("returns display name for operator", () => {
@@ -140,16 +151,17 @@ describe("AGENT_DISPLAY_NAMES", () => {
     // given expected mappings
     const expectedMappings = {
       morpheus: "Morpheus (Ultraworker)",
+      keymaker: "Keymaker (Deep Agent)",
       architect: "Architect (Plan Execution Orchestrator)",
-      cipher: "Cipher (DSL Expert)",
       oracle: "Oracle (Plan Builder)",
       mouse: "Mouse",
       seraph: "Seraph (Plan Consultant)",
       smith: "Smith (Plan Reviewer)",
-      merovingian: "merovingian",
+      merovingian: "Merovingian (Consultation Expert)",
       operator: "operator",
       trinity: "trinity",
       construct: "construct",
+      cipher: "Cipher (DSL Expert)",
     }
 
     // when checking the constant

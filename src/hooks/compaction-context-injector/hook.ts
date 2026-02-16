@@ -1,3 +1,4 @@
+import type { BackgroundManager } from "../../features/background-agent"
 import {
   createSystemDirective,
   SystemDirectiveTypes,
@@ -47,9 +48,25 @@ When summarizing this session, you MUST include the following sections in your s
 
 This section is CRITICAL for reviewer agents (momus, oracle) to maintain continuity.
 
+## 8. Delegated Agent Sessions
+- List ALL background agent tasks spawned during this session
+- For each: agent name, category, status, description, and **session_id**
+- **RESUME, DON'T RESTART.** Each listed session retains full context. After compaction, use \`session_id\` to continue existing agent sessions instead of spawning new ones. This saves tokens, preserves learned context, and prevents duplicate work.
+
 This context is critical for maintaining continuity after compaction.
 `
 
-export function createCompactionContextInjector() {
-  return (): string => COMPACTION_CONTEXT_PROMPT
+export function createCompactionContextInjector(backgroundManager?: BackgroundManager) {
+  return (sessionID?: string): string => {
+    let prompt = COMPACTION_CONTEXT_PROMPT
+
+    if (backgroundManager && sessionID) {
+      const history = backgroundManager.taskHistory.formatForCompaction(sessionID)
+      if (history) {
+        prompt += `\n### Active/Recent Delegated Sessions\n${history}\n`
+      }
+    }
+
+    return prompt
+  }
 }

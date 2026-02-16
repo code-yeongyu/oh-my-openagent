@@ -3,6 +3,7 @@ import { join } from "path"
 import { log } from "./logger"
 import { getOpenCodeCacheDir } from "./data-path"
 import * as connectedProvidersCache from "./connected-providers-cache"
+import { normalizeSDKResponse } from "./normalize-sdk-response"
 
 /**
  * Fuzzy match a target model name against available models
@@ -27,8 +28,7 @@ import * as connectedProvidersCache from "./connected-providers-cache"
 function normalizeModelName(name: string): string {
 	return name
 		.toLowerCase()
-		.replace(/claude-(opus|sonnet|haiku)-4-5/g, "claude-$1-4.5")
-		.replace(/claude-(opus|sonnet|haiku)-4\.5/g, "claude-$1-4.5")
+		.replace(/claude-(opus|sonnet|haiku)-(\d+)[.-](\d+)/g, "claude-$1-$2.$3")
 }
 
 export function fuzzyMatchModel(
@@ -159,7 +159,7 @@ export async function fetchAvailableModels(
 			const modelSet = new Set<string>()
 			try {
 				const modelsResult = await client.model.list()
-				const models = modelsResult.data ?? []
+				const models = normalizeSDKResponse(modelsResult, [] as Array<{ provider?: string; id?: string }>)
 				for (const model of models) {
 					if (model?.provider && model?.id) {
 						modelSet.add(`${model.provider}/${model.id}`)
@@ -261,7 +261,7 @@ export async function fetchAvailableModels(
 	if (client?.model?.list) {
 		try {
 			const modelsResult = await client.model.list()
-			const models = modelsResult.data ?? []
+			const models = normalizeSDKResponse(modelsResult, [] as Array<{ provider?: string; id?: string }>)
 
 			for (const model of models) {
 				if (!model?.provider || !model?.id) continue

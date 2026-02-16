@@ -5,6 +5,7 @@ const mockFindPluginEntry = mock(() => null as any)
 const mockGetCachedVersion = mock(() => null as string | null)
 const mockGetLatestVersion = mock(async () => null as string | null)
 const mockUpdatePinnedVersion = mock(() => false)
+const mockRevertPinnedVersion = mock(() => false)
 const mockExtractChannel = mock(() => "latest")
 const mockInvalidatePackage = mock(() => {})
 const mockRunBunInstall = mock(async () => true)
@@ -16,6 +17,7 @@ mock.module("../checker", () => ({
   getCachedVersion: mockGetCachedVersion,
   getLatestVersion: mockGetLatestVersion,
   updatePinnedVersion: mockUpdatePinnedVersion,
+  revertPinnedVersion: mockRevertPinnedVersion,
 }))
 
 mock.module("../version-channel", () => ({
@@ -51,6 +53,7 @@ describe("runBackgroundUpdateCheck", () => {
     mockGetCachedVersion.mockReset()
     mockGetLatestVersion.mockReset()
     mockUpdatePinnedVersion.mockReset()
+    mockRevertPinnedVersion.mockReset()
     mockExtractChannel.mockReset()
     mockInvalidatePackage.mockReset()
     mockRunBunInstall.mockReset()

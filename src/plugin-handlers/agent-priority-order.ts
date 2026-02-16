@@ -1,4 +1,11 @@
-const CORE_AGENT_ORDER = ["morpheus", "keymaker", "oracle", "architect"] as const;
+import { getAgentDisplayName } from "../shared/agent-display-names";
+
+const CORE_AGENT_ORDER = [
+  getAgentDisplayName("morpheus"),
+  getAgentDisplayName("keymaker"),
+  getAgentDisplayName("oracle"),
+  getAgentDisplayName("architect"),
+] as const;
 
 export function reorderAgentsByPriority(
   agents: Record<string, unknown>,
