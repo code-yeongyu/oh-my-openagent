@@ -22,8 +22,9 @@ export function createManagers(args: {
   pluginConfig: OhMyOpenCodeConfig
   tmuxConfig: TmuxConfig
   modelCacheState: ModelCacheState
+  backgroundNotificationHookEnabled: boolean
 }): Managers {
-  const { ctx, pluginConfig, tmuxConfig, modelCacheState } = args
+  const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
 
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig)
 
@@ -57,6 +58,7 @@ export function createManagers(args: {
           log("[index] tmux cleanup error during shutdown:", error)
         })
       },
+      enableParentSessionNotifications: backgroundNotificationHookEnabled,
     },
   )
 
