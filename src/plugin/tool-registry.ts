@@ -25,6 +25,7 @@ import {
   createTaskGetTool,
   createTaskList,
   createTaskUpdateTool,
+  createHashlineEditTool,
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
@@ -48,11 +49,7 @@ export function createToolRegistry(args: {
   const { ctx, pluginConfig, managers, skillContext, availableCategories } = args
 
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
-  const callOmoAgent = createCallOmoAgent(
-    ctx,
-    managers.backgroundManager,
-    pluginConfig.disabled_agents ?? [],
-  )
+  const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
@@ -121,6 +118,11 @@ export function createToolRegistry(args: {
       }
     : {}
 
+  const hashlineEnabled = pluginConfig.experimental?.hashline_edit ?? false
+  const hashlineToolsRecord: Record<string, ToolDefinition> = hashlineEnabled
+    ? { edit: createHashlineEditTool() }
+    : {}
+
   const allTools: Record<string, ToolDefinition> = {
     ...builtinTools,
     ...createGrepTools(ctx),
@@ -136,6 +138,7 @@ export function createToolRegistry(args: {
     slashcommand: slashcommandTool,
     interactive_bash,
     ...taskToolsRecord,
+    ...hashlineToolsRecord,
   }
 
   const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)

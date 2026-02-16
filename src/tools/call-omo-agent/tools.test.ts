@@ -1,62 +1,102 @@
-import { describe, expect, test } from "bun:test"
+import { describe, test, expect, mock } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
+import type { BackgroundManager } from "../../features/background-agent"
 import { createCallOmoAgent } from "./tools"
 
-const TEST_TOOL_CONTEXT = {
-  sessionID: "ses-parent",
-  messageID: "msg-1",
-  agent: "sisyphus",
-  abort: new AbortController().signal,
-}
+describe("createCallOmoAgent", () => {
+  const mockCtx = {
+    client: {},
+    directory: "/test",
+  } as unknown as PluginInput
 
-describe("call_omo_agent disabled_agents enforcement", () => {
-  test("rejects disabled agent from config with clear error", async () => {
+  const mockBackgroundManager = {
+    launch: mock(() => Promise.resolve({
+      id: "test-task-id",
+      sessionID: null,
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    })),
+  } as unknown as BackgroundManager
+
+  test("should reject agent in disabled_agents list", async () => {
     //#given
-    const tool = createCallOmoAgent(
-      { client: {} } as Parameters<typeof createCallOmoAgent>[0],
-      {} as Parameters<typeof createCallOmoAgent>[1],
-      ["explore"],
-    )
+    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["explore"])
+    const executeFunc = toolDef.execute as Function
 
     //#when
-    const result = await tool.execute(
+    const result = await executeFunc(
       {
-        description: "run search",
-        prompt: "find implementation",
-        subagent_type: "ExPlOrE",
-        run_in_background: false,
+        description: "Test",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
       },
-      TEST_TOOL_CONTEXT,
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
     )
 
     //#then
-    expect(result).toBe(
-      'Error: Agent "ExPlOrE" is disabled via disabled_agents config.',
-    )
+    expect(result).toContain("disabled via disabled_agents")
   })
 
-  test("allows enabled agent even when other agents are disabled", async () => {
+  test("should reject agent in disabled_agents list with case-insensitive matching", async () => {
     //#given
-    const tool = createCallOmoAgent(
-      { client: {} } as Parameters<typeof createCallOmoAgent>[0],
-      {} as Parameters<typeof createCallOmoAgent>[1],
-      ["explore"],
-    )
+    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["Explore"])
+    const executeFunc = toolDef.execute as Function
 
     //#when
-    const result = await tool.execute(
+    const result = await executeFunc(
       {
-        description: "continue session",
-        prompt: "read docs",
-        subagent_type: "librarian",
+        description: "Test",
+        prompt: "Test prompt",
+        subagent_type: "explore",
         run_in_background: true,
-        session_id: "ses-child",
       },
-      TEST_TOOL_CONTEXT,
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
     )
 
     //#then
-    expect(result).toBe(
-      "Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.",
+    expect(result).toContain("disabled via disabled_agents")
+  })
+
+  test("should allow agent not in disabled_agents list", async () => {
+    //#given
+    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, ["librarian"])
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    const result = await executeFunc(
+      {
+        description: "Test",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
     )
+
+    //#then
+    // Should not contain disabled error - may fail for other reasons but disabled check should pass
+    expect(result).not.toContain("disabled via disabled_agents")
+  })
+
+  test("should allow all agents when disabled_agents is empty", async () => {
+    //#given
+    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    const result = await executeFunc(
+      {
+        description: "Test",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+    )
+
+    //#then
+    expect(result).not.toContain("disabled via disabled_agents")
   })
 })

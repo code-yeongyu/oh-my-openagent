@@ -805,6 +805,62 @@ interface CurrentMessage {
 }
 
 describe("BackgroundManager.notifyParentSession - dynamic message lookup", () => {
+  test("should skip compaction agent and use nearest non-compaction message", async () => {
+    //#given
+    let capturedBody: Record<string, unknown> | undefined
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (args: { body: Record<string, unknown> }) => {
+          capturedBody = args.body
+          return {}
+        },
+        abort: async () => ({}),
+        messages: async () => ({
+          data: [
+            {
+              info: {
+                agent: "sisyphus",
+                model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+              },
+            },
+            {
+              info: {
+                agent: "compaction",
+                model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+              },
+            },
+          ],
+        }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-skip-compaction",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task with compaction at tail",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+      parentAgent: "fallback-agent",
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id, "still-running"]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (value: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(capturedBody?.agent).toBe("sisyphus")
+    expect(capturedBody?.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
+
+    manager.shutdown()
+  })
+
   test("should use currentMessage model/agent when available", async () => {
     // given - currentMessage has model and agent
     const task: BackgroundTask = {
@@ -998,6 +1054,52 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
 
     //#then
     expect(promptCalled).toBe(true)
+
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager.notifyParentSession - notifications toggle", () => {
+  test("should skip parent prompt injection when notifications are disabled", async () => {
+    //#given
+    let promptCalled = false
+    const promptMock = async () => {
+      promptCalled = true
+      return {}
+    }
+    const client = {
+      session: {
+        prompt: promptMock,
+        promptAsync: promptMock,
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager(
+      { client, directory: tmpdir() } as unknown as PluginInput,
+      undefined,
+      { enableParentSessionNotifications: false },
+    )
+    const task: BackgroundTask = {
+      id: "task-no-parent-notification",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task notifications disabled",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(promptCalled).toBe(false)
 
     manager.shutdown()
   })
