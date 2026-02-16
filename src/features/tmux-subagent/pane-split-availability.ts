@@ -56,8 +56,8 @@ export function canSplitPane(
 	return pane.height >= MIN_SPLIT_HEIGHT
 }
 
-export function canSplitPaneAnyDirection(pane: TmuxPaneInfo): boolean {
-	return canSplitPaneAnyDirectionWithMinWidth(pane, MIN_PANE_WIDTH)
+export function canSplitPaneAnyDirection(pane: TmuxPaneInfo, minPaneWidth: number = MIN_PANE_WIDTH): boolean {
+	return canSplitPaneAnyDirectionWithMinWidth(pane, minPaneWidth)
 }
 
 export function canSplitPaneAnyDirectionWithMinWidth(

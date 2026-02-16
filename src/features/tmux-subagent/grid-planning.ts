@@ -28,8 +28,12 @@ export function calculateCapacity(
 	windowWidth: number,
 	windowHeight: number,
 	minPaneWidth: number = MIN_PANE_WIDTH,
+	mainPaneWidth?: number,
 ): GridCapacity {
-	const availableWidth = Math.floor(windowWidth * (1 - MAIN_PANE_RATIO))
+	const availableWidth =
+	typeof mainPaneWidth === "number"
+		? Math.max(0, windowWidth - mainPaneWidth - DIVIDER_SIZE)
+		: Math.floor(windowWidth * (1 - MAIN_PANE_RATIO))
 	const cols = Math.min(
 		MAX_GRID_SIZE,
 		Math.max(
@@ -55,8 +59,15 @@ export function computeGridPlan(
 	windowWidth: number,
 	windowHeight: number,
 	paneCount: number,
+	mainPaneWidth?: number,
+	minPaneWidth?: number,
 ): GridPlan {
-	const capacity = calculateCapacity(windowWidth, windowHeight)
+	const capacity = calculateCapacity(
+		windowWidth,
+		windowHeight,
+		minPaneWidth ?? MIN_PANE_WIDTH,
+		mainPaneWidth,
+	)
 	const { cols: maxCols, rows: maxRows } = capacity
 
 	if (maxCols === 0 || maxRows === 0 || paneCount === 0) {
@@ -79,7 +90,10 @@ export function computeGridPlan(
 		}
 	}
 
-	const availableWidth = Math.floor(windowWidth * (1 - MAIN_PANE_RATIO))
+	const availableWidth =
+	typeof mainPaneWidth === "number"
+		? Math.max(0, windowWidth - mainPaneWidth - DIVIDER_SIZE)
+		: Math.floor(windowWidth * (1 - MAIN_PANE_RATIO))
 	const slotWidth = Math.floor(availableWidth / bestCols)
 	const slotHeight = Math.floor(windowHeight / bestRows)
 
