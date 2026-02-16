@@ -62,7 +62,7 @@ function getEditLineNumber(edit: HashlineEdit): number {
     case "insert_after":
       return parseLineRef(edit.line).line
     case "replace":
-      return Number.POSITIVE_INFINITY
+      return Number.NEGATIVE_INFINITY
     default:
       return Number.POSITIVE_INFINITY
   }
