@@ -41,7 +41,7 @@ export function createHashlineEditTool(): ToolDefinition {
 LINE:HASH FORMAT:
 Each line reference must be in "LINE:HASH" format where:
 - LINE: 1-based line number
-- HASH: First 2 characters of SHA-256 hash of line content (computed with computeLineHash)
+- HASH: First 2 characters of xxHash32 hash of line content (computed with computeLineHash)
 - Example: "5:a3|const x = 1" means line 5 with hash "a3"
 
 GETTING HASHES:
