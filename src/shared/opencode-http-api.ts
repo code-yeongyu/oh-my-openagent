@@ -1,11 +1,8 @@
 import { getServerBasicAuthHeader } from "./opencode-server-auth"
 import { log } from "./logger"
+import { isRecord } from "./record-type-guard"
 
 type UnknownRecord = Record<string, unknown>
-
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === "object" && value !== null
-}
 
 function getInternalClient(client: unknown): UnknownRecord | null {
   if (!isRecord(client)) {
