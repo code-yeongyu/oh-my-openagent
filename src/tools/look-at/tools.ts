@@ -16,6 +16,7 @@ import { resolveMultimodalLookerAgentMetadata } from "./multimodal-agent-metadat
 import {
   needsConversion,
   convertImageToJpeg,
+  convertBase64ImageToJpeg,
   cleanupConvertedImage,
 } from "./image-converter"
 
@@ -47,17 +48,36 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
       let mimeType: string
       let filePart: { type: "file"; mime: string; url: string; filename: string }
       let tempFilePath: string | null = null
+      let tempFilesToCleanup: string[] = []
 
       try {
         if (imageData) {
-        mimeType = inferMimeTypeFromBase64(imageData)
-        filePart = {
-          type: "file",
-          mime: mimeType,
-          url: `data:${mimeType};base64,${extractBase64Data(imageData)}`,
-          filename: `clipboard-image.${mimeType.split("/")[1] || "png"}`,
-        }
-      } else if (filePath) {
+          mimeType = inferMimeTypeFromBase64(imageData)
+          
+          let finalBase64Data = extractBase64Data(imageData)
+          let finalMimeType = mimeType
+          
+          if (needsConversion(mimeType)) {
+            log(`[look_at] Detected unsupported Base64 format: ${mimeType}, converting to JPEG...`)
+            try {
+              const { base64, tempFiles } = convertBase64ImageToJpeg(imageData, mimeType)
+              finalBase64Data = base64
+              finalMimeType = "image/jpeg"
+              tempFilesToCleanup = tempFiles
+              log(`[look_at] Base64 conversion successful`)
+            } catch (conversionError) {
+              log(`[look_at] Base64 conversion failed: ${conversionError}`)
+              return `Error: Failed to convert Base64 image format. ${conversionError}`
+            }
+          }
+          
+          filePart = {
+            type: "file",
+            mime: finalMimeType,
+            url: `data:${finalMimeType};base64,${finalBase64Data}`,
+            filename: `clipboard-image.${finalMimeType.split("/")[1] || "png"}`,
+          }
+        } else if (filePath) {
         mimeType = inferMimeTypeFromFilePath(filePath)
         
         let actualFilePath = filePath
@@ -177,6 +197,7 @@ Original error: ${createResult.error}`
         if (tempFilePath) {
           cleanupConvertedImage(tempFilePath)
         }
+        tempFilesToCleanup.forEach(file => cleanupConvertedImage(file))
       }
     },
   })
