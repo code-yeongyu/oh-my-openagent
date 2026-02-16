@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
+import { normalizeSDKResponse } from "../../shared"
 import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
@@ -63,7 +64,7 @@ export async function injectContinuation(args: {
   let todos: Todo[] = []
   try {
     const response = await ctx.client.session.todo({ path: { id: sessionID } })
-    todos = (response.data ?? response) as Todo[]
+    todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
   } catch (error) {
     log(`[${HOOK_NAME}] Failed to fetch todos`, { sessionID, error: String(error) })
     return

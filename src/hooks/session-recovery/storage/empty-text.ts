@@ -6,6 +6,7 @@ import type { StoredPart, StoredTextPart, MessageData } from "../types"
 import { readMessages } from "./messages-reader"
 import { readParts } from "./parts-reader"
 import { log, isSqliteBackend, patchPart } from "../../../shared"
+import { normalizeSDKResponse } from "../../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -51,7 +52,7 @@ export async function replaceEmptyTextPartsAsync(
 ): Promise<boolean> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as MessageData[], { preferResponseOnMissingData: true })
 
     const targetMsg = messages.find((m) => m.info?.id === messageID)
     if (!targetMsg?.parts) return false
@@ -101,7 +102,7 @@ export async function findMessagesWithEmptyTextPartsFromSDK(
 ): Promise<string[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as MessageData[], { preferResponseOnMissingData: true })
     const result: string[] = []
 
     for (const msg of messages) {

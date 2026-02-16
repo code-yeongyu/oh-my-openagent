@@ -4,6 +4,7 @@ import { TRUNCATION_MESSAGE } from "./storage-paths"
 import type { ToolResultInfo } from "./tool-part-types"
 import { patchPart } from "../../shared/opencode-http-api"
 import { log } from "../../shared/logger"
+import { normalizeSDKResponse } from "../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -32,7 +33,7 @@ export async function findToolResultsBySizeFromSDK(
 ): Promise<ToolResultInfo[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
     const results: ToolResultInfo[] = []
 
     for (const msg of messages) {
@@ -98,7 +99,7 @@ export async function countTruncatedResultsFromSDK(
 ): Promise<number> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
     let count = 0
 
     for (const msg of messages) {

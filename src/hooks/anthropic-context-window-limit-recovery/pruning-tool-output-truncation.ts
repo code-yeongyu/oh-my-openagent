@@ -7,6 +7,7 @@ import { truncateToolResultAsync } from "./tool-result-storage-sdk"
 import { log } from "../../shared/logger"
 import { getMessageDir } from "../../shared/opencode-message-dir"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
+import { normalizeSDKResponse } from "../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -108,7 +109,7 @@ async function truncateToolOutputsByCallIdFromSDK(
 ): Promise<{ truncatedCount: number }> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as SDKMessage[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as SDKMessage[], { preferResponseOnMissingData: true })
     let truncatedCount = 0
 
     for (const msg of messages) {

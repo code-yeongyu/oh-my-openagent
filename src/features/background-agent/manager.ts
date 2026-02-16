@@ -6,7 +6,7 @@ import type {
   ResumeInput,
 } from "./types"
 import { TaskHistory } from "./task-history"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, normalizeSDKResponse, promptWithModelSuggestionRetry } from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
@@ -651,7 +651,7 @@ export class BackgroundManager {
       const response = await this.client.session.todo({
         path: { id: sessionID },
       })
-      const todos = (response.data ?? response) as Todo[]
+      const todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
       if (!todos || todos.length === 0) return false
 
       const incomplete = todos.filter(
@@ -875,7 +875,7 @@ export class BackgroundManager {
         path: { id: sessionID },
       })
 
-      const messages = ((response.data ?? response) as unknown as Array<{ info?: { role?: string } }>) ?? []
+      const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
       
       // Check for at least one assistant or tool message
       const hasAssistantOrToolMessage = messages.some(
@@ -1244,9 +1244,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     try {
       const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
-      const messages = (messagesResp.data ?? []) as Array<{
+      const messages = normalizeSDKResponse(messagesResp, [] as Array<{
         info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
-      }>
+      }>)
       for (let i = messages.length - 1; i >= 0; i--) {
         const info = messages[i].info
         if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
@@ -1535,7 +1535,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.pruneStaleTasksAndNotifications()
 
     const statusResult = await this.client.session.status()
-    const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+    const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
 
     await this.checkAndInterruptStaleTasks(allStatuses)
 

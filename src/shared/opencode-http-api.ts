@@ -81,7 +81,7 @@ export async function patchPart(
         "Authorization": auth,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(10_000),
     })
 
     if (!response.ok) {
@@ -123,7 +123,7 @@ export async function deletePart(
       headers: {
         "Authorization": auth,
       },
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(10_000),
     })
 
     if (!response.ok) {

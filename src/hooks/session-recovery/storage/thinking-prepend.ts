@@ -6,6 +6,7 @@ import type { MessageData } from "../types"
 import { readMessages } from "./messages-reader"
 import { readParts } from "./parts-reader"
 import { log, isSqliteBackend, patchPart } from "../../../shared"
+import { normalizeSDKResponse } from "../../../shared"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -74,7 +75,7 @@ async function findLastThinkingContentFromSDK(
 ): Promise<string> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as MessageData[], { preferResponseOnMissingData: true })
 
     const currentIndex = messages.findIndex((m) => m.info?.id === beforeMessageID)
     if (currentIndex === -1) return ""
