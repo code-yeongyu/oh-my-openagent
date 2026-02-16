@@ -10,6 +10,7 @@ import { findNearestMessageWithFields } from "../../features/hook-message-inject
 import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { normalizeSDKResponse } from "../../shared"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
@@ -56,7 +57,7 @@ export async function executeSyncContinuation(
   try {
     try {
       const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
-      const messages = (messagesResp.data ?? []) as SessionMessage[]
+      const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
       anchorMessageCount = messages.length
       for (let i = messages.length - 1; i >= 0; i--) {
         const info = messages[i].info

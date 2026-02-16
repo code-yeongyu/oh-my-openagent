@@ -4,6 +4,7 @@ import { isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { parseModelString } from "./model-string-parser"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { normalizeSDKResponse } from "../../shared"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 
@@ -47,7 +48,9 @@ Create the work plan directly - that's your job as the planning agent.`,
   try {
     const agentsResult = await client.app.agents()
     type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all"; model?: { providerID: string; modelID: string } }
-    const agents = (agentsResult as { data?: AgentInfo[] }).data ?? agentsResult as unknown as AgentInfo[]
+    const agents = normalizeSDKResponse(agentsResult, [] as AgentInfo[], {
+      preferResponseOnMissingData: true,
+    })
 
     const callableAgents = agents.filter((a) => a.mode !== "primary")
 

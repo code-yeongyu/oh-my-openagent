@@ -2,6 +2,7 @@ import type { createOpencodeClient } from "@opencode-ai/sdk"
 import type { MessageData } from "./types"
 import { extractMessageIndex } from "./detect-error-type"
 import { META_TYPES, THINKING_TYPES } from "./constants"
+import { normalizeSDKResponse } from "../../shared"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -136,7 +137,7 @@ function sdkMessageHasContent(message: MessageData): boolean {
 async function readMessagesFromSDK(client: Client, sessionID: string): Promise<MessageData[]> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    return ((response.data ?? response) as unknown as MessageData[]) ?? []
+    return normalizeSDKResponse(response, [] as MessageData[], { preferResponseOnMissingData: true })
   } catch {
     return []
   }

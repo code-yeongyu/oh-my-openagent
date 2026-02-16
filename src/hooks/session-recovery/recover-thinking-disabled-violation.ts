@@ -5,6 +5,7 @@ import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { stripThinkingPartsAsync } from "./storage/thinking-strip"
 import { THINKING_TYPES } from "./constants"
 import { log } from "../../shared/logger"
+import { normalizeSDKResponse } from "../../shared"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -38,7 +39,7 @@ async function recoverThinkingDisabledViolationFromSDK(
 ): Promise<boolean> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
-    const messages = ((response.data ?? response) as unknown as MessageData[]) ?? []
+    const messages = normalizeSDKResponse(response, [] as MessageData[], { preferResponseOnMissingData: true })
 
     const messageIDsWithThinking: string[] = []
     for (const msg of messages) {
