@@ -1,7 +1,6 @@
 import type { InteractiveBashSessionState } from "./types";
-import { loadInteractiveBashSessionState, saveInteractiveBashSessionState } from "./storage";
+import { loadInteractiveBashSessionState } from "./storage";
 import { OMO_SESSION_PREFIX } from "./constants";
-import { subagentSessions } from "../../features/claude-code-session-state";
 
 export function getOrCreateState(sessionID: string, sessionStates: Map<string, InteractiveBashSessionState>): InteractiveBashSessionState {
   if (!sessionStates.has(sessionID)) {
@@ -31,10 +30,5 @@ export async function killAllTrackedSessions(
       });
       await proc.exited;
     } catch {}
-  }
-
-  for (const sessionId of subagentSessions) {
-    // Note: ctx is not available here, so we can't call ctx.client.session.abort
-    // This will need to be handled in the hook where ctx is available
   }
 }
