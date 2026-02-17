@@ -8,12 +8,18 @@ export function inferMimeTypeFromBase64(base64Data: string): string {
 
   try {
     const cleanData = base64Data.replace(/^data:[^;]+;base64,/, "")
-    const header = atob(cleanData.slice(0, 16))
+    const header = Buffer.from(cleanData.slice(0, 256), "base64").toString("binary")
 
     if (header.startsWith("\x89PNG")) return "image/png"
     if (header.startsWith("\xFF\xD8\xFF")) return "image/jpeg"
     if (header.startsWith("GIF8")) return "image/gif"
     if (header.startsWith("RIFF") && header.includes("WEBP")) return "image/webp"
+    if (header.includes("ftypheic") || header.includes("ftypheix") || header.includes("ftyphevc") || header.includes("ftyphevx")) {
+      return "image/heic"
+    }
+    if (header.includes("ftypheif") || header.includes("ftypmif1") || header.includes("ftypmsf1")) {
+      return "image/heif"
+    }
     if (header.startsWith("%PDF")) return "application/pdf"
   } catch {
     // invalid base64 - fall through
