@@ -112,15 +112,13 @@ export async function applyAgentConfig(params: {
   const shouldDemotePlan = plannerEnabled && replacePlan;
   const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
 
-  if (configuredDefaultAgent) {
-    (params.config as { default_agent?: string }).default_agent =
-      getAgentDisplayName(configuredDefaultAgent);
-  }
-
   const configAgent = params.config.agent as AgentConfigRecord | undefined;
 
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
-    if (!configuredDefaultAgent) {
+    if (configuredDefaultAgent) {
+      (params.config as { default_agent?: string }).default_agent =
+        getAgentDisplayName(configuredDefaultAgent);
+    } else {
       (params.config as { default_agent?: string }).default_agent =
         getAgentDisplayName("sisyphus");
     }
