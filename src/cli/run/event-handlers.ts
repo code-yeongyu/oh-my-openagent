@@ -13,6 +13,8 @@ import type {
 } from "./types"
 import type { EventState } from "./event-state"
 import { serializeError } from "./event-formatting"
+import { formatToolInputPreview } from "./tool-input-preview"
+import { displayChars } from "./display-chars"
 
 function getSessionId(props?: { sessionID?: string; sessionId?: string }): string | undefined {
   return props?.sessionID ?? props?.sessionId
@@ -74,6 +76,9 @@ export function handleMessagePartUpdated(ctx: RunContext, payload: EventPayload,
   const infoSid = getInfoSessionId(props)
   if ((partSid ?? infoSid) !== ctx.sessionID) return
 
+  const role = props?.info?.role ?? state.currentMessageRole
+  if (role === "user") return
+
   const part = props?.part
   if (!part) return
 
@@ -101,19 +106,9 @@ function handleToolPart(
 
   if (status === "running") {
     state.currentTool = toolName
-    let inputPreview = ""
-    const input = part.state?.input
-    if (input) {
-      if (input.command) {
-        inputPreview = ` ${pc.dim(String(input.command).slice(0, 60))}`
-      } else if (input.pattern) {
-        inputPreview = ` ${pc.dim(String(input.pattern).slice(0, 40))}`
-      } else if (input.filePath) {
-        inputPreview = ` ${pc.dim(String(input.filePath))}`
-      } else if (input.query) {
-        inputPreview = ` ${pc.dim(String(input.query).slice(0, 40))}`
-      }
-    }
+    const inputPreview = part.state?.input
+      ? formatToolInputPreview(part.state.input)
+      : ""
     state.hasReceivedMeaningfulWork = true
     process.stdout.write(`\n${pc.cyan(">")} ${pc.bold(toolName)}${inputPreview}\n`)
   }
@@ -124,7 +119,7 @@ function handleToolPart(
     const preview = output.length > maxLen ? output.slice(0, maxLen) + "..." : output
     if (preview.trim()) {
       const lines = preview.split("\n").slice(0, 3)
-      process.stdout.write(pc.dim(`   └─ ${lines.join("\n      ")}\n`))
+      process.stdout.write(pc.dim(`${displayChars.treeIndent}${displayChars.treeEnd} ${lines.join(`\n${displayChars.treeJoin}`)}\n`))
     }
     state.currentTool = null
     state.lastPartText = ""
@@ -136,6 +131,8 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
 
   const props = payload.properties as MessageUpdatedProps | undefined
   if (getInfoSessionId(props) !== ctx.sessionID) return
+
+  state.currentMessageRole = props?.info?.role ?? null
   if (props?.info?.role !== "assistant") return
 
   state.hasReceivedMeaningfulWork = true
@@ -167,20 +164,9 @@ export function handleToolExecute(ctx: RunContext, payload: EventPayload, state:
 
   const toolName = props?.name || "unknown"
   state.currentTool = toolName
-
-  let inputPreview = ""
-  if (props?.input) {
-    const input = props.input
-    if (input.command) {
-      inputPreview = ` ${pc.dim(String(input.command).slice(0, 60))}`
-    } else if (input.pattern) {
-      inputPreview = ` ${pc.dim(String(input.pattern).slice(0, 40))}`
-    } else if (input.filePath) {
-      inputPreview = ` ${pc.dim(String(input.filePath))}`
-    } else if (input.query) {
-      inputPreview = ` ${pc.dim(String(input.query).slice(0, 40))}`
-    }
-  }
+  const inputPreview = props?.input
+    ? formatToolInputPreview(props.input)
+    : ""
 
   state.hasReceivedMeaningfulWork = true
   process.stdout.write(`\n${pc.cyan(">")} ${pc.bold(toolName)}${inputPreview}\n`)
@@ -198,7 +184,7 @@ export function handleToolResult(ctx: RunContext, payload: EventPayload, state: 
 
   if (preview.trim()) {
     const lines = preview.split("\n").slice(0, 3)
-    process.stdout.write(pc.dim(`   └─ ${lines.join("\n      ")}\n`))
+    process.stdout.write(pc.dim(`${displayChars.treeIndent}${displayChars.treeEnd} ${lines.join(`\n${displayChars.treeJoin}`)}\n`))
   }
 
   state.currentTool = null

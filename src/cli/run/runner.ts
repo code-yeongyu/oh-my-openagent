@@ -22,13 +22,7 @@ export async function waitForEventProcessorShutdown(
     new Promise<boolean>((resolve) => setTimeout(() => resolve(false), timeoutMs)),
   ])
 
-  if (!completed) {
-    console.log(
-      pc.dim(
-        `[run] Event stream did not close within ${timeoutMs}ms after abort; continuing shutdown.`,
-      ),
-    )
-  }
+  void completed
 }
 
 export async function run(options: RunOptions): Promise<number> {

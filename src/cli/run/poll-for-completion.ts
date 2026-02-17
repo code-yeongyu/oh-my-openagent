@@ -5,9 +5,9 @@ import { checkCompletionConditions } from "./completion"
 import { normalizeSDKResponse } from "../../shared"
 
 const DEFAULT_POLL_INTERVAL_MS = 500
-const DEFAULT_REQUIRED_CONSECUTIVE = 3
+const DEFAULT_REQUIRED_CONSECUTIVE = 1
 const ERROR_GRACE_CYCLES = 3
-const MIN_STABILIZATION_MS = 10_000
+const MIN_STABILIZATION_MS = 0
 
 export interface PollOptions {
   pollIntervalMs?: number
@@ -75,6 +75,11 @@ export async function pollForCompletion(
     }
 
     if (!eventState.hasReceivedMeaningfulWork) {
+      if (minStabilizationMs <= 0) {
+        consecutiveCompleteChecks = 0
+        continue
+      }
+
       if (Date.now() - pollStartTimestamp < minStabilizationMs) {
         consecutiveCompleteChecks = 0
         continue

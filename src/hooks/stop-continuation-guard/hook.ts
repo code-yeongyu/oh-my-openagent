@@ -1,5 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
+import {
+  clearContinuationMarker,
+  setContinuationMarkerSource,
+} from "../../features/run-continuation-state"
 import { log } from "../../shared/logger"
 
 const HOOK_NAME = "stop-continuation-guard"
@@ -13,12 +17,13 @@ export interface StopContinuationGuard {
 }
 
 export function createStopContinuationGuardHook(
-  _ctx: PluginInput
+  ctx: PluginInput
 ): StopContinuationGuard {
   const stoppedSessions = new Set<string>()
 
   const stop = (sessionID: string): void => {
     stoppedSessions.add(sessionID)
+    setContinuationMarkerSource(ctx.directory, sessionID, "stop", "stopped", "continuation stopped")
     log(`[${HOOK_NAME}] Continuation stopped for session`, { sessionID })
   }
 
@@ -28,6 +33,7 @@ export function createStopContinuationGuardHook(
 
   const clear = (sessionID: string): void => {
     stoppedSessions.delete(sessionID)
+    setContinuationMarkerSource(ctx.directory, sessionID, "stop", "idle")
     log(`[${HOOK_NAME}] Continuation guard cleared for session`, { sessionID })
   }
 
@@ -42,6 +48,7 @@ export function createStopContinuationGuardHook(
       const sessionInfo = props?.info as { id?: string } | undefined
       if (sessionInfo?.id) {
         clear(sessionInfo.id)
+        clearContinuationMarker(ctx.directory, sessionInfo.id)
         log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID: sessionInfo.id })
       }
     }
