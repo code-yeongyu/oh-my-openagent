@@ -192,6 +192,7 @@ describe("AGENT_DISPLAY_NAMES", () => {
       librarian: "librarian",
       explore: "explore",
       "multimodal-looker": "multimodal-looker",
+      "council-member": "council-member",
     }
 
     // when checking the constant
