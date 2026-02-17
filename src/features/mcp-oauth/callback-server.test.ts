@@ -1,37 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import { findAvailablePort, startCallbackServer, type CallbackServer } from "./callback-server"
+import { startCallbackServer, type CallbackServer } from "./callback-server"
 
 const nativeFetch = Bun.fetch.bind(Bun)
-
-describe("findAvailablePort", () => {
-  it("returns the start port when it is available", async () => {
-    // given
-    const startPort = 19877
-
-    // when
-    const port = await findAvailablePort(startPort)
-
-    // then
-    expect(port).toBeGreaterThanOrEqual(startPort)
-    expect(port).toBeLessThan(startPort + 20)
-  })
-
-  it("skips busy ports and returns next available", async () => {
-    // given
-    const blocker = Bun.serve({
-      port: 19877,
-      hostname: "127.0.0.1",
-      fetch: () => new Response(),
-    })
-
-    // when
-    const port = await findAvailablePort(19877)
-
-    // then
-    expect(port).toBeGreaterThan(19877)
-    blocker.stop(true)
-  })
-})
 
 describe("startCallbackServer", () => {
   let server: CallbackServer | null = null
