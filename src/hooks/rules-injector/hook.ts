@@ -29,8 +29,11 @@ interface EventInput {
 
 const TRACKED_TOOLS = ["read", "write", "edit", "multiedit"];
 
-export function createRulesInjectorHook(ctx: PluginInput) {
-  const truncator = createDynamicTruncator(ctx);
+export function createRulesInjectorHook(
+  ctx: PluginInput,
+  anthropicContext1MEnabled?: boolean,
+) {
+  const truncator = createDynamicTruncator(ctx, anthropicContext1MEnabled);
   const { getSessionCache, clearSessionCache } = createSessionCacheStore();
   const { processFilePathForInjection } = createRuleInjectionProcessor({
     workspaceDirectory: ctx.directory,

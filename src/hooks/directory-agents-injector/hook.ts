@@ -27,9 +27,12 @@ interface EventInput {
   };
 }
 
-export function createDirectoryAgentsInjectorHook(ctx: PluginInput) {
+export function createDirectoryAgentsInjectorHook(
+  ctx: PluginInput,
+  anthropicContext1MEnabled?: boolean,
+) {
   const sessionCaches = new Map<string, Set<string>>();
-  const truncator = createDynamicTruncator(ctx);
+  const truncator = createDynamicTruncator(ctx, anthropicContext1MEnabled);
 
   const toolExecuteAfter = async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
     const toolName = input.tool.toLowerCase();

@@ -27,11 +27,12 @@ const TOOL_SPECIFIC_MAX_TOKENS: Record<string, number> = {
 }
 
 interface ToolOutputTruncatorOptions {
+  anthropicContext1MEnabled?: boolean
   experimental?: ExperimentalConfig
 }
 
 export function createToolOutputTruncatorHook(ctx: PluginInput, options?: ToolOutputTruncatorOptions) {
-  const truncator = createDynamicTruncator(ctx)
+  const truncator = createDynamicTruncator(ctx, options?.anthropicContext1MEnabled)
   const truncateAll = options?.experimental?.truncate_all_tool_outputs ?? false
 
   const toolExecuteAfter = async (

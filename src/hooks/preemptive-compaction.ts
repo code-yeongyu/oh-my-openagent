@@ -2,11 +2,13 @@ import { log } from "../shared/logger"
 
 const DEFAULT_ACTUAL_LIMIT = 200_000
 
-const ANTHROPIC_ACTUAL_LIMIT =
-  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
+function getAnthropicActualLimit(anthropicContext1MEnabled: boolean): number {
+  return anthropicContext1MEnabled ||
+    process.env.ANTHROPIC_1M_CONTEXT === "true" ||
+    process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
     ? 1_000_000
     : DEFAULT_ACTUAL_LIMIT
+}
 
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
 
@@ -43,7 +45,10 @@ type PluginInput = {
   directory: string
 }
 
-export function createPreemptiveCompactionHook(ctx: PluginInput) {
+export function createPreemptiveCompactionHook(
+  ctx: PluginInput,
+  anthropicContext1MEnabled = false,
+) {
   const compactionInProgress = new Set<string>()
   const compactedSessions = new Set<string>()
   const tokenCache = new Map<string, CachedCompactionState>()
@@ -60,7 +65,7 @@ export function createPreemptiveCompactionHook(ctx: PluginInput) {
 
     const actualLimit =
       isAnthropicProvider(cached.providerID)
-        ? ANTHROPIC_ACTUAL_LIMIT
+        ? getAnthropicActualLimit(anthropicContext1MEnabled)
         : DEFAULT_ACTUAL_LIMIT
 
     const lastTokens = cached.tokens
