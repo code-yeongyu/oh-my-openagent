@@ -91,6 +91,17 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
 
       const toolLower = input.tool.toLowerCase()
 
+      const isApplyPatch = toolLower === "apply_patch"
+      let pendingCall: PendingCall | null = null
+      if (!isApplyPatch) {
+        pendingCall = takePendingCall(input.callID) ?? null
+      }
+
+      if (!isApplyPatch && !pendingCall) {
+        debugLog("no pendingCall found for:", input.callID)
+        return
+      }
+
       // Only skip if the output indicates a tool execution failure
       const outputLower = (output.output ?? "").toLowerCase()
       const isToolFailure =
@@ -116,7 +127,7 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
         ),
       })
 
-      if (toolLower === "apply_patch") {
+      if (isApplyPatch) {
         const parsed = ApplyPatchMetadataSchema.safeParse(output.metadata)
         if (!parsed.success) {
           debugLog("apply_patch metadata schema mismatch, skipping")
@@ -158,9 +169,8 @@ export function createCommentCheckerHooks(config?: CommentCheckerConfig) {
         return
       }
 
-      const pendingCall = takePendingCall(input.callID)
       if (!pendingCall) {
-        debugLog("no pendingCall found for:", input.callID)
+        debugLog("no pendingCall available after checks")
         return
       }
 

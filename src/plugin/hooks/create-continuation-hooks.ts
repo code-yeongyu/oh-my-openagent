@@ -9,6 +9,7 @@ import {
   createCompactionContextInjector,
   createCompactionTodoPreserverHook,
   createAtlasHook,
+  createBackgroundToolOutputNotifierHook,
 } from "../../hooks"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { createUnstableAgentBabysitter } from "../unstable-agent-babysitter"
@@ -20,6 +21,7 @@ export type ContinuationHooks = {
   todoContinuationEnforcer: ReturnType<typeof createTodoContinuationEnforcer> | null
   unstableAgentBabysitter: ReturnType<typeof createUnstableAgentBabysitter> | null
   backgroundNotificationHook: ReturnType<typeof createBackgroundNotificationHook> | null
+  backgroundToolOutputNotifier: ReturnType<typeof createBackgroundToolOutputNotifierHook> | null
   atlasHook: ReturnType<typeof createAtlasHook> | null
 }
 
@@ -100,6 +102,13 @@ export function createContinuationHooks(args: {
     ? safeHook("background-notification", () => createBackgroundNotificationHook(backgroundManager))
     : null
 
+  const backgroundToolOutputNotifier =
+    pluginConfig.experimental?.background_notifications_via_tool_output &&
+    isHookEnabled("background-tool-output-notifier")
+      ? safeHook("background-tool-output-notifier", () =>
+          createBackgroundToolOutputNotifierHook(backgroundManager))
+      : null
+
   const atlasHook = isHookEnabled("atlas")
     ? safeHook("atlas", () =>
         createAtlasHook(ctx, {
@@ -118,6 +127,7 @@ export function createContinuationHooks(args: {
     todoContinuationEnforcer,
     unstableAgentBabysitter,
     backgroundNotificationHook,
+    backgroundToolOutputNotifier,
     atlasHook,
   }
 }

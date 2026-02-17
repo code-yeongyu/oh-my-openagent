@@ -1,56 +1,47 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test"
 
-// Mock modules before importing
-const mockFindPluginEntry = mock(() => null as any)
+const mockFindPluginEntry = mock(() => null as unknown)
 const mockGetCachedVersion = mock(() => null as string | null)
 const mockGetLatestVersion = mock(async () => null as string | null)
-const mockUpdatePinnedVersion = mock(() => false)
 const mockExtractChannel = mock(() => "latest")
 const mockInvalidatePackage = mock(() => {})
 const mockRunBunInstall = mock(async () => true)
 const mockShowUpdateAvailableToast = mock(async () => {})
 const mockShowAutoUpdatedToast = mock(async () => {})
 
-mock.module("../checker", () => ({
+const deps = {
   findPluginEntry: mockFindPluginEntry,
   getCachedVersion: mockGetCachedVersion,
   getLatestVersion: mockGetLatestVersion,
-  updatePinnedVersion: mockUpdatePinnedVersion,
-}))
-
-mock.module("../version-channel", () => ({
   extractChannel: mockExtractChannel,
-}))
-
-mock.module("../cache", () => ({
   invalidatePackage: mockInvalidatePackage,
-}))
-
-mock.module("../../../cli/config-manager", () => ({
   runBunInstall: mockRunBunInstall,
-}))
-
-mock.module("./update-toasts", () => ({
   showUpdateAvailableToast: mockShowUpdateAvailableToast,
   showAutoUpdatedToast: mockShowAutoUpdatedToast,
-}))
+}
 
-mock.module("../../../shared/logger", () => ({
-  log: () => {},
-}))
-
-const { runBackgroundUpdateCheck } = await import("./background-update-check")
+async function runWithFreshModule(
+  autoUpdate: boolean,
+  getToastMessage: (isUpdate: boolean, latestVersion?: string) => string,
+): Promise<void> {
+  const modulePath = `./background-update-check?test=${Date.now()}-${Math.random()}`
+  const imported = await import(modulePath)
+  await imported.runBackgroundUpdateCheck(
+    { directory: "/test" } as never,
+    autoUpdate,
+    getToastMessage,
+    deps as never,
+  )
+}
 
 describe("runBackgroundUpdateCheck", () => {
-  const mockCtx = { directory: "/test" } as any
-  const mockGetToastMessage = (isUpdate: boolean, version?: string) =>
+  const getToastMessage = (isUpdate: boolean, version?: string) =>
     isUpdate ? `Update to ${version}` : "Up to date"
 
   beforeEach(() => {
     mockFindPluginEntry.mockReset()
     mockGetCachedVersion.mockReset()
     mockGetLatestVersion.mockReset()
-    mockUpdatePinnedVersion.mockReset()
     mockExtractChannel.mockReset()
     mockInvalidatePackage.mockReset()
     mockRunBunInstall.mockReset()
@@ -61,114 +52,84 @@ describe("runBackgroundUpdateCheck", () => {
     mockRunBunInstall.mockResolvedValue(true)
   })
 
-  describe("#given user has pinned a specific version", () => {
-    beforeEach(() => {
-      mockFindPluginEntry.mockReturnValue({
-        entry: "oh-my-opencode@3.4.0",
-        isPinned: true,
-        pinnedVersion: "3.4.0",
-        configPath: "/test/opencode.json",
-      })
-      mockGetCachedVersion.mockReturnValue("3.4.0")
-      mockGetLatestVersion.mockResolvedValue("3.5.0")
+  it("uses notification-only flow for pinned versions", async () => {
+    mockFindPluginEntry.mockReturnValue({
+      entry: "oh-my-opencode@3.4.0",
+      isPinned: true,
+      pinnedVersion: "3.4.0",
+      configPath: "/test/opencode.json",
     })
+    mockGetCachedVersion.mockReturnValue("3.4.0")
+    mockGetLatestVersion.mockResolvedValue("3.5.0")
 
-    it("#then should NOT call updatePinnedVersion", async () => {
-      await runBackgroundUpdateCheck(mockCtx, true, mockGetToastMessage)
+    await runWithFreshModule(true, getToastMessage)
 
-      expect(mockUpdatePinnedVersion).not.toHaveBeenCalled()
-    })
-
-    it("#then should show update-available toast instead", async () => {
-      await runBackgroundUpdateCheck(mockCtx, true, mockGetToastMessage)
-
-      expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(
-        mockCtx,
-        "3.5.0",
-        mockGetToastMessage
-      )
-    })
-
-    it("#then should NOT run bun install", async () => {
-      await runBackgroundUpdateCheck(mockCtx, true, mockGetToastMessage)
-
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
-    })
-
-    it("#then should NOT invalidate package cache", async () => {
-      await runBackgroundUpdateCheck(mockCtx, true, mockGetToastMessage)
-
-      expect(mockInvalidatePackage).not.toHaveBeenCalled()
-    })
+    expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(
+      { directory: "/test" },
+      "3.5.0",
+      getToastMessage,
+    )
+    expect(mockInvalidatePackage).not.toHaveBeenCalled()
+    expect(mockRunBunInstall).not.toHaveBeenCalled()
   })
 
-  describe("#given user has NOT pinned a version (unpinned)", () => {
-    beforeEach(() => {
-      mockFindPluginEntry.mockReturnValue({
-        entry: "oh-my-opencode",
-        isPinned: false,
-        pinnedVersion: null,
-        configPath: "/test/opencode.json",
-      })
-      mockGetCachedVersion.mockReturnValue("3.4.0")
-      mockGetLatestVersion.mockResolvedValue("3.5.0")
+  it("runs auto-update for unpinned versions", async () => {
+    mockFindPluginEntry.mockReturnValue({
+      entry: "oh-my-opencode",
+      isPinned: false,
+      pinnedVersion: null,
+      configPath: "/test/opencode.json",
     })
+    mockGetCachedVersion.mockReturnValue("3.4.0")
+    mockGetLatestVersion.mockResolvedValue("3.5.0")
+    mockRunBunInstall.mockResolvedValue(true)
 
-    it("#then should proceed with auto-update", async () => {
-      await runBackgroundUpdateCheck(mockCtx, true, mockGetToastMessage)
+    await runWithFreshModule(true, getToastMessage)
 
-      expect(mockInvalidatePackage).toHaveBeenCalled()
-      expect(mockRunBunInstall).toHaveBeenCalled()
-    })
-
-    it("#then should show auto-updated toast on success", async () => {
-      mockRunBunInstall.mockResolvedValue(true)
-
-      await runBackgroundUpdateCheck(mockCtx, true, mockGetToastMessage)
-
-      expect(mockShowAutoUpdatedToast).toHaveBeenCalled()
-    })
+    expect(mockInvalidatePackage).toHaveBeenCalled()
+    expect(mockRunBunInstall).toHaveBeenCalled()
+    expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(
+      { directory: "/test" },
+      "3.4.0",
+      "3.5.0",
+    )
   })
 
-  describe("#given autoUpdate is false", () => {
-    beforeEach(() => {
-      mockFindPluginEntry.mockReturnValue({
-        entry: "oh-my-opencode",
-        isPinned: false,
-        pinnedVersion: null,
-        configPath: "/test/opencode.json",
-      })
-      mockGetCachedVersion.mockReturnValue("3.4.0")
-      mockGetLatestVersion.mockResolvedValue("3.5.0")
+  it("shows update-available only when autoUpdate=false", async () => {
+    mockFindPluginEntry.mockReturnValue({
+      entry: "oh-my-opencode",
+      isPinned: false,
+      pinnedVersion: null,
+      configPath: "/test/opencode.json",
     })
+    mockGetCachedVersion.mockReturnValue("3.4.0")
+    mockGetLatestVersion.mockResolvedValue("3.5.0")
 
-    it("#then should only show notification toast", async () => {
-      await runBackgroundUpdateCheck(mockCtx, false, mockGetToastMessage)
+    await runWithFreshModule(false, getToastMessage)
 
-      expect(mockShowUpdateAvailableToast).toHaveBeenCalled()
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
-      expect(mockUpdatePinnedVersion).not.toHaveBeenCalled()
-    })
+    expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(
+      { directory: "/test" },
+      "3.5.0",
+      getToastMessage,
+    )
+    expect(mockInvalidatePackage).not.toHaveBeenCalled()
+    expect(mockRunBunInstall).not.toHaveBeenCalled()
   })
 
-  describe("#given already on latest version", () => {
-    beforeEach(() => {
-      mockFindPluginEntry.mockReturnValue({
-        entry: "oh-my-opencode@3.5.0",
-        isPinned: true,
-        pinnedVersion: "3.5.0",
-        configPath: "/test/opencode.json",
-      })
-      mockGetCachedVersion.mockReturnValue("3.5.0")
-      mockGetLatestVersion.mockResolvedValue("3.5.0")
+  it("does nothing when already up to date", async () => {
+    mockFindPluginEntry.mockReturnValue({
+      entry: "oh-my-opencode@3.5.0",
+      isPinned: true,
+      pinnedVersion: "3.5.0",
+      configPath: "/test/opencode.json",
     })
+    mockGetCachedVersion.mockReturnValue("3.5.0")
+    mockGetLatestVersion.mockResolvedValue("3.5.0")
 
-    it("#then should not update or show toast", async () => {
-      await runBackgroundUpdateCheck(mockCtx, true, mockGetToastMessage)
+    await runWithFreshModule(true, getToastMessage)
 
-      expect(mockUpdatePinnedVersion).not.toHaveBeenCalled()
-      expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
-      expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
-    })
+    expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
+    expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
+    expect(mockInvalidatePackage).not.toHaveBeenCalled()
   })
 })

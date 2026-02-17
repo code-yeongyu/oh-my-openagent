@@ -28,9 +28,6 @@ export function createToolExecuteAfterHandler(args: {
     }
 
     await hooks.claudeCodeHooks?.["tool.execute.after"]?.(input, output)
-    await hooks.toolOutputTruncator?.["tool.execute.after"]?.(input, output)
-    await hooks.preemptiveCompaction?.["tool.execute.after"]?.(input, output)
-    await hooks.contextWindowMonitor?.["tool.execute.after"]?.(input, output)
     await hooks.commentChecker?.["tool.execute.after"]?.(input, output)
     await hooks.directoryAgentsInjector?.["tool.execute.after"]?.(input, output)
     await hooks.directoryReadmeInjector?.["tool.execute.after"]?.(input, output)
@@ -44,6 +41,10 @@ export function createToolExecuteAfterHandler(args: {
     await hooks.delegateTaskRetry?.["tool.execute.after"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.after"]?.(input, output)
     await hooks.taskResumeInfo?.["tool.execute.after"]?.(input, output)
+    await hooks.backgroundToolOutputNotifier?.["tool.execute.after"]?.(input, output)
     await hooks.hashlineReadEnhancer?.["tool.execute.after"]?.(input, output)
+    await hooks.toolOutputTruncator?.["tool.execute.after"]?.(input, output)
+    await hooks.preemptiveCompaction?.["tool.execute.after"]?.(input, output)
+    await hooks.contextWindowMonitor?.["tool.execute.after"]?.(input, output)
   }
 }
