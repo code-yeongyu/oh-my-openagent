@@ -3,7 +3,7 @@ import { z } from "zod"
 export const CategoryConfigSchema = z.object({
   /** Human-readable description of the category's purpose. Shown in task prompt. */
   description: z.string().optional(),
-  model: z.string().optional(),
+  model: z.union([z.string(), z.array(z.string()).min(1)]).optional(),
   variant: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
