@@ -723,7 +723,7 @@ Automatically switch to backup models when the primary model encounters retryabl
 {
   "runtime_fallback": {
     "enabled": true,
-    "retry_on_errors": [429, 503, 529],
+    "retry_on_errors": [400, 429, 503, 529],
     "max_fallback_attempts": 3,
     "cooldown_seconds": 60,
     "timeout_seconds": 30,
@@ -732,14 +732,14 @@ Automatically switch to backup models when the primary model encounters retryabl
 }
 ```
 
-| Option                  | Default           | Description                                                                 |
-| ----------------------- | ----------------- | --------------------------------------------------------------------------- |
-| `enabled`               | `true`            | Enable runtime fallback                                                     |
-| `retry_on_errors`       | `[429, 503, 529]` | HTTP status codes that trigger fallback (rate limit, service unavailable). Also supports certain classified provider errors (for example, missing API key) that do not expose HTTP status codes.   |
-| `max_fallback_attempts` | `3`               | Maximum fallback attempts per session (1-10)                                |
-| `cooldown_seconds`      | `60`              | Cooldown in seconds before retrying a failed model                          |
-| `timeout_seconds`       | `30`              | Timeout in seconds for an in-flight fallback request before forcing the next fallback model. Set to `0` to disable timeout-based fallback and provider quota retry signal detection. |
-| `notify_on_fallback`    | `true`            | Show toast notification when switching to a fallback model                  |
+| Option                  | Default                | Description                                                                 |
+| ----------------------- | ---------------------- | --------------------------------------------------------------------------- |
+| `enabled`               | `true`                 | Enable runtime fallback                                                     |
+| `retry_on_errors`       | `[400, 429, 503, 529]` | HTTP status codes that trigger fallback (rate limit, service unavailable). Also supports certain classified provider errors (for example, missing API key) that do not expose HTTP status codes.   |
+| `max_fallback_attempts` | `3`                    | Maximum fallback attempts per session (1-20)                                |
+| `cooldown_seconds`      | `60`                   | Cooldown in seconds before retrying a failed model                          |
+| `timeout_seconds`       | `30`                   | Timeout in seconds for an in-flight fallback request before forcing the next fallback model. Set to `0` to disable timeout-based fallback and provider quota retry signal detection. |
+| `notify_on_fallback`    | `true`                 | Show toast notification when switching to a fallback model                  |
 
 ### How It Works
 
