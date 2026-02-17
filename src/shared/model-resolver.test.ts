@@ -543,7 +543,8 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should use github-copilot (second provider) since google not connected
-      expect(result!.model).toBe("github-copilot/gemini-3-pro")
+      // model name is transformed to preview variant for github-copilot provider
+      expect(result!.model).toBe("github-copilot/gemini-3-pro-preview")
       expect(result!.source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
@@ -795,8 +796,82 @@ describe("resolveModelWithFallback", () => {
       // when
       const result = resolveModelWithFallback(input)
 
-      // then - should use categoryDefaultModel since google is connected
-      expect(result!.model).toBe("google/gemini-3-pro")
+      // then - should use transformed categoryDefaultModel since google is connected
+      expect(result!.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.source).toBe("category-default")
+      cacheSpy.mockRestore()
+    })
+
+    test("transforms gemini-3-flash in categoryDefaultModel for google connected provider", () => {
+      // given - google connected, category default uses gemini-3-flash
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-flash",
+        availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+
+      // then - gemini-3-flash should be transformed to gemini-3-flash-preview
+      expect(result!.model).toBe("google/gemini-3-flash-preview")
+      expect(result!.source).toBe("category-default")
+      cacheSpy.mockRestore()
+    })
+
+    test("does not double-transform categoryDefaultModel already containing -preview", () => {
+      // given - category default already has -preview suffix
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-pro-preview",
+        availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+
+      // then - should NOT become gemini-3-pro-preview-preview
+      expect(result!.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.source).toBe("category-default")
+      cacheSpy.mockRestore()
+    })
+
+    test("transforms gemini-3-pro in fallback chain for google connected provider", () => {
+      // given - google connected, fallback chain has gemini-3-pro
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["google", "github-copilot"], model: "gemini-3-pro" },
+        ],
+        availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+
+      // then - should transform to preview variant for google provider
+      expect(result!.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.source).toBe("provider-fallback")
+      cacheSpy.mockRestore()
+    })
+
+    test("passes through non-gemini-3 models for google connected provider", () => {
+      // given - google connected, category default uses gemini-2.5-flash (no transform needed)
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-2.5-flash",
+        availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+
+      // then - should pass through unchanged
+      expect(result!.model).toBe("google/gemini-2.5-flash")
       expect(result!.source).toBe("category-default")
       cacheSpy.mockRestore()
     })

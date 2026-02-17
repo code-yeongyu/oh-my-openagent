@@ -2,6 +2,7 @@ import { log } from "./logger"
 import * as connectedProvidersCache from "./connected-providers-cache"
 import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
+import { transformModelForProvider } from "./provider-model-id-transform"
 
 export type ModelResolutionRequest = {
   intent?: {
@@ -85,10 +86,13 @@ export function resolveModelPipeline(
       if (parts.length >= 2) {
         const provider = parts[0]
         if (connectedProviders.includes(provider)) {
+          const modelName = parts.slice(1).join("/")
+          const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
           log("Model resolved via category default (connected provider)", {
-            model: normalizedCategoryDefault,
+            model: transformedModel,
+            original: normalizedCategoryDefault,
           })
-          return { model: normalizedCategoryDefault, provenance: "category-default", attempted }
+          return { model: transformedModel, provenance: "category-default", attempted }
         }
       }
     }
@@ -108,10 +112,11 @@ export function resolveModelPipeline(
         for (const entry of fallbackChain) {
           for (const provider of entry.providers) {
             if (connectedSet.has(provider)) {
-              const model = `${provider}/${entry.model}`
+              const transformedModelId = transformModelForProvider(provider, entry.model)
+              const model = `${provider}/${transformedModelId}`
               log("Model resolved via fallback chain (connected provider)", {
                 provider,
-                model: entry.model,
+                model: transformedModelId,
                 variant: entry.variant,
               })
               return {

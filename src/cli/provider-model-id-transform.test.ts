@@ -63,6 +63,30 @@ describe("transformModelForProvider", () => {
 			// #then should transform to gemini-3-flash-preview
 			expect(result).toBe("gemini-3-flash-preview")
 		})
+
+		test("prevents double transformation of gemini-3-pro-preview", () => {
+			// #given github-copilot provider and gemini-3-pro-preview model (already transformed)
+			const provider = "github-copilot"
+			const model = "gemini-3-pro-preview"
+
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider(provider, model)
+
+			// #then should NOT become gemini-3-pro-preview-preview
+			expect(result).toBe("gemini-3-pro-preview")
+		})
+
+		test("prevents double transformation of gemini-3-flash-preview", () => {
+			// #given github-copilot provider and gemini-3-flash-preview model (already transformed)
+			const provider = "github-copilot"
+			const model = "gemini-3-flash-preview"
+
+			// #when transformModelForProvider is called
+			const result = transformModelForProvider(provider, model)
+
+			// #then should NOT become gemini-3-flash-preview-preview
+			expect(result).toBe("gemini-3-flash-preview")
+		})
 	})
 
 	describe("google provider", () => {

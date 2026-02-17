@@ -1,4 +1,5 @@
 import { resolveModelPipeline } from "../../shared"
+import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 
 export function applyModelResolution(input: {
   uiSelectedModel?: string
@@ -20,8 +21,10 @@ export function getFirstFallbackModel(requirement?: {
 }) {
   const entry = requirement?.fallbackChain?.[0]
   if (!entry || entry.providers.length === 0) return undefined
+  const provider = entry.providers[0]
+  const transformedModel = transformModelForProvider(provider, entry.model)
   return {
-    model: `${entry.providers[0]}/${entry.model}`,
+    model: `${provider}/${transformedModel}`,
     provenance: "provider-fallback" as const,
     variant: entry.variant,
   }
