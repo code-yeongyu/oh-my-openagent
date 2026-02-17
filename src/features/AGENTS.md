@@ -1,6 +1,6 @@
-# src/features/ — 18 Feature Modules
+# src/features/ — 19 Feature Modules
 
-**Generated:** 2026-02-17
+**Generated:** 2026-02-18
 
 ## OVERVIEW
 
@@ -27,6 +27,7 @@ Standalone feature modules wired into plugin/ layer. Each is self-contained with
 | **claude-code-agent-loader** | 3 | LOW | Load agents from .opencode/agents/ |
 | **claude-code-command-loader** | 3 | LOW | Load commands from .opencode/commands/ |
 | **claude-code-session-state** | 2 | LOW | Subagent session state tracking |
+| **run-continuation-state** | 5 | LOW | Persistent state for `run` command continuation across sessions |
 | **tool-metadata-store** | 2 | LOW | Tool execution metadata cache |
 
 ## KEY MODULES
