@@ -75,6 +75,7 @@ program
   .option("--attach <url>", "Attach to existing opencode server URL")
   .option("--on-complete <command>", "Shell command to run after completion")
   .option("--json", "Output structured JSON result to stdout")
+  .option("--verbose", "Show full event stream (default: messages/tools only)")
   .option("--session-id <id>", "Resume existing session instead of creating new one")
   .addHelpText("after", `
 Examples:
@@ -114,6 +115,7 @@ Unlike 'opencode run', this command waits until:
       attach: options.attach,
       onComplete: options.onComplete,
       json: options.json ?? false,
+      verbose: options.verbose ?? false,
       sessionId: options.sessionId,
     }
     const exitCode = await run(runOptions)
