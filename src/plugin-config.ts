@@ -49,7 +49,7 @@ export function parseConfigPartially(
 
 export function loadConfigFromPath(
   configPath: string,
-  ctx: unknown
+  _ctx: unknown
 ): OhMyOpenCodeConfig | null {
   try {
     if (fs.existsSync(configPath)) {

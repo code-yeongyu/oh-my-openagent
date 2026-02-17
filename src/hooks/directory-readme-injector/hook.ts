@@ -27,9 +27,12 @@ interface EventInput {
   };
 }
 
-export function createDirectoryReadmeInjectorHook(ctx: PluginInput) {
+export function createDirectoryReadmeInjectorHook(
+  ctx: PluginInput,
+  modelCacheState?: { anthropicContext1MEnabled: boolean },
+) {
   const sessionCaches = new Map<string, Set<string>>();
-  const truncator = createDynamicTruncator(ctx);
+  const truncator = createDynamicTruncator(ctx, modelCacheState);
 
   const toolExecuteAfter = async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
     const toolName = input.tool.toLowerCase();

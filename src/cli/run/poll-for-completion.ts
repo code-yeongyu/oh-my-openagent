@@ -2,11 +2,12 @@ import pc from "picocolors"
 import type { RunContext } from "./types"
 import type { EventState } from "./events"
 import { checkCompletionConditions } from "./completion"
+import { normalizeSDKResponse } from "../../shared"
 
 const DEFAULT_POLL_INTERVAL_MS = 500
-const DEFAULT_REQUIRED_CONSECUTIVE = 3
+const DEFAULT_REQUIRED_CONSECUTIVE = 1
 const ERROR_GRACE_CYCLES = 3
-const MIN_STABILIZATION_MS = 10_000
+const MIN_STABILIZATION_MS = 0
 
 export interface PollOptions {
   pollIntervalMs?: number
@@ -28,9 +29,14 @@ export async function pollForCompletion(
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
   let firstWorkTimestamp: number | null = null
+  const pollStartTimestamp = Date.now()
 
   while (!abortController.signal.aborted) {
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+
+    if (abortController.signal.aborted) {
+      return 130
+    }
 
     // ERROR CHECK FIRST — errors must not be masked by other gates
     if (eventState.mainSessionError) {
@@ -51,6 +57,13 @@ export async function pollForCompletion(
       errorCycleCount = 0
     }
 
+    const mainSessionStatus = await getMainSessionStatus(ctx)
+    if (mainSessionStatus === "busy" || mainSessionStatus === "retry") {
+      eventState.mainSessionIdle = false
+    } else if (mainSessionStatus === "idle") {
+      eventState.mainSessionIdle = true
+    }
+
     if (!eventState.mainSessionIdle) {
       consecutiveCompleteChecks = 0
       continue
@@ -62,8 +75,16 @@ export async function pollForCompletion(
     }
 
     if (!eventState.hasReceivedMeaningfulWork) {
+      if (minStabilizationMs <= 0) {
+        consecutiveCompleteChecks = 0
+        continue
+      }
+
+      if (Date.now() - pollStartTimestamp < minStabilizationMs) {
+        consecutiveCompleteChecks = 0
+        continue
+      }
       consecutiveCompleteChecks = 0
-      continue
     }
 
     // Track when first meaningful work was received
@@ -79,6 +100,10 @@ export async function pollForCompletion(
 
     const shouldExit = await checkCompletionConditions(ctx)
     if (shouldExit) {
+      if (abortController.signal.aborted) {
+        return 130
+      }
+
       consecutiveCompleteChecks++
       if (consecutiveCompleteChecks >= requiredConsecutive) {
         console.log(pc.green("\n\nAll tasks completed."))
@@ -90,4 +115,25 @@ export async function pollForCompletion(
   }
 
   return 130
+}
+
+async function getMainSessionStatus(
+  ctx: RunContext
+): Promise<"idle" | "busy" | "retry" | null> {
+  try {
+    const statusesRes = await ctx.client.session.status({
+      query: { directory: ctx.directory },
+    })
+    const statuses = normalizeSDKResponse(
+      statusesRes,
+      {} as Record<string, { type?: string }>
+    )
+    const status = statuses[ctx.sessionID]?.type
+    if (status === "idle" || status === "busy" || status === "retry") {
+      return status
+    }
+    return null
+  } catch {
+    return null
+  }
 }

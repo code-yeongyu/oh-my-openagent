@@ -1,11 +1,10 @@
-import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH } from "./types"
+import { MIN_PANE_WIDTH } from "./types"
 import type { SplitDirection, TmuxPaneInfo } from "./types"
 import {
-	DIVIDER_SIZE,
-	MAX_COLS,
-	MAX_ROWS,
-	MIN_SPLIT_HEIGHT,
-	MIN_SPLIT_WIDTH,
+  DIVIDER_SIZE,
+  MAX_COLS,
+  MAX_ROWS,
+  MIN_SPLIT_HEIGHT,
 } from "./tmux-grid-constants"
 
 function minSplitWidthFor(minPaneWidth: number): number {
@@ -56,12 +55,22 @@ export function canSplitPane(
 	return pane.height >= MIN_SPLIT_HEIGHT
 }
 
-export function canSplitPaneAnyDirection(pane: TmuxPaneInfo): boolean {
-	return pane.width >= MIN_SPLIT_WIDTH || pane.height >= MIN_SPLIT_HEIGHT
+export function canSplitPaneAnyDirection(pane: TmuxPaneInfo, minPaneWidth: number = MIN_PANE_WIDTH): boolean {
+	return canSplitPaneAnyDirectionWithMinWidth(pane, minPaneWidth)
 }
 
-export function getBestSplitDirection(pane: TmuxPaneInfo): SplitDirection | null {
-	const canH = pane.width >= MIN_SPLIT_WIDTH
+export function canSplitPaneAnyDirectionWithMinWidth(
+	pane: TmuxPaneInfo,
+	minPaneWidth: number = MIN_PANE_WIDTH,
+): boolean {
+	return pane.width >= minSplitWidthFor(minPaneWidth) || pane.height >= MIN_SPLIT_HEIGHT
+}
+
+export function getBestSplitDirection(
+	pane: TmuxPaneInfo,
+	minPaneWidth: number = MIN_PANE_WIDTH,
+): SplitDirection | null {
+	const canH = pane.width >= minSplitWidthFor(minPaneWidth)
 	const canV = pane.height >= MIN_SPLIT_HEIGHT
 
 	if (!canH && !canV) return null

@@ -1,4 +1,4 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test"
+import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test"
 import { truncateUntilTargetTokens } from "./storage"
 import * as storage from "./storage"
 
@@ -9,6 +9,10 @@ mock.module("./storage", () => {
     findToolResultsBySize: mock(() => []),
     truncateToolResult: mock(() => ({ success: false })),
   }
+})
+
+afterAll(() => {
+  mock.module("./storage", () => storage)
 })
 
 describe("truncateUntilTargetTokens", () => {

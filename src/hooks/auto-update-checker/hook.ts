@@ -10,6 +10,7 @@ import { showLocalDevToast, showVersionToast } from "./hook/startup-toasts"
 
 export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
   const { showStartupToast = true, isSisyphusEnabled = false, autoUpdate = true } = options
+  const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true"
 
   const getToastMessage = (isUpdate: boolean, latestVersion?: string): string => {
     if (isSisyphusEnabled) {
@@ -27,6 +28,7 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
   return {
     event: ({ event }: { event: { type: string; properties?: unknown } }) => {
       if (event.type !== "session.created") return
+      if (isCliRunMode) return
       if (hasChecked) return
 
       const props = event.properties as { info?: { parentID?: string } } | undefined

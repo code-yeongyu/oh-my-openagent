@@ -64,8 +64,8 @@ describe("buildCategorySkillsDelegationGuide", () => {
     const result = buildCategorySkillsDelegationGuide(categories, allSkills)
 
     //#then: should show source for each custom skill
-    expect(result).toContain("| user |")
-    expect(result).toContain("| project |")
+    expect(result).toContain("(user)")
+    expect(result).toContain("(project)")
   })
 
   it("should not show custom skill section when only builtin skills exist", () => {

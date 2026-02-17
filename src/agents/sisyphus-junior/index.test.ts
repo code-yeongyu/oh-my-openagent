@@ -71,7 +71,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.prompt).toContain("You work ALONE")
+      expect(result.prompt).toContain("Sisyphus-Junior")
       expect(result.prompt).toContain("Extra instructions here")
     })
   })
@@ -138,7 +138,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.prompt).toContain("You work ALONE")
+      expect(result.prompt).toContain("Sisyphus-Junior")
       expect(result.prompt).not.toBe("Completely new prompt that replaces everything")
     })
   })
@@ -209,12 +209,12 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
 
       //#then
-      expect(result.prompt).toContain("TaskCreate")
-      expect(result.prompt).toContain("TaskUpdate")
+      expect(result.prompt).toContain("task_create")
+      expect(result.prompt).toContain("task_update")
       expect(result.prompt).not.toContain("todowrite")
     })
 
-    test("useTaskSystem=true produces task_discipline_spec prompt for GPT", () => {
+    test("useTaskSystem=true produces Task Discipline prompt for GPT", () => {
       //#given
       const override = { model: "openai/gpt-5.2" }
 
@@ -222,9 +222,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
 
       //#then
-      expect(result.prompt).toContain("<task_discipline_spec>")
-      expect(result.prompt).toContain("TaskCreate")
-      expect(result.prompt).not.toContain("<todo_discipline_spec>")
+      expect(result.prompt).toContain("Task Discipline")
+      expect(result.prompt).toContain("task_create")
+      expect(result.prompt).not.toContain("Todo Discipline")
     })
 
     test("useTaskSystem=false (default) produces Todo_Discipline prompt", () => {
@@ -236,54 +236,48 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
       //#then
       expect(result.prompt).toContain("todowrite")
-      expect(result.prompt).not.toContain("TaskCreate")
+      expect(result.prompt).not.toContain("task_create")
     })
 
-    test("useTaskSystem=true explicitly lists task management tools as ALLOWED for Claude", () => {
+    test("useTaskSystem=true includes task_create/task_update in Claude prompt", () => {
       //#given
       const override = { model: "anthropic/claude-sonnet-4-5" }
 
       //#when
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
 
-      //#then - prompt must disambiguate: delegation tool blocked, management tools allowed
+      //#then
       expect(result.prompt).toContain("task_create")
       expect(result.prompt).toContain("task_update")
-      expect(result.prompt).toContain("task_list")
-      expect(result.prompt).toContain("task_get")
-      expect(result.prompt).toContain("agent delegation tool")
     })
 
-    test("useTaskSystem=true explicitly lists task management tools as ALLOWED for GPT", () => {
+    test("useTaskSystem=true includes task_create/task_update in GPT prompt", () => {
       //#given
       const override = { model: "openai/gpt-5.2" }
 
       //#when
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
 
-      //#then - prompt must disambiguate: delegation tool blocked, management tools allowed
+      //#then
       expect(result.prompt).toContain("task_create")
       expect(result.prompt).toContain("task_update")
-      expect(result.prompt).toContain("task_list")
-      expect(result.prompt).toContain("task_get")
-      expect(result.prompt).toContain("Agent delegation tool")
     })
 
-    test("useTaskSystem=false does NOT list task management tools in constraints", () => {
-      //#given - Claude model without task system
+    test("useTaskSystem=false uses todowrite instead of task_create", () => {
+      //#given
       const override = { model: "anthropic/claude-sonnet-4-5" }
 
       //#when
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, false)
 
-      //#then - no task management tool references in constraints section
+      //#then
+      expect(result.prompt).toContain("todowrite")
       expect(result.prompt).not.toContain("task_create")
-      expect(result.prompt).not.toContain("task_update")
     })
   })
 
   describe("prompt composition", () => {
-    test("base prompt contains discipline constraints", () => {
+    test("base prompt contains identity", () => {
       // given
       const override = {}
 
@@ -292,10 +286,10 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
       // then
       expect(result.prompt).toContain("Sisyphus-Junior")
-      expect(result.prompt).toContain("You work ALONE")
+      expect(result.prompt).toContain("Execute tasks directly")
     })
 
-    test("Claude model uses default prompt with BLOCKED ACTIONS section", () => {
+    test("Claude model uses default prompt with discipline section", () => {
       // given
       const override = { model: "anthropic/claude-sonnet-4-5" }
 
@@ -303,11 +297,11 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.prompt).toContain("BLOCKED ACTIONS")
-      expect(result.prompt).not.toContain("<blocked_actions>")
+      expect(result.prompt).toContain("<Role>")
+      expect(result.prompt).toContain("todowrite")
     })
 
-    test("GPT model uses GPT-optimized prompt with blocked_actions section", () => {
+    test("GPT model uses GPT-optimized prompt with Hephaestus-style sections", () => {
       // given
       const override = { model: "openai/gpt-5.2" }
 
@@ -315,9 +309,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.prompt).toContain("<blocked_actions>")
-      expect(result.prompt).toContain("<output_verbosity_spec>")
-      expect(result.prompt).toContain("<scope_and_design_constraints>")
+      expect(result.prompt).toContain("Scope Discipline")
+      expect(result.prompt).toContain("<tool_usage_rules>")
+      expect(result.prompt).toContain("Progress Updates")
     })
 
     test("prompt_append is added after base prompt", () => {
@@ -328,7 +322,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      const baseEndIndex = result.prompt!.indexOf("Dense > verbose.")
+      const baseEndIndex = result.prompt!.indexOf("</Style>")
       const appendIndex = result.prompt!.indexOf("CUSTOM_MARKER_FOR_TEST")
       expect(baseEndIndex).not.toBe(-1)
       expect(appendIndex).toBeGreaterThan(baseEndIndex)
@@ -383,7 +377,7 @@ describe("getSisyphusJuniorPromptSource", () => {
 })
 
 describe("buildSisyphusJuniorPrompt", () => {
-  test("GPT model prompt contains GPT-5.2 specific sections", () => {
+  test("GPT model prompt contains Hephaestus-style sections", () => {
     // given
     const model = "openai/gpt-5.2"
 
@@ -391,10 +385,10 @@ describe("buildSisyphusJuniorPrompt", () => {
     const prompt = buildSisyphusJuniorPrompt(model, false)
 
     // then
-    expect(prompt).toContain("<identity>")
-    expect(prompt).toContain("<output_verbosity_spec>")
-    expect(prompt).toContain("<scope_and_design_constraints>")
+    expect(prompt).toContain("## Identity")
+    expect(prompt).toContain("Scope Discipline")
     expect(prompt).toContain("<tool_usage_rules>")
+    expect(prompt).toContain("Progress Updates")
   })
 
   test("Claude model prompt contains Claude-specific sections", () => {
@@ -406,11 +400,11 @@ describe("buildSisyphusJuniorPrompt", () => {
 
     // then
     expect(prompt).toContain("<Role>")
-    expect(prompt).toContain("<Critical_Constraints>")
-    expect(prompt).toContain("BLOCKED ACTIONS")
+    expect(prompt).toContain("<Todo_Discipline>")
+    expect(prompt).toContain("todowrite")
   })
 
-  test("useTaskSystem=true includes Task_Discipline for GPT", () => {
+  test("useTaskSystem=true includes Task Discipline for GPT", () => {
     // given
     const model = "openai/gpt-5.2"
 
@@ -418,8 +412,8 @@ describe("buildSisyphusJuniorPrompt", () => {
     const prompt = buildSisyphusJuniorPrompt(model, true)
 
     // then
-    expect(prompt).toContain("<task_discipline_spec>")
-    expect(prompt).toContain("TaskCreate")
+    expect(prompt).toContain("Task Discipline")
+    expect(prompt).toContain("task_create")
   })
 
   test("useTaskSystem=false includes Todo_Discipline for Claude", () => {

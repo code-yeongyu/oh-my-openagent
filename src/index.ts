@@ -50,6 +50,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     pluginConfig,
     tmuxConfig,
     modelCacheState,
+    backgroundNotificationHookEnabled: isHookEnabled("background-notification"),
   })
 
   const toolsResult = await createTools({
@@ -61,6 +62,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const hooks = createHooks({
     ctx,
     pluginConfig,
+    modelCacheState,
     backgroundManager: managers.backgroundManager,
     isHookEnabled,
     safeHookEnabled,
@@ -85,10 +87,13 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       output: { context: string[] },
     ): Promise<void> => {
       await hooks.compactionTodoPreserver?.capture(_input.sessionID)
-      if (!hooks.compactionContextInjector) {
-        return
+      await hooks.claudeCodeHooks?.["experimental.session.compacting"]?.(
+        _input,
+        output,
+      )
+      if (hooks.compactionContextInjector) {
+        output.context.push(hooks.compactionContextInjector(_input.sessionID))
       }
-      output.context.push(hooks.compactionContextInjector(_input.sessionID))
     },
   }
 }

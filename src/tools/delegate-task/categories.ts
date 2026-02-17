@@ -26,7 +26,7 @@ export function resolveCategoryConfig(
   categoryName: string,
   options: ResolveCategoryConfigOptions
 ): ResolveCategoryConfigResult | null {
-  const { userCategories, inheritedModel, systemDefaultModel, availableModels } = options
+  const { userCategories, inheritedModel: _inheritedModel, systemDefaultModel, availableModels } = options
 
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]

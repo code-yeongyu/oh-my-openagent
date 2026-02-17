@@ -4,7 +4,9 @@ import { isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { parseModelString } from "./model-string-parser"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { getAgentDisplayName, getAgentConfigKey } from "../../shared/agent-display-names"
 import { normalizeSDKResponse } from "../../shared"
+import { log } from "../../shared/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 import { toCanonical } from "../../shared/agent-name-aliases"
@@ -55,13 +57,16 @@ Create the work plan directly - that's your job as the planning agent.`,
 
     const callableAgents = agents.filter((a) => a.mode !== "primary")
 
+    const resolvedDisplayName = getAgentDisplayName(agentToUse)
     const matchedAgent = callableAgents.find(
       (agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
+        || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase()
     )
     if (!matchedAgent) {
       const isPrimaryAgent = agents
         .filter((a) => a.mode === "primary")
-        .find((agent) => agent.name.toLowerCase() === agentToUse.toLowerCase())
+        .find((agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
+          || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase())
 
       if (isPrimaryAgent) {
         return {
@@ -116,8 +121,19 @@ Create the work plan directly - that's your job as the planning agent.`,
     if (!categoryModel && matchedAgent.model) {
       categoryModel = matchedAgent.model
     }
-  } catch {
-    // Proceed anyway - session.prompt will fail with clearer error if agent doesn't exist
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    log("[delegate-task] Failed to resolve subagent execution", {
+      requestedAgent: agentToUse,
+      parentAgent,
+      error: errorMessage,
+    })
+
+    return {
+      agentToUse: "",
+      categoryModel: undefined,
+      error: `Failed to delegate to agent "${agentToUse}": ${errorMessage}`,
+    }
   }
 
   return { agentToUse, categoryModel }

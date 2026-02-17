@@ -81,6 +81,7 @@ export function createChatMessageHandler(args: {
     await hooks.keywordDetector?.["chat.message"]?.(input, output)
     await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
+    await hooks.sisyphusGptHephaestusReminder?.["chat.message"]?.(input)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }

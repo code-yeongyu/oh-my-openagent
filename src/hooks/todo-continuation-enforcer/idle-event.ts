@@ -163,8 +163,9 @@ export async function handleSessionIdle(args: {
 
    log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents, hasCompactionMessage })
 
-   if (resolvedInfo?.agent && skipAgents.includes(toCanonical(resolvedInfo.agent))) {
-     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedInfo.agent })
+   const resolvedAgentName = resolvedInfo?.agent
+   if (resolvedAgentName && skipAgents.some(s => toCanonical(s) === toCanonical(resolvedAgentName))) {
+     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedAgentName })
      return
    }
   if (hasCompactionMessage && !resolvedInfo?.agent) {

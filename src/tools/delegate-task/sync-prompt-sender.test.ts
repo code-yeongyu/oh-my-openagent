@@ -1,17 +1,23 @@
-const { describe, test, expect, mock, afterEach } = require("bun:test")
+const {
+  describe: bunDescribe,
+  test: bunTest,
+  expect: bunExpect,
+  mock: bunMock,
+  afterEach: bunAfterEach,
+} = require("bun:test")
 const { resetAgentNameAliases } = require("../../shared/agent-name-aliases")
 
-describe("sendSyncPrompt", () => {
-  afterEach(() => {
+bunDescribe("sendSyncPrompt", () => {
+  bunAfterEach(() => {
     resetAgentNameAliases()
   })
 
-  test("passes question=false via tools parameter", async () => {
+  bunTest("passes question=false via tools parameter", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
     let promptArgs: any
-    const promptAsync = mock(async (input: any) => {
+    const promptAsync = bunMock(async (input: any) => {
       promptArgs = input
       return { data: {} }
     })
@@ -38,19 +44,19 @@ describe("sendSyncPrompt", () => {
     }
 
     //#when
-    await sendSyncPrompt(mockClient as any, input)
+    await sendSyncPrompt(mockClient, input)
 
     //#then
-    expect(promptAsync).toHaveBeenCalled()
-    expect(promptArgs.body.tools.question).toBe(false)
+    bunExpect(promptAsync).toHaveBeenCalled()
+    bunExpect(promptArgs.body.tools.question).toBe(false)
   })
 
-  test("applies agent tool restrictions for explore agent", async () => {
+  bunTest("applies agent tool restrictions for explore agent", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
     let promptArgs: any
-    const promptAsync = mock(async (input: any) => {
+    const promptAsync = bunMock(async (input: any) => {
       promptArgs = input
       return { data: {} }
     })
@@ -78,19 +84,19 @@ describe("sendSyncPrompt", () => {
     }
 
     //#when
-    await sendSyncPrompt(mockClient as any, input)
+    await sendSyncPrompt(mockClient, input)
 
     //#then
-    expect(promptAsync).toHaveBeenCalled()
-    expect(promptArgs.body.tools.call_omo_agent).toBe(false)
+    bunExpect(promptAsync).toHaveBeenCalled()
+    bunExpect(promptArgs.body.tools.call_omo_agent).toBe(false)
   })
 
-  test("applies agent tool restrictions for librarian agent", async () => {
+  bunTest("applies agent tool restrictions for librarian agent", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
     let promptArgs: any
-    const promptAsync = mock(async (input: any) => {
+    const promptAsync = bunMock(async (input: any) => {
       promptArgs = input
       return { data: {} }
     })
@@ -118,19 +124,19 @@ describe("sendSyncPrompt", () => {
     }
 
     //#when
-    await sendSyncPrompt(mockClient as any, input)
+    await sendSyncPrompt(mockClient, input)
 
     //#then
-    expect(promptAsync).toHaveBeenCalled()
-    expect(promptArgs.body.tools.call_omo_agent).toBe(false)
+    bunExpect(promptAsync).toHaveBeenCalled()
+    bunExpect(promptArgs.body.tools.call_omo_agent).toBe(false)
   })
 
-  test("does not restrict call_omo_agent for sisyphus agent", async () => {
+  bunTest("does not restrict call_omo_agent for sisyphus agent", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
 
     let promptArgs: any
-    const promptAsync = mock(async (input: any) => {
+    const promptAsync = bunMock(async (input: any) => {
       promptArgs = input
       return { data: {} }
     })
@@ -158,14 +164,94 @@ describe("sendSyncPrompt", () => {
     }
 
     //#when
-    await sendSyncPrompt(mockClient as any, input)
+    await sendSyncPrompt(mockClient, input)
 
     //#then
-    expect(promptAsync).toHaveBeenCalled()
-    expect(promptArgs.body.tools.call_omo_agent).toBe(true)
+    bunExpect(promptAsync).toHaveBeenCalled()
+    bunExpect(promptArgs.body.tools.call_omo_agent).toBe(true)
   })
 
-  test("canonicalizes agent name when checking isPlanFamily for prometheus alias", async () => {
+  bunTest("retries with promptSync for oracle when promptAsync fails with unexpected EOF", async () => {
+    //#given
+    const { sendSyncPrompt } = require("./sync-prompt-sender")
+
+    const promptWithModelSuggestionRetry = bunMock(async () => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+    const promptSyncWithModelSuggestionRetry = bunMock(async () => {})
+
+    const input = {
+      sessionID: "test-session",
+      agentToUse: "oracle",
+      args: {
+        description: "test task",
+        prompt: "test prompt",
+        run_in_background: false,
+        load_skills: [],
+      },
+      systemContent: undefined,
+      categoryModel: undefined,
+      toastManager: null,
+      taskId: undefined,
+    }
+
+    //#when
+    const result = await sendSyncPrompt(
+      { session: { promptAsync: bunMock(async () => ({ data: {} })) } },
+      input,
+      {
+        promptWithModelSuggestionRetry,
+        promptSyncWithModelSuggestionRetry,
+      },
+    )
+
+    //#then
+    bunExpect(result).toBeNull()
+    bunExpect(promptWithModelSuggestionRetry).toHaveBeenCalledTimes(1)
+    bunExpect(promptSyncWithModelSuggestionRetry).toHaveBeenCalledTimes(1)
+  })
+
+  bunTest("does not retry with promptSync for non-oracle on unexpected EOF", async () => {
+    //#given
+    const { sendSyncPrompt } = require("./sync-prompt-sender")
+
+    const promptWithModelSuggestionRetry = bunMock(async () => {
+      throw new Error("JSON Parse error: Unexpected EOF")
+    })
+    const promptSyncWithModelSuggestionRetry = bunMock(async () => {})
+
+    const input = {
+      sessionID: "test-session",
+      agentToUse: "metis",
+      args: {
+        description: "test task",
+        prompt: "test prompt",
+        run_in_background: false,
+        load_skills: [],
+      },
+      systemContent: undefined,
+      categoryModel: undefined,
+      toastManager: null,
+      taskId: undefined,
+    }
+
+    //#when
+    const result = await sendSyncPrompt(
+      { session: { promptAsync: bunMock(async () => ({ data: {} })) } },
+      input,
+      {
+        promptWithModelSuggestionRetry,
+        promptSyncWithModelSuggestionRetry,
+      },
+    )
+
+    //#then
+    bunExpect(result).toContain("JSON Parse error: Unexpected EOF")
+    bunExpect(promptWithModelSuggestionRetry).toHaveBeenCalledTimes(1)
+    bunExpect(promptSyncWithModelSuggestionRetry).toHaveBeenCalledTimes(0)
+  })
+
+  bunTest("canonicalizes agent name when checking isPlanFamily for prometheus alias", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
     const { initializeAgentNameAliases } = require("../../shared/agent-name-aliases")
@@ -174,7 +260,7 @@ describe("sendSyncPrompt", () => {
     initializeAgentNameAliases({ prometheus: "Bob" }, ["prometheus", "plan", "sisyphus"])
 
     let promptArgs: any
-    const promptAsync = mock(async (input: any) => {
+    const promptAsync = bunMock(async (input: any) => {
       promptArgs = input
       return { data: {} }
     })
@@ -205,11 +291,11 @@ describe("sendSyncPrompt", () => {
     await sendSyncPrompt(mockClient as any, input)
 
     //#then - should recognize "Bob" as prometheus (plan family) and allow task
-    expect(promptAsync).toHaveBeenCalled()
-    expect(promptArgs.body.tools.task).toBe(true)
+    bunExpect(promptAsync).toHaveBeenCalled()
+    bunExpect(promptArgs.body.tools.task).toBe(true)
   })
 
-  test("canonicalizes agent name when checking isPlanFamily for plan alias", async () => {
+  bunTest("canonicalizes agent name when checking isPlanFamily for plan alias", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
     const { initializeAgentNameAliases } = require("../../shared/agent-name-aliases")
@@ -218,7 +304,7 @@ describe("sendSyncPrompt", () => {
     initializeAgentNameAliases({ plan: "Planner" }, ["prometheus", "plan", "sisyphus"])
 
     let promptArgs: any
-    const promptAsync = mock(async (input: any) => {
+    const promptAsync = bunMock(async (input: any) => {
       promptArgs = input
       return { data: {} }
     })
@@ -249,7 +335,7 @@ describe("sendSyncPrompt", () => {
     await sendSyncPrompt(mockClient as any, input)
 
     //#then - should recognize "Planner" as plan (plan family) and allow task
-    expect(promptAsync).toHaveBeenCalled()
-    expect(promptArgs.body.tools.task).toBe(true)
+    bunExpect(promptAsync).toHaveBeenCalled()
+    bunExpect(promptArgs.body.tools.task).toBe(true)
   })
 })

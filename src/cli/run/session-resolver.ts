@@ -8,11 +8,15 @@ const SESSION_CREATE_RETRY_DELAY_MS = 1000
 export async function resolveSession(options: {
   client: OpencodeClient
   sessionId?: string
+  directory: string
 }): Promise<string> {
-  const { client, sessionId } = options
+  const { client, sessionId, directory } = options
 
   if (sessionId) {
-    const res = await client.session.get({ path: { id: sessionId } })
+    const res = await client.session.get({
+      path: { id: sessionId },
+      query: { directory },
+    })
     if (res.error || !res.data) {
       throw new Error(`Session not found: ${sessionId}`)
     }
@@ -28,6 +32,7 @@ export async function resolveSession(options: {
           { permission: "question", action: "deny" as const, pattern: "*" },
         ],
       } as any,
+      query: { directory },
     })
 
     if (res.error) {

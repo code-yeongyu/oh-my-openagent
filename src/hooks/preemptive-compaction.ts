@@ -2,11 +2,17 @@ import { log } from "../shared/logger"
 
 const DEFAULT_ACTUAL_LIMIT = 200_000
 
-const ANTHROPIC_ACTUAL_LIMIT =
-  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
+type ModelCacheStateLike = {
+  anthropicContext1MEnabled: boolean
+}
+
+function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
+  return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
+    process.env.ANTHROPIC_1M_CONTEXT === "true" ||
+    process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
     ? 1_000_000
     : DEFAULT_ACTUAL_LIMIT
+}
 
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
 
@@ -21,6 +27,10 @@ interface CachedCompactionState {
   providerID: string
   modelID: string
   tokens: TokenInfo
+}
+
+function isAnthropicProvider(providerID: string): boolean {
+  return providerID === "anthropic" || providerID === "google-vertex-anthropic"
 }
 
 type PluginInput = {
@@ -39,7 +49,10 @@ type PluginInput = {
   directory: string
 }
 
-export function createPreemptiveCompactionHook(ctx: PluginInput) {
+export function createPreemptiveCompactionHook(
+  ctx: PluginInput,
+  modelCacheState?: ModelCacheStateLike,
+) {
   const compactionInProgress = new Set<string>()
   const compactedSessions = new Set<string>()
   const tokenCache = new Map<string, CachedCompactionState>()
@@ -55,8 +68,8 @@ export function createPreemptiveCompactionHook(ctx: PluginInput) {
     if (!cached) return
 
     const actualLimit =
-      cached.providerID === "anthropic"
-        ? ANTHROPIC_ACTUAL_LIMIT
+      isAnthropicProvider(cached.providerID)
+        ? getAnthropicActualLimit(modelCacheState)
         : DEFAULT_ACTUAL_LIMIT
 
     const lastTokens = cached.tokens

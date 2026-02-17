@@ -5,7 +5,7 @@ import type {
 	TmuxPaneInfo,
 	WindowState,
 } from "./types"
-import { MAIN_PANE_RATIO } from "./tmux-grid-constants"
+import { DIVIDER_SIZE } from "./tmux-grid-constants"
 import {
 	canSplitPane,
 	findMinimalEvictions,
@@ -26,7 +26,10 @@ export function decideSpawnActions(
 	}
 
 	const minPaneWidth = config.agentPaneWidth
-	const agentAreaWidth = Math.floor(state.windowWidth * (1 - MAIN_PANE_RATIO))
+	const agentAreaWidth = Math.max(
+		0,
+		state.windowWidth - state.mainPane.width - DIVIDER_SIZE,
+	)
 	const currentCount = state.agentPanes.length
 
 	if (agentAreaWidth < minPaneWidth) {
@@ -62,7 +65,7 @@ export function decideSpawnActions(
 	}
 
 	if (isSplittableAtCount(agentAreaWidth, currentCount, minPaneWidth)) {
-		const spawnTarget = findSpawnTarget(state)
+		const spawnTarget = findSpawnTarget(state, minPaneWidth)
 		if (spawnTarget) {
 			return {
 				canSpawn: true,
@@ -85,19 +88,14 @@ export function decideSpawnActions(
 			canSpawn: true,
 			actions: [
 				{
-					type: "close",
+					type: "replace",
 					paneId: oldestPane.paneId,
-					sessionId: oldestMapping?.sessionId || "",
-				},
-				{
-					type: "spawn",
-					sessionId,
+					oldSessionId: oldestMapping?.sessionId || "",
+					newSessionId: sessionId,
 					description,
-					targetPaneId: state.mainPane.paneId,
-					splitDirection: "-h",
 				},
 			],
-			reason: "closed 1 pane to make room for split",
+			reason: "replaced oldest pane to avoid split churn",
 		}
 	}
 

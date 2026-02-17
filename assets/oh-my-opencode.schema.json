@@ -87,9 +87,11 @@
           "claude-code-hooks",
           "auto-slash-command",
           "edit-error-recovery",
+          "json-error-recovery",
           "delegate-task-retry",
           "prometheus-md-only",
           "sisyphus-junior-notepad",
+          "sisyphus-gpt-hephaestus-reminder",
           "start-work",
           "atlas",
           "unstable-agent-babysitter",
@@ -98,7 +100,8 @@
           "stop-continuation-guard",
           "tasks-todowrite-disabler",
           "write-existing-file-guard",
-          "anthropic-effort"
+          "anthropic-effort",
+          "hashline-read-enhancer"
         ]
       }
     },
@@ -2836,6 +2839,9 @@
         },
         "safe_hook_creation": {
           "type": "boolean"
+        },
+        "hashline_edit": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -3062,7 +3068,8 @@
           "enum": [
             "playwright",
             "agent-browser",
-            "dev-browser"
+            "dev-browser",
+            "playwright-cli"
           ]
         }
       },

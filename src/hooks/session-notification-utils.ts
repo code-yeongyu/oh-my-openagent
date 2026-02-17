@@ -1,5 +1,3 @@
-import { spawn } from "bun"
-
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
 
 async function findCommand(commandName: string): Promise<string | null> {

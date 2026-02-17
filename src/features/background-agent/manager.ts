@@ -16,7 +16,6 @@ import {
   DEFAULT_STALE_TIMEOUT_MS,
   MIN_IDLE_TIME_MS,
   MIN_RUNTIME_BEFORE_STALE_MS,
-  MIN_STABILITY_TIME_MS,
   POLLING_INTERVAL_MS,
   TASK_CLEANUP_DELAY_MS,
   TASK_TTL_MS,
@@ -24,8 +23,8 @@ import {
 
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
-import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../hook-message-injector"
-import { existsSync, readdirSync } from "node:fs"
+import { MESSAGE_STORAGE, type StoredMessage } from "../hook-message-injector"
+import { existsSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
 type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
@@ -81,6 +80,7 @@ export class BackgroundManager {
   private client: OpencodeClient
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
+  private pollingInFlight = false
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
@@ -93,6 +93,7 @@ export class BackgroundManager {
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
+  private enableParentSessionNotifications: boolean
   readonly taskHistory = new TaskHistory()
 
   constructor(
@@ -102,6 +103,7 @@ export class BackgroundManager {
       tmuxConfig?: TmuxConfig
       onSubagentSessionCreated?: OnSubagentSessionCreated
       onShutdown?: () => void
+      enableParentSessionNotifications?: boolean
     }
   ) {
     this.tasks = new Map()
@@ -114,6 +116,7 @@ export class BackgroundManager {
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.onShutdown = options?.onShutdown
+    this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.registerProcessCleanup()
   }
 
@@ -1204,19 +1207,21 @@ export class BackgroundManager {
       allComplete = true
     }
 
+    const completedTasks = allComplete
+      ? Array.from(this.tasks.values())
+        .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
+      : []
+
     const statusText = task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
-    
-    let notification: string
-    let completedTasks: BackgroundTask[] = []
-    if (allComplete) {
-      completedTasks = Array.from(this.tasks.values())
-        .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
-      const completedTasksText = completedTasks
-        .map(t => `- \`${t.id}\`: ${t.description}`)
-        .join("\n")
 
-      notification = `<system-reminder>
+    let notification: string
+    if (allComplete) {
+        const completedTasksText = completedTasks
+          .map(t => `- \`${t.id}\`: ${t.description}`)
+          .join("\n")
+
+        notification = `<system-reminder>
 [ALL BACKGROUND TASKS COMPLETE]
 
 **Completed:**
@@ -1239,69 +1244,79 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 </system-reminder>`
     }
 
-    let agent: string | undefined = task.parentAgent
-    let model: { providerID: string; modelID: string } | undefined
+      let agent: string | undefined = task.parentAgent
+      let model: { providerID: string; modelID: string } | undefined
 
-    try {
-      const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
-      const messages = normalizeSDKResponse(messagesResp, [] as Array<{
-        info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
-      }>)
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const info = messages[i].info
-        if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
-          agent = info.agent ?? task.parentAgent
-          model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
-          break
+      if (this.enableParentSessionNotifications) {
+        try {
+          const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
+          const messages = normalizeSDKResponse(messagesResp, [] as Array<{
+            info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
+          }>)
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const info = messages[i].info
+            if (isCompactionAgent(info?.agent)) {
+              continue
+            }
+            if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
+              agent = info.agent ?? task.parentAgent
+              model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+              break
+            }
+          }
+        } catch (error) {
+          if (this.isAbortedSessionError(error)) {
+            log("[background-agent] Parent session aborted while loading messages; using messageDir fallback:", {
+              taskId: task.id,
+              parentSessionID: task.parentSessionID,
+            })
+          }
+          const messageDir = getMessageDir(task.parentSessionID)
+          const currentMessage = messageDir ? findNearestMessageExcludingCompaction(messageDir) : null
+          agent = currentMessage?.agent ?? task.parentAgent
+          model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+            ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+            : undefined
         }
-      }
-    } catch (error) {
-      if (this.isAbortedSessionError(error)) {
-        log("[background-agent] Parent session aborted while loading messages; using messageDir fallback:", {
-          taskId: task.id,
-          parentSessionID: task.parentSessionID,
-        })
-      }
-      const messageDir = getMessageDir(task.parentSessionID)
-      const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-      agent = currentMessage?.agent ?? task.parentAgent
-      model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
-        ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
-        : undefined
-    }
 
-    log("[background-agent] notifyParentSession context:", {
-      taskId: task.id,
-      resolvedAgent: agent,
-      resolvedModel: model,
-    })
-
-    try {
-      await this.client.session.promptAsync({
-        path: { id: task.parentSessionID },
-        body: {
-          noReply: !allComplete,
-          ...(agent !== undefined ? { agent } : {}),
-          ...(model !== undefined ? { model } : {}),
-          ...(task.parentTools ? { tools: task.parentTools } : {}),
-          parts: [{ type: "text", text: notification }],
-        },
-      })
-      log("[background-agent] Sent notification to parent session:", {
-        taskId: task.id,
-        allComplete,
-        noReply: !allComplete,
-      })
-    } catch (error) {
-      if (this.isAbortedSessionError(error)) {
-        log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
+        log("[background-agent] notifyParentSession context:", {
           taskId: task.id,
-          parentSessionID: task.parentSessionID,
+          resolvedAgent: agent,
+          resolvedModel: model,
         })
+
+        try {
+          await this.client.session.promptAsync({
+            path: { id: task.parentSessionID },
+            body: {
+              noReply: !allComplete,
+              ...(agent !== undefined ? { agent } : {}),
+              ...(model !== undefined ? { model } : {}),
+              ...(task.parentTools ? { tools: task.parentTools } : {}),
+              parts: [{ type: "text", text: notification }],
+            },
+          })
+          log("[background-agent] Sent notification to parent session:", {
+            taskId: task.id,
+            allComplete,
+            noReply: !allComplete,
+          })
+        } catch (error) {
+          if (this.isAbortedSessionError(error)) {
+            log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
+              taskId: task.id,
+              parentSessionID: task.parentSessionID,
+            })
+          } else {
+            log("[background-agent] Failed to send notification:", error)
+          }
+        }
       } else {
-        log("[background-agent] Failed to send notification:", error)
+        log("[background-agent] Parent session notifications disabled, skipping prompt injection:", {
+          taskId: task.id,
+          parentSessionID: task.parentSessionID,
+        })
       }
-    }
 
     if (allComplete) {
       for (const completedTask of completedTasks) {
@@ -1532,6 +1547,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
   }
 
   private async pollRunningTasks(): Promise<void> {
+    if (this.pollingInFlight) return
+    this.pollingInFlight = true
+    try {
     this.pruneStaleTasksAndNotifications()
 
     const statusResult = await this.client.session.status()
@@ -1586,6 +1604,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     if (!this.hasRunningTasks()) {
       this.stopPolling()
+    }
+    } finally {
+      this.pollingInFlight = false
     }
   }
 
@@ -1702,5 +1723,59 @@ function getMessageDir(sessionID: string): string | null {
     const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
     if (existsSync(sessionPath)) return sessionPath
   }
+  return null
+}
+
+function isCompactionAgent(agent: string | undefined): boolean {
+  return agent?.trim().toLowerCase() === "compaction"
+}
+
+function hasFullAgentAndModel(message: StoredMessage): boolean {
+  return !!message.agent &&
+    !isCompactionAgent(message.agent) &&
+    !!message.model?.providerID &&
+    !!message.model?.modelID
+}
+
+function hasPartialAgentOrModel(message: StoredMessage): boolean {
+  const hasAgent = !!message.agent && !isCompactionAgent(message.agent)
+  const hasModel = !!message.model?.providerID && !!message.model?.modelID
+  return hasAgent || hasModel
+}
+
+function findNearestMessageExcludingCompaction(messageDir: string): StoredMessage | null {
+  try {
+    const files = readdirSync(messageDir)
+      .filter((name) => name.endsWith(".json"))
+      .sort()
+      .reverse()
+
+    for (const file of files) {
+      try {
+        const content = readFileSync(join(messageDir, file), "utf-8")
+        const parsed = JSON.parse(content) as StoredMessage
+        if (hasFullAgentAndModel(parsed)) {
+          return parsed
+        }
+      } catch {
+        continue
+      }
+    }
+
+    for (const file of files) {
+      try {
+        const content = readFileSync(join(messageDir, file), "utf-8")
+        const parsed = JSON.parse(content) as StoredMessage
+        if (hasPartialAgentOrModel(parsed)) {
+          return parsed
+        }
+      } catch {
+        continue
+      }
+    }
+  } catch {
+    return null
+  }
+
   return null
 }

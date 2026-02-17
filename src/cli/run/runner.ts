@@ -8,10 +8,10 @@ import { createJsonOutputManager } from "./json-output"
 import { executeOnCompleteHook } from "./on-complete-hook"
 import { resolveRunAgent } from "./agent-resolver"
 import { pollForCompletion } from "./poll-for-completion"
+import { loadAgentProfileColors } from "./agent-profile-colors"
 
 export { resolveRunAgent }
 
-const DEFAULT_TIMEOUT_MS = 600_000
 const EVENT_PROCESSOR_SHUTDOWN_TIMEOUT_MS = 2_000
 
 export async function waitForEventProcessorShutdown(
@@ -23,13 +23,7 @@ export async function waitForEventProcessorShutdown(
     new Promise<boolean>((resolve) => setTimeout(() => resolve(false), timeoutMs)),
   ])
 
-  if (!completed) {
-    console.log(
-      pc.dim(
-        `[run] Event stream did not close within ${timeoutMs}ms after abort; continuing shutdown.`,
-      ),
-    )
-  }
+  void completed
 }
 
 export async function run(options: RunOptions): Promise<number> {
@@ -39,7 +33,6 @@ export async function run(options: RunOptions): Promise<number> {
   const {
     message,
     directory = process.cwd(),
-    timeout = DEFAULT_TIMEOUT_MS,
   } = options
 
   const jsonManager = options.json ? createJsonOutputManager() : null
@@ -48,14 +41,6 @@ export async function run(options: RunOptions): Promise<number> {
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
   const abortController = new AbortController()
-  let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-  if (timeout > 0) {
-    timeoutId = setTimeout(() => {
-      console.log(pc.yellow("\nTimeout reached. Aborting..."))
-      abortController.abort()
-    }, timeout)
-  }
 
   try {
     const { client, cleanup: serverCleanup } = await createServerConnection({
@@ -65,7 +50,6 @@ export async function run(options: RunOptions): Promise<number> {
     })
 
     const cleanup = () => {
-      if (timeoutId) clearTimeout(timeoutId)
       serverCleanup()
     }
 
@@ -79,18 +63,25 @@ export async function run(options: RunOptions): Promise<number> {
       const sessionID = await resolveSession({
         client,
         sessionId: options.sessionId,
+        directory,
       })
 
       console.log(pc.dim(`Session: ${sessionID}`))
 
-      const ctx: RunContext = { client, sessionID, directory, abortController }
+      const ctx: RunContext = {
+        client,
+        sessionID,
+        directory,
+        abortController,
+        verbose: options.verbose ?? false,
+      }
       const events = await client.event.subscribe({ query: { directory } })
       const eventState = createEventState()
+      eventState.agentColorsByName = await loadAgentProfileColors(client)
       const eventProcessor = processEvents(ctx, events.stream, eventState).catch(
         () => {},
       )
 
-      console.log(pc.dim("\nSending prompt..."))
       await client.session.promptAsync({
         path: { id: sessionID },
         body: {
@@ -99,8 +90,6 @@ export async function run(options: RunOptions): Promise<number> {
         },
         query: { directory },
       })
-
-      console.log(pc.dim("Waiting for completion...\n"))
       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
       // Abort the event stream to stop the processor
@@ -137,7 +126,6 @@ export async function run(options: RunOptions): Promise<number> {
       throw err
     }
   } catch (err) {
-    if (timeoutId) clearTimeout(timeoutId)
     if (jsonManager) jsonManager.restore()
     if (err instanceof Error && err.name === "AbortError") {
       return 130
