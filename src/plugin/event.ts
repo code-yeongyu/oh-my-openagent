@@ -49,7 +49,11 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.ralphLoop?.event?.(input))
     await Promise.resolve(hooks.stopContinuationGuard?.event?.(input))
     await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input))
-    await Promise.resolve(hooks.runtimeFallback?.event?.(input))
+    try {
+      await Promise.resolve(hooks.runtimeFallback?.event?.(input))
+    } catch (error) {
+      log("[event] runtimeFallback event handler failed", { error: String(error) })
+    }
     await Promise.resolve(hooks.atlasHook?.handler?.(input))
 
     if (event.type === "session.created") {
