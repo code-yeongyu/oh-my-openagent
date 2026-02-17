@@ -67,10 +67,9 @@ program
    .command("run <message>")
    .allowUnknownOption()
    .passThroughOptions()
-   .description("Run opencode with todo/background task completion enforcement")
+  .description("Run opencode with todo/background task completion enforcement")
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-d, --directory <path>", "Working directory")
-  .option("-t, --timeout <ms>", "Timeout in milliseconds (default: 30 minutes)", parseInt)
   .option("-p, --port <port>", "Server port (attaches if port already in use)", parseInt)
   .option("--attach <url>", "Attach to existing opencode server URL")
   .option("--on-complete <command>", "Shell command to run after completion")
@@ -81,7 +80,6 @@ program
 Examples:
   $ bunx oh-my-opencode run "Fix the bug in index.ts"
   $ bunx oh-my-opencode run --agent Sisyphus "Implement feature X"
-  $ bunx oh-my-opencode run --timeout 3600000 "Large refactoring task"
   $ bunx oh-my-opencode run --port 4321 "Fix the bug"
   $ bunx oh-my-opencode run --attach http://127.0.0.1:4321 "Fix the bug"
   $ bunx oh-my-opencode run --json "Fix the bug" | jq .sessionId
@@ -110,7 +108,6 @@ Unlike 'opencode run', this command waits until:
       message,
       agent: options.agent,
       directory: options.directory,
-      timeout: options.timeout,
       port: options.port,
       attach: options.attach,
       onComplete: options.onComplete,

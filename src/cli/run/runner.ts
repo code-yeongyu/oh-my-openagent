@@ -11,7 +11,6 @@ import { pollForCompletion } from "./poll-for-completion"
 
 export { resolveRunAgent }
 
-const DEFAULT_TIMEOUT_MS = 600_000
 const EVENT_PROCESSOR_SHUTDOWN_TIMEOUT_MS = 2_000
 
 export async function waitForEventProcessorShutdown(
@@ -39,7 +38,6 @@ export async function run(options: RunOptions): Promise<number> {
   const {
     message,
     directory = process.cwd(),
-    timeout = DEFAULT_TIMEOUT_MS,
   } = options
 
   const jsonManager = options.json ? createJsonOutputManager() : null
@@ -99,9 +97,7 @@ export async function run(options: RunOptions): Promise<number> {
       })
 
       console.log(pc.dim("Waiting for completion...\n"))
-      const exitCode = await pollForCompletion(ctx, eventState, abortController, {
-        timeoutMs: timeout,
-      })
+      const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
       // Abort the event stream to stop the processor
       abortController.abort()
