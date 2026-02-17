@@ -8,5 +8,13 @@ export function transformModelForProvider(provider: string, model: string): stri
 			.replace("gemini-3-pro", "gemini-3-pro-preview")
 			.replace("gemini-3-flash", "gemini-3-flash-preview")
 	}
+	if (provider === "google") {
+		if (!model.endsWith("-preview")) {
+			return model
+				.replace("gemini-3-pro", "gemini-3-pro-preview")
+				.replace("gemini-3-flash", "gemini-3-flash-preview")
+		}
+		return model
+	}
 	return model
 }
