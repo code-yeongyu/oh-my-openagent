@@ -11,11 +11,11 @@ Root source directory. Entry point `index.ts` orchestrates 4-step initialization
 | File | Purpose |
 |------|---------|
 | `index.ts` | Plugin entry, exports `OhMyOpenCodePlugin` |
-| `plugin-config.ts` | JSONC parse, multi-level merge (project → user → defaults), Zod validation |
+| `plugin-config.ts` | JSONC parse, multi-level merge (user → project → defaults), Zod validation |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry |
-| `create-hooks.ts` | 3-tier hook composition: Core(33) + Continuation(7) + Skill(2) |
-| `plugin-interface.ts` | Assembles 7 OpenCode hook handlers into PluginInterface |
+| `create-hooks.ts` | 3-tier hook composition: Core(32) + Continuation(7) + Skill(2) |
+| `plugin-interface.ts` | Assembles 8 OpenCode hook handlers into PluginInterface |
 
 ## CONFIG LOADING
 
@@ -32,8 +32,8 @@ loadPluginConfig(directory, ctx)
 
 ```
 createHooks()
-  ├─→ createCoreHooks()           # 33 hooks
-  │   ├─ createSessionHooks()     # 20: contextWindowMonitor, thinkMode, ralphLoop, sessionRecovery...
+  ├─→ createCoreHooks()           # 32 hooks
+  │   ├─ createSessionHooks()     # 19: contextWindowMonitor, thinkMode, ralphLoop, sessionRecovery...
   │   ├─ createToolGuardHooks()   # 9: commentChecker, rulesInjector, writeExistingFileGuard...
   │   └─ createTransformHooks()   # 4: claudeCodeHooks, keywordDetector, contextInjector, thinkingBlockValidator
   ├─→ createContinuationHooks()   # 7: todoContinuationEnforcer, atlas, stopContinuationGuard...
