@@ -1,5 +1,12 @@
 import { readdir, readFile, stat } from "fs/promises"
 import { join, relative } from "path"
+import {
+  formatTypes,
+  formatConventions,
+  formatDependencies,
+  type ExtractedTypes,
+  type PackageDeps,
+} from "./formatter"
 
 const ZOD_SCHEMA_PATTERN = /export\s+const\s+(\w+Schema)\s*=/g
 const ZOD_INFER_PATTERN = /export\s+type\s+(\w+)\s*=\s*z\.infer</g
@@ -8,13 +15,6 @@ const TYPE_ALIAS_PATTERN = /export\s+type\s+(\w+)\s*=/g
 const MAX_DEPTH = 6
 const TS_EXTENSIONS = new Set([".ts", ".tsx"])
 const IGNORED_DIRS = new Set(["node_modules", ".git", "dist", ".next", "build", "__fixtures__"])
-
-interface ExtractedTypes {
-  zodSchemas: Array<{ name: string; file: string }>
-  zodInferred: Array<{ name: string; file: string }>
-  interfaces: Array<{ name: string; file: string }>
-  typeAliases: Array<{ name: string; file: string }>
-}
 
 async function collectTsFiles(dir: string, depth = 0): Promise<string[]> {
   if (depth > MAX_DEPTH) return []
@@ -134,12 +134,6 @@ async function readAgentsMd(projectDir: string): Promise<string> {
   }
 }
 
-interface PackageDeps {
-  name: string
-  dependencies: Record<string, string>
-  devDependencies: Record<string, string>
-}
-
 async function readPackageJson(projectDir: string): Promise<PackageDeps> {
   try {
     const raw = await readFile(join(projectDir, "package.json"), "utf-8")
@@ -152,83 +146,6 @@ async function readPackageJson(projectDir: string): Promise<PackageDeps> {
   } catch {
     return { name: "unknown", dependencies: {}, devDependencies: {} }
   }
-}
-
-function formatTypes(types: ExtractedTypes): string {
-  const lines: string[] = ["## Existing Types", ""]
-
-  if (types.zodSchemas.length === 0 && types.zodInferred.length === 0 && types.interfaces.length === 0 && types.typeAliases.length === 0) {
-    lines.push("No types found.", "")
-    return lines.join("\n")
-  }
-
-  if (types.zodSchemas.length > 0) {
-    lines.push("### Zod Schemas", "")
-    for (const s of types.zodSchemas) {
-      lines.push(`- \`${s.name}\` (${s.file})`)
-    }
-    lines.push("")
-  }
-
-  if (types.zodInferred.length > 0) {
-    lines.push("### Zod Inferred Types", "")
-    for (const t of types.zodInferred) {
-      lines.push(`- \`${t.name}\` (${t.file})`)
-    }
-    lines.push("")
-  }
-
-  if (types.interfaces.length > 0) {
-    lines.push("### Interfaces", "")
-    for (const i of types.interfaces) {
-      lines.push(`- \`${i.name}\` (${i.file})`)
-    }
-    lines.push("")
-  }
-
-  if (types.typeAliases.length > 0) {
-    lines.push("### Type Aliases", "")
-    for (const t of types.typeAliases) {
-      lines.push(`- \`${t.name}\` (${t.file})`)
-    }
-    lines.push("")
-  }
-
-  return lines.join("\n")
-}
-
-function formatConventions(agentsContent: string): string {
-  return `## Project Conventions\n\n${agentsContent}\n`
-}
-
-function formatDependencies(pkg: PackageDeps): string {
-  const lines: string[] = ["## Dependencies", ""]
-
-  const depKeys = Object.keys(pkg.dependencies)
-  const devKeys = Object.keys(pkg.devDependencies)
-
-  if (depKeys.length === 0 && devKeys.length === 0) {
-    lines.push("No dependencies found.", "")
-    return lines.join("\n")
-  }
-
-  if (depKeys.length > 0) {
-    lines.push("### Runtime", "")
-    for (const dep of depKeys) {
-      lines.push(`- ${dep} (${pkg.dependencies[dep]})`)
-    }
-    lines.push("")
-  }
-
-  if (devKeys.length > 0) {
-    lines.push("### Development", "")
-    for (const dep of devKeys) {
-      lines.push(`- ${dep} (${pkg.devDependencies[dep]})`)
-    }
-    lines.push("")
-  }
-
-  return lines.join("\n")
 }
 
 export async function extractGlobalConstraints(projectDir: string): Promise<string> {
