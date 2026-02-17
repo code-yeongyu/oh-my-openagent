@@ -7,6 +7,7 @@ import {
   handleSessionIdle,
   handleSessionStatus,
   handleMessagePartUpdated,
+  handleMessagePartDelta,
   handleMessageUpdated,
   handleToolExecute,
   handleToolResult,
@@ -38,6 +39,7 @@ export async function processEvents(
       handleSessionIdle(ctx, payload, state)
       handleSessionStatus(ctx, payload, state)
       handleMessagePartUpdated(ctx, payload, state)
+      handleMessagePartDelta(ctx, payload, state)
       handleMessageUpdated(ctx, payload, state)
       handleToolExecute(ctx, payload, state)
       handleToolResult(ctx, payload, state)

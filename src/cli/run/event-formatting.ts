@@ -4,6 +4,7 @@ import type {
   EventPayload,
   MessageUpdatedProps,
   MessagePartUpdatedProps,
+  MessagePartDeltaProps,
   ToolExecuteProps,
   ToolResultProps,
   SessionErrorProps,
@@ -90,6 +91,15 @@ export function logEventVerbose(ctx: RunContext, payload: EventPayload): void {
         const preview = part.text.slice(0, 80).replace(/\n/g, "\\n")
         console.error(pc.dim(`${sessionTag} message.part (text): "${preview}${part.text.length > 80 ? "..." : ""}"`))
       }
+      break
+    }
+
+    case "message.part.delta": {
+      const deltaProps = props as MessagePartDeltaProps | undefined
+      const field = deltaProps?.field ?? "unknown"
+      const delta = deltaProps?.delta ?? ""
+      const preview = delta.slice(0, 80).replace(/\n/g, "\\n")
+      console.error(pc.dim(`${sessionTag} message.part.delta (${field}): "${preview}${delta.length > 80 ? "..." : ""}"`))
       break
     }
 
