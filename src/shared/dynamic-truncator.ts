@@ -1,13 +1,21 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { normalizeSDKResponse } from "./normalize-sdk-response"
 
-const ANTHROPIC_ACTUAL_LIMIT =
-  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
-    ? 1_000_000
-    : 200_000;
+const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 const DEFAULT_TARGET_MAX_TOKENS = 50_000;
+
+type ModelCacheStateLike = {
+	anthropicContext1MEnabled: boolean;
+}
+
+function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
+	return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
+		process.env.ANTHROPIC_1M_CONTEXT === "true" ||
+		process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
+		? 1_000_000
+		: DEFAULT_ANTHROPIC_ACTUAL_LIMIT;
+}
 
 interface AssistantMessageInfo {
 	role: "assistant";
@@ -110,6 +118,7 @@ export function truncateToTokenLimit(
 export async function getContextWindowUsage(
 	ctx: PluginInput,
 	sessionID: string,
+	modelCacheState?: ModelCacheStateLike,
 ): Promise<{
 	usedTokens: number;
 	remainingTokens: number;
@@ -134,12 +143,13 @@ export async function getContextWindowUsage(
 			(lastTokens?.input ?? 0) +
 			(lastTokens?.cache?.read ?? 0) +
 			(lastTokens?.output ?? 0);
-		const remainingTokens = ANTHROPIC_ACTUAL_LIMIT - usedTokens;
+		const anthropicActualLimit = getAnthropicActualLimit(modelCacheState);
+		const remainingTokens = anthropicActualLimit - usedTokens;
 
 		return {
 			usedTokens,
 			remainingTokens,
-			usagePercentage: usedTokens / ANTHROPIC_ACTUAL_LIMIT,
+			usagePercentage: usedTokens / anthropicActualLimit,
 		};
 	} catch {
 		return null;
@@ -151,6 +161,7 @@ export async function dynamicTruncate(
 	sessionID: string,
 	output: string,
 	options: TruncationOptions = {},
+	modelCacheState?: ModelCacheStateLike,
 ): Promise<TruncationResult> {
 	if (typeof output !== 'string') {
 		return { result: String(output ?? ''), truncated: false };
@@ -161,7 +172,7 @@ export async function dynamicTruncate(
 		preserveHeaderLines = 3,
 	} = options;
 
-	const usage = await getContextWindowUsage(ctx, sessionID);
+	const usage = await getContextWindowUsage(ctx, sessionID, modelCacheState);
 
 	if (!usage) {
 		// Fallback: apply conservative truncation when context usage unavailable
@@ -183,15 +194,19 @@ export async function dynamicTruncate(
 	return truncateToTokenLimit(output, maxOutputTokens, preserveHeaderLines);
 }
 
-export function createDynamicTruncator(ctx: PluginInput) {
+export function createDynamicTruncator(
+	ctx: PluginInput,
+	modelCacheState?: ModelCacheStateLike,
+) {
 	return {
 		truncate: (
 			sessionID: string,
 			output: string,
 			options?: TruncationOptions,
-		) => dynamicTruncate(ctx, sessionID, output, options),
+		) => dynamicTruncate(ctx, sessionID, output, options, modelCacheState),
 
-		getUsage: (sessionID: string) => getContextWindowUsage(ctx, sessionID),
+		getUsage: (sessionID: string) =>
+			getContextWindowUsage(ctx, sessionID, modelCacheState),
 
 		truncateSync: (
 			output: string,
