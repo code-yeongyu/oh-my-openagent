@@ -3,7 +3,7 @@ import { z } from "zod"
 export const RuntimeFallbackConfigSchema = z.object({
   /** Enable runtime fallback (default: true) */
   enabled: z.boolean().optional(),
-  /** HTTP status codes that trigger fallback (default: [429, 503, 529]) */
+  /** HTTP status codes that trigger fallback (default: [400, 429, 503, 529]) */
   retry_on_errors: z.array(z.number()).optional(),
   /** Maximum fallback attempts per session (default: 3) */
   max_fallback_attempts: z.number().min(1).max(20).optional(),
