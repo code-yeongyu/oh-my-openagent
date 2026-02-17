@@ -228,7 +228,15 @@ Parallel Speedup: ~40% faster than sequential
 > EVERY task MUST have: Recommended Agent Profile + Parallelization info.
 > Support hierarchical structures: parent tasks aggregate child completion.
 
-**CRITICAL: Hierarchical Numbering Rules**
+**CRITICAL: Waves → Parent Tasks Mapping**
+
+Execution Waves from the "Execution Strategy" section MUST become parent tasks here:
+- Wave 1 → \`1. Wave 1: [Description] [0/N]\`
+- Wave 2 → \`2. Wave 2: [Description] [0/N]\`
+- Tasks within Wave 1 → \`1.1.\`, \`1.2.\`, \`1.3.\`, etc.
+- Tasks within Wave 2 → \`2.1.\`, \`2.2.\`, \`2.3.\`, etc.
+
+**Hierarchical Numbering Rules**
 
 1. **If a task shows \`[0/N]\` with N > 0, it MUST have exactly N child tasks below it**
 2. **Child tasks MUST use hierarchical numbering**: \`1.1\`, \`1.2\`, \`2.1\`, \`2.2.1\`, etc.
@@ -238,9 +246,9 @@ Parallel Speedup: ~40% faster than sequential
 
 **Examples follow these rules strictly:**
 
-- [ ] 1. Parent Task [0/2]
+- [ ] 1. Wave 1: Foundation [0/2]
 
-  **What to do**: [High-level work package]
+  **What to do**: [High-level work package for foundation setup]
   
   **Recommended Agent Profile**:
   > Select category + skills based on task domain. Justify each choice.
@@ -252,13 +260,13 @@ Parallel Speedup: ~40% faster than sequential
 
   **Parallelization**:
   - **Can Run In Parallel**: YES | NO
-  - **Parallel Group**: Wave N (with Tasks X, Y) | Sequential
+  - **Parallel Group**: Wave 1 (with Tasks 1.1, 1.2)
   - **Blocks**: [Child tasks 1.1, 1.2]
   - **Blocked By**: None (can start immediately)
 
   ---
 
-  - [ ] 1.1. Child Task A
+  - [ ] 1.1. Initialize Project
 
     **What to do**:
     - [Clear implementation steps]
@@ -323,7 +331,7 @@ Parallel Speedup: ~40% faster than sequential
 
   ---
 
-  - [ ] 1.2. Child Task B
+  - [ ] 1.2. Database Configuration
 
     **What to do**:
     - [Clear implementation steps]
@@ -334,8 +342,8 @@ Parallel Speedup: ~40% faster than sequential
     - **Skills**: [\`skill-name\`]
 
     **Parallelization**:
-    - **Can Run In Parallel**: NO
-    - **Blocked By**: Child task 1.1
+    - **Can Run In Parallel**: YES (with 1.1)
+    - **Blocked By**: None (Wave 1 tasks can run in parallel)
     - **Blocks**: None
 
     **References**:
@@ -348,21 +356,22 @@ Parallel Speedup: ~40% faster than sequential
 
 ---
 
-- [ ] 2. Independent Task [0/1]
+- [ ] 2. Wave 2: Core Features [0/1]
 
-  **What to do**: [Standalone work]
+  **What to do**: [Core feature implementation after foundation]
 
   **Recommended Agent Profile**:
   - **Category**: \`quick\`
   - **Skills**: [\`git-master\`]
 
   **Parallelization**:
-  - **Can Run In Parallel**: YES (with Task 1)
-  - **Parallel Group**: Wave 1
+  - **Can Run In Parallel**: NO (depends on Wave 1)
+  - **Parallel Group**: Wave 2
+  - **Blocked By**: Wave 1 completion
 
   ---
 
-  - [ ] 2.1. Subtask
+  - [ ] 2.1. Authentication Module
 
     **What to do**: [Implementation details]
 

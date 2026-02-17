@@ -84,7 +84,9 @@ export function buildNumberedTree(tasks: Task[]): NumberedTreeResult {
       const ancestors = getAncestors(task.id, tasks).reverse()
 
       if (ancestors.length === 0) {
-        const index = activeRoots.findIndex((r) => r.id === task.id)
+        const allRoots = tasks.filter((t) => !t.parentID)
+        allRoots.sort((a, b) => a.id.localeCompare(b.id))
+        const index = allRoots.findIndex((r) => r.id === task.id)
         if (index >= 0) {
           taskNumbers.set(task.id, {
             depth: 0,
@@ -94,7 +96,10 @@ export function buildNumberedTree(tasks: Task[]): NumberedTreeResult {
       } else {
         const parentPath = taskNumbers.get(ancestors[ancestors.length - 1].id)
         if (parentPath) {
-          const siblingIndex = tasks.filter((t) => t.parentID === task.parentID).length - 1
+          const allSiblings = tasks.filter((t) => t.parentID === task.parentID)
+          allSiblings.sort((a, b) => a.id.localeCompare(b.id))
+          const siblingIndex = allSiblings.findIndex((s) => s.id === task.id)
+          
           taskNumbers.set(task.id, {
             depth: depth,
             numberingPath: [...parentPath.numberingPath, siblingIndex + 1],

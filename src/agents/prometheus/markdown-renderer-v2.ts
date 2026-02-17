@@ -1,4 +1,5 @@
 import { buildTaskTree, calculateProgress } from "../../features/claude-tasks/tree-utils"
+import type { TaskTree } from "../../features/claude-tasks/tree-utils"
 import { TASK_MAX_DEPTH } from "../../features/claude-tasks/storage"
 import type { Task } from "../../tools/task/types"
 
@@ -12,12 +13,13 @@ export function renderNode(
   task: Task,
   depth: number,
   children: Task[],
-  allTasks: Task[]
+  tree: TaskTree,
+  activeTasks: Task[]
 ): string {
   const indent = INDENT.repeat(depth)
   const checkbox = task.status === "completed" ? "[x]" : "[ ]"
   
-  const pathArray = getNumberingPath(task, allTasks)
+  const pathArray = getNumberingPath(task, tree)
   const numbering = generateNumbering(pathArray)
   
   const isLeaf = children.length === 0
@@ -39,14 +41,14 @@ export function renderNode(
     return output
   }
   
-  const progress = calculateProgress(task.id, allTasks)
+  const progress = calculateProgress(task.id, activeTasks)
   const progressIndicator = `[${progress.completed}/${progress.total}]`
   
   return `${indent}- ${checkbox} ${numbering}. ${task.subject} ${progressIndicator}\n`
 }
 
-function getNumberingPath(task: Task, allTasks: Task[]): number[] {
-  const { byId, childrenByParent, roots } = buildTaskTree(allTasks)
+function getNumberingPath(task: Task, tree: TaskTree): number[] {
+  const { byId, childrenByParent, roots } = tree
   const path: number[] = []
   
   const ancestors: Task[] = []
@@ -81,14 +83,15 @@ export function renderTaskTree(tasks: Task[]): string {
     return ""
   }
   
-  const { roots, childrenByParent } = buildTaskTree(activeTasks)
+  const tree = buildTaskTree(activeTasks)
+  const { roots, childrenByParent } = tree
   let output = ""
   
   function renderRecursive(task: Task, depth: number): void {
     const children = childrenByParent.get(task.id) ?? []
     const activeChildren = children.filter((c) => c.status !== "deleted")
     
-    output += renderNode(task, depth, activeChildren, activeTasks)
+    output += renderNode(task, depth, activeChildren, tree, activeTasks)
     
     if (depth < TASK_MAX_DEPTH) {
       for (const child of activeChildren) {

@@ -10,6 +10,7 @@ import {
   renderNode,
   generateNumbering,
 } from "./markdown-renderer-v2"
+import { buildTaskTree } from "../../features/claude-tasks/tree-utils"
 import type { Task } from "../../tools/task/types"
 
 describe("generateNumbering", () => {
@@ -61,8 +62,9 @@ describe("renderNode", () => {
       threadID: "thread-1",
     }
     const allTasks = [task]
+    const tree = buildTaskTree(allTasks)
 
-    const result = renderNode(task, 0, [], allTasks)
+    const result = renderNode(task, 0, [], tree, allTasks)
 
     expect(result).toContain("- [ ] 1. Write unit tests")
     expect(result).toContain("**What to do:**")
@@ -104,8 +106,9 @@ describe("renderNode", () => {
       threadID: "thread-1",
     }
     const allTasks = [parent, child1, child2]
+    const tree = buildTaskTree(allTasks)
 
-    const result = renderNode(parent, 0, [child1, child2], allTasks)
+    const result = renderNode(parent, 0, [child1, child2], tree, allTasks)
 
     expect(result).toContain("- [ ] 1. Implement feature X")
     expect(result).toContain("[1/2]")
@@ -127,8 +130,9 @@ describe("renderNode", () => {
       threadID: "thread-1",
     }
     const allTasks = [task]
+    const tree = buildTaskTree(allTasks)
 
-    const result = renderNode(task, 0, [], allTasks)
+    const result = renderNode(task, 0, [], tree, allTasks)
 
     expect(result).toContain("- [x] 1. Setup database")
   })
@@ -147,8 +151,9 @@ describe("renderNode", () => {
       threadID: "thread-1",
     }
     const allTasks = [task]
+    const tree = buildTaskTree(allTasks)
 
-    const result = renderNode(task, 2, [], allTasks)
+    const result = renderNode(task, 2, [], tree, allTasks)
 
     expect(result).toStartWith("    - [ ]") // 4 spaces for depth 2
   })
@@ -168,8 +173,9 @@ describe("renderNode", () => {
       threadID: "thread-1",
     }
     const allTasks = [task]
+    const tree = buildTaskTree(allTasks)
 
-    const result = renderNode(task, 0, [], allTasks)
+    const result = renderNode(task, 0, [], tree, allTasks)
 
     expect(result).toContain("**Acceptance Criteria:**")
     expect(result).toContain("Deploying to production")
@@ -668,9 +674,10 @@ describe("renderNode edge cases", () => {
       threadID: "thread-1",
     }
     const allTasks = [task]
+    const tree = buildTaskTree(allTasks)
 
     //#when
-    const result = renderNode(task, 0, [], allTasks)
+    const result = renderNode(task, 0, [], tree, allTasks)
 
     //#then - in_progress shows unchecked checkbox
     expect(result).toContain("- [ ]")
@@ -689,9 +696,10 @@ describe("renderNode edge cases", () => {
       threadID: "thread-1",
     }
     const allTasks = [task]
+    const tree = buildTaskTree(allTasks)
 
     //#when
-    const result = renderNode(task, 0, [], allTasks)
+    const result = renderNode(task, 0, [], tree, allTasks)
 
     //#then
     expect(result).toContain("- [ ]")
@@ -720,9 +728,10 @@ describe("renderNode edge cases", () => {
       threadID: "thread-1",
     }
     const allTasks = [parent, child]
+    const tree = buildTaskTree(allTasks)
 
     //#when
-    const result = renderNode(parent, 0, [child], allTasks)
+    const result = renderNode(parent, 0, [child], tree, allTasks)
 
     //#then - parent node is single line, no activeForm
     expect(result).not.toContain("Should not appear")
@@ -741,9 +750,10 @@ describe("renderNode edge cases", () => {
       threadID: "thread-1",
     }
     const allTasks = [task]
+    const tree = buildTaskTree(allTasks)
 
     //#when
-    const result = renderNode(task, 0, [], allTasks)
+    const result = renderNode(task, 0, [], tree, allTasks)
 
     //#then
     expect(result).toContain("**What to do:**")

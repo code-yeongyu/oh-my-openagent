@@ -288,9 +288,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -339,9 +336,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -432,9 +426,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -644,9 +635,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -695,9 +683,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -788,9 +773,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -1000,9 +982,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -1051,9 +1030,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1144,9 +1120,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -1356,9 +1329,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -1407,9 +1377,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1500,9 +1467,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -1715,9 +1679,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -1766,9 +1727,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1859,9 +1817,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -2071,9 +2026,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2122,9 +2074,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -2215,9 +2164,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -2427,9 +2373,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2478,9 +2421,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -2571,9 +2511,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -2783,9 +2720,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2834,9 +2768,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -2927,9 +2858,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -3139,9 +3067,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -3190,9 +3115,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -3283,9 +3205,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -3495,9 +3414,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -3546,9 +3462,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -3639,9 +3552,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -3851,9 +3761,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -3902,9 +3809,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -3995,9 +3899,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -4207,9 +4108,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -4258,9 +4156,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -4351,9 +4246,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -4563,9 +4455,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -4614,9 +4503,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -4707,9 +4593,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -4919,9 +4802,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -4970,9 +4850,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -5063,9 +4940,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "ultrawork": {
@@ -5096,6 +4970,13 @@
           "additionalProperties": false
         }
       },
+<<<<<<< HEAD
+=======
+      "additionalProperties": false
+    },
+    "categories": {
+      "type": "object",
+>>>>>>> daef4eb4 (fix(prometheus): (MR CR opinion) resolve tool API mismatches and tree numbering bugs)
       "additionalProperties": {
         "type": "object",
         "properties": {
@@ -5668,9 +5549,6 @@
           },
           "tools": {
             "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
             "additionalProperties": {
               "type": "boolean"
             }
@@ -5716,9 +5594,6 @@
         },
         "plugins_override": {
           "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
           "additionalProperties": {
             "type": "boolean"
           }
@@ -6007,9 +5882,6 @@
                   },
                   "metadata": {
                     "type": "object",
-                    "propertyNames": {
-                      "type": "string"
-                    },
                     "additionalProperties": {}
                   },
                   "allowed-tools": {
@@ -6108,9 +5980,6 @@
         },
         "providerConcurrency": {
           "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
           "additionalProperties": {
             "type": "number",
             "minimum": 0
@@ -6118,9 +5987,6 @@
         },
         "modelConcurrency": {
           "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
           "additionalProperties": {
             "type": "number",
             "minimum": 0

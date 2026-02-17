@@ -414,4 +414,87 @@ describe("buildNumberedTree", () => {
     const bChildren = result.childrenByParent.get("T-b-child") || []
     expect(bChildren.map((t) => t.id)).toEqual(["T-b-grandchild"])
   })
+
+  it("should number deleted root tasks correctly", () => {
+    const tasks: Task[] = [
+      {
+        id: "T-deleted-root",
+        subject: "Deleted Root",
+        description: "",
+        status: "deleted",
+        blocks: [],
+        blockedBy: [],
+        threadID: "thread-1",
+      },
+      {
+        id: "T-active-root",
+        subject: "Active Root",
+        description: "",
+        status: "pending",
+        blocks: [],
+        blockedBy: [],
+        threadID: "thread-1",
+      },
+    ]
+
+    const result = buildNumberedTree(tasks)
+    
+    // Should be numbered based on sorted ID order:
+    // T-active-root (1)
+    // T-deleted-root (2)
+    
+    expect(result.taskNumbers.has("T-deleted-root")).toBe(true)
+    const numbering = result.taskNumbers.get("T-deleted-root")
+    expect(numbering).toBeDefined()
+    expect(numbering?.numberingPath).toEqual([2])
+  })
+
+  it("should assign unique indices to multiple deleted siblings", () => {
+    const tasks: Task[] = [
+      {
+        id: "T-root",
+        subject: "Root",
+        description: "",
+        status: "pending",
+        blocks: [],
+        blockedBy: [],
+        threadID: "thread-1",
+      },
+      {
+        id: "T-child-1-deleted",
+        subject: "Deleted Child 1",
+        description: "",
+        status: "deleted",
+        parentID: "T-root",
+        blocks: [],
+        blockedBy: [],
+        threadID: "thread-1",
+      },
+      {
+        id: "T-child-2-deleted",
+        subject: "Deleted Child 2",
+        description: "",
+        status: "deleted",
+        parentID: "T-root",
+        blocks: [],
+        blockedBy: [],
+        threadID: "thread-1",
+      },
+    ]
+
+    const result = buildNumberedTree(tasks)
+    
+    const child1Num = result.taskNumbers.get("T-child-1-deleted")
+    const child2Num = result.taskNumbers.get("T-child-2-deleted")
+
+    expect(child1Num).toBeDefined()
+    expect(child2Num).toBeDefined()
+
+    // Sorted by ID: T-child-1-deleted, T-child-2-deleted
+    expect(child1Num?.numberingPath).toEqual([1, 1])
+    expect(child2Num?.numberingPath).toEqual([1, 2])
+    
+    // Explicit check against duplicate indices
+    expect(child1Num?.numberingPath).not.toEqual(child2Num?.numberingPath)
+  })
 })
