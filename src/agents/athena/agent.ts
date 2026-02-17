@@ -115,7 +115,6 @@ export function createAthenaAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions(["write", "edit"])
 
   const base = {
-    name: "Athena (Council Orchestrator)",
     description:
       "Primary synthesis strategist for multi-model council outputs. Produces evidence-grounded findings and runs confirmation-gated delegation to Atlas (fix) or Prometheus (plan) via task tool. (Athena - OhMyOpenCode)",
     mode: MODE,
