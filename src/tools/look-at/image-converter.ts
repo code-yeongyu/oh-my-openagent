@@ -1,4 +1,4 @@
-import { execSync } from "node:child_process"
+import { execFileSync } from "node:child_process"
 import { existsSync, mkdtempSync, unlinkSync, writeFileSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -57,7 +57,7 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
   try {
     if (process.platform === "darwin") {
       try {
-        execSync(`sips -s format jpeg "${inputPath}" --out "${outputPath}"`, {
+        execFileSync("sips", ["-s", "format", "jpeg", inputPath, "--out", outputPath], {
           stdio: "pipe",
           encoding: "utf-8",
         })
@@ -72,7 +72,7 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
     }
 
     try {
-      execSync(`convert "${inputPath}" "${outputPath}"`, {
+      execFileSync("convert", [inputPath, outputPath], {
         stdio: "pipe",
         encoding: "utf-8",
       })
