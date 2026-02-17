@@ -87,12 +87,9 @@ export function buildToolSelectionTable(
     "",
   ]
 
-  rows.push("| Resource | Cost | When to Use |")
-  rows.push("|----------|------|-------------|")
-
   if (tools.length > 0) {
     const toolsDisplay = formatToolsForPrompt(tools)
-    rows.push(`| ${toolsDisplay} | FREE | Not Complex, Scope Clear, No Implicit Assumptions |`)
+    rows.push(`- ${toolsDisplay} — **FREE** — Not Complex, Scope Clear, No Implicit Assumptions`)
   }
 
   const costOrder = { FREE: 0, CHEAP: 1, EXPENSIVE: 2 }
@@ -102,7 +99,7 @@ export function buildToolSelectionTable(
 
   for (const agent of sortedAgents) {
     const shortDesc = agent.description.split(".")[0] || agent.description
-    rows.push(`| \`${agent.name}\` agent | ${agent.metadata.cost} | ${shortDesc} |`)
+    rows.push(`- \`${agent.name}\` agent — **${agent.metadata.cost}** — ${shortDesc}`)
   }
 
   rows.push("")
@@ -122,10 +119,11 @@ export function buildExploreSection(agents: AvailableAgent[]): string {
 
 Use it as a **peer tool**, not a fallback. Fire liberally.
 
-| Use Direct Tools | Use Explore Agent |
-|------------------|-------------------|
-${avoidWhen.map((w) => `| ${w} |  |`).join("\n")}
-${useWhen.map((w) => `|  | ${w} |`).join("\n")}`
+**Use Direct Tools when:**
+${avoidWhen.map((w) => `- ${w}`).join("\n")}
+
+**Use Explore Agent when:**
+${useWhen.map((w) => `- ${w}`).join("\n")}`
 }
 
 export function buildLibrarianSection(agents: AvailableAgent[]): string {
@@ -138,14 +136,8 @@ export function buildLibrarianSection(agents: AvailableAgent[]): string {
 
 Search **external references** (docs, OSS, web). Fire proactively when unfamiliar libraries are involved.
 
-| Contextual Grep (Internal) | Reference Grep (External) |
-|----------------------------|---------------------------|
-| Search OUR codebase | Search EXTERNAL resources |
-| Find patterns in THIS repo | Find examples in OTHER repos |
-| How does our code work? | How does this library work? |
-| Project-specific logic | Official API documentation |
-| | Library best practices & quirks |
-| | OSS implementation examples |
+**Contextual Grep (Internal)** — search OUR codebase, find patterns in THIS repo, project-specific logic.
+**Reference Grep (External)** — search EXTERNAL resources, official API docs, library best practices, OSS implementation examples.
 
 **Trigger phrases** (fire librarian immediately):
 ${useWhen.map((w) => `- "${w}"`).join("\n")}`
@@ -155,13 +147,11 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
   const rows: string[] = [
     "### Delegation Table:",
     "",
-    "| Domain | Delegate To | Trigger |",
-    "|--------|-------------|---------|",
   ]
 
   for (const agent of agents) {
     for (const trigger of agent.metadata.triggers) {
-      rows.push(`| ${trigger.domain} | \`${agent.name}\` | ${trigger.trigger} |`)
+      rows.push(`- **${trigger.domain}** → \`${agent.name}\` — ${trigger.trigger}`)
     }
   }
 
@@ -187,8 +177,6 @@ export function formatCustomSkillsBlock(
 **The user has installed these custom skills. They MUST be evaluated for EVERY delegation.**
 Subagents are STATELESS — they lose all custom knowledge unless you pass these skills via \`load_skills\`.
 
-| Skill | Expertise Domain | Source |
-|-------|------------------|--------|
 ${customRows.join("\n")}
 
 > **CRITICAL**: Ignoring user-installed skills when they match the task domain is a failure.
@@ -200,7 +188,7 @@ export function buildCategorySkillsDelegationGuide(categories: AvailableCategory
 
   const categoryRows = categories.map((c) => {
     const desc = c.description || c.name
-    return `| \`${c.name}\` | ${desc} |`
+    return `- \`${c.name}\` — ${desc}`
   })
 
   const builtinSkills = skills.filter((s) => s.location === "plugin")
@@ -208,13 +196,13 @@ export function buildCategorySkillsDelegationGuide(categories: AvailableCategory
 
    const builtinRows = builtinSkills.map((s) => {
      const desc = truncateDescription(s.description)
-     return `| \`${s.name}\` | ${desc} |`
+     return `- \`${s.name}\` — ${desc}`
    })
 
    const customRows = customSkills.map((s) => {
      const desc = truncateDescription(s.description)
      const source = s.location === "project" ? "project" : "user"
-     return `| \`${s.name}\` | ${desc} | ${source} |`
+     return `- \`${s.name}\` (${source}) — ${desc}`
    })
 
   const customSkillBlock = formatCustomSkillsBlock(customRows, customSkills)
@@ -224,8 +212,6 @@ export function buildCategorySkillsDelegationGuide(categories: AvailableCategory
   if (customSkills.length > 0 && builtinSkills.length > 0) {
     skillsSection = `#### Built-in Skills
 
-| Skill | Expertise Domain |
-|-------|------------------|
 ${builtinRows.join("\n")}
 
 ${customSkillBlock}`
@@ -236,8 +222,6 @@ ${customSkillBlock}`
 
 Skills inject specialized instructions into the subagent. Read the description to understand when each skill applies.
 
-| Skill | Expertise Domain |
-|-------|------------------|
 ${builtinRows.join("\n")}`
   }
 
@@ -249,8 +233,6 @@ ${builtinRows.join("\n")}`
 
 Each category is configured with a model optimized for that domain. Read the description to understand when to use it.
 
-| Category | Domain / Best For |
-|----------|-------------------|
 ${categoryRows.join("\n")}
 
 ${skillsSection}
@@ -322,11 +304,9 @@ export function buildOracleSection(agents: AvailableAgent[]): string {
 
 Oracle is a read-only, expensive, high-quality reasoning model for debugging and architecture. Consultation only.
 
-### WHEN to Consult:
+### WHEN to Consult (Oracle FIRST, then implement):
 
-| Trigger | Action |
-|---------|--------|
-${useWhen.map((w) => `| ${w} | Oracle FIRST, then implement |`).join("\n")}
+${useWhen.map((w) => `- ${w}`).join("\n")}
 
 ### WHEN NOT to Consult:
 
@@ -338,39 +318,44 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 **Exception**: This is the ONLY case where you announce before acting. For all other work, start immediately without status updates.
 
 ### Oracle Background Task Policy:
-- Oracle takes 20+ min by design. Always wait for Oracle results via \`background_output\` before final answer.
-- Oracle provides independent analysis from a different angle that catches blind spots — even when you believe you already have sufficient context, Oracle's perspective is worth the wait.
+
+**You MUST collect Oracle results before your final answer. No exceptions.**
+
+- Oracle may take several minutes. This is normal and expected.
+- When Oracle is running and you finish your own exploration/analysis, your next action is \`background_output(task_id="...")\` on Oracle — NOT delivering a final answer.
+- Oracle catches blind spots you cannot see — its value is HIGHEST when you think you don't need it.
+- **NEVER** cancel Oracle. **NEVER** use \`background_cancel(all=true)\` when Oracle is running. Cancel disposable tasks (explore, librarian) individually by taskId instead.
 </Oracle_Usage>`
 }
 
 export function buildHardBlocksSection(): string {
   const blocks = [
-    "| Type error suppression (`as any`, `@ts-ignore`) | Never |",
-    "| Commit without explicit request | Never |",
-    "| Speculate about unread code | Never |",
-    "| Leave code in broken state after failures | Never |",
+    "- Type error suppression (`as any`, `@ts-ignore`) — **Never**",
+    "- Commit without explicit request — **Never**",
+    "- Speculate about unread code — **Never**",
+    "- Leave code in broken state after failures — **Never**",
+    "- `background_cancel(all=true)` when Oracle is running — **Never.** Cancel tasks individually by taskId.",
+    "- Delivering final answer before collecting Oracle result — **Never.** Always `background_output` Oracle first.",
   ]
 
   return `## Hard Blocks (NEVER violate)
 
-| Constraint | No Exceptions |
-|------------|---------------|
 ${blocks.join("\n")}`
 }
 
 export function buildAntiPatternsSection(): string {
   const patterns = [
-    "| **Type Safety** | `as any`, `@ts-ignore`, `@ts-expect-error` |",
-    "| **Error Handling** | Empty catch blocks `catch(e) {}` |",
-    "| **Testing** | Deleting failing tests to \"pass\" |",
-    "| **Search** | Firing agents for single-line typos or obvious syntax errors |",
-    "| **Debugging** | Shotgun debugging, random changes |",
+    "- **Type Safety**: `as any`, `@ts-ignore`, `@ts-expect-error`",
+    "- **Error Handling**: Empty catch blocks `catch(e) {}`",
+    "- **Testing**: Deleting failing tests to \"pass\"",
+    "- **Search**: Firing agents for single-line typos or obvious syntax errors",
+    "- **Debugging**: Shotgun debugging, random changes",
+    "- **Background Tasks**: `background_cancel(all=true)` — always cancel individually by taskId",
+    "- **Oracle**: Skipping Oracle results when Oracle was launched — ALWAYS collect via `background_output`",
   ]
 
   return `## Anti-Patterns (BLOCKING violations)
 
-| Category | Forbidden |
-|----------|-----------|
 ${patterns.join("\n")}`
 }
 
