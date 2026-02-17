@@ -82,10 +82,10 @@ export async function startTask(item: QueueItem, ctx: SpawnerContext): Promise<v
       system: input.skillContent,
       tools: (() => {
         const tools = {
-          ...getAgentToolRestrictions(input.agent),
           task: false,
           call_omo_agent: true,
           question: false,
+          ...getAgentToolRestrictions(input.agent),
         }
         setSessionTools(sessionID, tools)
         return tools
