@@ -86,14 +86,7 @@ async function areAllDescendantsIdle(
 
   for (const child of children) {
     const status = allStatuses[child.id]
-    if (!status) {
-      console.log(
-        pc.dim(`  Waiting: session ${child.id.slice(0, 8)}... status unknown`)
-      )
-      return false
-    }
-
-    if (status.type !== "idle") {
+    if (status && status.type !== "idle") {
       console.log(
         pc.dim(`  Waiting: session ${child.id.slice(0, 8)}... is ${status.type}`)
       )
