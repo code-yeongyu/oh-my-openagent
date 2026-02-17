@@ -1,14 +1,19 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
-import { fuzzyMatchModel } from "../../shared/model-availability"
+import { fuzzyMatchModel, isModelAvailable } from "../../shared/model-availability"
+import { getNextModel } from "./model-pool-state"
+import { isModelPool } from "./model-pool-utils"
 
-function normalizeModel(model?: string): string | undefined {
-  const trimmed = model?.trim()
+function normalizeModel(model: unknown): string | undefined {
+  if (typeof model !== "string") {
+    return undefined
+  }
+  const trimmed = model.trim()
   return trimmed || undefined
 }
 
 export function resolveModelForDelegateTask(input: {
   userModel?: string
-  categoryDefaultModel?: string
+  categoryDefaultModel?: string | string[] | undefined
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
   systemDefaultModel?: string
@@ -16,6 +21,31 @@ export function resolveModelForDelegateTask(input: {
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     return { model: userModel }
+  }
+
+  if (isModelPool(input.categoryDefaultModel)) {
+    const pool = input.categoryDefaultModel
+    if (pool.length > 0) {
+      const poolKey = JSON.stringify(pool)
+
+      if (input.availableModels.size === 0) {
+        const candidateModel = normalizeModel(getNextModel(poolKey, pool))
+        if (candidateModel) {
+          return { model: candidateModel }
+        }
+      } else {
+        const maxAttempts = pool.length
+        for (let i = 0; i < maxAttempts; i++) {
+          const candidateModel = normalizeModel(getNextModel(poolKey, pool))
+          if (!candidateModel) {
+            continue
+          }
+          if (isModelAvailable(candidateModel, input.availableModels)) {
+            return { model: candidateModel }
+          }
+        }
+      }
+    }
   }
 
   const categoryDefault = normalizeModel(input.categoryDefaultModel)
