@@ -1,0 +1,1 @@
+export { extractGlobalConstraints } from "./extractor"
