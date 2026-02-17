@@ -60,7 +60,7 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
           if (needsConversion(mimeType)) {
             log(`[look_at] Detected unsupported Base64 format: ${mimeType}, converting to JPEG...`)
             try {
-              const { base64, tempFiles } = convertBase64ImageToJpeg(imageData, mimeType)
+              const { base64, tempFiles } = convertBase64ImageToJpeg(finalBase64Data, mimeType)
               finalBase64Data = base64
               finalMimeType = "image/jpeg"
               tempFilesToCleanup = tempFiles

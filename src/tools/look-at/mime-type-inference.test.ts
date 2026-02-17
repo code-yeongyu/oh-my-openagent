@@ -33,4 +33,9 @@ describe("mime type inference", () => {
     const base64 = extractBase64Data("data:image/png;base64,abc123")
     expect(base64).toBe("abc123")
   })
+
+  test("extracts raw base64 data from data URL with extra parameters", () => {
+    const base64 = extractBase64Data("data:image/heic;name=clip.heic;base64,abc123")
+    expect(base64).toBe("abc123")
+  })
 })
