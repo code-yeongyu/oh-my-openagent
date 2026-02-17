@@ -5,8 +5,12 @@ const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
 const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000
 const CONTEXT_WARNING_THRESHOLD = 0.70
 
-function getAnthropicActualLimit(anthropicContext1MEnabled: boolean): number {
-  return anthropicContext1MEnabled ||
+type ModelCacheStateLike = {
+  anthropicContext1MEnabled: boolean
+}
+
+function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
+  return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
     process.env.ANTHROPIC_1M_CONTEXT === "true" ||
     process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
     ? 1_000_000
@@ -37,7 +41,7 @@ function isAnthropicProvider(providerID: string): boolean {
 
 export function createContextWindowMonitorHook(
   _ctx: PluginInput,
-  anthropicContext1MEnabled = false,
+  modelCacheState?: ModelCacheStateLike,
 ) {
   const remindedSessions = new Set<string>()
   const tokenCache = new Map<string, CachedTokenState>()
@@ -59,7 +63,7 @@ export function createContextWindowMonitorHook(
     const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
 
     const actualUsagePercentage =
-      totalInputTokens / getAnthropicActualLimit(anthropicContext1MEnabled)
+      totalInputTokens / getAnthropicActualLimit(modelCacheState)
 
     if (actualUsagePercentage < CONTEXT_WARNING_THRESHOLD) return
 

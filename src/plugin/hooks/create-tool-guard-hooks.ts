@@ -51,7 +51,7 @@ export function createToolGuardHooks(args: {
   const toolOutputTruncator = isHookEnabled("tool-output-truncator")
     ? safeHook("tool-output-truncator", () =>
         createToolOutputTruncatorHook(ctx, {
-          anthropicContext1MEnabled: modelCacheState.anthropicContext1MEnabled,
+          modelCacheState,
           experimental: pluginConfig.experimental,
         }))
     : null
@@ -68,13 +68,13 @@ export function createToolGuardHooks(args: {
       })
     } else {
       directoryAgentsInjector = safeHook("directory-agents-injector", () =>
-        createDirectoryAgentsInjectorHook(ctx, modelCacheState.anthropicContext1MEnabled))
+        createDirectoryAgentsInjectorHook(ctx, modelCacheState))
     }
   }
 
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
     ? safeHook("directory-readme-injector", () =>
-        createDirectoryReadmeInjectorHook(ctx, modelCacheState.anthropicContext1MEnabled))
+        createDirectoryReadmeInjectorHook(ctx, modelCacheState))
     : null
 
   const emptyTaskResponseDetector = isHookEnabled("empty-task-response-detector")
@@ -83,7 +83,7 @@ export function createToolGuardHooks(args: {
 
   const rulesInjector = isHookEnabled("rules-injector")
     ? safeHook("rules-injector", () =>
-        createRulesInjectorHook(ctx, modelCacheState.anthropicContext1MEnabled))
+        createRulesInjectorHook(ctx, modelCacheState))
     : null
 
   const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")

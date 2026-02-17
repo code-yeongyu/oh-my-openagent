@@ -5,8 +5,12 @@ const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 const DEFAULT_TARGET_MAX_TOKENS = 50_000;
 
-function getAnthropicActualLimit(anthropicContext1MEnabled = false): number {
-	return anthropicContext1MEnabled ||
+type ModelCacheStateLike = {
+	anthropicContext1MEnabled: boolean;
+}
+
+function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
+	return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
 		process.env.ANTHROPIC_1M_CONTEXT === "true" ||
 		process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
 		? 1_000_000
@@ -114,7 +118,7 @@ export function truncateToTokenLimit(
 export async function getContextWindowUsage(
 	ctx: PluginInput,
 	sessionID: string,
-	anthropicContext1MEnabled = false,
+	modelCacheState?: ModelCacheStateLike,
 ): Promise<{
 	usedTokens: number;
 	remainingTokens: number;
@@ -139,7 +143,7 @@ export async function getContextWindowUsage(
 			(lastTokens?.input ?? 0) +
 			(lastTokens?.cache?.read ?? 0) +
 			(lastTokens?.output ?? 0);
-		const anthropicActualLimit = getAnthropicActualLimit(anthropicContext1MEnabled);
+		const anthropicActualLimit = getAnthropicActualLimit(modelCacheState);
 		const remainingTokens = anthropicActualLimit - usedTokens;
 
 		return {
@@ -157,7 +161,7 @@ export async function dynamicTruncate(
 	sessionID: string,
 	output: string,
 	options: TruncationOptions = {},
-	anthropicContext1MEnabled = false,
+	modelCacheState?: ModelCacheStateLike,
 ): Promise<TruncationResult> {
 	if (typeof output !== 'string') {
 		return { result: String(output ?? ''), truncated: false };
@@ -168,7 +172,7 @@ export async function dynamicTruncate(
 		preserveHeaderLines = 3,
 	} = options;
 
-	const usage = await getContextWindowUsage(ctx, sessionID, anthropicContext1MEnabled);
+	const usage = await getContextWindowUsage(ctx, sessionID, modelCacheState);
 
 	if (!usage) {
 		// Fallback: apply conservative truncation when context usage unavailable
@@ -192,17 +196,17 @@ export async function dynamicTruncate(
 
 export function createDynamicTruncator(
 	ctx: PluginInput,
-	anthropicContext1MEnabled?: boolean,
+	modelCacheState?: ModelCacheStateLike,
 ) {
 	return {
 		truncate: (
 			sessionID: string,
 			output: string,
 			options?: TruncationOptions,
-		) => dynamicTruncate(ctx, sessionID, output, options, anthropicContext1MEnabled),
+		) => dynamicTruncate(ctx, sessionID, output, options, modelCacheState),
 
 		getUsage: (sessionID: string) =>
-			getContextWindowUsage(ctx, sessionID, anthropicContext1MEnabled),
+			getContextWindowUsage(ctx, sessionID, modelCacheState),
 
 		truncateSync: (
 			output: string,

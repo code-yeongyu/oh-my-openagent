@@ -66,14 +66,14 @@ export function createSessionHooks(args: {
 
   const contextWindowMonitor = isHookEnabled("context-window-monitor")
     ? safeHook("context-window-monitor", () =>
-        createContextWindowMonitorHook(ctx, modelCacheState.anthropicContext1MEnabled))
+        createContextWindowMonitorHook(ctx, modelCacheState))
     : null
 
   const preemptiveCompaction =
     isHookEnabled("preemptive-compaction") &&
     pluginConfig.experimental?.preemptive_compaction
       ? safeHook("preemptive-compaction", () =>
-          createPreemptiveCompactionHook(ctx, modelCacheState.anthropicContext1MEnabled))
+          createPreemptiveCompactionHook(ctx, modelCacheState))
       : null
 
   const sessionRecovery = isHookEnabled("session-recovery")
