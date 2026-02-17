@@ -4,6 +4,7 @@ import { resolveModel } from "../../shared/model-resolver"
 import { isModelAvailable } from "../../shared/model-availability"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
+import { isModelPool, extractSingleModel, type ModelPool } from "./model-pool-utils"
 
 export interface ResolveCategoryConfigOptions {
   userCategories?: CategoriesConfig
@@ -15,7 +16,7 @@ export interface ResolveCategoryConfigOptions {
 export interface ResolveCategoryConfigResult {
   config: CategoryConfig
   promptAppend: string
-  model: string | undefined
+  model: string | ModelPool | undefined
 }
 
 /**
@@ -51,11 +52,15 @@ export function resolveCategoryConfig(
 
   // Model priority for categories: user override > category default > system default
   // Categories have explicit models - no inheritance from parent session
-  const model = resolveModel({
-    userModel: userConfig?.model,
-    inheritedModel: defaultConfig?.model, // Category's built-in model takes precedence over system default
-    systemDefault: systemDefaultModel,
-  })
+  // Array models are passed through as-is; string models are resolved
+  const userModel = userConfig?.model
+  const model = isModelPool(userModel)
+    ? userModel
+    : resolveModel({
+        userModel,
+        inheritedModel: extractSingleModel(defaultConfig?.model),
+        systemDefault: systemDefaultModel,
+      })
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
