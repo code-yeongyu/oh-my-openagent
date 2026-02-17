@@ -11,6 +11,7 @@ import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log } from "./shared"
+import { patchFetchForSurrogates } from "./shared/patch-fetch-surrogates"
 import { startTmuxCheck } from "./tools"
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
@@ -18,6 +19,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     directory: ctx.directory,
   })
 
+  patchFetchForSurrogates()
   injectServerAuthIntoClient(ctx.client)
   startTmuxCheck()
 
