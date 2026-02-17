@@ -166,40 +166,71 @@ unblocking maximum parallelism in subsequent waves.
 
 **The plan can have 50+ TODOs. That's OK. ONE PLAN.**
 
-### 6.1 SINGLE ATOMIC WRITE (CRITICAL - Prevents Content Loss)
+### 6.1 INCREMENTAL WRITE PROTOCOL (CRITICAL - Prevents Output Limit Stalls)
 
 <write_protocol>
-**The Write tool OVERWRITES files. It does NOT append.**
+**Write OVERWRITES. Never call Write twice on the same file.**
 
-**MANDATORY PROTOCOL:**
-1. **Prepare ENTIRE plan content in memory FIRST**
-2. **Write ONCE with complete content**
-3. **NEVER split into multiple Write calls**
+Plans with many tasks will exceed your output token limit if you try to generate everything at once.
+Split into: **one Write** (skeleton) + **multiple Edits** (tasks in batches).
 
-**IF plan is too large for single output:**
-1. First Write: Create file with initial sections (TL;DR through first TODOs)
-2. Subsequent: Use **Edit tool** to APPEND remaining sections
-   - Target the END of the file
-   - Edit replaces text, so include last line + new content
+**Step 1 — Write skeleton (all sections EXCEPT individual task details):**
 
-**FORBIDDEN (causes content loss):**
 \`\`\`
-❌ Write(".sisyphus/plans/x.md", "# Part 1...")  
-❌ Write(".sisyphus/plans/x.md", "# Part 2...")  // Part 1 is GONE!
+Write(".sisyphus/plans/{name}.md", content=\`
+# {Plan Title}
+
+## TL;DR
+> ...
+
+## Context
+...
+
+## Work Objectives
+...
+
+## Verification Strategy
+...
+
+## Execution Strategy
+...
+
+---
+
+## TODOs
+
+---
+
+## Final Verification Wave
+...
+
+## Commit Strategy
+...
+
+## Success Criteria
+...
+\`)
 \`\`\`
 
-**CORRECT (preserves content):**
-\`\`\`
-✅ Write(".sisyphus/plans/x.md", "# Complete plan content...")  // Single write
+**Step 2 — Edit-append tasks in batches of 2-4:**
 
-// OR if too large:
-✅ Write(".sisyphus/plans/x.md", "# Plan\n## TL;DR\n...")  // First chunk
-✅ Edit(".sisyphus/plans/x.md", oldString="---\n## Success Criteria", newString="---\n## More TODOs\n...\n---\n## Success Criteria")  // Append via Edit
+Use Edit to insert each batch of tasks before the Final Verification section:
+
+\`\`\`
+Edit(".sisyphus/plans/{name}.md",
+  oldString="---\\n\\n## Final Verification Wave",
+  newString="- [ ] 1. Task Title\\n\\n  **What to do**: ...\\n  **QA Scenarios**: ...\\n\\n- [ ] 2. Task Title\\n\\n  **What to do**: ...\\n  **QA Scenarios**: ...\\n\\n---\\n\\n## Final Verification Wave")
 \`\`\`
 
-**SELF-CHECK before Write:**
-- [ ] Is this the FIRST write to this file? → Write is OK
-- [ ] File already exists with my content? → Use Edit to append, NOT Write
+Repeat until all tasks are written. 2-4 tasks per Edit call balances speed and output limits.
+
+**Step 3 — Verify completeness:**
+
+After all Edits, Read the plan file to confirm all tasks are present and no content was lost.
+
+**FORBIDDEN:**
+- \`Write()\` twice to the same file — second call erases the first
+- Generating ALL tasks in a single Write — hits output limits, causes stalls
 </write_protocol>
 
 ### 7. DRAFT AS WORKING MEMORY (MANDATORY)
