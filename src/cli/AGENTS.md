@@ -1,69 +1,71 @@
-# CLI KNOWLEDGE BASE
+# src/cli/ — CLI: install, run, doctor, mcp-oauth
+
+**Generated:** 2026-02-17
 
 ## OVERVIEW
 
-CLI entry: `bunx oh-my-opencode`. 107+ files with Commander.js + @clack/prompts TUI. 5 commands: install, run, doctor, get-local-version, mcp-oauth.
-
-## STRUCTURE
-```
-cli/
-├── index.ts                 # Entry point (5 lines)
-├── cli-program.ts           # Commander.js program (150+ lines, 5 commands)
-├── install.ts               # TTY routing (TUI or CLI installer)
-├── cli-installer.ts         # Non-interactive installer (164 lines)
-├── tui-installer.ts         # Interactive TUI with @clack/prompts (140 lines)
-├── config-manager/          # 20 config utilities
-│   ├── add-plugin-to-opencode-config.ts  # Plugin registration
-│   ├── add-provider-config.ts            # Provider setup (Google/Antigravity)
-│   ├── detect-current-config.ts          # Installed providers detection
-│   ├── write-omo-config.ts               # JSONC writing
-│   ├── generate-omo-config.ts            # Config generation
-│   ├── jsonc-provider-editor.ts          # JSONC editing
-│   └── ...                               # 14 more utilities
-├── doctor/                  # 4 check categories, 21 check files
-│   ├── runner.ts            # Parallel check execution + result aggregation
-│   ├── formatter.ts         # Colored output (default/status/verbose/JSON)
-│   └── checks/              # system (4), config (1), tools (4), models (6 sub-checks)
-├── run/                     # Session launcher (24 files)
-│   ├── runner.ts            # Run orchestration (126 lines)
-│   ├── agent-resolver.ts    # Agent: flag → env → config → Sisyphus
-│   ├── session-resolver.ts  # Session create or resume with retries
-│   ├── event-handlers.ts    # Event processing (125 lines)
-│   ├── completion.ts        # Completion detection
-│   └── poll-for-completion.ts # Polling with timeout
-├── mcp-oauth/               # OAuth token management (login, logout, status)
-├── get-local-version/       # Version detection + update check
-├── model-fallback.ts        # Model fallback configuration
-└── provider-availability.ts # Provider availability checks
-```
+Commander.js CLI with 5 commands. Entry: `index.ts` → `runCli()` in `cli-program.ts`.
 
 ## COMMANDS
 
 | Command | Purpose | Key Logic |
 |---------|---------|-----------|
-| `install` | Interactive setup | Provider selection → config generation → plugin registration |
-| `run` | Session launcher | Agent: flag → env → config → Sisyphus. Enforces todo completion. |
-| `doctor` | 4-category health checks | system, config, tools, models (6 sub-checks) |
-| `get-local-version` | Version check | Detects installed, compares with npm latest |
-| `mcp-oauth` | OAuth tokens | login (PKCE flow), logout, status |
+| `install` | Interactive/non-interactive setup | Provider selection → config gen → plugin registration |
+| `run <message>` | Non-interactive session launcher | Agent resolution (flag → env → config → Sisyphus) |
+| `doctor` | 4-category health checks | System, Config, Tools, Models |
+| `get-local-version` | Version detection | Installed vs npm latest |
+| `mcp-oauth` | OAuth token management | login (PKCE), logout, status |
 
-## RUN SESSION LIFECYCLE
+## STRUCTURE
 
-1. Load config, resolve agent (CLI > env > config > Sisyphus)
-2. Create server connection (port/attach), setup cleanup/signal handlers
-3. Resolve session (create new or resume with retries)
-4. Send prompt, start event processing, poll for completion
-5. Execute on-complete hook, output JSON if requested, cleanup
+```
+cli/
+├── index.ts                     # Entry point → runCli()
+├── cli-program.ts               # Commander.js program (5 commands)
+├── install.ts                   # Routes to TUI or CLI installer
+├── cli-installer.ts             # Non-interactive (console output)
+├── tui-installer.ts             # Interactive (@clack/prompts)
+├── model-fallback.ts            # Model config gen by provider availability
+├── provider-availability.ts     # Provider detection
+├── fallback-chain-resolution.ts # Fallback chain logic
+├── config-manager/              # 20 config utilities
+│   ├── plugin registration, provider config
+│   ├── JSONC operations, auth plugins
+│   └── npm dist-tags, binary detection
+├── doctor/
+│   ├── runner.ts                # Parallel check execution
+│   ├── formatter.ts             # Output formatting
+│   └── checks/                  # 15 check files in 4 categories
+│       ├── system.ts            # Binary, plugin, version
+│       ├── config.ts            # JSONC validity, Zod schema
+│       ├── tools.ts             # AST-Grep, LSP, GH CLI, MCP
+│       └── model-resolution.ts  # Cache, resolution, overrides (6 sub-files)
+├── run/                         # Session launcher
+│   ├── runner.ts                # Main orchestration
+│   ├── agent-resolver.ts        # Flag → env → config → Sisyphus
+│   ├── session-resolver.ts      # Create/resume sessions
+│   ├── event-handlers.ts        # Event processing
+│   └── poll-for-completion.ts   # Wait for todos/background tasks
+└── mcp-oauth/                   # OAuth token management
+```
 
-## HOW TO ADD CHECK
+## MODEL FALLBACK SYSTEM
 
-1. Create `src/cli/doctor/checks/my-check.ts`
-2. Export `getXXXCheckDefinition()` returning `CheckDefinition`
-3. Add to `getAllCheckDefinitions()` in `checks/index.ts`
+Priority: Claude > OpenAI > Gemini > Copilot > OpenCode Zen > Z.ai > Kimi > glm-4.7-free
 
-## ANTI-PATTERNS
+Agent-specific: librarian→ZAI, explore→Haiku/nano, hephaestus→requires OpenAI/Copilot
 
-- **Blocking in non-TTY**: Check `process.stdout.isTTY`
-- **Direct JSON.parse**: Use `parseJsonc()` from shared
-- **Silent failures**: Return `warn` or `fail` in doctor, don't throw
-- **Hardcoded paths**: Use `getOpenCodeConfigPaths()` from config-manager
+## DOCTOR CHECKS
+
+| Category | Validates |
+|----------|-----------|
+| **System** | Binary found, version >=1.0.150, plugin registered, version match |
+| **Config** | JSONC validity, Zod schema, model override syntax |
+| **Tools** | AST-Grep, comment-checker, LSP servers, GH CLI, MCP servers |
+| **Models** | Cache exists, model resolution, agent/category overrides, availability |
+
+## HOW TO ADD A DOCTOR CHECK
+
+1. Create `src/cli/doctor/checks/{name}.ts`
+2. Export check function matching `DoctorCheck` interface
+3. Register in `checks/index.ts`
