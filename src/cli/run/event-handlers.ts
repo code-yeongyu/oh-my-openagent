@@ -187,6 +187,7 @@ function handleToolPart(
   const status = part.state?.status
 
   if (status === "running") {
+    if (state.currentTool !== null) return
     state.currentTool = toolName
     const header = formatToolHeader(toolName, part.state?.input ?? {})
     const suffix = header.description ? ` ${pc.dim(header.description)}` : ""
@@ -195,6 +196,7 @@ function handleToolPart(
   }
 
   if (status === "completed" || status === "error") {
+    if (state.currentTool === null) return
     const output = part.state?.output || ""
     if (output.trim()) {
       process.stdout.write(pc.dim(`  ${displayChars.treeEnd} output  \n`))
@@ -216,7 +218,7 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
 
   state.currentMessageRole = props?.info?.role ?? null
 
-  const messageID = props?.info?.id
+  const messageID = props?.info?.id ?? null
   const role = props?.info?.role
   if (messageID && role) {
     state.messageRoleById[messageID] = role
@@ -224,15 +226,19 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
 
   if (props?.info?.role !== "assistant") return
 
-  state.hasReceivedMeaningfulWork = true
-  state.messageCount++
-  state.lastPartText = ""
-  state.lastReasoningText = ""
-  state.hasPrintedThinkingLine = false
-  state.lastThinkingSummary = ""
-  state.textAtLineStart = true
-  state.thinkingAtLineStart = false
-  closeThinkBlockIfNeeded(state)
+  const isNewMessage = !messageID || messageID !== state.currentMessageId
+  if (isNewMessage) {
+    state.currentMessageId = messageID
+    state.hasReceivedMeaningfulWork = true
+    state.messageCount++
+    state.lastPartText = ""
+    state.lastReasoningText = ""
+    state.hasPrintedThinkingLine = false
+    state.lastThinkingSummary = ""
+    state.textAtLineStart = true
+    state.thinkingAtLineStart = false
+    closeThinkBlockIfNeeded(state)
+  }
 
   const agent = props?.info?.agent ?? null
   const model = props?.info?.modelID ?? null
@@ -253,6 +259,8 @@ export function handleToolExecute(ctx: RunContext, payload: EventPayload, state:
 
   closeThinkBlockIfNeeded(state)
 
+  if (state.currentTool !== null) return
+
   const toolName = props?.name || "unknown"
   state.currentTool = toolName
   const header = formatToolHeader(toolName, props?.input ?? {})
@@ -269,6 +277,8 @@ export function handleToolResult(ctx: RunContext, payload: EventPayload, state: 
   if (getSessionId(props) !== ctx.sessionID) return
 
   closeThinkBlockIfNeeded(state)
+
+  if (state.currentTool === null) return
 
   const output = props?.output || ""
   if (output.trim()) {

@@ -37,6 +37,8 @@ export interface EventState {
   textAtLineStart: boolean
   /** Whether reasoning stream is currently at line start (for padding) */
   thinkingAtLineStart: boolean
+  /** Current assistant message ID — prevents counter resets on repeated message.updated for same message */
+  currentMessageId: string | null
 }
 
 export function createEventState(): EventState {
@@ -63,5 +65,6 @@ export function createEventState(): EventState {
     lastThinkingSummary: "",
     textAtLineStart: true,
     thinkingAtLineStart: false,
+    currentMessageId: null,
   }
 }
