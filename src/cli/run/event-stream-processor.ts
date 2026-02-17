@@ -24,11 +24,15 @@ export async function processEvents(
     try {
       const payload = event as EventPayload
       if (!payload?.type) {
-        console.error(pc.dim(`[event] no type: ${JSON.stringify(event)}`))
+        if (ctx.verbose) {
+          console.error(pc.dim(`[event] no type: ${JSON.stringify(event)}`))
+        }
         continue
       }
 
-      logEventVerbose(ctx, payload)
+      if (ctx.verbose) {
+        logEventVerbose(ctx, payload)
+      }
 
       handleSessionError(ctx, payload, state)
       handleSessionIdle(ctx, payload, state)

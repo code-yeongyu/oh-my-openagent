@@ -1,4 +1,4 @@
-import { describe, it, expect } from "bun:test"
+import { describe, it, expect, spyOn } from "bun:test"
 import { createEventState, serializeError, type EventState } from "./events"
 import type { RunContext, EventPayload } from "./types"
 
@@ -87,6 +87,52 @@ describe("createEventState", () => {
 })
 
 describe("event handling", () => {
+  it("does not log verbose event traces by default", async () => {
+    // given
+    const ctx = createMockContext("my-session")
+    const state = createEventState()
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+
+    const payload: EventPayload = {
+      type: "custom.event",
+      properties: { sessionID: "my-session" },
+    }
+
+    const events = toAsyncIterable([payload])
+    const { processEvents } = await import("./events")
+
+    // when
+    await processEvents(ctx, events, state)
+
+    // then
+    expect(errorSpy).not.toHaveBeenCalled()
+    errorSpy.mockRestore()
+  })
+
+  it("logs full event traces when verbose is enabled", async () => {
+    // given
+    const ctx = { ...createMockContext("my-session"), verbose: true }
+    const state = createEventState()
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+
+    const payload: EventPayload = {
+      type: "custom.event",
+      properties: { sessionID: "my-session" },
+    }
+
+    const events = toAsyncIterable([payload])
+    const { processEvents } = await import("./events")
+
+    // when
+    await processEvents(ctx, events, state)
+
+    // then
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    const firstCall = errorSpy.mock.calls[0]
+    expect(String(firstCall?.[0] ?? "")).toContain("custom.event")
+    errorSpy.mockRestore()
+  })
+
   it("session.idle sets mainSessionIdle to true for matching session", async () => {
     // given
     const ctx = createMockContext("my-session")
