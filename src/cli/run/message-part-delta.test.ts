@@ -215,8 +215,7 @@ describe("message.part.delta handling", () => {
 
     //#then
     const rendered = stdoutSpy.mock.calls.map((call) => String(call[0] ?? "")).join("")
-    expect(rendered).toContain("\r")
-    expect(rendered).toContain("Thinking: Composing final summary")
+    expect(rendered).toContain("┃  Thinking: Composing final summary")
     expect(rendered).toContain("in Korean with specifics.")
 
     if (previous !== undefined) process.env.GITHUB_ACTIONS = previous
@@ -282,7 +281,7 @@ describe("message.part.delta handling", () => {
     //#then
     const rendered = stdoutSpy.mock.calls.map((call) => String(call[0] ?? "")).join("")
     const renderCount = rendered.split("Thinking:").length - 1
-    expect(renderCount).toBe(2)
+    expect(renderCount).toBe(1)
 
     if (previous !== undefined) process.env.GITHUB_ACTIONS = previous
     stdoutSpy.mockRestore()
