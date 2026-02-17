@@ -12,10 +12,10 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then known agents get display name keys
+    // then known agents get display name keys, and original keys are preserved
     expect(result["Sisyphus (Ultraworker)"]).toBeDefined()
     expect(result["oracle"]).toBeDefined()
-    expect(result["sisyphus"]).toBeUndefined()
+    expect(result["sisyphus"]).toBeDefined()
   })
 
   it("preserves unknown agent keys unchanged", () => {
@@ -46,15 +46,20 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then all get display name keys
-    expect(Object.keys(result)).toEqual([
-      "Sisyphus (Ultraworker)",
-      "Hephaestus (Deep Agent)",
-      "Prometheus (Plan Builder)",
-      "Atlas (Plan Executor)",
-      "Metis (Plan Consultant)",
-      "Momus (Plan Critic)",
-      "Sisyphus-Junior",
-    ])
+    // then all get display name keys while preserving original keys
+    expect(result["Sisyphus (Ultraworker)"]).toBeDefined()
+    expect(result["sisyphus"]).toBeDefined()
+    expect(result["Hephaestus (Deep Agent)"]).toBeDefined()
+    expect(result["hephaestus"]).toBeDefined()
+    expect(result["Prometheus (Plan Builder)"]).toBeDefined()
+    expect(result["prometheus"]).toBeDefined()
+    expect(result["Atlas (Plan Executor)"]).toBeDefined()
+    expect(result["atlas"]).toBeDefined()
+    expect(result["Metis (Plan Consultant)"]).toBeDefined()
+    expect(result["metis"]).toBeDefined()
+    expect(result["Momus (Plan Critic)"]).toBeDefined()
+    expect(result["momus"]).toBeDefined()
+    expect(result["Sisyphus-Junior"]).toBeDefined()
+    expect(result["sisyphus-junior"]).toBeDefined()
   })
 })
