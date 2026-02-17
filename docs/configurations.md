@@ -723,7 +723,7 @@ Automatically switch to backup models when the primary model encounters retryabl
 {
   "runtime_fallback": {
     "enabled": true,
-    "retry_on_errors": [429, 503, 529],
+    "retry_on_errors": [400, 429, 503, 529],
     "max_fallback_attempts": 3,
     "cooldown_seconds": 60,
     "timeout_seconds": 30,
@@ -732,14 +732,14 @@ Automatically switch to backup models when the primary model encounters retryabl
 }
 ```
 
-| Option                  | Default           | Description                                                                 |
-| ----------------------- | ----------------- | --------------------------------------------------------------------------- |
-| `enabled`               | `true`            | Enable runtime fallback                                                     |
-| `retry_on_errors`       | `[429, 503, 529]` | HTTP status codes that trigger fallback (rate limit, service unavailable). Also supports certain classified provider errors (for example, missing API key) that do not expose HTTP status codes.   |
-| `max_fallback_attempts` | `3`               | Maximum fallback attempts per session (1-10)                                |
-| `cooldown_seconds`      | `60`              | Cooldown in seconds before retrying a failed model                          |
-| `timeout_seconds`       | `30`              | Timeout in seconds for an in-flight fallback request before forcing the next fallback model. Set to `0` to disable timeout-based fallback and provider quota retry signal detection. |
-| `notify_on_fallback`    | `true`            | Show toast notification when switching to a fallback model                  |
+| Option                  | Default                | Description                                                                 |
+| ----------------------- | ---------------------- | --------------------------------------------------------------------------- |
+| `enabled`               | `true`                 | Enable runtime fallback                                                     |
+| `retry_on_errors`       | `[400, 429, 503, 529]` | HTTP status codes that trigger fallback (rate limit, service unavailable). Also supports certain classified provider errors (for example, missing API key) that do not expose HTTP status codes.   |
+| `max_fallback_attempts` | `3`                    | Maximum fallback attempts per session (1-20)                                |
+| `cooldown_seconds`      | `60`                   | Cooldown in seconds before retrying a failed model                          |
+| `timeout_seconds`       | `30`                   | Timeout in seconds for an in-flight fallback request before forcing the next fallback model. Set to `0` to disable timeout-based fallback and provider quota retry signal detection. |
+| `notify_on_fallback`    | `true`                 | Show toast notification when switching to a fallback model                  |
 
 ### How It Works
 
@@ -895,66 +895,6 @@ Each category supports: `model`, `fallback_models`, `temperature`, `top_p`, `max
 | `fallback_models`   | string/array | -       | Fallback models for runtime switching on API errors. Single string or array of model strings.      |
 | `description`       | string       | -       | Human-readable description of the category's purpose. Shown in task prompt.                         |
 | `is_unstable_agent` | boolean      | `false` | Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini models.    |
-
-## Runtime Fallback
-
-Automatically switch to backup models when the primary model encounters retryable API errors (rate limits, overload, etc.) or provider key misconfiguration errors (for example, missing API key). This keeps conversations running without manual intervention.
-
-```json
-{
-  "runtime_fallback": {
-    "enabled": true,
-    "retry_on_errors": [429, 503, 529],
-    "max_fallback_attempts": 3,
-    "cooldown_seconds": 60,
-    "timeout_seconds": 30,
-    "notify_on_fallback": true
-  }
-}
-```
-
-| Option                  | Default           | Description                                                                 |
-| ----------------------- | ----------------- | --------------------------------------------------------------------------- |
-| `enabled`               | `true`            | Enable runtime fallback                                                     |
-| `retry_on_errors`       | `[429, 503, 529]` | HTTP status codes that trigger fallback (rate limit, service unavailable). Also supports certain classified provider errors (for example, missing API key) that do not expose HTTP status codes.   |
-| `max_fallback_attempts` | `3`               | Maximum fallback attempts per session (1-10)                                |
-| `cooldown_seconds`      | `60`              | Cooldown in seconds before retrying a failed model                          |
-| `timeout_seconds`       | `30`              | Timeout in seconds for an in-flight fallback request before forcing the next fallback model. Set to `0` to disable timeout-based fallback and provider quota retry signal detection. |
-| `notify_on_fallback`    | `true`            | Show toast notification when switching to a fallback model                  |
-
-### How It Works
-
-1. When an API error matching `retry_on_errors` occurs (or a classified provider key error such as missing API key), the hook intercepts it
-2. The next request automatically uses the next available model from `fallback_models`
-3. Failed models enter a cooldown period before being retried
-4. If a fallback provider hangs, timeout advances to the next fallback model
-5. Toast notification (optional) informs you of the model switch
-
-### Configuring Fallback Models
-
-Define `fallback_models` at the agent or category level:
-
-```json
-{
-  "agents": {
-    "sisyphus": {
-      "model": "anthropic/claude-opus-4-5",
-      "fallback_models": ["openai/gpt-5.2", "google/gemini-3-pro"]
-    }
-  },
-  "categories": {
-    "ultrabrain": {
-      "model": "openai/gpt-5.2-codex",
-      "fallback_models": ["anthropic/claude-opus-4-5", "google/gemini-3-pro"]
-    }
-  }
-}
-```
-
-When the primary model fails:
-1. First fallback: `openai/gpt-5.2`
-2. Second fallback: `google/gemini-3-pro`
-3. After `max_fallback_attempts`, returns to primary model
 
 ## Model Resolution System
 
