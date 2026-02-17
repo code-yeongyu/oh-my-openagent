@@ -153,33 +153,127 @@ Keymaker is inspired by [AmpCode's deep mode](https://ampcode.com)—autonomous 
 
 ### For Those Who Build Languages: Meet Cipher
 
-In The Matrix, ciphers were the encoded signals flowing through the system—the raw language underneath reality itself. **Meet our DSL engineering specialist: Cipher (Claude Opus 4.6 Max). The Language Architect.**
+![Meet Cipher](.github/assets/cipher.png)
+
+In The Matrix, ciphers were the encoded signals flowing through the system—the raw language underneath reality itself. **Meet our DSL engineering specialist: Cipher (Claude Opus 4.6). The Language Architect.**
 
 Cipher is the agent you call when you need to design, build, or extend domain-specific languages. He doesn't just write parsers—he thinks in grammars, type systems, and metamodels.
 
+**Agent Characteristics:**
+
+| Property | Value |
+|----------|-------|
+| **Model** | Claude Opus 4.6 (fallback: GPT 5.2 → Kimi K2.5 → Gemini 3 Pro) |
+| **Mode** | `all` — selectable in agent menu AND spawnable as subagent |
+| **Thinking** | Extended thinking enabled (32k budget) |
+| **Max Tokens** | 64,000 — DSL tasks produce large outputs (grammars + parsers + code generators) |
+| **Temperature** | 0.1 — precision-critical language engineering |
+| **Denied Tools** | `call_omo_agent` — Cipher uses direct tools (grep, LSP, AST-grep) for exploration |
+
 **Five Sub-Specializations:**
-- **Grammar Architect**: Formal grammar design (BNF/EBNF/PEG), disambiguation, grammar composition
-- **Semantic Analyst**: Type systems, scope analysis, constraint checking for custom languages
-- **Toolsmith**: IDE/LSP support, tree-sitter grammars, formatters, syntax highlighting
-- **Code Generator**: Transpilers, model-to-text transformations, multi-target code generation
-- **Metamodel Designer**: textX/PyEcore metamodeling, model transformations, EMF-style engineering
+- **Grammar Architect**: Formal grammar design (BNF/EBNF/PEG), operator precedence, disambiguation, grammar composition
+- **Semantic Analyst**: Type systems (structural/nominal), scope analysis, constraint checking, static analysis
+- **Toolsmith**: IDE/LSP integration, tree-sitter grammars, formatters, syntax highlighting, incremental parsing
+- **Code Generator**: Transpilers, model-to-text transformations, multi-target code generation, source maps
+- **Metamodel Designer**: textX/PyEcore metamodeling, model transformations (M2M/M2T), EMF-style engineering
 
 **Framework Coverage:**
 textX, ANTLR4, tree-sitter, Langium, Chevrotain, PyEcore — both external DSLs (custom syntax) and internal DSLs (fluent APIs/builder patterns).
 
-**Three Ways to Use Cipher:**
+#### Cipher's Skill Architecture
+
+Cipher's DSL knowledge is modular. Instead of a monolithic prompt, Cipher loads **5 composable skills** that are injected at agent build time. This means any agent in the system can load the same DSL knowledge — Cipher isn't special, he's just the one who loads all of them by default.
+
+| Skill | Domain | What It Contains |
+|-------|--------|------------------|
+| `dsl-core` | Foundations | 5 expert constraints (grammar-first, sound types, composability, error reporting, incremental parsing), framework selection guide, paradigm coverage, anti-patterns |
+| `dsl-grammar` | Grammar & Parsing | EBNF reference, expression precedence-by-nesting pattern, declaration/statement patterns, common pitfalls, error recovery, framework adaptation |
+| `dsl-codegen` | Code Generation | Source analysis, generator architecture (template/AST-walk/IR), language-specific idioms, multi-target generation |
+| `dsl-metamodel` | Metamodeling & textX | Complete textX grammar reference (assignments, rule types, references, modifiers, scoping), Python API (`obj_processors`, `scope_providers`, custom classes), PyEcore patterns |
+| `dsl-tooling` | IDE & Internal DSLs | Tree-sitter grammars, LSP implementation, fluent APIs, builder patterns, decorators, tagged template literals |
+
+**How skills compose:**
+
+```
+# Cipher loads ALL 5 (automatic — configured in the agent factory)
+Cipher = dsl-core + dsl-grammar + dsl-codegen + dsl-metamodel + dsl-tooling
+
+# Other agents can load specific skills for focused tasks
+task(category="source", load_skills=["dsl-core", "dsl-grammar"])        # just grammar work
+task(category="source", load_skills=["dsl-core", "dsl-codegen"])         # just transpiler work
+task(category="source", load_skills=["dsl-metamodel"])                   # just textX reference
+task(category="source", load_skills=["dsl-tooling"])                     # just tree-sitter/LSP
+```
+
+#### Internal DSL Engineering Workflow
+
+When Cipher tackles a DSL project, this is the internal workflow:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   USER REQUEST                          │
+│  "Build a state machine DSL with Python code generation"│
+└──────────────────────┬──────────────────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────────────────┐
+│              CIPHER (Language Architect)                  │
+│                                                          │
+│  1. Domain Analysis                                      │
+│     └─ Concepts, operations, relationships, constraints  │
+│                                                          │
+│  2. Formal Grammar (BNF/EBNF)        ◄── dsl-grammar    │
+│     └─ Precedence, disambiguation, error productions     │
+│                                                          │
+│  3. textX Grammar Implementation      ◄── dsl-metamodel  │
+│     └─ Rules, assignments, references, scoping           │
+│                                                          │
+│  4. Semantic Validation               ◄── dsl-metamodel  │
+│     └─ obj_processors, scope_providers, custom classes   │
+│                                                          │
+│  5. Code Generation Architecture      ◄── dsl-codegen    │
+│     └─ Strategy selection (template/visitor/IR)          │
+│                                                          │
+│  6. DELEGATE target-language code gen                     │
+│     └─ task(category="source") ──────────────────────┐   │
+│                                                      │   │
+└──────────────────────────────────────────────────────┼───┘
+                                                       │
+                       ┌───────────────────────────────┘
+                       ▼
+┌──────────────────────────────────────────────────────────┐
+│           LANGUAGE EXPERT (Mouse / Source Agent)          │
+│                                                          │
+│  Receives from Cipher:                                   │
+│  • DSL grammar/spec                                      │
+│  • AST/IR structure                                      │
+│  • Code generation strategy                              │
+│  • Example input → expected output pairs                 │
+│  • Idiomatic requirements (PEP 8, type hints, etc.)      │
+│                                                          │
+│  Produces:                                               │
+│  • Idiomatic Python code generator                       │
+│  • Runtime library                                       │
+│  • Integration tests                                     │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Key design principle**: Cipher is the *language architect* — he designs the grammar, AST, type system, and code generation strategy. But he **delegates** the actual target-language implementation to language experts via `task(category="source")`. For multi-target generation (e.g., same DSL → Python + TypeScript + Rust), Cipher fires delegations **in parallel**.
+
+#### Three Ways to Use Cipher
 
 | Method | How | Best For |
 |--------|-----|----------|
 | **Direct** | Select `@cipher` in the agent menu | Full DSL design sessions |
 | **Delegated** | Morpheus auto-detects DSL keywords and delegates | Seamless — just describe your DSL work |
-| **Skill injection** | `load_skills=["dsl-expert"]` on any task | Add DSL knowledge to any agent |
+| **Skill injection** | `load_skills=["dsl-core", "dsl-grammar"]` on any task | Add specific DSL knowledge to any agent |
 
 **Example prompts:**
 - *"Design a BNF grammar for a configuration language with typed variables and imports"*
 - *"Implement an ANTLR4 parser for this SQL-like query DSL"*
 - *"Create a tree-sitter grammar for syntax highlighting of my custom language"*
 - *"Build a textX metamodel for a state machine DSL with code generation to Python"*
+- *"Design an internal DSL with fluent API for defining data pipelines in Python"*
 
 ## Installation
 
@@ -258,7 +352,7 @@ See the full [Configuration Documentation](docs/configurations.md) for detailed 
 - **Config Locations**: `.opencode/matrixx.jsonc` or `.opencode/matrixx.json` (project), `~/.config/opencode/matrixx.jsonc` or `~/.config/opencode/matrixx.json` (user)
 - **JSONC Support**: Comments and trailing commas supported
 - **Agents**: Override models, temperatures, prompts, and permissions for any agent
-- **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits)
+- **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits), `dsl-core/grammar/codegen/metamodel/tooling` (DSL engineering)
 - **Morpheus Agent**: Main orchestrator with Oracle (Planner) and Seraph (Plan Consultant)
 - **Background Tasks**: Configure concurrency limits per provider/model
 - **Categories**: Domain-specific task delegation (`visual`, `business-logic`, custom)
