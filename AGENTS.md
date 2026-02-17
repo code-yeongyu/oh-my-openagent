@@ -1,6 +1,6 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-02-17 | **Commit:** 5a8e424c | **Branch:** dev
+**Generated:** 2026-02-17 | **Commit:** aac79f03 | **Branch:** dev
 
 ## OVERVIEW
 
@@ -12,16 +12,16 @@ OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork)
 oh-my-opencode/
 ├── src/
 │   ├── index.ts              # Plugin entry: loadConfig → createManagers → createTools → createHooks → createPluginInterface
-│   ├── plugin-config.ts      # JSONC multi-level config: project → user → defaults (Zod v4)
+│   ├── plugin-config.ts      # JSONC multi-level config: user → project → defaults (Zod v4)
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
 │   ├── hooks/                # 41 hooks across 37 directories + 6 standalone files
-│   ├── tools/                # 26 tools across 14 directories
+│   ├── tools/                # 26 tools across 15 directories
 │   ├── features/             # 18 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
 │   ├── shared/               # 101 utility files in 13 categories
 │   ├── config/               # Zod v4 schema system (22 files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth (Commander.js)
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
-│   ├── plugin/               # 7 OpenCode hook handlers + 41 hook composition
+│   ├── plugin/               # 8 OpenCode hook handlers + 41 hook composition
 │   └── plugin-handlers/      # 6-phase config loading pipeline
 ├── packages/                 # Monorepo: comment-checker, opencode-sdk
 └── local-ignore/             # Dev-only test fixtures
@@ -34,11 +34,11 @@ OhMyOpenCodePlugin(ctx)
   ├─→ loadPluginConfig()         # JSONC parse → project/user merge → Zod validate → migrate
   ├─→ createManagers()           # TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler
   ├─→ createTools()              # SkillContext + AvailableCategories + ToolRegistry (26 tools)
-  ├─→ createHooks()              # 3-tier: Core(33) + Continuation(7) + Skill(2) = 41 hooks
-  └─→ createPluginInterface()    # 7 OpenCode hook handlers → PluginInterface
+  ├─→ createHooks()              # 3-tier: Core(32) + Continuation(7) + Skill(2) = 41 hooks
+  └─→ createPluginInterface()    # 8 OpenCode hook handlers → PluginInterface
 ```
 
-## 7 OPENCODE HOOK HANDLERS
+## 8 OPENCODE HOOK HANDLERS
 
 | Handler | Purpose |
 |---------|---------|
@@ -86,7 +86,7 @@ Fields: agents (14 overridable), categories (8 built-in + custom), disabled_* ar
 
 - **Test pattern**: Vitest, co-located `*.test.ts`, given/when/then style
 - **Factory pattern**: `createXXX()` for all tools, hooks, agents
-- **Hook tiers**: Session (20) → Tool-Guard (9) → Transform (4) → Continuation (7) → Skill (2)
+- **Hook tiers**: Session (19) → Tool-Guard (9) → Transform (4) → Continuation (7) → Skill (2)
 - **Agent modes**: `primary` (respects UI model) vs `subagent` (own fallback chain) vs `all`
 - **Model resolution**: 3-step: override → category-default → provider-fallback → system-default
 - **Config format**: JSONC with comments, Zod v4 validation, snake_case keys
