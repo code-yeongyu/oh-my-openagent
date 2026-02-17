@@ -35,6 +35,8 @@ export interface EventState {
   lastThinkingSummary: string
   /** Whether text stream is currently at line start (for padding) */
   textAtLineStart: boolean
+  /** Whether reasoning stream is currently at line start (for padding) */
+  thinkingAtLineStart: boolean
 }
 
 export function createEventState(): EventState {
@@ -60,5 +62,6 @@ export function createEventState(): EventState {
     messageRoleById: {},
     lastThinkingSummary: "",
     textAtLineStart: true,
+    thinkingAtLineStart: false,
   }
 }

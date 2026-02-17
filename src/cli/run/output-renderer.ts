@@ -25,29 +25,11 @@ export function renderAgentHeader(
 }
 
 export function openThinkBlock(): void {
-  return
+  process.stdout.write("\n  ┃  Thinking: ")
 }
 
 export function closeThinkBlock(): void {
-  process.stdout.write("\n")
-}
-
-export function renderThinkingLine(
-  summary: string,
-  previousWidth: number,
-): number {
-  const line = `  ┃  Thinking: ${summary}  `
-  const isGitHubActions = process.env.GITHUB_ACTIONS === "true"
-
-  if (isGitHubActions) {
-    process.stdout.write(`${pc.dim(line)}\n`)
-    return line.length
-  }
-
-  const minPadding = 6
-  const clearPadding = Math.max(previousWidth - line.length + minPadding, minPadding)
-  process.stdout.write(`\r${pc.dim(line)}${" ".repeat(clearPadding)}`)
-  return line.length
+  process.stdout.write("  \n")
 }
 
 export function writePaddedText(

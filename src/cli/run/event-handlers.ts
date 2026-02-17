@@ -20,7 +20,6 @@ import {
   closeThinkBlock,
   openThinkBlock,
   renderAgentHeader,
-  renderThinkingLine,
   writePaddedText,
 } from "./output-renderer"
 
@@ -111,10 +110,15 @@ export function handleMessagePartUpdated(ctx: RunContext, payload: EventPayload,
 
   if (part.type === "reasoning") {
     ensureThinkBlockOpen(state)
-    const reasoningText = part.text ?? state.lastReasoningText
-    maybePrintThinkingLine(state, reasoningText)
+    const reasoningText = part.text ?? ""
+    const newText = reasoningText.slice(state.lastReasoningText.length)
+    if (newText) {
+      const padded = writePaddedText(newText, state.thinkingAtLineStart)
+      process.stdout.write(pc.dim(padded.output))
+      state.thinkingAtLineStart = padded.atLineStart
+      state.hasReceivedMeaningfulWork = true
+    }
     state.lastReasoningText = reasoningText
-    state.hasReceivedMeaningfulWork = true
     return
   }
 
@@ -157,9 +161,10 @@ export function handleMessagePartDelta(ctx: RunContext, payload: EventPayload, s
 
   if (partType === "reasoning") {
     ensureThinkBlockOpen(state)
-    const nextReasoningText = `${state.lastReasoningText}${delta}`
-    maybePrintThinkingLine(state, nextReasoningText)
-    state.lastReasoningText = nextReasoningText
+    const padded = writePaddedText(delta, state.thinkingAtLineStart)
+    process.stdout.write(pc.dim(padded.output))
+    state.thinkingAtLineStart = padded.atLineStart
+    state.lastReasoningText += delta
     state.hasReceivedMeaningfulWork = true
     return
   }
@@ -226,6 +231,7 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
   state.hasPrintedThinkingLine = false
   state.lastThinkingSummary = ""
   state.textAtLineStart = true
+  state.thinkingAtLineStart = false
   closeThinkBlockIfNeeded(state)
 
   const agent = props?.info?.agent ?? null
@@ -298,6 +304,7 @@ function ensureThinkBlockOpen(state: EventState): void {
   openThinkBlock()
   state.inThinkBlock = true
   state.hasPrintedThinkingLine = false
+  state.thinkingAtLineStart = false
 }
 
 function closeThinkBlockIfNeeded(state: EventState): void {
@@ -306,19 +313,5 @@ function closeThinkBlockIfNeeded(state: EventState): void {
   state.inThinkBlock = false
   state.lastThinkingLineWidth = 0
   state.lastThinkingSummary = ""
-}
-
-function maybePrintThinkingLine(state: EventState, text: string): void {
-  const normalized = text.replace(/\s+/g, " ").trim()
-  if (!normalized) return
-
-  const summary = normalized
-  if (summary === state.lastThinkingSummary) return
-
-  state.lastThinkingLineWidth = renderThinkingLine(
-    summary,
-    state.lastThinkingLineWidth,
-  )
-  state.lastThinkingSummary = summary
-  state.hasPrintedThinkingLine = true
+  state.thinkingAtLineStart = false
 }
