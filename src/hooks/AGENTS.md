@@ -1,14 +1,14 @@
-# src/hooks/ — 41 Lifecycle Hooks
+# src/hooks/ — 44 Lifecycle Hooks
 
-**Generated:** 2026-02-17
+**Generated:** 2026-02-18
 
 ## OVERVIEW
 
-41 hooks across 37 directories + 6 standalone files. Three-tier composition: Core(33) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
+44 hooks across 39 directories + 6 standalone files. Three-tier composition: Core(35) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
 
 ## HOOK TIERS
 
-### Tier 1: Session Hooks (20) — `create-session-hooks.ts`
+### Tier 1: Session Hooks (22) — `create-session-hooks.ts`
 
 | Hook | Event | Purpose |
 |------|-------|---------|
@@ -31,6 +31,9 @@
 | questionLabelTruncator | tool.execute.before | Truncate long question labels |
 | taskResumeInfo | chat.message | Inject task context on resume |
 | anthropicEffort | chat.params | Adjust reasoning effort level |
+| jsonErrorRecovery | tool.execute.after | Detect JSON parse errors, inject correction reminder |
+| sisyphusGptHephaestusReminder | chat.message | Toast warning when Sisyphus uses GPT model |
+| taskReminder | tool.execute.after | Remind about task tools after 10 turns without usage |
 
 ### Tier 2: Tool Guard Hooks (9) — `create-tool-guard-hooks.ts`
 

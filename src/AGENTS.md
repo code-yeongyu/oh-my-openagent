@@ -1,6 +1,6 @@
 # src/ — Plugin Source
 
-**Generated:** 2026-02-17
+**Generated:** 2026-02-18
 
 ## OVERVIEW
 
@@ -14,7 +14,7 @@ Root source directory. Entry point `index.ts` orchestrates 4-step initialization
 | `plugin-config.ts` | JSONC parse, multi-level merge (user → project → defaults), Zod validation |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry |
-| `create-hooks.ts` | 3-tier hook composition: Core(32) + Continuation(7) + Skill(2) |
+| `create-hooks.ts` | 3-tier hook composition: Core(35) + Continuation(7) + Skill(2) |
 | `plugin-interface.ts` | Assembles 8 OpenCode hook handlers into PluginInterface |
 
 ## CONFIG LOADING
@@ -32,8 +32,8 @@ loadPluginConfig(directory, ctx)
 
 ```
 createHooks()
-  ├─→ createCoreHooks()           # 32 hooks
-  │   ├─ createSessionHooks()     # 19: contextWindowMonitor, thinkMode, ralphLoop, sessionRecovery...
+  ├─→ createCoreHooks()           # 35 hooks
+  │   ├─ createSessionHooks()     # 22: contextWindowMonitor, thinkMode, ralphLoop, sessionRecovery, jsonErrorRecovery, sisyphusGptHephaestusReminder, taskReminder...
   │   ├─ createToolGuardHooks()   # 9: commentChecker, rulesInjector, writeExistingFileGuard...
   │   └─ createTransformHooks()   # 4: claudeCodeHooks, keywordDetector, contextInjector, thinkingBlockValidator
   ├─→ createContinuationHooks()   # 7: todoContinuationEnforcer, atlas, stopContinuationGuard...
