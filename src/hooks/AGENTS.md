@@ -1,95 +1,113 @@
-# HOOKS KNOWLEDGE BASE
+# src/hooks/ — 41 Lifecycle Hooks
+
+**Generated:** 2026-02-17
 
 ## OVERVIEW
 
-41 lifecycle hooks intercepting/modifying agent behavior across 7 event types. Three-tier registration: Core (32) → Continuation (7) → Skill (2).
+41 hooks across 37 directories + 6 standalone files. Three-tier composition: Core(33) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
 
-## STRUCTURE
-```
-hooks/
-├── agent-usage-reminder/         # Specialized agent hints (109 lines)
-├── anthropic-context-window-limit-recovery/ # Auto-summarize on limit (2232 lines, 29 files)
-├── anthropic-effort/             # Effort=max for Opus max variant (56 lines)
-├── atlas/                        # Main orchestration hook (1976 lines, 17 files)
-├── auto-slash-command/           # Detects /command patterns (1134 lines)
-├── auto-update-checker/          # Plugin update check (1140 lines, 20 files)
-├── background-notification/      # OS notifications (33 lines)
-├── category-skill-reminder/      # Category+skill delegation reminders (597 lines)
-├── claude-code-hooks/            # settings.json compat (2110 lines) — see AGENTS.md
-├── comment-checker/              # Prevents AI slop comments (710 lines)
-├── compaction-context-injector/  # Injects context on compaction (128 lines)
-├── compaction-todo-preserver/    # Preserves todos during compaction (203 lines)
-├── context-window-monitor.ts     # Reminds of headroom at 70% (100 lines)
-├── delegate-task-retry/          # Retries failed delegations (266 lines)
-├── directory-agents-injector/    # Auto-injects AGENTS.md (195 lines)
-├── directory-readme-injector/    # Auto-injects README.md (190 lines)
-├── edit-error-recovery/          # Recovers from edit failures (188 lines)
-├── empty-task-response-detector.ts # Detects empty responses (27 lines)
-├── interactive-bash-session/     # Tmux session management (695 lines)
-├── keyword-detector/             # ultrawork/search/analyze modes (1665 lines)
-├── non-interactive-env/          # Non-TTY handling (483 lines)
-├── preemptive-compaction.ts      # Auto-compact at 78% usage (108 lines)
-├── prometheus-md-only/           # Planner read-only mode (955 lines)
-├── question-label-truncator/     # Truncates labels to 30 chars (199 lines)
-├── ralph-loop/                   # Self-referential dev loop (1687 lines)
-├── rules-injector/               # Conditional .sisyphus/rules injection (1604 lines)
-├── session-notification.ts       # OS idle notifications (108 lines)
-├── session-recovery/             # Auto-recovers from crashes (1279 lines, 14 files)
-├── sisyphus-junior-notepad/      # Junior notepad directive (76 lines)
-├── start-work/                   # Sisyphus work session starter (648 lines)
-├── stop-continuation-guard/      # Guards stop continuation (214 lines)
-├── subagent-question-blocker/    # Blocks subagent questions (112 lines)
-├── task-reminder/                # Task progress reminders (210 lines)
-├── task-resume-info/             # Resume info for cancelled tasks (39 lines)
-├── tasks-todowrite-disabler/     # Disables TodoWrite when tasks active (202 lines)
-├── think-mode/                   # Dynamic thinking budget (1365 lines)
-├── thinking-block-validator/     # Validates thinking blocks (169 lines)
-├── todo-continuation-enforcer/   # Force TODO completion — boulder mechanism (2061 lines)
-├── tool-output-truncator.ts      # Prevents context bloat (62 lines)
-├── unstable-agent-babysitter/    # Monitors unstable behavior (451 lines)
-└── write-existing-file-guard/    # Guards against file overwrite (356 lines)
-```
+## HOOK TIERS
 
-## EVENT TYPES
+### Tier 1: Session Hooks (20) — `create-session-hooks.ts`
 
-| Event | Hook Method | Can Block | Count |
-|-------|-------------|-----------|-------|
-| UserPromptSubmit | `chat.message` | Yes | 4 |
-| ChatParams | `chat.params` | No | 2 |
-| PreToolUse | `tool.execute.before` | Yes | 13 |
-| PostToolUse | `tool.execute.after` | No | 15 |
-| SessionEvent | `event` | No | 17 |
-| MessagesTransform | `experimental.chat.messages.transform` | No | 1 |
-| Compaction | `onSummarize` | No | 2 |
+| Hook | Event | Purpose |
+|------|-------|---------|
+| contextWindowMonitor | session.idle | Track context window usage |
+| preemptiveCompaction | session.idle | Trigger compaction before limit |
+| sessionRecovery | session.error | Auto-retry on recoverable errors |
+| sessionNotification | session.idle | OS notifications on completion |
+| thinkMode | chat.params | Model variant switching (extended thinking) |
+| anthropicContextWindowLimitRecovery | session.error | Multi-strategy context recovery (truncation, compaction) |
+| autoUpdateChecker | session.created | Check npm for plugin updates |
+| agentUsageReminder | chat.message | Remind about available agents |
+| nonInteractiveEnv | chat.message | Adjust behavior for `run` command |
+| interactiveBashSession | tool.execute | Tmux session for interactive tools |
+| ralphLoop | event | Self-referential dev loop (boulder continuation) |
+| editErrorRecovery | tool.execute.after | Retry failed file edits |
+| delegateTaskRetry | tool.execute.after | Retry failed task delegations |
+| startWork | chat.message | `/start-work` command handler |
+| prometheusMdOnly | tool.execute.before | Enforce .md-only writes for Prometheus |
+| sisyphusJuniorNotepad | chat.message | Notepad injection for subagents |
+| questionLabelTruncator | tool.execute.before | Truncate long question labels |
+| taskResumeInfo | chat.message | Inject task context on resume |
+| anthropicEffort | chat.params | Adjust reasoning effort level |
 
-## BLOCKING HOOKS (8)
+### Tier 2: Tool Guard Hooks (9) — `create-tool-guard-hooks.ts`
 
-| Hook | Event | Blocks When |
-|------|-------|-------------|
-| auto-slash-command | chat.message | Command execution fails |
-| keyword-detector | chat.message | Keyword injection fails |
-| non-interactive-env | tool.execute.before | Interactive command in non-TTY |
-| prometheus-md-only | tool.execute.before | Write outside .sisyphus/*.md |
-| subagent-question-blocker | tool.execute.before | Question tool in subagent |
-| tasks-todowrite-disabler | tool.execute.before | TodoWrite with task system |
-| write-existing-file-guard | tool.execute.before | Write to existing file |
-| claude-code-hooks | tool.execute.before | Exit code 2 from settings.json hook |
+| Hook | Event | Purpose |
+|------|-------|---------|
+| commentChecker | tool.execute.after | Block AI-generated comment patterns |
+| toolOutputTruncator | tool.execute.after | Truncate oversized tool output |
+| directoryAgentsInjector | tool.execute.before | Inject dir AGENTS.md into context |
+| directoryReadmeInjector | tool.execute.before | Inject dir README.md into context |
+| emptyTaskResponseDetector | tool.execute.after | Detect empty task responses |
+| rulesInjector | tool.execute.before | Conditional rules injection (AGENTS.md, config) |
+| tasksTodowriteDisabler | tool.execute.before | Disable TodoWrite when task system active |
+| writeExistingFileGuard | tool.execute.before | Require Read before Write on existing files |
+| hashlineReadEnhancer | tool.execute.after | Enhance Read output with line hashes |
 
-## EXECUTION ORDER
+### Tier 3: Transform Hooks (4) — `create-transform-hooks.ts`
 
-**UserPromptSubmit**: keywordDetector → claudeCodeHooks → autoSlashCommand → startWork
-**PreToolUse**: subagentQuestionBlocker → questionLabelTruncator → claudeCodeHooks → nonInteractiveEnv → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → prometheusMdOnly → sisyphusJuniorNotepad → writeExistingFileGuard → tasksToDoWriteDisabler → atlasHook
-**PostToolUse**: claudeCodeHooks → toolOutputTruncator → contextWindowMonitor → commentChecker → directoryAgentsInjector → directoryReadmeInjector → rulesInjector → emptyTaskResponseDetector → agentUsageReminder → interactiveBashSession → editErrorRecovery → delegateTaskRetry → atlasHook → taskResumeInfo → taskReminder
+| Hook | Event | Purpose |
+|------|-------|---------|
+| claudeCodeHooks | messages.transform | Claude Code settings.json compatibility |
+| keywordDetector | messages.transform | Detect ultrawork/search/analyze modes |
+| contextInjectorMessagesTransform | messages.transform | Inject AGENTS.md/README.md into context |
+| thinkingBlockValidator | messages.transform | Validate thinking block structure |
 
-## HOW TO ADD
+### Tier 4: Continuation Hooks (7) — `create-continuation-hooks.ts`
 
-1. Create `src/hooks/name/` with `index.ts` exporting `createMyHook(ctx)`
-2. Add hook name to `HookNameSchema` in `src/config/schema/hooks.ts`
-3. Register in appropriate `src/plugin/hooks/create-*-hooks.ts`
+| Hook | Event | Purpose |
+|------|-------|---------|
+| stopContinuationGuard | chat.message | `/stop-continuation` command handler |
+| compactionContextInjector | session.compacted | Re-inject context after compaction |
+| compactionTodoPreserver | session.compacted | Preserve todos through compaction |
+| todoContinuationEnforcer | session.idle | **Boulder**: force continuation on incomplete todos |
+| unstableAgentBabysitter | session.idle | Monitor unstable agent behavior |
+| backgroundNotificationHook | event | Background task completion notifications |
+| atlasHook | event | Master orchestrator for boulder/background sessions |
 
-## ANTI-PATTERNS
+### Tier 5: Skill Hooks (2) — `create-skill-hooks.ts`
 
-- **Heavy PreToolUse**: Runs before EVERY tool — keep light
-- **Blocking non-critical**: Use PostToolUse warnings instead
-- **Redundant injection**: Track injected files to avoid context bloat
-- **Direct state mutation**: Use `output.output +=` instead of replacing
+| Hook | Event | Purpose |
+|------|-------|---------|
+| categorySkillReminder | chat.message | Remind about category+skill delegation |
+| autoSlashCommand | chat.message | Auto-detect `/command` in user input |
+
+## KEY HOOKS (COMPLEX)
+
+### anthropic-context-window-limit-recovery (31 files, ~2232 LOC)
+Multi-strategy recovery when hitting context limits. Strategies: truncation, compaction, summarization.
+
+### atlas (17 files, ~1976 LOC)
+Master orchestrator for boulder sessions. Decision gates: session type → abort check → failure count → background tasks → agent match → plan completeness → cooldown (5s). Injects continuation prompts on session.idle.
+
+### ralph-loop (14 files, ~1687 LOC)
+Self-referential dev loop via `/ralph-loop` command. State persisted in `.sisyphus/ralph-loop.local.md`. Detects `<promise>DONE</promise>` in AI output. Max 100 iterations default.
+
+### todo-continuation-enforcer (13 files, ~2061 LOC)
+"Boulder" mechanism. Forces agent to continue when todos remain incomplete. 2s countdown toast → continuation injection. Exponential backoff: 30s base, ×2 per failure, max 5 consecutive failures then 5min pause.
+
+### keyword-detector (~1665 LOC)
+Detects modes from user input: ultrawork, search, analyze, prove-yourself. Injects mode-specific system prompts.
+
+### rules-injector (19 files, ~1604 LOC)
+Conditional rules injection from AGENTS.md, config, skill rules. Evaluates conditions to determine which rules apply.
+
+## STANDALONE HOOKS (in src/hooks/ root)
+
+| File | Purpose |
+|------|---------|
+| context-window-monitor.ts | Track context window percentage |
+| preemptive-compaction.ts | Trigger compaction before hard limit |
+| tool-output-truncator.ts | Truncate tool output by token count |
+| session-notification.ts + 4 helpers | OS notification on session completion |
+| empty-task-response-detector.ts | Detect empty/failed task responses |
+| session-todo-status.ts | Todo completion status tracking |
+
+## HOW TO ADD A HOOK
+
+1. Create `src/hooks/{name}/index.ts` with `createXXXHook(deps)` factory
+2. Register in appropriate tier file (`src/plugin/hooks/create-{tier}-hooks.ts`)
+3. Add hook name to `src/config/schema/hooks.ts` HookNameSchema
+4. Hook receives `(event, ctx)` — return value depends on event type

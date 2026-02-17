@@ -1,55 +1,41 @@
-# CLAUDE CODE HOOKS COMPATIBILITY
+# src/hooks/claude-code-hooks/ — Claude Code Compatibility
+
+**Generated:** 2026-02-17
 
 ## OVERVIEW
 
-Full Claude Code `settings.json` hook compatibility layer. Intercepts OpenCode events to execute external scripts/commands defined in settings.json.
+~2110 LOC across 19 files. Provides Claude Code settings.json compatibility layer. Parses CC permission rules and maps CC hooks (PreToolUse, PostToolUse) to OpenCode hooks.
 
-**Config Sources** (priority): `.claude/settings.local.json` > `.claude/settings.json` (project) > `~/.claude/settings.json` (global)
+## WHAT IT DOES
 
-## STRUCTURE
+1. Parses Claude Code `settings.json` permission format
+2. Maps CC hook types to OpenCode event types
+3. Enforces CC permission rules (allow/deny per tool)
+4. Supports CC `.claude/settings.json` and `.claude/settings.local.json`
+
+## CC → OPENCODE HOOK MAPPING
+
+| CC Hook | OpenCode Event |
+|---------|---------------|
+| PreToolUse | tool.execute.before |
+| PostToolUse | tool.execute.after |
+| Notification | event (session.idle) |
+| Stop | event (session.idle) |
+
+## PERMISSION SYSTEM
+
+CC permissions format:
+```json
+{
+  "permissions": {
+    "allow": ["Edit", "Write"],
+    "deny": ["Bash(rm:*)"]
+  }
+}
 ```
-claude-code-hooks/
-├── index.ts              # Barrel export
-├── claude-code-hooks-hook.ts  # Main factory (22 lines)
-├── config.ts             # Claude settings.json loader (105 lines)
-├── config-loader.ts      # Extended plugin config (107 lines)
-├── pre-tool-use.ts       # PreToolUse hook executor (173 lines)
-├── post-tool-use.ts      # PostToolUse hook executor (200 lines)
-├── user-prompt-submit.ts # UserPromptSubmit executor (125 lines)
-├── stop.ts               # Stop hook executor (122 lines)
-├── pre-compact.ts        # PreCompact executor (110 lines)
-├── transcript.ts         # Tool use recording (235 lines)
-├── tool-input-cache.ts   # Pre→post input caching (51 lines)
-├── todo.ts               # Todo integration
-├── session-hook-state.ts # Active state tracking (11 lines)
-├── types.ts              # Hook & IO type definitions (204 lines)
-├── plugin-config.ts      # Default config constants (12 lines)
-└── handlers/             # Event handlers (5 files)
-    ├── pre-compact-handler.ts
-    ├── tool-execute-before-handler.ts
-    ├── tool-execute-after-handler.ts
-    ├── chat-message-handler.ts
-    └── session-event-handler.ts
-```
 
-## HOOK LIFECYCLE
+Translated to OpenCode tool restrictions via permission-compat in shared/.
 
-| Event | Timing | Can Block | Context Provided |
-|-------|--------|-----------|------------------|
-| PreToolUse | Before exec | Yes (exit 2) | sessionId, toolName, toolInput, cwd |
-| PostToolUse | After exec | Warn (exit 1) | + toolOutput, transcriptPath |
-| UserPromptSubmit | On message | Yes (exit 2) | sessionId, prompt, parts, cwd |
-| Stop | Session end | Inject | sessionId, parentSessionId, cwd |
-| PreCompact | Before summarize | No | sessionId, cwd |
+## FILES
 
-## EXIT CODES
-
-- `0`: Pass (continue)
-- `1`: Warn (continue + system message)
-- `2`: Block (abort operation)
-
-## ANTI-PATTERNS
-
-- **Heavy PreToolUse**: Runs before EVERY tool — keep scripts fast
-- **Blocking non-critical**: Prefer PostToolUse warnings
-- **Ignoring exit codes**: Return `2` to block sensitive tools
+Key files: `settings-loader.ts` (parse CC settings), `hook-mapper.ts` (CC→OC mapping), `permission-handler.ts` (rule enforcement), `types.ts` (CC type definitions).

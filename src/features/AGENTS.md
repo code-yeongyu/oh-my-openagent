@@ -1,83 +1,69 @@
-# FEATURES KNOWLEDGE BASE
+# src/features/ — 18 Feature Modules
+
+**Generated:** 2026-02-17
 
 ## OVERVIEW
 
-18 feature modules extending plugin capabilities: agent orchestration, skill loading, Claude Code compatibility, MCP management, task storage, and tmux integration.
+Standalone feature modules wired into plugin/ layer. Each is self-contained with own types, implementation, and tests.
 
-## STRUCTURE
-```
-features/
-├── background-agent/           # Task lifecycle, concurrency (56 files, 1701-line manager)
-│   ├── manager.ts              # Main task orchestration (1701 lines)
-│   ├── concurrency.ts          # Parallel execution limits per provider/model (137 lines)
-│   ├── task-history.ts         # Task execution history per parent session (76 lines)
-│   └── spawner/                # Task spawning: factory, starter, resumer, tmux (8 files)
-├── tmux-subagent/              # Tmux integration (28 files, 3303 LOC)
-│   └── manager.ts              # Pane management, grid planning (350 lines)
-├── opencode-skill-loader/      # YAML frontmatter skill loading (28 files, 2967 LOC)
-│   ├── loader.ts               # Skill discovery (4 scopes)
-│   ├── skill-directory-loader.ts # Recursive directory scanning (maxDepth=2)
-│   ├── skill-discovery.ts      # getAllSkills() with caching + provider gating
-│   └── merger/                 # Skill merging with scope priority
-├── mcp-oauth/                  # OAuth 2.0 flow for MCP (18 files, 2164 LOC)
-│   ├── provider.ts             # McpOAuthProvider class
-│   ├── oauth-authorization-flow.ts # PKCE, callback handling
-│   └── dcr.ts                  # Dynamic Client Registration (RFC 7591)
-├── skill-mcp-manager/          # MCP client lifecycle per session (12 files, 1769 LOC)
-│   └── manager.ts              # SkillMcpManager class (150 lines)
-├── builtin-skills/             # 5 built-in skills (10 files, 1921 LOC)
-│   └── skills/                 # git-master (1112), playwright (313), dev-browser (222), frontend-ui-ux (80)
-├── builtin-commands/           # 7 command templates (11 files, 1511 LOC)
-│   └── templates/              # refactor (620), init-deep (306), handoff (178), start-work, ralph-loop, stop-continuation
-├── claude-tasks/               # Task schema + storage (7 files) — see AGENTS.md
-├── context-injector/           # AGENTS.md, README.md, rules injection (6 files, 809 LOC)
-├── claude-code-plugin-loader/  # Plugin discovery from .opencode/plugins/ (10 files)
-├── claude-code-mcp-loader/     # .mcp.json with ${VAR} expansion (6 files)
-├── claude-code-command-loader/ # Command loading from .opencode/commands/ (3 files)
-├── claude-code-agent-loader/   # Agent loading from .opencode/agents/ (3 files)
-├── claude-code-session-state/  # Subagent session state tracking (3 files)
-├── hook-message-injector/      # System message injection (4 files)
-├── task-toast-manager/         # Task progress notifications (4 files)
-├── boulder-state/              # Persistent state for multi-step ops (5 files)
-└── tool-metadata-store/        # Tool execution metadata caching (3 files)
-```
+## MODULE MAP
 
-## KEY PATTERNS
+| Module | Files | Complexity | Purpose |
+|--------|-------|------------|---------|
+| **background-agent** | 49 | HIGH | Task lifecycle, concurrency (5/model), polling, spawner pattern |
+| **tmux-subagent** | 27 | HIGH | Tmux pane management, grid planning, session orchestration |
+| **opencode-skill-loader** | 25 | HIGH | YAML frontmatter skill loading from 4 scopes |
+| **mcp-oauth** | 10 | HIGH | OAuth 2.0 + PKCE + DCR (RFC 7591) for MCP servers |
+| **builtin-skills** | 10 | LOW | 6 skills: git-master, playwright, playwright-cli, agent-browser, dev-browser, frontend-ui-ux |
+| **skill-mcp-manager** | 10 | MEDIUM | MCP client lifecycle per session (stdio + HTTP) |
+| **claude-code-plugin-loader** | 10 | MEDIUM | Unified plugin discovery from .opencode/plugins/ |
+| **builtin-commands** | 9 | LOW | Command templates: refactor, init-deep, handoff, etc. |
+| **claude-code-mcp-loader** | 5 | MEDIUM | .mcp.json loading with ${VAR} env expansion |
+| **context-injector** | 4 | MEDIUM | AGENTS.md/README.md injection into context |
+| **boulder-state** | 4 | LOW | Persistent state for multi-step operations |
+| **hook-message-injector** | 4 | MEDIUM | System message injection for hooks |
+| **claude-tasks** | 4 | MEDIUM | Task schema + file storage + OpenCode todo sync |
+| **task-toast-manager** | 3 | MEDIUM | Task progress notifications |
+| **claude-code-agent-loader** | 3 | LOW | Load agents from .opencode/agents/ |
+| **claude-code-command-loader** | 3 | LOW | Load commands from .opencode/commands/ |
+| **claude-code-session-state** | 2 | LOW | Subagent session state tracking |
+| **tool-metadata-store** | 2 | LOW | Tool execution metadata cache |
 
-**Background Agent Lifecycle:**
-pending → running → completed/error/cancelled/interrupt
-- Concurrency: Per provider/model limits (default: 5), queue-based FIFO
-- Events: session.idle + session.error drive completion detection
-- Key methods: `launch()`, `resume()`, `cancelTask()`, `getTask()`, `getAllDescendantTasks()`
+## KEY MODULES
 
-**Skill Loading Pipeline (4-scope priority):**
-opencode-project (`.opencode/skills/`) > opencode (`~/.config/opencode/skills/`) > project (`.claude/skills/`) > user (`~/.claude/skills/`)
+### background-agent (49 files, ~10k LOC)
 
-**Claude Code Compatibility Layer:**
-5 loaders: agent-loader, command-loader, mcp-loader, plugin-loader, session-state
+Core orchestration engine. `BackgroundManager` manages task lifecycle:
+- States: pending → running → completed/error/cancelled/interrupt
+- Concurrency: per-model/provider limits via `ConcurrencyManager` (FIFO queue)
+- Polling: 3s interval, completion via idle events + stability detection (10s unchanged)
+- spawner/: 8 focused files composing via `SpawnerContext` interface
 
-**SKILL.md Format:**
-```yaml
----
-name: my-skill
-description: "..."
-model: "claude-opus-4-6"    # optional
-agent: "sisyphus"           # optional
-mcp:                        # optional embedded MCPs
-  server-name:
-    type: http
-    url: https://...
----
-# Skill instruction content
-```
+### opencode-skill-loader (25 files, ~3.2k LOC)
 
-## HOW TO ADD
+4-scope skill discovery (project > opencode > user > global):
+- YAML frontmatter parsing from SKILL.md files
+- Skill merger with priority deduplication
+- Template resolution with variable substitution
+- Provider gating for model-specific skills
 
-1. Create directory under `src/features/`
-2. Add `index.ts`, `types.ts`, `constants.ts` as needed
-3. Export from `index.ts` following barrel pattern
-4. Register in main plugin if plugin-level feature
+### tmux-subagent (27 files, ~3.6k LOC)
 
-## CHILD DOCUMENTATION
+State-first tmux integration:
+- `TmuxSessionManager`: pane lifecycle, grid planning
+- Spawn action decider + target finder
+- Polling manager for session health
+- Event handlers for pane creation/destruction
 
-- See `claude-tasks/AGENTS.md` for task schema and storage details
+### builtin-skills (6 skill objects)
+
+| Skill | Size | MCP | Tools |
+|-------|------|-----|-------|
+| git-master | 1111 LOC | — | Bash |
+| playwright | 312 LOC | @playwright/mcp | — |
+| agent-browser | (in playwright.ts) | — | Bash(agent-browser:*) |
+| playwright-cli | 268 LOC | — | Bash(playwright-cli:*) |
+| dev-browser | 221 LOC | — | Bash |
+| frontend-ui-ux | 79 LOC | — | — |
+
+Browser variant selected by `browserProvider` config: playwright (default) | playwright-cli | agent-browser.
