@@ -1,4 +1,26 @@
-import { describe, it, expect, mock, beforeEach } from "bun:test"
+/// <reference types="bun-types" />
+
+import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+
+const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
+const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
+
+const originalAnthropicContextEnv = process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+const originalVertexContextEnv = process.env[VERTEX_CONTEXT_ENV_KEY]
+
+function resetContextLimitEnv(): void {
+  if (originalAnthropicContextEnv === undefined) {
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+  } else {
+    process.env[ANTHROPIC_CONTEXT_ENV_KEY] = originalAnthropicContextEnv
+  }
+
+  if (originalVertexContextEnv === undefined) {
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+  } else {
+    process.env[VERTEX_CONTEXT_ENV_KEY] = originalVertexContextEnv
+  }
+}
 
 const logMock = mock(() => {})
 
@@ -29,6 +51,12 @@ describe("preemptive-compaction", () => {
   beforeEach(() => {
     ctx = createMockCtx()
     logMock.mockClear()
+    delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+    delete process.env[VERTEX_CONTEXT_ENV_KEY]
+  })
+
+  afterEach(() => {
+    resetContextLimitEnv()
   })
 
   // #given event caches token info from message.updated
@@ -237,5 +265,82 @@ describe("preemptive-compaction", () => {
       sessionID,
       error: String(summarizeError),
     })
+  })
+
+  it("should use 1M limit when model cache flag is enabled", async () => {
+    //#given
+    const hook = createPreemptiveCompactionHook(ctx as never, {
+      anthropicContext1MEnabled: true,
+    })
+    const sessionID = "ses_1m_flag"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-5",
+            finish: true,
+            tokens: {
+              input: 300000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    //#then
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+  })
+
+  it("should keep env var fallback when model cache flag is disabled", async () => {
+    //#given
+    process.env[ANTHROPIC_CONTEXT_ENV_KEY] = "true"
+    const hook = createPreemptiveCompactionHook(ctx as never, {
+      anthropicContext1MEnabled: false,
+    })
+    const sessionID = "ses_env_fallback"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-5",
+            finish: true,
+            tokens: {
+              input: 300000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 0, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    //#when
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    //#then
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
   })
 })

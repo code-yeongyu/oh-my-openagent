@@ -56,6 +56,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const hooks = createHooks({
     ctx,
     pluginConfig,
+    modelCacheState,
     backgroundManager: managers.backgroundManager,
     isHookEnabled,
     safeHookEnabled,

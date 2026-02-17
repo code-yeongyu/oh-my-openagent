@@ -2,12 +2,20 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
 const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
-const ANTHROPIC_ACTUAL_LIMIT =
-  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
-    ? 1_000_000
-    : 200_000
+const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000
 const CONTEXT_WARNING_THRESHOLD = 0.70
+
+type ModelCacheStateLike = {
+  anthropicContext1MEnabled: boolean
+}
+
+function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
+  return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
+    process.env.ANTHROPIC_1M_CONTEXT === "true" ||
+    process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
+    ? 1_000_000
+    : DEFAULT_ANTHROPIC_ACTUAL_LIMIT
+}
 
 const CONTEXT_REMINDER = `${createSystemDirective(SystemDirectiveTypes.CONTEXT_WINDOW_MONITOR)}
 
@@ -31,7 +39,10 @@ function isAnthropicProvider(providerID: string): boolean {
   return providerID === "anthropic" || providerID === "google-vertex-anthropic"
 }
 
-export function createContextWindowMonitorHook(_ctx: PluginInput) {
+export function createContextWindowMonitorHook(
+  _ctx: PluginInput,
+  modelCacheState?: ModelCacheStateLike,
+) {
   const remindedSessions = new Set<string>()
   const tokenCache = new Map<string, CachedTokenState>()
 
@@ -51,7 +62,8 @@ export function createContextWindowMonitorHook(_ctx: PluginInput) {
     const lastTokens = cached.tokens
     const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
 
-    const actualUsagePercentage = totalInputTokens / ANTHROPIC_ACTUAL_LIMIT
+    const actualUsagePercentage =
+      totalInputTokens / getAnthropicActualLimit(modelCacheState)
 
     if (actualUsagePercentage < CONTEXT_WARNING_THRESHOLD) return
 
