@@ -7,6 +7,9 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
     "atlas": {
       "model": "opencode/glm-4.7-free",
     },
+    "coeus": {
+      "model": "opencode/glm-4.7-free",
+    },
     "explore": {
       "model": "opencode/glm-4.7-free",
     },
@@ -29,6 +32,9 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
       "model": "opencode/glm-4.7-free",
     },
     "prometheus": {
+      "model": "opencode/glm-4.7-free",
+    },
+    "sub-prometheus": {
       "model": "opencode/glm-4.7-free",
     },
   },
@@ -68,6 +74,10 @@ exports[`generateModelConfig single native provider uses Claude models when only
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
     },
+    "coeus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -96,6 +106,9 @@ exports[`generateModelConfig single native provider uses Claude models when only
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "anthropic/claude-sonnet-4-5",
     },
   },
   "categories": {
@@ -130,6 +143,10 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
     },
+    "coeus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -158,6 +175,9 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "anthropic/claude-sonnet-4-5",
     },
   },
   "categories": {
@@ -193,6 +213,10 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
     "atlas": {
       "model": "openai/gpt-5.2",
     },
+    "coeus": {
+      "model": "openai/gpt-5.2",
+      "variant": "high",
+    },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
@@ -219,6 +243,10 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "high",
     },
     "prometheus": {
+      "model": "openai/gpt-5.2",
+      "variant": "high",
+    },
+    "sub-prometheus": {
       "model": "openai/gpt-5.2",
       "variant": "high",
     },
@@ -260,6 +288,10 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
     "atlas": {
       "model": "openai/gpt-5.2",
     },
+    "coeus": {
+      "model": "openai/gpt-5.2",
+      "variant": "high",
+    },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
@@ -286,6 +318,10 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "high",
     },
     "prometheus": {
+      "model": "openai/gpt-5.2",
+      "variant": "high",
+    },
+    "sub-prometheus": {
       "model": "openai/gpt-5.2",
       "variant": "high",
     },
@@ -327,6 +363,9 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     "atlas": {
       "model": "google/gemini-3.1-pro-preview",
     },
+    "coeus": {
+      "model": "google/gemini-3-pro",
+    },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
@@ -350,6 +389,9 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     },
     "prometheus": {
       "model": "google/gemini-3.1-pro-preview",
+    },
+    "sub-prometheus": {
+      "model": "google/gemini-3-pro",
     },
   },
   "categories": {
@@ -388,6 +430,9 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
     "atlas": {
       "model": "google/gemini-3.1-pro-preview",
     },
+    "coeus": {
+      "model": "google/gemini-3-pro",
+    },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
@@ -411,6 +456,9 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
     },
     "prometheus": {
       "model": "google/gemini-3.1-pro-preview",
+    },
+    "sub-prometheus": {
+      "model": "google/gemini-3-pro",
     },
   },
   "categories": {
@@ -449,6 +497,10 @@ exports[`generateModelConfig all native providers uses preferred models from fal
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
     },
+    "coeus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -481,6 +533,9 @@ exports[`generateModelConfig all native providers uses preferred models from fal
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "anthropic/claude-sonnet-4-5",
     },
   },
   "categories": {
@@ -523,6 +578,10 @@ exports[`generateModelConfig all native providers uses preferred models with isM
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
     },
+    "coeus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -555,6 +614,9 @@ exports[`generateModelConfig all native providers uses preferred models with isM
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "anthropic/claude-sonnet-4-5",
     },
   },
   "categories": {
@@ -598,6 +660,10 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
+    "coeus": {
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
+    },
     "explore": {
       "model": "opencode/claude-haiku-4-5",
     },
@@ -630,6 +696,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "sisyphus": {
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "opencode/claude-sonnet-4-5",
     },
   },
   "categories": {
@@ -672,6 +741,10 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
+    "coeus": {
+      "model": "opencode/claude-opus-4-6",
+      "variant": "max",
+    },
     "explore": {
       "model": "opencode/claude-haiku-4-5",
     },
@@ -704,6 +777,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     "sisyphus": {
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "opencode/claude-sonnet-4-5",
     },
   },
   "categories": {
@@ -747,6 +823,10 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "atlas": {
       "model": "github-copilot/claude-sonnet-4.5",
     },
+    "coeus": {
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
+    },
     "explore": {
       "model": "github-copilot/gpt-5-mini",
     },
@@ -775,6 +855,9 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "sisyphus": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "github-copilot/claude-sonnet-4.5",
     },
   },
   "categories": {
@@ -813,6 +896,10 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     "atlas": {
       "model": "github-copilot/claude-sonnet-4.5",
     },
+    "coeus": {
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
+    },
     "explore": {
       "model": "github-copilot/gpt-5-mini",
     },
@@ -841,6 +928,9 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     "sisyphus": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "github-copilot/claude-sonnet-4.5",
     },
   },
   "categories": {
@@ -880,6 +970,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     "atlas": {
       "model": "opencode/glm-4.7-free",
     },
+    "coeus": {
+      "model": "opencode/glm-4.7-free",
+    },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
@@ -903,6 +996,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     },
     "sisyphus": {
       "model": "zai-coding-plan/glm-4.7",
+    },
+    "sub-prometheus": {
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -935,6 +1031,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
     "atlas": {
       "model": "opencode/glm-4.7-free",
     },
+    "coeus": {
+      "model": "opencode/glm-4.7-free",
+    },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
@@ -958,6 +1057,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
     },
     "sisyphus": {
       "model": "zai-coding-plan/glm-4.7",
+    },
+    "sub-prometheus": {
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -989,6 +1091,10 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
   "agents": {
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
+    },
+    "coeus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
     },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1022,6 +1128,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "anthropic/claude-sonnet-4-5",
     },
   },
   "categories": {
@@ -1064,6 +1173,10 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "atlas": {
       "model": "github-copilot/claude-sonnet-4.5",
     },
+    "coeus": {
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
+    },
     "explore": {
       "model": "github-copilot/gpt-5-mini",
     },
@@ -1096,6 +1209,9 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "sisyphus": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "github-copilot/claude-sonnet-4.5",
     },
   },
   "categories": {
@@ -1138,6 +1254,10 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
     },
+    "coeus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -1166,6 +1286,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "anthropic/claude-sonnet-4-5",
     },
   },
   "categories": {
@@ -1199,6 +1322,10 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
     "atlas": {
       "model": "anthropic/claude-sonnet-4-5",
     },
+    "coeus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -1227,6 +1354,9 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "anthropic/claude-sonnet-4-5",
     },
   },
   "categories": {
@@ -1265,6 +1395,10 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
+    "coeus": {
+      "model": "github-copilot/claude-opus-4.6",
+      "variant": "max",
+    },
     "explore": {
       "model": "opencode/claude-haiku-4-5",
     },
@@ -1297,6 +1431,9 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "sisyphus": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "github-copilot/claude-sonnet-4.5",
     },
   },
   "categories": {
@@ -1339,6 +1476,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
+    "coeus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -1371,6 +1512,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "anthropic/claude-sonnet-4-5",
     },
   },
   "categories": {
@@ -1413,6 +1557,10 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "atlas": {
       "model": "opencode/kimi-k2.5-free",
     },
+    "coeus": {
+      "model": "anthropic/claude-opus-4-6",
+      "variant": "max",
+    },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
@@ -1445,6 +1593,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sub-prometheus": {
+      "model": "anthropic/claude-sonnet-4-5",
     },
   },
   "categories": {
