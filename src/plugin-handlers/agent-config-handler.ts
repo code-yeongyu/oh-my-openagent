@@ -23,9 +23,12 @@ type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   plan?: Record<string, unknown>;
 };
 
-function hasConfiguredDefaultAgent(config: Record<string, unknown>): boolean {
+function getConfiguredDefaultAgent(config: Record<string, unknown>): string | undefined {
   const defaultAgent = config.default_agent;
-  return typeof defaultAgent === "string" && defaultAgent.trim().length > 0;
+  if (typeof defaultAgent !== "string") return undefined;
+
+  const trimmedDefaultAgent = defaultAgent.trim();
+  return trimmedDefaultAgent.length > 0 ? trimmedDefaultAgent : undefined;
 }
 
 export async function applyAgentConfig(params: {
@@ -107,11 +110,17 @@ export async function applyAgentConfig(params: {
   const plannerEnabled = params.pluginConfig.sisyphus_agent?.planner_enabled ?? true;
   const replacePlan = params.pluginConfig.sisyphus_agent?.replace_plan ?? true;
   const shouldDemotePlan = plannerEnabled && replacePlan;
+  const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
+
+  if (configuredDefaultAgent) {
+    (params.config as { default_agent?: string }).default_agent =
+      getAgentDisplayName(configuredDefaultAgent);
+  }
 
   const configAgent = params.config.agent as AgentConfigRecord | undefined;
 
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
-    if (!hasConfiguredDefaultAgent(params.config)) {
+    if (!configuredDefaultAgent) {
       (params.config as { default_agent?: string }).default_agent =
         getAgentDisplayName("sisyphus");
     }
