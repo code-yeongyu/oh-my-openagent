@@ -9,6 +9,10 @@ export interface EventState {
   hasReceivedMeaningfulWork: boolean
   /** Count of assistant messages for the main session */
   messageCount: number
+  /** Current agent name from the latest assistant message */
+  currentAgent: string | null
+  /** Current model ID from the latest assistant message */
+  currentModel: string | null
 }
 
 export function createEventState(): EventState {
@@ -21,5 +25,7 @@ export function createEventState(): EventState {
     currentTool: null,
     hasReceivedMeaningfulWork: false,
     messageCount: 0,
+    currentAgent: null,
+    currentModel: null,
   }
 }
