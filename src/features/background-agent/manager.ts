@@ -355,10 +355,10 @@ export class BackgroundManager {
         system: input.skillContent,
         tools: (() => {
           const tools = {
-            ...getAgentToolRestrictions(input.agent),
             task: false,
             call_omo_agent: true,
             question: false,
+            ...getAgentToolRestrictions(input.agent),
           }
           setSessionTools(sessionID, tools)
           return tools
@@ -628,10 +628,10 @@ export class BackgroundManager {
         ...(resumeVariant ? { variant: resumeVariant } : {}),
         tools: (() => {
           const tools = {
-            ...getAgentToolRestrictions(existingTask.agent),
             task: false,
             call_omo_agent: true,
             question: false,
+            ...getAgentToolRestrictions(existingTask.agent),
           }
           setSessionTools(existingTask.sessionID!, tools)
           return tools
