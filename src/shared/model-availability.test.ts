@@ -9,6 +9,14 @@ let fetchAvailableModels: (client?: unknown, options?: { connectedProviders?: st
 let fuzzyMatchModel: (target: string, available: Set<string>, providers?: string[]) => string | null
 let isModelAvailable: (targetModel: string, availableModels: Set<string>) => boolean
 let getConnectedProviders: (client: unknown) => Promise<string[]>
+let isAnyFallbackModelAvailable: (
+	fallbackChain: Array<{ providers: string[]; model: string }>,
+	availableModels: Set<string>,
+) => boolean
+let resolveFirstAvailableFallback: (
+	fallbackChain: Array<{ providers: string[]; model: string }>,
+	availableModels: Set<string>,
+) => { provider: string; model: string } | null
 
 beforeAll(async () => {
   ;({
@@ -18,6 +26,10 @@ beforeAll(async () => {
     isModelAvailable,
     getConnectedProviders,
   } = await import("./model-availability"))
+	;({
+		isAnyFallbackModelAvailable,
+		resolveFirstAvailableFallback,
+	} = await import("./fallback-model-availability"))
 })
 
 describe("fetchAvailableModels", () => {
@@ -861,5 +873,92 @@ describe("isModelAvailable", () => {
 
 		// then
 		expect(result).toBe(false)
+	})
+})
+
+describe("fallback model availability", () => {
+	let tempDir: string
+	let originalXdgCache: string | undefined
+
+	beforeEach(() => {
+		// given
+		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
+		originalXdgCache = process.env.XDG_CACHE_HOME
+		process.env.XDG_CACHE_HOME = tempDir
+	})
+
+	afterEach(() => {
+		if (originalXdgCache !== undefined) {
+			process.env.XDG_CACHE_HOME = originalXdgCache
+		} else {
+			delete process.env.XDG_CACHE_HOME
+		}
+		rmSync(tempDir, { recursive: true, force: true })
+	})
+
+	function writeConnectedProvidersCache(connected: string[]): void {
+		const cacheDir = join(tempDir, "oh-my-opencode")
+		require("fs").mkdirSync(cacheDir, { recursive: true })
+		writeFileSync(
+			join(cacheDir, "connected-providers.json"),
+			JSON.stringify({ connected, updatedAt: new Date().toISOString() }),
+		)
+	}
+
+	it("returns null for completely unknown model", () => {
+		// given
+		const available = new Set(["openai/gpt-5.2", "anthropic/claude-opus-4-6"])
+
+		// when
+		const result = fuzzyMatchModel("non-existent-model-family", available)
+
+		// then
+		expect(result).toBeNull()
+	})
+
+	it("returns true when models do not match but provider is connected", () => {
+		// given
+		const fallbackChain = [{ providers: ["openai"], model: "gpt-5.2" }]
+		const availableModels = new Set(["anthropic/claude-opus-4-6"])
+		writeConnectedProvidersCache(["openai"])
+
+		// when
+		const result = isAnyFallbackModelAvailable(fallbackChain, availableModels)
+
+		// then
+		expect(result).toBe(true)
+	})
+
+	it("returns first resolved fallback model from chain", () => {
+		// given
+		const fallbackChain = [
+			{ providers: ["openai"], model: "gpt-5.2" },
+			{ providers: ["anthropic"], model: "claude-opus-4-6" },
+		]
+		const availableModels = new Set([
+			"anthropic/claude-opus-4-6",
+			"openai/gpt-5.2-preview",
+		])
+
+		// when
+		const result = resolveFirstAvailableFallback(fallbackChain, availableModels)
+
+		// then
+		expect(result).toEqual({ provider: "openai", model: "openai/gpt-5.2-preview" })
+	})
+
+	it("returns null when no fallback model resolves", () => {
+		// given
+		const fallbackChain = [
+			{ providers: ["openai"], model: "gpt-5.2" },
+			{ providers: ["anthropic"], model: "claude-opus-4-6" },
+		]
+		const availableModels = new Set(["google/gemini-3-pro"])
+
+		// when
+		const result = resolveFirstAvailableFallback(fallbackChain, availableModels)
+
+		// then
+		expect(result).toBeNull()
 	})
 })
