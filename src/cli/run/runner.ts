@@ -48,14 +48,6 @@ export async function run(options: RunOptions): Promise<number> {
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
   const abortController = new AbortController()
-  let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-  if (timeout > 0) {
-    timeoutId = setTimeout(() => {
-      console.log(pc.yellow("\nTimeout reached. Aborting..."))
-      abortController.abort()
-    }, timeout)
-  }
 
   try {
     const { client, cleanup: serverCleanup } = await createServerConnection({
@@ -65,7 +57,6 @@ export async function run(options: RunOptions): Promise<number> {
     })
 
     const cleanup = () => {
-      if (timeoutId) clearTimeout(timeoutId)
       serverCleanup()
     }
 
@@ -108,7 +99,9 @@ export async function run(options: RunOptions): Promise<number> {
       })
 
       console.log(pc.dim("Waiting for completion...\n"))
-      const exitCode = await pollForCompletion(ctx, eventState, abortController)
+      const exitCode = await pollForCompletion(ctx, eventState, abortController, {
+        timeoutMs: timeout,
+      })
 
       // Abort the event stream to stop the processor
       abortController.abort()
@@ -144,7 +137,6 @@ export async function run(options: RunOptions): Promise<number> {
       throw err
     }
   } catch (err) {
-    if (timeoutId) clearTimeout(timeoutId)
     if (jsonManager) jsonManager.restore()
     if (err instanceof Error && err.name === "AbortError") {
       return 130

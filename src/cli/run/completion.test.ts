@@ -143,6 +143,25 @@ describe("checkCompletionConditions", () => {
     expect(result).toBe(false)
   })
 
+  it("returns false when child status is missing", async () => {
+    // given
+    spyOn(console, "log").mockImplementation(() => {})
+    const ctx = createMockContext({
+      childrenBySession: {
+        "test-session": [{ id: "child-1" }],
+        "child-1": [],
+      },
+      statuses: {},
+    })
+    const { checkCompletionConditions } = await import("./completion")
+
+    // when
+    const result = await checkCompletionConditions(ctx)
+
+    // then
+    expect(result).toBe(false)
+  })
+
   it("returns true when all descendants idle (recursive)", async () => {
     // given
     spyOn(console, "log").mockImplementation(() => {})
