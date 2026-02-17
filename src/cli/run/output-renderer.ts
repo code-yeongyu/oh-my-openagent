@@ -15,6 +15,8 @@ export function renderAgentHeader(
   const variantSuffix = variant ? ` (${variant})` : ""
   const modelLabel = model ? pc.dim(`${modelBase}${variantSuffix}`) : ""
 
+  process.stdout.write("\n")
+
   if (modelLabel) {
     process.stdout.write(`  ${modelLabel}  \n`)
   }
@@ -22,14 +24,16 @@ export function renderAgentHeader(
   if (agentLabel) {
     process.stdout.write(`  ${pc.dim("└─")} ${agentLabel}  \n`)
   }
+
+  process.stdout.write("\n")
 }
 
 export function openThinkBlock(): void {
-  process.stdout.write("\n  ┃  Thinking: ")
+  process.stdout.write(`\n  ${pc.dim("┃  Thinking:")} `)
 }
 
 export function closeThinkBlock(): void {
-  process.stdout.write("  \n")
+  process.stdout.write("  \n\n")
 }
 
 export function writePaddedText(
