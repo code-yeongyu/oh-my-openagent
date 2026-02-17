@@ -4,6 +4,7 @@ const CORE_AGENT_ORDER = [
   getAgentDisplayName("sisyphus"),
   getAgentDisplayName("hephaestus"),
   getAgentDisplayName("prometheus"),
+  getAgentDisplayName("coeus"),
   getAgentDisplayName("atlas"),
 ] as const;
 
