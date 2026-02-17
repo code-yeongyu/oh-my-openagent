@@ -41,6 +41,7 @@ export type {
   ModelResolutionResult,
 } from "./model-resolution-types"
 export * from "./model-availability"
+export * from "./fallback-model-availability"
 export * from "./connected-providers-cache"
 export * from "./session-utils"
 export * from "./tmux"
