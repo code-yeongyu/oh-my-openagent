@@ -65,7 +65,7 @@ describe("executeCouncil", () => {
 
     for (const launch of launches) {
       expect(launch.prompt).toBe(expectedPrompt)
-      expect(launch.agent).toBe("athena")
+      expect(launch.agent).toBe("council-member")
     }
 
     expect(launches[0]?.model).toEqual({ providerID: "openai", modelID: "gpt-5.3-codex" })

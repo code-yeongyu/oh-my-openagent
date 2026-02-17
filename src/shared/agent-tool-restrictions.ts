@@ -50,6 +50,14 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
   },
 
   athena: ATHENA_RESTRICTIONS,
+
+  "council-member": {
+    write: false,
+    edit: false,
+    task: false,
+    call_omo_agent: false,
+    athena_council: false,
+  },
 }
 
 function permissionToToolBooleans(

@@ -75,7 +75,7 @@ async function launchMember(
   return launcher.launch({
     description: `Council member: ${memberName}`,
     prompt,
-    agent: "athena",
+    agent: "council-member",
     parentSessionID,
     parentMessageID,
     parentAgent,

@@ -13,6 +13,7 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import { createAthenaAgent, ATHENA_PROMPT_METADATA } from "./athena/agent"
+import { createCouncilMemberAgent } from "./athena/council-member-agent"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -40,6 +41,7 @@ const agentSources: Partial<Record<BuiltinAgentName, AgentSource>> = {
   metis: createMetisAgent,
   momus: createMomusAgent,
   athena: createAthenaAgent,
+  "council-member": createCouncilMemberAgent,
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
