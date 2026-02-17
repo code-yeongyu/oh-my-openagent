@@ -8,11 +8,14 @@ const DEFAULT_POLL_INTERVAL_MS = 500
 const DEFAULT_REQUIRED_CONSECUTIVE = 3
 const ERROR_GRACE_CYCLES = 3
 const MIN_STABILIZATION_MS = 10_000
+const DEFAULT_TIMEOUT_GRACE_MS = 15_000
 
 export interface PollOptions {
   pollIntervalMs?: number
   requiredConsecutive?: number
   minStabilizationMs?: number
+  timeoutMs?: number
+  timeoutGraceMs?: number
 }
 
 export async function pollForCompletion(
@@ -26,13 +29,34 @@ export async function pollForCompletion(
     options.requiredConsecutive ?? DEFAULT_REQUIRED_CONSECUTIVE
   const minStabilizationMs =
     options.minStabilizationMs ?? MIN_STABILIZATION_MS
+  const timeoutMs = options.timeoutMs ?? 0
+  const timeoutGraceMs = options.timeoutGraceMs ?? DEFAULT_TIMEOUT_GRACE_MS
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
   let firstWorkTimestamp: number | null = null
   const pollStartTimestamp = Date.now()
+  let timeoutNoticePrinted = false
 
   while (!abortController.signal.aborted) {
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+
+    if (abortController.signal.aborted) {
+      return 130
+    }
+
+    if (timeoutMs > 0) {
+      const elapsedMs = Date.now() - pollStartTimestamp
+      if (elapsedMs >= timeoutMs && !timeoutNoticePrinted) {
+        console.log(pc.yellow("\nTimeout reached. Entering graceful shutdown window..."))
+        timeoutNoticePrinted = true
+      }
+
+      if (elapsedMs >= timeoutMs + timeoutGraceMs) {
+        console.log(pc.yellow("Grace period expired. Aborting..."))
+        abortController.abort()
+        return 130
+      }
+    }
 
     // ERROR CHECK FIRST — errors must not be masked by other gates
     if (eventState.mainSessionError) {
@@ -91,6 +115,10 @@ export async function pollForCompletion(
 
     const shouldExit = await checkCompletionConditions(ctx)
     if (shouldExit) {
+      if (abortController.signal.aborted) {
+        return 130
+      }
+
       consecutiveCompleteChecks++
       if (consecutiveCompleteChecks >= requiredConsecutive) {
         console.log(pc.green("\n\nAll tasks completed."))

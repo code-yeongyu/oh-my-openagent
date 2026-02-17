@@ -310,7 +310,7 @@ describe("pollForCompletion", () => {
     //#then - returns 1 (not 130/timeout), error message printed
     expect(result).toBe(1)
     const errorCalls = (console.error as ReturnType<typeof mock>).mock.calls
-    expect(errorCalls.some((call) => call[0]?.includes("Session ended with error"))).toBe(true)
+    expect(errorCalls.some((call: unknown[]) => String(call[0] ?? "").includes("Session ended with error"))).toBe(true)
   })
 
   it("returns 1 when session errors while tool is active (error not masked by tool gate)", async () => {
@@ -334,5 +334,70 @@ describe("pollForCompletion", () => {
 
     //#then - returns 1
     expect(result).toBe(1)
+  })
+
+  it("returns 130 after graceful timeout window expires", async () => {
+    //#given
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext({
+      statuses: {
+        "test-session": { type: "busy" },
+      },
+    })
+    const eventState = createEventState()
+    eventState.mainSessionIdle = false
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+      minStabilizationMs: 0,
+      timeoutMs: 30,
+      timeoutGraceMs: 40,
+    })
+
+    //#then
+    expect(result).toBe(130)
+    expect(abortController.signal.aborted).toBe(true)
+  })
+
+  it("allows completion during graceful timeout window", async () => {
+    //#given
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+    let todoCalls = 0
+
+    ;(ctx.client.session as unknown as {
+      todo: ReturnType<typeof mock>
+      children: ReturnType<typeof mock>
+      status: ReturnType<typeof mock>
+    }).todo = mock(async () => {
+      todoCalls++
+      if (todoCalls === 1) {
+        return { data: [{ id: "1", content: "wip", status: "in_progress", priority: "high" }] }
+      }
+      return { data: [] }
+    })
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+      minStabilizationMs: 0,
+      timeoutMs: 20,
+      timeoutGraceMs: 80,
+    })
+
+    //#then
+    expect(result).toBe(0)
+    expect(abortController.signal.aborted).toBe(false)
   })
 })
