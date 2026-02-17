@@ -1,11 +1,10 @@
 import { MIN_PANE_WIDTH } from "./types"
 import type { SplitDirection, TmuxPaneInfo } from "./types"
 import {
-	DIVIDER_SIZE,
-	MAX_COLS,
-	MAX_ROWS,
-	MIN_SPLIT_HEIGHT,
-	MIN_SPLIT_WIDTH,
+  DIVIDER_SIZE,
+  MAX_COLS,
+  MAX_ROWS,
+  MIN_SPLIT_HEIGHT,
 } from "./tmux-grid-constants"
 
 function minSplitWidthFor(minPaneWidth: number): number {
