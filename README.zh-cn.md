@@ -172,16 +172,16 @@
 我的生活也没有什么不同。回顾过去，我们与这些智能体并没有太大不同。
 **是的！LLM 智能体和我们没有区别。如果你给它们优秀的工具和可靠的队友，它们可以写出和我们一样出色的代码，工作得同样优秀。**
 
-认识我们的主智能体：Sisyphus (Opus 4.5 High)。以下是 Sisyphus 用来继续推动巨石的工具。
+认识我们的主智能体：Sisyphus (Opus 4.6)。以下是 Sisyphus 用来继续推动巨石的工具。
 
 *以下所有内容都是可配置的。按需选取。所有功能默认启用。你不需要做任何事情。开箱即用，电池已包含。*
 
 - Sisyphus 的队友（精选智能体）
-  - Hephaestus：自主深度工作者，目标导向执行（GPT 5.2 Codex Medium）— *合法的工匠*
-  - Oracle：设计、调试 (GPT 5.2 Medium)
+  - Hephaestus：自主深度工作者，目标导向执行（GPT 5.3 Codex Medium）— *合法的工匠*
+  - Oracle：设计、调试 (GPT 5.2)
   - Frontend UI/UX Engineer：前端开发 (Gemini 3 Pro)
-  - Librarian：官方文档、开源实现、代码库探索 (Claude Sonnet 4.5)
-   - Explore：极速代码库探索（上下文感知 Grep）(Claude Haiku 4.5)
+  - Librarian：官方文档、开源实现、代码库探索 (GLM-4.7)
+   - Explore：极速代码库探索（上下文感知 Grep）(Grok Code Fast 1)
 - 完整 LSP / AstGrep 支持：果断重构。
 - Todo 继续执行器：如果智能体中途退出，强制它继续。**这就是让 Sisyphus 继续推动巨石的关键。**
 - 注释检查器：防止 AI 添加过多注释。Sisyphus 生成的代码应该与人类编写的代码无法区分。
@@ -199,7 +199,7 @@
 ![Meet Hephaestus](.github/assets/hephaestus.png)
 
 在希腊神话中，赫菲斯托斯是锻造、火焰、金属加工和工艺之神——他是神圣的铁匠，以无与伦比的精准和奉献为众神打造武器。
-**介绍我们的自主深度工作者：赫菲斯托斯（GPT 5.2 Codex Medium）。合法的工匠代理。**
+**介绍我们的自主深度工作者：赫菲斯托斯（GPT 5.3 Codex Medium）。合法的工匠代理。**
 
 *为什么是"合法的"？当Anthropic以违反服务条款为由封锁第三方访问时，社区开始调侃"合法"使用。赫菲斯托斯拥抱这种讽刺——他是那种用正确的方式、有条不紊、彻底地构建事物的工匠，绝不走捷径。*
 
