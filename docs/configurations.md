@@ -245,7 +245,7 @@ Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or 
 }
 ```
 
-Available agents: `sisyphus`, `prometheus`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`
+Available agents: `sisyphus`, `hephaestus`, `prometheus`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`
 
 ## Built-in Skills
 
@@ -720,17 +720,18 @@ Categories enable domain-specific task delegation via the `task` tool. Each cate
 
 ### Built-in Categories
 
-All 7 categories come with optimal model defaults, but **you must configure them to use those defaults**:
+All 8 categories come with optimal model defaults, but **you must configure them to use those defaults**:
 
 | Category             | Built-in Default Model             | Description                                                          |
 | -------------------- | ---------------------------------- | -------------------------------------------------------------------- |
-| `visual-engineering` | `google/gemini-3-pro-preview`      | Frontend, UI/UX, design, styling, animation                          |
+| `visual-engineering` | `google/gemini-3-pro` (high)       | Frontend, UI/UX, design, styling, animation                          |
 | `ultrabrain`         | `openai/gpt-5.3-codex` (xhigh)     | Deep logical reasoning, complex architecture decisions               |
-| `artistry`           | `google/gemini-3-pro-preview` (max)| Highly creative/artistic tasks, novel ideas                          |
+| `deep`               | `openai/gpt-5.3-codex` (medium)    | Goal-oriented autonomous problem-solving, thorough research before action |
+| `artistry`           | `google/gemini-3-pro` (high)       | Highly creative/artistic tasks, novel ideas                          |
 | `quick`              | `anthropic/claude-haiku-4-5`       | Trivial tasks - single file changes, typo fixes, simple modifications|
 | `unspecified-low`    | `anthropic/claude-sonnet-4-5`      | Tasks that don't fit other categories, low effort required           |
 | `unspecified-high`   | `anthropic/claude-opus-4-6` (max)  | Tasks that don't fit other categories, high effort required          |
-| `writing`            | `google/gemini-3-flash-preview`    | Documentation, prose, technical writing                              |
+| `writing`            | `kimi-for-coding/k2p5`             | Documentation, prose, technical writing                              |
 
 ### ⚠️ Critical: Model Resolution Priority
 
@@ -765,15 +766,19 @@ All 7 categories come with optimal model defaults, but **you must configure them
 {
   "categories": {
     "visual-engineering": { 
-      "model": "google/gemini-3-pro-preview"
+      "model": "google/gemini-3-pro"
     },
     "ultrabrain": { 
       "model": "openai/gpt-5.3-codex",
       "variant": "xhigh"
     },
+    "deep": {
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium"
+    },
     "artistry": { 
-      "model": "google/gemini-3-pro-preview",
-      "variant": "max"
+      "model": "google/gemini-3-pro",
+      "variant": "high"
     },
     "quick": { 
       "model": "anthropic/claude-haiku-4-5"  // Fast + cheap for trivial tasks
@@ -786,7 +791,7 @@ All 7 categories come with optimal model defaults, but **you must configure them
       "variant": "max"
     },
     "writing": { 
-      "model": "google/gemini-3-flash-preview"
+      "model": "kimi-for-coding/k2p5"
     }
   }
 }
@@ -894,15 +899,16 @@ Each agent has a defined provider priority chain. The system tries providers in 
 
 | Agent | Model (no prefix) | Provider Priority Chain |
 |-------|-------------------|-------------------------|
-| **Sisyphus** | `claude-opus-4-6` | anthropic → kimi-for-coding → zai-coding-plan → openai → google |
-| **oracle** | `gpt-5.2` | openai → google → anthropic |
-| **librarian** | `glm-4.7` | zai-coding-plan → opencode → anthropic |
-| **explore** | `claude-haiku-4-5` | anthropic → github-copilot → opencode |
-| **multimodal-looker** | `gemini-3-flash` | google → openai → zai-coding-plan → kimi-for-coding → anthropic → opencode |
-| **Prometheus (Planner)** | `claude-opus-4-6` | anthropic → kimi-for-coding → openai → google |
-| **Metis (Plan Consultant)** | `claude-opus-4-6` | anthropic → kimi-for-coding → openai → google |
-| **Momus (Plan Reviewer)** | `gpt-5.2` | openai → anthropic → google |
-| **Atlas** | `claude-sonnet-4-5` | anthropic → kimi-for-coding → openai → google |
+| **Sisyphus** | `claude-opus-4-6` | anthropic/github-copilot/opencode → kimi-for-coding → opencode → zai-coding-plan → opencode |
+| **Hephaestus** | `gpt-5.3-codex` | openai/github-copilot/opencode (requires provider) |
+| **oracle** | `gpt-5.2` | openai/github-copilot/opencode → google/github-copilot/opencode → anthropic/github-copilot/opencode |
+| **librarian** | `glm-4.7` | zai-coding-plan → opencode → anthropic/github-copilot/opencode |
+| **explore** | `grok-code-fast-1` | github-copilot → anthropic/opencode → opencode |
+| **multimodal-looker** | `gemini-3-flash` | google/github-copilot/opencode → openai/github-copilot/opencode → zai-coding-plan → kimi-for-coding → opencode → anthropic/github-copilot/opencode → opencode |
+| **Prometheus (Planner)** | `claude-opus-4-6` | anthropic/github-copilot/opencode → kimi-for-coding → opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
+| **Metis (Plan Consultant)** | `claude-opus-4-6` | anthropic/github-copilot/opencode → kimi-for-coding → opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
+| **Momus (Plan Reviewer)** | `gpt-5.2` | openai/github-copilot/opencode → anthropic/github-copilot/opencode → google/github-copilot/opencode |
+| **Atlas** | `k2p5` | kimi-for-coding → opencode → anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
 
 ### Category Provider Chains
 
@@ -910,14 +916,14 @@ Categories follow the same resolution logic:
 
 | Category | Model (no prefix) | Provider Priority Chain |
 |----------|-------------------|-------------------------|
-| **visual-engineering** | `gemini-3-pro` | google → anthropic → zai-coding-plan |
-| **ultrabrain** | `gpt-5.3-codex` | openai → google → anthropic |
-| **deep** | `gpt-5.3-codex` | openai → anthropic → google |
-| **artistry** | `gemini-3-pro` | google → anthropic → openai |
-| **quick** | `claude-haiku-4-5` | anthropic → google → opencode |
-| **unspecified-low** | `claude-sonnet-4-5` | anthropic → openai → google |
-| **unspecified-high** | `claude-opus-4-6` | anthropic → openai → google |
-| **writing** | `gemini-3-flash` | google → anthropic → zai-coding-plan → openai |
+| **visual-engineering** | `gemini-3-pro` | google/github-copilot/opencode → zai-coding-plan → anthropic/github-copilot/opencode → kimi-for-coding |
+| **ultrabrain** | `gpt-5.3-codex` | openai/github-copilot/opencode → google/github-copilot/opencode → anthropic/github-copilot/opencode |
+| **deep** | `gpt-5.3-codex` | openai/github-copilot/opencode → anthropic/github-copilot/opencode → google/github-copilot/opencode |
+| **artistry** | `gemini-3-pro` | google/github-copilot/opencode → anthropic/github-copilot/opencode → openai/github-copilot/opencode |
+| **quick** | `claude-haiku-4-5` | anthropic/github-copilot/opencode → google/github-copilot/opencode → opencode |
+| **unspecified-low** | `claude-sonnet-4-5` | anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
+| **unspecified-high** | `claude-opus-4-6` | anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
+| **writing** | `k2p5` | kimi-for-coding → google/github-copilot/opencode → anthropic/github-copilot/opencode |
 
 ### Checking Your Configuration
 
