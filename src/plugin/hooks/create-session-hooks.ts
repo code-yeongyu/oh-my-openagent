@@ -20,6 +20,7 @@ import {
   createStartWorkHook,
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
+  createSisyphusGptHephaestusReminderHook,
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
 } from "../../hooks"
@@ -50,6 +51,7 @@ export type SessionHooks = {
   startWork: ReturnType<typeof createStartWorkHook> | null
   prometheusMdOnly: ReturnType<typeof createPrometheusMdOnlyHook> | null
   sisyphusJuniorNotepad: ReturnType<typeof createSisyphusJuniorNotepadHook> | null
+  sisyphusGptHephaestusReminder: ReturnType<typeof createSisyphusGptHephaestusReminderHook> | null
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook>
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
@@ -156,6 +158,10 @@ export function createSessionHooks(args: {
     ? safeHook("sisyphus-junior-notepad", () => createSisyphusJuniorNotepadHook(ctx))
     : null
 
+  const sisyphusGptHephaestusReminder = isHookEnabled("sisyphus-gpt-hephaestus-reminder")
+    ? safeHook("sisyphus-gpt-hephaestus-reminder", () => createSisyphusGptHephaestusReminderHook(ctx))
+    : null
+
   const questionLabelTruncator = createQuestionLabelTruncatorHook()
   const taskResumeInfo = createTaskResumeInfoHook()
 
@@ -181,6 +187,7 @@ export function createSessionHooks(args: {
     startWork,
     prometheusMdOnly,
     sisyphusJuniorNotepad,
+    sisyphusGptHephaestusReminder,
     questionLabelTruncator,
     taskResumeInfo,
     anthropicEffort,
