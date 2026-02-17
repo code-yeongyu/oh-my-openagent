@@ -5,6 +5,7 @@ import type { BackgroundManager } from "../../features/background-agent"
 import { ATHENA_COUNCIL_TOOL_DESCRIPTION_TEMPLATE } from "./constants"
 import { createCouncilLauncher } from "./council-launcher"
 import { isCouncilRunning, markCouncilDone, markCouncilRunning } from "./session-guard"
+import { waitForCouncilSessions } from "./session-waiter"
 import type { AthenaCouncilLaunchResult, AthenaCouncilToolArgs } from "./types"
 
 function isCouncilConfigured(councilConfig: CouncilConfig | undefined): councilConfig is CouncilConfig {
@@ -111,6 +112,31 @@ export function createAthenaCouncilTool(args: {
           parentMessageID: toolContext.messageID,
           parentAgent: toolContext.agent,
         })
+
+        // Wait for sessions to be created so we can register metadata for UI visibility.
+        // This makes council member tasks clickable in the OpenCode TUI, matching the
+        // behavior of the task tool (delegate-task/background-task.ts).
+        const metadataFn = (toolContext as Record<string, unknown>).metadata as
+          | ((input: { title?: string; metadata?: Record<string, unknown> }) => Promise<void>)
+          | undefined
+        if (metadataFn && execution.launched.length > 0) {
+          const sessions = await waitForCouncilSessions(
+            execution.launched,
+            backgroundManager,
+            toolContext.abort
+          )
+          for (const session of sessions) {
+            await metadataFn({
+              title: `Council: ${session.memberName}`,
+              metadata: {
+                sessionId: session.sessionId,
+                agent: "council-member",
+                model: session.model,
+                description: `Council member: ${session.memberName}`,
+              },
+            })
+          }
+        }
 
         const launchResult: AthenaCouncilLaunchResult = {
           launched: execution.launched.length,
