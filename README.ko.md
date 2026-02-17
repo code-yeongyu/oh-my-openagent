@@ -176,16 +176,16 @@ Hey please read this readme and tell me why it is different from other agent har
 내 삶도 다르지 않습니다. 돌이켜보면 우리는 이 에이전트들과 그리 다르지 않습니다.
 **맞습니다! LLM 에이전트는 우리와 다르지 않습니다. 훌륭한 도구와 확고한 팀원을 제공하면 우리만큼 훌륭한 코드를 작성하고 똑같이 훌륭하게 작업할 수 있습니다.**
 
-우리의 주요 에이전트를 만나보세요: Sisyphus (Opus 4.5 High). 아래는 Sisyphus가 그 바위를 굴리는 데 사용하는 도구입니다.
+우리의 주요 에이전트를 만나보세요: Sisyphus (Opus 4.6). 아래는 Sisyphus가 그 바위를 굴리는 데 사용하는 도구입니다.
 
 *아래의 모든 것은 사용자 정의 가능합니다. 원하는 것을 가져가세요. 모든 기능은 기본적으로 활성화됩니다. 아무것도 할 필요가 없습니다. 포함되어 있으며, 즉시 작동합니다.*
 
 - Sisyphus의 팀원 (큐레이팅된 에이전트)
-  - Hephaestus: 자율적 딥 워커, 목표 지향 실행 (GPT 5.2 Codex Medium) — *합법적인 장인*
-  - Oracle: 디자인, 디버깅 (GPT 5.2 Medium)
+  - Hephaestus: 자율적 딥 워커, 목표 지향 실행 (GPT 5.3 Codex Medium) — *합법적인 장인*
+  - Oracle: 디자인, 디버깅 (GPT 5.2)
   - Frontend UI/UX Engineer: 프론트엔드 개발 (Gemini 3 Pro)
-  - Librarian: 공식 문서, 오픈 소스 구현, 코드베이스 탐색 (Claude Sonnet 4.5)
-   - Explore: 엄청나게 빠른 코드베이스 탐색 (Contextual Grep) (Claude Haiku 4.5)
+  - Librarian: 공식 문서, 오픈 소스 구현, 코드베이스 탐색 (GLM-4.7)
+   - Explore: 엄청나게 빠른 코드베이스 탐색 (Contextual Grep) (Grok Code Fast 1)
 - 완전한 LSP / AstGrep 지원: 결정적으로 리팩토링합니다.
 - TODO 연속 강제: 에이전트가 중간에 멈추면 계속하도록 강제합니다. **이것이 Sisyphus가 그 바위를 굴리게 하는 것입니다.**
 - 주석 검사기: AI가 과도한 주석을 추가하는 것을 방지합니다. Sisyphus가 생성한 코드는 인간이 작성한 것과 구별할 수 없어야 합니다.
@@ -228,7 +228,7 @@ Hey please read this readme and tell me why it is different from other agent har
 ![Meet Hephaestus](.github/assets/hephaestus.png)
 
 그리스 신화에서 헤파이스토스는 대장간, 불, 금속 세공, 장인 정신의 신이었습니다—비교할 수 없는 정밀함과 헌신으로 신들의 무기를 만든 신성한 대장장이입니다.
-**자율적 딥 워커를 소개합니다: 헤파이스토스 (GPT 5.2 Codex Medium). 합법적인 장인 에이전트.**
+**자율적 딥 워커를 소개합니다: 헤파이스토스 (GPT 5.3 Codex Medium). 합법적인 장인 에이전트.**
 
 *왜 "합법적인"일까요? Anthropic이 ToS 위반을 이유로 서드파티 접근을 차단했을 때, 커뮤니티에서 "합법적인" 사용에 대한 농담이 시작되었습니다. 헤파이스토스는 이 아이러니를 받아들입니다—그는 편법 없이 올바른 방식으로, 체계적이고 철저하게 만드는 장인입니다.*
 
