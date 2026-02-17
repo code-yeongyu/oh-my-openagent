@@ -745,4 +745,54 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(textPart!.text).toBe("ultrawork plan this")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
+
+  test("should skip ALL keyword injections for Athena with display name", async () => {
+    // given - session agent is stored as display name "Athena (Council)" after remapping
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "athena-display-name-session"
+    updateSessionAgent(sessionID, "Athena (Council)")
+
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork search for bugs in the code" }],
+    }
+
+    // when - keyword detection runs with Athena display name in session state
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - ALL keywords should be skipped (no injection)
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart!.text).toBe("ultrawork search for bugs in the code")
+    expect(textPart!.text).not.toContain("[search-mode]")
+    expect(textPart!.text).not.toContain("MAXIMIZE SEARCH EFFORT")
+
+    const skipLog = logCalls.find(c => c.msg.includes("Skipping all keywords for Athena"))
+    expect(skipLog).toBeDefined()
+
+    clearSessionAgent(sessionID)
+  })
+
+  test("should skip ALL keyword injections for Athena with lowercase config key", async () => {
+    // given - session agent is stored as lowercase "athena"
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "athena-lowercase-session"
+
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "search for the implementation" }],
+    }
+
+    // when - keyword detection runs with athena as input.agent
+    await hook["chat.message"]({ sessionID, agent: "athena" }, output)
+
+    // then - ALL keywords should be skipped
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart!.text).toBe("search for the implementation")
+    expect(textPart!.text).not.toContain("[search-mode]")
+
+    const skipLog = logCalls.find(c => c.msg.includes("Skipping all keywords for Athena"))
+    expect(skipLog).toBeDefined()
+  })
 })
