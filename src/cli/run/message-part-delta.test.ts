@@ -462,4 +462,187 @@ describe("message.part.delta handling", () => {
     expect(rendered).toContain("END-OF-TOOL-OUTPUT-MARKER")
     stdoutSpy.mockRestore()
   })
+
+  it("renders tool header only once when message.part.updated fires multiple times for same running tool", async () => {
+    //#given
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
+    const events: EventPayload[] = [
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "tool-1",
+            sessionID: "ses_main",
+            type: "tool",
+            tool: "bash",
+            state: { status: "running", input: { command: "bun test" } },
+          },
+        },
+      },
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "tool-1",
+            sessionID: "ses_main",
+            type: "tool",
+            tool: "bash",
+            state: { status: "running", input: { command: "bun test" } },
+          },
+        },
+      },
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "tool-1",
+            sessionID: "ses_main",
+            type: "tool",
+            tool: "bash",
+            state: { status: "running", input: { command: "bun test" } },
+          },
+        },
+      },
+    ]
+
+    //#when
+    await processEvents(ctx, toAsyncIterable(events), state)
+
+    //#then
+    const rendered = stdoutSpy.mock.calls.map((call) => String(call[0] ?? "")).join("")
+    const headerCount = rendered.split("bun test").length - 1
+    expect(headerCount).toBe(1)
+    stdoutSpy.mockRestore()
+  })
+
+  it("renders tool header only once when both tool.execute and message.part.updated fire", async () => {
+    //#given
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
+    const events: EventPayload[] = [
+      {
+        type: "tool.execute",
+        properties: {
+          sessionID: "ses_main",
+          name: "bash",
+          input: { command: "bun test" },
+        },
+      },
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "tool-1",
+            sessionID: "ses_main",
+            type: "tool",
+            tool: "bash",
+            state: { status: "running", input: { command: "bun test" } },
+          },
+        },
+      },
+    ]
+
+    //#when
+    await processEvents(ctx, toAsyncIterable(events), state)
+
+    //#then
+    const rendered = stdoutSpy.mock.calls.map((call) => String(call[0] ?? "")).join("")
+    const headerCount = rendered.split("bun test").length - 1
+    expect(headerCount).toBe(1)
+    stdoutSpy.mockRestore()
+  })
+
+  it("renders tool output only once when both tool.result and message.part.updated(completed) fire", async () => {
+    //#given
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
+    const events: EventPayload[] = [
+      {
+        type: "tool.execute",
+        properties: {
+          sessionID: "ses_main",
+          name: "bash",
+          input: { command: "bun test" },
+        },
+      },
+      {
+        type: "tool.result",
+        properties: {
+          sessionID: "ses_main",
+          name: "bash",
+          output: "UNIQUE-OUTPUT-MARKER",
+        },
+      },
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "tool-1",
+            sessionID: "ses_main",
+            type: "tool",
+            tool: "bash",
+            state: { status: "completed", input: { command: "bun test" }, output: "UNIQUE-OUTPUT-MARKER" },
+          },
+        },
+      },
+    ]
+
+    //#when
+    await processEvents(ctx, toAsyncIterable(events), state)
+
+    //#then
+    const rendered = stdoutSpy.mock.calls.map((call) => String(call[0] ?? "")).join("")
+    const outputCount = rendered.split("UNIQUE-OUTPUT-MARKER").length - 1
+    expect(outputCount).toBe(1)
+    stdoutSpy.mockRestore()
+  })
+
+  it("does not re-render text when message.updated fires multiple times for same message", async () => {
+    //#given
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
+    const events: EventPayload[] = [
+      {
+        type: "message.updated",
+        properties: {
+          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: "claude-opus-4-6" },
+        },
+      },
+      {
+        type: "message.part.delta",
+        properties: {
+          sessionID: "ses_main",
+          messageID: "msg_1",
+          field: "text",
+          delta: "Hello world",
+        },
+      },
+      {
+        type: "message.updated",
+        properties: {
+          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: "claude-opus-4-6" },
+        },
+      },
+      {
+        type: "message.part.updated",
+        properties: {
+          part: { id: "text-1", sessionID: "ses_main", type: "text", text: "Hello world" },
+        },
+      },
+    ]
+
+    //#when
+    await processEvents(ctx, toAsyncIterable(events), state)
+
+    //#then
+    const rendered = stdoutSpy.mock.calls.map((call) => String(call[0] ?? "")).join("")
+    const textCount = rendered.split("Hello world").length - 1
+    expect(textCount).toBe(1)
+    stdoutSpy.mockRestore()
+  })
 })
