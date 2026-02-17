@@ -29,10 +29,10 @@ interface EventInput {
 
 export function createDirectoryAgentsInjectorHook(
   ctx: PluginInput,
-  anthropicContext1MEnabled?: boolean,
+  modelCacheState?: { anthropicContext1MEnabled: boolean },
 ) {
   const sessionCaches = new Map<string, Set<string>>();
-  const truncator = createDynamicTruncator(ctx, anthropicContext1MEnabled);
+  const truncator = createDynamicTruncator(ctx, modelCacheState);
 
   const toolExecuteAfter = async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
     const toolName = input.tool.toLowerCase();

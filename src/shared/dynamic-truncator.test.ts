@@ -60,7 +60,9 @@ describe("getContextWindowUsage", () => {
     const ctx = createContextUsageMockContext(300000)
 
     //#when
-    const usage = await getContextWindowUsage(ctx as never, "ses_1m_flag", true)
+    const usage = await getContextWindowUsage(ctx as never, "ses_1m_flag", {
+      anthropicContext1MEnabled: true,
+    })
 
     //#then
     expect(usage?.usagePercentage).toBe(0.3)
@@ -74,7 +76,9 @@ describe("getContextWindowUsage", () => {
     const ctx = createContextUsageMockContext(150000)
 
     //#when
-    const usage = await getContextWindowUsage(ctx as never, "ses_default", false)
+    const usage = await getContextWindowUsage(ctx as never, "ses_default", {
+      anthropicContext1MEnabled: false,
+    })
 
     //#then
     expect(usage?.usagePercentage).toBe(0.75)
@@ -87,7 +91,9 @@ describe("getContextWindowUsage", () => {
     const ctx = createContextUsageMockContext(300000)
 
     //#when
-    const usage = await getContextWindowUsage(ctx as never, "ses_env_fallback", false)
+    const usage = await getContextWindowUsage(ctx as never, "ses_env_fallback", {
+      anthropicContext1MEnabled: false,
+    })
 
     //#then
     expect(usage?.usagePercentage).toBe(0.3)

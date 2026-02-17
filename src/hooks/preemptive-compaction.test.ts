@@ -269,7 +269,9 @@ describe("preemptive-compaction", () => {
 
   it("should use 1M limit when model cache flag is enabled", async () => {
     //#given
-    const hook = createPreemptiveCompactionHook(ctx as never, true)
+    const hook = createPreemptiveCompactionHook(ctx as never, {
+      anthropicContext1MEnabled: true,
+    })
     const sessionID = "ses_1m_flag"
 
     await hook.event({
@@ -306,7 +308,9 @@ describe("preemptive-compaction", () => {
   it("should keep env var fallback when model cache flag is disabled", async () => {
     //#given
     process.env[ANTHROPIC_CONTEXT_ENV_KEY] = "true"
-    const hook = createPreemptiveCompactionHook(ctx as never, false)
+    const hook = createPreemptiveCompactionHook(ctx as never, {
+      anthropicContext1MEnabled: false,
+    })
     const sessionID = "ses_env_fallback"
 
     await hook.event({
