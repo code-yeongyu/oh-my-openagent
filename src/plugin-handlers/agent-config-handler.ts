@@ -15,6 +15,7 @@ import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
+import { rekeyAgentsByDisplayNames } from "./agent-display-name-rekeyer";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 
@@ -36,6 +37,7 @@ export async function applyAgentConfig(params: {
   pluginConfig: OhMyOpenCodeConfig;
   ctx: { directory: string; client?: any };
   pluginComponents: PluginComponents;
+  displayNames?: Record<string, string>;
 }): Promise<Record<string, unknown>> {
   const migratedDisabledAgents = (params.pluginConfig.disabled_agents ?? []).map(
     (agent) => {
@@ -210,6 +212,14 @@ export async function applyAgentConfig(params: {
   }
 
   if (params.config.agent) {
+    const agentMap = params.config.agent as Record<string, unknown>;
+
+    rekeyAgentsByDisplayNames({
+      config: params.config,
+      agentResult: agentMap,
+      displayNames: params.displayNames,
+    });
+
     params.config.agent = remapAgentKeysToDisplayNames(
       params.config.agent as Record<string, unknown>,
     );

@@ -1,6 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
+import { readBoulderState } from "../../features/boulder-state/storage"
+import { getMainSessionID, subagentSessions } from "../../features/claude-code-session-state"
 import type { ToolPermission } from "../../features/hook-message-injector"
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
@@ -62,6 +64,18 @@ export async function handleSessionIdle(args: {
   if (hasRunningBgTasks) {
     log(`[${HOOK_NAME}] Skipped: background tasks running`, { sessionID })
     return
+  }
+
+  const isBackgroundTask = subagentSessions.has(sessionID)
+  if (!isBackgroundTask) {
+    const mainSessionID = getMainSessionID()
+    if (sessionID === mainSessionID) {
+      const boulderState = readBoulderState(ctx.directory)
+      if (!boulderState || !boulderState.session_ids?.includes(sessionID)) {
+        log(`[${HOOK_NAME}] Skipped: main session not in boulder session_ids`, { sessionID })
+        return
+      }
+    }
   }
 
   try {
