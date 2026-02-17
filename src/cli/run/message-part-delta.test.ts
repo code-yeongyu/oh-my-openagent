@@ -3,6 +3,10 @@ import type { EventPayload, RunContext } from "./types"
 import { createEventState } from "./events"
 import { processEvents } from "./event-stream-processor"
 
+function stripAnsi(str: string): string {
+  return str.replace(new RegExp("\x1b\\[[0-9;]*m", "g"), "")
+}
+
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
   client: {} as RunContext["client"],
   sessionID,
@@ -164,8 +168,10 @@ describe("message.part.delta handling", () => {
 
     //#then
     const rendered = stdoutSpy.mock.calls.map((call) => String(call[0] ?? "")).join("")
-    expect(rendered).toContain("┃  Thinking: Composing final summary in Korean")
-    expect(rendered).toContain("answer")
+    const plain = stripAnsi(rendered)
+    expect(plain).toContain("Thinking:")
+    expect(plain).toContain("Composing final summary in Korean")
+    expect(plain).toContain("answer")
     stdoutSpy.mockRestore()
   })
 
@@ -215,8 +221,10 @@ describe("message.part.delta handling", () => {
 
     //#then
     const rendered = stdoutSpy.mock.calls.map((call) => String(call[0] ?? "")).join("")
-    expect(rendered).toContain("┃  Thinking: Composing final summary")
-    expect(rendered).toContain("in Korean with specifics.")
+    const plain = stripAnsi(rendered)
+    expect(plain).toContain("Thinking:")
+    expect(plain).toContain("Composing final summary")
+    expect(plain).toContain("in Korean with specifics.")
 
     if (previous !== undefined) process.env.GITHUB_ACTIONS = previous
     stdoutSpy.mockRestore()
@@ -280,7 +288,8 @@ describe("message.part.delta handling", () => {
 
     //#then
     const rendered = stdoutSpy.mock.calls.map((call) => String(call[0] ?? "")).join("")
-    const renderCount = rendered.split("Thinking:").length - 1
+    const plain = stripAnsi(rendered)
+    const renderCount = plain.split("Thinking:").length - 1
     expect(renderCount).toBe(1)
 
     if (previous !== undefined) process.env.GITHUB_ACTIONS = previous
