@@ -1,6 +1,7 @@
 import pc from "picocolors"
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
 import { normalizeSDKResponse } from "../../shared"
+import { getContinuationState } from "./continuation-state"
 
 export async function checkCompletionConditions(ctx: RunContext): Promise<boolean> {
   try {
@@ -12,11 +13,31 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
       return false
     }
 
+    if (!areContinuationHooksIdle(ctx)) {
+      return false
+    }
+
     return true
   } catch (err) {
     console.error(pc.red(`[completion] API error: ${err}`))
     return false
   }
+}
+
+function areContinuationHooksIdle(ctx: RunContext): boolean {
+  const continuationState = getContinuationState(ctx.directory, ctx.sessionID)
+
+  if (continuationState.hasActiveBoulder) {
+    console.log(pc.dim("  Waiting: boulder continuation is active"))
+    return false
+  }
+
+  if (continuationState.hasActiveRalphLoop) {
+    console.log(pc.dim("  Waiting: ralph-loop continuation is active"))
+    return false
+  }
+
+  return true
 }
 
 async function areAllTodosComplete(ctx: RunContext): Promise<boolean> {
