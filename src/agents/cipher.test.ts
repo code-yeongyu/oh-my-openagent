@@ -55,50 +55,24 @@ describe("createCipherAgent", () => {
     const config = createCipherAgent("anthropic/claude-opus-4-6")
 
     expect(config.prompt).toContain("CODE GENERATION DELEGATION")
-    expect(config.prompt).toContain("Python")
-    expect(config.prompt).toContain("Rust")
-    expect(config.prompt).toContain("JavaScript")
+    expect(config.prompt).toContain("DELEGATE")
+    expect(config.prompt).toContain("language expert")
     expect(config.prompt).toContain("task(")
   })
 
   //#given a model
   //#when creating the agent
-  //#then prompt should contain all five sub-specialization keywords
-  test("prompt contains all sub-specialization keywords", () => {
+  //#then config should include all 5 DSL skills
+  test("includes all DSL skills for skill-based knowledge injection", () => {
     const config = createCipherAgent("anthropic/claude-opus-4-6")
+    const skills = (config as Record<string, unknown>).skills as string[]
 
-    expect(config.prompt).toContain("Grammar Architect")
-    expect(config.prompt).toContain("Semantic Analyst")
-    expect(config.prompt).toContain("Toolsmith")
-    expect(config.prompt).toContain("Code Generator")
-    expect(config.prompt).toContain("Metamodel Designer")
-  })
-
-  //#given a model
-  //#when creating the agent
-  //#then prompt should contain all five expert constraint keywords
-  test("prompt contains expert constraint keywords", () => {
-    const config = createCipherAgent("anthropic/claude-opus-4-6")
-
-    expect(config.prompt).toContain("FORMAL GRAMMAR FIRST")
-    expect(config.prompt).toContain("SOUND TYPE SYSTEMS")
-    expect(config.prompt).toContain("COMPOSABILITY")
-    expect(config.prompt).toContain("ERROR REPORTING")
-    expect(config.prompt).toContain("INCREMENTAL PARSING")
-  })
-
-  //#given a model
-  //#when creating the agent
-  //#then prompt should reference key frameworks
-  test("prompt contains framework references", () => {
-    const config = createCipherAgent("anthropic/claude-opus-4-6")
-
-    expect(config.prompt).toContain("textX")
-    expect(config.prompt).toContain("PyEcore")
-    expect(config.prompt).toContain("ANTLR4")
-    expect(config.prompt).toContain("Tree-sitter")
-    expect(config.prompt).toContain("Langium")
-    expect(config.prompt).toContain("Chevrotain")
+    expect(skills).toContain("dsl-core")
+    expect(skills).toContain("dsl-grammar")
+    expect(skills).toContain("dsl-codegen")
+    expect(skills).toContain("dsl-metamodel")
+    expect(skills).toContain("dsl-tooling")
+    expect(skills).toHaveLength(5)
   })
 
   //#given a model

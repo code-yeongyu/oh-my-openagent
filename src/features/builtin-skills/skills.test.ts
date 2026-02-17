@@ -61,7 +61,7 @@ describe("createBuiltinSkills", () => {
 		expect(agentBrowserSkill!.template).toContain("agent-browser snapshot")
 	})
 
-	test("always includes frontend-ui-ux, git-master, and dsl-expert skills", () => {
+	test("always includes frontend-ui-ux, git-master, and dsl skills", () => {
 		// given - both provider options
 
 		// when
@@ -72,11 +72,15 @@ describe("createBuiltinSkills", () => {
 		for (const skills of [defaultSkills, agentBrowserSkills]) {
 			expect(skills.find((s) => s.name === "frontend-ui-ux")).toBeDefined()
 			expect(skills.find((s) => s.name === "git-master")).toBeDefined()
-			expect(skills.find((s) => s.name === "dsl-expert")).toBeDefined()
+			expect(skills.find((s) => s.name === "dsl-core")).toBeDefined()
+			expect(skills.find((s) => s.name === "dsl-grammar")).toBeDefined()
+			expect(skills.find((s) => s.name === "dsl-codegen")).toBeDefined()
+			expect(skills.find((s) => s.name === "dsl-metamodel")).toBeDefined()
+			expect(skills.find((s) => s.name === "dsl-tooling")).toBeDefined()
 		}
 	})
 
-	test("returns exactly 5 skills regardless of provider", () => {
+	test("returns exactly 9 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -84,8 +88,8 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(5)
-		expect(agentBrowserSkills).toHaveLength(5)
+		expect(defaultSkills).toHaveLength(9)
+		expect(agentBrowserSkills).toHaveLength(9)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -100,8 +104,8 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
 		expect(skills.map((s) => s.name)).toContain("git-master")
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
-		expect(skills.map((s) => s.name)).toContain("dsl-expert")
-		expect(skills.length).toBe(4)
+		expect(skills.map((s) => s.name)).toContain("dsl-core")
+		expect(skills.length).toBe(8)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -116,14 +120,14 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).not.toContain("git-master")
 		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
-		expect(skills.map((s) => s.name)).toContain("dsl-expert")
-		expect(skills.length).toBe(3)
+		expect(skills.map((s) => s.name)).toContain("dsl-core")
+		expect(skills.length).toBe(7)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
 		// #given
 		const options = {
-			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser", "dsl-expert"]),
+			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser", "dsl-core", "dsl-grammar", "dsl-codegen", "dsl-metamodel", "dsl-tooling"]),
 		}
 
 		// #when
@@ -141,7 +145,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(5)
+		expect(skills.length).toBe(9)
 	})
 
 	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {
