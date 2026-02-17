@@ -6,7 +6,7 @@ Learn about Oh My OpenCode, a plugin that transforms OpenCode into the best agen
 
 ## TL;DR
 
-> **Sisyphus agent strongly recommends Opus 4.5 model. Using other models may result in significantly degraded experience.**
+> **Sisyphus agent strongly recommends Opus 4.6 model. Using other models may result in significantly degraded experience.**
 
 **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. That's it. The agent figures out the rest.
 

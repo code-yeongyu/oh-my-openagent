@@ -609,7 +609,7 @@ Configure git-master skill behavior:
 
 When enabled (default), Sisyphus provides a powerful orchestrator with optional specialized agents:
 
-- **Sisyphus**: Primary orchestrator agent (Claude Opus 4.5)
+- **Sisyphus**: Primary orchestrator agent (Claude Opus 4.6)
 - **OpenCode-Builder**: OpenCode's default build agent, renamed due to SDK limitations (disabled by default)
 - **Prometheus (Planner)**: OpenCode's default plan agent with work-planner methodology (enabled by default)
 - **Metis (Plan Consultant)**: Pre-planning analysis agent that identifies hidden requirements and AI failure points
