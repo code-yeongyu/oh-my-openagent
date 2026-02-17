@@ -196,7 +196,7 @@ When GitHub Copilot is the best available provider, oh-my-opencode uses these mo
 
 | Agent         | Model                            |
 | ------------- | -------------------------------- |
-| **Sisyphus**  | `github-copilot/claude-opus-4.6` |
+| **Sisyphus**  | `github-copilot/claude-opus-4-6` |
 | **Oracle**    | `github-copilot/gpt-5.2`         |
 | **Explore**   | `opencode/gpt-5-nano`              |
 | **Librarian** | `zai-coding-plan/glm-4.7` (if Z.ai available) or fallback |
@@ -292,7 +292,7 @@ gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-opencode >/dev/nul
 
 Tell the user of following:
 
-1. **Sisyphus agent strongly recommends Opus 4.5 model. Using other models may result in significantly degraded experience.**
+1. **Sisyphus agent strongly recommends Opus 4.6 model. Using other models may result in significantly degraded experience.**
 
 2. **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. That's it. The agent figures out the rest.
 
