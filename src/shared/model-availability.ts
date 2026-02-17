@@ -69,6 +69,7 @@ export function fuzzyMatchModel(
 	log("[fuzzyMatchModel] substring matches", { targetNormalized, matchCount: matches.length, matches })
 
 	if (matches.length === 0) {
+		log("[fuzzyMatchModel] WARNING: no match found", { target, availableCount: available.size, providers })
 		return null
 	}
 
