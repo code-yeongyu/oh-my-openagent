@@ -54,7 +54,7 @@ describe("createBuiltinAgents with model overrides", () => {
   test("Atlas uses uiSelectedModel when provided", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-5"])
+      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-6"])
     )
     const uiSelectedModel = "openai/gpt-5.2"
 
@@ -84,7 +84,7 @@ describe("createBuiltinAgents with model overrides", () => {
   test("user config model takes priority over uiSelectedModel for sisyphus", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-5"])
+      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-6"])
     )
     const uiSelectedModel = "openai/gpt-5.2"
     const overrides = {
@@ -117,7 +117,7 @@ describe("createBuiltinAgents with model overrides", () => {
   test("user config model takes priority over uiSelectedModel for atlas", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-5"])
+      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-6"])
     )
     const uiSelectedModel = "openai/gpt-5.2"
     const overrides = {

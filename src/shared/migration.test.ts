@@ -479,6 +479,12 @@ describe("MODEL_VERSION_MAP", () => {
     // then: Should contain correct mapping
     expect(MODEL_VERSION_MAP["anthropic/claude-opus-4-5"]).toBe("anthropic/claude-opus-4-6")
   })
+
+  test("maps anthropic/claude-sonnet-4-5 to anthropic/claude-sonnet-4-6", () => {
+    // given/when: Check MODEL_VERSION_MAP
+    // then: Should contain correct mapping
+    expect(MODEL_VERSION_MAP["anthropic/claude-sonnet-4-5"]).toBe("anthropic/claude-sonnet-4-6")
+  })
 })
 
 describe("migrateModelVersions", () => {
@@ -782,7 +788,7 @@ describe("migrateAgentConfigToCategory", () => {
       { model: "openai/gpt-5.2" },
       { model: "anthropic/claude-haiku-4-5" },
       { model: "anthropic/claude-opus-4-6" },
-      { model: "anthropic/claude-sonnet-4-5" },
+      { model: "anthropic/claude-sonnet-4-6" },
     ]
 
     const expectedCategories = ["visual-engineering", "writing", "ultrabrain", "quick", "unspecified-high", "unspecified-low"]

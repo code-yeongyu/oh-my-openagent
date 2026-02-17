@@ -665,7 +665,7 @@ You can also customize Sisyphus agents like other agents:
       "model": "openai/gpt-5.2"
     },
     "Metis (Plan Consultant)": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-sonnet-4-6"
     }
   }
 }
@@ -729,7 +729,7 @@ All 8 categories come with optimal model defaults, but **you must configure them
 | `deep`               | `openai/gpt-5.3-codex` (medium)    | Goal-oriented autonomous problem-solving, thorough research before action |
 | `artistry`           | `google/gemini-3-pro` (high)       | Highly creative/artistic tasks, novel ideas                          |
 | `quick`              | `anthropic/claude-haiku-4-5`       | Trivial tasks - single file changes, typo fixes, simple modifications|
-| `unspecified-low`    | `anthropic/claude-sonnet-4-5`      | Tasks that don't fit other categories, low effort required           |
+| `unspecified-low`    | `anthropic/claude-sonnet-4-6`      | Tasks that don't fit other categories, low effort required           |
 | `unspecified-high`   | `anthropic/claude-opus-4-6` (max)  | Tasks that don't fit other categories, high effort required          |
 | `writing`            | `kimi-for-coding/k2p5`             | Documentation, prose, technical writing                              |
 
@@ -747,12 +747,12 @@ All 8 categories come with optimal model defaults, but **you must configure them
 
 ```json
 // opencode.json
-{ "model": "anthropic/claude-sonnet-4-5" }
+{ "model": "anthropic/claude-sonnet-4-6" }
 
 // oh-my-opencode.json (empty categories section)
 {}
 
-// Result: ALL categories use claude-sonnet-4-5 (wasteful!)
+// Result: ALL categories use claude-sonnet-4-6 (wasteful!)
 // - quick tasks use Sonnet instead of Haiku (expensive)
 // - ultrabrain uses Sonnet instead of GPT-5.2 (inferior reasoning)
 // - visual tasks use Sonnet instead of Gemini (suboptimal for UI)
@@ -784,7 +784,7 @@ All 8 categories come with optimal model defaults, but **you must configure them
       "model": "anthropic/claude-haiku-4-5"  // Fast + cheap for trivial tasks
     },
     "unspecified-low": { 
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-sonnet-4-6"
     },
     "unspecified-high": { 
       "model": "anthropic/claude-opus-4-6",
@@ -818,7 +818,7 @@ Add your own categories or override built-in ones:
 {
   "categories": {
     "data-science": {
-      "model": "anthropic/claude-sonnet-4-5",
+      "model": "anthropic/claude-sonnet-4-6",
       "temperature": 0.2,
       "prompt_append": "Focus on data analysis, ML pipelines, and statistical methods."
     },
@@ -921,7 +921,7 @@ Categories follow the same resolution logic:
 | **deep** | `gpt-5.3-codex` | openai/github-copilot/opencode → anthropic/github-copilot/opencode → google/github-copilot/opencode |
 | **artistry** | `gemini-3-pro` | google/github-copilot/opencode → anthropic/github-copilot/opencode → openai/github-copilot/opencode |
 | **quick** | `claude-haiku-4-5` | anthropic/github-copilot/opencode → google/github-copilot/opencode → opencode |
-| **unspecified-low** | `claude-sonnet-4-5` | anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
+| **unspecified-low** | `claude-sonnet-4-6` | anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
 | **unspecified-high** | `claude-opus-4-6` | anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
 | **writing** | `k2p5` | kimi-for-coding → google/github-copilot/opencode → anthropic/github-copilot/opencode |
 
@@ -947,7 +947,7 @@ Override any agent or category model in `oh-my-opencode.json`:
 {
   "agents": {
     "Sisyphus": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-sonnet-4-6"
     },
     "oracle": {
       "model": "openai/o3"
