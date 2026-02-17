@@ -3,7 +3,20 @@
 import { describe, expect, test } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { BackgroundTask } from "../../features/background-agent/types"
+import type { BackgroundOutputClient } from "../background-task/clients"
 import { createAthenaCouncilTool, filterCouncilMembers } from "./tools"
+
+const mockClient = {
+  session: {
+    messages: async () => ({
+      data: [{
+        id: "msg-1",
+        info: { role: "assistant" },
+        parts: [{ type: "text", text: "Test analysis result" }],
+      }],
+    }),
+  },
+} as unknown as BackgroundOutputClient
 
 const mockManager = {
   getTask: () => undefined,
@@ -25,25 +38,17 @@ const configuredMembers = [
   { model: "google/gemini-3-pro" },
 ]
 
-function createRunningTask(id: string): BackgroundTask {
+function createCompletedTask(id: string): BackgroundTask {
   return {
     id,
     parentSessionID: "session-1",
     parentMessageID: "message-1",
     description: `Council member task ${id}`,
     prompt: "prompt",
-    agent: "athena",
-    status: "running",
+    agent: "council-member",
+    status: "completed",
+    sessionID: `ses-${id}`,
   }
-}
-
-function parseLaunchResult(result: unknown): {
-  launched: number
-  members: Array<{ task_id: string; name: string; model: string; status: string }>
-  failed: Array<{ name: string; model: string; error: string }>
-} {
-  expect(typeof result).toBe("string")
-  return JSON.parse(result as string)
 }
 
 describe("filterCouncilMembers", () => {
@@ -142,6 +147,7 @@ describe("createAthenaCouncilTool", () => {
     const athenaCouncilTool = createAthenaCouncilTool({
       backgroundManager: mockManager,
       councilConfig: undefined,
+      client: mockClient,
     })
 
     // #when
@@ -156,6 +162,7 @@ describe("createAthenaCouncilTool", () => {
     const athenaCouncilTool = createAthenaCouncilTool({
       backgroundManager: mockManager,
       councilConfig: { members: [] },
+      client: mockClient,
     })
 
     // #when
@@ -170,6 +177,7 @@ describe("createAthenaCouncilTool", () => {
     const athenaCouncilTool = createAthenaCouncilTool({
       backgroundManager: mockManager,
       councilConfig: { members: [{ model: "openai/gpt-5.3-codex" }] },
+      client: mockClient,
     })
 
     // #then - description should be dynamic and include the member model
@@ -184,6 +192,7 @@ describe("createAthenaCouncilTool", () => {
     const athenaCouncilTool = createAthenaCouncilTool({
       backgroundManager: mockManager,
       councilConfig: { members: configuredMembers },
+      client: mockClient,
     })
     const toolArgs = {
       question: "Who should investigate this?",
@@ -197,63 +206,54 @@ describe("createAthenaCouncilTool", () => {
     expect(result).toBe("Unknown council members: unknown-model. Available members: Claude, GPT, google/gemini-3-pro.")
   })
 
-  test("returns launched task_ids and member mapping for configured council", async () => {
+  test("returns collected markdown results for all configured council members", async () => {
     // #given
     let launchCount = 0
+    const taskStore = new Map<string, BackgroundTask>()
     const launchManager = {
       launch: async () => {
         launchCount += 1
-        return createRunningTask(`bg-${launchCount}`)
+        const task = createCompletedTask(`bg-${launchCount}`)
+        taskStore.set(task.id, task)
+        return task
       },
-      getTask: () => undefined,
+      getTask: (id: string) => taskStore.get(id),
     } as unknown as BackgroundManager
     const athenaCouncilTool = createAthenaCouncilTool({
       backgroundManager: launchManager,
       councilConfig: { members: configuredMembers },
+      client: mockClient,
     })
 
     // #when
     const result = await athenaCouncilTool.execute({ question: "How should we proceed?" }, mockToolContext)
-    const parsed = parseLaunchResult(result)
 
-    // #then
-    expect(parsed.launched).toBe(3)
-    expect(parsed.failed).toEqual([])
-    expect(parsed.members).toEqual([
-      {
-        task_id: "bg-1",
-        name: "Claude",
-        model: "anthropic/claude-sonnet-4-5",
-        status: "running",
-      },
-      {
-        task_id: "bg-2",
-        name: "GPT",
-        model: "openai/gpt-5.3-codex",
-        status: "running",
-      },
-      {
-        task_id: "bg-3",
-        name: "google/gemini-3-pro",
-        model: "google/gemini-3-pro",
-        status: "running",
-      },
-    ])
+    // #then - returns markdown with council results, one section per member
+    expect(result).toContain("## Council Results")
+    expect(result).toContain("How should we proceed?")
+    expect(result).toContain("### Claude (anthropic/claude-sonnet-4-5)")
+    expect(result).toContain("### GPT (openai/gpt-5.3-codex)")
+    expect(result).toContain("### google/gemini-3-pro (google/gemini-3-pro)")
+    expect(result).toContain("Test analysis result")
   })
 
-  test("returns task_ids length matching selected members", async () => {
+  test("returns collected results only for selected members", async () => {
     // #given
     let launchCount = 0
+    const taskStore = new Map<string, BackgroundTask>()
     const launchManager = {
       launch: async () => {
         launchCount += 1
-        return createRunningTask(`bg-${launchCount}`)
+        const task = createCompletedTask(`bg-${launchCount}`)
+        taskStore.set(task.id, task)
+        return task
       },
-      getTask: () => undefined,
+      getTask: (id: string) => taskStore.get(id),
     } as unknown as BackgroundManager
     const athenaCouncilTool = createAthenaCouncilTool({
       backgroundManager: launchManager,
       councilConfig: { members: configuredMembers },
+      client: mockClient,
     })
 
     // #when
@@ -264,54 +264,50 @@ describe("createAthenaCouncilTool", () => {
       },
       mockToolContext
     )
-    const parsed = parseLaunchResult(result)
 
-    // #then
-    expect(parsed.launched).toBe(2)
-    expect(parsed.members).toHaveLength(2)
-    expect(parsed.members.map((member) => member.name)).toEqual(["GPT", "google/gemini-3-pro"])
+    // #then - only selected members appear in output
+    expect(result).toContain("### GPT (openai/gpt-5.3-codex)")
+    expect(result).toContain("### google/gemini-3-pro (google/gemini-3-pro)")
+    expect(result).not.toContain("### Claude")
+    expect(launchCount).toBe(2)
   })
 
-  test("returns failed launches inline while keeping successful task mappings", async () => {
+  test("includes launch failures alongside successful member results", async () => {
     // #given
     let launchCount = 0
+    const taskStore = new Map<string, BackgroundTask>()
     const launchManager = {
       launch: async () => {
         launchCount += 1
         if (launchCount === 2) {
           throw new Error("provider outage")
         }
-
-        return createRunningTask(`bg-${launchCount}`)
+        const task = createCompletedTask(`bg-${launchCount}`)
+        taskStore.set(task.id, task)
+        return task
       },
-      getTask: () => undefined,
+      getTask: (id: string) => taskStore.get(id),
     } as unknown as BackgroundManager
     const athenaCouncilTool = createAthenaCouncilTool({
       backgroundManager: launchManager,
       councilConfig: { members: configuredMembers },
+      client: mockClient,
     })
 
     // #when
     const result = await athenaCouncilTool.execute({ question: "Any concerns?" }, mockToolContext)
-    const parsed = parseLaunchResult(result)
 
-    // #then
-    expect(parsed.launched).toBe(2)
-    expect(parsed.members).toHaveLength(2)
-    expect(parsed.failed).toHaveLength(1)
-    expect(parsed.failed[0]).toEqual({
-      name: "GPT",
-      model: "openai/gpt-5.3-codex",
-      error: "Launch failed: Error: provider outage",
-    })
+    // #then - successful members have results, failed member listed in failures section
+    expect(result).toContain("### Claude (anthropic/claude-sonnet-4-5)")
+    expect(result).toContain("### google/gemini-3-pro (google/gemini-3-pro)")
+    expect(result).toContain("### Launch Failures")
+    expect(result).toContain("**GPT**")
+    expect(result).toContain("provider outage")
   })
 
   test("returns dedup error when council is already running in same session", async () => {
-    // #given
-    let resolveLaunch: ((task: BackgroundTask) => void) | undefined
-    const pendingLaunch = new Promise<BackgroundTask>((resolve) => {
-      resolveLaunch = resolve
-    })
+    // #given - use a never-resolving launch to keep the first execution in-flight
+    const pendingLaunch = new Promise<BackgroundTask>(() => {})
     const launchManager = {
       launch: async () => pendingLaunch,
       getTask: () => undefined,
@@ -319,17 +315,19 @@ describe("createAthenaCouncilTool", () => {
     const athenaCouncilTool = createAthenaCouncilTool({
       backgroundManager: launchManager,
       councilConfig: { members: [{ model: "openai/gpt-5.3-codex" }] },
+      client: mockClient,
     })
 
-    // #when
-    const firstExecution = athenaCouncilTool.execute({ question: "First run" }, mockToolContext)
-    const secondExecution = await athenaCouncilTool.execute({ question: "Second run" }, mockToolContext)
+    // #when - first call starts but never resolves (stuck in launch)
+    // second call should be rejected by session guard
+    const _firstExecution = athenaCouncilTool.execute({ question: "First run" }, mockToolContext)
 
-    resolveLaunch?.(createRunningTask("bg-dedup"))
-    const firstResult = parseLaunchResult(await firstExecution)
+    // Allow microtask queue to process so markCouncilRunning is called
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    const secondExecution = await athenaCouncilTool.execute({ question: "Second run" }, mockToolContext)
 
     // #then
     expect(secondExecution).toBe("Council is already running for this session. Wait for the current council execution to complete.")
-    expect(firstResult.launched).toBe(1)
   })
 })

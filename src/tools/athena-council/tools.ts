@@ -2,11 +2,13 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { executeCouncil } from "../../agents/athena/council-orchestrator"
 import type { CouncilConfig, CouncilMemberConfig } from "../../agents/athena/types"
 import type { BackgroundManager } from "../../features/background-agent"
+import type { BackgroundOutputClient } from "../background-task/clients"
 import { ATHENA_COUNCIL_TOOL_DESCRIPTION_TEMPLATE } from "./constants"
 import { createCouncilLauncher } from "./council-launcher"
 import { isCouncilRunning, markCouncilDone, markCouncilRunning } from "./session-guard"
 import { waitForCouncilSessions } from "./session-waiter"
-import type { AthenaCouncilLaunchResult, AthenaCouncilToolArgs } from "./types"
+import { collectCouncilResults } from "./result-collector"
+import type { AthenaCouncilToolArgs } from "./types"
 
 function isCouncilConfigured(councilConfig: CouncilConfig | undefined): councilConfig is CouncilConfig {
   return Boolean(councilConfig && councilConfig.members.length > 0)
@@ -75,8 +77,9 @@ function buildToolDescription(councilConfig: CouncilConfig | undefined): string 
 export function createAthenaCouncilTool(args: {
   backgroundManager: BackgroundManager
   councilConfig: CouncilConfig | undefined
+  client: BackgroundOutputClient
 }): ToolDefinition {
-  const { backgroundManager, councilConfig } = args
+  const { backgroundManager, councilConfig, client } = args
   const description = buildToolDescription(councilConfig)
 
   return tool({
@@ -113,17 +116,13 @@ export function createAthenaCouncilTool(args: {
           parentAgent: toolContext.agent,
         })
 
-        // Wait for sessions to be created so we can register metadata for UI visibility.
-        // This makes council member tasks clickable in the OpenCode TUI, matching the
-        // behavior of the task tool (delegate-task/background-task.ts).
+        // Register metadata for UI visibility (makes sessions clickable in TUI).
         const metadataFn = (toolContext as Record<string, unknown>).metadata as
           | ((input: { title?: string; metadata?: Record<string, unknown> }) => Promise<void>)
           | undefined
         if (metadataFn && execution.launched.length > 0) {
           const sessions = await waitForCouncilSessions(
-            execution.launched,
-            backgroundManager,
-            toolContext.abort
+            execution.launched, backgroundManager, toolContext.abort
           )
           for (const session of sessions) {
             await metadataFn({
@@ -138,27 +137,46 @@ export function createAthenaCouncilTool(args: {
           }
         }
 
-        const launchResult: AthenaCouncilLaunchResult = {
-          launched: execution.launched.length,
-          members: execution.launched.map((entry) => ({
-            task_id: entry.taskId,
-            name: entry.member.name ?? entry.member.model,
-            model: entry.member.model,
-            status: "running",
-          })),
-          failed: execution.failures.map((entry) => ({
-            name: entry.member.name ?? entry.member.model,
-            model: entry.member.model,
-            error: entry.error,
-          })),
-        }
+        // Wait for all members to complete and collect their actual results.
+        // This eliminates the need for Athena to poll background_output repeatedly.
+        const collected = await collectCouncilResults(
+          execution.launched, backgroundManager, client, toolContext.abort
+        )
 
-        markCouncilDone(toolContext.sessionID)
-        return JSON.stringify(launchResult)
+        return formatCouncilOutput(toolArgs.question, collected.results, execution.failures)
       } catch (error) {
-        markCouncilDone(toolContext.sessionID)
         throw error
+      } finally {
+        markCouncilDone(toolContext.sessionID)
       }
     },
   })
+}
+
+function formatCouncilOutput(
+  question: string,
+  results: Array<{ name: string; model: string; taskId: string; status: string; content: string }>,
+  failures: Array<{ member: { name?: string; model: string }; error: string }>
+): string {
+  const sections: string[] = []
+
+  sections.push(`## Council Results\n\n**Question:** ${question}\n`)
+
+  for (const result of results) {
+    const header = `### ${result.name} (${result.model})`
+    if (result.status !== "completed") {
+      sections.push(`${header}\n\n*Status: ${result.status}*`)
+      continue
+    }
+    sections.push(`${header}\n\n${result.content}`)
+  }
+
+  if (failures.length > 0) {
+    const failureLines = failures
+      .map((f) => `- **${f.member.name ?? f.member.model}**: ${f.error}`)
+      .join("\n")
+    sections.push(`### Launch Failures\n\n${failureLines}`)
+  }
+
+  return sections.join("\n\n---\n\n")
 }
