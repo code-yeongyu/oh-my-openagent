@@ -1,6 +1,6 @@
 import { HASH_DICT } from "./constants"
 
-export function computeLineHash(lineNumber: number, content: string): string {
+export function computeLineHash(_lineNumber: number, content: string): string {
   const stripped = content.replace(/\s+/g, "")
   const hash = Bun.hash.xxHash32(stripped)
   const index = hash % 256
