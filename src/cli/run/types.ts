@@ -6,7 +6,6 @@ export interface RunOptions {
   agent?: string
   verbose?: boolean
   directory?: string
-  timeout?: number
   port?: number
   attach?: string
   onComplete?: string
