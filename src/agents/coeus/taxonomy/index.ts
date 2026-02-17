@@ -10,3 +10,11 @@ export {
 } from "./schema";
 
 export type { TaxonomyQuery } from "./types";
+
+export { TaxonomyStore } from "./storage";
+
+export {
+  rankSources,
+  validateProvenance,
+  type ValidationResult,
+} from "./provenance-validator";
