@@ -6,8 +6,12 @@ import {
 	detectCompletionInSessionMessages,
 	detectCompletionInTranscript,
 } from "./completion-promise-detector"
-import { buildContinuationPrompt } from "./continuation-prompt-builder"
+import {
+	buildContinuationPrompt,
+	buildNoWorkRejectionPrompt,
+} from "./continuation-prompt-builder"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
+import { countToolCallsInCurrentIteration } from "./work-verifier"
 
 type SessionRecovery = {
 	isRecovering: (sessionID: string) => boolean
@@ -72,6 +76,66 @@ export function createRalphLoopEventHandler(
 				})
 
 			if (completionViaTranscript || completionViaApi) {
+				if (completionViaApi) {
+					const toolCallCount = await countToolCallsInCurrentIteration(ctx, {
+						sessionID,
+						apiTimeoutMs: options.apiTimeoutMs,
+						directory: options.directory,
+					})
+
+					if (toolCallCount === 0) {
+					log(`[${HOOK_NAME}] Promise detected but no tool calls found - rejecting`, {
+						sessionID,
+						iteration: state.iteration,
+						promise: state.completion_promise,
+					})
+
+						if (state.iteration >= state.max_iterations) {
+							options.loopState.clear()
+							await ctx.client.tui
+								.showToast({
+									body: {
+										title: "Ralph Loop Stopped",
+										message: `Max iterations (${state.max_iterations}) reached - promise was rejected due to no work performed`,
+										variant: "warning",
+										duration: 5000,
+									},
+								})
+								.catch(() => {})
+							return
+						}
+
+						const newState = options.loopState.incrementIteration()
+						if (!newState) return
+
+						await ctx.client.tui
+							.showToast({
+								body: {
+									title: "Ralph Loop",
+									message: `Promise rejected - no work detected. Iteration ${newState.iteration}/${newState.max_iterations}`,
+									variant: "warning",
+									duration: 3000,
+								},
+							})
+							.catch(() => {})
+
+						try {
+							await injectContinuationPrompt(ctx, {
+								sessionID,
+								prompt: buildNoWorkRejectionPrompt(newState),
+								directory: options.directory,
+								apiTimeoutMs: options.apiTimeoutMs,
+							})
+						} catch (err) {
+							log(`[${HOOK_NAME}] Failed to inject no-work rejection`, {
+								sessionID,
+								error: String(err),
+							})
+						}
+						return
+					}
+				}
+
 				log(`[${HOOK_NAME}] Completion detected!`, {
 					sessionID,
 					iteration: state.iteration,
