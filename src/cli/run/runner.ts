@@ -8,6 +8,7 @@ import { createJsonOutputManager } from "./json-output"
 import { executeOnCompleteHook } from "./on-complete-hook"
 import { resolveRunAgent } from "./agent-resolver"
 import { pollForCompletion } from "./poll-for-completion"
+import { loadAgentProfileColors } from "./agent-profile-colors"
 
 export { resolveRunAgent }
 
@@ -76,11 +77,11 @@ export async function run(options: RunOptions): Promise<number> {
       }
       const events = await client.event.subscribe({ query: { directory } })
       const eventState = createEventState()
+      eventState.agentColorsByName = await loadAgentProfileColors(client)
       const eventProcessor = processEvents(ctx, events.stream, eventState).catch(
         () => {},
       )
 
-      console.log(pc.dim("\nSending prompt..."))
       await client.session.promptAsync({
         path: { id: sessionID },
         body: {
@@ -89,8 +90,6 @@ export async function run(options: RunOptions): Promise<number> {
         },
         query: { directory },
       })
-
-      console.log(pc.dim("Waiting for completion...\n"))
       const exitCode = await pollForCompletion(ctx, eventState, abortController)
 
       // Abort the event stream to stop the processor

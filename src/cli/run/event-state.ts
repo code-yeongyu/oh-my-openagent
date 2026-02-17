@@ -13,8 +13,28 @@ export interface EventState {
   currentAgent: string | null
   /** Current model ID from the latest assistant message */
   currentModel: string | null
+  /** Current model variant from the latest assistant message */
+  currentVariant: string | null
   /** Current message role (user/assistant) — used to filter user messages from display */
   currentMessageRole: string | null
+  /** Agent profile colors keyed by display name */
+  agentColorsByName: Record<string, string>
+  /** Part type registry keyed by partID (text, reasoning, tool, ...) */
+  partTypesById: Record<string, string>
+  /** Whether a THINK block is currently open in output */
+  inThinkBlock: boolean
+  /** Tracks streamed reasoning text to avoid duplicates */
+  lastReasoningText: string
+  /** Whether compact thinking line already printed for current reasoning block */
+  hasPrintedThinkingLine: boolean
+  /** Last rendered thinking line width (for in-place padding updates) */
+  lastThinkingLineWidth: number
+  /** Message role lookup by message ID to filter user parts */
+  messageRoleById: Record<string, string>
+  /** Last rendered thinking summary (to avoid duplicate re-render) */
+  lastThinkingSummary: string
+  /** Whether text stream is currently at line start (for padding) */
+  textAtLineStart: boolean
 }
 
 export function createEventState(): EventState {
@@ -29,6 +49,16 @@ export function createEventState(): EventState {
     messageCount: 0,
     currentAgent: null,
     currentModel: null,
+    currentVariant: null,
     currentMessageRole: null,
+    agentColorsByName: {},
+    partTypesById: {},
+    inThinkBlock: false,
+    lastReasoningText: "",
+    hasPrintedThinkingLine: false,
+    lastThinkingLineWidth: 0,
+    messageRoleById: {},
+    lastThinkingSummary: "",
+    textAtLineStart: true,
   }
 }

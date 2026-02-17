@@ -1,38 +1,144 @@
-import pc from "picocolors"
+export interface ToolHeader {
+  icon: string
+  title: string
+  description?: string
+}
 
-const SINGLE_VALUE_FIELDS = ["command", "filePath"] as const
-
-const MULTI_VALUE_FIELDS = [
-  "description",
-  "pattern",
-  "query",
-  "url",
-  "category",
-  "subagent_type",
-  "lang",
-  "run_in_background",
-] as const
-
-export function formatToolInputPreview(input: Record<string, unknown>): string {
-  for (const key of SINGLE_VALUE_FIELDS) {
-    if (!input[key]) continue
-    const maxLen = key === "command" ? 80 : 120
-    return ` ${pc.dim(String(input[key]).slice(0, maxLen))}`
+export function formatToolHeader(toolName: string, input: Record<string, unknown>): ToolHeader {
+  if (toolName === "glob") {
+    const pattern = str(input.pattern)
+    const root = str(input.path)
+    return {
+      icon: "✱",
+      title: pattern ? `Glob "${pattern}"` : "Glob",
+      description: root ? `in ${root}` : undefined,
+    }
   }
 
-  const parts: string[] = []
-  let totalLen = 0
-
-  for (const key of MULTI_VALUE_FIELDS) {
-    const val = input[key]
-    if (val === undefined || val === null) continue
-    const str = String(val)
-    const truncated = str.length > 50 ? str.slice(0, 47) + "..." : str
-    const entry = `${key}=${truncated}`
-    if (totalLen + entry.length > 120) break
-    parts.push(entry)
-    totalLen += entry.length + 1
+  if (toolName === "grep") {
+    const pattern = str(input.pattern)
+    const root = str(input.path)
+    return {
+      icon: "✱",
+      title: pattern ? `Grep "${pattern}"` : "Grep",
+      description: root ? `in ${root}` : undefined,
+    }
   }
 
-  return parts.length > 0 ? ` ${pc.dim(parts.join(" "))}` : ""
+  if (toolName === "list") {
+    const path = str(input.path)
+    return {
+      icon: "→",
+      title: path ? `List ${path}` : "List",
+    }
+  }
+
+  if (toolName === "read") {
+    const filePath = str(input.filePath)
+    return {
+      icon: "→",
+      title: filePath ? `Read ${filePath}` : "Read",
+      description: formatKeyValues(input, ["filePath"]),
+    }
+  }
+
+  if (toolName === "write") {
+    const filePath = str(input.filePath)
+    return {
+      icon: "←",
+      title: filePath ? `Write ${filePath}` : "Write",
+    }
+  }
+
+  if (toolName === "edit") {
+    const filePath = str(input.filePath)
+    return {
+      icon: "←",
+      title: filePath ? `Edit ${filePath}` : "Edit",
+      description: formatKeyValues(input, ["filePath", "oldString", "newString"]),
+    }
+  }
+
+  if (toolName === "webfetch") {
+    const url = str(input.url)
+    return {
+      icon: "%",
+      title: url ? `WebFetch ${url}` : "WebFetch",
+      description: formatKeyValues(input, ["url"]),
+    }
+  }
+
+  if (toolName === "websearch_web_search_exa") {
+    const query = str(input.query)
+    return {
+      icon: "◈",
+      title: query ? `Web Search "${query}"` : "Web Search",
+    }
+  }
+
+  if (toolName === "grep_app_searchGitHub") {
+    const query = str(input.query)
+    return {
+      icon: "◇",
+      title: query ? `Code Search "${query}"` : "Code Search",
+    }
+  }
+
+  if (toolName === "task") {
+    const desc = str(input.description)
+    const subagent = str(input.subagent_type)
+    return {
+      icon: "#",
+      title: desc || (subagent ? `${subagent} Task` : "Task"),
+      description: subagent ? `agent=${subagent}` : undefined,
+    }
+  }
+
+  if (toolName === "bash") {
+    const command = str(input.command)
+    return {
+      icon: "$",
+      title: command || "bash",
+      description: formatKeyValues(input, ["command"]),
+    }
+  }
+
+  if (toolName === "skill") {
+    const name = str(input.name)
+    return {
+      icon: "→",
+      title: name ? `Skill "${name}"` : "Skill",
+    }
+  }
+
+  if (toolName === "todowrite") {
+    return {
+      icon: "#",
+      title: "Todos",
+    }
+  }
+
+  return {
+    icon: "⚙",
+    title: toolName,
+    description: formatKeyValues(input, []),
+  }
+}
+
+function formatKeyValues(input: Record<string, unknown>, exclude: string[]): string | undefined {
+  const entries = Object.entries(input).filter(([key, value]) => {
+    if (exclude.includes(key)) return false
+    return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+  })
+  if (!entries.length) return undefined
+
+  return entries
+    .map(([key, value]) => `${key}=${String(value)}`)
+    .join(" ")
+}
+
+function str(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined
+  const trimmed = value.trim()
+  return trimmed.length ? trimmed : undefined
 }
