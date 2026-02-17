@@ -1,15 +1,30 @@
 import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import {
+  getActiveContinuationMarkerReason,
+  isContinuationMarkerActive,
+  readContinuationMarker,
+} from "../../features/run-continuation-state"
 import { readState as readRalphLoopState } from "../../hooks/ralph-loop/storage"
 
 export interface ContinuationState {
   hasActiveBoulder: boolean
   hasActiveRalphLoop: boolean
+  hasHookMarker: boolean
+  hasTodoHookMarker: boolean
+  hasActiveHookMarker: boolean
+  activeHookMarkerReason: string | null
 }
 
 export function getContinuationState(directory: string, sessionID: string): ContinuationState {
+  const marker = readContinuationMarker(directory, sessionID)
+
   return {
     hasActiveBoulder: hasActiveBoulderContinuation(directory, sessionID),
     hasActiveRalphLoop: hasActiveRalphLoopContinuation(directory, sessionID),
+    hasHookMarker: marker !== null,
+    hasTodoHookMarker: marker?.sources.todo !== undefined,
+    hasActiveHookMarker: isContinuationMarkerActive(marker),
+    activeHookMarkerReason: getActiveContinuationMarkerReason(marker),
   }
 }
 

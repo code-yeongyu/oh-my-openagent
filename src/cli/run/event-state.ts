@@ -13,6 +13,8 @@ export interface EventState {
   currentAgent: string | null
   /** Current model ID from the latest assistant message */
   currentModel: string | null
+  /** Current message role (user/assistant) — used to filter user messages from display */
+  currentMessageRole: string | null
 }
 
 export function createEventState(): EventState {
@@ -27,5 +29,6 @@ export function createEventState(): EventState {
     messageCount: 0,
     currentAgent: null,
     currentModel: null,
+    currentMessageRole: null,
   }
 }

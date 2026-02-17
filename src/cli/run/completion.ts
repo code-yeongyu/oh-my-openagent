@@ -1,11 +1,22 @@
 import pc from "picocolors"
 import type { RunContext, Todo, ChildSession, SessionStatus } from "./types"
 import { normalizeSDKResponse } from "../../shared"
-import { getContinuationState } from "./continuation-state"
+import {
+  getContinuationState,
+  type ContinuationState,
+} from "./continuation-state"
 
 export async function checkCompletionConditions(ctx: RunContext): Promise<boolean> {
   try {
-    if (!await areAllTodosComplete(ctx)) {
+    const continuationState = getContinuationState(ctx.directory, ctx.sessionID)
+
+    if (continuationState.hasActiveHookMarker) {
+      const reason = continuationState.activeHookMarkerReason ?? "continuation hook is active"
+      console.log(pc.dim(`  Waiting: ${reason}`))
+      return false
+    }
+
+    if (!continuationState.hasTodoHookMarker && !await areAllTodosComplete(ctx)) {
       return false
     }
 
@@ -13,7 +24,7 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
       return false
     }
 
-    if (!areContinuationHooksIdle(ctx)) {
+    if (!areContinuationHooksIdle(continuationState)) {
       return false
     }
 
@@ -24,9 +35,7 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
   }
 }
 
-function areContinuationHooksIdle(ctx: RunContext): boolean {
-  const continuationState = getContinuationState(ctx.directory, ctx.sessionID)
-
+function areContinuationHooksIdle(continuationState: ContinuationState): boolean {
   if (continuationState.hasActiveBoulder) {
     console.log(pc.dim("  Waiting: boulder continuation is active"))
     return false

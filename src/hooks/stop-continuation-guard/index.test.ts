@@ -1,7 +1,28 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
+import { readContinuationMarker } from "../../features/run-continuation-state"
 import { createStopContinuationGuardHook } from "./index"
 
 describe("stop-continuation-guard", () => {
+  const tempDirs: string[] = []
+
+  function createTempDir(): string {
+    const directory = mkdtempSync(join(tmpdir(), "omo-stop-guard-"))
+    tempDirs.push(directory)
+    return directory
+  }
+
+  afterEach(() => {
+    while (tempDirs.length > 0) {
+      const directory = tempDirs.pop()
+      if (directory) {
+        rmSync(directory, { recursive: true, force: true })
+      }
+    }
+  })
+
   function createMockPluginInput() {
     return {
       client: {
@@ -9,13 +30,14 @@ describe("stop-continuation-guard", () => {
           showToast: async () => ({}),
         },
       },
-      directory: "/tmp/test",
-    } as never
+      directory: createTempDir(),
+    } as any
   }
 
   test("should mark session as stopped", () => {
     // given - a guard hook with no stopped sessions
-    const guard = createStopContinuationGuardHook(createMockPluginInput())
+    const input = createMockPluginInput()
+    const guard = createStopContinuationGuardHook(input)
     const sessionID = "test-session-1"
 
     // when - we stop continuation for the session
@@ -23,6 +45,9 @@ describe("stop-continuation-guard", () => {
 
     // then - session should be marked as stopped
     expect(guard.isStopped(sessionID)).toBe(true)
+
+    const marker = readContinuationMarker(input.directory, sessionID)
+    expect(marker?.sources.stop?.state).toBe("stopped")
   })
 
   test("should return false for non-stopped sessions", () => {

@@ -94,6 +94,7 @@ describe("pollForCompletion", () => {
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
+      minStabilizationMs: 500,
     })
 
     //#then - should be aborted, not completed (tool blocked exit)
@@ -159,6 +160,7 @@ describe("pollForCompletion", () => {
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
+      minStabilizationMs: 500,
     })
 
     //#then
