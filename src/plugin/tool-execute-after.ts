@@ -1,5 +1,6 @@
 import { consumeToolMetadata } from "../features/tool-metadata-store"
 import type { CreatedHooks } from "../create-hooks"
+import { deepSanitizeSurrogates, sanitizeSurrogates } from "../shared/sanitize-surrogates"
 
 export function createToolExecuteAfterHandler(args: {
   hooks: CreatedHooks
@@ -17,13 +18,20 @@ export function createToolExecuteAfterHandler(args: {
   ): Promise<void> => {
     if (!output) return
 
+    output.title = sanitizeSurrogates(output.title)
+    output.output = sanitizeSurrogates(output.output)
+    output.metadata = deepSanitizeSurrogates(output.metadata) as Record<string, unknown>
+
     const stored = consumeToolMetadata(input.sessionID, input.callID)
     if (stored) {
       if (stored.title) {
-        output.title = stored.title
+        output.title = sanitizeSurrogates(stored.title)
       }
       if (stored.metadata) {
-        output.metadata = { ...output.metadata, ...stored.metadata }
+        output.metadata = deepSanitizeSurrogates({
+          ...output.metadata,
+          ...stored.metadata,
+        }) as Record<string, unknown>
       }
     }
 
