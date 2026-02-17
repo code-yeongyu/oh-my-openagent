@@ -30,6 +30,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_agents: z.array(z.string()).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
   disabled_hooks: z.array(z.string()).optional(),
+  /** Per-hook cadence control: hook fires every N qualifying events (default: 1 = every event) */
+  hook_cadence: z.record(z.string(), z.number().int().positive()).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
   disabled_tools: z.array(z.string()).optional(),

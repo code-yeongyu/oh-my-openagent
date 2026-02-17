@@ -1,6 +1,7 @@
 import type { HookName, OhMyOpenCodeConfig } from "../../config"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginContext } from "../types"
+import type { HookCadenceTracker } from "../hook-cadence-tracker"
 
 import {
   createTodoContinuationEnforcer,
@@ -35,6 +36,7 @@ export function createContinuationHooks(args: {
   safeHookEnabled: boolean
   backgroundManager: BackgroundManager
   sessionRecovery: SessionRecovery
+  cadenceTracker: HookCadenceTracker
 }): ContinuationHooks {
   const {
     ctx,
@@ -43,6 +45,7 @@ export function createContinuationHooks(args: {
     safeHookEnabled,
     backgroundManager,
     sessionRecovery,
+    cadenceTracker,
   } = args
 
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
