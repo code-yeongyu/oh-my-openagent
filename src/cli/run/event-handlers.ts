@@ -141,6 +141,22 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
   state.hasReceivedMeaningfulWork = true
   state.messageCount++
   state.lastPartText = ""
+
+  const agent = props?.info?.agent ?? null
+  const model = props?.info?.modelID ?? null
+  if (agent !== state.currentAgent || model !== state.currentModel) {
+    state.currentAgent = agent
+    state.currentModel = model
+    printAgentHeader(agent, model)
+  }
+}
+
+function printAgentHeader(agent: string | null, model: string | null): void {
+  if (!agent && !model) return
+  const agentLabel = agent ? pc.bold(pc.magenta(agent)) : ""
+  const modelLabel = model ? pc.dim(model) : ""
+  const separator = agent && model ? " " : ""
+  process.stdout.write(`\n${agentLabel}${separator}${modelLabel}\n`)
 }
 
 export function handleToolExecute(ctx: RunContext, payload: EventPayload, state: EventState): void {
@@ -193,19 +209,14 @@ export function handleTuiToast(_ctx: RunContext, payload: EventPayload, state: E
   if (payload.type !== "tui.toast.show") return
 
   const props = payload.properties as TuiToastShowProps | undefined
-  const title = props?.title ? `${props.title}: ` : ""
-  const message = props?.message?.trim()
   const variant = props?.variant ?? "info"
 
-  if (!message) return
-
   if (variant === "error") {
-    state.mainSessionError = true
-    state.lastError = `${title}${message}`
-    console.error(pc.red(`\n[tui.toast.error] ${state.lastError}`))
-    return
+    const title = props?.title ? `${props.title}: ` : ""
+    const message = props?.message?.trim()
+    if (message) {
+      state.mainSessionError = true
+      state.lastError = `${title}${message}`
+    }
   }
-
-  const colorize = variant === "warning" ? pc.yellow : pc.dim
-  console.log(colorize(`[toast:${variant}] ${title}${message}`))
 }
