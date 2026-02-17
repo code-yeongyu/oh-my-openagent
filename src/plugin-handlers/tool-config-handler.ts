@@ -1,5 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../config";
 import { getAgentDisplayName } from "../shared/agent-display-names";
+import { getAgentToolRestrictions } from "../shared/agent-tool-restrictions";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
@@ -96,6 +97,15 @@ export function applyToolConfig(params: {
       teammate: "allow",
       ...denyTodoTools,
     };
+  }
+
+  for (const customAgent of Object.keys(params.agentResult)) {
+    const agent = params.agentResult[customAgent] as AgentWithPermission | undefined;
+    if (!agent) continue;
+    const restrictions = getAgentToolRestrictions(customAgent);
+    if (!("task" in restrictions) && !agent.permission?.task) {
+      agent.permission = { ...agent.permission, task: "allow" };
+    }
   }
 
   params.config.permission = {

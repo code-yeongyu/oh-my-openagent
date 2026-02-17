@@ -31,6 +31,23 @@ function getConfiguredDefaultAgent(config: Record<string, unknown>): string | un
   return trimmedDefaultAgent.length > 0 ? trimmedDefaultAgent : undefined;
 }
 
+function addCustomAgentsFromConfig(params: {
+  config: Record<string, unknown>;
+  pluginConfig: OhMyOpenCodeConfig;
+}): void {
+  const agents = params.pluginConfig.agents;
+  if (!agents) return;
+
+  const configAgent = params.config.agent as Record<string, unknown> | undefined;
+  if (!configAgent) return;
+
+  for (const [name, agentCfg] of Object.entries(agents)) {
+    if (agentCfg && !configAgent[name]) {
+      configAgent[name] = migrateAgentConfig(agentCfg as Record<string, unknown>);
+    }
+  }
+}
+
 export async function applyAgentConfig(params: {
   config: Record<string, unknown>;
   pluginConfig: OhMyOpenCodeConfig;
@@ -210,6 +227,8 @@ export async function applyAgentConfig(params: {
       build: { ...migratedBuild, mode: "subagent", hidden: true },
       ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
     };
+
+    addCustomAgentsFromConfig(params);
   } else {
     params.config.agent = {
       ...builtinAgents,
@@ -218,6 +237,8 @@ export async function applyAgentConfig(params: {
       ...filterDisabledAgents(pluginAgents),
       ...configAgent,
     };
+
+    addCustomAgentsFromConfig(params);
   }
 
   if (params.config.agent) {
