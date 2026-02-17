@@ -51,7 +51,7 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.sisyphus.thinking).toBeUndefined()
   })
 
-  test("Atlas does not use uiSelectedModel (respects its own fallback chain)", async () => {
+  test("Atlas uses uiSelectedModel", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-6"])
@@ -75,7 +75,7 @@ describe("createBuiltinAgents with model overrides", () => {
 
       // #then
       expect(agents.atlas).toBeDefined()
-      expect(agents.atlas.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(agents.atlas.model).toBe("openai/gpt-5.2")
     } finally {
       fetchSpy.mockRestore()
     }
