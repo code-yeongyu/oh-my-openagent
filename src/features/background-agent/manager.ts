@@ -6,7 +6,14 @@ import type {
   ResumeInput,
 } from "./types"
 import { TaskHistory } from "./task-history"
-import { log, getAgentToolRestrictions, normalizeSDKResponse, promptWithModelSuggestionRetry } from "../../shared"
+import {
+  log,
+  getAgentToolRestrictions,
+  normalizePromptTools,
+  normalizeSDKResponse,
+  promptWithModelSuggestionRetry,
+  resolveInheritedPromptTools,
+} from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
@@ -1246,12 +1253,19 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
       let agent: string | undefined = task.parentAgent
       let model: { providerID: string; modelID: string } | undefined
+      let tools: Record<string, boolean> | undefined = task.parentTools
 
       if (this.enableParentSessionNotifications) {
         try {
           const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
           const messages = normalizeSDKResponse(messagesResp, [] as Array<{
-            info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
+            info?: {
+              agent?: string
+              model?: { providerID: string; modelID: string }
+              modelID?: string
+              providerID?: string
+              tools?: Record<string, boolean | "allow" | "deny" | "ask">
+            }
           }>)
           for (let i = messages.length - 1; i >= 0; i--) {
             const info = messages[i].info
@@ -1261,6 +1275,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
               agent = info.agent ?? task.parentAgent
               model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+              tools = normalizePromptTools(info.tools) ?? tools
               break
             }
           }
@@ -1277,7 +1292,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
             ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
             : undefined
+          tools = normalizePromptTools(currentMessage?.tools) ?? tools
         }
+
+        tools = resolveInheritedPromptTools(task.parentSessionID, tools)
 
         log("[background-agent] notifyParentSession context:", {
           taskId: task.id,
@@ -1292,7 +1310,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               noReply: !allComplete,
               ...(agent !== undefined ? { agent } : {}),
               ...(model !== undefined ? { model } : {}),
-              ...(task.parentTools ? { tools: task.parentTools } : {}),
+              ...(tools ? { tools } : {}),
               parts: [{ type: "text", text: notification }],
             },
           })

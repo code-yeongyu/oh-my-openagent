@@ -56,7 +56,7 @@ export async function notifyParentSession(
     completedTasks,
   })
 
-  const { agent, model } = await resolveParentSessionAgentAndModel({ client, task })
+  const { agent, model, tools } = await resolveParentSessionAgentAndModel({ client, task })
 
   log("[background-agent] notifyParentSession context:", {
     taskId: task.id,
@@ -71,7 +71,7 @@ export async function notifyParentSession(
         noReply: !allComplete,
         ...(agent !== undefined ? { agent } : {}),
         ...(model !== undefined ? { model } : {}),
-        ...(task.parentTools ? { tools: task.parentTools } : {}),
+        ...(tools ? { tools } : {}),
         parts: [{ type: "text", text: notification }],
       },
     })
