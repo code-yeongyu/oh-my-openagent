@@ -80,4 +80,18 @@ describe("comment-checker apply_patch integration", () => {
     // then
     expect(processApplyPatchEditsWithCli).toHaveBeenCalledTimes(0)
   })
+
+  it("returns early for non-apply_patch tools without pending call", async () => {
+    const hooks = createCommentCheckerHooks()
+    const input = { tool: "read", sessionID: "ses_test", callID: "call_without_pending" }
+    const output = {
+      title: "ok",
+      output: "x".repeat(2000),
+      metadata: {},
+    }
+
+    await hooks["tool.execute.after"](input, output)
+
+    expect(processApplyPatchEditsWithCli).toHaveBeenCalledTimes(0)
+  })
 })

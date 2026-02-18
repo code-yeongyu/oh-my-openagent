@@ -26,6 +26,9 @@ export function createManagers(args: {
 }): Managers {
   const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled } = args
 
+  const useToolOutputBackgroundNotifications =
+    pluginConfig.experimental?.background_notifications_via_tool_output === true
+
   const tmuxSessionManager = new TmuxSessionManager(ctx, tmuxConfig)
 
   const backgroundManager = new BackgroundManager(
@@ -58,7 +61,8 @@ export function createManagers(args: {
           log("[index] tmux cleanup error during shutdown:", error)
         })
       },
-      enableParentSessionNotifications: backgroundNotificationHookEnabled,
+      enableParentSessionNotifications:
+        backgroundNotificationHookEnabled && !useToolOutputBackgroundNotifications,
     },
   )
 

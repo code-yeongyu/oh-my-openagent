@@ -699,6 +699,20 @@ describe("ExperimentalConfigSchema feature flags", () => {
     }
   })
 
+  test("accepts background_notifications_via_tool_output as boolean", () => {
+    //#given
+    const config = { background_notifications_via_tool_output: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.background_notifications_via_tool_output).toBe(true)
+    }
+  })
+
   test("accepts hashline_edit as true", () => {
     //#given
     const config = { hashline_edit: true }
