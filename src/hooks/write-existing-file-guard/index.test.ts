@@ -3,9 +3,11 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync 
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
+import { MAX_TRACKED_PATHS_PER_SESSION } from "./hook"
 import { createWriteExistingFileGuardHook } from "./index"
 
 const BLOCK_MESSAGE = "File already exists. Use edit tool instead."
+const OUTSIDE_SESSION_MESSAGE = "Path must be inside session directory."
 
 type Hook = ReturnType<typeof createWriteExistingFileGuardHook>
 
@@ -52,6 +54,10 @@ describe("createWriteExistingFileGuardHook", () => {
     )
 
     return output
+  }
+
+  const emitSessionDeleted = async (sessionID: string): Promise<void> => {
+    await hook.event?.({ event: { type: "session.deleted", properties: { info: { id: sessionID } } } })
   }
 
   beforeEach(() => {
@@ -111,6 +117,39 @@ describe("createWriteExistingFileGuardHook", () => {
     ).rejects.toThrow(BLOCK_MESSAGE)
   })
 
+  test("#given same-session concurrent writes #when only one read permission exists #then allows only one write", async () => {
+    const existingFile = createFile("concurrent-consume.txt")
+    const sessionID = "ses_concurrent"
+
+    await invoke({
+      tool: "read",
+      sessionID,
+      outputArgs: { filePath: existingFile },
+    })
+
+    const results = await Promise.allSettled([
+      invoke({
+        tool: "write",
+        sessionID,
+        outputArgs: { filePath: existingFile, content: "first attempt" },
+      }),
+      invoke({
+        tool: "write",
+        sessionID,
+        outputArgs: { filePath: existingFile, content: "second attempt" },
+      }),
+    ])
+
+    const successCount = results.filter((result) => result.status === "fulfilled").length
+    const failures = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected"
+    )
+
+    expect(successCount).toBe(1)
+    expect(failures).toHaveLength(1)
+    expect(String(failures[0]?.reason)).toContain(BLOCK_MESSAGE)
+  })
+
   test("#given read in another session #when write executes #then blocks", async () => {
     const existingFile = createFile("cross-session.txt")
 
@@ -157,6 +196,23 @@ describe("createWriteExistingFileGuardHook", () => {
     })
 
     expect(output.args.overwrite).toBeUndefined()
+  })
+
+  test("#given overwrite falsy values #when write executes #then does not bypass guard", async () => {
+    const existingFile = createFile("overwrite-falsy.txt")
+
+    for (const overwrite of [false, "false"] as const) {
+      await expect(
+        invoke({
+          tool: "write",
+          outputArgs: {
+            filePath: existingFile,
+            content: "new content",
+            overwrite,
+          },
+        })
+      ).rejects.toThrow(BLOCK_MESSAGE)
+    }
   })
 
   test("#given two sessions read same file #when one writes #then other session is invalidated", async () => {
@@ -227,6 +283,41 @@ describe("createWriteExistingFileGuardHook", () => {
     }
   })
 
+  test("#given tools without file path arg #when write and read execute #then ignores safely", async () => {
+    await expect(
+      invoke({
+        tool: "write",
+        outputArgs: { content: "no path" },
+      })
+    ).resolves.toBeDefined()
+
+    await expect(
+      invoke({
+        tool: "read",
+        outputArgs: {},
+      })
+    ).resolves.toBeDefined()
+  })
+
+  test("#given non-read-write tool #when it executes #then does not grant write permission", async () => {
+    const existingFile = createFile("ignored-tool.txt")
+    const sessionID = "ses_ignored_tool"
+
+    await invoke({
+      tool: "edit",
+      sessionID,
+      outputArgs: { filePath: existingFile, oldString: "old", newString: "new" },
+    })
+
+    await expect(
+      invoke({
+        tool: "write",
+        sessionID,
+        outputArgs: { filePath: existingFile, content: "should block" },
+      })
+    ).rejects.toThrow(BLOCK_MESSAGE)
+  })
+
   test("#given relative read and absolute write #when same session writes #then allows", async () => {
     createFile("relative-absolute.txt")
     const sessionID = "ses_relative_absolute"
@@ -246,6 +337,45 @@ describe("createWriteExistingFileGuardHook", () => {
         outputArgs: { filePath: absolutePath, content: "updated" },
       })
     ).resolves.toBeDefined()
+  })
+
+  test("#given existing file outside session directory #when write executes #then blocks", async () => {
+    const outsideDir = mkdtempSync(join(tmpdir(), "write-existing-file-guard-outside-"))
+
+    try {
+      const outsideFile = join(outsideDir, "outside.txt")
+      writeFileSync(outsideFile, "outside")
+
+      await expect(
+        invoke({
+          tool: "write",
+          outputArgs: { filePath: outsideFile, content: "attempted overwrite" },
+        })
+      ).rejects.toThrow(OUTSIDE_SESSION_MESSAGE)
+    } finally {
+      rmSync(outsideDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given session read permission #when session deleted #then permission is cleaned up", async () => {
+    const existingFile = createFile("session-cleanup.txt")
+    const sessionID = "ses_cleanup"
+
+    await invoke({
+      tool: "read",
+      sessionID,
+      outputArgs: { filePath: existingFile },
+    })
+
+    await emitSessionDeleted(sessionID)
+
+    await expect(
+      invoke({
+        tool: "write",
+        sessionID,
+        outputArgs: { filePath: existingFile, content: "after cleanup" },
+      })
+    ).rejects.toThrow(BLOCK_MESSAGE)
   })
 
   test("#given case-different read path #when writing canonical path #then follows platform behavior", async () => {
@@ -281,7 +411,11 @@ describe("createWriteExistingFileGuardHook", () => {
 
     try {
       symlinkSync(targetFile, symlinkPath)
-    } catch {
+    } catch (error) {
+      console.warn(
+        "Skipping symlink test: symlinks are not supported or cannot be created in this environment.",
+        error
+      )
       return
     }
 
@@ -296,6 +430,43 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: targetFile, content: "updated via symlink read" },
+      })
+    ).resolves.toBeDefined()
+  })
+
+  test("#given session reads beyond path cap #when writing oldest and newest #then only newest is authorized", async () => {
+    const sessionID = "ses_path_cap"
+    const oldestFile = createFile("path-cap/0.txt")
+    let newestFile = oldestFile
+
+    await invoke({
+      tool: "read",
+      sessionID,
+      outputArgs: { filePath: oldestFile },
+    })
+
+    for (let index = 1; index <= MAX_TRACKED_PATHS_PER_SESSION; index += 1) {
+      newestFile = createFile(`path-cap/${index}.txt`)
+      await invoke({
+        tool: "read",
+        sessionID,
+        outputArgs: { filePath: newestFile },
+      })
+    }
+
+    await expect(
+      invoke({
+        tool: "write",
+        sessionID,
+        outputArgs: { filePath: oldestFile, content: "stale write" },
+      })
+    ).rejects.toThrow(BLOCK_MESSAGE)
+
+    await expect(
+      invoke({
+        tool: "write",
+        sessionID,
+        outputArgs: { filePath: newestFile, content: "fresh write" },
       })
     ).resolves.toBeDefined()
   })

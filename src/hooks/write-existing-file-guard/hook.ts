@@ -1,7 +1,7 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 
 import { existsSync, realpathSync } from "fs"
-import { basename, dirname, isAbsolute, join, normalize, resolve, sep } from "path"
+import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from "path"
 
 import { log } from "../../shared"
 
@@ -13,9 +13,11 @@ type GuardArgs = {
 }
 
 const MAX_TRACKED_SESSIONS = 256
+export const MAX_TRACKED_PATHS_PER_SESSION = 1024
+const OUTSIDE_SESSION_MESSAGE = "Path must be inside session directory."
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== "object") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined
   }
 
@@ -28,6 +30,11 @@ function getPathFromArgs(args: GuardArgs | undefined): string | undefined {
 
 function resolveInputPath(ctx: PluginInput, inputPath: string): string {
   return normalize(isAbsolute(inputPath) ? inputPath : resolve(ctx.directory, inputPath))
+}
+
+function isPathInsideDirectory(pathToCheck: string, directory: string): boolean {
+  const relativePath = relative(directory, pathToCheck)
+  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath))
 }
 
 function toCanonicalPath(absolutePath: string): string {
@@ -106,9 +113,25 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
     return readSet
   }
 
+  const trimSessionReadSet = (readSet: Set<string>): void => {
+    while (readSet.size > MAX_TRACKED_PATHS_PER_SESSION) {
+      const oldestPath = readSet.values().next().value
+      if (!oldestPath) {
+        return
+      }
+
+      readSet.delete(oldestPath)
+    }
+  }
+
   const registerReadPermission = (sessionID: string, canonicalPath: string): void => {
     const readSet = ensureSessionReadSet(sessionID)
+    if (readSet.has(canonicalPath)) {
+      readSet.delete(canonicalPath)
+    }
+
     readSet.add(canonicalPath)
+    trimSessionReadSet(readSet)
   }
 
   const consumeReadPermission = (sessionID: string, canonicalPath: string): boolean => {
@@ -128,9 +151,7 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
         continue
       }
 
-      if (readSet.delete(canonicalPath)) {
-        touchSession(sessionID)
-      }
+      readSet.delete(canonicalPath)
     }
   }
 
@@ -150,6 +171,20 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
 
       const resolvedPath = resolveInputPath(ctx, filePath)
       const canonicalPath = toCanonicalPath(resolvedPath)
+      const isInsideSessionDirectory = isPathInsideDirectory(canonicalPath, canonicalSessionRoot)
+
+      if (!isInsideSessionDirectory) {
+        if (toolName === "read") {
+          return
+        }
+
+        log("[write-existing-file-guard] Blocking write outside session directory", {
+          sessionID: input.sessionID,
+          filePath,
+          resolvedPath,
+        })
+        throw new Error(OUTSIDE_SESSION_MESSAGE)
+      }
 
       if (toolName === "read") {
         if (!existsSync(resolvedPath) || !input.sessionID) {
@@ -163,6 +198,7 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
       const overwriteEnabled = isOverwriteEnabled(args?.overwrite)
 
       if (argsRecord && "overwrite" in argsRecord) {
+        // Intentionally mutate output args so overwrite bypass remains hook-only.
         delete argsRecord.overwrite
       }
 
@@ -207,6 +243,20 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
       })
 
       throw new Error("File already exists. Use edit tool instead.")
+    },
+    event: async ({ event }: { event: { type: string; properties?: unknown } }) => {
+      if (event.type !== "session.deleted") {
+        return
+      }
+
+      const props = event.properties as { info?: { id?: string } } | undefined
+      const sessionID = props?.info?.id
+      if (!sessionID) {
+        return
+      }
+
+      readPermissionsBySession.delete(sessionID)
+      sessionLastAccess.delete(sessionID)
     },
   }
 }
