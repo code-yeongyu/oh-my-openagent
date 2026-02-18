@@ -241,6 +241,14 @@
 
 ### 面向人类用户
 
+获取安装指南并按照说明操作：
+
+```bash
+curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+```
+
+### 面向 LLM 智能体
+
 复制以下提示并粘贴到你的 LLM 智能体（Claude Code、AmpCode、Cursor 等）：
 
 ```
@@ -249,14 +257,6 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/
 ```
 
 或者直接阅读 [安装指南](docs/guide/installation.md)——但我们强烈建议让智能体来处理。人会犯错，智能体不会。
-
-### 面向 LLM 智能体
-
-获取安装指南并按照说明操作：
-
-```bash
-curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
-```
 
 ## 卸载
 
