@@ -12,6 +12,7 @@ import {
 } from "./fallback-handoff"
 
 const processedFallbackMessages = new Set<string>()
+const MAX_PROCESSED_FALLBACK_MARKERS = 500
 
 function getSessionIDFromStatusEvent(input: { event: { properties?: Record<string, unknown> } }): string | undefined {
   const props = input.event.properties as Record<string, unknown> | undefined
@@ -97,6 +98,15 @@ export function createAgentSwitchHook(ctx: PluginInput) {
         }
         processedFallbackMessages.add(marker)
 
+        // Prevent unbounded growth of the Set
+        if (processedFallbackMessages.size > MAX_PROCESSED_FALLBACK_MARKERS) {
+          const iterator = processedFallbackMessages.values()
+          const oldest = iterator.next().value
+          if (oldest) {
+            processedFallbackMessages.delete(oldest)
+          }
+        }
+
         // If switch_agent already queued a handoff, do not synthesize fallback behavior.
         if (getPendingSwitch(sessionID)) {
           return
@@ -125,6 +135,7 @@ export function createAgentSwitchHook(ctx: PluginInput) {
             source: "athena-message-fallback",
           })
         } catch (error) {
+          processedFallbackMessages.delete(marker)
           log("[agent-switch] Failed to recover fallback handoff from Athena message", {
             sessionID,
             messageID,
