@@ -8,6 +8,13 @@ import { waitForCouncilSessions } from "./session-waiter"
 import type { AthenaCouncilToolArgs } from "./types"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 
+function getToolContextProperty(toolContext: unknown, key: string): unknown {
+  if (typeof toolContext === "object" && toolContext !== null && key in toolContext) {
+    return (toolContext as Record<string, unknown>)[key]
+  }
+  return undefined
+}
+
 function isCouncilConfigured(councilConfig: CouncilConfig | undefined): councilConfig is CouncilConfig {
   return Boolean(councilConfig && councilConfig.members.length > 0)
 }
@@ -27,7 +34,10 @@ export function filterCouncilMembers(
   selectedNames: string[] | undefined
 ): FilterCouncilMembersResult {
   if (!selectedNames || selectedNames.length === 0) {
-    return { members }
+    return {
+      members: [],
+      error: buildSingleMemberSelectionError(members),
+    }
   }
 
   const memberLookup = new Map<string, CouncilMemberConfig>()
@@ -59,10 +69,17 @@ export function filterCouncilMembers(
   })
 
   if (unresolved.length > 0) {
-    const availableNames = members.map((member) => member.name ?? member.model).join(", ")
+    const availableDescriptions = members
+      .map((member) => {
+        if (member.name) {
+          return `${member.name} (${member.model})`
+        }
+        return member.model
+      })
+      .join(", ")
     return {
       members: [],
-      error: `Unknown council members: ${unresolved.join(", ")}. Available members: ${availableNames}.`,
+      error: `Unknown council members: ${unresolved.join(", ")}. Available: ${availableDescriptions}.`,
     }
   }
 
@@ -95,7 +112,7 @@ export function createAthenaCouncilTool(args: {
     },
     async execute(toolArgs: AthenaCouncilToolArgs, toolContext) {
       if (!isCouncilConfigured(councilConfig)) {
-        return "Athena council not configured. Add agents.athena.council.members to your config."
+        return "Athena council is not configured. Add council members to agents.athena.council.members in .opencode/oh-my-opencode.jsonc."
       }
 
       const filteredMembers = filterCouncilMembers(councilConfig.members, toolArgs.members)
@@ -124,11 +141,11 @@ export function createAthenaCouncilTool(args: {
       const launchedMemberModel = launched?.member.model ?? "unknown"
       const launchedTaskId = launched?.taskId ?? "unknown"
 
-      const sessionInfos = await waitForCouncilSessions(execution.launched, backgroundManager, toolContext.abort)
-      const launchedSession = sessionInfos.find((session) => session.taskId === launchedTaskId)
+      const waitResult = await waitForCouncilSessions(execution.launched, backgroundManager, toolContext.abort)
+      const launchedSession = waitResult.sessions.find((session) => session.taskId === launchedTaskId)
       const sessionId = launchedSession?.sessionId ?? "pending"
 
-      const metadataFn = (toolContext as Record<string, unknown>).metadata as
+      const metadataFn = getToolContextProperty(toolContext, "metadata") as
         | ((input: { title?: string; metadata?: Record<string, unknown> }) => Promise<void>)
         | undefined
       if (metadataFn) {
@@ -141,11 +158,15 @@ export function createAthenaCouncilTool(args: {
             description: `Council member: ${launchedMemberName}`,
           },
         }
-        await metadataFn(memberMetadata)
+        try {
+          await metadataFn(memberMetadata)
 
-        const callID = (toolContext as Record<string, unknown>).callID
-        if (typeof callID === "string") {
-          storeToolMetadata(toolContext.sessionID, callID, memberMetadata)
+          const callID = getToolContextProperty(toolContext, "callID")
+          if (typeof callID === "string") {
+            storeToolMetadata(toolContext.sessionID, callID, memberMetadata)
+          }
+        } catch {
+          // Metadata storage is best-effort — don't mask successful council launch
         }
       }
 

@@ -39,16 +39,20 @@ function createRunningTask(id: string, sessionID = `ses-${id}`): BackgroundTask 
 }
 
 describe("filterCouncilMembers", () => {
-  test("returns all members when selection is undefined", () => {
+  test("returns selection error when selection is undefined", () => {
     const result = filterCouncilMembers(configuredMembers, undefined)
-    expect(result.members).toEqual(configuredMembers)
-    expect(result.error).toBeUndefined()
+    expect(result.members).toEqual([])
+    expect(result.error).toBe(
+      "athena_council runs one member per call. Pass exactly one member in members (single-item array). Available members: Claude, GPT, google/gemini-3-pro."
+    )
   })
 
-  test("returns all members when selection is empty", () => {
+  test("returns selection error when selection is empty", () => {
     const result = filterCouncilMembers(configuredMembers, [])
-    expect(result.members).toEqual(configuredMembers)
-    expect(result.error).toBeUndefined()
+    expect(result.members).toEqual([])
+    expect(result.error).toBe(
+      "athena_council runs one member per call. Pass exactly one member in members (single-item array). Available members: Claude, GPT, google/gemini-3-pro."
+    )
   })
 
   test("filters members using case-insensitive name and model matching", () => {
@@ -61,7 +65,7 @@ describe("filterCouncilMembers", () => {
     const result = filterCouncilMembers(configuredMembers, ["mistral", "xai/grok-3"])
     expect(result.members).toEqual([])
     expect(result.error).toBe(
-      "Unknown council members: mistral, xai/grok-3. Available members: Claude, GPT, google/gemini-3-pro."
+      "Unknown council members: mistral, xai/grok-3. Available: Claude (anthropic/claude-sonnet-4-5), GPT (openai/gpt-5.3-codex), google/gemini-3-pro."
     )
   })
 
@@ -81,7 +85,7 @@ describe("createAthenaCouncilTool", () => {
 
     const result = await athenaCouncilTool.execute({ question: "How should we proceed?" }, mockToolContext)
 
-    expect(result).toBe("Athena council not configured. Add agents.athena.council.members to your config.")
+    expect(result).toBe("Athena council is not configured. Add council members to agents.athena.council.members in .opencode/oh-my-opencode.jsonc.")
   })
 
   test("returns error when councilConfig has empty members", async () => {
@@ -92,7 +96,7 @@ describe("createAthenaCouncilTool", () => {
 
     const result = await athenaCouncilTool.execute({ question: "Any concerns?" }, mockToolContext)
 
-    expect(result).toBe("Athena council not configured. Add agents.athena.council.members to your config.")
+    expect(result).toBe("Athena council is not configured. Add council members to agents.athena.council.members in .opencode/oh-my-opencode.jsonc.")
   })
 
   test("returns helpful error when members contains invalid names", async () => {
@@ -106,7 +110,7 @@ describe("createAthenaCouncilTool", () => {
       mockToolContext
     )
 
-    expect(result).toBe("Unknown council members: unknown-model. Available members: Claude, GPT, google/gemini-3-pro.")
+    expect(result).toBe("Unknown council members: unknown-model. Available: Claude (anthropic/claude-sonnet-4-5), GPT (openai/gpt-5.3-codex), google/gemini-3-pro.")
   })
 
   test("returns selection error when members are omitted", async () => {
