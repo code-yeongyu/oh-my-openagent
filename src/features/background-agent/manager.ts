@@ -14,6 +14,7 @@ import {
   promptWithModelSuggestionRetry,
   resolveInheritedPromptTools,
 } from "../../shared"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
@@ -1296,10 +1297,11 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         }
 
         tools = resolveInheritedPromptTools(task.parentSessionID, tools)
+        const promptAgent = normalizeAgentForPrompt(agent)
 
         log("[background-agent] notifyParentSession context:", {
           taskId: task.id,
-          resolvedAgent: agent,
+          resolvedAgent: promptAgent,
           resolvedModel: model,
         })
 
@@ -1308,7 +1310,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             path: { id: task.parentSessionID },
             body: {
               noReply: !allComplete,
-              ...(agent !== undefined ? { agent } : {}),
+              ...(promptAgent !== undefined ? { agent: promptAgent } : {}),
               ...(model !== undefined ? { model } : {}),
               ...(tools ? { tools } : {}),
               parts: [{ type: "text", text: notification }],

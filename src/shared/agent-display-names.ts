@@ -54,3 +54,31 @@ export function getAgentConfigKey(agentName: string): string {
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
   return lower
 }
+
+/**
+ * Normalize an agent name for prompt APIs.
+ * - Known display names -> canonical display names
+ * - Known config keys (any case) -> canonical display names
+ * - Unknown/custom names -> preserved as-is (trimmed)
+ */
+export function normalizeAgentForPrompt(agentName: string | undefined): string | undefined {
+  if (typeof agentName !== "string") {
+    return undefined
+  }
+
+  const trimmed = agentName.trim()
+  if (!trimmed) {
+    return undefined
+  }
+
+  const lower = trimmed.toLowerCase()
+  const reversed = REVERSE_DISPLAY_NAMES[lower]
+  if (reversed !== undefined) {
+    return AGENT_DISPLAY_NAMES[reversed] ?? trimmed
+  }
+  if (AGENT_DISPLAY_NAMES[lower] !== undefined) {
+    return AGENT_DISPLAY_NAMES[lower]
+  }
+
+  return trimmed
+}

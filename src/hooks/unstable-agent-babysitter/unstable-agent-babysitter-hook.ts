@@ -1,5 +1,6 @@
 import type { BackgroundManager } from "../../features/background-agent"
 import { getMainSessionID, getSessionAgent } from "../../features/claude-code-session-state"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { resolveInheritedPromptTools } from "../../shared"
 import {
@@ -80,7 +81,7 @@ async function resolveMainSessionTarget(
     log(`[${HOOK_NAME}] Failed to resolve main session agent`, { sessionID, error: String(error) })
   }
 
-  return { agent, model, tools: resolveInheritedPromptTools(sessionID, tools) }
+  return { agent: normalizeAgentForPrompt(agent), model, tools: resolveInheritedPromptTools(sessionID, tools) }
 }
 
 async function getThinkingSummary(ctx: BabysitterContext, sessionID: string): Promise<string | null> {

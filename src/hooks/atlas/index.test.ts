@@ -997,7 +997,7 @@ describe("atlas hook", () => {
        // then - should call prompt for sisyphus
        expect(mockInput._promptMock).toHaveBeenCalled()
        const callArgs = mockInput._promptMock.mock.calls[0][0]
-       expect(callArgs.body.agent).toBe("sisyphus")
+       expect(callArgs.body.agent).toBe("Sisyphus (Ultraworker)")
      })
 
     test("should debounce rapid continuation injections (prevent infinite loop)", async () => {

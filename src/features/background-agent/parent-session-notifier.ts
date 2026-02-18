@@ -6,6 +6,7 @@ import { getTaskToastManager } from "../task-toast-manager"
 import { formatDuration } from "./duration-formatter"
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
 import { resolveParentSessionAgentAndModel } from "./parent-session-context-resolver"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 
 export async function notifyParentSession(
   task: BackgroundTask,
@@ -57,10 +58,11 @@ export async function notifyParentSession(
   })
 
   const { agent, model, tools } = await resolveParentSessionAgentAndModel({ client, task })
+  const promptAgent = normalizeAgentForPrompt(agent)
 
   log("[background-agent] notifyParentSession context:", {
     taskId: task.id,
-    resolvedAgent: agent,
+    resolvedAgent: promptAgent,
     resolvedModel: model,
   })
 
@@ -69,7 +71,7 @@ export async function notifyParentSession(
       path: { id: task.parentSessionID },
       body: {
         noReply: !allComplete,
-        ...(agent !== undefined ? { agent } : {}),
+        ...(promptAgent !== undefined ? { agent: promptAgent } : {}),
         ...(model !== undefined ? { model } : {}),
         ...(tools ? { tools } : {}),
         parts: [{ type: "text", text: notification }],

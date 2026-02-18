@@ -1,4 +1,5 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 import type { MessageData, ResumeConfig } from "./types"
 import { resolveInheritedPromptTools } from "../../shared"
 
@@ -25,13 +26,15 @@ export function extractResumeConfig(userMessage: MessageData | undefined, sessio
 }
 
 export async function resumeSession(client: Client, config: ResumeConfig): Promise<boolean> {
+  const promptAgent = normalizeAgentForPrompt(config.agent)
+
   try {
     const inheritedTools = resolveInheritedPromptTools(config.sessionID, config.tools)
     await client.session.promptAsync({
       path: { id: config.sessionID },
       body: {
         parts: [{ type: "text", text: RECOVERY_RESUME_TEXT }],
-        agent: config.agent,
+        ...(promptAgent ? { agent: promptAgent } : {}),
         model: config.model,
         ...(inheritedTools ? { tools: inheritedTools } : {}),
       },

@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { resolveInheritedPromptTools } from "../../shared"
 import { HOOK_NAME } from "./hook-name"
@@ -40,6 +41,7 @@ export async function injectBoulderContinuation(input: {
   const prompt =
     BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
     `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]`
+  const promptAgent = normalizeAgentForPrompt(agent ?? "atlas") ?? "atlas"
 
   try {
     log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
@@ -50,7 +52,7 @@ export async function injectBoulderContinuation(input: {
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
-        agent: agent ?? "atlas",
+        agent: promptAgent,
         ...(promptContext.model !== undefined ? { model: promptContext.model } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [{ type: "text", text: prompt }],

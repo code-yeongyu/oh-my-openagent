@@ -3,6 +3,7 @@ import type { BackgroundTask } from "./types"
 import { findNearestMessageWithFields } from "../hook-message-injector"
 import { getMessageDir } from "../../shared"
 import { normalizePromptTools, resolveInheritedPromptTools } from "../../shared"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 
 type AgentModel = { providerID: string; modelID: string }
 
@@ -77,5 +78,5 @@ export async function resolveParentSessionAgentAndModel(input: {
     tools = normalizePromptTools(currentMessage?.tools) ?? tools
   }
 
-  return { agent, model, tools: resolveInheritedPromptTools(task.parentSessionID, tools) }
+  return { agent: normalizeAgentForPrompt(agent), model, tools: resolveInheritedPromptTools(task.parentSessionID, tools) }
 }

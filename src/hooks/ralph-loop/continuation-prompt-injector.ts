@@ -4,6 +4,7 @@ import { findNearestMessageWithFields } from "../../features/hook-message-inject
 import { getMessageDir } from "./message-storage-directory"
 import { withTimeout } from "./with-timeout"
 import { normalizeSDKResponse, resolveInheritedPromptTools } from "../../shared"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 
 type MessageInfo = {
 	agent?: string
@@ -57,11 +58,12 @@ export async function injectContinuationPrompt(
 	}
 
 	const inheritedTools = resolveInheritedPromptTools(options.sessionID, tools)
+	const promptAgent = normalizeAgentForPrompt(agent)
 
 	await ctx.client.session.promptAsync({
 		path: { id: options.sessionID },
 		body: {
-			...(agent !== undefined ? { agent } : {}),
+			...(promptAgent ? { agent: promptAgent } : {}),
 			...(model !== undefined ? { model } : {}),
 			...(inheritedTools ? { tools: inheritedTools } : {}),
 			parts: [{ type: "text", text: options.prompt }],
