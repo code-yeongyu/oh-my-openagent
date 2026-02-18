@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
-import { normalizeSDKResponse } from "../../shared"
+import { normalizeSDKResponse, resolveInheritedPromptTools } from "../../shared"
 import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
@@ -136,11 +136,14 @@ ${todoList}`
       incompleteCount: freshIncompleteCount,
     })
 
+    const inheritedTools = resolveInheritedPromptTools(sessionID, tools)
+
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
         agent: agentName,
         ...(model !== undefined ? { model } : {}),
+        ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [{ type: "text", text: prompt }],
       },
       query: { directory: ctx.directory },

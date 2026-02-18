@@ -1,9 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 import { log } from "../../shared/logger"
+import { resolveInheritedPromptTools } from "../../shared"
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
-import { resolveRecentModelForSession } from "./recent-model-resolver"
+import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
 import type { SessionState } from "./types"
 
 export async function injectBoulderContinuation(input: {
@@ -43,13 +44,15 @@ export async function injectBoulderContinuation(input: {
   try {
     log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
 
-    const model = await resolveRecentModelForSession(ctx, sessionID)
+    const promptContext = await resolveRecentPromptContextForSession(ctx, sessionID)
+    const inheritedTools = resolveInheritedPromptTools(sessionID, promptContext.tools)
 
     await ctx.client.session.promptAsync({
       path: { id: sessionID },
       body: {
         agent: agent ?? "atlas",
-        ...(model !== undefined ? { model } : {}),
+        ...(promptContext.model !== undefined ? { model: promptContext.model } : {}),
+        ...(inheritedTools ? { tools: inheritedTools } : {}),
         parts: [{ type: "text", text: prompt }],
       },
       query: { directory: ctx.directory },
