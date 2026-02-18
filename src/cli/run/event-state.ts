@@ -39,6 +39,10 @@ export interface EventState {
   thinkingAtLineStart: boolean
   /** Current assistant message ID — prevents counter resets on repeated message.updated for same message */
   currentMessageId: string | null
+  /** Assistant message start timestamp by message ID */
+  messageStartedAtById: Record<string, number>
+  /** Prevent duplicate completion metadata lines per message */
+  completionMetaPrintedByMessageId: Record<string, boolean>
 }
 
 export function createEventState(): EventState {
@@ -66,5 +70,7 @@ export function createEventState(): EventState {
     textAtLineStart: true,
     thinkingAtLineStart: false,
     currentMessageId: null,
+    messageStartedAtById: {},
+    completionMetaPrintedByMessageId: {},
   }
 }
