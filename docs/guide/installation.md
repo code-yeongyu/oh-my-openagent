@@ -68,6 +68,15 @@ Ask the user these questions to determine CLI options:
 
 **Provider Priority**: Native (anthropic/, openai/, google/) > GitHub Copilot > OpenCode Zen > Z.ai Coding Plan
 
+#### Claude Subscription Model Assignments
+
+| Subscription | Sisyphus (Daily) | Ultrawork Mode |
+| ------------ | ---------------- | -------------- |
+| **max20** | `anthropic/claude-opus-4-6` (max) | Already on Opus — no override |
+| **standard** | `anthropic/claude-sonnet-4-6` (max) | `anthropic/claude-opus-4-6` (max) |
+
+Standard Claude subscribers use Sonnet 4.6 for daily driving and automatically switch to Opus 4.6 when ultrawork mode is activated (by typing `ultrawork` or `ulw`).
+
 MUST STRONGLY WARNING, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALLY.
 
 ### Step 1: Install OpenCode (if not installed)
