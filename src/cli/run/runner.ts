@@ -91,6 +91,9 @@ export async function run(options: RunOptions): Promise<number> {
         path: { id: sessionID },
         body: {
           agent: resolvedAgent,
+          tools: {
+            question: false,
+          },
           parts: [{ type: "text", text: message }],
         },
         query: { directory },
