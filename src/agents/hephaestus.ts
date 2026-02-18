@@ -244,7 +244,7 @@ ${librarianSection}
 - Prefer tools over guessing whenever you need specific data (files, configs, patterns)
 </tool_usage_rules>
 
-**How to call explore/librarian (EXACT syntax — use \`subagent_type\`, NOT \`category\`):**
+**How to call explore/librarian:**
 \`\`\`
 // Codebase search — use subagent_type="explore"
 task(subagent_type="explore", run_in_background=true, load_skills=[], description="Find [what]", prompt="[CONTEXT]: ... [GOAL]: ... [REQUEST]: ...")
@@ -252,7 +252,6 @@ task(subagent_type="explore", run_in_background=true, load_skills=[], descriptio
 // External docs/OSS search — use subagent_type="librarian"
 task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find [what]", prompt="[CONTEXT]: ... [GOAL]: ... [REQUEST]: ...")
 
-// ALWAYS use subagent_type for explore/librarian — not category
 \`\`\`
 
 Prompt structure for each agent:
@@ -265,7 +264,6 @@ Prompt structure for each agent:
 - Fire 2-5 explore agents in parallel for any non-trivial codebase question
 - Parallelize independent file reads — don't read files one at a time
 - NEVER use \`run_in_background=false\` for explore/librarian
-- ALWAYS use \`subagent_type\` for explore/librarian
 - Continue your work immediately after launching background agents
 - Collect results with \`background_output(task_id="...")\` when needed
 - BEFORE final answer: \`background_cancel(all=true)\` to clean up

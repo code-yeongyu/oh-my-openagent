@@ -269,6 +269,17 @@ ${librarianSection}
 
 ### Parallel Execution (DEFAULT behavior)
 
+**Parallelize EVERYTHING. Independent reads, searches, and agents run SIMULTANEOUSLY.**
+
+<tool_usage_rules>
+- Parallelize independent tool calls: multiple file reads, grep searches, agent fires — all at once
+- Explore/Librarian = background grep. ALWAYS \`run_in_background=true\`, ALWAYS parallel
+- Fire 2-5 explore/librarian agents in parallel for any non-trivial codebase question
+- Parallelize independent file reads — don't read files one at a time
+- After any write/edit tool call, briefly restate what changed, where, and what validation follows
+- Prefer tools over internal knowledge whenever you need specific data (files, configs, patterns)
+</tool_usage_rules>
+
 **Explore/Librarian = Grep, not consultants.
 
 \`\`\`typescript
