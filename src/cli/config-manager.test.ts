@@ -240,7 +240,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
 })
 
 describe("generateOmoConfig - model fallback system", () => {
-  test("generates native sonnet models when Claude standard subscription", () => {
+  test("generates sonnet model with ultrawork opus for Claude standard subscription", () => {
     // #given user has Claude standard subscription (not max20)
     const config: InstallConfig = {
       hasClaude: true,
@@ -256,13 +256,15 @@ describe("generateOmoConfig - model fallback system", () => {
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then Sisyphus uses Claude (OR logic - at least one provider available)
+    // #then Sisyphus uses sonnet for daily driving with ultrawork opus override
+    const sisyphus = (result.agents as Record<string, { model: string; variant?: string; ultrawork?: { model: string; variant?: string } }>).sisyphus
     expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
-    expect(result.agents).toBeDefined()
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-6")
+    expect(sisyphus.model).toBe("anthropic/claude-sonnet-4-6")
+    expect(sisyphus.variant).toBe("max")
+    expect(sisyphus.ultrawork).toEqual({ model: "anthropic/claude-opus-4-6", variant: "max" })
   })
 
-  test("generates native opus models when Claude max20 subscription", () => {
+  test("generates native opus models without ultrawork when Claude max20 subscription", () => {
     // #given user has Claude max20 subscription
     const config: InstallConfig = {
       hasClaude: true,
@@ -278,8 +280,10 @@ describe("generateOmoConfig - model fallback system", () => {
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then Sisyphus uses Claude (OR logic - at least one provider available)
-    expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-6")
+    // #then Sisyphus uses opus directly, no ultrawork override needed
+    const sisyphus = (result.agents as Record<string, { model: string; ultrawork?: unknown }>).sisyphus
+    expect(sisyphus.model).toBe("anthropic/claude-opus-4-6")
+    expect(sisyphus.ultrawork).toBeUndefined()
   })
 
   test("uses github-copilot sonnet fallback when only copilot available", () => {

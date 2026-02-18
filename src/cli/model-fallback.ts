@@ -75,6 +75,16 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       if (req.requiresAnyModel && !isAnyFallbackEntryAvailable(fallbackChain, avail)) {
         continue
       }
+
+      if (avail.native.claude && !avail.isMaxPlan) {
+        agents[role] = {
+          model: "anthropic/claude-sonnet-4-6",
+          variant: "max",
+          ultrawork: { model: "anthropic/claude-opus-4-6", variant: "max" },
+        }
+        continue
+      }
+
       const resolved = resolveModelFromChain(fallbackChain, avail)
       if (resolved) {
         const variant = resolved.variant ?? req.variant
