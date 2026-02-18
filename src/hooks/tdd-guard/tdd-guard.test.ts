@@ -375,6 +375,8 @@ describe("TDD Guard Hook", () => {
       // #then - should block and inject skill
       expect(output.blocked).toBe(true)
       expect(output.message).toContain("TDD Guard")
+      expect(output.message).toContain("Suggested failing test starter")
+      expect(output.message).toContain("src/utils/helper.test.ts")
       expect(output.messages?.length).toBeGreaterThan(0)
       expect(output.messages?.[0].content).toContain("TDD SKILL")
     })

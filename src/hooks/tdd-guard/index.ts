@@ -10,6 +10,7 @@
  * - chat.message (UserPromptSubmit): Handle /tdd on|off commands
  */
 
+import { isAbsolute, join, relative } from "node:path"
 import type { TddGuardConfig } from "./types"
 import { DEFAULT_TDD_GUARD_CONFIG, EXEMPTION_PATTERNS } from "./constants"
 import { determineRiskTier, shouldBlockEdit, matchesIgnorePattern } from "./risk-validator"
@@ -17,6 +18,7 @@ import { isTestFile } from "./language-adapter"
 import { FileStorage } from "./storage"
 import { UserPromptHandler, SessionHandler, PostToolLintHandler } from "./handlers"
 import { executeTests } from "./test-executor"
+import { generateTestTemplate } from "./template-generator"
 
 // Inline TDD skill content (loaded at module init, fallback if external file not found)
 const TDD_SKILL_CONTENT = `# TDD Workflow (Auto-Injected)
@@ -106,6 +108,32 @@ function cleanupOldPendingCalls(): void {
       pendingCalls.delete(callID)
     }
   }
+}
+
+function generateTemplateGuidance(filePath: string, cwd: string): string {
+  const sourceFilePath = isAbsolute(filePath) ? filePath : join(cwd, filePath)
+  const templateResult = generateTestTemplate({ sourceFile: sourceFilePath })
+  const relativeTestPath = relative(cwd, templateResult.testFilePath)
+  const displayTestPath = (relativeTestPath.length > 0 ? relativeTestPath : templateResult.testFilePath)
+    .replace(/\\/g, "/")
+
+  if (!templateResult.generated || !templateResult.content) {
+    return `
+
+Suggested failing test starter:
+- Test file: ${displayTestPath}
+- Template not generated: ${templateResult.reason ?? "Unavailable"}`
+  }
+
+  return `
+
+Suggested failing test starter:
+- Test file: ${displayTestPath}
+- Start with this template, then make it fail first:
+
+\`\`\`typescript
+${templateResult.content.trim()}
+\`\`\``
 }
 
 /**
@@ -255,6 +283,8 @@ export function createTddGuardHook(
       const blockResult = shouldBlockEdit(tier, hasFailingTest, hasExemption)
 
       if (blockResult.blocked) {
+        const templateGuidance = generateTemplateGuidance(filePath, ctx.cwd)
+
         // Mark as blocked
         output.blocked = true
         output.message = `[TDD Guard] ${blockResult.reason}
@@ -264,7 +294,7 @@ Risk Tier: ${tier.tier} (${tier.description})
 
 To proceed:
 1. Write a failing test first, OR
-2. Add a TDD-EXEMPT comment (Tier 2 only)`
+2. Add a TDD-EXEMPT comment (Tier 2 only)${templateGuidance}`
 
         // Inject TDD Skill for guidance (if enabled and not already injected for this file)
         if (config.inject_skill_on_block && !checkedFiles.has(filePath)) {
