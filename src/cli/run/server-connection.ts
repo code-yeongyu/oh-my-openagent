@@ -12,6 +12,14 @@ function isPortStartFailure(error: unknown, port: number): boolean {
   return error.message.includes(`Failed to start server on port ${port}`)
 }
 
+function isPortRangeExhausted(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  return error.message.includes("No available port found in range")
+}
+
 async function startServer(options: { signal: AbortSignal, port: number }): Promise<ServerConnection> {
   const { signal, port } = options
   const { client, server } = await withWorkingOpencodePath(() =>
@@ -67,7 +75,27 @@ export async function createServerConnection(options: {
     return { client, cleanup: () => {} }
   }
 
-  const { port: selectedPort, wasAutoSelected } = await getAvailableServerPort(DEFAULT_SERVER_PORT, "127.0.0.1")
+  let selectedPort: number
+  let wasAutoSelected: boolean
+  try {
+    const selected = await getAvailableServerPort(DEFAULT_SERVER_PORT, "127.0.0.1")
+    selectedPort = selected.port
+    wasAutoSelected = selected.wasAutoSelected
+  } catch (error) {
+    if (!isPortRangeExhausted(error)) {
+      throw error
+    }
+
+    const defaultPortIsAvailable = await isPortAvailable(DEFAULT_SERVER_PORT, "127.0.0.1")
+    if (defaultPortIsAvailable) {
+      throw error
+    }
+
+    console.log(pc.dim("Port range exhausted, attaching to existing server on"), pc.cyan(DEFAULT_SERVER_PORT.toString()))
+    const client = createOpencodeClient({ baseUrl: `http://127.0.0.1:${DEFAULT_SERVER_PORT}` })
+    return { client, cleanup: () => {} }
+  }
+
   if (wasAutoSelected) {
     console.log(pc.dim("Auto-selected port"), pc.cyan(selectedPort.toString()))
   } else {

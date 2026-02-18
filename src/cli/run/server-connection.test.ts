@@ -177,6 +177,28 @@ describe("createServerConnection", () => {
     expect(mockServerClose).toHaveBeenCalledTimes(1)
   })
 
+  it("auto mode attaches to default server when port range is exhausted", async () => {
+    // given
+    const signal = new AbortController().signal
+    mockGetAvailableServerPort.mockRejectedValueOnce(
+      new Error("No available port found in range 4097-4116"),
+    )
+    mockIsPortAvailable.mockResolvedValueOnce(false)
+
+    // when
+    const result = await createServerConnection({ signal })
+
+    // then
+    expect(mockGetAvailableServerPort).toHaveBeenCalledWith(4096, "127.0.0.1")
+    expect(mockIsPortAvailable).toHaveBeenCalledWith(4096, "127.0.0.1")
+    expect(mockCreateOpencodeClient).toHaveBeenCalledWith({
+      baseUrl: "http://127.0.0.1:4096",
+    })
+    expect(mockCreateOpencode).not.toHaveBeenCalled()
+    result.cleanup()
+    expect(mockServerClose).not.toHaveBeenCalled()
+  })
+
   it("invalid port throws error", async () => {
     // given
     const signal = new AbortController().signal
