@@ -1,10 +1,12 @@
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared"
+import type { PluginContext } from "./types"
 
 type ChatHeadersInput = {
+  sessionID: string
   provider: { id: string }
   message: {
-    info?: { role?: string }
-    parts?: Array<{ type?: string; text?: string; synthetic?: boolean }>
+    id?: string
+    role?: string
   }
 }
 
@@ -19,28 +21,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function buildChatHeadersInput(raw: unknown): ChatHeadersInput | null {
   if (!isRecord(raw)) return null
 
+  const sessionID = raw.sessionID
   const provider = raw.provider
   const message = raw.message
 
+  if (typeof sessionID !== "string") return null
   if (!isRecord(provider) || typeof provider.id !== "string") return null
   if (!isRecord(message)) return null
 
-  const info = isRecord(message.info) ? message.info : undefined
-  const rawParts = Array.isArray(message.parts) ? message.parts : undefined
-
-  const parts = rawParts
-    ?.filter(isRecord)
-    .map((part) => ({
-      type: typeof part.type === "string" ? part.type : undefined,
-      text: typeof part.text === "string" ? part.text : undefined,
-      synthetic: part.synthetic === true,
-    }))
-
   return {
+    sessionID,
     provider: { id: provider.id },
     message: {
-      info: info ? { role: typeof info.role === "string" ? info.role : undefined } : undefined,
-      parts,
+      id: typeof message.id === "string" ? message.id : undefined,
+      role: typeof message.role === "string" ? message.role : undefined,
     },
   }
 }
@@ -57,28 +51,53 @@ function isCopilotProvider(providerID: string): boolean {
   return providerID === "github-copilot" || providerID === "github-copilot-enterprise"
 }
 
-function isOmoInternalMessage(input: ChatHeadersInput): boolean {
-  if (input.message.info?.role !== "user") {
+async function hasInternalMarker(
+  client: PluginContext["client"],
+  sessionID: string,
+  messageID: string,
+): Promise<boolean> {
+  try {
+    const response = await client.session.message({
+      path: { id: sessionID, messageID },
+    })
+
+    const data = response.data
+    if (!isRecord(data) || !Array.isArray(data.parts)) return false
+
+    return data.parts.some((part) => {
+      if (!isRecord(part) || part.type !== "text" || typeof part.text !== "string") {
+        return false
+      }
+
+      return part.text.includes(OMO_INTERNAL_INITIATOR_MARKER)
+    })
+  } catch {
+    return false
+  }
+}
+
+async function isOmoInternalMessage(input: ChatHeadersInput, client: PluginContext["client"]): Promise<boolean> {
+  if (input.message.role !== "user") {
     return false
   }
 
-  return input.message.parts?.some((part) => {
-    if (part.type !== "text" || !part.text || part.synthetic !== true) {
-      return false
-    }
+  if (!input.message.id) {
+    return false
+  }
 
-    return part.text.includes(OMO_INTERNAL_INITIATOR_MARKER)
-  }) ?? false
+  return hasInternalMarker(client, input.sessionID, input.message.id)
 }
 
-export function createChatHeadersHandler(): (input: unknown, output: unknown) => Promise<void> {
+export function createChatHeadersHandler(args: { ctx: PluginContext }): (input: unknown, output: unknown) => Promise<void> {
+  const { ctx } = args
+
   return async (input, output): Promise<void> => {
     const normalizedInput = buildChatHeadersInput(input)
     if (!normalizedInput) return
     if (!isChatHeadersOutput(output)) return
 
     if (!isCopilotProvider(normalizedInput.provider.id)) return
-    if (!isOmoInternalMessage(normalizedInput)) return
+    if (!(await isOmoInternalMessage(normalizedInput, ctx.client))) return
 
     output.headers["x-initiator"] = "agent"
   }

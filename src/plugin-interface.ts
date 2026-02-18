@@ -36,7 +36,7 @@ export function createPluginInterface(args: {
       await handler(input, output)
     },
 
-    "chat.headers": createChatHeadersHandler(),
+    "chat.headers": createChatHeadersHandler({ ctx }),
 
     "chat.message": createChatMessageHandler({
       ctx,
