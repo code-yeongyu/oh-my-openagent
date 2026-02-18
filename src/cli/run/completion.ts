@@ -12,7 +12,7 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
 
     if (continuationState.hasActiveHookMarker) {
       const reason = continuationState.activeHookMarkerReason ?? "continuation hook is active"
-      console.log(pc.dim(`  Waiting: ${reason}`))
+      logWaiting(ctx, reason)
       return false
     }
 
@@ -24,7 +24,7 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
       return false
     }
 
-    if (!areContinuationHooksIdle(continuationState)) {
+    if (!areContinuationHooksIdle(ctx, continuationState)) {
       return false
     }
 
@@ -35,14 +35,17 @@ export async function checkCompletionConditions(ctx: RunContext): Promise<boolea
   }
 }
 
-function areContinuationHooksIdle(continuationState: ContinuationState): boolean {
+function areContinuationHooksIdle(
+  ctx: RunContext,
+  continuationState: ContinuationState
+): boolean {
   if (continuationState.hasActiveBoulder) {
-    console.log(pc.dim("  Waiting: boulder continuation is active"))
+    logWaiting(ctx, "boulder continuation is active")
     return false
   }
 
   if (continuationState.hasActiveRalphLoop) {
-    console.log(pc.dim("  Waiting: ralph-loop continuation is active"))
+    logWaiting(ctx, "ralph-loop continuation is active")
     return false
   }
 
@@ -61,7 +64,7 @@ async function areAllTodosComplete(ctx: RunContext): Promise<boolean> {
   )
 
   if (incompleteTodos.length > 0) {
-    console.log(pc.dim(`  Waiting: ${incompleteTodos.length} todos remaining`))
+    logWaiting(ctx, `${incompleteTodos.length} todos remaining`)
     return false
   }
 
@@ -96,9 +99,7 @@ async function areAllDescendantsIdle(
   for (const child of children) {
     const status = allStatuses[child.id]
     if (status && status.type !== "idle") {
-      console.log(
-        pc.dim(`  Waiting: session ${child.id.slice(0, 8)}... is ${status.type}`)
-      )
+      logWaiting(ctx, `session ${child.id.slice(0, 8)}... is ${status.type}`)
       return false
     }
 
@@ -113,4 +114,12 @@ async function areAllDescendantsIdle(
   }
 
   return true
+}
+
+function logWaiting(ctx: RunContext, message: string): void {
+  if (!ctx.verbose) {
+    return
+  }
+
+  console.log(pc.dim(`  Waiting: ${message}`))
 }
