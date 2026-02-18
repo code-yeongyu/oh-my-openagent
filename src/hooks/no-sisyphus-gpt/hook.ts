@@ -1,8 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { isGptModel } from "../../agents/types"
-import { getSessionAgent } from "../../features/claude-code-session-state"
+import { getSessionAgent, updateSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
-import { getAgentConfigKey } from "../../shared/agent-display-names"
+import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
 
 const TOAST_TITLE = "NEVER Use Sisyphus with GPT"
 const TOAST_MESSAGE = [
@@ -11,6 +11,7 @@ const TOAST_MESSAGE = [
   "You are literally burning money.",
   "Use Hephaestus for GPT models instead.",
 ].join("\n")
+const HEPHAESTUS_DISPLAY = getAgentDisplayName("hephaestus")
 
 function showToast(ctx: PluginInput, sessionID: string): void {
   ctx.client.tui.showToast({
@@ -21,19 +22,21 @@ function showToast(ctx: PluginInput, sessionID: string): void {
       duration: 10000,
     },
   }).catch((error) => {
-    log("[sisyphus-gpt-hephaestus-reminder] Failed to show toast", {
+    log("[no-sisyphus-gpt] Failed to show toast", {
       sessionID,
       error,
     })
   })
 }
 
-export function createSisyphusGptHephaestusReminderHook(ctx: PluginInput) {
+export function createNoSisyphusGptHook(ctx: PluginInput) {
   return {
     "chat.message": async (input: {
       sessionID: string
       agent?: string
       model?: { providerID: string; modelID: string }
+    }, output?: {
+      message?: { agent?: string; [key: string]: unknown }
     }): Promise<void> => {
       const rawAgent = input.agent ?? getSessionAgent(input.sessionID) ?? ""
       const agentKey = getAgentConfigKey(rawAgent)
@@ -41,6 +44,11 @@ export function createSisyphusGptHephaestusReminderHook(ctx: PluginInput) {
 
       if (agentKey === "sisyphus" && modelID && isGptModel(modelID)) {
         showToast(ctx, input.sessionID)
+        input.agent = HEPHAESTUS_DISPLAY
+        if (output?.message) {
+          output.message.agent = HEPHAESTUS_DISPLAY
+        }
+        updateSessionAgent(input.sessionID, HEPHAESTUS_DISPLAY)
       }
     },
   }
