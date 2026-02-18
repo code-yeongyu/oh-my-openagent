@@ -284,18 +284,18 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("anthropic")
   })
 
-  test("unspecified-low has valid fallbackChain with claude-sonnet-4-5 as primary", () => {
+  test("unspecified-low has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
     // given - unspecified-low category requirement
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
     // when - accessing unspecified-low requirement
-    // then - fallbackChain exists with claude-sonnet-4-5 as first entry
+    // then - fallbackChain exists with claude-sonnet-4-6 as first entry
     expect(unspecifiedLow).toBeDefined()
     expect(unspecifiedLow.fallbackChain).toBeArray()
     expect(unspecifiedLow.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = unspecifiedLow.fallbackChain[0]
-    expect(primary.model).toBe("claude-sonnet-4-5")
+    expect(primary.model).toBe("claude-sonnet-4-6")
     expect(primary.providers[0]).toBe("anthropic")
   })
 
@@ -336,7 +336,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
     // when - accessing writing requirement
-    // then - fallbackChain: k2p5 → gemini-3-flash → claude-sonnet-4-5
+    // then - fallbackChain: k2p5 → gemini-3-flash → claude-sonnet-4-6
     expect(writing).toBeDefined()
     expect(writing.fallbackChain).toBeArray()
     expect(writing.fallbackChain).toHaveLength(3)

@@ -144,10 +144,10 @@ describe("createAnthropicEffortHook", () => {
     })
 
     it("should NOT inject effort for non-opus model", async () => {
-      //#given claude-sonnet-4-5 (not opus)
+      //#given claude-sonnet-4-6 (not opus)
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({
-        modelID: "claude-sonnet-4-5",
+        modelID: "claude-sonnet-4-6",
       })
 
       //#when chat.params hook is called

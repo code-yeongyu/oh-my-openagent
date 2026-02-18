@@ -75,7 +75,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 50000,
@@ -128,7 +128,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 170000,
@@ -164,7 +164,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "google-vertex-anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 170000,
@@ -202,7 +202,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: { input: 180000, output: 0, reasoning: 0, cache: { read: 10000, write: 0 } },
           },
@@ -241,7 +241,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 170000,
@@ -282,7 +282,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 300000,
@@ -321,7 +321,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 300000,

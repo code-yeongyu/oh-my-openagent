@@ -177,7 +177,7 @@ import type { AgentConfig } from "./types";
 
 export const myAgent: AgentConfig = {
   name: "my-agent",
-  model: "anthropic/claude-sonnet-4-5",
+  model: "anthropic/claude-sonnet-4-6",
   description: "Description of what this agent does",
   prompt: `Your agent's system prompt here`,
   temperature: 0.1,

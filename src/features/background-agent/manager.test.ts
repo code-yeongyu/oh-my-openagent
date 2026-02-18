@@ -827,7 +827,7 @@ describe("BackgroundManager.notifyParentSession - dynamic message lookup", () =>
             {
               info: {
                 agent: "compaction",
-                model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+                model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
               },
             },
           ],

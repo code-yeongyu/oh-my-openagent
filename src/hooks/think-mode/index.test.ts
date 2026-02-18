@@ -83,7 +83,7 @@ describe("createThinkModeHook integration", () => {
         const hook = createThinkModeHook()
         const input = createMockInput(
           "github-copilot",
-          "claude-sonnet-4-5",
+          "claude-sonnet-4-6",
           "think about this"
         )
 
@@ -92,7 +92,7 @@ describe("createThinkModeHook integration", () => {
 
         // then should upgrade to high variant
         const message = input.message as MessageWithInjectedProps
-        expect(input.message.model?.modelID).toBe("claude-sonnet-4-5-high")
+        expect(input.message.model?.modelID).toBe("claude-sonnet-4-6-high")
         expect(message.thinking).toBeDefined()
       })
     })
@@ -201,7 +201,7 @@ describe("createThinkModeHook integration", () => {
       const hook = createThinkModeHook()
       const input = createMockInput(
         "anthropic",
-        "claude-sonnet-4-5",
+        "claude-sonnet-4-6",
         "think about this"
       )
 
@@ -210,7 +210,7 @@ describe("createThinkModeHook integration", () => {
 
       // then should work as before
       const message = input.message as MessageWithInjectedProps
-      expect(input.message.model?.modelID).toBe("claude-sonnet-4-5-high")
+      expect(input.message.model?.modelID).toBe("claude-sonnet-4-6-high")
       expect(message.thinking).toBeDefined()
     })
 
@@ -272,7 +272,7 @@ describe("createThinkModeHook integration", () => {
       const hook = createThinkModeHook()
       const input = createMockInput(
         "amazon-bedrock",
-        "claude-sonnet-4-5",
+        "claude-sonnet-4-6",
         "think"
       )
 
@@ -281,7 +281,7 @@ describe("createThinkModeHook integration", () => {
 
       // then should inject bedrock thinking config
       const message = input.message as MessageWithInjectedProps
-      expect(input.message.model?.modelID).toBe("claude-sonnet-4-5-high")
+      expect(input.message.model?.modelID).toBe("claude-sonnet-4-6-high")
       expect(message.reasoningConfig).toBeDefined()
     })
   })

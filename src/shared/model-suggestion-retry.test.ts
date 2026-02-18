@@ -10,7 +10,7 @@ describe("parseModelSuggestion", () => {
         data: {
           providerID: "anthropic",
           modelID: "claude-sonet-4",
-          suggestions: ["claude-sonnet-4", "claude-sonnet-4-5"],
+          suggestions: ["claude-sonnet-4", "claude-sonnet-4-6"],
         },
       }
 
@@ -115,7 +115,7 @@ describe("parseModelSuggestion", () => {
     it("should parse suggestion from error message string", () => {
       // given an Error with model-not-found message and suggestion
       const error = new Error(
-        "Model not found: anthropic/claude-sonet-4. Did you mean: claude-sonnet-4, claude-sonnet-4-5?"
+        "Model not found: anthropic/claude-sonet-4. Did you mean: claude-sonnet-4, claude-sonnet-4-6?"
       )
 
       // when parsing the error
