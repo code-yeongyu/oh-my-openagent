@@ -52,10 +52,12 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
       // Use getAgentConfigKey to handle display name remapping ("Athena (Council)" → "athena").
       const agentConfigKey = currentAgent ? getAgentConfigKey(currentAgent) : undefined
       if (agentConfigKey === "athena") {
-        log(`[keyword-detector] Skipping all keywords for Athena (council orchestrator)`, {
-          sessionID: input.sessionID,
-          skippedTypes: detectedKeywords.map((k) => k.type),
-        })
+        if (detectedKeywords.length > 0) {
+          log(`[keyword-detector] Skipping keywords for Athena (council orchestrator)`, {
+            sessionID: input.sessionID,
+            skippedTypes: detectedKeywords.map((k) => k.type),
+          })
+        }
         return
       }
 
