@@ -27,7 +27,7 @@ export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
 export { createCategorySkillReminderHook } from "./category-skill-reminder";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
-export { createSisyphusGptHephaestusReminderHook } from "./sisyphus-gpt-hephaestus-reminder";
+export { createNoSisyphusGptHook } from "./no-sisyphus-gpt";
 export { createAutoSlashCommandHook } from "./auto-slash-command";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
 export { createJsonErrorRecoveryHook } from "./json-error-recovery";
