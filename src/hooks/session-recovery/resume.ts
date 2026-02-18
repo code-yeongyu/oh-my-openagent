@@ -1,6 +1,6 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 import type { MessageData, ResumeConfig } from "./types"
-import { resolveInheritedPromptTools } from "../../shared"
+import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../shared"
 
 const RECOVERY_RESUME_TEXT = "[session recovered - continuing previous task]"
 
@@ -30,7 +30,7 @@ export async function resumeSession(client: Client, config: ResumeConfig): Promi
     await client.session.promptAsync({
       path: { id: config.sessionID },
       body: {
-        parts: [{ type: "text", text: RECOVERY_RESUME_TEXT }],
+        parts: [createInternalAgentTextPart(RECOVERY_RESUME_TEXT)],
         agent: config.agent,
         model: config.model,
         ...(inheritedTools ? { tools: inheritedTools } : {}),
