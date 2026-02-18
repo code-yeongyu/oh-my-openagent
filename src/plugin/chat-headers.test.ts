@@ -4,22 +4,34 @@ import { OMO_INTERNAL_INITIATOR_MARKER } from "../shared"
 import { createChatHeadersHandler } from "./chat-headers"
 
 describe("createChatHeadersHandler", () => {
-  test("sets x-initiator=agent for Copilot internal synthetic marker messages", async () => {
-    const handler = createChatHeadersHandler()
+  test("sets x-initiator=agent for Copilot internal marker messages", async () => {
+    const handler = createChatHeadersHandler({
+      ctx: {
+        client: {
+          session: {
+            message: async () => ({
+              data: {
+                parts: [
+                  {
+                    type: "text",
+                    text: `notification\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+                  },
+                ],
+              },
+            }),
+          },
+        },
+      } as never,
+    })
     const output: { headers: Record<string, string> } = { headers: {} }
 
     await handler(
       {
+        sessionID: "ses_1",
         provider: { id: "github-copilot" },
         message: {
-          info: { role: "user" },
-          parts: [
-            {
-              type: "text",
-              text: `notification\n${OMO_INTERNAL_INITIATOR_MARKER}`,
-              synthetic: true,
-            },
-          ],
+          id: "msg_1",
+          role: "user",
         },
       },
       output,
@@ -29,21 +41,33 @@ describe("createChatHeadersHandler", () => {
   })
 
   test("does not override non-copilot providers", async () => {
-    const handler = createChatHeadersHandler()
+    const handler = createChatHeadersHandler({
+      ctx: {
+        client: {
+          session: {
+            message: async () => ({
+              data: {
+                parts: [
+                  {
+                    type: "text",
+                    text: `notification\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+                  },
+                ],
+              },
+            }),
+          },
+        },
+      } as never,
+    })
     const output: { headers: Record<string, string> } = { headers: {} }
 
     await handler(
       {
+        sessionID: "ses_1",
         provider: { id: "openai" },
         message: {
-          info: { role: "user" },
-          parts: [
-            {
-              type: "text",
-              text: `notification\n${OMO_INTERNAL_INITIATOR_MARKER}`,
-              synthetic: true,
-            },
-          ],
+          id: "msg_1",
+          role: "user",
         },
       },
       output,
@@ -53,15 +77,28 @@ describe("createChatHeadersHandler", () => {
   })
 
   test("does not override regular user messages", async () => {
-    const handler = createChatHeadersHandler()
+    const handler = createChatHeadersHandler({
+      ctx: {
+        client: {
+          session: {
+            message: async () => ({
+              data: {
+                parts: [{ type: "text", text: "normal user message" }],
+              },
+            }),
+          },
+        },
+      } as never,
+    })
     const output: { headers: Record<string, string> } = { headers: {} }
 
     await handler(
       {
+        sessionID: "ses_1",
         provider: { id: "github-copilot" },
         message: {
-          info: { role: "user" },
-          parts: [{ type: "text", text: "normal user message" }],
+          id: "msg_1",
+          role: "user",
         },
       },
       output,
