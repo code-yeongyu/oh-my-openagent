@@ -14,6 +14,8 @@ import { INSTINCT_STATUS_TEMPLATE } from "./templates/instinct-status"
 import { BUILD_FIX_TEMPLATE } from "./templates/build-fix"
 import { LEARN_TEMPLATE } from "./templates/learn"
 import { createPresetManager } from "./presets"
+import { createAgentChainManager } from "./templates/agent-chains"
+import type { ChainType } from "./templates/agent-chains"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -169,6 +171,7 @@ export function loadBuiltinCommands(
   const disabled = new Set(disabledCommands ?? [])
   const commands: BuiltinCommands = {}
   const presetManager = createPresetManager()
+  const agentChainManager = createAgentChainManager()
 
   for (const [name, definition] of Object.entries(BUILTIN_COMMAND_DEFINITIONS)) {
     if (!disabled.has(name as BuiltinCommandName)) {
@@ -202,6 +205,28 @@ Timeout: ${preset.timeout}ms
           // Inject preset context after command-instruction
           template = template.replace("</command-instruction>", `</command-instruction>\n${presetContext}`)
         }
+
+        const chainMatch = userMessage.match(/--chain(?:=|\s+)(bugfix|refactor)\b/i)
+        const chainType = chainMatch?.[1].toLowerCase()
+
+        if (chainType && agentChainManager.hasChain(chainType as ChainType)) {
+          const description = userMessage
+            .replace(/--chain(?:=|\s+)(bugfix|refactor)\b/gi, "")
+            .replace(/\s+/g, " ")
+            .trim()
+
+          const chainContext = agentChainManager.generateExecutionContext(chainType as ChainType, {
+            description,
+          })
+
+          const wrappedChainContext = `
+<agent-chain-context>
+${chainContext}
+</agent-chain-context>
+`
+
+          template = template.replace("</command-instruction>", `</command-instruction>\n${wrappedChainContext}`)
+        }
         
         return template
       }
@@ -209,7 +234,7 @@ Timeout: ${preset.timeout}ms
       commands[name] = { 
         ...openCodeCompatible, 
         name,
-        template: wrappedTemplate as any // Cast to any because CommandDefinition expects string, but our loader supports lazy templates
+        template: wrappedTemplate as unknown as CommandDefinition["template"]
       } as CommandDefinition
     }
   }
