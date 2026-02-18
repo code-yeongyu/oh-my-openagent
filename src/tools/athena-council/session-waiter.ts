@@ -11,6 +11,12 @@ interface CouncilSessionInfo {
   sessionId: string
 }
 
+export interface CouncilSessionWaitResult {
+  sessions: CouncilSessionInfo[]
+  timedOut: boolean
+  aborted: boolean
+}
+
 /**
  * Waits for background sessions to be created for launched council members.
  * Returns session info for each member whose session became available within the timeout.
@@ -19,16 +25,21 @@ export async function waitForCouncilSessions(
   launched: CouncilLaunchedMember[],
   manager: BackgroundManager,
   abort?: AbortSignal
-): Promise<CouncilSessionInfo[]> {
+): Promise<CouncilSessionWaitResult> {
   const results: CouncilSessionInfo[] = []
   const pending = new Map(
     launched.map((entry) => [entry.taskId, entry])
   )
 
   const deadline = Date.now() + WAIT_TIMEOUT_MS
+  let timedOut = false
+  let aborted = false
 
   while (pending.size > 0 && Date.now() < deadline) {
-    if (abort?.aborted) break
+    if (abort?.aborted) {
+      aborted = true
+      break
+    }
 
     for (const [taskId, entry] of pending) {
       const task = manager.getTask(taskId)
@@ -48,5 +59,9 @@ export async function waitForCouncilSessions(
     }
   }
 
-  return results
+  if (pending.size > 0 && !aborted) {
+    timedOut = true
+  }
+
+  return { sessions: results, timedOut, aborted }
 }
