@@ -182,7 +182,7 @@ describe("TaskToastManager", () => {
         description: "Task with system default model",
         agent: "sisyphus-junior",
         isBackground: false,
-        modelInfo: { model: "anthropic/claude-sonnet-4-5", type: "system-default" as const },
+        modelInfo: { model: "anthropic/claude-sonnet-4-6", type: "system-default" as const },
       }
 
       // when - addTask is called
@@ -192,7 +192,7 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
-      expect(call.body.message).toContain("anthropic/claude-sonnet-4-5")
+      expect(call.body.message).toContain("anthropic/claude-sonnet-4-6")
       expect(call.body.message).toContain("(system default fallback)")
     })
 

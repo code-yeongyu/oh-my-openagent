@@ -203,7 +203,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
   describe("useTaskSystem integration", () => {
     test("useTaskSystem=true produces Task_Discipline prompt for Claude", () => {
       //#given
-      const override = { model: "anthropic/claude-sonnet-4-5" }
+      const override = { model: "anthropic/claude-sonnet-4-6" }
 
       //#when
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
@@ -241,7 +241,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
     test("useTaskSystem=true includes task_create/task_update in Claude prompt", () => {
       //#given
-      const override = { model: "anthropic/claude-sonnet-4-5" }
+      const override = { model: "anthropic/claude-sonnet-4-6" }
 
       //#when
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, true)
@@ -265,7 +265,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
     test("useTaskSystem=false uses todowrite instead of task_create", () => {
       //#given
-      const override = { model: "anthropic/claude-sonnet-4-5" }
+      const override = { model: "anthropic/claude-sonnet-4-6" }
 
       //#when
       const result = createSisyphusJuniorAgentWithOverrides(override, undefined, false)
@@ -291,7 +291,7 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
     test("Claude model uses default prompt with discipline section", () => {
       // given
-      const override = { model: "anthropic/claude-sonnet-4-5" }
+      const override = { model: "anthropic/claude-sonnet-4-6" }
 
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override)
@@ -355,7 +355,7 @@ describe("getSisyphusJuniorPromptSource", () => {
 
   test("returns 'default' for Claude models", () => {
     // given
-    const model = "anthropic/claude-sonnet-4-5"
+    const model = "anthropic/claude-sonnet-4-6"
 
     // when
     const source = getSisyphusJuniorPromptSource(model)
@@ -393,7 +393,7 @@ describe("buildSisyphusJuniorPrompt", () => {
 
   test("Claude model prompt contains Claude-specific sections", () => {
     // given
-    const model = "anthropic/claude-sonnet-4-5"
+    const model = "anthropic/claude-sonnet-4-6"
 
     // when
     const prompt = buildSisyphusJuniorPrompt(model, false)
@@ -418,7 +418,7 @@ describe("buildSisyphusJuniorPrompt", () => {
 
   test("useTaskSystem=false includes Todo_Discipline for Claude", () => {
     // given
-    const model = "anthropic/claude-sonnet-4-5"
+    const model = "anthropic/claude-sonnet-4-6"
 
     // when
     const prompt = buildSisyphusJuniorPrompt(model, false)

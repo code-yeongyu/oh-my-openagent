@@ -180,8 +180,8 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     const required = [
       "antigravity-gemini-3-pro",
       "antigravity-gemini-3-flash",
-      "antigravity-claude-sonnet-4-5",
-      "antigravity-claude-sonnet-4-5-thinking",
+      "antigravity-claude-sonnet-4-6",
+      "antigravity-claude-sonnet-4-6-thinking",
       "antigravity-claude-opus-4-5-thinking",
     ]
 
@@ -227,7 +227,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
 
     // #when checking Claude thinking variants
-    const sonnetThinking = models["antigravity-claude-sonnet-4-5-thinking"]
+    const sonnetThinking = models["antigravity-claude-sonnet-4-6-thinking"]
     const opusThinking = models["antigravity-claude-opus-4-5-thinking"]
 
     // #then both should have low and max variants

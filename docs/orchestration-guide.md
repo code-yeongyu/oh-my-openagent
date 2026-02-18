@@ -294,7 +294,7 @@ flowchart TD
 
 ### ⚡ Atlas (The Plan Executor)
 
-- **Model**: `anthropic/claude-sonnet-4-5` (Extended Thinking 32k)
+- **Model**: `anthropic/claude-sonnet-4-6` (Extended Thinking 32k)
 - **Role**: Execution and delegation
 - **Characteristic**: Doesn't do everything directly, actively delegates to specialized agents (Frontend, Librarian, etc.).
 

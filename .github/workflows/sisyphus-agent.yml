@@ -135,14 +135,14 @@ jobs:
                   "limit": { "context": 190000, "output": 128000 },
                   "options": { "effort": "high", "thinking": { "type": "enabled", "budgetTokens": 64000 } }
                 },
-                "claude-sonnet-4-5": {
-                  "id": "claude-sonnet-4-5-20250929",
-                  "name": "Sonnet 4.5",
+                "claude-sonnet-4-6": {
+                  "id": "claude-sonnet-4-6-20250929",
+                  "name": "Sonnet 4.6",
                   "limit": { "context": 200000, "output": 64000 }
                 },
-                "claude-sonnet-4-5-high": {
-                  "id": "claude-sonnet-4-5-20250929",
-                  "name": "Sonnet 4.5 High",
+                "claude-sonnet-4-6-high": {
+                  "id": "claude-sonnet-4-6-20250929",
+                  "name": "Sonnet 4.6 High",
                   "limit": { "context": 200000, "output": 128000 },
                   "options": { "thinking": { "type": "enabled", "budgetTokens": 64000 } }
                 },

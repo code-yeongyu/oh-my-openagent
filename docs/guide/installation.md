@@ -162,8 +162,8 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 **Available models (Antigravity quota)**:
 - `google/antigravity-gemini-3-pro` — variants: `low`, `high`
 - `google/antigravity-gemini-3-flash` — variants: `minimal`, `low`, `medium`, `high`
-- `google/antigravity-claude-sonnet-4-5` — no variants
-- `google/antigravity-claude-sonnet-4-5-thinking` — variants: `low`, `max`
+- `google/antigravity-claude-sonnet-4-6` — no variants
+- `google/antigravity-claude-sonnet-4-6-thinking` — variants: `low`, `max`
 - `google/antigravity-claude-opus-4-5-thinking` — variants: `low`, `max`
 
 **Available models (Gemini CLI quota)**:

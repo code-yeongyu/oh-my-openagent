@@ -4,11 +4,11 @@ import type { PluginInput } from "@opencode-ai/plugin"
 const executeCompactMock = mock(async () => {})
 const getLastAssistantMock = mock(async () => ({
   providerID: "anthropic",
-  modelID: "claude-sonnet-4-5",
+  modelID: "claude-sonnet-4-6",
 }))
 const parseAnthropicTokenLimitErrorMock = mock(() => ({
   providerID: "anthropic",
-  modelID: "claude-sonnet-4-5",
+  modelID: "claude-sonnet-4-6",
 }))
 
 mock.module("./executor", () => ({

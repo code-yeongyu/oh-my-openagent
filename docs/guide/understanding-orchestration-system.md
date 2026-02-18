@@ -33,7 +33,7 @@ flowchart TB
     end
     
     subgraph Workers["Worker Layer (Specialized Agents)"]
-        Junior["🪨 Sisyphus-Junior<br/>(Task Executor)<br/>Claude Sonnet 4.5"]
+        Junior["🪨 Sisyphus-Junior<br/>(Task Executor)<br/>Claude Sonnet 4.6"]
         Oracle["🧠 Oracle<br/>(Architecture)<br/>GPT-5.2"]
         Explore["🔍 Explore<br/>(Codebase Grep)<br/>Grok Code"]
         Librarian["📚 Librarian<br/>(Docs/OSS)<br/>GLM-4.7"]
@@ -298,7 +298,7 @@ task(category="quick", prompt="...")          // "Just get it done fast"
 | `artistry` | Gemini 3 Pro (max) | Highly creative/artistic tasks, novel ideas |
 | `quick` | Claude Haiku 4.5 | Trivial tasks - single file changes, typo fixes |
 | `deep` | GPT-5.3 Codex (medium) | Goal-oriented autonomous problem-solving, thorough research |
-| `unspecified-low` | Claude Sonnet 4.5 | Tasks that don't fit other categories, low effort |
+| `unspecified-low` | Claude Sonnet 4.6 | Tasks that don't fit other categories, low effort |
 | `unspecified-high` | Claude Opus 4.6 (max) | Tasks that don't fit other categories, high effort |
 | `writing` | K2P5 (Kimi) | Documentation, prose, technical writing |
 

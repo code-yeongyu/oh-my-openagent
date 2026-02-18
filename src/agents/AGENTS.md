@@ -13,14 +13,14 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | **Sisyphus** | claude-opus-4-6 | 0.1 | primary | kimi-k2.5 → glm-4.7 → gemini-3-pro | Main orchestrator, plans + delegates |
 | **Hephaestus** | gpt-5.3-codex | 0.1 | primary | NONE (required) | Autonomous deep worker |
 | **Oracle** | gpt-5.2 | 0.1 | subagent | claude-opus-4-6 → gemini-3-pro | Read-only consultation |
-| **Librarian** | glm-4.7 | 0.1 | subagent | glm-4.7-free → claude-sonnet-4-5 | External docs/code search |
+| **Librarian** | glm-4.7 | 0.1 | subagent | glm-4.7-free → claude-sonnet-4-6 | External docs/code search |
 | **Explore** | grok-code-fast-1 | 0.1 | subagent | claude-haiku-4-5 → gpt-5-nano | Contextual grep |
 | **Multimodal-Looker** | gemini-3-flash | 0.1 | subagent | gpt-5.2 → glm-4.6v → ... (6 deep) | PDF/image analysis |
 | **Metis** | claude-opus-4-6 | **0.3** | subagent | kimi-k2.5 → gpt-5.2 → gemini-3-pro | Pre-planning consultant |
 | **Momus** | gpt-5.2 | 0.1 | subagent | claude-opus-4-6 → gemini-3-pro | Plan reviewer |
-| **Atlas** | claude-sonnet-4-5 | 0.1 | primary | kimi-k2.5 → gpt-5.2 → gemini-3-pro | Todo-list orchestrator |
+| **Atlas** | claude-sonnet-4-6 | 0.1 | primary | kimi-k2.5 → gpt-5.2 → gemini-3-pro | Todo-list orchestrator |
 | **Prometheus** | claude-opus-4-6 | 0.1 | — | kimi-k2.5 → gpt-5.2 → gemini-3-pro | Strategic planner (internal) |
-| **Sisyphus-Junior** | claude-sonnet-4-5 | 0.1 | all | user-configurable | Category-spawned executor |
+| **Sisyphus-Junior** | claude-sonnet-4-6 | 0.1 | all | user-configurable | Category-spawned executor |
 
 ## TOOL RESTRICTIONS
 
