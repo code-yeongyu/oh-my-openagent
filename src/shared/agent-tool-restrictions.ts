@@ -14,7 +14,7 @@ const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
 }
 
 const ATHENA_RESTRICTIONS = permissionToToolBooleans(
-  createAgentToolRestrictions(["write", "edit", "athena_council"]).permission
+  createAgentToolRestrictions(["write", "edit"]).permission
 )
 
 const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {

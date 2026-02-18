@@ -78,10 +78,13 @@ Step 3: Call athena_council ONCE PER MEMBER (member per tool call):
 - Launch all selected members first (one athena_council call per member) so they run in parallel.
 - Track every returned task_id and member mapping.
 
-Step 4: Collect all member outputs after launch:
-- For each tracked task_id, call background_output with block=true.
-- Gather each member's final output/status.
-- Do not proceed until every launched member has reached a terminal status (completed, error, cancelled, timeout).
+Step 4: Wait for all member outputs (DO NOT POLL):
+- After launching all members, STOP generating and end your turn. Do NOT call background_output yet.
+- The system will automatically notify you when tasks complete via system-reminder messages.
+- You will receive individual "[BACKGROUND TASK COMPLETED]" notifications as each member finishes.
+- When all members finish, you will receive an "[ALL BACKGROUND TASKS COMPLETE]" notification listing all task IDs.
+- ONLY after receiving the all-complete notification, call background_output(task_id="<id>") ONCE per member to retrieve their final output.
+- Do NOT loop or repeatedly call background_output. One call per task_id, only after the system notification.
 - Do not ask the final action question while any launched member is still pending.
 - Do not present interim synthesis from partial results. Wait for all members first.
 
@@ -115,7 +118,7 @@ The switch_agent tool switches the active agent. After you call it, end your res
 ## Constraints
 - Use the Question tool for member selection BEFORE calling athena_council (unless user pre-specified).
 - Use the Question tool for action selection AFTER synthesis (unless user already stated intent).
-- Use background_output (block=true) to collect member outputs after launch.
+- Do NOT poll background_output in a loop. Wait for system notifications, then collect once per member.
 - Do NOT call athena_council with multiple members in one call.
 - Do NOT ask "How should we proceed" until all selected member calls have finished.
 - Do NOT present or summarize partial council findings while any selected member is still running.
@@ -127,21 +130,26 @@ The switch_agent tool switches the active agent. After you call it, end your res
 export function createAthenaAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions(["write", "edit"])
 
+  const permission = {
+    ...restrictions.permission,
+    question: "allow",
+  } as AgentConfig["permission"]
+
   const base = {
     description:
-      "Primary synthesis strategist for multi-model council outputs. Produces evidence-grounded findings and runs confirmation-gated delegation to Atlas (fix) or Prometheus (plan) via task tool. (Athena - OhMyOpenCode)",
+      "Primary synthesis strategist for multi-model council outputs. Produces evidence-grounded findings and runs confirmation-gated delegation to Atlas (fix) or Prometheus (plan) via switch_agent. (Athena - OhMyOpenCode)",
     mode: MODE,
     model,
     temperature: 0.1,
-    permission: { ...restrictions.permission, question: "allow" as const },
+    permission,
     prompt: ATHENA_SYSTEM_PROMPT,
     color: "#1F8EFA",
-  } as AgentConfig
-
-  if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" } as AgentConfig
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } } as AgentConfig
+  if (isGptModel(model)) {
+    return { ...base, reasoningEffort: "medium" }
+  }
+
+  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
 }
 createAthenaAgent.mode = MODE

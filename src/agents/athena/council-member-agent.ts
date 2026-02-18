@@ -1,5 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
+import { isGptModel } from "../types"
 import { createAgentToolRestrictions } from "../../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
@@ -16,13 +17,20 @@ export function createCouncilMemberAgent(model: string): AgentConfig {
     "athena_council",
   ])
 
-  return {
-    description: "Independent code analyst for Athena multi-model council. Read-only, evidence-based analysis. (Council Member - OhMyOpenCode)",
+  const base = {
+    description:
+      "Independent code analyst for Athena multi-model council. Read-only, evidence-based analysis. (Council Member - OhMyOpenCode)",
     mode: MODE,
     model,
     temperature: 0.1,
     prompt: COUNCIL_MEMBER_PROMPT,
     ...restrictions,
-  } as AgentConfig
+  }
+
+  if (isGptModel(model)) {
+    return { ...base, reasoningEffort: "medium" }
+  }
+
+  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
 }
 createCouncilMemberAgent.mode = MODE

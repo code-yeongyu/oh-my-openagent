@@ -1,4 +1,5 @@
 import type { LaunchInput, BackgroundTask } from "../../features/background-agent/types"
+import { log } from "../../shared/logger"
 import { buildCouncilPrompt } from "./council-prompt"
 import { parseModelString } from "./model-parser"
 import type { CouncilConfig, CouncilLaunchFailure, CouncilLaunchedMember, CouncilLaunchResult, CouncilMemberConfig } from "./types"
@@ -25,6 +26,9 @@ export interface CouncilExecutionInput {
  */
 export async function executeCouncil(input: CouncilExecutionInput): Promise<CouncilLaunchResult> {
   const { question, council, launcher, parentSessionID, parentMessageID, parentAgent } = input
+
+  log("[athena-council] Executing council", { memberCount: council.members.length })
+
   const prompt = buildCouncilPrompt(question)
 
   const launchResults = await Promise.allSettled(
@@ -49,6 +53,8 @@ export async function executeCouncil(input: CouncilExecutionInput): Promise<Coun
       error: `Launch failed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
     })
   })
+
+  log("[athena-council] Council execution complete", { launched: launched.length, failures: failures.length })
 
   return {
     question,
