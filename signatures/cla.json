@@ -1575,6 +1575,14 @@
       "created_at": "2026-02-18T08:21:19Z",
       "repoId": 1108837393,
       "pullRequestNo": 1940
+    },
+    {
+      "name": "kang-heewon",
+      "id": 36758131,
+      "comment_id": 3921893776,
+      "created_at": "2026-02-18T16:43:47Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 1936
     }
   ]
 }
