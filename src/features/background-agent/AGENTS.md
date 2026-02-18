@@ -1,6 +1,6 @@
 # src/features/background-agent/ — Core Orchestration Engine
 
-**Generated:** 2026-02-18
+**Generated:** 2026-02-19
 
 ## OVERVIEW
 
