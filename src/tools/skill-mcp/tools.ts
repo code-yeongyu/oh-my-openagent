@@ -137,7 +137,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
             `Available MCP servers in loaded skills:\n` +
             formatAvailableMcps(skills) +
             `\n\n` +
-            `Hint: Load the skill first using the 'slashcommand' tool, then call skill_mcp.`,
+            `Hint: Load the skill first using the 'skill' tool, then call skill_mcp.`,
         )
       }
 

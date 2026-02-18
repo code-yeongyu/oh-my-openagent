@@ -35,7 +35,7 @@ export function categorizeTools(toolNames: string[]): AvailableTool[] {
       category = "search"
     } else if (name.startsWith("session_")) {
       category = "session"
-    } else if (name === "slashcommand") {
+    } else if (name === "skill") {
       category = "command"
     }
     return { name, category }

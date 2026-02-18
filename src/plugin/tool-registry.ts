@@ -12,7 +12,7 @@ import {
   createCallOmoAgent,
   createLookAt,
   createSkillMcpTool,
-  createSlashcommandTool,
+  createSkillTool,
   createGrepTools,
   createGlobTools,
   createAstGrepTools,
@@ -95,7 +95,7 @@ export function createToolRegistry(args: {
   })
 
   const commands = discoverCommandsSync(ctx.directory)
-  const slashcommandTool = createSlashcommandTool({
+  const skillTool = createSkillTool({
     commands,
     skills: skillContext.mergedSkills,
     mcpManager: managers.skillMcpManager,
@@ -129,7 +129,7 @@ export function createToolRegistry(args: {
     ...(lookAt ? { look_at: lookAt } : {}),
     task: delegateTask,
     skill_mcp: skillMcpTool,
-    slashcommand: slashcommandTool,
+    skill: skillTool,
     interactive_bash,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
