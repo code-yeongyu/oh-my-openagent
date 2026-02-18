@@ -16,6 +16,7 @@ mock.module("../checker", () => ({
   getCachedVersion: mockGetCachedVersion,
   getLatestVersion: mockGetLatestVersion,
   updatePinnedVersion: mockUpdatePinnedVersion,
+  revertPinnedVersion: mock(() => false),
 }))
 
 mock.module("../version-channel", () => ({
