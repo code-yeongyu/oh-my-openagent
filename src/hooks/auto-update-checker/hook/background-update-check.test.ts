@@ -40,7 +40,7 @@ mock.module("../../../shared/logger", () => ({
   log: () => {},
 }))
 
-const { runBackgroundUpdateCheck } = await import("./background-update-check")
+const { runBackgroundUpdateCheck } = await import("./background-update-check?test")
 
 describe("runBackgroundUpdateCheck", () => {
   const mockCtx = { directory: "/test" } as any
