@@ -28,7 +28,7 @@ export function createExploreAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
-    "task",
+    "apply_patch",
     "task",
     "call_omo_agent",
   ])

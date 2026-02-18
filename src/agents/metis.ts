@@ -306,6 +306,7 @@ User confirms the button works as expected.
 const metisRestrictions = createAgentToolRestrictions([
   "write",
   "edit",
+  "apply_patch",
   "task",
 ])
 
