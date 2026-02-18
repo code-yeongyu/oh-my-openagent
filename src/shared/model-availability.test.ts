@@ -251,7 +251,7 @@ describe("fuzzyMatchModel", () => {
 	it("should match github-copilot claude-opus-4-6 to claude-opus-4.6", () => {
 		const available = new Set([
 			"github-copilot/claude-opus-4.6",
-			"opencode/glm-4.7-free",
+			"opencode/big-pickle",
 		])
 		const result = fuzzyMatchModel("claude-opus-4-6", available, ["github-copilot"])
 		expect(result).toBe("github-copilot/claude-opus-4.6")
@@ -327,16 +327,16 @@ describe("fuzzyMatchModel", () => {
 		expect(result).toBe("anthropic/claude-opus-4-6")
 	})
 
-	// given available models with similar model IDs (e.g., glm-4.7 and glm-4.7-free)
-	// when searching for the longer variant (glm-4.7-free)
+	// given available models with similar model IDs (e.g., glm-4.7 and big-pickle)
+	// when searching for the longer variant (big-pickle)
 	// then return exact model ID match, not the shorter one
 	it("should prefer exact model ID match over shorter substring match", () => {
 		const available = new Set([
 			"zai-coding-plan/glm-4.7",
-			"zai-coding-plan/glm-4.7-free",
+			"zai-coding-plan/big-pickle",
 		])
-		const result = fuzzyMatchModel("glm-4.7-free", available)
-		expect(result).toBe("zai-coding-plan/glm-4.7-free")
+		const result = fuzzyMatchModel("big-pickle", available)
+		expect(result).toBe("zai-coding-plan/big-pickle")
 	})
 
 	// given available models with similar model IDs
@@ -345,7 +345,7 @@ describe("fuzzyMatchModel", () => {
 	it("should still prefer shorter match when searching for shorter variant", () => {
 		const available = new Set([
 			"zai-coding-plan/glm-4.7",
-			"zai-coding-plan/glm-4.7-free",
+			"zai-coding-plan/big-pickle",
 		])
 		const result = fuzzyMatchModel("glm-4.7", available)
 		expect(result).toBe("zai-coding-plan/glm-4.7")
@@ -690,13 +690,13 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 	it("should prefer provider-models cache over models.json", async () => {
 		writeProviderModelsCache({
 			models: {
-				opencode: ["glm-4.7-free", "gpt-5-nano"],
+				opencode: ["big-pickle", "gpt-5-nano"],
 				anthropic: ["claude-opus-4-6"]
 			},
 			connected: ["opencode", "anthropic"]
 		})
 		writeModelsCache({
-			opencode: { models: { "glm-4.7-free": {}, "gpt-5-nano": {}, "gpt-5.2": {} } },
+			opencode: { models: { "big-pickle": {}, "gpt-5-nano": {}, "gpt-5.2": {} } },
 			anthropic: { models: { "claude-opus-4-6": {}, "claude-sonnet-4-6": {} } }
 		})
 
@@ -705,7 +705,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		})
 
 		expect(result.size).toBe(3)
-		expect(result.has("opencode/glm-4.7-free")).toBe(true)
+		expect(result.has("opencode/big-pickle")).toBe(true)
 		expect(result.has("opencode/gpt-5-nano")).toBe(true)
 		expect(result.has("anthropic/claude-opus-4-6")).toBe(true)
 		expect(result.has("opencode/gpt-5.2")).toBe(false)
@@ -738,7 +738,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 	// then falls back to models.json (no whitelist filtering)
 	it("should fallback to models.json when provider-models cache not found", async () => {
 		writeModelsCache({
-			opencode: { models: { "glm-4.7-free": {}, "gpt-5-nano": {}, "gpt-5.2": {} } },
+			opencode: { models: { "big-pickle": {}, "gpt-5-nano": {}, "gpt-5.2": {} } },
 		})
 
 		const result = await fetchAvailableModels(undefined, {
@@ -746,7 +746,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		})
 
 		expect(result.size).toBe(3)
-		expect(result.has("opencode/glm-4.7-free")).toBe(true)
+		expect(result.has("opencode/big-pickle")).toBe(true)
 		expect(result.has("opencode/gpt-5-nano")).toBe(true)
 		expect(result.has("opencode/gpt-5.2")).toBe(true)
 	})
@@ -757,7 +757,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 	it("should filter by connectedProviders even with provider-models cache", async () => {
 		writeProviderModelsCache({
 			models: {
-				opencode: ["glm-4.7-free"],
+				opencode: ["big-pickle"],
 				anthropic: ["claude-opus-4-6"],
 				google: ["gemini-3-pro"]
 			},
@@ -769,7 +769,7 @@ describe("fetchAvailableModels with provider-models cache (whitelist-filtered)",
 		})
 
 		expect(result.size).toBe(1)
-		expect(result.has("opencode/glm-4.7-free")).toBe(true)
+		expect(result.has("opencode/big-pickle")).toBe(true)
 		expect(result.has("anthropic/claude-opus-4-6")).toBe(false)
 		expect(result.has("google/gemini-3-pro")).toBe(false)
 	})

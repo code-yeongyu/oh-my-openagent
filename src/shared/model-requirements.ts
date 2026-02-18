@@ -19,7 +19,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["opencode"], model: "kimi-k2.5-free" },
       { providers: ["zai-coding-plan"], model: "glm-4.7" },
-      { providers: ["opencode"], model: "glm-4.7-free" },
+      { providers: ["opencode"], model: "big-pickle" },
     ],
     requiresAnyModel: true,
   },
@@ -39,7 +39,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
    librarian: {
      fallbackChain: [
        { providers: ["zai-coding-plan"], model: "glm-4.7" },
-       { providers: ["opencode"], model: "glm-4.7-free" },
+       { providers: ["opencode"], model: "big-pickle" },
        { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
      ],
    },
