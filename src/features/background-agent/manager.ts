@@ -13,6 +13,7 @@ import {
   normalizeSDKResponse,
   promptWithModelSuggestionRetry,
   resolveInheritedPromptTools,
+  createInternalAgentTextPart,
 } from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { ConcurrencyManager } from "./concurrency"
@@ -1311,7 +1312,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               ...(agent !== undefined ? { agent } : {}),
               ...(model !== undefined ? { model } : {}),
               ...(tools ? { tools } : {}),
-              parts: [{ type: "text", text: notification }],
+              parts: [createInternalAgentTextPart(notification)],
             },
           })
           log("[background-agent] Sent notification to parent session:", {
