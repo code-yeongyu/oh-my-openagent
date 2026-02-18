@@ -245,6 +245,14 @@ Hey please read this readme and tell me why it is different from other agent har
 
 ### 인간을 위한
 
+설치 가이드를 가져와서 따르세요:
+
+```bash
+curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+```
+
+### LLM 에이전트를 위한
+
 이 프롬프트를 LLM 에이전트(Claude Code, AmpCode, Cursor 등)에 복사하여 붙여넣으세요:
 
 ```
@@ -253,14 +261,6 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/
 ```
 
 또는 [설치 가이드](docs/guide/installation.md)를 직접 읽으세요 — 하지만 **에이전트가 처리하도록 하는 것을 강력히 권장합니다. 인간은 실수를 합니다.**
-
-### LLM 에이전트를 위한
-
-설치 가이드를 가져와서 따르세요:
-
-```bash
-curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
-```
 
 ## 제거
 
