@@ -80,7 +80,6 @@
           "non-interactive-env",
           "interactive-bash-session",
           "thinking-block-validator",
-          "ultrawork-model-override",
           "ralph-loop",
           "category-skill-reminder",
           "compaction-context-injector",
@@ -279,21 +278,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -464,21 +448,6 @@
               },
               "required": [
                 "type"
-              ],
-              "additionalProperties": false
-            },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
               ],
               "additionalProperties": false
             },
@@ -655,21 +624,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -840,21 +794,6 @@
               },
               "required": [
                 "type"
-              ],
-              "additionalProperties": false
-            },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
               ],
               "additionalProperties": false
             },
@@ -1031,21 +970,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -1216,21 +1140,6 @@
               },
               "required": [
                 "type"
-              ],
-              "additionalProperties": false
-            },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
               ],
               "additionalProperties": false
             },
@@ -1407,21 +1316,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -1592,21 +1486,6 @@
               },
               "required": [
                 "type"
-              ],
-              "additionalProperties": false
-            },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
               ],
               "additionalProperties": false
             },
@@ -1783,21 +1662,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -1968,21 +1832,6 @@
               },
               "required": [
                 "type"
-              ],
-              "additionalProperties": false
-            },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
               ],
               "additionalProperties": false
             },
@@ -2159,21 +2008,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -2344,21 +2178,6 @@
               },
               "required": [
                 "type"
-              ],
-              "additionalProperties": false
-            },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
               ],
               "additionalProperties": false
             },
@@ -2535,21 +2354,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -2720,21 +2524,6 @@
               },
               "required": [
                 "type"
-              ],
-              "additionalProperties": false
-            },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
               ],
               "additionalProperties": false
             },
