@@ -2,13 +2,11 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { executeCouncil } from "../../agents/athena/council-orchestrator"
 import type { CouncilConfig, CouncilMemberConfig } from "../../agents/athena/types"
 import type { BackgroundManager } from "../../features/background-agent"
-import type { BackgroundOutputClient } from "../background-task/clients"
 import { ATHENA_COUNCIL_TOOL_DESCRIPTION_TEMPLATE } from "./constants"
 import { createCouncilLauncher } from "./council-launcher"
-import { isCouncilRunning, markCouncilDone, markCouncilRunning } from "./session-guard"
 import { waitForCouncilSessions } from "./session-waiter"
-import { collectCouncilResults } from "./result-collector"
 import type { AthenaCouncilToolArgs } from "./types"
+import { storeToolMetadata } from "../../features/tool-metadata-store"
 
 function isCouncilConfigured(councilConfig: CouncilConfig | undefined): councilConfig is CouncilConfig {
   return Boolean(councilConfig && councilConfig.members.length > 0)
@@ -17,6 +15,11 @@ function isCouncilConfigured(councilConfig: CouncilConfig | undefined): councilC
 interface FilterCouncilMembersResult {
   members: CouncilMemberConfig[]
   error?: string
+}
+
+function buildSingleMemberSelectionError(members: CouncilMemberConfig[]): string {
+  const availableNames = members.map((member) => member.name ?? member.model).join(", ")
+  return `athena_council runs one member per call. Pass exactly one member in members (single-item array). Available members: ${availableNames}.`
 }
 
 export function filterCouncilMembers(
@@ -77,9 +80,8 @@ function buildToolDescription(councilConfig: CouncilConfig | undefined): string 
 export function createAthenaCouncilTool(args: {
   backgroundManager: BackgroundManager
   councilConfig: CouncilConfig | undefined
-  client: BackgroundOutputClient
 }): ToolDefinition {
-  const { backgroundManager, councilConfig, client } = args
+  const { backgroundManager, councilConfig } = args
   const description = buildToolDescription(councilConfig)
 
   return tool({
@@ -89,7 +91,7 @@ export function createAthenaCouncilTool(args: {
       members: tool.schema
         .array(tool.schema.string())
         .optional()
-        .describe("Optional list of council member names or models to consult. Defaults to all configured members."),
+        .describe("Single-item list containing exactly one council member name or model ID."),
     },
     async execute(toolArgs: AthenaCouncilToolArgs, toolContext) {
       if (!isCouncilConfigured(councilConfig)) {
@@ -100,83 +102,82 @@ export function createAthenaCouncilTool(args: {
       if (filteredMembers.error) {
         return filteredMembers.error
       }
-
-      if (isCouncilRunning(toolContext.sessionID)) {
-        return "Council is already running for this session. Wait for the current council execution to complete."
+      if (filteredMembers.members.length !== 1) {
+        return buildSingleMemberSelectionError(councilConfig.members)
       }
 
-      markCouncilRunning(toolContext.sessionID)
-      try {
-        const execution = await executeCouncil({
-          question: toolArgs.question,
-          council: { members: filteredMembers.members },
-          launcher: createCouncilLauncher(backgroundManager),
-          parentSessionID: toolContext.sessionID,
-          parentMessageID: toolContext.messageID,
-          parentAgent: toolContext.agent,
-        })
+      const execution = await executeCouncil({
+        question: toolArgs.question,
+        council: { members: filteredMembers.members },
+        launcher: createCouncilLauncher(backgroundManager),
+        parentSessionID: toolContext.sessionID,
+        parentMessageID: toolContext.messageID,
+        parentAgent: toolContext.agent,
+      })
 
-        // Register metadata for UI visibility (makes sessions clickable in TUI).
-        const metadataFn = (toolContext as Record<string, unknown>).metadata as
-          | ((input: { title?: string; metadata?: Record<string, unknown> }) => Promise<void>)
-          | undefined
-        if (metadataFn && execution.launched.length > 0) {
-          const sessions = await waitForCouncilSessions(
-            execution.launched, backgroundManager, toolContext.abort
-          )
-          for (const session of sessions) {
-            await metadataFn({
-              title: `Council: ${session.memberName}`,
-              metadata: {
-                sessionId: session.sessionId,
-                agent: "council-member",
-                model: session.model,
-                description: `Council member: ${session.memberName}`,
-              },
-            })
-          }
+      if (execution.launched.length === 0) {
+        return formatCouncilLaunchFailure(execution.failures)
+      }
+
+      const launched = execution.launched[0]
+      const launchedMemberName = launched?.member.name ?? launched?.member.model
+      const launchedMemberModel = launched?.member.model ?? "unknown"
+      const launchedTaskId = launched?.taskId ?? "unknown"
+
+      const sessionInfos = await waitForCouncilSessions(execution.launched, backgroundManager, toolContext.abort)
+      const launchedSession = sessionInfos.find((session) => session.taskId === launchedTaskId)
+      const sessionId = launchedSession?.sessionId ?? "pending"
+
+      const metadataFn = (toolContext as Record<string, unknown>).metadata as
+        | ((input: { title?: string; metadata?: Record<string, unknown> }) => Promise<void>)
+        | undefined
+      if (metadataFn) {
+        const memberMetadata = {
+          title: `Council: ${launchedMemberName}`,
+          metadata: {
+            sessionId,
+            agent: "council-member",
+            model: launchedMemberModel,
+            description: `Council member: ${launchedMemberName}`,
+          },
         }
+        await metadataFn(memberMetadata)
 
-        // Wait for all members to complete and collect their actual results.
-        // This eliminates the need for Athena to poll background_output repeatedly.
-        const collected = await collectCouncilResults(
-          execution.launched, backgroundManager, client, toolContext.abort
-        )
-
-        return formatCouncilOutput(toolArgs.question, collected.results, execution.failures)
-      } catch (error) {
-        throw error
-      } finally {
-        markCouncilDone(toolContext.sessionID)
+        const callID = (toolContext as Record<string, unknown>).callID
+        if (typeof callID === "string") {
+          storeToolMetadata(toolContext.sessionID, callID, memberMetadata)
+        }
       }
+
+      return `Council member launched in background.
+
+Task ID: ${launchedTaskId}
+Session ID: ${sessionId}
+Member: ${launchedMemberName}
+Model: ${launchedMemberModel}
+Status: running
+
+Use \`background_output\` with task_id="${launchedTaskId}" to collect this member's result.
+- block=true: Wait for completion and return the result
+- full_session=true: Include full session messages when needed
+
+<task_metadata>
+session_id: ${sessionId}
+</task_metadata>`
     },
   })
 }
 
-function formatCouncilOutput(
-  question: string,
-  results: Array<{ name: string; model: string; taskId: string; status: string; content: string }>,
+function formatCouncilLaunchFailure(
   failures: Array<{ member: { name?: string; model: string }; error: string }>
 ): string {
-  const sections: string[] = []
-
-  sections.push(`## Council Results\n\n**Question:** ${question}\n`)
-
-  for (const result of results) {
-    const header = `### ${result.name} (${result.model})`
-    if (result.status !== "completed") {
-      sections.push(`${header}\n\n*Status: ${result.status}*`)
-      continue
-    }
-    sections.push(`${header}\n\n${result.content}`)
+  if (failures.length === 0) {
+    return "Failed to launch council member."
   }
 
-  if (failures.length > 0) {
-    const failureLines = failures
-      .map((f) => `- **${f.member.name ?? f.member.model}**: ${f.error}`)
-      .join("\n")
-    sections.push(`### Launch Failures\n\n${failureLines}`)
-  }
+  const failureLines = failures
+    .map((failure) => `- **${failure.member.name ?? failure.member.model}**: ${failure.error}`)
+    .join("\n")
 
-  return sections.join("\n\n---\n\n")
+  return `Failed to launch council member.\n\n### Launch Failures\n\n${failureLines}`
 }

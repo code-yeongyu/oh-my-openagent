@@ -1,22 +1,50 @@
 import type { PluginContext } from "./types"
+import type { BackgroundManager } from "../features/background-agent"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { clearBoulderState } from "../features/boulder-state"
 import { log } from "../shared"
 import { resolveSessionAgent } from "./session-agent-resolver"
+import { getAgentConfigKey } from "../shared/agent-display-names"
 
 import type { CreatedHooks } from "../create-hooks"
 
 export function createToolExecuteBeforeHandler(args: {
   ctx: PluginContext
   hooks: CreatedHooks
+  backgroundManager?: Pick<BackgroundManager, "getTasksByParentSession">
 }): (
   input: { tool: string; sessionID: string; callID: string },
   output: { args: Record<string, unknown> },
 ) => Promise<void> {
-  const { ctx, hooks } = args
+  const { ctx, hooks, backgroundManager } = args
+
+  function hasPendingCouncilMembers(sessionID: string): boolean {
+    if (!backgroundManager) {
+      return false
+    }
+
+    const tasks = backgroundManager.getTasksByParentSession(sessionID)
+    return tasks.some((task) =>
+      task.agent === "council-member" &&
+      (task.status === "pending" || task.status === "running")
+    )
+  }
 
   return async (input, output): Promise<void> => {
+    const toolNameLower = input.tool?.toLowerCase()
+
+    if (toolNameLower === "question" || toolNameLower === "askuserquestion" || toolNameLower === "ask_user_question" || toolNameLower === "switch_agent") {
+      const sessionAgent = await resolveSessionAgent(ctx.client, input.sessionID)
+      const sessionAgentKey = sessionAgent ? getAgentConfigKey(sessionAgent) : undefined
+
+      if (sessionAgentKey === "athena" && hasPendingCouncilMembers(input.sessionID)) {
+        throw new Error(
+          "Council members are still running. Wait for all launched members to finish and collect their outputs before asking next-step questions or switching agents."
+        )
+      }
+    }
+
     await hooks.writeExistingFileGuard?.["tool.execute.before"]?.(input, output)
     await hooks.questionLabelTruncator?.["tool.execute.before"]?.(input, output)
     await hooks.claudeCodeHooks?.["tool.execute.before"]?.(input, output)

@@ -2,6 +2,109 @@ const { describe, expect, test } = require("bun:test")
 const { createToolExecuteBeforeHandler } = require("./tool-execute-before")
 
 describe("createToolExecuteBeforeHandler", () => {
+  test("blocks Athena question tool while council members are still running", async () => {
+    //#given
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [{ info: { role: "assistant", agent: "Athena (Council)" } }],
+          }),
+        },
+      },
+    }
+
+    const backgroundManager = {
+      getTasksByParentSession: () => [
+        { agent: "council-member", status: "running" },
+      ],
+    }
+
+    const handler = createToolExecuteBeforeHandler({
+      ctx,
+      hooks: {},
+      backgroundManager,
+    })
+
+    //#when
+    const run = handler(
+      { tool: "question", sessionID: "ses_athena", callID: "call_1" },
+      { args: { questions: [] } }
+    )
+
+    //#then
+    await expect(run).rejects.toThrow("Council members are still running")
+  })
+
+  test("blocks Athena switch_agent while council members are still running", async () => {
+    //#given
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [{ info: { role: "assistant", agent: "Athena (Council)" } }],
+          }),
+        },
+      },
+    }
+
+    const backgroundManager = {
+      getTasksByParentSession: () => [
+        { agent: "council-member", status: "pending" },
+      ],
+    }
+
+    const handler = createToolExecuteBeforeHandler({
+      ctx,
+      hooks: {},
+      backgroundManager,
+    })
+
+    //#when
+    const run = handler(
+      { tool: "switch_agent", sessionID: "ses_athena", callID: "call_1" },
+      { args: { agent: "atlas", context: "ctx" } }
+    )
+
+    //#then
+    await expect(run).rejects.toThrow("Council members are still running")
+  })
+
+  test("allows Athena question tool when no council members are pending", async () => {
+    //#given
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({
+            data: [{ info: { role: "assistant", agent: "Athena (Council)" } }],
+          }),
+        },
+      },
+    }
+
+    const backgroundManager = {
+      getTasksByParentSession: () => [
+        { agent: "council-member", status: "completed" },
+        { agent: "council-member", status: "cancelled" },
+      ],
+    }
+
+    const handler = createToolExecuteBeforeHandler({
+      ctx,
+      hooks: {},
+      backgroundManager,
+    })
+
+    //#when
+    const run = handler(
+      { tool: "question", sessionID: "ses_athena", callID: "call_1" },
+      { args: { questions: [] } }
+    )
+
+    //#then
+    await expect(run).resolves.toBeUndefined()
+  })
+
   test("does not execute subagent question blocker hook for question tool", async () => {
     //#given
     const ctx = {
