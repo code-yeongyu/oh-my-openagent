@@ -9,6 +9,7 @@ import { executeOnCompleteHook } from "./on-complete-hook"
 import { resolveRunAgent } from "./agent-resolver"
 import { pollForCompletion } from "./poll-for-completion"
 import { loadAgentProfileColors } from "./agent-profile-colors"
+import { suppressRunInput } from "./stdin-suppression"
 
 export { resolveRunAgent }
 
@@ -53,11 +54,15 @@ export async function run(options: RunOptions): Promise<number> {
       serverCleanup()
     }
 
-    process.on("SIGINT", () => {
+    const restoreInput = suppressRunInput()
+    const handleSigint = () => {
       console.log(pc.yellow("\nInterrupted. Shutting down..."))
+      restoreInput()
       cleanup()
       process.exit(130)
-    })
+    }
+
+    process.on("SIGINT", handleSigint)
 
     try {
       const sessionID = await resolveSession({
@@ -86,6 +91,9 @@ export async function run(options: RunOptions): Promise<number> {
         path: { id: sessionID },
         body: {
           agent: resolvedAgent,
+          tools: {
+            question: false,
+          },
           parts: [{ type: "text", text: message }],
         },
         query: { directory },
@@ -124,6 +132,9 @@ export async function run(options: RunOptions): Promise<number> {
     } catch (err) {
       cleanup()
       throw err
+    } finally {
+      process.removeListener("SIGINT", handleSigint)
+      restoreInput()
     }
   } catch (err) {
     if (jsonManager) jsonManager.restore()

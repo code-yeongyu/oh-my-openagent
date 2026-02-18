@@ -21,8 +21,8 @@
  * Custom providers may use prefixes for routing (e.g., vertex_ai/, openai/).
  *
  * @example
- * extractModelPrefix("vertex_ai/claude-sonnet-4-5") // { prefix: "vertex_ai/", base: "claude-sonnet-4-5" }
- * extractModelPrefix("claude-sonnet-4-5") // { prefix: "", base: "claude-sonnet-4-5" }
+ * extractModelPrefix("vertex_ai/claude-sonnet-4-6") // { prefix: "vertex_ai/", base: "claude-sonnet-4-6" }
+ * extractModelPrefix("claude-sonnet-4-6") // { prefix: "", base: "claude-sonnet-4-6" }
  * extractModelPrefix("openai/gpt-5.2") // { prefix: "openai/", base: "gpt-5.2" }
  */
 function extractModelPrefix(modelID: string): { prefix: string; base: string } {
@@ -87,7 +87,7 @@ function resolveProvider(providerID: string, modelID: string): string {
 // For OpenAI models, this signals that reasoning_effort should be set to "high"
 const HIGH_VARIANT_MAP: Record<string, string> = {
   // Claude
-  "claude-sonnet-4-5": "claude-sonnet-4-5-high",
+  "claude-sonnet-4-6": "claude-sonnet-4-6-high",
   "claude-opus-4-6": "claude-opus-4-6-high",
    // Gemini
    "gemini-3-pro": "gemini-3-pro-high",

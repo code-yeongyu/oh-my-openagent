@@ -666,7 +666,7 @@ You can also customize Sisyphus agents like other agents:
       "model": "openai/gpt-5.2"
     },
     "Metis (Plan Consultant)": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-sonnet-4-6"
     }
   }
 }
@@ -790,7 +790,7 @@ All 8 categories come with optimal model defaults, but **you must configure them
 | `deep`               | `openai/gpt-5.3-codex` (medium)    | Goal-oriented autonomous problem-solving, thorough research before action |
 | `artistry`           | `google/gemini-3-pro` (high)       | Highly creative/artistic tasks, novel ideas                          |
 | `quick`              | `anthropic/claude-haiku-4-5`       | Trivial tasks - single file changes, typo fixes, simple modifications|
-| `unspecified-low`    | `anthropic/claude-sonnet-4-5`      | Tasks that don't fit other categories, low effort required           |
+| `unspecified-low`    | `anthropic/claude-sonnet-4-6`      | Tasks that don't fit other categories, low effort required           |
 | `unspecified-high`   | `anthropic/claude-opus-4-6` (max)  | Tasks that don't fit other categories, high effort required          |
 | `writing`            | `kimi-for-coding/k2p5`             | Documentation, prose, technical writing                              |
 
@@ -808,12 +808,12 @@ All 8 categories come with optimal model defaults, but **you must configure them
 
 ```json
 // opencode.json
-{ "model": "anthropic/claude-sonnet-4-5" }
+{ "model": "anthropic/claude-sonnet-4-6" }
 
 // oh-my-opencode.json (empty categories section)
 {}
 
-// Result: ALL categories use claude-sonnet-4-5 (wasteful!)
+// Result: ALL categories use claude-sonnet-4-6 (wasteful!)
 // - quick tasks use Sonnet instead of Haiku (expensive)
 // - ultrabrain uses Sonnet instead of GPT-5.2 (inferior reasoning)
 // - visual tasks use Sonnet instead of Gemini (suboptimal for UI)
@@ -845,7 +845,7 @@ All 8 categories come with optimal model defaults, but **you must configure them
       "model": "anthropic/claude-haiku-4-5"  // Fast + cheap for trivial tasks
     },
     "unspecified-low": { 
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-sonnet-4-6"
     },
     "unspecified-high": { 
       "model": "anthropic/claude-opus-4-6",
@@ -879,7 +879,7 @@ Add your own categories or override built-in ones:
 {
   "categories": {
     "data-science": {
-      "model": "anthropic/claude-sonnet-4-5",
+      "model": "anthropic/claude-sonnet-4-6",
       "temperature": 0.2,
       "prompt_append": "Focus on data analysis, ML pipelines, and statistical methods."
     },
@@ -983,7 +983,7 @@ Categories follow the same resolution logic:
 | **deep** | `gpt-5.3-codex` | openai/github-copilot/opencode → anthropic/github-copilot/opencode → google/github-copilot/opencode |
 | **artistry** | `gemini-3-pro` | google/github-copilot/opencode → anthropic/github-copilot/opencode → openai/github-copilot/opencode |
 | **quick** | `claude-haiku-4-5` | anthropic/github-copilot/opencode → google/github-copilot/opencode → opencode |
-| **unspecified-low** | `claude-sonnet-4-5` | anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
+| **unspecified-low** | `claude-sonnet-4-6` | anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
 | **unspecified-high** | `claude-opus-4-6` | anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
 | **writing** | `k2p5` | kimi-for-coding → google/github-copilot/opencode → anthropic/github-copilot/opencode |
 
@@ -1009,7 +1009,7 @@ Override any agent or category model in `oh-my-opencode.json`:
 {
   "agents": {
     "Sisyphus": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-sonnet-4-6"
     },
     "oracle": {
       "model": "openai/o3"
@@ -1035,9 +1035,11 @@ Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-m
 }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `start-work`, `runtime-fallback`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`
 
 **Note on `directory-agents-injector`**: This hook is **automatically disabled** when running on OpenCode 1.1.37+ because OpenCode now has native support for dynamically resolving AGENTS.md files from subdirectories (PR #10678). This prevents duplicate AGENTS.md injection. For older OpenCode versions, the hook remains active to provide the same functionality.
+
+**Note on `no-sisyphus-gpt`**: Disabling this hook is **STRONGLY discouraged**. Sisyphus is NOT optimized for GPT models — running Sisyphus with GPT performs worse than vanilla Codex and wastes your money. This hook automatically switches to Hephaestus when a GPT model is detected, which is the correct agent for GPT. Only disable this if you fully understand the consequences.
 
 **Note on `auto-update-checker` and `startup-toast`**: The `startup-toast` hook is a sub-feature of `auto-update-checker`. To disable only the startup toast notification while keeping update checking enabled, add `"startup-toast"` to `disabled_hooks`. To disable all update checking features (including the toast), add `"auto-update-checker"` to `disabled_hooks`.
 

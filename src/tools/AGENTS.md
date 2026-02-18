@@ -97,7 +97,7 @@
 | deep | gpt-5.3-codex medium | Autonomous problem-solving |
 | artistry | gemini-3-pro high | Creative approaches |
 | quick | claude-haiku-4-5 | Trivial tasks |
-| unspecified-low | claude-sonnet-4-5 | Moderate effort |
+| unspecified-low | claude-sonnet-4-6 | Moderate effort |
 | unspecified-high | claude-opus-4-6 max | High effort |
 | writing | kimi-k2p5 | Documentation |
 

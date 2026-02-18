@@ -34,7 +34,7 @@ describe("isGptModel", () => {
 
   test("claude models are not gpt", () => {
     expect(isGptModel("anthropic/claude-opus-4-6")).toBe(false);
-    expect(isGptModel("anthropic/claude-sonnet-4-5")).toBe(false);
+    expect(isGptModel("anthropic/claude-sonnet-4-6")).toBe(false);
     expect(isGptModel("litellm/anthropic.claude-opus-4-5")).toBe(false);
   });
 

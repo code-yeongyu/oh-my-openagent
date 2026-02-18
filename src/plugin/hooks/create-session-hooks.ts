@@ -20,12 +20,13 @@ import {
   createStartWorkHook,
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
-  createSisyphusGptHephaestusReminderHook,
+  createNoSisyphusGptHook,
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
+import { createUltraworkModelOverrideHook } from "../../hooks/ultrawork-model-override"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -52,11 +53,12 @@ export type SessionHooks = {
   startWork: ReturnType<typeof createStartWorkHook> | null
   prometheusMdOnly: ReturnType<typeof createPrometheusMdOnlyHook> | null
   sisyphusJuniorNotepad: ReturnType<typeof createSisyphusJuniorNotepadHook> | null
-  sisyphusGptHephaestusReminder: ReturnType<typeof createSisyphusGptHephaestusReminderHook> | null
+  noSisyphusGpt: ReturnType<typeof createNoSisyphusGptHook> | null
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook>
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
+  ultraworkModelOverride: ReturnType<typeof createUltraworkModelOverrideHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -160,8 +162,8 @@ export function createSessionHooks(args: {
     ? safeHook("sisyphus-junior-notepad", () => createSisyphusJuniorNotepadHook(ctx))
     : null
 
-  const sisyphusGptHephaestusReminder = isHookEnabled("sisyphus-gpt-hephaestus-reminder")
-    ? safeHook("sisyphus-gpt-hephaestus-reminder", () => createSisyphusGptHephaestusReminderHook(ctx))
+  const noSisyphusGpt = isHookEnabled("no-sisyphus-gpt")
+    ? safeHook("no-sisyphus-gpt", () => createNoSisyphusGptHook(ctx))
     : null
 
   const questionLabelTruncator = createQuestionLabelTruncatorHook()
@@ -177,6 +179,10 @@ export function createSessionHooks(args: {
           config: pluginConfig.runtime_fallback,
           pluginConfig,
         }))
+    : null
+
+  const ultraworkModelOverride = isHookEnabled("ultrawork-model-override")
+    ? safeHook("ultrawork-model-override", () => createUltraworkModelOverrideHook({ agents: pluginConfig.agents }))
     : null
 
   return {
@@ -197,10 +203,11 @@ export function createSessionHooks(args: {
     startWork,
     prometheusMdOnly,
     sisyphusJuniorNotepad,
-    sisyphusGptHephaestusReminder,
+    noSisyphusGpt,
     questionLabelTruncator,
     taskResumeInfo,
     anthropicEffort,
     runtimeFallback,
+    ultraworkModelOverride,
   }
 }

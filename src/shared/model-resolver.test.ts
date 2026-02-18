@@ -117,7 +117,7 @@ describe("resolveModelWithFallback", () => {
     test("returns uiSelectedModel with override source when provided", () => {
       // given
       const input: ExtendedModelResolutionInput = {
-        uiSelectedModel: "opencode/glm-4.7-free",
+        uiSelectedModel: "opencode/big-pickle",
         userModel: "anthropic/claude-opus-4-6",
         fallbackChain: [
           { providers: ["anthropic", "github-copilot"], model: "claude-opus-4-6" },
@@ -130,15 +130,15 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("opencode/glm-4.7-free")
+      expect(result!.model).toBe("opencode/big-pickle")
       expect(result!.source).toBe("override")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via UI selection", { model: "opencode/glm-4.7-free" })
+      expect(logSpy).toHaveBeenCalledWith("Model resolved via UI selection", { model: "opencode/big-pickle" })
     })
 
     test("UI selection takes priority over config override", () => {
       // given
       const input: ExtendedModelResolutionInput = {
-        uiSelectedModel: "opencode/glm-4.7-free",
+        uiSelectedModel: "opencode/big-pickle",
         userModel: "anthropic/claude-opus-4-6",
         availableModels: new Set(["anthropic/claude-opus-4-6"]),
         systemDefaultModel: "google/gemini-3-pro",
@@ -148,7 +148,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("opencode/glm-4.7-free")
+      expect(result!.model).toBe("opencode/big-pickle")
       expect(result!.source).toBe("override")
     })
 
@@ -394,9 +394,9 @@ describe("resolveModelWithFallback", () => {
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
           { providers: ["zai-coding-plan"], model: "glm-4.7" },
-          { providers: ["anthropic"], model: "claude-sonnet-4-5" },
+          { providers: ["anthropic"], model: "claude-sonnet-4-6" },
         ],
-        availableModels: new Set(["opencode/glm-4.7", "anthropic/claude-sonnet-4-5"]),
+        availableModels: new Set(["opencode/glm-4.7", "anthropic/claude-sonnet-4-6"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
@@ -454,9 +454,9 @@ describe("resolveModelWithFallback", () => {
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
           { providers: ["zai-coding-plan"], model: "nonexistent-model" },
-          { providers: ["anthropic"], model: "claude-sonnet-4-5" },
+          { providers: ["anthropic"], model: "claude-sonnet-4-6" },
         ],
-        availableModels: new Set(["anthropic/claude-sonnet-4-5"]),
+        availableModels: new Set(["anthropic/claude-sonnet-4-6"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
@@ -464,7 +464,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should fall through to second entry
-      expect(result!.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(result!.model).toBe("anthropic/claude-sonnet-4-6")
       expect(result!.source).toBe("provider-fallback")
     })
   })
@@ -536,7 +536,7 @@ describe("resolveModelWithFallback", () => {
           { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
         ],
         availableModels: new Set(),
-        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+        systemDefaultModel: "anthropic/claude-sonnet-4-6",
       }
 
       // when
@@ -714,7 +714,7 @@ describe("resolveModelWithFallback", () => {
           { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
         ],
         availableModels: new Set(["google/gemini-3-pro-preview", "anthropic/claude-opus-4-6"]),
-        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+        systemDefaultModel: "anthropic/claude-sonnet-4-6",
       }
 
       // when
@@ -733,7 +733,7 @@ describe("resolveModelWithFallback", () => {
           { providers: ["google"], model: "gemini-3-pro" },
         ],
         availableModels: new Set(["google/gemini-3-pro", "google/gemini-3-pro-preview"]),
-        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+        systemDefaultModel: "anthropic/claude-sonnet-4-6",
       }
 
       // when
@@ -789,7 +789,7 @@ describe("resolveModelWithFallback", () => {
       const input: ExtendedModelResolutionInput = {
         categoryDefaultModel: "google/gemini-3-pro",
         availableModels: new Set(),
-        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+        systemDefaultModel: "anthropic/claude-sonnet-4-6",
       }
 
       // when

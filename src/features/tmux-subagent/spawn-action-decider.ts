@@ -32,7 +32,7 @@ export function decideSpawnActions(
 	)
 	const currentCount = state.agentPanes.length
 
-	if (agentAreaWidth < minPaneWidth) {
+	if (agentAreaWidth < minPaneWidth && currentCount > 0) {
 		return {
 			canSpawn: false,
 			actions: [],

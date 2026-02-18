@@ -28,7 +28,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // #when - accessing Sisyphus requirement
-    // #then - fallbackChain has claude-opus-4-6 first, glm-4.7-free last
+    // #then - fallbackChain has claude-opus-4-6 first, big-pickle last
     expect(sisyphus).toBeDefined()
     expect(sisyphus.fallbackChain).toBeArray()
     expect(sisyphus.fallbackChain).toHaveLength(5)
@@ -41,7 +41,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 
     const last = sisyphus.fallbackChain[4]
     expect(last.providers[0]).toBe("opencode")
-    expect(last.model).toBe("glm-4.7-free")
+    expect(last.model).toBe("big-pickle")
   })
 
   test("librarian has valid fallbackChain with glm-4.7 as primary", () => {
@@ -284,18 +284,18 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("anthropic")
   })
 
-  test("unspecified-low has valid fallbackChain with claude-sonnet-4-5 as primary", () => {
+  test("unspecified-low has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
     // given - unspecified-low category requirement
     const unspecifiedLow = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
     // when - accessing unspecified-low requirement
-    // then - fallbackChain exists with claude-sonnet-4-5 as first entry
+    // then - fallbackChain exists with claude-sonnet-4-6 as first entry
     expect(unspecifiedLow).toBeDefined()
     expect(unspecifiedLow.fallbackChain).toBeArray()
     expect(unspecifiedLow.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = unspecifiedLow.fallbackChain[0]
-    expect(primary.model).toBe("claude-sonnet-4-5")
+    expect(primary.model).toBe("claude-sonnet-4-6")
     expect(primary.providers[0]).toBe("anthropic")
   })
 
@@ -336,7 +336,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
     // when - accessing writing requirement
-    // then - fallbackChain: k2p5 → gemini-3-flash → claude-sonnet-4-5
+    // then - fallbackChain: k2p5 → gemini-3-flash → claude-sonnet-4-6
     expect(writing).toBeDefined()
     expect(writing.fallbackChain).toBeArray()
     expect(writing.fallbackChain).toHaveLength(3)
@@ -404,7 +404,7 @@ describe("FallbackEntry type", () => {
     // given - a FallbackEntry without variant
     const entry: FallbackEntry = {
       providers: ["opencode", "anthropic"],
-      model: "glm-4.7-free",
+      model: "big-pickle",
     }
 
     // when - accessing variant
@@ -434,7 +434,7 @@ describe("ModelRequirement type", () => {
   test("ModelRequirement variant is optional", () => {
     // given - a ModelRequirement without top-level variant
     const requirement: ModelRequirement = {
-      fallbackChain: [{ providers: ["opencode"], model: "glm-4.7-free" }],
+      fallbackChain: [{ providers: ["opencode"], model: "big-pickle" }],
     }
 
     // when - accessing variant

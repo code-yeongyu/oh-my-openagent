@@ -11,9 +11,15 @@ export interface ProviderAvailability {
 	isMaxPlan: boolean
 }
 
+export interface UltraworkConfig {
+	model: string
+	variant?: string
+}
+
 export interface AgentConfig {
 	model: string
 	variant?: string
+	ultrawork?: UltraworkConfig
 }
 
 export interface CategoryConfig {

@@ -11,8 +11,8 @@ describe("Agent Config Integration", () => {
         Sisyphus: { model: "anthropic/claude-opus-4-6" },
         Atlas: { model: "anthropic/claude-opus-4-6" },
         "Prometheus (Planner)": { model: "anthropic/claude-opus-4-6" },
-        "Metis (Plan Consultant)": { model: "anthropic/claude-sonnet-4-5" },
-        "Momus (Plan Reviewer)": { model: "anthropic/claude-sonnet-4-5" },
+        "Metis (Plan Consultant)": { model: "anthropic/claude-sonnet-4-6" },
+        "Momus (Plan Reviewer)": { model: "anthropic/claude-sonnet-4-6" },
       }
 
       // when - migration is applied
@@ -46,7 +46,7 @@ describe("Agent Config Integration", () => {
       const config = {
         sisyphus: { model: "anthropic/claude-opus-4-6" },
         oracle: { model: "openai/gpt-5.2" },
-        librarian: { model: "opencode/glm-4.7-free" },
+        librarian: { model: "opencode/big-pickle" },
       }
 
       // when - migration is applied
@@ -65,7 +65,7 @@ describe("Agent Config Integration", () => {
         Sisyphus: { model: "anthropic/claude-opus-4-6" },
         oracle: { model: "openai/gpt-5.2" },
         "Prometheus (Planner)": { model: "anthropic/claude-opus-4-6" },
-        librarian: { model: "opencode/glm-4.7-free" },
+        librarian: { model: "opencode/big-pickle" },
       }
 
       // when - migration is applied

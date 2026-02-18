@@ -40,7 +40,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		const inheritedModel = undefined
-		const systemDefaultModel = "anthropic/claude-sonnet-4-5"
+		const systemDefaultModel = "anthropic/claude-sonnet-4-6"
 
 		//#when
 		const result = await resolveCategoryExecution(args, executorCtx, inheritedModel, systemDefaultModel)
@@ -65,7 +65,7 @@ describe("resolveCategoryExecution", () => {
 		}
 		const executorCtx = createMockExecutorContext()
 		const inheritedModel = undefined
-		const systemDefaultModel = "anthropic/claude-sonnet-4-5"
+		const systemDefaultModel = "anthropic/claude-sonnet-4-6"
 
 		//#when
 		const result = await resolveCategoryExecution(args, executorCtx, inheritedModel, systemDefaultModel)

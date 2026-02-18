@@ -27,7 +27,7 @@ export { createInteractiveBashSessionHook } from "./interactive-bash-session";
 export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
 export { createCategorySkillReminderHook } from "./category-skill-reminder";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
-export { createSisyphusGptHephaestusReminderHook } from "./sisyphus-gpt-hephaestus-reminder";
+export { createNoSisyphusGptHook } from "./no-sisyphus-gpt";
 export { createAutoSlashCommandHook } from "./auto-slash-command";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
 export { createJsonErrorRecoveryHook } from "./json-error-recovery";
@@ -47,3 +47,5 @@ export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
 export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createRuntimeFallbackHook, type RuntimeFallbackHook, type RuntimeFallbackOptions } from "./runtime-fallback";
 export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
+
+export { createUltraworkModelOverrideHook } from "./ultrawork-model-override";

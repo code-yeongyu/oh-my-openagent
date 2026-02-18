@@ -40,66 +40,69 @@ RULES:
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`
 
-export const VERIFICATION_REMINDER = `**MANDATORY: WHAT YOU MUST DO RIGHT NOW**
+export const VERIFICATION_REMINDER = `**THE SUBAGENT JUST CLAIMED THIS TASK IS DONE. THEY ARE PROBABLY LYING.**
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Subagents say "done" when code has errors, tests pass trivially, logic is wrong,
+or they quietly added features nobody asked for. This happens EVERY TIME.
+Assume the work is broken until YOU prove otherwise.
 
-CRITICAL: Subagents FREQUENTLY LIE about completion.
-Tests FAILING, code has ERRORS, implementation INCOMPLETE - but they say "done".
+---
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**PHASE 1: READ THE CODE FIRST (before running anything)**
 
-**STEP 1: AUTOMATED VERIFICATION (DO THIS FIRST)**
+Do NOT run tests yet. Read the code FIRST so you know what you're testing.
 
-Run these commands YOURSELF - do NOT trust agent's claims:
-1. \`lsp_diagnostics\` on changed files → Must be CLEAN
-2. \`bash\` to run tests → Must PASS
-3. \`bash\` to run build/typecheck → Must succeed
+1. \`Bash("git diff --stat")\` — see exactly which files changed. Any file outside expected scope = scope creep.
+2. \`Read\` EVERY changed file — no exceptions, no skimming.
+3. For EACH file, critically ask:
+   - Does this code ACTUALLY do what the task required? (Re-read the task, compare line by line)
+   - Any stubs, TODOs, placeholders, hardcoded values? (\`Grep\` for TODO, FIXME, HACK, xxx)
+   - Logic errors? Trace the happy path AND the error path in your head.
+   - Anti-patterns? (\`Grep\` for \`as any\`, \`@ts-ignore\`, empty catch, console.log in changed files)
+   - Scope creep? Did the subagent touch things or add features NOT in the task spec?
+4. Cross-check every claim:
+   - Said "Updated X" — READ X. Actually updated, or just superficially touched?
+   - Said "Added tests" — READ the tests. Do they test REAL behavior or just \`expect(true).toBe(true)\`?
+   - Said "Follows patterns" — OPEN a reference file. Does it ACTUALLY match?
 
-**STEP 2: MANUAL CODE REVIEW (NON-NEGOTIABLE — DO NOT SKIP)**
+**If you cannot explain what every changed line does, you have NOT reviewed it.**
 
-Automated checks are NECESSARY but INSUFFICIENT. You MUST read the actual code.
+**PHASE 2: RUN AUTOMATED CHECKS (targeted, then broad)**
 
-**RIGHT NOW — \`Read\` EVERY file the subagent touched. No exceptions.**
+Now that you understand the code, verify mechanically:
+1. \`lsp_diagnostics\` on EACH changed file — ZERO new errors
+2. Run tests for changed modules FIRST, then full suite
+3. Build/typecheck — exit 0
 
-For EACH changed file, verify:
-1. Does the implementation logic ACTUALLY match the task requirements?
-2. Are there incomplete stubs (TODO comments, placeholder code, hardcoded values)?
-3. Are there logic errors, off-by-one bugs, or missing edge cases?
-4. Does it follow existing codebase patterns and conventions?
-5. Are imports correct? No unused or missing imports?
-6. Is error handling present where needed?
+If Phase 1 found issues but Phase 2 passes: Phase 2 is WRONG. The code has bugs that tests don't cover. Fix the code.
 
-**Cross-check the subagent's claims against reality:**
-- Subagent said "Updated X" → READ X. Is it actually updated?
-- Subagent said "Added tests" → READ tests. Do they test the RIGHT behavior?
-- Subagent said "Follows patterns" → COMPARE with reference. Does it actually?
+**PHASE 3: HANDS-ON QA — ACTUALLY RUN IT (MANDATORY for user-facing changes)**
 
-**If you cannot explain what the changed code does, you have not reviewed it.**
-**If you skip this step, you are rubber-stamping broken work.**
+Tests and linters CANNOT catch: visual bugs, wrong CLI output, broken user flows, API response shape issues.
 
-**STEP 3: DETERMINE IF HANDS-ON QA IS NEEDED**
+**If this task produced anything a user would SEE or INTERACT with, you MUST launch it and verify yourself.**
 
-| Deliverable Type | QA Method | Tool |
-|------------------|-----------|------|
-| **Frontend/UI** | Browser interaction | \`/playwright\` skill |
-| **TUI/CLI** | Run interactively | \`interactive_bash\` (tmux) |
-| **API/Backend** | Send real requests | \`bash\` with curl |
+- **Frontend/UI**: \`/playwright\` skill — load the page, click through the flow, check console. Verify: page loads, interactions work, console clean, responsive.
+- **TUI/CLI**: \`interactive_bash\` — run the command, try good input, try bad input, try --help. Verify: command runs, output correct, error messages helpful, edge inputs handled.
+- **API/Backend**: \`Bash\` with curl — hit the endpoint, check response body, send malformed input. Verify: returns 200, body correct, error cases return proper errors.
+- **Config/Build**: Actually start the service or import the config. Verify: loads without error, backward compatible.
 
-Static analysis CANNOT catch: visual bugs, animation issues, user flow breakages.
+This is NOT optional "if applicable". If the deliverable is user-facing and you did not run it, you are shipping untested work.
 
-**STEP 4: IF QA IS NEEDED - ADD TO TODO IMMEDIATELY**
+**PHASE 4: GATE DECISION — Should you proceed to the next task?**
 
-\`\`\`
-todowrite([
-  { id: "qa-X", content: "HANDS-ON QA: [specific verification action]", status: "pending", priority: "high" }
-])
-\`\`\`
+Answer honestly:
+1. Can I explain what EVERY changed line does? (If no — back to Phase 1)
+2. Did I SEE it work with my own eyes? (If user-facing and no — back to Phase 3)
+3. Am I confident nothing existing is broken? (If no — run broader tests)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ALL three must be YES. "Probably" = NO. "I think so" = NO. Investigate until CERTAIN.
 
-**BLOCKING: DO NOT proceed until Steps 1-4 are ALL completed.**
-**Skipping Step 2 (manual code review) = unverified work = FAILURE.**`
+- **All 3 YES** — Proceed: mark task complete, move to next.
+- **Any NO** — Reject: resume session with \`session_id\`, fix the specific issue.
+- **Unsure** — Reject: "unsure" = "no". Investigate until you have a definitive answer.
+
+**DO NOT proceed to the next task until all 4 phases are complete and the gate passes.**`
 
 export const ORCHESTRATOR_DELEGATION_REQUIRED = `
 

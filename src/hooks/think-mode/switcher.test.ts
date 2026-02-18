@@ -30,7 +30,7 @@ describe("think-mode switcher", () => {
 
       it("should resolve github-copilot Claude Sonnet to anthropic config", () => {
         // given a github-copilot provider with Claude Sonnet model
-        const config = getThinkingConfig("github-copilot", "claude-sonnet-4-5")
+        const config = getThinkingConfig("github-copilot", "claude-sonnet-4-6")
 
         // then should return anthropic thinking config
         expect(config).not.toBeNull()
@@ -295,7 +295,7 @@ describe("think-mode switcher", () => {
 
     it("should still work for amazon-bedrock provider", () => {
       // given amazon-bedrock provider with claude model
-      const config = getThinkingConfig("amazon-bedrock", "claude-sonnet-4-5")
+      const config = getThinkingConfig("amazon-bedrock", "claude-sonnet-4-6")
 
       // then should return bedrock thinking config
       expect(config).not.toBeNull()
@@ -364,10 +364,10 @@ describe("think-mode switcher", () => {
     describe("getHighVariant with prefixes", () => {
       it("should preserve vertex_ai/ prefix when getting high variant", () => {
         // given a model ID with vertex_ai/ prefix
-        const variant = getHighVariant("vertex_ai/claude-sonnet-4-5")
+        const variant = getHighVariant("vertex_ai/claude-sonnet-4-6")
 
         // then should return high variant with prefix preserved
-        expect(variant).toBe("vertex_ai/claude-sonnet-4-5-high")
+        expect(variant).toBe("vertex_ai/claude-sonnet-4-6-high")
       })
 
       it("should preserve openai/ prefix when getting high variant", () => {
@@ -389,7 +389,7 @@ describe("think-mode switcher", () => {
       it("should handle multiple different prefixes", () => {
         // given various custom prefixes
         expect(getHighVariant("azure/gpt-5")).toBe("azure/gpt-5-high")
-        expect(getHighVariant("bedrock/claude-sonnet-4-5")).toBe("bedrock/claude-sonnet-4-5-high")
+        expect(getHighVariant("bedrock/claude-sonnet-4-6")).toBe("bedrock/claude-sonnet-4-6-high")
         expect(getHighVariant("custom-llm/gemini-3-pro")).toBe("custom-llm/gemini-3-pro-high")
       })
 
@@ -430,7 +430,7 @@ describe("think-mode switcher", () => {
     describe("getThinkingConfig with prefixes", () => {
       it("should return null for custom providers (not in THINKING_CONFIGS)", () => {
         // given custom provider with prefixed Claude model
-        const config = getThinkingConfig("dia-llm", "vertex_ai/claude-sonnet-4-5")
+        const config = getThinkingConfig("dia-llm", "vertex_ai/claude-sonnet-4-6")
 
         // then should return null (custom provider not in THINKING_CONFIGS)
         expect(config).toBeNull()
@@ -459,13 +459,13 @@ describe("think-mode switcher", () => {
       it("should handle LLM proxy with vertex_ai prefix correctly", () => {
         // given a custom LLM proxy provider using vertex_ai/ prefix
         const providerID = "dia-llm"
-        const modelID = "vertex_ai/claude-sonnet-4-5"
+        const modelID = "vertex_ai/claude-sonnet-4-6"
 
         // when getting high variant
         const highVariant = getHighVariant(modelID)
 
         // then should preserve the prefix
-        expect(highVariant).toBe("vertex_ai/claude-sonnet-4-5-high")
+        expect(highVariant).toBe("vertex_ai/claude-sonnet-4-6-high")
 
         // #and when checking if already high
         expect(isAlreadyHighVariant(modelID)).toBe(false)
