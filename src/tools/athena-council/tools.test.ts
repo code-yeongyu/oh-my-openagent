@@ -3,7 +3,8 @@
 import { describe, expect, test } from "bun:test"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { BackgroundTask } from "../../features/background-agent/types"
-import { createAthenaCouncilTool, filterCouncilMembers } from "./tools"
+import { createAthenaCouncilTool } from "./tools"
+import { filterCouncilMembers } from "./tool-helpers"
 
 const mockManager = {
   getTask: () => undefined,
