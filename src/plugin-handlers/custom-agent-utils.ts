@@ -74,9 +74,9 @@ export function collectCustomAgentSummariesFromRecord(
     summaries.push({
       name,
       description,
-      hidden: agentValue.hidden === true,
-      disabled: agentValue.disabled === true,
-      enabled: agentValue.enabled === false ? false : true,
+      hidden: typeof agentValue.hidden === "boolean" ? agentValue.hidden : undefined,
+      disabled: typeof agentValue.disabled === "boolean" ? agentValue.disabled : undefined,
+      enabled: typeof agentValue.enabled === "boolean" ? agentValue.enabled : undefined,
     });
   }
 
@@ -99,9 +99,15 @@ export function mergeCustomAgentSummaries(...summaryGroups: AgentSummary[][]): A
 
       const existingDescription = existing.description.trim();
       const incomingDescription = summary.description.trim();
-      if (!existingDescription && incomingDescription) {
-        merged.set(key, summary);
-      }
+
+      merged.set(key, {
+        ...existing,
+        ...summary,
+        hidden: summary.hidden ?? existing.hidden,
+        disabled: summary.disabled ?? existing.disabled,
+        enabled: summary.enabled ?? existing.enabled,
+        description: incomingDescription || existingDescription,
+      });
     }
   }
 

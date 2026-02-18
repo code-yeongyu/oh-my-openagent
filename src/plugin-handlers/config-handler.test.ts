@@ -351,6 +351,68 @@ describe("custom agent overrides", () => {
     expect(agentsConfig[pKey].prompt).toContain("translator")
     expect(agentsConfig[pKey].prompt).not.toContain("ghostwriter")
   })
+
+  test("custom agent summary merge preserves flags when custom_agents adds description", async () => {
+    // #given
+    ;(agentLoader.loadUserAgents as any).mockReturnValue({
+      translator: {
+        name: "translator",
+        mode: "subagent",
+        description: "",
+        hidden: true,
+        disabled: true,
+        enabled: false,
+        prompt: "Translate content",
+      },
+    })
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mock: { calls: unknown[][] }
+    }
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      custom_agents: {
+        translator: {
+          description: "Translate and localize locale files",
+        },
+      },
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const firstCallArgs = createBuiltinAgentsMock.mock.calls[0]
+    const summaries = firstCallArgs[7] as Array<{
+      name: string
+      description: string
+      hidden?: boolean
+      disabled?: boolean
+      enabled?: boolean
+    }>
+    const translatorSummary = summaries.find((summary) => summary.name === "translator")
+
+    expect(translatorSummary).toBeDefined()
+    expect(translatorSummary?.description).toBe("Translate and localize locale files")
+    expect(translatorSummary?.hidden).toBe(true)
+    expect(translatorSummary?.disabled).toBe(true)
+    expect(translatorSummary?.enabled).toBe(false)
+  })
 })
 
 describe("Plan agent demote behavior", () => {
