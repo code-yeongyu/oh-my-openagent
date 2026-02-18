@@ -46,7 +46,7 @@ export async function executeCouncil(input: CouncilExecutionInput): Promise<Coun
 
     failures.push({
       member,
-      error: `Launch failed: ${String(result.reason)}`,
+      error: `Launch failed: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`,
     })
   })
 
