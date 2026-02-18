@@ -318,6 +318,40 @@ describe("decideSpawnActions", () => {
       expect(result.reason).toContain("too small")
     })
 
+    it("spawns at exact minimum splittable width with 0 agent panes", () => {
+      // given - canSplitPane requires width >= 2*agentPaneWidth + DIVIDER_SIZE = 2*40+1 = 81
+      const exactThreshold = 2 * defaultConfig.agentPaneWidth + 1
+      const state: WindowState = {
+        windowWidth: exactThreshold,
+        windowHeight: 56,
+        mainPane: { paneId: "%0", width: exactThreshold, height: 56, left: 0, top: 0, title: "main", isActive: true },
+        agentPanes: [],
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
+
+      // then - exactly at threshold should succeed
+      expect(result.canSpawn).toBe(true)
+    })
+
+    it("rejects spawn 1 pixel below minimum splittable width with 0 agent panes", () => {
+      // given - 1 below exact threshold
+      const belowThreshold = 2 * defaultConfig.agentPaneWidth
+      const state: WindowState = {
+        windowWidth: belowThreshold,
+        windowHeight: 56,
+        mainPane: { paneId: "%0", width: belowThreshold, height: 56, left: 0, top: 0, title: "main", isActive: true },
+        agentPanes: [],
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
+
+      // then - 1 below threshold should fail
+      expect(result.canSpawn).toBe(false)
+    })
+
     it("replaces oldest pane when existing panes are too small to split", () => {
       // given - existing pane is below minimum splittable size
       const state = createWindowState(220, 30, [
