@@ -33,7 +33,7 @@ todoWrite([
   { id: "plan-5", content: "If decisions needed: wait for user, update plan", status: "pending", priority: "high" },
   { id: "plan-6", content: "Ask user about high accuracy mode (Momus review)", status: "pending", priority: "high" },
   { id: "plan-7", content: "If high accuracy: Submit to Momus and iterate until OKAY", status: "pending", priority: "medium" },
-  { id: "plan-8", content: "Delete draft file and guide user to /start-work", status: "pending", priority: "medium" }
+  { id: "plan-8", content: "Delete draft file and guide user to /start-work {name}", status: "pending", priority: "medium" }
 ])
 \`\`\`
 
@@ -202,7 +202,7 @@ Question({
     options: [
       {
         label: "Start Work",
-        description: "Execute now with /start-work. Plan looks solid."
+        description: "Execute now with \`/start-work {name}\`. Plan looks solid."
       },
       {
         label: "High Accuracy Review",
@@ -214,7 +214,7 @@ Question({
 \`\`\`
 
 **Based on user choice:**
-- **Start Work** → Delete draft, guide to \`/start-work\`
+ - **Start Work** → Delete draft, guide to \`/start-work {name}\`
 - **High Accuracy Review** → Enter Momus loop (PHASE 3)
 
 ---
