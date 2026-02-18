@@ -977,6 +977,8 @@ Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `sessio
 
 **Note on `directory-agents-injector`**: This hook is **automatically disabled** when running on OpenCode 1.1.37+ because OpenCode now has native support for dynamically resolving AGENTS.md files from subdirectories (PR #10678). This prevents duplicate AGENTS.md injection. For older OpenCode versions, the hook remains active to provide the same functionality.
 
+**Note on `no-sisyphus-gpt`**: Disabling this hook is **STRONGLY discouraged**. Sisyphus is NOT optimized for GPT models — running Sisyphus with GPT performs worse than vanilla Codex and wastes your money. This hook automatically switches to Hephaestus when a GPT model is detected, which is the correct agent for GPT. Only disable this if you fully understand the consequences.
+
 **Note on `auto-update-checker` and `startup-toast`**: The `startup-toast` hook is a sub-feature of `auto-update-checker`. To disable only the startup toast notification while keeping update checking enabled, add `"startup-toast"` to `disabled_hooks`. To disable all update checking features (including the toast), add `"auto-update-checker"` to `disabled_hooks`.
 
 ## Disabled Commands

@@ -32,6 +32,11 @@ export const AgentOverrideConfigSchema = z.object({
       budgetTokens: z.number().optional(),
     })
     .optional(),
+  /** Ultrawork model override configuration. */
+  ultrawork: z.object({
+    model: z.string(),
+    variant: z.string().optional(),
+  }).optional(),
   /** Reasoning effort level (OpenAI). Overrides category and default settings. */
   reasoningEffort: z.enum(["low", "medium", "high", "xhigh"]).optional(),
   /** Text verbosity level. */
