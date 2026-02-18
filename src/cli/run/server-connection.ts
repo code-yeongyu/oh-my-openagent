@@ -3,7 +3,6 @@ import pc from "picocolors"
 import type { ServerConnection } from "./types"
 import { getAvailableServerPort, isPortAvailable, DEFAULT_SERVER_PORT } from "../../shared/port-utils"
 import { withWorkingOpencodePath } from "./opencode-binary-resolver"
-import { prependResolvedOpencodeBinToPath } from "./opencode-bin-path"
 
 function isPortStartFailure(error: unknown, port: number): boolean {
   if (!(error instanceof Error)) {
@@ -28,8 +27,6 @@ export async function createServerConnection(options: {
   attach?: string
   signal: AbortSignal
 }): Promise<ServerConnection> {
-  prependResolvedOpencodeBinToPath()
-
   const { port, attach, signal } = options
 
   if (attach !== undefined) {
