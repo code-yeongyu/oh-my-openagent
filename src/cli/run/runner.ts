@@ -10,6 +10,7 @@ import { resolveRunAgent } from "./agent-resolver"
 import { pollForCompletion } from "./poll-for-completion"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
+import { createTimestampedStdoutController } from "./timestamp-output"
 
 export { resolveRunAgent }
 
@@ -38,6 +39,10 @@ export async function run(options: RunOptions): Promise<number> {
 
   const jsonManager = options.json ? createJsonOutputManager() : null
   if (jsonManager) jsonManager.redirectToStderr()
+  const timestampOutput = options.json || options.timestamp === false
+    ? null
+    : createTimestampedStdoutController()
+  timestampOutput?.enable()
 
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
@@ -138,10 +143,13 @@ export async function run(options: RunOptions): Promise<number> {
     }
   } catch (err) {
     if (jsonManager) jsonManager.restore()
+    timestampOutput?.restore()
     if (err instanceof Error && err.name === "AbortError") {
       return 130
     }
     console.error(pc.red(`Error: ${serializeError(err)}`))
     return 1
+  } finally {
+    timestampOutput?.restore()
   }
 }
