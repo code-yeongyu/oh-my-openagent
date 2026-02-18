@@ -3318,21 +3318,6 @@
             ],
             "additionalProperties": false
           },
-          "ultrawork": {
-            "type": "object",
-            "properties": {
-              "model": {
-                "type": "string"
-              },
-              "variant": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "model"
-            ],
-            "additionalProperties": false
-          },
           "reasoningEffort": {
             "type": "string",
             "enum": [
