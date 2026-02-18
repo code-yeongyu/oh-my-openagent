@@ -171,10 +171,13 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     return cachedDescription
   }
 
-  // Eagerly build description if possible
-  if (options.skills && options.commands !== undefined) {
+  // Eagerly build description when callers pre-provide skills/commands.
+  if (options.skills !== undefined) {
     const skillInfos = options.skills.map(loadedSkillToInfo)
-    cachedDescription = formatCombinedDescription(skillInfos, options.commands)
+    const commandsForDescription = options.commands ?? []
+    cachedDescription = formatCombinedDescription(skillInfos, commandsForDescription)
+  } else if (options.commands !== undefined) {
+    cachedDescription = formatCombinedDescription([], options.commands)
   } else {
     void buildDescription()
   }
