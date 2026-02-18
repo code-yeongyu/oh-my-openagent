@@ -1,7 +1,7 @@
 import type { BackgroundTask } from "./types"
 import type { ResultHandlerContext } from "./result-handler-context"
 import { TASK_CLEANUP_DELAY_MS } from "./constants"
-import { log } from "../../shared"
+import { createInternalAgentTextPart, log } from "../../shared"
 import { getTaskToastManager } from "../task-toast-manager"
 import { formatDuration } from "./duration-formatter"
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
@@ -72,7 +72,7 @@ export async function notifyParentSession(
         ...(agent !== undefined ? { agent } : {}),
         ...(model !== undefined ? { model } : {}),
         ...(tools ? { tools } : {}),
-        parts: [{ type: "text", text: notification }],
+        parts: [createInternalAgentTextPart(notification)],
       },
     })
 
