@@ -7,6 +7,9 @@ import { getAllSkills, extractSkillTemplate } from "../../features/opencode-skil
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
+import { discoverCommandsSync } from "../slashcommand/command-discovery"
+import type { CommandInfo } from "../slashcommand/types"
+import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
 
 function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
   return {
@@ -21,23 +24,38 @@ function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
   }
 }
 
-function formatSkillsXml(skills: SkillInfo[]): string {
-  if (skills.length === 0) return ""
+function formatCombinedDescription(skills: SkillInfo[], commands: CommandInfo[]): string {
+  const lines: string[] = []
 
-  const skillsXml = skills.map(skill => {
-    const lines = [
-      "  <skill>",
-      `    <name>${skill.name}</name>`,
-      `    <description>${skill.description}</description>`,
-    ]
-    if (skill.compatibility) {
-      lines.push(`    <compatibility>${skill.compatibility}</compatibility>`)
-    }
-    lines.push("  </skill>")
-    return lines.join("\n")
-  }).join("\n")
+  if (skills.length === 0 && commands.length === 0) {
+    return TOOL_DESCRIPTION_NO_SKILLS
+  }
 
-  return `\n\n<available_skills>\n${skillsXml}\n</available_skills>`
+  if (skills.length > 0) {
+    const skillsXml = skills.map(skill => {
+      const parts = [
+        "  <skill>",
+        `    <name>${skill.name}</name>`,
+        `    <description>${skill.description}</description>`,
+      ]
+      if (skill.compatibility) {
+        parts.push(`    <compatibility>${skill.compatibility}</compatibility>`)
+      }
+      parts.push("  </skill>")
+      return parts.join("\n")
+    }).join("\n")
+    lines.push(`\n<available_skills>\n${skillsXml}\n</available_skills>`)
+  }
+
+  if (commands.length > 0) {
+    const commandLines = commands.map(cmd => {
+      const hint = cmd.metadata.argumentHint ? ` ${cmd.metadata.argumentHint}` : ""
+      return `  - /${cmd.name}${hint}: ${cmd.metadata.description || "(no description)"} (${cmd.scope})`
+    }).join("\n")
+    lines.push(`\n<available_commands>\n${commandLines}\n</available_commands>`)
+  }
+
+  return TOOL_DESCRIPTION_PREFIX + lines.join("")
 }
 
 async function extractSkillBody(skill: LoadedSkill): Promise<string> {
@@ -128,6 +146,7 @@ async function formatMcpCapabilities(
 
 export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition {
   let cachedSkills: LoadedSkill[] | null = null
+  let cachedCommands: CommandInfo[] | null = options.commands ?? null
   let cachedDescription: string | null = null
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
@@ -137,23 +156,27 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     return cachedSkills
   }
 
-  const getDescription = async (): Promise<string> => {
+  const getCommands = (): CommandInfo[] => {
+    if (cachedCommands) return cachedCommands
+    cachedCommands = discoverCommandsSync()
+    return cachedCommands
+  }
+
+  const buildDescription = async (): Promise<string> => {
     if (cachedDescription) return cachedDescription
     const skills = await getSkills()
+    const commands = getCommands()
     const skillInfos = skills.map(loadedSkillToInfo)
-    cachedDescription = skillInfos.length === 0
-      ? TOOL_DESCRIPTION_NO_SKILLS
-      : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+    cachedDescription = formatCombinedDescription(skillInfos, commands)
     return cachedDescription
   }
 
-  if (options.skills) {
+  // Eagerly build description if possible
+  if (options.skills && options.commands !== undefined) {
     const skillInfos = options.skills.map(loadedSkillToInfo)
-    cachedDescription = skillInfos.length === 0
-      ? TOOL_DESCRIPTION_NO_SKILLS
-      : TOOL_DESCRIPTION_PREFIX + formatSkillsXml(skillInfos)
+    cachedDescription = formatCombinedDescription(skillInfos, options.commands)
   } else {
-    getDescription()
+    void buildDescription()
   }
 
   return tool({
@@ -161,49 +184,79 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       return cachedDescription ?? TOOL_DESCRIPTION_PREFIX
     },
     args: {
-      name: tool.schema.string().describe("The skill identifier from available_skills (e.g., 'code-review')"),
+      name: tool.schema.string().describe("The skill or command name (e.g., 'code-review' or 'publish'). Use without leading slash for commands."),
     },
     async execute(args: SkillArgs, ctx?: { agent?: string }) {
       const skills = await getSkills()
-      const skill = skills.find(s => s.name === args.name)
+      const commands = getCommands()
 
-      if (!skill) {
-        const available = skills.map(s => s.name).join(", ")
-        throw new Error(`Skill "${args.name}" not found. Available skills: ${available || "none"}`)
+      const requestedName = args.name.replace(/^\//, "")
+
+      // Check skills first (exact match, case-insensitive)
+      const matchedSkill = skills.find(s => s.name.toLowerCase() === requestedName.toLowerCase())
+
+      if (matchedSkill) {
+        if (matchedSkill.definition.agent && (!ctx?.agent || matchedSkill.definition.agent !== ctx.agent)) {
+          throw new Error(`Skill "${matchedSkill.name}" is restricted to agent "${matchedSkill.definition.agent}"`)
+        }
+
+        let body = await extractSkillBody(matchedSkill)
+
+        if (matchedSkill.name === "git-master") {
+          body = injectGitMasterConfig(body, options.gitMasterConfig)
+        }
+
+        const dir = matchedSkill.path ? dirname(matchedSkill.path) : matchedSkill.resolvedPath || process.cwd()
+
+        const output = [
+          `## Skill: ${matchedSkill.name}`,
+          "",
+          `**Base directory**: ${dir}`,
+          "",
+          body,
+        ]
+
+        if (options.mcpManager && options.getSessionID && matchedSkill.mcpConfig) {
+          const mcpInfo = await formatMcpCapabilities(
+            matchedSkill,
+            options.mcpManager,
+            options.getSessionID()
+          )
+          if (mcpInfo) {
+            output.push(mcpInfo)
+          }
+        }
+
+        return output.join("\n")
       }
 
-      if (skill.definition.agent && (!ctx?.agent || skill.definition.agent !== ctx.agent)) {
-        throw new Error(`Skill "${args.name}" is restricted to agent "${skill.definition.agent}"`)
+      // Check commands (exact match, case-insensitive)
+      const matchedCommand = commands.find(c => c.name.toLowerCase() === requestedName.toLowerCase())
+
+      if (matchedCommand) {
+        return await formatLoadedCommand(matchedCommand)
       }
 
-      let body = await extractSkillBody(skill)
-
-      if (args.name === "git-master") {
-        body = injectGitMasterConfig(body, options.gitMasterConfig)
-      }
-
-      const dir = skill.path ? dirname(skill.path) : skill.resolvedPath || process.cwd()
-
-      const output = [
-        `## Skill: ${skill.name}`,
-        "",
-        `**Base directory**: ${dir}`,
-        "",
-        body,
+      // No match found — provide helpful error with partial matches
+      const allNames = [
+        ...skills.map(s => s.name),
+        ...commands.map(c => `/${c.name}`),
       ]
 
-      if (options.mcpManager && options.getSessionID && skill.mcpConfig) {
-        const mcpInfo = await formatMcpCapabilities(
-          skill,
-          options.mcpManager,
-          options.getSessionID()
+      const partialMatches = allNames.filter(n =>
+        n.toLowerCase().includes(requestedName.toLowerCase())
+      )
+
+      if (partialMatches.length > 0) {
+        throw new Error(
+          `Skill or command "${args.name}" not found. Did you mean: ${partialMatches.join(", ")}?`
         )
-        if (mcpInfo) {
-          output.push(mcpInfo)
-        }
       }
 
-      return output.join("\n")
+      const available = allNames.join(", ")
+      throw new Error(
+        `Skill or command "${args.name}" not found. Available: ${available || "none"}`
+      )
     },
   })
 }
