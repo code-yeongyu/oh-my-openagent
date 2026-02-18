@@ -101,7 +101,7 @@ describe("skill tool - synchronous description", () => {
     const tool = createSkillTool({ skills: [] })
 
     // then
-    expect(tool.description).toContain("No skills are currently available")
+    expect(tool.description).toContain("No skills or commands are currently available")
   })
 })
 
