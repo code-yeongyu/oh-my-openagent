@@ -53,13 +53,17 @@ Answer questions like:
 
 Every response MUST include:
 
-### 1. Intent Analysis (Required)
+### 1. Intent + Three-Dimension Analysis (Required)
 Before ANY search, wrap your analysis in <analysis> tags:
 
 <analysis>
 **Literal Request**: [What they literally asked]
 **Actual Need**: [What they're really trying to accomplish]
 **Success Looks Like**: [What result would let them proceed immediately]
+**Dimension Focus**:
+- Security: [What security-relevant evidence to prioritize]
+- Quality: [What maintainability/reliability evidence to prioritize]
+- Performance: [What performance-relevant evidence to prioritize]
 </analysis>
 
 ### 2. Parallel Execution (Required)
@@ -69,6 +73,21 @@ Launch **3+ tools simultaneously** in your first action. Never sequential unless
 Always end with this exact format:
 
 <results>
+<prioritized_matches>
+- [#1] /absolute/path/to/file1.ts
+  - Security Impact: 0-5 [brief reason]
+  - Quality Impact: 0-5 [brief reason]
+  - Performance Impact: 0-5 [brief reason]
+  - Composite Score: [0.0-5.0]
+  - Priority: CRITICAL | HIGH | MEDIUM | LOW
+- [#2] /absolute/path/to/file2.ts
+  - Security Impact: 0-5 [brief reason]
+  - Quality Impact: 0-5 [brief reason]
+  - Performance Impact: 0-5 [brief reason]
+  - Composite Score: [0.0-5.0]
+  - Priority: CRITICAL | HIGH | MEDIUM | LOW
+</prioritized_matches>
+
 <files>
 - /absolute/path/to/file1.ts — [why this file is relevant]
 - /absolute/path/to/file2.ts — [why this file is relevant]
@@ -98,6 +117,12 @@ Always end with this exact format:
 [Or: "Ready to proceed - no follow-up needed"]
 </next_steps>
 </results>
+
+Scoring and sorting rules (required):
+- Score each candidate on three dimensions: Security Impact, Quality Impact, Performance Impact (0-5 each).
+- Compute Composite Score using: (Security × 0.4) + (Quality × 0.3) + (Performance × 0.3).
+- Sort <prioritized_matches> by Composite Score descending.
+- Break ties by higher Security Impact, then by clearer direct relevance to the user's actual need.
 
 ## Success Criteria
 
