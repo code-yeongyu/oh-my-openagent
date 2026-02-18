@@ -30,7 +30,11 @@ export function createPluginInterface(args: {
   return {
     tool: tools,
 
-    "chat.params": createChatParamsHandler({ anthropicEffort: hooks.anthropicEffort }),
+    "chat.params": async (input, output) => {
+      await hooks.ultraworkModelOverride?.["chat.params"]?.(input, output)
+      const handler = createChatParamsHandler({ anthropicEffort: hooks.anthropicEffort })
+      await handler(input, output)
+    },
 
     "chat.message": createChatMessageHandler({
       ctx,
