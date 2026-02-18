@@ -1583,6 +1583,14 @@
       "created_at": "2026-02-18T16:43:47Z",
       "repoId": 1108837393,
       "pullRequestNo": 1936
+    },
+    {
+      "name": "gustavosmendes",
+      "id": 87918773,
+      "comment_id": 3922620232,
+      "created_at": "2026-02-18T19:04:24Z",
+      "repoId": 1108837393,
+      "pullRequestNo": 1952
     }
   ]
 }
