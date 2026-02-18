@@ -30,6 +30,9 @@ function resolveMinPaneWidth(options?: CapacityOptions): number {
 	if (typeof options === "number") {
 		return Math.max(1, options)
 	}
+	if (options && typeof options.agentPaneWidth === "number") {
+		return Math.max(1, options.agentPaneWidth)
+	}
 	return MIN_PANE_WIDTH
 }
 
