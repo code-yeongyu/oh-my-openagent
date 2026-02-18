@@ -10,9 +10,10 @@ describe("prependResolvedOpencodeBinToPath", () => {
       PATH: "/Users/yeongyu/node_modules/.bin:/usr/bin",
     }
     const resolver = () => "/tmp/bunx-123/node_modules/opencode-ai/bin/opencode"
+    const pathExists = () => true
 
     //#when
-    prependResolvedOpencodeBinToPath(env, resolver)
+    prependResolvedOpencodeBinToPath(env, resolver, pathExists)
 
     //#then
     expect(env.PATH).toBe(
@@ -26,9 +27,10 @@ describe("prependResolvedOpencodeBinToPath", () => {
       PATH: "/tmp/bunx-123/node_modules/opencode-ai/bin:/usr/bin",
     }
     const resolver = () => "/tmp/bunx-123/node_modules/opencode-ai/bin/opencode"
+    const pathExists = () => true
 
     //#when
-    prependResolvedOpencodeBinToPath(env, resolver)
+    prependResolvedOpencodeBinToPath(env, resolver, pathExists)
 
     //#then
     expect(env.PATH).toBe("/tmp/bunx-123/node_modules/opencode-ai/bin:/usr/bin")
@@ -45,6 +47,21 @@ describe("prependResolvedOpencodeBinToPath", () => {
 
     //#when
     prependResolvedOpencodeBinToPath(env, resolver)
+
+    //#then
+    expect(env.PATH).toBe("/Users/yeongyu/node_modules/.bin:/usr/bin")
+  })
+
+  it("keeps PATH unchanged when resolved binary path does not exist", () => {
+    //#given
+    const env: Record<string, string | undefined> = {
+      PATH: "/Users/yeongyu/node_modules/.bin:/usr/bin",
+    }
+    const resolver = () => "/Users/yeongyu/node_modules/opencode-ai/bin/opencode"
+    const pathExists = () => false
+
+    //#when
+    prependResolvedOpencodeBinToPath(env, resolver, pathExists)
 
     //#then
     expect(env.PATH).toBe("/Users/yeongyu/node_modules/.bin:/usr/bin")
