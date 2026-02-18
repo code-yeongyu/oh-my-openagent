@@ -340,4 +340,41 @@ describe("createWriteExistingFileGuardHook", () => {
       })
     ).resolves.toBeDefined()
   })
+
+  test("#given session permissions #when session deleted #then subsequent writes are blocked", async () => {
+    const existingFile = createFile("cleanup.txt")
+    const sessionID = "ses_cleanup"
+
+    // establish permission by reading the existing file
+    await invoke({
+      tool: "read",
+      sessionID,
+      outputArgs: { filePath: existingFile },
+    })
+
+    // sanity check: write should be allowed while the session is active
+    await expect(
+      invoke({
+        tool: "write",
+        sessionID,
+        outputArgs: { filePath: existingFile, content: "first write" },
+      })
+    ).resolves.toBeDefined()
+
+    // delete the session to trigger cleanup of any stored permissions/state
+    await invoke({
+      tool: "session.deleted",
+      sessionID,
+      outputArgs: {},
+    })
+
+    // after session deletion, the previous permissions must no longer apply
+    await expect(
+      invoke({
+        tool: "write",
+        sessionID,
+        outputArgs: { filePath: existingFile, content: "second write after delete" },
+      })
+    ).rejects.toThrow(BLOCK_MESSAGE)
+  })
 })
