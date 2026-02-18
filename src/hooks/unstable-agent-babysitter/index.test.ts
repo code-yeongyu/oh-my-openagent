@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
 import type { BackgroundTask } from "../../features/background-agent"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import { createUnstableAgentBabysitterHook } from "./index"
 
 const projectDir = process.cwd()
@@ -93,6 +94,7 @@ describe("unstable-agent-babysitter hook", () => {
     expect(text).toContain("background_output")
     expect(text).toContain("background_cancel")
     expect(text).toContain("deep thought")
+    expect(text).toContain(OMO_INTERNAL_INITIATOR_MARKER)
   })
 
   test("fires reminder for hung minimax task", async () => {
@@ -128,6 +130,7 @@ describe("unstable-agent-babysitter hook", () => {
     expect(text).toContain("background_output")
     expect(text).toContain("background_cancel")
     expect(text).toContain("minimax thought")
+    expect(text).toContain(OMO_INTERNAL_INITIATOR_MARKER)
   })
 
   test("does not remind stable model tasks", async () => {
