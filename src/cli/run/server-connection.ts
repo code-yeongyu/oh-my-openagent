@@ -5,6 +5,24 @@ import { getAvailableServerPort, isPortAvailable, DEFAULT_SERVER_PORT } from "..
 import { withWorkingOpencodePath } from "./opencode-binary-resolver"
 import { prependResolvedOpencodeBinToPath } from "./opencode-bin-path"
 
+function isPortStartFailure(error: unknown, port: number): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  return error.message.includes(`Failed to start server on port ${port}`)
+}
+
+async function startServer(options: { signal: AbortSignal, port: number }): Promise<ServerConnection> {
+  const { signal, port } = options
+  const { client, server } = await withWorkingOpencodePath(() =>
+    createOpencode({ signal, port, hostname: "127.0.0.1" }),
+  )
+
+  console.log(pc.dim("Server listening at"), pc.cyan(server.url))
+  return { client, cleanup: () => server.close() }
+}
+
 export async function createServerConnection(options: {
   port?: number
   attach?: string
@@ -29,11 +47,22 @@ export async function createServerConnection(options: {
 
     if (available) {
       console.log(pc.dim("Starting server on port"), pc.cyan(port.toString()))
-      const { client, server } = await withWorkingOpencodePath(() =>
-        createOpencode({ signal, port, hostname: "127.0.0.1" }),
-      )
-      console.log(pc.dim("Server listening at"), pc.cyan(server.url))
-      return { client, cleanup: () => server.close() }
+      try {
+        return await startServer({ signal, port })
+      } catch (error) {
+        if (!isPortStartFailure(error, port)) {
+          throw error
+        }
+
+        const stillAvailable = await isPortAvailable(port, "127.0.0.1")
+        if (stillAvailable) {
+          throw error
+        }
+
+        console.log(pc.dim("Port"), pc.cyan(port.toString()), pc.dim("became occupied, attaching to existing server"))
+        const client = createOpencodeClient({ baseUrl: `http://127.0.0.1:${port}` })
+        return { client, cleanup: () => {} }
+      }
     }
 
     console.log(pc.dim("Port"), pc.cyan(port.toString()), pc.dim("is occupied, attaching to existing server"))
@@ -47,9 +76,16 @@ export async function createServerConnection(options: {
   } else {
     console.log(pc.dim("Starting server on port"), pc.cyan(selectedPort.toString()))
   }
-  const { client, server } = await withWorkingOpencodePath(() =>
-    createOpencode({ signal, port: selectedPort, hostname: "127.0.0.1" }),
-  )
-  console.log(pc.dim("Server listening at"), pc.cyan(server.url))
-  return { client, cleanup: () => server.close() }
+
+  try {
+    return await startServer({ signal, port: selectedPort })
+  } catch (error) {
+    if (!isPortStartFailure(error, selectedPort)) {
+      throw error
+    }
+
+    const { port: retryPort } = await getAvailableServerPort(selectedPort + 1, "127.0.0.1")
+    console.log(pc.dim("Retrying server start on port"), pc.cyan(retryPort.toString()))
+    return await startServer({ signal, port: retryPort })
+  }
 }

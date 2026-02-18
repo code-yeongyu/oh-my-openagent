@@ -95,6 +95,24 @@ describe("createServerConnection", () => {
     expect(mockServerClose).toHaveBeenCalled()
   })
 
+  it("explicit port attaches when start fails because port became occupied", async () => {
+    // given
+    const signal = new AbortController().signal
+    const port = 8080
+    mockIsPortAvailable.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+    mockCreateOpencode.mockRejectedValueOnce(new Error("Failed to start server on port 8080"))
+
+    // when
+    const result = await createServerConnection({ port, signal })
+
+    // then
+    expect(mockIsPortAvailable).toHaveBeenNthCalledWith(1, 8080, "127.0.0.1")
+    expect(mockIsPortAvailable).toHaveBeenNthCalledWith(2, 8080, "127.0.0.1")
+    expect(mockCreateOpencodeClient).toHaveBeenCalledWith({ baseUrl: "http://127.0.0.1:8080" })
+    result.cleanup()
+    expect(mockServerClose).not.toHaveBeenCalled()
+  })
+
   it("explicit port attaches when port is occupied", async () => {
     // given
     const signal = new AbortController().signal
@@ -131,6 +149,32 @@ describe("createServerConnection", () => {
     expect(result.cleanup).toBeDefined()
     result.cleanup()
     expect(mockServerClose).toHaveBeenCalled()
+  })
+
+  it("auto mode retries on next port when initial start fails", async () => {
+    // given
+    const signal = new AbortController().signal
+    mockGetAvailableServerPort
+      .mockResolvedValueOnce({ port: 4096, wasAutoSelected: false })
+      .mockResolvedValueOnce({ port: 4097, wasAutoSelected: true })
+
+    mockCreateOpencode
+      .mockRejectedValueOnce(new Error("Failed to start server on port 4096"))
+      .mockResolvedValueOnce({
+        client: { session: {} },
+        server: { url: "http://127.0.0.1:4097", close: mockServerClose },
+      })
+
+    // when
+    const result = await createServerConnection({ signal })
+
+    // then
+    expect(mockGetAvailableServerPort).toHaveBeenNthCalledWith(1, 4096, "127.0.0.1")
+    expect(mockGetAvailableServerPort).toHaveBeenNthCalledWith(2, 4097, "127.0.0.1")
+    expect(mockCreateOpencode).toHaveBeenNthCalledWith(1, { signal, port: 4096, hostname: "127.0.0.1" })
+    expect(mockCreateOpencode).toHaveBeenNthCalledWith(2, { signal, port: 4097, hostname: "127.0.0.1" })
+    result.cleanup()
+    expect(mockServerClose).toHaveBeenCalledTimes(1)
   })
 
   it("invalid port throws error", async () => {
