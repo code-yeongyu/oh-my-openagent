@@ -101,6 +101,7 @@
           "tasks-todowrite-disabler",
           "write-existing-file-guard",
           "anthropic-effort",
+          "runtime-fallback",
           "hashline-read-enhancer"
         ]
       }
@@ -298,6 +299,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -471,6 +485,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -644,6 +671,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -817,6 +857,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -990,6 +1043,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -1163,6 +1229,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -1336,6 +1415,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -1509,6 +1601,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -1682,6 +1787,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -1855,6 +1973,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -2028,6 +2159,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -2201,6 +2345,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -2374,6 +2531,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -2547,6 +2717,19 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -2628,6 +2811,19 @@
           },
           "is_unstable_agent": {
             "type": "boolean"
+          },
+          "fallback_models": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           },
           "disable": {
             "type": "boolean"
@@ -2972,6 +3168,37 @@
         "enabled",
         "default_max_iterations"
       ],
+      "additionalProperties": false
+    },
+    "runtime_fallback": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "retry_on_errors": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "max_fallback_attempts": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "cooldown_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "timeout_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "notify_on_fallback": {
+          "type": "boolean"
+        }
+      },
       "additionalProperties": false
     },
     "background_task": {
