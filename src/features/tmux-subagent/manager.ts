@@ -58,6 +58,7 @@ export class TmuxSessionManager {
   private deferredSessions = new Map<string, DeferredSession>()
   private deferredQueue: string[] = []
   private deferredAttachInterval?: ReturnType<typeof setInterval>
+  private deferredAttachTickScheduled = false
   private deps: TmuxUtilDeps
   private pollingManager: TmuxPollingManager
   constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
@@ -130,8 +131,14 @@ export class TmuxSessionManager {
   private startDeferredAttachLoop(): void {
     if (this.deferredAttachInterval) return
     this.deferredAttachInterval = setInterval(() => {
+      if (this.deferredAttachTickScheduled) return
+      this.deferredAttachTickScheduled = true
       void this.enqueueSpawn(async () => {
-        await this.tryAttachDeferredSession()
+        try {
+          await this.tryAttachDeferredSession()
+        } finally {
+          this.deferredAttachTickScheduled = false
+        }
       })
     }, POLL_INTERVAL_BACKGROUND_MS)
     log("[tmux-session-manager] deferred attach polling started", {
@@ -143,6 +150,7 @@ export class TmuxSessionManager {
     if (!this.deferredAttachInterval) return
     clearInterval(this.deferredAttachInterval)
     this.deferredAttachInterval = undefined
+    this.deferredAttachTickScheduled = false
     log("[tmux-session-manager] deferred attach polling stopped")
   }
 

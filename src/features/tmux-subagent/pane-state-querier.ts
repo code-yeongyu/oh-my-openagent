@@ -14,7 +14,7 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
       "-t",
       sourcePaneId,
       "-F",
-      "#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_title}\t#{pane_active}\t#{window_width}\t#{window_height}",
+			"#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{pane_title}",
     ],
     { stdout: "pipe", stderr: "pipe" }
   )
@@ -35,7 +35,11 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
   const panes: TmuxPaneInfo[] = []
 
   for (const line of lines) {
-    const [paneId, widthStr, heightStr, leftStr, topStr, title, activeStr, windowWidthStr, windowHeightStr] = line.split("\t")
+		const fields = line.split("\t")
+		if (fields.length < 9) continue
+
+		const [paneId, widthStr, heightStr, leftStr, topStr, activeStr, windowWidthStr, windowHeightStr] = fields
+		const title = fields.slice(8).join("\t")
     const width = parseInt(widthStr, 10)
     const height = parseInt(heightStr, 10)
     const left = parseInt(leftStr, 10)
