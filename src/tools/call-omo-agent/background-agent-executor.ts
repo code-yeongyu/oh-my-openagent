@@ -1,20 +1,27 @@
 import type { BackgroundManager } from "../../features/background-agent"
-import { findFirstMessageWithAgent, findNearestMessageWithFields } from "../../features/hook-message-injector"
+import type { PluginInput } from "@opencode-ai/plugin"
+import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import type { CallOmoAgentArgs } from "./types"
 import type { ToolContextWithMetadata } from "./tool-context-with-metadata"
 import { getMessageDir } from "./message-storage-directory"
+import { getSessionTools } from "../../shared/session-tools-store"
 
 export async function executeBackgroundAgent(
 	args: CallOmoAgentArgs,
 	toolContext: ToolContextWithMetadata,
 	manager: BackgroundManager,
+	client: PluginInput["client"],
 ): Promise<string> {
 	try {
 		const messageDir = getMessageDir(toolContext.sessionID)
-		const prevMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-		const firstMessageAgent = messageDir ? findFirstMessageWithAgent(messageDir) : null
+		const { prevMessage, firstMessageAgent } = await resolveMessageContext(
+			toolContext.sessionID,
+			client,
+			messageDir
+		)
+
 		const sessionAgent = getSessionAgent(toolContext.sessionID)
 		const parentAgent =
 			toolContext.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
@@ -36,6 +43,7 @@ export async function executeBackgroundAgent(
 			parentSessionID: toolContext.sessionID,
 			parentMessageID: toolContext.messageID,
 			parentAgent,
+			parentTools: getSessionTools(toolContext.sessionID),
 		})
 
 		const waitStart = Date.now()
@@ -48,7 +56,7 @@ export async function executeBackgroundAgent(
 				return `Task aborted while waiting for session to start.\n\nTask ID: ${task.id}`
 			}
 			const updated = manager.getTask(task.id)
-			if (updated?.status === "error" || updated?.status === "cancelled") {
+			if (updated?.status === "error" || updated?.status === "cancelled" || updated?.status === "interrupt") {
 				return `Task failed to start (status: ${updated.status}).\n\nTask ID: ${task.id}`
 			}
 			await new Promise<void>((resolve) => {

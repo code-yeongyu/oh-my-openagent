@@ -56,12 +56,14 @@ export function createChatMessageHandler(args: {
     const message = output.message
 
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-      const variant =
-        input.model && input.agent
-          ? resolveVariantForModel(pluginConfig, input.agent, input.model)
-          : resolveAgentVariant(pluginConfig, input.agent)
-      if (variant !== undefined) {
-        message["variant"] = variant
+      if (message["variant"] === undefined) {
+        const variant =
+          input.model && input.agent
+            ? resolveVariantForModel(pluginConfig, input.agent, input.model)
+            : resolveAgentVariant(pluginConfig, input.agent)
+        if (variant !== undefined) {
+          message["variant"] = variant
+        }
       }
       firstMessageVariantGate.markApplied(input.sessionID)
     } else {
@@ -80,6 +82,7 @@ export function createChatMessageHandler(args: {
     await hooks.keywordDetector?.["chat.message"]?.(input, output)
     await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
+    await hooks.sisyphusGptHephaestusReminder?.["chat.message"]?.(input)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }

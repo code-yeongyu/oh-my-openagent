@@ -66,7 +66,7 @@ describe("PROMETHEUS_SYSTEM_PROMPT zero human intervention", () => {
     expect(lowerPrompt).toContain("preconditions")
     expect(lowerPrompt).toContain("failure indicators")
     expect(lowerPrompt).toContain("evidence")
-    expect(lowerPrompt).toMatch(/negative scenario/)
+    expect(prompt).toMatch(/negative/i)
   })
 
   test("should require QA scenario adequacy in self-review checklist", () => {

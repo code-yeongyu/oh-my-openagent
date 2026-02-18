@@ -266,6 +266,24 @@ describe("think-mode switcher", () => {
       expect((config?.thinking as Record<string, unknown>)?.type).toBe("enabled")
     })
 
+    it("should work for direct google-vertex-anthropic provider", () => {
+      //#given direct google-vertex-anthropic provider
+      const config = getThinkingConfig(
+        "google-vertex-anthropic",
+        "claude-opus-4-6"
+      )
+
+      //#when thinking config is resolved
+
+      //#then it should return anthropic-style thinking config
+      expect(config).not.toBeNull()
+      expect(config?.thinking).toBeDefined()
+      expect((config?.thinking as Record<string, unknown>)?.type).toBe("enabled")
+      expect((config?.thinking as Record<string, unknown>)?.budgetTokens).toBe(
+        64000
+      )
+    })
+
     it("should still work for direct google provider", () => {
       // given direct google provider
       const config = getThinkingConfig("google", "gemini-3-pro")
@@ -310,6 +328,17 @@ describe("think-mode switcher", () => {
   describe("THINKING_CONFIGS structure", () => {
     it("should have correct structure for anthropic", () => {
       const config = THINKING_CONFIGS.anthropic
+      expect(config.thinking).toBeDefined()
+      expect(config.maxTokens).toBe(128000)
+    })
+
+    it("should have correct structure for google-vertex-anthropic", () => {
+      //#given google-vertex-anthropic config entry
+      const config = THINKING_CONFIGS["google-vertex-anthropic"]
+
+      //#when structure is validated
+
+      //#then it should match anthropic style structure
       expect(config.thinking).toBeDefined()
       expect(config.maxTokens).toBe(128000)
     })
@@ -470,10 +499,12 @@ describe("think-mode switcher", () => {
   describe("Z.AI GLM-4.7 provider support", () => {
     describe("getThinkingConfig for zai-coding-plan", () => {
       it("should return thinking config for glm-4.7", () => {
-        // given zai-coding-plan provider with glm-4.7 model
+        //#given a Z.ai GLM model
         const config = getThinkingConfig("zai-coding-plan", "glm-4.7")
 
-        // then should return zai-coding-plan thinking config
+        //#when thinking config is resolved
+
+        //#then thinking type is "disabled"
         expect(config).not.toBeNull()
         expect(config?.providerOptions).toBeDefined()
         const zaiOptions = (config?.providerOptions as Record<string, unknown>)?.[
@@ -482,8 +513,7 @@ describe("think-mode switcher", () => {
         expect(zaiOptions?.extra_body).toBeDefined()
         const extraBody = zaiOptions?.extra_body as Record<string, unknown>
         expect(extraBody?.thinking).toBeDefined()
-        expect((extraBody?.thinking as Record<string, unknown>)?.type).toBe("enabled")
-        expect((extraBody?.thinking as Record<string, unknown>)?.clear_thinking).toBe(false)
+        expect((extraBody?.thinking as Record<string, unknown>)?.type).toBe("disabled")
       })
 
       it("should return thinking config for glm-4.6v (multimodal)", () => {
@@ -505,7 +535,7 @@ describe("think-mode switcher", () => {
     })
 
     describe("HIGH_VARIANT_MAP for GLM", () => {
-      it("should NOT have high variant for glm-4.7 (thinking enabled by default)", () => {
+      it("should NOT have high variant for glm-4.7", () => {
         // given glm-4.7 model
         const variant = getHighVariant("glm-4.7")
 

@@ -19,7 +19,7 @@ export function createAtlasHook(ctx: PluginInput, options?: AtlasHookOptions) {
 
   return {
     handler: createAtlasEventHandler({ ctx, options, sessions, getState }),
-    "tool.execute.before": createToolExecuteBeforeHandler({ pendingFilePaths }),
+    "tool.execute.before": createToolExecuteBeforeHandler({ ctx, pendingFilePaths }),
     "tool.execute.after": createToolExecuteAfterHandler({ ctx, pendingFilePaths }),
   }
 }

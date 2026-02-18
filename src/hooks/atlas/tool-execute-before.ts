@@ -1,25 +1,28 @@
 import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { isCallerOrchestrator } from "../../shared/session-utils"
+import type { PluginInput } from "@opencode-ai/plugin"
 import { HOOK_NAME } from "./hook-name"
 import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
 import { isSisyphusPath } from "./sisyphus-path"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 
 export function createToolExecuteBeforeHandler(input: {
+  ctx: PluginInput
   pendingFilePaths: Map<string, string>
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
-  const { pendingFilePaths } = input
+  const { ctx, pendingFilePaths } = input
 
   return async (toolInput, toolOutput): Promise<void> => {
-    if (!isCallerOrchestrator(toolInput.sessionID)) {
+    if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
       return
     }
 
     // Check Write/Edit tools for orchestrator - inject strong warning
+    // Warn-only policy: Atlas guides orchestrators toward delegation but doesn't block, allowing flexibility for urgent fixes
     if (isWriteOrEditToolName(toolInput.tool)) {
       const filePath = (toolOutput.args.filePath ?? toolOutput.args.path ?? toolOutput.args.file) as string | undefined
       if (filePath && !isSisyphusPath(filePath)) {

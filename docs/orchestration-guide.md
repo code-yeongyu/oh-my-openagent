@@ -160,7 +160,7 @@ Another common question: **When should I use Hephaestus vs just typing `ulw` in 
 
 | Aspect | Hephaestus | Sisyphus + `ulw` / `ultrawork` |
 |--------|-----------|-------------------------------|
-| **Model** | GPT-5.2 Codex (medium reasoning) | Claude Opus 4.5 (your default) |
+| **Model** | GPT-5.3 Codex (medium reasoning) | Claude Opus 4.6 (your default) |
 | **Approach** | Autonomous deep worker | Keyword-activated ultrawork mode |
 | **Best For** | Complex architectural work, deep reasoning | General complex tasks, "just do it" scenarios |
 | **Planning** | Self-plans during execution | Uses Prometheus plans if available |
@@ -183,8 +183,8 @@ Switch to Hephaestus (Tab → Select Hephaestus) when:
    - "Integrate our Rust core with the TypeScript frontend"
    - "Migrate from MongoDB to PostgreSQL with zero downtime"
 
-4. **You specifically want GPT-5.2 Codex reasoning**
-   - Some problems benefit from GPT-5.2's training characteristics
+4. **You specifically want GPT-5.3 Codex reasoning**
+   - Some problems benefit from GPT-5.3 Codex's training characteristics
 
 **Example:**
 ```
@@ -231,7 +231,7 @@ Use the `ulw` keyword in Sisyphus when:
 | Hephaestus | Sisyphus + ulw |
 |------------|----------------|
 | You manually switch to Hephaestus agent | You type `ulw` in any Sisyphus session |
-| GPT-5.2 Codex with medium reasoning | Your configured default model |
+| GPT-5.3 Codex with medium reasoning | Your configured default model |
 | Optimized for autonomous deep work | Optimized for general execution |
 | Always uses explore-first approach | Respects existing plans if available |
 | "Smart intern that needs no supervision" | "Smart intern that follows your workflow" |
@@ -240,7 +240,7 @@ Use the `ulw` keyword in Sisyphus when:
 
 **For most users**: Use `ulw` keyword in Sisyphus. It's the default path and works excellently for 90% of complex tasks.
 
-**For power users**: Switch to Hephaestus when you specifically need GPT-5.2 Codex's reasoning style or want the "AmpCode deep mode" experience of fully autonomous exploration and execution.
+**For power users**: Switch to Hephaestus when you specifically need GPT-5.3 Codex's reasoning style or want the "AmpCode deep mode" experience of fully autonomous exploration and execution.
 
 ---
 
@@ -354,7 +354,7 @@ Press `Tab` at the prompt to see available agents:
 |-------|---------------|
 | **Prometheus** | You want to create a detailed work plan |
 | **Atlas** | You want to manually control plan execution (rare) |
-| **Hephaestus** | You need GPT-5.2 Codex for deep autonomous work |
+| **Hephaestus** | You need GPT-5.3 Codex for deep autonomous work |
 | **Sisyphus** | Return to default agent for normal prompting |
 
 ---
@@ -421,4 +421,4 @@ Type `exit` or start a new session. Atlas is primarily entered via `/start-work`
 
 **For most tasks**: Type `ulw` in Sisyphus.
 
-**Use Hephaestus when**: You specifically need GPT-5.2 Codex's reasoning style for deep architectural work or complex debugging.
+**Use Hephaestus when**: You specifically need GPT-5.3 Codex's reasoning style for deep architectural work or complex debugging.

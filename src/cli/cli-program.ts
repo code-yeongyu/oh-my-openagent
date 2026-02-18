@@ -67,20 +67,19 @@ program
    .command("run <message>")
    .allowUnknownOption()
    .passThroughOptions()
-   .description("Run opencode with todo/background task completion enforcement")
+  .description("Run opencode with todo/background task completion enforcement")
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-d, --directory <path>", "Working directory")
-  .option("-t, --timeout <ms>", "Timeout in milliseconds (default: 30 minutes)", parseInt)
   .option("-p, --port <port>", "Server port (attaches if port already in use)", parseInt)
   .option("--attach <url>", "Attach to existing opencode server URL")
   .option("--on-complete <command>", "Shell command to run after completion")
   .option("--json", "Output structured JSON result to stdout")
+  .option("--verbose", "Show full event stream (default: messages/tools only)")
   .option("--session-id <id>", "Resume existing session instead of creating new one")
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode run "Fix the bug in index.ts"
   $ bunx oh-my-opencode run --agent Sisyphus "Implement feature X"
-  $ bunx oh-my-opencode run --timeout 3600000 "Large refactoring task"
   $ bunx oh-my-opencode run --port 4321 "Fix the bug"
   $ bunx oh-my-opencode run --attach http://127.0.0.1:4321 "Fix the bug"
   $ bunx oh-my-opencode run --json "Fix the bug" | jq .sessionId
@@ -109,11 +108,11 @@ Unlike 'opencode run', this command waits until:
       message,
       agent: options.agent,
       directory: options.directory,
-      timeout: options.timeout,
       port: options.port,
       attach: options.attach,
       onComplete: options.onComplete,
       json: options.json ?? false,
+      verbose: options.verbose ?? false,
       sessionId: options.sessionId,
     }
     const exitCode = await run(runOptions)
@@ -149,29 +148,21 @@ This command shows:
 program
   .command("doctor")
   .description("Check oh-my-opencode installation health and diagnose issues")
+  .option("--status", "Show compact system dashboard")
   .option("--verbose", "Show detailed diagnostic information")
   .option("--json", "Output results in JSON format")
-  .option("--category <category>", "Run only specific category")
   .addHelpText("after", `
 Examples:
-  $ bunx oh-my-opencode doctor
-  $ bunx oh-my-opencode doctor --verbose
-  $ bunx oh-my-opencode doctor --json
-  $ bunx oh-my-opencode doctor --category authentication
-
-Categories:
-  installation     Check OpenCode and plugin installation
-  configuration    Validate configuration files
-  authentication   Check auth provider status
-  dependencies     Check external dependencies
-  tools            Check LSP and MCP servers
-  updates          Check for version updates
+  $ bunx oh-my-opencode doctor            # Show problems only
+  $ bunx oh-my-opencode doctor --status   # Compact dashboard
+  $ bunx oh-my-opencode doctor --verbose  # Deep diagnostics
+  $ bunx oh-my-opencode doctor --json     # JSON output
 `)
   .action(async (options) => {
+    const mode = options.status ? "status" : options.verbose ? "verbose" : "default"
     const doctorOptions: DoctorOptions = {
-      verbose: options.verbose ?? false,
+      mode,
       json: options.json ?? false,
-      category: options.category,
     }
     const exitCode = await doctor(doctorOptions)
     process.exit(exitCode)

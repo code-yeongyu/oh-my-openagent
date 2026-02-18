@@ -1,6 +1,6 @@
 export type { ResultHandlerContext } from "./result-handler-context"
 export { formatDuration } from "./duration-formatter"
-export { getMessageDir } from "./message-storage-locator"
+export { getMessageDir } from "../../shared"
 export { checkSessionTodos } from "./session-todo-checker"
 export { validateSessionHasOutput } from "./session-output-validator"
 export { tryCompleteTask } from "./background-task-completer"

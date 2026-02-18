@@ -1,7 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
-import { getMainSessionID, subagentSessions } from "../../features/claude-code-session-state"
+import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { HOOK_NAME } from "./hook-name"
 import { isAbortError } from "./is-abort-error"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
@@ -41,15 +42,13 @@ export function createAtlasEventHandler(input: {
 
       // Read boulder state FIRST to check if this session is part of an active boulder
       const boulderState = readBoulderState(ctx.directory)
-      const isBoulderSession = boulderState?.session_ids.includes(sessionID) ?? false
+      const isBoulderSession = boulderState?.session_ids?.includes(sessionID) ?? false
 
-      const mainSessionID = getMainSessionID()
-      const isMainSession = sessionID === mainSessionID
       const isBackgroundTaskSession = subagentSessions.has(sessionID)
 
-      // Allow continuation if: main session OR background task OR boulder session
-      if (mainSessionID && !isMainSession && !isBackgroundTaskSession && !isBoulderSession) {
-        log(`[${HOOK_NAME}] Skipped: not main, background task, or boulder session`, { sessionID })
+      // Allow continuation only if: session is in boulder's session_ids OR is a background task
+      if (!isBackgroundTaskSession && !isBoulderSession) {
+        log(`[${HOOK_NAME}] Skipped: not boulder or background task session`, { sessionID })
         return
       }
 
@@ -89,13 +88,21 @@ export function createAtlasEventHandler(input: {
         return
       }
 
-      const requiredAgent = (boulderState.agent ?? "atlas").toLowerCase()
-      const lastAgent = getLastAgentFromSession(sessionID)
-      if (!lastAgent || lastAgent !== requiredAgent) {
+      const lastAgent = await getLastAgentFromSession(sessionID, ctx.client)
+      const lastAgentKey = getAgentConfigKey(lastAgent ?? "")
+      const requiredAgent = getAgentConfigKey(boulderState.agent ?? "atlas")
+      const lastAgentMatchesRequired = lastAgentKey === requiredAgent
+      const boulderAgentWasNotExplicitlySet = boulderState.agent === undefined
+      const boulderAgentDefaultsToAtlas = requiredAgent === "atlas"
+      const lastAgentIsSisyphus = lastAgentKey === "sisyphus"
+      const allowSisyphusWhenDefaultAtlas = boulderAgentWasNotExplicitlySet && boulderAgentDefaultsToAtlas && lastAgentIsSisyphus
+      const agentMatches = lastAgentMatchesRequired || allowSisyphusWhenDefaultAtlas
+      if (!agentMatches) {
         log(`[${HOOK_NAME}] Skipped: last agent does not match boulder agent`, {
           sessionID,
           lastAgent: lastAgent ?? "unknown",
           requiredAgent,
+          boulderAgentExplicitlySet: boulderState.agent !== undefined,
         })
         return
       }
@@ -117,16 +124,21 @@ export function createAtlasEventHandler(input: {
 
       state.lastContinuationInjectedAt = now
       const remaining = progress.total - progress.completed
-      injectBoulderContinuation({
-        ctx,
-        sessionID,
-        planName: boulderState.plan_name,
-        remaining,
-        total: progress.total,
-        agent: boulderState.agent,
-        backgroundManager,
-        sessionState: state,
-      })
+      try {
+        await injectBoulderContinuation({
+          ctx,
+          sessionID,
+          planName: boulderState.plan_name,
+          remaining,
+          total: progress.total,
+          agent: boulderState.agent,
+          backgroundManager,
+          sessionState: state,
+        })
+      } catch (err) {
+        log(`[${HOOK_NAME}] Failed to inject boulder continuation`, { sessionID, error: err })
+        state.promptFailureCount++
+      }
       return
     }
 

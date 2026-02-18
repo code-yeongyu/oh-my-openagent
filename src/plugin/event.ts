@@ -12,6 +12,8 @@ import { lspManager } from "../tools"
 
 import type { CreatedHooks } from "../create-hooks"
 import type { Managers } from "../create-managers"
+import { normalizeSessionStatusToIdle } from "./session-status-normalizer"
+import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles"
 
 type FirstMessageVariantGate = {
   markSessionCreated: (sessionInfo: { id?: string; title?: string; parentID?: string } | undefined) => void
@@ -27,10 +29,7 @@ export function createEventHandler(args: {
 }): (input: { event: { type: string; properties?: Record<string, unknown> } }) => Promise<void> {
   const { ctx, firstMessageVariantGate, managers, hooks } = args
 
-  return async (input): Promise<void> => {
-    const { event } = input
-    const props = event.properties as Record<string, unknown> | undefined
-
+  const dispatchToHooks = async (input: { event: { type: string; properties?: Record<string, unknown> } }): Promise<void> => {
     await Promise.resolve(hooks.autoUpdateChecker?.event?.(input))
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input))
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input))
@@ -55,6 +54,48 @@ export function createEventHandler(args: {
       log("[event] runtimeFallback event handler failed", { error: String(error) })
     }
     await Promise.resolve(hooks.atlasHook?.handler?.(input))
+  }
+
+  const recentSyntheticIdles = new Map<string, number>()
+  const recentRealIdles = new Map<string, number>()
+  const DEDUP_WINDOW_MS = 500
+
+  return async (input): Promise<void> => {
+    pruneRecentSyntheticIdles({
+      recentSyntheticIdles,
+      recentRealIdles,
+      now: Date.now(),
+      dedupWindowMs: DEDUP_WINDOW_MS,
+    })
+
+    if (input.event.type === "session.idle") {
+      const sessionID = (input.event.properties as Record<string, unknown> | undefined)?.sessionID as string | undefined
+      if (sessionID) {
+        const emittedAt = recentSyntheticIdles.get(sessionID)
+        if (emittedAt && Date.now() - emittedAt < DEDUP_WINDOW_MS) {
+          recentSyntheticIdles.delete(sessionID)
+          return
+        }
+        recentRealIdles.set(sessionID, Date.now())
+      }
+    }
+
+    await dispatchToHooks(input)
+
+    const syntheticIdle = normalizeSessionStatusToIdle(input)
+    if (syntheticIdle) {
+      const sessionID = (syntheticIdle.event.properties as Record<string, unknown>)?.sessionID as string
+      const emittedAt = recentRealIdles.get(sessionID)
+      if (emittedAt && Date.now() - emittedAt < DEDUP_WINDOW_MS) {
+        recentRealIdles.delete(sessionID)
+        return
+      }
+      recentSyntheticIdles.set(sessionID, Date.now())
+      await dispatchToHooks(syntheticIdle)
+    }
+
+    const { event } = input
+    const props = event.properties as Record<string, unknown> | undefined
 
     if (event.type === "session.created") {
       const sessionInfo = props?.info as

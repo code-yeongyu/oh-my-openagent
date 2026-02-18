@@ -1,7 +1,7 @@
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
-import { DEFAULT_CATEGORIES } from "./constants"
+import { mergeCategories } from "../../shared/merge-categories"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
 import { parseModelString } from "./model-string-parser"
@@ -29,7 +29,11 @@ export async function resolveCategoryExecution(
 
   const availableModels = await getAvailableModelsForDelegateTask(client)
 
-  const resolved = resolveCategoryConfig(args.category!, {
+  const categoryName = args.category!
+  const enabledCategories = mergeCategories(userCategories)
+  const categoryExists = enabledCategories[categoryName] !== undefined
+
+  const resolved = resolveCategoryConfig(categoryName, {
     userCategories,
     inheritedModel,
     systemDefaultModel,
@@ -37,6 +41,27 @@ export async function resolveCategoryExecution(
   })
 
   if (!resolved) {
+    const requirement = CATEGORY_MODEL_REQUIREMENTS[categoryName]
+    const allCategoryNames = Object.keys(enabledCategories).join(", ")
+
+    if (categoryExists && requirement?.requiresModel) {
+      return {
+        agentToUse: "",
+        categoryModel: undefined,
+        categoryPromptAppend: undefined,
+        modelInfo: undefined,
+        actualModel: undefined,
+        isUnstableAgent: false,
+        error: `Category "${categoryName}" requires model "${requirement.requiresModel}" which is not available.
+
+To use this category:
+1. Connect a provider with this model: ${requirement.requiresModel}
+2. Or configure an alternative model in your oh-my-opencode.json for this category
+
+Available categories: ${allCategoryNames}`,
+      }
+    }
+
     return {
       agentToUse: "",
       categoryModel: undefined,
@@ -44,7 +69,7 @@ export async function resolveCategoryExecution(
       modelInfo: undefined,
       actualModel: undefined,
       isUnstableAgent: false,
-      error: `Unknown category: "${args.category}". Available: ${Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories }).join(", ")}`,
+      error: `Unknown category: "${categoryName}". Available: ${allCategoryNames}`,
     }
   }
 
@@ -122,7 +147,7 @@ export async function resolveCategoryExecution(
   const categoryPromptAppend = resolved.promptAppend || undefined
 
   if (!categoryModel && !actualModel) {
-    const categoryNames = Object.keys({ ...DEFAULT_CATEGORIES, ...userCategories })
+    const categoryNames = Object.keys(enabledCategories)
     return {
       agentToUse: "",
       categoryModel: undefined,

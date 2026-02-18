@@ -3,6 +3,7 @@ import { join } from "path"
 import { log } from "./logger"
 import { getOpenCodeCacheDir } from "./data-path"
 import * as connectedProvidersCache from "./connected-providers-cache"
+import { normalizeSDKResponse } from "./normalize-sdk-response"
 
 /**
  * Fuzzy match a target model name against available models
@@ -27,8 +28,7 @@ import * as connectedProvidersCache from "./connected-providers-cache"
 function normalizeModelName(name: string): string {
 	return name
 		.toLowerCase()
-		.replace(/claude-(opus|sonnet|haiku)-4-5/g, "claude-$1-4.5")
-		.replace(/claude-(opus|sonnet|haiku)-4\.5/g, "claude-$1-4.5")
+		.replace(/claude-(opus|sonnet|haiku)-(\d+)[.-](\d+)/g, "claude-$1-$2.$3")
 }
 
 export function fuzzyMatchModel(
@@ -69,6 +69,7 @@ export function fuzzyMatchModel(
 	log("[fuzzyMatchModel] substring matches", { targetNormalized, matchCount: matches.length, matches })
 
 	if (matches.length === 0) {
+		log("[fuzzyMatchModel] WARNING: no match found", { target, availableCount: available.size, providers })
 		return null
 	}
 
@@ -159,7 +160,7 @@ export async function fetchAvailableModels(
 			const modelSet = new Set<string>()
 			try {
 				const modelsResult = await client.model.list()
-				const models = modelsResult.data ?? []
+				const models = normalizeSDKResponse(modelsResult, [] as Array<{ provider?: string; id?: string }>)
 				for (const model of models) {
 					if (model?.provider && model?.id) {
 						modelSet.add(`${model.provider}/${model.id}`)
@@ -261,7 +262,7 @@ export async function fetchAvailableModels(
 	if (client?.model?.list) {
 		try {
 			const modelsResult = await client.model.list()
-			const models = modelsResult.data ?? []
+			const models = normalizeSDKResponse(modelsResult, [] as Array<{ provider?: string; id?: string }>)
 
 			for (const model of models) {
 				if (!model?.provider || !model?.id) continue
@@ -280,71 +281,6 @@ export async function fetchAvailableModels(
 	}
 
 	return modelSet
-}
-
-export function isAnyFallbackModelAvailable(
-	fallbackChain: Array<{ providers: string[]; model: string }>,
-	availableModels: Set<string>,
-): boolean {
-	// If we have models, check them first
-	if (availableModels.size > 0) {
-		for (const entry of fallbackChain) {
-			const hasAvailableProvider = entry.providers.some((provider) => {
-				return fuzzyMatchModel(entry.model, availableModels, [provider]) !== null
-			})
-			if (hasAvailableProvider) {
-				return true
-			}
-		}
-	}
-
-	// Fallback: check if any provider in the chain is connected
-	// This handles race conditions where availableModels is empty or incomplete
-	// but we know the provider is connected.
-	const connectedProviders = connectedProvidersCache.readConnectedProvidersCache()
-	if (connectedProviders) {
-		const connectedSet = new Set(connectedProviders)
-		for (const entry of fallbackChain) {
-			if (entry.providers.some((p) => connectedSet.has(p))) {
-				log("[isAnyFallbackModelAvailable] model not in available set, but provider is connected", {
-					model: entry.model,
-					availableCount: availableModels.size,
-				})
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-export function isAnyProviderConnected(
-	providers: string[],
-	availableModels: Set<string>,
-): boolean {
-	if (availableModels.size > 0) {
-		const providerSet = new Set(providers)
-		for (const model of availableModels) {
-			const [provider] = model.split("/")
-			if (providerSet.has(provider)) {
-				log("[isAnyProviderConnected] found model from required provider", { provider, model })
-				return true
-			}
-		}
-	}
-
-	const connectedProviders = connectedProvidersCache.readConnectedProvidersCache()
-	if (connectedProviders) {
-		const connectedSet = new Set(connectedProviders)
-		for (const provider of providers) {
-			if (connectedSet.has(provider)) {
-				log("[isAnyProviderConnected] provider connected via cache", { provider })
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 export function __resetModelCache(): void {}

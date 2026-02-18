@@ -9,6 +9,7 @@ import {
   readBoulderState,
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
+import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -18,6 +19,17 @@ mock.module("../../features/hook-message-injector/constants", () => ({
   OPENCODE_STORAGE: TEST_STORAGE_ROOT,
   MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
   PART_STORAGE: TEST_PART_STORAGE,
+}))
+
+mock.module("../../shared/opencode-message-dir", () => ({
+  getMessageDir: (sessionID: string) => {
+    const dir = join(TEST_MESSAGE_STORAGE, sessionID)
+    return existsSync(dir) ? dir : null
+  },
+}))
+
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => false,
 }))
 
 const { createAtlasHook } = await import("./index")
@@ -77,7 +89,6 @@ describe("atlas hook", () => {
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
     }
-    rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
   })
 
   describe("tool.execute.after handler", () => {
@@ -631,15 +642,14 @@ describe("atlas hook", () => {
     }
 
      beforeEach(() => {
-       mock.module("../../features/claude-code-session-state", () => ({
-         getMainSessionID: () => MAIN_SESSION_ID,
-         subagentSessions: new Set<string>(),
-       }))
+       _resetForTesting()
+       subagentSessions.clear()
        setupMessageStorage(MAIN_SESSION_ID, "atlas")
      })
 
     afterEach(() => {
       cleanupMessageStorage(MAIN_SESSION_ID)
+      _resetForTesting()
     })
 
     test("should inject continuation when boulder has incomplete tasks", async () => {
@@ -688,6 +698,34 @@ describe("atlas hook", () => {
       })
 
       // then - should not call prompt
+      expect(mockInput._promptMock).not.toHaveBeenCalled()
+    })
+
+    test("should not inject when main session is not in boulder session_ids", async () => {
+      // given - boulder state exists but current (main) session is NOT in session_ids
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["some-other-session-id"],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when - main session fires idle but is NOT in boulder's session_ids
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then - should NOT call prompt because session is not part of this boulder
       expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 

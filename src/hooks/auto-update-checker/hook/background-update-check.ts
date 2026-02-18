@@ -4,7 +4,7 @@ import { log } from "../../../shared/logger"
 import { invalidatePackage } from "../cache"
 import { PACKAGE_NAME } from "../constants"
 import { extractChannel } from "../version-channel"
-import { findPluginEntry, getCachedVersion, getLatestVersion, updatePinnedVersion } from "../checker"
+import { findPluginEntry, getCachedVersion, getLatestVersion, revertPinnedVersion } from "../checker"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
 async function runBunInstallSafe(): Promise<boolean> {
@@ -56,13 +56,9 @@ export async function runBackgroundUpdateCheck(
   }
 
   if (pluginInfo.isPinned) {
-    const updated = updatePinnedVersion(pluginInfo.configPath, pluginInfo.entry, latestVersion)
-    if (!updated) {
-      await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
-      log("[auto-update-checker] Failed to update pinned version in config")
-      return
-    }
-    log(`[auto-update-checker] Config updated: ${pluginInfo.entry} → ${PACKAGE_NAME}@${latestVersion}`)
+    await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+    log(`[auto-update-checker] User-pinned version detected (${pluginInfo.entry}), skipping auto-update. Notification only.`)
+    return
   }
 
   invalidatePackage(PACKAGE_NAME)
@@ -72,8 +68,14 @@ export async function runBackgroundUpdateCheck(
   if (installSuccess) {
     await showAutoUpdatedToast(ctx, currentVersion, latestVersion)
     log(`[auto-update-checker] Update installed: ${currentVersion} → ${latestVersion}`)
-  } else {
-    await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
-    log("[auto-update-checker] bun install failed; update not installed (falling back to notification-only)")
+    return
   }
+
+  if (pluginInfo.isPinned) {
+    revertPinnedVersion(pluginInfo.configPath, latestVersion, pluginInfo.entry)
+    log("[auto-update-checker] Config reverted due to install failure")
+  }
+
+  await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+  log("[auto-update-checker] bun install failed; update not installed (falling back to notification-only)")
 }

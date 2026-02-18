@@ -26,13 +26,16 @@ export function resolveCategoryConfig(
   categoryName: string,
   options: ResolveCategoryConfigOptions
 ): ResolveCategoryConfigResult | null {
-  const { userCategories, inheritedModel, systemDefaultModel, availableModels } = options
+  const { userCategories, inheritedModel: _inheritedModel, systemDefaultModel, availableModels } = options
 
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
   const hasExplicitUserConfig = userConfig !== undefined
 
-  // Check if category requires a specific model - bypass if user explicitly provides config
+  if (userConfig?.disable) {
+    return null
+  }
+
   const categoryReq = CATEGORY_MODEL_REQUIREMENTS[categoryName]
   if (categoryReq?.requiresModel && availableModels && !hasExplicitUserConfig) {
     if (!isModelAvailable(categoryReq.requiresModel, availableModels)) {

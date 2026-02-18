@@ -1,96 +1,58 @@
-**Generated:** 2026-02-09T14:16:00+09:00
-**Commit:** f22f14d9
-**Branch:** dev
+# src/plugin-handlers/ — 6-Phase Config Loading Pipeline
+
+**Generated:** 2026-02-17
 
 ## OVERVIEW
 
-Plugin component loading and configuration orchestration. 500+ lines of config merging, migration, and component discovery for Claude Code compatibility.
+13 non-test files implementing the `ConfigHandler` — the `config` hook handler. Executes 6 sequential phases to register agents, tools, MCPs, and commands with OpenCode.
 
-## STRUCTURE
-```
-plugin-handlers/
-├── config-handler.ts       # Main config orchestrator (563 lines) - agent/skill/command loading
-├── config-handler.test.ts  # Config handler tests (1061 lines)
-├── plan-model-inheritance.ts # Plan agent model inheritance logic (657 lines)
-├── plan-model-inheritance.test.ts # Inheritance tests (3696 lines)
-└── index.ts               # Barrel export
-```
+## 6-PHASE PIPELINE
 
-## CORE FUNCTIONS
+| Phase | Handler | Purpose |
+|-------|---------|---------|
+| 1 | `applyProviderConfig` | Cache model context limits, detect anthropic-beta headers |
+| 2 | `loadPluginComponents` | Discover Claude Code plugins (10s timeout, error isolation) |
+| 3 | `applyAgentConfig` | Load agents from 5 sources, skill discovery, plan demotion |
+| 4 | `applyToolConfig` | Agent-specific tool permissions |
+| 5 | `applyMcpConfig` | Merge builtin + CC + plugin MCPs |
+| 6 | `applyCommandConfig` | Merge commands/skills from 9 parallel sources |
 
-**Config Handler (`createConfigHandler`):**
-- Loads all plugin components (agents, skills, commands, MCPs)
-- Applies permission migrations for compatibility
-- Merges user/project/global configurations
-- Handles Claude Code plugin integration
+## FILES
 
-**Plan Model Inheritance:**
-- Demotes plan agent to prometheus when planner enabled
-- Preserves user overrides during migration
-- Handles model/variant inheritance from categories
+| File | Lines | Purpose |
+|------|-------|---------|
+| `config-handler.ts` | ~200 | Main orchestrator, 6-phase sequential |
+| `plugin-components-loader.ts` | ~100 | CC plugin discovery (10s timeout) |
+| `agent-config-handler.ts` | ~300 | Agent loading + skill discovery from 5 sources |
+| `mcp-config-handler.ts` | ~150 | Builtin + CC + plugin MCP merge |
+| `command-config-handler.ts` | ~200 | 9 parallel sources for commands/skills |
+| `tool-config-handler.ts` | ~100 | Agent-specific tool grants/denials |
+| `provider-config-handler.ts` | ~80 | Provider config + model cache |
+| `prometheus-agent-config-builder.ts` | ~100 | Prometheus config with model resolution |
+| `plan-model-inheritance.ts` | 28 | Plan demotion logic |
+| `agent-priority-order.ts` | ~30 | sisyphus, hephaestus, prometheus, atlas first |
+| `agent-key-remapper.ts` | ~30 | Agent key → display name |
+| `category-config-resolver.ts` | ~40 | User vs default category lookup |
+| `index.ts` | ~10 | Barrel exports |
 
-## LOADING PHASES
+## TOOL PERMISSIONS
 
-1. **Plugin Discovery**: Load Claude Code plugins with timeout protection
-2. **Component Loading**: Parallel loading of agents, skills, commands
-3. **Config Merging**: User → Project → Global → Defaults
-4. **Migration**: Legacy config format compatibility
-5. **Permission Application**: Tool access control per agent
+| Agent | Granted | Denied |
+|-------|---------|--------|
+| Librarian | grep_app_* | — |
+| Atlas, Sisyphus, Prometheus | task, task_*, teammate | — |
+| Hephaestus | task | — |
+| Default (all others) | — | grep_app_*, task_*, teammate, LSP |
 
-## KEY FEATURES
-
-**Parallel Loading:**
-- Concurrent discovery of user/project/global components
-- Timeout protection for plugin loading (default: 10s)
-- Error isolation (failed plugins don't break others)
-
-**Migration Support:**
-- Agent name mapping (old → new names)
-- Permission format conversion
-- Config structure updates
-
-**Claude Code Integration:**
-- Plugin component loading
-- MCP server discovery
-- Agent/skill/command compatibility
-
-## CONFIGURATION FLOW
+## MULTI-LEVEL CONFIG MERGE
 
 ```
-User Config → Migration → Merging → Validation → Agent Creation → Permission Application
+User (~/.config/opencode/oh-my-opencode.jsonc)
+  ↓ deepMerge
+Project (.opencode/oh-my-opencode.jsonc)
+  ↓ Zod defaults
+Final Config
 ```
 
-## TESTING COVERAGE
-
-- **Config Handler**: 1061 lines of tests
-- **Plan Inheritance**: 3696 lines of tests
-- **Migration Logic**: Legacy compatibility verification
-- **Parallel Loading**: Timeout and error handling
-
-## USAGE PATTERNS
-
-**Config Handler Creation:**
-```typescript
-const handler = createConfigHandler({
-  ctx: { directory: projectDir },
-  pluginConfig: userConfig,
-  modelCacheState: cache
-});
-```
-
-**Plan Demotion:**
-```typescript
-const demotedPlan = buildPlanDemoteConfig(
-  prometheusConfig,
-  userPlanOverrides
-);
-```
-
-**Component Loading:**
-```typescript
-const [agents, skills, commands] = await Promise.all([
-  loadUserAgents(),
-  loadProjectSkills(),
-  loadGlobalCommands()
-]);
-```
+- `agents`, `categories`, `claude_code`: deep merged
+- `disabled_*` arrays: Set union

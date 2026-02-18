@@ -3,6 +3,7 @@ import type { PluginContext } from "./types"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { clearBoulderState } from "../features/boulder-state"
 import { log } from "../shared"
+import { resolveSessionAgent } from "./session-agent-resolver"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -16,7 +17,6 @@ export function createToolExecuteBeforeHandler(args: {
   const { ctx, hooks } = args
 
   return async (input, output): Promise<void> => {
-    await hooks.subagentQuestionBlocker?.["tool.execute.before"]?.(input, output)
     await hooks.writeExistingFileGuard?.["tool.execute.before"]?.(input, output)
     await hooks.questionLabelTruncator?.["tool.execute.before"]?.(input, output)
     await hooks.claudeCodeHooks?.["tool.execute.before"]?.(input, output)
@@ -29,13 +29,17 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.prometheusMdOnly?.["tool.execute.before"]?.(input, output)
     await hooks.sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
-
     if (input.tool === "task") {
       const argsObject = output.args
       const category = typeof argsObject.category === "string" ? argsObject.category : undefined
       const subagentType = typeof argsObject.subagent_type === "string" ? argsObject.subagent_type : undefined
-      if (category && !subagentType) {
+      const sessionId = typeof argsObject.session_id === "string" ? argsObject.session_id : undefined
+
+      if (category) {
         argsObject.subagent_type = "sisyphus-junior"
+      } else if (!subagentType && sessionId) {
+        const resolvedAgent = await resolveSessionAgent(ctx.client, sessionId)
+        argsObject.subagent_type = resolvedAgent ?? "continue"
       }
     }
 

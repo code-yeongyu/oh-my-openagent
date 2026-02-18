@@ -1,64 +1,43 @@
-# CLAUDE TASKS FEATURE KNOWLEDGE BASE
+# src/features/claude-tasks/ — Task Schema + Storage
+
+**Generated:** 2026-02-17
 
 ## OVERVIEW
 
-Claude Code compatible task schema and storage. Provides core task management utilities used by task-related tools and features.
-
-## STRUCTURE
-
-```
-claude-tasks/
-├── types.ts               # Task schema (Zod)
-├── types.test.ts          # Schema validation tests (8 tests)
-├── storage.ts             # File operations
-├── storage.test.ts        # Storage tests (30 tests, 543 lines)
-├── session-storage.ts     # Session-scoped task storage
-├── session-storage.test.ts
-└── index.ts               # Barrel exports
-```
+4 non-test files (~622 LOC). File-based task persistence with atomic writes, locking, and OpenCode todo API sync.
 
 ## TASK SCHEMA
 
 ```typescript
-type TaskStatus = "pending" | "in_progress" | "completed" | "deleted"
-
 interface Task {
-  id: string
-  subject: string           // Imperative: "Run tests" (was: title)
-  description: string
-  status: TaskStatus
-  activeForm?: string       // Present continuous: "Running tests"
-  blocks: string[]          // Task IDs this task blocks
-  blockedBy: string[]       // Task IDs blocking this task (was: dependsOn)
-  owner?: string            // Agent name
+  id: string              // T-{uuid} auto-generated
+  subject: string         // Short title
+  description?: string    // Detailed description
+  status: "pending" | "in_progress" | "completed" | "deleted"
+  activeForm?: string     // Current form/template
+  blocks?: string[]       // Tasks this blocks
+  blockedBy?: string[]    // Tasks blocking this
+  owner?: string          // Agent/session
   metadata?: Record<string, unknown>
+  repoURL?: string        // Associated repository
+  parentID?: string       // Parent task ID
+  threadID?: string       // Session ID (auto-recorded)
 }
 ```
 
-**Key Differences from Legacy**:
-- `subject` (was `title`)
-- `blockedBy` (was `dependsOn`)
-- `blocks` (new field)
-- `activeForm` (new field)
+## FILES
 
-## STORAGE UTILITIES
+| File | Purpose |
+|------|---------|
+| `types.ts` | Task interface + status types |
+| `storage.ts` | `readJsonSafe()`, `writeJsonAtomic()`, `acquireLock()`, `generateTaskId()` |
+| `session-storage.ts` | Per-session task storage, threadID auto-recording |
+| `index.ts` | Barrel exports |
 
-| Function | Purpose |
-|----------|---------|
-| `getTaskDir(config)` | Returns task storage directory path |
-| `resolveTaskListId(config)` | Resolves task list ID (env → config → cwd basename) |
-| `readJsonSafe(path, schema)` | Parse + validate, returns null on failure |
-| `writeJsonAtomic(path, data)` | Atomic write via temp file + rename |
-| `acquireLock(dirPath)` | File-based lock with 30s stale threshold |
-| `generateTaskId()` | Generates `T-{uuid}` task ID |
-| `listTaskFiles(config)` | Lists all task IDs in storage |
-| `getSessionTaskDir(config, sessionID)` | Returns session-scoped task directory |
-| `listSessionTaskFiles(config, sessionID)` | Lists tasks for specific session |
-| `findTaskAcrossSessions(config, taskId)` | Locates task in any session directory |
+## STORAGE
 
-## ANTI-PATTERNS
-
-- Direct fs operations (use storage utilities)
-- Skipping lock acquisition for writes
-- Ignoring null returns from readJsonSafe
-- Using old schema field names (title, dependsOn)
+- Location: `.sisyphus/tasks/` directory
+- Format: JSON files, one per task
+- Atomic writes: temp file → rename
+- Locking: file-based lock for concurrent access
+- Sync: Changes pushed to OpenCode Todo API after each update

@@ -1,70 +1,58 @@
-# MCP KNOWLEDGE BASE
+# src/mcp/ — 3 Built-in Remote MCPs
+
+**Generated:** 2026-02-17
 
 ## OVERVIEW
 
-Tier 1 of three-tier MCP system: 3 built-in remote HTTP MCPs.
+Tier 1 of the three-tier MCP system. 3 remote HTTP MCPs created via `createBuiltinMcps(disabledMcps, config)`.
 
-**Three-Tier System**:
-1. **Built-in** (this directory): websearch, context7, grep_app
-2. **Claude Code compat**: `.mcp.json` with `${VAR}` expansion
-3. **Skill-embedded**: YAML frontmatter in skills
+## BUILT-IN MCPs
 
-## STRUCTURE
+| Name | URL | Env Vars | Tools |
+|------|-----|----------|-------|
+| **websearch** | `mcp.exa.ai` (default) or `mcp.tavily.com` | `EXA_API_KEY` (optional), `TAVILY_API_KEY` (if tavily) | Web search |
+| **context7** | `mcp.context7.com/mcp` | `CONTEXT7_API_KEY` (optional) | Library documentation |
+| **grep_app** | `mcp.grep.app` | None | GitHub code search |
 
-```
-mcp/
-├── index.ts        # createBuiltinMcps() factory
-├── websearch.ts    # Exa AI / Tavily web search
-├── context7.ts     # Library documentation
-├── grep-app.ts     # GitHub code search
-├── types.ts        # McpNameSchema
-└── index.test.ts   # Tests
-```
-
-## MCP SERVERS
-
-| Name | URL | Purpose | Auth |
-|------|-----|---------|------|
-| websearch | mcp.exa.ai/mcp?tools=web_search_exa or mcp.tavily.com/mcp/ | Real-time web search | EXA_API_KEY (optional) / TAVILY_API_KEY (required) |
-| context7 | mcp.context7.com/mcp | Library docs | CONTEXT7_API_KEY (optional) |
-| grep_app | mcp.grep.app | GitHub code search | None |
-
-## Websearch Provider Configuration
-
-| Provider | URL | Auth | API Key Required |
-|----------|-----|------|------------------|
-| exa (default) | mcp.exa.ai/mcp?tools=web_search_exa | query param | No (optional) |
-| tavily | mcp.tavily.com/mcp/ | Authorization Bearer | Yes |
-
-```jsonc
-{
-  "websearch": {
-    "provider": "tavily"  // or "exa" (default)
-  }
-}
-```
-
-## CONFIG PATTERN
+## REGISTRATION PATTERN
 
 ```typescript
-export const mcp_name = {
+// Static export (context7, grep_app)
+export const context7 = {
   type: "remote" as const,
-  url: "https://...",
+  url: "https://mcp.context7.com/mcp",
   enabled: true,
   oauth: false as const,
-  headers?: { ... },
 }
+
+// Factory with config (websearch)
+export function createWebsearchConfig(config?: WebsearchConfig): RemoteMcpConfig
 ```
 
-## HOW TO ADD
+## ENABLE/DISABLE
 
-1. Create `src/mcp/my-mcp.ts` with MCP config object
-2. Add conditional check in `createBuiltinMcps()` in `index.ts`
-3. Add name to `McpNameSchema` in `types.ts`
+```jsonc
+// Method 1: disabled_mcps array
+{ "disabled_mcps": ["websearch", "context7"] }
 
-## NOTES
+// Method 2: enabled flag
+{ "mcp": { "websearch": { "enabled": false } } }
+```
 
-- **Remote only**: HTTP/SSE, no stdio
-- **Disable**: User can set `disabled_mcps: ["name"]` in config
-- **Exa**: Default provider, works without API key
-- **Tavily**: Requires `TAVILY_API_KEY` env var
+## THREE-TIER SYSTEM
+
+| Tier | Source | Mechanism |
+|------|--------|-----------|
+| 1. Built-in | `src/mcp/` | 3 remote HTTP, created by `createBuiltinMcps()` |
+| 2. Claude Code | `.mcp.json` | `${VAR}` expansion via `claude-code-mcp-loader` |
+| 3. Skill-embedded | SKILL.md YAML | Managed by `SkillMcpManager` (stdio + HTTP) |
+
+## FILES
+
+| File | Purpose |
+|------|---------|
+| `index.ts` | `createBuiltinMcps()` factory |
+| `types.ts` | `McpNameSchema`: "websearch" \| "context7" \| "grep_app" |
+| `websearch.ts` | Exa/Tavily provider with config |
+| `context7.ts` | Context7 with optional auth header |
+| `grep-app.ts` | Grep.app (no auth) |

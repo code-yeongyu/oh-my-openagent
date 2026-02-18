@@ -1,15 +1,13 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig } from "./types"
+import { log, normalizeSDKResponse } from "../../shared"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
-  POLL_INTERVAL_BACKGROUND_MS,
-  SESSION_MISSING_GRACE_MS,
   SESSION_READY_POLL_INTERVAL_MS,
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
-import { log } from "../../shared"
 import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeActions, executeAction } from "./action-executor"
@@ -30,13 +28,6 @@ const defaultTmuxDeps: TmuxUtilDeps = {
   isInsideTmux: defaultIsInsideTmux,
   getCurrentPaneId: defaultGetCurrentPaneId,
 }
-
-const SESSION_TIMEOUT_MS = 10 * 60 * 1000
-
-// Stability detection constants (prevents premature closure - see issue #1330)
-// Mirrors the proven pattern from background-agent/manager.ts
-const MIN_STABILITY_TIME_MS = 10 * 1000  // Must run at least 10s before stability detection kicks in
-const STABLE_POLLS_REQUIRED = 3          // 3 consecutive idle polls (~6s with 2s poll interval)
 
 /**
  * State-first Tmux Session Manager
@@ -103,7 +94,7 @@ export class TmuxSessionManager {
     while (Date.now() - startTime < SESSION_READY_TIMEOUT_MS) {
       try {
         const statusResult = await this.client.session.status({ path: undefined })
-        const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+        const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
         
         if (allStatuses[sessionId]) {
           log("[tmux-session-manager] session ready", {
@@ -125,12 +116,6 @@ export class TmuxSessionManager {
       timeoutMs: SESSION_READY_TIMEOUT_MS,
     })
     return false
-  }
-
-  // NOTE: Exposed (via `as any`) for test stability checks.
-  // Actual polling is owned by TmuxPollingManager.
-  private async pollSessions(): Promise<void> {
-    await (this.pollingManager as any).pollSessions()
   }
 
   async onSessionCreated(event: SessionCreatedEvent): Promise<void> {
@@ -228,10 +213,17 @@ export class TmuxSessionManager {
         const sessionReady = await this.waitForSessionReady(sessionId)
         
         if (!sessionReady) {
-          log("[tmux-session-manager] session not ready after timeout, tracking anyway", {
+          log("[tmux-session-manager] session not ready after timeout, closing spawned pane", {
             sessionId,
             paneId: result.spawnedPaneId,
           })
+
+          await executeAction(
+            { type: "close", paneId: result.spawnedPaneId, sessionId },
+            { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
+          )
+
+          return
         }
         
         const now = Date.now()

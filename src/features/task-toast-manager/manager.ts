@@ -217,3 +217,7 @@ export function initTaskToastManager(
   instance = new TaskToastManager(client, concurrencyManager)
   return instance
 }
+
+export function _resetTaskToastManagerForTesting(): void {
+  instance = null
+}

@@ -1,17 +1,26 @@
+/// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 
 import type { BackgroundManager } from "../../features/background-agent"
 import { setMainSession, subagentSessions, _resetForTesting } from "../../features/claude-code-session-state"
 import { createTodoContinuationEnforcer } from "."
+import {
+  CONTINUATION_COOLDOWN_MS,
+  FAILURE_RESET_WINDOW_MS,
+  MAX_CONSECUTIVE_FAILURES,
+} from "./constants"
 
 type TimerCallback = (...args: any[]) => void
 
 interface FakeTimers {
   advanceBy: (ms: number, advanceClock?: boolean) => Promise<void>
+  advanceClockBy: (ms: number) => Promise<void>
   restore: () => void
 }
 
 function createFakeTimers(): FakeTimers {
+  const FAKE_MIN_DELAY_MS = 500
+  const REAL_MAX_DELAY_MS = 5000
   const originalNow = Date.now()
   let clockNow = originalNow
   let timerNow = 0
@@ -51,20 +60,41 @@ function createFakeTimers(): FakeTimers {
   }
 
   globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
-    return schedule(callback, delay, null, args) as unknown as ReturnType<typeof setTimeout>
+    const normalized = normalizeDelay(delay)
+    if (normalized < FAKE_MIN_DELAY_MS) {
+      return original.setTimeout(callback, delay, ...args)
+    }
+    if (normalized >= REAL_MAX_DELAY_MS) {
+      return original.setTimeout(callback, delay, ...args)
+    }
+    return schedule(callback, normalized, null, args) as unknown as ReturnType<typeof setTimeout>
   }) as typeof setTimeout
 
   globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
     const interval = normalizeDelay(delay)
-    return schedule(callback, delay, interval, args) as unknown as ReturnType<typeof setInterval>
+    if (interval < FAKE_MIN_DELAY_MS) {
+      return original.setInterval(callback, delay, ...args)
+    }
+    if (interval >= REAL_MAX_DELAY_MS) {
+      return original.setInterval(callback, delay, ...args)
+    }
+    return schedule(callback, interval, interval, args) as unknown as ReturnType<typeof setInterval>
   }) as typeof setInterval
 
-  globalThis.clearTimeout = ((id?: number) => {
-    clear(id)
+  globalThis.clearTimeout = ((id?: Parameters<typeof clearTimeout>[0]) => {
+    if (typeof id === "number" && timers.has(id)) {
+      clear(id)
+      return
+    }
+    original.clearTimeout(id)
   }) as typeof clearTimeout
 
-  globalThis.clearInterval = ((id?: number) => {
-    clear(id)
+  globalThis.clearInterval = ((id?: Parameters<typeof clearInterval>[0]) => {
+    if (typeof id === "number" && timers.has(id)) {
+      clear(id)
+      return
+    }
+    original.clearInterval(id)
   }) as typeof clearInterval
 
   Date.now = () => clockNow
@@ -106,6 +136,12 @@ function createFakeTimers(): FakeTimers {
     await Promise.resolve()
   }
 
+  const advanceClockBy = async (ms: number) => {
+    const clamped = Math.max(0, ms)
+    clockNow += clamped
+    await Promise.resolve()
+  }
+
   const restore = () => {
     globalThis.setTimeout = original.setTimeout
     globalThis.clearTimeout = original.clearTimeout
@@ -114,7 +150,7 @@ function createFakeTimers(): FakeTimers {
     Date.now = original.dateNow
   }
 
-  return { advanceBy, restore }
+  return { advanceBy, advanceClockBy, restore }
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -129,6 +165,15 @@ describe("todo-continuation-enforcer", () => {
       id: string
       role: "user" | "assistant"
       error?: { name: string; data?: { message: string } }
+    }
+  }
+
+  interface PromptRequestOptions {
+    path: { id: string }
+    body: {
+      agent?: string
+      model?: { providerID?: string; modelID?: string }
+      parts: Array<{ text: string }>
     }
   }
 
@@ -266,23 +311,23 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
-  test("should not inject for non-main session", async () => {
-    // given - main session set, different session goes idle
-    setMainSession("main-session")
+  test("should inject for any session with incomplete todos", async () => {
+    fakeTimers.restore()
+    //#given — any session, not necessarily main session
     const otherSession = "other-session"
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
-    // when - non-main session goes idle
+    //#when — session goes idle
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID: otherSession } },
     })
 
-    await fakeTimers.advanceBy(3000)
-
-    // then - no continuation injected
-    expect(promptCalls).toHaveLength(0)
-  })
+    //#then — continuation injected regardless of session type
+    await wait(2500)
+    expect(promptCalls.length).toBe(1)
+    expect(promptCalls[0].sessionID).toBe(otherSession)
+  }, { timeout: 15000 })
 
   test("should inject for background task session (subagent)", async () => {
     fakeTimers.restore()
@@ -478,6 +523,300 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should not inject again when cooldown is active", async () => {
+    //#given
+    const sessionID = "main-cooldown-active"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+  })
+
+  test("should inject again when cooldown expires", async () => {
+    //#given
+    const sessionID = "main-cooldown-expired"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+  }, { timeout: 15000 })
+
+  test("should apply cooldown even after injection failure", async () => {
+    //#given
+    const sessionID = "main-failure-cooldown"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+  })
+
+  test("should stop retries after max consecutive failures", async () => {
+    //#given
+    const sessionID = "main-max-consecutive-failures"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      if (index < MAX_CONSECUTIVE_FAILURES - 1) {
+        await fakeTimers.advanceClockBy(1_000_000)
+      }
+    }
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES)
+  }, { timeout: 30000 })
+
+  test("should resume retries after reset window when max failures reached", async () => {
+    //#given
+    const sessionID = "main-recovery-after-max-failures"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      if (index < MAX_CONSECUTIVE_FAILURES - 1) {
+        await fakeTimers.advanceClockBy(1_000_000)
+      }
+    }
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    await fakeTimers.advanceClockBy(FAILURE_RESET_WINDOW_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES + 1)
+  }, { timeout: 30000 })
+
+  test("should increase cooldown exponentially after consecutive failures", async () => {
+    //#given
+    const sessionID = "main-exponential-backoff"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+  }, { timeout: 30000 })
+
+  test("should reset consecutive failure count after successful injection", async () => {
+    //#given
+    const sessionID = "main-reset-consecutive-failures"
+    setMainSession(sessionID)
+    let shouldFail = true
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      if (shouldFail) {
+        shouldFail = false
+        throw new Error("simulated auth failure")
+      }
+      return {}
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS * 2)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(3)
+  }, { timeout: 30000 })
+
+  test("should keep injecting even when todos remain unchanged across cycles", async () => {
+    //#given
+    const sessionID = "main-no-stagnation-cap"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "completed", priority: "medium" },
+    ]})
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when — 5 consecutive idle cycles with unchanged todos
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then — all 5 injections should fire (no stagnation cap)
+    expect(promptCalls).toHaveLength(5)
+  }, { timeout: 60000 })
+
+  test("should skip idle handling while injection is in flight", async () => {
+    //#given
+    const sessionID = "main-in-flight"
+    setMainSession(sessionID)
+    let resolvePrompt: (() => void) | undefined
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: any) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      await new Promise<void>((resolve) => {
+        resolvePrompt = resolve
+      })
+      return {}
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2100, true)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(3000, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+
+    resolvePrompt?.()
+    await Promise.resolve()
+  })
+
+  test("should clear cooldown state on session deleted", async () => {
+    //#given
+    const sessionID = "main-delete-state-reset"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+    await hook.handler({
+      event: { type: "session.deleted", properties: { info: { id: sessionID } } },
+    })
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+  }, { timeout: 15000 })
+
   test("should accept skipAgents option without error", async () => {
     // given - session with skipAgents configured for Prometheus
     const sessionID = "main-prometheus-option"
@@ -527,16 +866,16 @@ describe("todo-continuation-enforcer", () => {
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
-    await fakeTimers.advanceBy(3500)
+    await fakeTimers.advanceBy(3500, true)
 
     // then - first injection happened
     expect(promptCalls.length).toBe(1)
 
-    // when - immediately trigger second idle (no 10s wait needed)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
-    await fakeTimers.advanceBy(3500)
+    await fakeTimers.advanceBy(3500, true)
 
     // then - second injection also happened (no throttle blocking)
     expect(promptCalls.length).toBe(2)
@@ -1313,4 +1652,5 @@ describe("todo-continuation-enforcer", () => {
     // then - no continuation injected (all countdowns cancelled)
     expect(promptCalls).toHaveLength(0)
   })
+
 })

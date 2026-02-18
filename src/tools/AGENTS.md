@@ -1,92 +1,109 @@
-# TOOLS KNOWLEDGE BASE
+# src/tools/ — 26 Tools Across 14 Directories
+
+**Generated:** 2026-02-17
 
 ## OVERVIEW
 
-25+ tools across 14 directories. Two patterns: Direct ToolDefinition (static) and Factory Function (context-dependent).
+26 tools registered via `createToolRegistry()`. Two patterns: factory functions (`createXXXTool`) for 19 tools, direct `ToolDefinition` for 7 (LSP + interactive_bash).
 
-**Categories**: LSP (6), AST-Grep (2), Search (2), Session (4), Task (4), Agent delegation (1), Background (2), Skill (2), System (2), MCP (1), Command (1)
+## TOOL CATALOG
 
-## STRUCTURE
+### Task Management (4)
 
-```
-tools/
-├── [tool-name]/
-│   ├── index.ts      # Barrel export
-│   ├── tools.ts      # ToolDefinition or factory
-│   ├── types.ts      # Zod schemas
-│   └── constants.ts  # Fixed values
-├── lsp/              # 6 tools: goto_definition, find_references, symbols, diagnostics, prepare_rename, rename
-├── ast-grep/         # 2 tools: search, replace (25 languages)
-├── delegate-task/    # Category routing (constants.ts 569 lines, tools.test.ts 3582 lines)
-├── task/             # 4 tools: create, get, list, update (Claude Code compatible)
-├── session-manager/  # 4 tools: list, read, search, info
-├── grep/             # Custom grep (60s timeout, 10MB limit)
-├── glob/             # 60s timeout, 100 file limit
-├── interactive-bash/ # Tmux session management
-├── look-at/          # Multimodal PDF/image analysis
-├── skill/            # Skill execution
-├── skill-mcp/        # Skill MCP operations
-├── slashcommand/     # Slash command dispatch
-├── call-omo-agent/   # Direct agent invocation
-└── background-task/  # background_output, background_cancel
-```
+| Tool | Factory | Parameters |
+|------|---------|------------|
+| `task_create` | `createTaskCreateTool` | subject, description, blockedBy, blocks, metadata, parentID |
+| `task_list` | `createTaskList` | (none) |
+| `task_get` | `createTaskGetTool` | id |
+| `task_update` | `createTaskUpdateTool` | id, subject, description, status, addBlocks, addBlockedBy, owner, metadata |
 
-## TOOL CATEGORIES
+### Delegation (1)
 
-| Category | Tools | Pattern |
-|----------|-------|---------|
-| LSP | lsp_goto_definition, lsp_find_references, lsp_symbols, lsp_diagnostics, lsp_prepare_rename, lsp_rename | Direct |
-| Search | ast_grep_search, ast_grep_replace, grep, glob | Direct |
-| Session | session_list, session_read, session_search, session_info | Direct |
-| Task | task_create, task_get, task_list, task_update | Factory |
-| Agent | call_omo_agent | Factory |
-| Background | background_output, background_cancel | Factory |
-| System | interactive_bash, look_at | Mixed |
-| Skill | skill, skill_mcp | Factory |
-| Command | slashcommand | Factory |
+| Tool | Factory | Parameters |
+|------|---------|------------|
+| `task` | `createDelegateTask` | description, prompt, category, subagent_type, run_in_background, session_id, load_skills, command |
 
-## TASK TOOLS
+**8 Built-in Categories**: visual-engineering, ultrabrain, deep, artistry, quick, unspecified-low, unspecified-high, writing
 
-Claude Code compatible task management.
+### Agent Invocation (1)
 
-- **task_create**: Creates a new task. Auto-generates ID and syncs to Todo.
-- **task_get**: Retrieves a task by ID.
-- **task_list**: Lists active tasks. Filters out completed/deleted by default.
-- **task_update**: Updates task fields. Supports additive `addBlocks`/`addBlockedBy`.
+| Tool | Factory | Parameters |
+|------|---------|------------|
+| `call_omo_agent` | `createCallOmoAgent` | description, prompt, subagent_type, run_in_background, session_id |
 
-## HOW TO ADD
+### Background Tasks (2)
 
-1. Create `src/tools/[name]/` with standard files
-2. Use `tool()` from `@opencode-ai/plugin/tool`
-3. Export from `src/tools/index.ts`
-4. Static tools → `builtinTools`, Factory → separate export
+| Tool | Factory | Parameters |
+|------|---------|------------|
+| `background_output` | `createBackgroundOutput` | task_id, block, timeout, full_session, include_thinking, message_limit |
+| `background_cancel` | `createBackgroundCancel` | taskId, all |
 
-## TOOL PATTERNS
+### LSP Refactoring (6) — Direct ToolDefinition
 
-**Direct ToolDefinition**:
-```typescript
-export const grep: ToolDefinition = tool({
-  description: "...",
-  args: { pattern: tool.schema.string() },
-  execute: async (args) => result,
-})
-```
+| Tool | Parameters |
+|------|------------|
+| `lsp_goto_definition` | filePath, line, character |
+| `lsp_find_references` | filePath, line, character, includeDeclaration |
+| `lsp_symbols` | filePath, scope (document/workspace), query, limit |
+| `lsp_diagnostics` | filePath, severity |
+| `lsp_prepare_rename` | filePath, line, character |
+| `lsp_rename` | filePath, line, character, newName |
 
-**Factory Function** (context-dependent):
-```typescript
-export function createDelegateTask(ctx, manager): ToolDefinition {
-  return tool({ execute: async (args) => { /* uses ctx */ } })
-}
-```
+### Code Search (4)
 
-## NAMING
+| Tool | Factory | Parameters |
+|------|---------|------------|
+| `ast_grep_search` | `createAstGrepTools` | pattern, lang, paths, globs, context |
+| `ast_grep_replace` | `createAstGrepTools` | pattern, rewrite, lang, paths, globs, dryRun |
+| `grep` | `createGrepTools` | pattern, path, include (60s timeout, 10MB limit) |
+| `glob` | `createGlobTools` | pattern, path (60s timeout, 100 file limit) |
 
-- **Tool names**: snake_case (`lsp_goto_definition`)
-- **Functions**: camelCase (`createDelegateTask`)
-- **Directories**: kebab-case (`delegate-task/`)
+### Session History (4)
 
-## ANTI-PATTERNS
+| Tool | Factory | Parameters |
+|------|---------|------------|
+| `session_list` | `createSessionManagerTools` | (none) |
+| `session_read` | `createSessionManagerTools` | session_id, include_todos, limit |
+| `session_search` | `createSessionManagerTools` | query, session_id, case_sensitive, limit |
+| `session_info` | `createSessionManagerTools` | session_id |
 
-- **Sequential bash**: Use `&&` or delegation
-- **Raw file ops**: Never mkdir/touch in tool logic
-- **Sleep**: Use polling loops
+### Skill/Command (3)
+
+| Tool | Factory | Parameters |
+|------|---------|------------|
+| `skill` | `createSkillTool` | name |
+| `skill_mcp` | `createSkillMcpTool` | mcp_name, tool_name/resource_name/prompt_name, arguments, grep |
+| `slashcommand` | `createSlashcommandTool` | command, user_message |
+
+### System (2)
+
+| Tool | Factory | Parameters |
+|------|---------|------------|
+| `interactive_bash` | Direct | tmux_command |
+| `look_at` | `createLookAt` | file_path, image_data, goal |
+
+### Editing (1) — Conditional
+
+| Tool | Factory | Parameters |
+|------|---------|------------|
+| `hashline_edit` | `createHashlineEditTool` | file, edits[] |
+
+## DELEGATION CATEGORIES
+
+| Category | Model | Domain |
+|----------|-------|--------|
+| visual-engineering | gemini-3-pro | Frontend, UI/UX |
+| ultrabrain | gpt-5.3-codex xhigh | Hard logic |
+| deep | gpt-5.3-codex medium | Autonomous problem-solving |
+| artistry | gemini-3-pro high | Creative approaches |
+| quick | claude-haiku-4-5 | Trivial tasks |
+| unspecified-low | claude-sonnet-4-5 | Moderate effort |
+| unspecified-high | claude-opus-4-6 max | High effort |
+| writing | kimi-k2p5 | Documentation |
+
+## HOW TO ADD A TOOL
+
+1. Create `src/tools/{name}/index.ts` exporting factory
+2. Create `src/tools/{name}/types.ts` for parameter schemas
+3. Create `src/tools/{name}/tools.ts` for implementation
+4. Register in `src/plugin/tool-registry.ts`

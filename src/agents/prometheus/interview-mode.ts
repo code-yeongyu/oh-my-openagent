@@ -65,9 +65,13 @@ Or should I just note down this single fix?"
 
 **Research First:**
 \`\`\`typescript
-// Prompt structure: CONTEXT (what I'm doing) + GOAL (what I'm trying to achieve) + QUESTION (what I need to know) + REQUEST (what to find)
-task(subagent_type="explore", load_skills=[], prompt="I'm refactoring [target] and need to understand its impact scope before making changes. Find all usages via lsp_find_references - show calling code, patterns of use, and potential breaking points.", run_in_background=true)
-task(subagent_type="explore", load_skills=[], prompt="I'm about to modify [affected code] and need to ensure behavior preservation. Find existing test coverage - which tests exercise this code, what assertions exist, and any gaps in coverage.", run_in_background=true)
+// Prompt structure (each field substantive):
+//   [CONTEXT]: Task, files/modules involved, approach
+//   [GOAL]: Specific outcome needed — what decision/action results will unblock
+//   [DOWNSTREAM]: How results will be used
+//   [REQUEST]: What to find, return format, what to SKIP
+task(subagent_type="explore", load_skills=[], prompt="I'm refactoring [target] and need to map its full impact scope before making changes. I'll use this to build a safe refactoring plan. Find all usages via lsp_find_references — call sites, how return values are consumed, type flow, and patterns that would break on signature changes. Also check for dynamic access that lsp_find_references might miss. Return: file path, usage pattern, risk level (high/medium/low) per call site.", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="I'm about to modify [affected code] and need to understand test coverage for behavior preservation. I'll use this to decide whether to add tests first. Find all test files exercising this code — what each asserts, what inputs it uses, public API vs internals. Identify coverage gaps: behaviors used in production but untested. Return a coverage map: tested vs untested behaviors.", run_in_background=true)
 \`\`\`
 
 **Interview Focus:**
@@ -90,10 +94,10 @@ task(subagent_type="explore", load_skills=[], prompt="I'm about to modify [affec
 **Pre-Interview Research (MANDATORY):**
 \`\`\`typescript
 // Launch BEFORE asking user questions
-// Prompt structure: CONTEXT + GOAL + QUESTION + REQUEST
-task(subagent_type="explore", load_skills=[], prompt="I'm building a new [feature] and want to maintain codebase consistency. Find similar implementations in this project - their structure, patterns used, and conventions to follow.", run_in_background=true)
-task(subagent_type="explore", load_skills=[], prompt="I'm adding [feature type] to the project and need to understand existing conventions. Find how similar features are organized - file structure, naming patterns, and architectural approach.", run_in_background=true)
-task(subagent_type="librarian", load_skills=[], prompt="I'm implementing [technology] and want to follow established best practices. Find official documentation and community recommendations - setup patterns, common pitfalls, and production-ready examples.", run_in_background=true)
+// Prompt structure: [CONTEXT] + [GOAL] + [DOWNSTREAM] + [REQUEST]
+task(subagent_type="explore", load_skills=[], prompt="I'm building a new [feature] from scratch and need to match existing codebase conventions exactly. I'll use this to copy the right file structure and patterns. Find 2-3 most similar implementations — document: directory structure, naming pattern, public API exports, shared utilities used, error handling, and registration/wiring steps. Return concrete file paths and patterns, not abstract descriptions.", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="I'm adding [feature type] and need to understand organizational conventions to match them. I'll use this to determine directory layout and naming scheme. Find how similar features are organized: nesting depth, index.ts barrel pattern, types conventions, test file placement, registration patterns. Compare 2-3 feature directories. Return the canonical structure as a file tree.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="I'm implementing [technology] in production and need authoritative guidance to avoid common mistakes. I'll use this for setup and configuration decisions. Find official docs: setup, project structure, API reference, pitfalls, and migration gotchas. Also find 1-2 production-quality OSS examples (not tutorials). Skip beginner guides — I need production patterns only.", run_in_background=true)
 \`\`\`
 
 **Interview Focus** (AFTER research):
@@ -132,7 +136,7 @@ Based on your stack, I'd recommend NextAuth.js - it integrates well with Next.js
 
 Run this check:
 \`\`\`typescript
-task(subagent_type="explore", load_skills=[], prompt="I'm assessing this project's test setup before planning work that may require TDD. I need to understand what testing capabilities exist. Find test infrastructure: package.json test scripts, config files (jest.config, vitest.config, pytest.ini), and existing test files. Report: 1) Does test infra exist? 2) What framework? 3) Example test patterns.", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="I'm assessing test infrastructure before planning TDD work. I'll use this to decide whether to include test setup tasks. Find: 1) Test framework — package.json scripts, config files (jest/vitest/bun/pytest), test dependencies. 2) Test patterns — 2-3 representative test files showing assertion style, mock strategy, organization. 3) Coverage config and test-to-source ratio. 4) CI integration — test commands in .github/workflows. Return structured report: YES/NO per capability with examples.", run_in_background=true)
 \`\`\`
 
 #### Step 2: Ask the Test Question (MANDATORY)
@@ -230,8 +234,8 @@ Add to draft immediately:
 
 **Research First:**
 \`\`\`typescript
-task(subagent_type="explore", load_skills=[], prompt="I'm planning architectural changes and need to understand the current system design. Find existing architecture: module boundaries, dependency patterns, data flow, and key abstractions used.", run_in_background=true)
-task(subagent_type="librarian", load_skills=[], prompt="I'm designing architecture for [domain] and want to make informed decisions. Find architectural best practices - proven patterns, trade-offs, and lessons learned from similar systems.", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="I'm planning architectural changes and need to understand current system design. I'll use this to identify safe-to-change vs load-bearing boundaries. Find: module boundaries (imports), dependency direction, data flow patterns, key abstractions (interfaces, base classes), and any ADRs. Map top-level dependency graph, identify circular deps and coupling hotspots. Return: modules, responsibilities, dependencies, critical integration points.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="I'm designing architecture for [domain] and need to evaluate trade-offs before committing. I'll use this to present concrete options to the user. Find architectural best practices for [domain]: proven patterns, scalability trade-offs, common failure modes, and real-world case studies. Look at engineering blogs (Netflix/Uber/Stripe-level) and architecture guides. Skip generic pattern catalogs — I need domain-specific guidance.", run_in_background=true)
 \`\`\`
 
 **Oracle Consultation** (recommend when stakes are high):
@@ -253,9 +257,9 @@ task(subagent_type="oracle", load_skills=[], prompt="Architecture consultation n
 
 **Parallel Investigation:**
 \`\`\`typescript
-task(subagent_type="explore", load_skills=[], prompt="I'm researching how to implement [feature] and need to understand current approach. Find how X is currently handled in this codebase - implementation details, edge cases covered, and any known limitations.", run_in_background=true)
-task(subagent_type="librarian", load_skills=[], prompt="I'm implementing Y and need authoritative guidance. Find official documentation - API reference, configuration options, and recommended usage patterns.", run_in_background=true)
-task(subagent_type="librarian", load_skills=[], prompt="I'm looking for battle-tested implementations of Z. Find open source projects that solve this - focus on production-quality code, how they handle edge cases, and any gotchas documented.", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="I'm researching [feature] to decide whether to extend or replace the current approach. I'll use this to recommend a strategy. Find how [X] is currently handled — full path from entry to result: core files, edge cases handled, error scenarios, known limitations (TODOs/FIXMEs), and whether this area is actively evolving (git blame). Return: what works, what's fragile, what's missing.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="I'm implementing [Y] and need authoritative guidance to make correct API choices first try. I'll use this to follow intended patterns, not anti-patterns. Find official docs: API reference, config options with defaults, migration guides, and recommended patterns. Check for 'common mistakes' sections and GitHub issues for gotchas. Return: key API signatures, recommended config, pitfalls.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="I'm looking for battle-tested implementations of [Z] to identify the consensus approach. I'll use this to avoid reinventing the wheel. Find OSS projects (1000+ stars) solving this — focus on: architecture decisions, edge case handling, test strategy, documented gotchas. Compare 2-3 implementations for common vs project-specific patterns. Skip tutorials — production code only.", run_in_background=true)
 \`\`\`
 
 **Interview Focus:**
@@ -281,17 +285,17 @@ task(subagent_type="librarian", load_skills=[], prompt="I'm looking for battle-t
 
 **For Understanding Codebase:**
 \`\`\`typescript
-task(subagent_type="explore", load_skills=[], prompt="I'm working on [topic] and need to understand how it's organized in this project. Find all related files - show the structure, patterns used, and conventions I should follow.", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="I'm working on [topic] and need to understand how it's organized before making changes. I'll use this to match existing conventions. Find all related files — directory structure, naming patterns, export conventions, how modules connect. Compare 2-3 similar modules to identify the canonical pattern. Return file paths with descriptions and the recommended pattern to follow.", run_in_background=true)
 \`\`\`
 
 **For External Knowledge:**
 \`\`\`typescript
-task(subagent_type="librarian", load_skills=[], prompt="I'm integrating [library] and need to understand [specific feature]. Find official documentation - API details, configuration options, and recommended best practices.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="I'm integrating [library] and need to understand [specific feature] for correct first-try implementation. I'll use this to follow recommended patterns. Find official docs: API surface, config options with defaults, TypeScript types, recommended usage, and breaking changes in recent versions. Check changelog if our version differs from latest. Return: API signatures, config snippets, pitfalls.", run_in_background=true)
 \`\`\`
 
 **For Implementation Examples:**
 \`\`\`typescript
-task(subagent_type="librarian", load_skills=[], prompt="I'm implementing [feature] and want to learn from existing solutions. Find open source implementations - focus on production-quality code, architecture decisions, and common patterns.", run_in_background=true)
+task(subagent_type="librarian", load_skills=[], prompt="I'm implementing [feature] and want to learn from production OSS before designing our approach. I'll use this to identify consensus patterns. Find 2-3 established implementations (1000+ stars) — focus on: architecture choices, edge case handling, test strategies, documented trade-offs. Skip tutorials — I need real implementations with proper error handling.", run_in_background=true)
 \`\`\`
 
 ## Interview Mode Anti-Patterns

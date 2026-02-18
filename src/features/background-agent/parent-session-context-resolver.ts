@@ -1,7 +1,7 @@
 import type { OpencodeClient } from "./constants"
 import type { BackgroundTask } from "./types"
 import { findNearestMessageWithFields } from "../hook-message-injector"
-import { getMessageDir } from "./message-storage-locator"
+import { getMessageDir } from "../../shared"
 
 type AgentModel = { providerID: string; modelID: string }
 

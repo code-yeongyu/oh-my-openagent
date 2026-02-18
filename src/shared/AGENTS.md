@@ -1,95 +1,54 @@
-# SHARED UTILITIES KNOWLEDGE BASE
+# src/shared/ — 101 Utility Files in 13 Categories
+
+**Generated:** 2026-02-17
 
 ## OVERVIEW
 
-88 cross-cutting utilities. Import via barrel pattern: `import { log, deepMerge } from "../../shared"`
+Cross-cutting utilities used throughout the plugin. Barrel-exported from `index.ts`. Logger writes to `/tmp/oh-my-opencode.log`.
 
-**Categories**: Path resolution, Token truncation, Config parsing, Model resolution, System directives, Tool restrictions
+## CATEGORY MAP
 
-## STRUCTURE
+| Category | Files | Key Exports |
+|----------|-------|-------------|
+| **Model Resolution** | 17 | `resolveModel()`, `checkModelAvailability()`, `AGENT_MODEL_REQUIREMENTS` |
+| **Tmux Integration** | 11 | `createTmuxSession()`, `spawnPane()`, `closePane()`, server health |
+| **Configuration & Paths** | 10 | `resolveOpenCodeConfigDir()`, `getDataPath()`, `parseJSONC()` |
+| **Session Management** | 8 | `SessionCursor`, `trackInjectedPath()`, `SessionToolsStore` |
+| **Git Worktree** | 7 | `parseGitStatusPorcelain()`, `collectGitDiffStats()`, `formatFileChanges()` |
+| **Command Execution** | 7 | `executeCommand()`, `executeHookCommand()`, embedded command registry |
+| **Migration** | 6 | `migrateConfigFile()`, AGENT_NAME_MAP, HOOK_NAME_MAP, MODEL_VERSION_MAP |
+| **String & Tool Utils** | 6 | `toSnakeCase()`, `normalizeToolName()`, `parseFrontmatter()` |
+| **Agent Configuration** | 5 | `getAgentVariant()`, `AGENT_DISPLAY_NAMES`, `AGENT_TOOL_RESTRICTIONS` |
+| **OpenCode Integration** | 5 | `injectServerAuth()`, `detectExternalPlugins()`, client accessors |
+| **Type Helpers** | 4 | `deepMerge()`, `DynamicTruncator`, `matchPattern()`, `isRecord()` |
+| **Misc** | 8 | `log()`, `readFile()`, `extractZip()`, `downloadBinary()`, `findAvailablePort()` |
+
+## MODEL RESOLUTION PIPELINE
+
 ```
-shared/
-├── git-worktree/          # Git worktree operations (311 lines)
-├── tmux/                  # Tmux TUI integration (227 lines)
-├── logger.ts              # File-based logging (/tmp/oh-my-opencode.log) - 53 imports
-├── dynamic-truncator.ts   # Token-aware context window management (201 lines)
-├── model-resolver.ts      # 3-step resolution (Override → Fallback → Default)
-├── model-requirements.ts  # Agent/category model fallback chains (160 lines)
-├── model-availability.ts  # Provider model fetching & fuzzy matching (358 lines)
-├── model-sanitizer.ts     # Model name sanitization
-├── model-suggestion-retry.ts # Model suggestion on failure
-├── jsonc-parser.ts        # JSONC parsing with comment support
-├── frontmatter.ts         # YAML frontmatter extraction (JSON_SCHEMA only) - 9 imports
-├── data-path.ts           # XDG-compliant storage resolution
-├── opencode-config-dir.ts # ~/.config/opencode resolution (138 lines) - 9 imports
-├── claude-config-dir.ts   # ~/.claude resolution - 9 imports
-├── migration.ts           # Legacy config migration logic (341 lines across dir)
-├── opencode-version.ts    # Semantic version comparison
-├── permission-compat.ts   # Agent tool restriction enforcement - 6 imports
-├── system-directive.ts    # Unified system message prefix & types - 8 imports
-├── session-utils.ts       # Session cursor, orchestrator detection
-├── session-cursor.ts      # Session message cursor tracking
-├── shell-env.ts           # Cross-platform shell environment
-├── agent-variant.ts       # Agent variant from config
-├── zip-extractor.ts       # Binary/Resource ZIP extraction
-├── deep-merge.ts          # Recursive object merging (proto-pollution safe, MAX_DEPTH=50)
-├── command-executor.ts    # Shell command execution (213 lines across dir)
-├── snake-case.ts          # Case conversion utilities
-├── tool-name.ts           # Tool naming conventions
-├── pattern-matcher.ts     # Pattern matching utilities
-├── port-utils.ts          # Port management
-├── file-utils.ts          # File operation utilities
-├── file-reference-resolver.ts # File reference resolution
-├── connected-providers-cache.ts # Provider caching
-├── external-plugin-detector.ts  # Plugin detection
-├── first-message-variant.ts     # Message variant types
-├── opencode-server-auth.ts      # Authentication utilities
-└── index.ts               # Barrel export for all utilities
+resolveModel(input)
+  1. Override: UI-selected model (primary agents only)
+  2. Category default: From category config
+  3. Provider fallback: AGENT_MODEL_REQUIREMENTS chains
+  4. System default: Ultimate fallback
 ```
+
+Key files: `model-resolver.ts` (entry), `model-resolution-pipeline.ts` (orchestration), `model-requirements.ts` (fallback chains), `model-name-matcher.ts` (fuzzy matching).
+
+## MIGRATION SYSTEM
+
+Automatically transforms legacy config on load:
+- `agent-names.ts`: Old agent names → new (e.g., `junior` → `sisyphus-junior`)
+- `hook-names.ts`: Old hook names → new
+- `model-versions.ts`: Old model IDs → current
+- `agent-category.ts`: Legacy agent configs → category system
 
 ## MOST IMPORTED
-| Utility | Imports | Purpose |
-|---------|---------|---------|
-| logger.ts | 53 | Background task visibility |
-| opencode-config-dir.ts | 9 | Path resolution |
-| claude-config-dir.ts | 9 | Path resolution |
-| frontmatter.ts | 9 | YAML parsing |
-| system-directive.ts | 8 | Message filtering |
-| permission-compat.ts | 6 | Tool restrictions |
 
-## WHEN TO USE
-| Task | Utility |
-|------|---------|
-| Path Resolution | `getOpenCodeConfigDir()`, `getDataPath()` |
-| Token Truncation | `dynamicTruncate(ctx, sessionId, output)` |
-| Config Parsing | `readJsoncFile<T>(path)`, `parseJsonc(text)` |
-| Model Resolution | `resolveModelWithFallback(client, reqs, override)` |
-| Version Gating | `isOpenCodeVersionAtLeast(version)` |
-| YAML Metadata | `parseFrontmatter(content)` |
-| Tool Security | `createAgentToolAllowlist(tools)` |
-| System Messages | `createSystemDirective(type)`, `isSystemDirective(msg)` |
-| Deep Merge | `deepMerge(target, source)` |
-
-## KEY PATTERNS
-
-**3-Step Resolution** (Override → Fallback → Default):
-```typescript
-const model = resolveModelWithFallback({
-  userModel: config.agents.sisyphus.model,
-  fallbackChain: AGENT_MODEL_REQUIREMENTS.sisyphus.fallbackChain,
-  availableModels: fetchedModels,
-})
-```
-
-**System Directive Filtering**:
-```typescript
-if (isSystemDirective(message)) return  // Skip system-generated
-const directive = createSystemDirective("TODO CONTINUATION")
-```
-
-## ANTI-PATTERNS
-- **Raw JSON.parse**: Use `jsonc-parser.ts` for comment support
-- **Hardcoded Paths**: Use `*-config-dir.ts` or `data-path.ts`
-- **console.log**: Use `logger.ts` for background task visibility
-- **Unbounded Output**: Use `dynamic-truncator.ts` to prevent overflow
-- **Manual Version Check**: Use `opencode-version.ts` for semver safety
+| Utility | Import Count | Purpose |
+|---------|-------------|---------|
+| `logger.ts` | 62 | `/tmp/oh-my-opencode.log` |
+| `data-path.ts` | 11 | XDG storage resolution |
+| `model-requirements.ts` | 11 | Agent fallback chains |
+| `system-directive.ts` | 11 | System message filtering |
+| `frontmatter.ts` | 10 | YAML metadata extraction |

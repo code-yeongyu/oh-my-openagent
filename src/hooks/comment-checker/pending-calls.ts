@@ -4,6 +4,7 @@ const pendingCalls = new Map<string, PendingCall>()
 const PENDING_CALL_TTL = 60_000
 
 let cleanupIntervalStarted = false
+let cleanupInterval: ReturnType<typeof setInterval> | undefined
 
 function cleanupOldPendingCalls(): void {
   const now = Date.now()
@@ -17,7 +18,10 @@ function cleanupOldPendingCalls(): void {
 export function startPendingCallCleanup(): void {
   if (cleanupIntervalStarted) return
   cleanupIntervalStarted = true
-  setInterval(cleanupOldPendingCalls, 10_000)
+  cleanupInterval = setInterval(cleanupOldPendingCalls, 10_000)
+  if (typeof cleanupInterval === "object" && "unref" in cleanupInterval) {
+    cleanupInterval.unref()
+  }
 }
 
 export function registerPendingCall(callID: string, pendingCall: PendingCall): void {

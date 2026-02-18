@@ -3,10 +3,12 @@ import type { TmuxLayout } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 
 export async function applyLayout(
-	tmux: string,
 	layout: TmuxLayout,
 	mainPaneSize: number,
 ): Promise<void> {
+	const tmux = await getTmuxPath()
+	if (!tmux) return
+
 	const layoutProc = spawn([tmux, "select-layout", layout], {
 		stdout: "ignore",
 		stderr: "ignore",
@@ -27,13 +29,15 @@ export async function applyLayout(
 export async function enforceMainPaneWidth(
 	mainPaneId: string,
 	windowWidth: number,
+	mainPaneSize: number,
 ): Promise<void> {
 	const { log } = await import("../../logger")
 	const tmux = await getTmuxPath()
 	if (!tmux) return
 
 	const dividerWidth = 1
-	const mainWidth = Math.floor((windowWidth - dividerWidth) / 2)
+	const boundedMainPaneSize = Math.max(20, Math.min(80, mainPaneSize))
+	const mainWidth = Math.floor(((windowWidth - dividerWidth) * boundedMainPaneSize) / 100)
 
 	const proc = spawn([tmux, "resize-pane", "-t", mainPaneId, "-x", String(mainWidth)], {
 		stdout: "ignore",
@@ -45,5 +49,6 @@ export async function enforceMainPaneWidth(
 		mainPaneId,
 		mainWidth,
 		windowWidth,
+		mainPaneSize: boundedMainPaneSize,
 	})
 }

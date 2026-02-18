@@ -33,6 +33,7 @@ export async function processFilePathForAgentsInjection(input: {
   const cache = getSessionCache(input.sessionCaches, input.sessionID);
   const agentsPaths = findAgentsMdUp({ startDir: dir, rootDir: input.ctx.directory });
 
+  let dirty = false;
   for (const agentsPath of agentsPaths) {
     const agentsDir = dirname(agentsPath);
     if (cache.has(agentsDir)) continue;
@@ -48,8 +49,11 @@ export async function processFilePathForAgentsInjection(input: {
         : "";
       input.output.output += `\n\n[Directory Context: ${agentsPath}]\n${result}${truncationNotice}`;
       cache.add(agentsDir);
+      dirty = true;
     } catch {}
   }
 
-  saveInjectedPaths(input.sessionID, cache);
+  if (dirty) {
+    saveInjectedPaths(input.sessionID, cache);
+  }
 }

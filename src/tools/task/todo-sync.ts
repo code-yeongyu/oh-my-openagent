@@ -3,7 +3,7 @@ import { log } from "../../shared/logger";
 import type { Task } from "../../features/claude-tasks/types.ts";
 
 export interface TodoInfo {
-  id: string;
+  id?: string;
   content: string;
   status: "pending" | "in_progress" | "completed" | "cancelled";
   priority?: "low" | "medium" | "high";
@@ -45,6 +45,13 @@ function extractPriority(
   }
 
   return undefined;
+}
+
+function todosMatch(todo1: TodoInfo, todo2: TodoInfo): boolean {
+  if (todo1.id && todo2.id) {
+    return todo1.id === todo2.id;
+  }
+  return todo1.content === todo2.content;
 }
 
 export function syncTaskToTodo(task: Task): TodoInfo | null {
@@ -100,8 +107,18 @@ export async function syncTaskTodoUpdate(
       path: { id: sessionID },
     });
     const currentTodos = extractTodos(response);
-    const nextTodos = currentTodos.filter((todo) => todo.id !== task.id);
-    const todo = syncTaskToTodo(task);
+    const taskTodo = syncTaskToTodo(task);
+    const nextTodos = currentTodos.filter((todo) => {
+      if (taskTodo) {
+        return !todosMatch(todo, taskTodo);
+      }
+      // Deleted task: match by id if present, otherwise by content
+      if (todo.id) {
+        return todo.id !== task.id;
+      }
+      return todo.content !== task.subject;
+    });
+    const todo = taskTodo;
 
     if (todo) {
       nextTodos.push(todo);
@@ -122,6 +139,7 @@ export async function syncAllTasksToTodos(
   ctx: PluginInput,
   tasks: Task[],
   sessionID?: string,
+  writer?: TodoWriter,
 ): Promise<void> {
   try {
     let currentTodos: TodoInfo[] = [];
@@ -139,8 +157,10 @@ export async function syncAllTasksToTodos(
 
     const newTodos: TodoInfo[] = [];
     const tasksToRemove = new Set<string>();
+    const allTaskSubjects = new Set<string>();
 
     for (const task of tasks) {
+      allTaskSubjects.add(task.subject);
       const todo = syncTaskToTodo(task);
       if (todo === null) {
         tasksToRemove.add(task.id);
@@ -150,15 +170,27 @@ export async function syncAllTasksToTodos(
     }
 
     const finalTodos: TodoInfo[] = [];
-    const newTodoIds = new Set(newTodos.map((t) => t.id));
+
+    const removedTaskSubjects = new Set(
+      tasks.filter((t) => t.status === "deleted").map((t) => t.subject),
+    );
 
     for (const existing of currentTodos) {
-      if (!newTodoIds.has(existing.id) && !tasksToRemove.has(existing.id)) {
+      const isInNewTodos = newTodos.some((newTodo) => todosMatch(existing, newTodo));
+      const isRemovedById = existing.id ? tasksToRemove.has(existing.id) : false;
+      const isRemovedByContent = !existing.id && removedTaskSubjects.has(existing.content);
+      const isReplacedByTask = !existing.id && allTaskSubjects.has(existing.content);
+      if (!isInNewTodos && !isRemovedById && !isRemovedByContent && !isReplacedByTask) {
         finalTodos.push(existing);
       }
     }
 
     finalTodos.push(...newTodos);
+
+    const resolvedWriter = writer ?? (await resolveTodoWriter());
+    if (resolvedWriter && sessionID) {
+      await resolvedWriter({ sessionID, todos: finalTodos });
+    }
 
     log("[todo-sync] Synced todos", {
       count: finalTodos.length,
