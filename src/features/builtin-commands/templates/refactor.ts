@@ -481,6 +481,45 @@ git commit -m "refactor(scope): description
 [details of what was changed and why]"
 \`\`\`
 
+## 5.4: Dead-Code Detection & Cleanup (MANDATORY BEFORE PHASE 6)
+
+Before final verification, run dead-code analysis and cleanup suggestions.
+
+\`\`\`typescript
+// Preferred path: use dead-code-detector (knip-backed when available)
+const deadCode = createDeadCodeDetector()
+const result = await deadCode.analyze(projectPath)
+const suggestions = deadCode.generateSuggestions(result)
+\`\`\`
+
+### Cleanup Rules
+
+1. **Unused exports**
+   - Remove exports only after confirming they have no runtime usage.
+   - Use \`lsp_find_references\` for confirmation before deletion.
+2. **Unused dependencies**
+   - Propose removal candidates and verify lockfile/build impact.
+   - Use \`bun remove <dep>\` only for confirmed unused packages.
+3. **Uncertain/dynamic exports**
+   - Do not auto-delete.
+   - Keep as manual-review items in the final summary.
+
+### If knip is unavailable
+
+Use fallback detection and report lower confidence:
+
+\`\`\`bash
+# Fallback examples when knip is unavailable
+# 1) Check export usage with LSP references per symbol
+# 2) Compare package.json dependencies against actual imports
+# 3) Flag results as "manual verification required"
+\`\`\`
+
+After each cleanup batch, run:
+- \`lsp_diagnostics\` on changed files
+- Targeted tests for affected modules
+- Typecheck command
+
 **Mark phase-5 as completed when all refactoring steps done.**
 
 ---
