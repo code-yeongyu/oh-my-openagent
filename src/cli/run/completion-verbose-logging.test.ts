@@ -33,6 +33,7 @@ describe("checkCompletionConditions verbose waiting logs", () => {
   it("does not print busy waiting line when verbose is disabled", async () => {
     // given
     const consoleLogSpy = spyOn(console, "log").mockImplementation(() => {})
+    consoleLogSpy.mockClear()
     const ctx = createMockContext({
       childrenBySession: {
         "test-session": [{ id: "child-1" }],
@@ -54,6 +55,7 @@ describe("checkCompletionConditions verbose waiting logs", () => {
   it("prints busy waiting line when verbose is enabled", async () => {
     // given
     const consoleLogSpy = spyOn(console, "log").mockImplementation(() => {})
+    consoleLogSpy.mockClear()
     const ctx = createMockContext({
       childrenBySession: {
         "test-session": [{ id: "child-1" }],
