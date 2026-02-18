@@ -117,7 +117,7 @@ describe("resolveModelWithFallback", () => {
     test("returns uiSelectedModel with override source when provided", () => {
       // given
       const input: ExtendedModelResolutionInput = {
-        uiSelectedModel: "opencode/glm-4.7-free",
+        uiSelectedModel: "opencode/big-pickle",
         userModel: "anthropic/claude-opus-4-6",
         fallbackChain: [
           { providers: ["anthropic", "github-copilot"], model: "claude-opus-4-6" },
@@ -130,15 +130,15 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("opencode/glm-4.7-free")
+      expect(result!.model).toBe("opencode/big-pickle")
       expect(result!.source).toBe("override")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via UI selection", { model: "opencode/glm-4.7-free" })
+      expect(logSpy).toHaveBeenCalledWith("Model resolved via UI selection", { model: "opencode/big-pickle" })
     })
 
     test("UI selection takes priority over config override", () => {
       // given
       const input: ExtendedModelResolutionInput = {
-        uiSelectedModel: "opencode/glm-4.7-free",
+        uiSelectedModel: "opencode/big-pickle",
         userModel: "anthropic/claude-opus-4-6",
         availableModels: new Set(["anthropic/claude-opus-4-6"]),
         systemDefaultModel: "google/gemini-3-pro",
@@ -148,7 +148,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("opencode/glm-4.7-free")
+      expect(result!.model).toBe("opencode/big-pickle")
       expect(result!.source).toBe("override")
     })
 

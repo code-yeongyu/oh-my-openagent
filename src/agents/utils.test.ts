@@ -19,7 +19,7 @@ describe("createBuiltinAgents with model overrides", () => {
         "kimi-for-coding/k2p5",
         "opencode/kimi-k2.5-free",
         "zai-coding-plan/glm-4.7",
-        "opencode/glm-4.7-free",
+        "opencode/big-pickle",
       ])
     )
 
@@ -260,7 +260,7 @@ describe("createBuiltinAgents with model overrides", () => {
         "kimi-for-coding/k2p5",
         "opencode/kimi-k2.5-free",
         "zai-coding-plan/glm-4.7",
-        "opencode/glm-4.7-free",
+        "opencode/big-pickle",
         "openai/gpt-5.2",
       ])
     )
@@ -506,7 +506,7 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
         "kimi-for-coding/k2p5",
         "opencode/kimi-k2.5-free",
         "zai-coding-plan/glm-4.7",
-        "opencode/glm-4.7-free",
+        "opencode/big-pickle",
       ])
     )
 
