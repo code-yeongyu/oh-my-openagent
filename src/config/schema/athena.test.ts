@@ -111,6 +111,17 @@ describe("CouncilMemberSchema", () => {
     expect(parsed.variant).toBeUndefined()
     expect(parsed.name).toBeUndefined()
   })
+
+  test("rejects member config with unknown fields", () => {
+    //#given
+    const config = { model: "openai/gpt-5.3-codex", temperature: 0.2 }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("CouncilConfigSchema", () => {
