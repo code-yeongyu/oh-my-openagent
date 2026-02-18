@@ -258,6 +258,66 @@ describe("decideSpawnActions", () => {
       expect(result.actions[0].type).toBe("spawn")
     })
 
+    it("returns canSpawn=true when 0 agent panes exist and mainPane occupies full window width", () => {
+      // given - tmux reports mainPane.width === windowWidth when no splits exist
+      // agentAreaWidth = max(0, 252 - 252 - 1) = 0, which is < minPaneWidth
+      // but with 0 agent panes, the early return should be skipped
+      const windowWidth = 252
+      const windowHeight = 56
+      const state: WindowState = {
+        windowWidth,
+        windowHeight,
+        mainPane: { paneId: "%0", width: windowWidth, height: windowHeight, left: 0, top: 0, title: "main", isActive: true },
+        agentPanes: [],
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
+
+      // then - should NOT be blocked by agentAreaWidth check
+      expect(result.canSpawn).toBe(true)
+      expect(result.actions.length).toBe(1)
+      expect(result.actions[0].type).toBe("spawn")
+    })
+
+    it("returns canSpawn=false when 0 agent panes and window genuinely too narrow to split", () => {
+      // given - window so narrow that even splitting mainPane wouldn't work
+      // canSplitPane requires width >= 2*minPaneWidth + DIVIDER_SIZE = 2*40+1 = 81
+      const windowWidth = 70
+      const windowHeight = 56
+      const state: WindowState = {
+        windowWidth,
+        windowHeight,
+        mainPane: { paneId: "%0", width: windowWidth, height: windowHeight, left: 0, top: 0, title: "main", isActive: true },
+        agentPanes: [],
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
+
+      // then - should fail because mainPane itself is too small to split
+      expect(result.canSpawn).toBe(false)
+      expect(result.reason).toContain("too small")
+    })
+
+    it("returns canSpawn=false when agent panes exist but agent area too small", () => {
+      // given - 1 agent pane exists, but agent area is below minPaneWidth
+      // this verifies the early return still works for currentCount > 0
+      const state: WindowState = {
+        windowWidth: 180,
+        windowHeight: 44,
+        mainPane: { paneId: "%0", width: 160, height: 44, left: 0, top: 0, title: "main", isActive: true },
+        agentPanes: [{ paneId: "%1", width: 19, height: 44, left: 161, top: 0, title: "agent-0", isActive: false }],
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
+
+      // then - agent area = max(0, 180-160-1) = 19, which is < agentPaneWidth(40)
+      expect(result.canSpawn).toBe(false)
+      expect(result.reason).toContain("too small")
+    })
+
     it("replaces oldest pane when existing panes are too small to split", () => {
       // given - existing pane is below minimum splittable size
       const state = createWindowState(220, 30, [
