@@ -27,7 +27,9 @@ export function buildAgent(
     const categoryConfig = categoryConfigs[agentWithCategory.category]
     if (categoryConfig) {
       if (!base.model) {
-        base.model = categoryConfig.model
+        if (typeof categoryConfig.model === "string") {
+          base.model = categoryConfig.model
+        }
       }
       if (base.temperature === undefined && categoryConfig.temperature !== undefined) {
         base.temperature = categoryConfig.temperature

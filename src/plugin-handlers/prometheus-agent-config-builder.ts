@@ -41,7 +41,8 @@ export async function buildPrometheusAgentConfig(params: {
   const modelResolution = resolveModelPipeline({
     intent: {
       uiSelectedModel: params.currentModel,
-      userModel: params.pluginPrometheusOverride?.model ?? categoryConfig?.model,
+      userModel: params.pluginPrometheusOverride?.model ??
+        (typeof categoryConfig?.model === "string" ? categoryConfig.model : undefined),
     },
     constraints: { availableModels },
     policy: {

@@ -8,6 +8,7 @@ import { parseModelString } from "./model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
+import { extractSingleModel } from "./model-pool-utils"
 
 export interface CategoryResolutionResult {
   agentToUse: string
@@ -79,13 +80,14 @@ Available categories: ${allCategoryNames}`,
   let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
 
   const overrideModel = sisyphusJuniorModel
-  const explicitCategoryModel = userCategories?.[args.category!]?.model
+  const rawCategoryModel = userCategories?.[args.category!]?.model
+  const isPoolConfig = Array.isArray(rawCategoryModel)
+  const explicitCategoryModel: string | undefined = isPoolConfig ? undefined : rawCategoryModel
+  const poolCategoryModel: string[] | undefined = isPoolConfig ? rawCategoryModel : undefined
+  const resolvedModelSingle = extractSingleModel(resolved.model)
 
   if (!requirement) {
-    // Precedence: explicit category model > sisyphus-junior default > category resolved model
-    // This keeps `sisyphus-junior.model` useful as a global default while allowing
-    // per-category overrides via `categories[category].model`.
-    actualModel = explicitCategoryModel ?? overrideModel ?? resolved.model
+    actualModel = explicitCategoryModel ?? overrideModel ?? resolvedModelSingle
     if (actualModel) {
       modelInfo = explicitCategoryModel || overrideModel
         ? { model: actualModel, type: "user-defined", source: "override" }
@@ -94,7 +96,7 @@ Available categories: ${allCategoryNames}`,
   } else {
     const resolution = resolveModelForDelegateTask({
       userModel: explicitCategoryModel ?? overrideModel,
-      categoryDefaultModel: resolved.model,
+      categoryDefaultModel: poolCategoryModel ?? resolved.model,
       fallbackChain: requirement.fallbackChain,
       availableModels,
       systemDefaultModel,
