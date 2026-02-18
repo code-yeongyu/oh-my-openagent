@@ -1,5 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { setPendingSwitch } from "../../features/agent-switch"
+import { schedulePendingSwitchApply } from "../../features/agent-switch/scheduler"
 import { updateSessionAgent } from "../../features/claude-code-session-state"
 import type { SwitchAgentArgs } from "./types"
 
@@ -10,7 +11,26 @@ const DESCRIPTION =
 
 const ALLOWED_AGENTS = new Set(["atlas", "prometheus", "sisyphus", "hephaestus"])
 
-export function createSwitchAgentTool(): ToolDefinition {
+type SessionClient = {
+  session: {
+    prompt?: (input: {
+      path: { id: string }
+      body: { agent: string; parts: Array<{ type: "text"; text: string }> }
+    }) => Promise<unknown>
+    promptAsync: (input: {
+      path: { id: string }
+      body: { agent: string; parts: Array<{ type: "text"; text: string }> }
+    }) => Promise<unknown>
+    messages: (input: { path: { id: string } }) => Promise<unknown>
+    status?: () => Promise<unknown>
+  }
+}
+
+export function createSwitchAgentTool(args: {
+  client: SessionClient
+}): ToolDefinition {
+  const { client } = args
+
   return tool({
     description: DESCRIPTION,
     args: {
@@ -30,6 +50,10 @@ export function createSwitchAgentTool(): ToolDefinition {
 
       updateSessionAgent(toolContext.sessionID, agentName)
       setPendingSwitch(toolContext.sessionID, agentName, args.context)
+      schedulePendingSwitchApply({
+        sessionID: toolContext.sessionID,
+        client,
+      })
 
       return `Agent switch queued. Session will switch to ${agentName} when your turn completes.`
     },

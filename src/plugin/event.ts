@@ -7,6 +7,7 @@ import {
   setMainSession,
   updateSessionAgent,
 } from "../features/claude-code-session-state"
+import { log } from "../shared"
 import { resetMessageCursor } from "../shared"
 import { lspManager } from "../tools"
 
@@ -29,27 +30,43 @@ export function createEventHandler(args: {
 }): (input: { event: { type: string; properties?: Record<string, unknown> } }) => Promise<void> {
   const { ctx, firstMessageVariantGate, managers, hooks } = args
 
+  async function runHookSafely(
+    hookName: string,
+    runner: () => Promise<unknown>
+  ): Promise<void> {
+    try {
+      await runner()
+    } catch (error) {
+      log("[event] Hook execution failed", {
+        hookName,
+        error: String(error),
+      })
+    }
+  }
+
   const dispatchToHooks = async (input: { event: { type: string; properties?: Record<string, unknown> } }): Promise<void> => {
-    await Promise.resolve(hooks.autoUpdateChecker?.event?.(input))
-    await Promise.resolve(hooks.claudeCodeHooks?.event?.(input))
-    await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input))
-    await Promise.resolve(hooks.sessionNotification?.(input))
-    await Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input))
-    await Promise.resolve(hooks.unstableAgentBabysitter?.event?.(input))
-    await Promise.resolve(hooks.contextWindowMonitor?.event?.(input))
-    await Promise.resolve(hooks.directoryAgentsInjector?.event?.(input))
-    await Promise.resolve(hooks.directoryReadmeInjector?.event?.(input))
-    await Promise.resolve(hooks.rulesInjector?.event?.(input))
-    await Promise.resolve(hooks.thinkMode?.event?.(input))
-    await Promise.resolve(hooks.anthropicContextWindowLimitRecovery?.event?.(input))
-    await Promise.resolve(hooks.agentUsageReminder?.event?.(input))
-    await Promise.resolve(hooks.categorySkillReminder?.event?.(input))
-    await Promise.resolve(hooks.interactiveBashSession?.event?.(input))
-    await Promise.resolve(hooks.ralphLoop?.event?.(input))
-    await Promise.resolve(hooks.stopContinuationGuard?.event?.(input))
-    await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input))
-    await Promise.resolve(hooks.atlasHook?.handler?.(input))
-    await Promise.resolve(hooks.agentSwitchHook?.event?.(input))
+    // Keep agent switch early and resilient so queued handoffs are not blocked
+    // by unrelated hook failures in the same idle cycle.
+    await runHookSafely("agent-switch", () => Promise.resolve(hooks.agentSwitchHook?.event?.(input)))
+    await runHookSafely("auto-update-checker", () => Promise.resolve(hooks.autoUpdateChecker?.event?.(input)))
+    await runHookSafely("claude-code-hooks", () => Promise.resolve(hooks.claudeCodeHooks?.event?.(input)))
+    await runHookSafely("background-notification", () => Promise.resolve(hooks.backgroundNotificationHook?.event?.(input)))
+    await runHookSafely("session-notification", () => Promise.resolve(hooks.sessionNotification?.(input)))
+    await runHookSafely("todo-continuation-enforcer", () => Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input)))
+    await runHookSafely("unstable-agent-babysitter", () => Promise.resolve(hooks.unstableAgentBabysitter?.event?.(input)))
+    await runHookSafely("context-window-monitor", () => Promise.resolve(hooks.contextWindowMonitor?.event?.(input)))
+    await runHookSafely("directory-agents-injector", () => Promise.resolve(hooks.directoryAgentsInjector?.event?.(input)))
+    await runHookSafely("directory-readme-injector", () => Promise.resolve(hooks.directoryReadmeInjector?.event?.(input)))
+    await runHookSafely("rules-injector", () => Promise.resolve(hooks.rulesInjector?.event?.(input)))
+    await runHookSafely("think-mode", () => Promise.resolve(hooks.thinkMode?.event?.(input)))
+    await runHookSafely("anthropic-context-window-limit-recovery", () => Promise.resolve(hooks.anthropicContextWindowLimitRecovery?.event?.(input)))
+    await runHookSafely("agent-usage-reminder", () => Promise.resolve(hooks.agentUsageReminder?.event?.(input)))
+    await runHookSafely("category-skill-reminder", () => Promise.resolve(hooks.categorySkillReminder?.event?.(input)))
+    await runHookSafely("interactive-bash-session", () => Promise.resolve(hooks.interactiveBashSession?.event?.(input)))
+    await runHookSafely("ralph-loop", () => Promise.resolve(hooks.ralphLoop?.event?.(input)))
+    await runHookSafely("stop-continuation-guard", () => Promise.resolve(hooks.stopContinuationGuard?.event?.(input)))
+    await runHookSafely("compaction-todo-preserver", () => Promise.resolve(hooks.compactionTodoPreserver?.event?.(input)))
+    await runHookSafely("atlas", () => Promise.resolve(hooks.atlasHook?.handler?.(input)))
   }
 
   const recentSyntheticIdles = new Map<string, number>()

@@ -55,7 +55,6 @@ export function createToolRegistry(args: {
   const athenaCouncilTool = createAthenaCouncilTool({
     backgroundManager: managers.backgroundManager,
     councilConfig: athenaCouncilConfig,
-    client: ctx.client,
   })
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
@@ -135,7 +134,9 @@ export function createToolRegistry(args: {
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
     athena_council: athenaCouncilTool,
-    switch_agent: createSwitchAgentTool(),
+    switch_agent: createSwitchAgentTool({
+      client: ctx.client,
+    }),
     ...(lookAt ? { look_at: lookAt } : {}),
     task: delegateTask,
     skill_mcp: skillMcpTool,

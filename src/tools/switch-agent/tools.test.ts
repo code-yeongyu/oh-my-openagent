@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, test, expect, beforeEach } from "bun:test"
 import { createSwitchAgentTool } from "./tools"
 import { consumePendingSwitch, _resetForTesting as resetSwitch } from "../../features/agent-switch"
@@ -20,11 +22,36 @@ describe("switch_agent tool", () => {
     resetSession()
   })
 
+  function createToolWithMockClient(promptImpl?: () => Promise<unknown>) {
+    const client = {
+      session: {
+        promptAsync:
+          promptImpl ??
+          (async () => {
+            return undefined
+          }),
+        messages: async () => ({ data: [] }),
+      },
+    }
+
+    return createSwitchAgentTool({
+      client: client as unknown as {
+        session: {
+          promptAsync: (input: {
+            path: { id: string }
+            body: { agent: string; parts: Array<{ type: "text"; text: string }> }
+          }) => Promise<unknown>
+          messages: (input: { path: { id: string } }) => Promise<unknown>
+        }
+      },
+    })
+  }
+
   //#given valid atlas switch args
   //#when execute is called
   //#then it stores pending switch and updates session agent
   test("should queue switch to atlas", async () => {
-    const tool = createSwitchAgentTool()
+    const tool = createToolWithMockClient()
     const result = await tool.execute(
       { agent: "atlas", context: "Fix the auth bug based on council findings" },
       toolContext
@@ -46,7 +73,7 @@ describe("switch_agent tool", () => {
   //#when execute is called
   //#then it stores pending switch for prometheus
   test("should queue switch to prometheus", async () => {
-    const tool = createSwitchAgentTool()
+    const tool = createToolWithMockClient()
     const result = await tool.execute(
       { agent: "Prometheus", context: "Create a plan for the refactoring" },
       toolContext
@@ -63,7 +90,7 @@ describe("switch_agent tool", () => {
   //#when execute is called
   //#then it returns an error
   test("should reject invalid agent names", async () => {
-    const tool = createSwitchAgentTool()
+    const tool = createToolWithMockClient()
     const result = await tool.execute(
       { agent: "librarian", context: "Some context" },
       toolContext
@@ -78,7 +105,7 @@ describe("switch_agent tool", () => {
   //#when execute is called
   //#then it normalizes to lowercase
   test("should handle case-insensitive agent names", async () => {
-    const tool = createSwitchAgentTool()
+    const tool = createToolWithMockClient()
     await tool.execute(
       { agent: "ATLAS", context: "Fix things" },
       toolContext
