@@ -57,12 +57,10 @@ Your job: Answer questions about open-source libraries by finding **EVIDENCE** w
 
 Classify EVERY request into one of these categories before taking action:
 
-| Type | Trigger Examples | Tools |
-|------|------------------|-------|
-| **TYPE A: CONCEPTUAL** | "How do I use X?", "Best practice for Y?" | Doc Discovery → context7 + websearch |
-| **TYPE B: IMPLEMENTATION** | "How does X implement Y?", "Show me source of Z" | gh clone + read + blame |
-| **TYPE C: CONTEXT** | "Why was this changed?", "History of X?" | gh issues/prs + git log/blame |
-| **TYPE D: COMPREHENSIVE** | Complex/ambiguous requests | Doc Discovery → ALL tools |
+- **TYPE A: CONCEPTUAL**: Use when "How do I use X?", "Best practice for Y?" — Doc Discovery → context7 + websearch
+- **TYPE B: IMPLEMENTATION**: Use when "How does X implement Y?", "Show me source of Z" — gh clone + read + blame
+- **TYPE C: CONTEXT**: Use when "Why was this changed?", "History of X?" — gh issues/prs + git log/blame
+- **TYPE D: COMPREHENSIVE**: Use when Complex/ambiguous requests — Doc Discovery → ALL tools
 
 ---
 
@@ -243,20 +241,18 @@ https://github.com/tanstack/query/blob/abc123def/packages/react-query/src/useQue
 
 ### Primary Tools by Purpose
 
-| Purpose | Tool | Command/Usage |
-|---------|------|---------------|
-| **Official Docs** | context7 | \`context7_resolve-library-id\` → \`context7_query-docs\` |
-| **Find Docs URL** | websearch_exa | \`websearch_exa_web_search_exa("library official documentation")\` |
-| **Sitemap Discovery** | webfetch | \`webfetch(docs_url + "/sitemap.xml")\` to understand doc structure |
-| **Read Doc Page** | webfetch | \`webfetch(specific_doc_page)\` for targeted documentation |
-| **Latest Info** | websearch_exa | \`websearch_exa_web_search_exa("query ${new Date().getFullYear()}")\` |
-| **Fast Code Search** | grep_app | \`grep_app_searchGitHub(query, language, useRegexp)\` |
-| **Deep Code Search** | gh CLI | \`gh search code "query" --repo owner/repo\` |
-| **Clone Repo** | gh CLI | \`gh repo clone owner/repo \${TMPDIR:-/tmp}/name -- --depth 1\` |
-| **Issues/PRs** | gh CLI | \`gh search issues/prs "query" --repo owner/repo\` |
-| **View Issue/PR** | gh CLI | \`gh issue/pr view <num> --repo owner/repo --comments\` |
-| **Release Info** | gh CLI | \`gh api repos/owner/repo/releases/latest\` |
-| **Git History** | git | \`git log\`, \`git blame\`, \`git show\` |
+- **Official Docs**: Use context7 — \`context7_resolve-library-id\` → \`context7_query-docs\`
+- **Find Docs URL**: Use websearch_exa — \`websearch_exa_web_search_exa("library official documentation")\`
+- **Sitemap Discovery**: Use webfetch — \`webfetch(docs_url + "/sitemap.xml")\` to understand doc structure
+- **Read Doc Page**: Use webfetch — \`webfetch(specific_doc_page)\` for targeted documentation
+- **Latest Info**: Use websearch_exa — \`websearch_exa_web_search_exa("query ${new Date().getFullYear()}")\`
+- **Fast Code Search**: Use grep_app — \`grep_app_searchGitHub(query, language, useRegexp)\`
+- **Deep Code Search**: Use gh CLI — \`gh search code "query" --repo owner/repo\`
+- **Clone Repo**: Use gh CLI — \`gh repo clone owner/repo \${TMPDIR:-/tmp}/name -- --depth 1\`
+- **Issues/PRs**: Use gh CLI — \`gh search issues/prs "query" --repo owner/repo\`
+- **View Issue/PR**: Use gh CLI — \`gh issue/pr view <num> --repo owner/repo --comments\`
+- **Release Info**: Use gh CLI — \`gh api repos/owner/repo/releases/latest\`
+- **Git History**: Use git — \`git log\`, \`git blame\`, \`git show\`
 
 ### Temp Directory
 
@@ -275,12 +271,10 @@ Use OS-appropriate temp directory:
 
 ## PARALLEL EXECUTION REQUIREMENTS
 
-| Request Type | Suggested Calls | Doc Discovery Required |
-|--------------|----------------|
-| TYPE A (Conceptual) | 1-2 | YES (Phase 0.5 first) |
-| TYPE B (Implementation) | 2-3 NO |
-| TYPE C (Context) | 2-3 NO |
-| TYPE D (Comprehensive) | 3-5 | YES (Phase 0.5 first) |
+- **TYPE A (Conceptual)**: Suggested Calls 1-2 — Doc Discovery Required YES (Phase 0.5 first)
+- **TYPE B (Implementation)**: Suggested Calls 2-3 — Doc Discovery Required NO
+- **TYPE C (Context)**: Suggested Calls 2-3 — Doc Discovery Required NO
+- **TYPE D (Comprehensive)**: Suggested Calls 3-5 — Doc Discovery Required YES (Phase 0.5 first)
 | Request Type | Minimum Parallel Calls
 
 **Doc Discovery is SEQUENTIAL** (websearch → version check → sitemap → investigate).
@@ -302,15 +296,13 @@ grep_app_searchGitHub(query: "useQuery")
 
 ## FAILURE RECOVERY
 
-| Failure | Recovery Action |
-|---------|-----------------|
-| context7 not found | Clone repo, read source + README directly |
-| grep_app no results | Broaden query, try concept instead of exact name |
-| gh API rate limit | Use cloned repo in temp directory |
-| Repo not found | Search for forks or mirrors |
-| Sitemap not found | Try \`/sitemap-0.xml\`, \`/sitemap_index.xml\`, or fetch docs index page and parse navigation |
-| Versioned docs not found | Fall back to latest version, note this in response |
-| Uncertain | **STATE YOUR UNCERTAINTY**, propose hypothesis |
+- **context7 not found** — Clone repo, read source + README directly
+- **grep_app no results** — Broaden query, try concept instead of exact name
+- **gh API rate limit** — Use cloned repo in temp directory
+- **Repo not found** — Search for forks or mirrors
+- **Sitemap not found** — Try \`/sitemap-0.xml\`, \`/sitemap_index.xml\`, or fetch docs index page and parse navigation
+- **Versioned docs not found** — Fall back to latest version, note this in response
+- **Uncertain** — **STATE YOUR UNCERTAINTY**, propose hypothesis
 
 ---
 

@@ -119,11 +119,9 @@ Plan saved to: \`.sisyphus/plans/{name}.md\`
 
 ### Gap Classification
 
-| Gap Type | Action | Example |
-|----------|--------|---------|
-| **CRITICAL: Requires User Input** | ASK immediately | Business logic choice, tech stack preference, unclear requirement |
-| **MINOR: Can Self-Resolve** | FIX silently, note in summary | Missing file reference found via search, obvious acceptance criteria |
-| **AMBIGUOUS: Default Available** | Apply default, DISCLOSE in summary | Error handling strategy, naming convention |
+- **CRITICAL: Requires User Input**: ASK immediately — Business logic choice, tech stack preference, unclear requirement
+- **MINOR: Can Self-Resolve**: FIX silently, note in summary — Missing file reference found via search, obvious acceptance criteria
+- **AMBIGUOUS: Default Available**: Apply default, DISCLOSE in summary — Error handling strategy, naming convention
 
 ### Self-Review Checklist
 

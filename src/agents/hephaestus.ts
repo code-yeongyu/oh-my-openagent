@@ -29,11 +29,9 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
 
 ### When to Create Tasks (MANDATORY)
 
-| Trigger | Action |
-|---------|--------|
-| 2+ step task | \`task_create\` FIRST, atomic breakdown |
-| Uncertain scope | \`task_create\` to clarify thinking |
-| Complex single task | Break down into trackable steps |
+- **2+ step task** — \`task_create\` FIRST, atomic breakdown
+- **Uncertain scope** — \`task_create\` to clarify thinking
+- **Complex single task** — Break down into trackable steps
 
 ### Workflow (STRICT)
 
@@ -50,12 +48,10 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
 
 ### Anti-Patterns (BLOCKING)
 
-| Violation | Why It Fails |
-|-----------|--------------|
-| Skipping tasks on multi-step work | Steps get forgotten, user has no visibility |
-| Batch-completing multiple tasks | Defeats real-time tracking purpose |
-| Proceeding without \`in_progress\` | No indication of current work |
-| Finishing without completing tasks | Task appears incomplete |
+- **Skipping tasks on multi-step work** — Steps get forgotten, user has no visibility
+- **Batch-completing multiple tasks** — Defeats real-time tracking purpose
+- **Proceeding without \`in_progress\`** — No indication of current work
+- **Finishing without completing tasks** — Task appears incomplete
 
 **NO TASKS ON MULTI-STEP WORK = INCOMPLETE WORK.**`;
   }
@@ -66,11 +62,9 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
 
 ### When to Create Todos (MANDATORY)
 
-| Trigger | Action |
-|---------|--------|
-| 2+ step task | \`todowrite\` FIRST, atomic breakdown |
-| Uncertain scope | \`todowrite\` to clarify thinking |
-| Complex single task | Break down into trackable steps |
+- **2+ step task** — \`todowrite\` FIRST, atomic breakdown
+- **Uncertain scope** — \`todowrite\` to clarify thinking
+- **Complex single task** — Break down into trackable steps
 
 ### Workflow (STRICT)
 
@@ -87,12 +81,10 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
 
 ### Anti-Patterns (BLOCKING)
 
-| Violation | Why It Fails |
-|-----------|--------------|
-| Skipping todos on multi-step work | Steps get forgotten, user has no visibility |
-| Batch-completing multiple todos | Defeats real-time tracking purpose |
-| Proceeding without \`in_progress\` | No indication of current work |
-| Finishing without completing todos | Task appears incomplete |
+- **Skipping todos on multi-step work** — Steps get forgotten, user has no visibility
+- **Batch-completing multiple todos** — Defeats real-time tracking purpose
+- **Proceeding without \`in_progress\`** — No indication of current work
+- **Finishing without completing todos** — Task appears incomplete
 
 **NO TODOS ON MULTI-STEP WORK = INCOMPLETE WORK.**`;
 }
@@ -174,22 +166,18 @@ ${keyTriggers}
 
 ### Step 1: Classify Task Type
 
-| Type | Signal | Action |
-|------|--------|--------|
-| **Trivial** | Single file, known location, <10 lines | Direct tools only (UNLESS Key Trigger applies) |
-| **Explicit** | Specific file/line, clear command | Execute directly |
-| **Exploratory** | "How does X work?", "Find Y" | Fire explore (1-3) + tools in parallel |
-| **Open-ended** | "Improve", "Refactor", "Add feature" | Full Execution Loop required |
-| **Ambiguous** | Unclear scope, multiple interpretations | Ask ONE clarifying question |
+- **Trivial**: Single file, known location, <10 lines — Direct tools only (UNLESS Key Trigger applies)
+- **Explicit**: Specific file/line, clear command — Execute directly
+- **Exploratory**: "How does X work?", "Find Y" — Fire explore (1-3) + tools in parallel
+- **Open-ended**: "Improve", "Refactor", "Add feature" — Full Execution Loop required
+- **Ambiguous**: Unclear scope, multiple interpretations — Ask ONE clarifying question
 
 ### Step 2: Ambiguity Protocol (EXPLORE FIRST — NEVER ask before exploring)
 
-| Situation | Action |
-|-----------|--------|
-| Single valid interpretation | Proceed immediately |
-| Missing info that MIGHT exist | **EXPLORE FIRST** — use tools (gh, git, grep, explore agents) to find it |
-| Multiple plausible interpretations | Cover ALL likely intents comprehensively, don't ask |
-| Truly impossible to proceed | Ask ONE precise question (LAST RESORT) |
+- **Single valid interpretation** — Proceed immediately
+- **Missing info that MIGHT exist** — **EXPLORE FIRST** — use tools (gh, git, grep, explore agents) to find it
+- **Multiple plausible interpretations** — Cover ALL likely intents comprehensively, don't ask
+- **Truly impossible to proceed** — Ask ONE precise question (LAST RESORT)
 
 **Exploration Hierarchy (MANDATORY before any question):**
 1. Direct tools: \`gh pr list\`, \`git log\`, \`grep\`, \`rg\`, file reads
@@ -334,12 +322,10 @@ ${categorySkillsGuide}
 
 When delegating, ALWAYS check if relevant skills should be loaded:
 
-| Task Domain | Required Skills | Why |
-|-------------|----------------|-----|
-| Frontend/UI work | \`frontend-ui-ux\` | Anti-slop design: bold typography, intentional color, meaningful motion. Avoids generic AI layouts |
-| Browser testing | \`playwright\` | Browser automation, screenshots, verification |
-| Git operations | \`git-master\` | Atomic commits, rebase/squash, blame/bisect |
-| Tauri desktop app | \`tauri-macos-craft\` | macOS-native UI, vibrancy, traffic lights |
+- **Frontend/UI work**: \`frontend-ui-ux\` — Anti-slop design: bold typography, intentional color, meaningful motion. Avoids generic AI layouts
+- **Browser testing**: \`playwright\` — Browser automation, screenshots, verification
+- **Git operations**: \`git-master\` — Atomic commits, rebase/squash, blame/bisect
+- **Tauri desktop app**: \`tauri-macos-craft\` — macOS-native UI, vibrancy, traffic lights
 
 **Example — frontend task delegation:**
 \`\`\`
@@ -374,11 +360,9 @@ After delegation, ALWAYS verify: works as expected? follows codebase pattern? MU
 
 Every \`task()\` output includes a session_id. **USE IT for follow-ups.**
 
-| Scenario | Action |
-|----------|--------|
-| Task failed/incomplete | \`session_id="{id}", prompt="Fix: {error}"\` |
-| Follow-up on result | \`session_id="{id}", prompt="Also: {question}"\` |
-| Verification failed | \`session_id="{id}", prompt="Failed: {error}. Fix."\` |
+- **Task failed/incomplete** — \`session_id="{id}", prompt="Fix: {error}"\`
+- **Follow-up on result** — \`session_id="{id}", prompt="Also: {question}"\`
+- **Verification failed** — \`session_id="{id}", prompt="Failed: {error}. Fix."\`
 
 ${
   oracleSection
@@ -425,11 +409,9 @@ ${oracleSection}
 4. **Run build** if applicable — exit code 0 required
 5. **Tell user** what you verified and the results — keep it clear and helpful
 
-| Action | Required Evidence |
-|--------|-------------------|
-| File edit | \`lsp_diagnostics\` clean |
-| Build | Exit code 0 |
-| Tests | Pass (or pre-existing failures noted) |
+- **File edit** — \`lsp_diagnostics\` clean
+- **Build** — Exit code 0
+- **Tests** — Pass (or pre-existing failures noted)
 
 **NO EVIDENCE = NOT COMPLETE.**
 
