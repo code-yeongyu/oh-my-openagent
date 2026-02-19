@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn, mock } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import {
   applyUltraworkModelOverrideOnMessage,
   resolveUltraworkOverride,
@@ -6,6 +6,7 @@ import {
 } from "./ultrawork-model-override"
 import * as sharedModule from "../shared"
 import * as dbOverrideModule from "./ultrawork-db-model-override"
+import * as sessionStateModule from "../features/claude-code-session-state"
 
 describe("detectUltrawork", () => {
   test("should detect ultrawork keyword", () => {
@@ -197,6 +198,22 @@ describe("resolveUltraworkOverride", () => {
     //#then
     expect(result).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6", variant: undefined })
   })
+
+  test("should use session agent when input and message agents are undefined", () => {
+    //#given
+    const config = createConfig("sisyphus", { model: "anthropic/claude-opus-4-6", variant: "max" })
+    const output = createOutput("ultrawork do something")
+    const getSessionAgentSpy = spyOn(sessionStateModule, "getSessionAgent").mockReturnValue("sisyphus")
+
+    //#when
+    const result = resolveUltraworkOverride(config, undefined, output, "ses_test")
+
+    //#then
+    expect(getSessionAgentSpy).toHaveBeenCalledWith("ses_test")
+    expect(result).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6", variant: "max" })
+
+    getSessionAgentSpy.mockRestore()
+  })
 })
 
 describe("applyUltraworkModelOverrideOnMessage", () => {
@@ -377,5 +394,27 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
       { providerID: "anthropic", modelID: "claude-opus-4-6" },
       "max",
     )
+  })
+
+  test("should skip override trigger when current model already matches ultrawork model", () => {
+    //#given
+    const config = createConfig("sisyphus", { model: "anthropic/claude-opus-4-6", variant: "max" })
+    const output = createOutput("ultrawork do something", {
+      existingModel: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      messageId: "msg_123",
+    })
+    let toastCalled = false
+    const tui = {
+      showToast: async () => {
+        toastCalled = true
+      },
+    }
+
+    //#when
+    applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui)
+
+    //#then
+    expect(dbOverrideSpy).not.toHaveBeenCalled()
+    expect(toastCalled).toBe(false)
   })
 })

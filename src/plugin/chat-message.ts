@@ -140,6 +140,6 @@ export function createChatMessageHandler(args: {
       }
     }
 
-    applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, ctx.client.tui)
+    applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, ctx.client.tui, input.sessionID)
   }
 }
