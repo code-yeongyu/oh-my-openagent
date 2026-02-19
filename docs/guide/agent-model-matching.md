@@ -55,6 +55,18 @@ Categories are used for `background_task` and `delegate_task` dispatching:
 
 ## Model-Specific Prompt Routing
 
+### Why Different Models Need Different Prompts
+
+Claude and GPT models have fundamentally different instruction-following behaviors:
+
+- **Claude models** respond well to **mechanics-driven** prompts — detailed checklists, templates, step-by-step procedures, and explicit anti-patterns. More rules = more compliance.
+- **GPT models** (especially 5.2+) have **stronger instruction adherence** and respond better to **principle-driven** prompts — concise principles, XML-tagged structure, explicit decision criteria. More rules = more contradiction surface area = more drift.
+
+This insight comes from analyzing OpenAI's Codex Plan Mode prompt alongside the GPT-5.2 Prompting Guide:
+- Codex Plan Mode uses 3 clean principles in ~121 lines to achieve what Prometheus's Claude prompt does in ~1,100 lines across 7 files
+- GPT-5.2's "conservative grounding bias" and "more deliberate scaffolding" mean it builds clearer plans by default, but needs **explicit decision criteria** (it won't infer what you want)
+- The key concept is **"Decision Complete"** — a plan must leave ZERO decisions to the implementer. GPT models follow this literally when stated as a principle, while Claude models need enforcement mechanisms
+
 ### How It Works
 
 Some agents detect the assigned model at runtime and switch prompts:
@@ -68,10 +80,10 @@ export function getPrometheusPrompt(model?: string): string {
 ```
 
 **Agents with dual prompts:**
-- **Prometheus**: Claude prompt (modular sections) vs GPT prompt (XML-tagged, Codex plan mode style with explicit decision criteria)
-- **Atlas**: Claude prompt vs GPT prompt (GPT-optimized todo orchestration)
+- **Prometheus**: Claude prompt (~1,100 lines, 7 files, mechanics-driven with checklists and templates) vs GPT prompt (~300 lines, single file, principle-driven with XML structure inspired by Codex Plan Mode)
+- **Atlas**: Claude prompt vs GPT prompt (GPT-optimized todo orchestration with explicit scope constraints)
 
-**Why this matters for customization**: If you override Prometheus to use a GPT model, the GPT prompt activates automatically. But if you override Sisyphus to use GPT — there is no GPT prompt, and performance will degrade significantly.
+**Why this matters for customization**: If you override Prometheus to use a GPT model, the GPT prompt activates automatically — and it's specifically designed for how GPT reasons. But if you override Sisyphus to use GPT — there is no GPT prompt, and performance will degrade significantly because Sisyphus's prompt is deeply tuned for Claude's reasoning style.
 
 ### Model Family Detection
 
