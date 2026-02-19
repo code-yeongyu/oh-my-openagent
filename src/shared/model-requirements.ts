@@ -20,6 +20,18 @@ function fb(providers: string[] | string, model: string, variant?: string): Fall
   }
 }
 
+function dedupeChain(chain: FallbackEntry[]): FallbackEntry[] {
+  const seen = new Set<string>()
+  const result: FallbackEntry[] = []
+  for (const entry of chain) {
+    const key = `${entry.model}:${entry.variant ?? ""}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(entry)
+  }
+  return result
+}
+
 // Provider preference rules:
 // - Never use the paid `opencode` provider as an automatic fallback.
 // - Prefer `quotio` when the same model exists across multiple providers.
@@ -82,12 +94,12 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     requiresAnyModel: true,
   },
   oracle: {
-    fallbackChain: [
+    fallbackChain: dedupeChain([
       fb("quotio", "gpt-5.3-codex", "high"),
       fb("quotio", "claude-opus-4-6-thinking"),
       fb("quotio", "claude-sonnet-4-5-thinking"),
       ...QUALITY_CODING_CHAIN,
-    ],
+    ]),
   },
   librarian: {
     fallbackChain: [
@@ -111,35 +123,35 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
   prometheus: {
-    fallbackChain: [
+    fallbackChain: dedupeChain([
       fb("quotio", "claude-opus-4-6-thinking"),
       fb("quotio", "gpt-5.3-codex", "high"),
       fb("quotio", "claude-sonnet-4-5-thinking"),
       ...QUALITY_CODING_CHAIN,
-    ],
+    ]),
   },
   metis: {
-    fallbackChain: [
+    fallbackChain: dedupeChain([
       fb("quotio", "claude-opus-4-6-thinking"),
       fb("quotio", "gpt-5.3-codex", "high"),
       fb("quotio", "claude-sonnet-4-5-thinking"),
       ...QUALITY_CODING_CHAIN,
-    ],
+    ]),
   },
   momus: {
-    fallbackChain: [
+    fallbackChain: dedupeChain([
       fb("quotio", "gpt-5.3-codex", "high"),
       fb("quotio", "claude-opus-4-6-thinking"),
       ...QUALITY_CODING_CHAIN,
-    ],
+    ]),
   },
   atlas: {
-    fallbackChain: [
+    fallbackChain: dedupeChain([
       fb("quotio", "claude-sonnet-4-5-thinking"),
       fb("quotio", "claude-opus-4-6-thinking"),
       fb("quotio", "gpt-5.3-codex", "medium"),
       ...QUALITY_CODING_CHAIN,
-    ],
+    ]),
   },
 }
 
@@ -155,13 +167,10 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
   ultrabrain: {
-    fallbackChain: [
+    fallbackChain: dedupeChain([
       fb("quotio", "gpt-5.3-codex", "high"),
-      fb("quotio", "claude-opus-4-6-thinking"),
-      fb("nvidia", "stepfun-ai/step-3.5-flash"),
-      fb("nvidia", "qwen/qwen3.5-397b-a17b"),
       ...QUALITY_CODING_CHAIN,
-    ],
+    ]),
   },
   deep: {
     fallbackChain: [
@@ -187,11 +196,11 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: SPEED_CHAIN,
   },
   "unspecified-high": {
-    fallbackChain: [
+    fallbackChain: dedupeChain([
       fb("quotio", "claude-opus-4-6-thinking"),
       fb("quotio", "gpt-5.3-codex", "high"),
       ...QUALITY_CODING_CHAIN,
-    ],
+    ]),
   },
   writing: {
     fallbackChain: [

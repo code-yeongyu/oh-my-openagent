@@ -100,7 +100,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#when - executeSyncTask with fetchSyncResult failing
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
-    }, "test-agent", undefined, undefined, undefined, deps)
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
 
     //#then - should return error and cleanup resources
     expect(result).toBe("Fetch failed")
@@ -150,7 +150,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#when - executeSyncTask with pollSyncSession failing
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
-    }, "test-agent", undefined, undefined, undefined, deps)
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
 
     //#then - should return error and cleanup resources
     expect(result).toBe("Poll error")
@@ -200,7 +200,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     //#when - executeSyncTask completes successfully
     const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
       sessionID: "parent-session",
-    }, "test-agent", undefined, undefined, undefined, deps)
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
 
     //#then - should complete and cleanup resources
     expect(result).toContain("Task completed")
