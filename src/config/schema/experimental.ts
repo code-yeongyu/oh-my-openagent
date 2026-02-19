@@ -17,6 +17,8 @@ export const ExperimentalConfigSchema = z.object({
   safe_hook_creation: z.boolean().optional(),
   /** Enable hashline_edit tool for improved file editing with hash-based line anchors */
   hashline_edit: z.boolean().optional(),
+  /** Append fallback model info to session title when a runtime fallback occurs (default: false) */
+  model_fallback_title: z.boolean().optional(),
 })
 
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>

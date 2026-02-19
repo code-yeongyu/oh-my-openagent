@@ -2836,6 +2836,9 @@
         },
         "hashline_edit": {
           "type": "boolean"
+        },
+        "model_fallback_title": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
