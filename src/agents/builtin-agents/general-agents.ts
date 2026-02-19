@@ -23,6 +23,7 @@ export function collectPendingBuiltinAgents(input: {
   availableModels: Set<string>
   disabledSkills?: Set<string>
   useTaskSystem?: boolean
+  disableOmoEnv?: boolean
 }): { pendingAgentConfigs: Map<string, AgentConfig>; availableAgents: AvailableAgent[] } {
   const {
     agentSources,
@@ -37,6 +38,7 @@ export function collectPendingBuiltinAgents(input: {
     uiSelectedModel,
     availableModels,
     disabledSkills,
+    disableOmoEnv = false,
   } = input
 
   const availableAgents: AvailableAgent[] = []
@@ -81,7 +83,7 @@ export function collectPendingBuiltinAgents(input: {
     }
 
     if (agentName === "librarian") {
-      config = applyEnvironmentContext(config, directory)
+      config = applyEnvironmentContext(config, directory, { disableOmoEnv })
     }
 
     config = applyOverrides(config, override, mergedCategories, directory)
