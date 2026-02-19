@@ -77,6 +77,7 @@ export async function applyAgentConfig(params: {
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
 
+  const athenaCouncilConfig = params.pluginConfig.agents?.athena?.council
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
     params.pluginConfig.agents,
@@ -90,6 +91,7 @@ export async function applyAgentConfig(params: {
     currentModel,
     disabledSkills,
     useTaskSystem,
+    athenaCouncilConfig,
   );
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;

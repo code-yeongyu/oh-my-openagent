@@ -28,6 +28,8 @@ import { maybeCreateSisyphusConfig } from "./builtin-agents/sisyphus-agent"
 import { maybeCreateHephaestusConfig } from "./builtin-agents/hephaestus-agent"
 import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
 import { buildCustomAgentMetadata, parseRegisteredAgentSummaries } from "./custom-agent-summaries"
+import { registerCouncilMemberAgents } from "./builtin-agents/council-member-agents"
+import type { CouncilConfig } from "./athena/types"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -74,7 +76,8 @@ export async function createBuiltinAgents(
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
   disabledSkills?: Set<string>,
-  useTaskSystem = false
+  useTaskSystem = false,
+  councilConfig?: CouncilConfig
 ): Promise<Record<string, AgentConfig>> {
   const connectedProviders = readConnectedProvidersCache()
   const providerModelsConnected = connectedProviders
@@ -191,6 +194,22 @@ export async function createBuiltinAgents(
   })
   if (atlasConfig) {
     result["atlas"] = atlasConfig
+  }
+
+  if (councilConfig && councilConfig.members.length >= 2) {
+    const { agents: councilAgents, registeredKeys } = registerCouncilMemberAgents(councilConfig)
+    for (const [key, config] of Object.entries(councilAgents)) {
+      result[key] = config
+    }
+
+    if (result["athena"] && registeredKeys.length > 0) {
+      const memberList = registeredKeys.map((key) => `- "${key}"`).join("\n")
+      const councilTaskInstructions = `\n\n## Registered Council Members (use these as subagent_type in task calls)\n\n${memberList}`
+      result["athena"] = {
+        ...result["athena"],
+        prompt: (result["athena"].prompt ?? "") + councilTaskInstructions,
+      }
+    }
   }
 
   return result
