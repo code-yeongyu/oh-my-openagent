@@ -2,7 +2,7 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent, extractErrorContentFromParts } from "./error-classifier"
+import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent, extractErrorContentFromParts, detectErrorInTextParts } from "./error-classifier"
 import { createFallbackState, prepareFallback } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 
@@ -76,7 +76,12 @@ async function checkLastAssistantForErrorContent(
       (lastAssistant.info?.parts as Array<{ type?: string; text?: string }> | undefined)
 
     const result = extractErrorContentFromParts(parts)
-    return result.hasError ? result.errorMessage : undefined
+    if (result.hasError) return result.errorMessage
+
+    const textResult = detectErrorInTextParts(parts)
+    if (textResult.hasError) return textResult.errorMessage
+
+    return undefined
   } catch {
     return undefined
   }
@@ -98,7 +103,19 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined) ??
       (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
     const role = info?.role as string | undefined
-    const model = info?.model as string | undefined
+    const model = (info?.model as string | undefined)
+      ?? (typeof info?.providerID === "string" && typeof info?.modelID === "string"
+        ? `${info.providerID}/${info.modelID}`
+        : undefined)
+
+    if (sessionID && role === "assistant") {
+      log(`[${HOOK_NAME}] message.updated received`, {
+        sessionID,
+        model,
+        hasInfoError: !!info?.error,
+        errorType: info?.error ? classifyErrorType(info.error) : undefined,
+      })
+    }
 
     if (sessionID && role === "assistant" && !error) {
       const errorContent = await checkLastAssistantForErrorContent(ctx, sessionID)
@@ -202,12 +219,18 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         }
 
         if (!initialModel) {
-          log(`[${HOOK_NAME}] message.updated missing model info, cannot fallback`, {
-            sessionID,
-            errorName: extractErrorName(error),
-            errorType: classifyErrorType(error),
-          })
-          return
+          const sisyphusModel = pluginConfig?.agents?.sisyphus?.model as string | undefined
+          if (sisyphusModel) {
+            log(`[${HOOK_NAME}] Using sisyphus model for state creation (no agent detected)`, { sessionID, model: sisyphusModel })
+            initialModel = sisyphusModel
+          } else {
+            log(`[${HOOK_NAME}] message.updated missing model info, cannot fallback`, {
+              sessionID,
+              errorName: extractErrorName(error),
+              errorType: classifyErrorType(error),
+            })
+            return
+          }
         }
 
         state = createFallbackState(initialModel)

@@ -99,38 +99,66 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const handleSessionStatus = async (props: Record<string, unknown> | undefined) => {
     const sessionID = props?.sessionID as string | undefined
     const status = props?.status as { type?: string; attempt?: number; message?: string; next?: number } | undefined
-    if (!sessionID || !status) return
+    if (!sessionID || !status || status.type !== "retry") return
 
-    if (status.type === "retry") {
-      const state = sessionStates.get(sessionID)
-      const fallbackModels = state
-        ? getFallbackModelsForSession(sessionID, undefined, pluginConfig)
-        : []
-      const totalModels = fallbackModels.length
+    const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, undefined)
+    const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
-      log(`[${HOOK_NAME}] Provider retry detected`, {
-        sessionID,
-        attempt: status.attempt,
-        message: status.message,
-        nextRetryMs: status.next,
-        fallbackAttempt: state?.attemptCount ?? 0,
-        totalFallbackModels: totalModels,
-      })
+    log(`[${HOOK_NAME}] Provider retry detected`, {
+      sessionID, attempt: status.attempt, message: status.message,
+      nextRetryMs: status.next, resolvedAgent, totalFallbackModels: fallbackModels.length,
+    })
 
+    if (fallbackModels.length === 0) {
       if (config.notify_on_fallback) {
-        const attemptInfo = state && totalModels > 0
-          ? ` (fallback ${state.attemptCount} of ${totalModels})`
-          : ""
-        await deps.ctx.client.tui
-          .showToast({
-            body: {
-              title: "Provider Retrying",
-              message: `Retry attempt ${status.attempt ?? "?"}${attemptInfo}: ${status.message || "retrying..."}`,
-              variant: "info",
-              duration: 3000,
-            },
-          })
-          .catch(() => {})
+        await deps.ctx.client.tui.showToast({ body: {
+          title: "Provider Retrying", variant: "info", duration: 3000,
+          message: `${status.message || "retrying..."} (no fallback models configured)`,
+        } }).catch(() => {})
+      }
+      return
+    }
+
+    let state = sessionStates.get(sessionID)
+    if (!state) {
+      const agentConfig = resolvedAgent
+        ? pluginConfig?.agents?.[resolvedAgent as keyof typeof pluginConfig.agents] : undefined
+      const initialModel = (agentConfig?.model as string | undefined)
+        ?? (pluginConfig?.agents?.sisyphus?.model as string | undefined)
+      if (!initialModel) {
+        log(`[${HOOK_NAME}] No model info for session.status fallback`, { sessionID })
+        return
+      }
+      log(`[${HOOK_NAME}] Creating on-demand state for session.status`, { sessionID, model: initialModel, agent: resolvedAgent })
+      state = createFallbackState(initialModel)
+      sessionStates.set(sessionID, state)
+      sessionLastAccess.set(sessionID, Date.now())
+    } else {
+      sessionLastAccess.set(sessionID, Date.now())
+    }
+
+    sessionAwaitingFallbackResult.delete(sessionID)
+    helpers.clearSessionFallbackTimeout(sessionID)
+
+    const result = prepareFallback(sessionID, state, fallbackModels, config)
+
+    if (result.success && config.notify_on_fallback) {
+      const modelName = result.newModel?.split("/").pop() || result.newModel
+      await deps.ctx.client.tui.showToast({ body: {
+        title: "Retry Detected — Switching Model", variant: "warning", duration: 5000,
+        message: `${status.message || "Provider retrying"} → ${modelName} (attempt ${state.attemptCount} of ${fallbackModels.length})`,
+      } }).catch(() => {})
+    }
+
+    if (result.success && result.newModel) {
+      await helpers.autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.status")
+    } else if (!result.success) {
+      log(`[${HOOK_NAME}] session.status fallback failed`, { sessionID, error: result.error })
+      if (result.maxAttemptsReached && config.notify_on_fallback) {
+        await deps.ctx.client.tui.showToast({ body: {
+          title: "All Fallbacks Exhausted", variant: "error", duration: 8000,
+          message: `All ${fallbackModels.length} fallback models exhausted after ${state.attemptCount} attempts`,
+        } }).catch(() => {})
       }
     }
   }
@@ -195,8 +223,16 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
           sessionStates.set(sessionID, state)
           sessionLastAccess.set(sessionID, Date.now())
         } else {
-          log(`[${HOOK_NAME}] No model info available, cannot fallback`, { sessionID })
-          return
+          const sisyphusModel = pluginConfig?.agents?.sisyphus?.model as string | undefined
+          if (sisyphusModel) {
+            log(`[${HOOK_NAME}] Using sisyphus model for state creation (no agent detected)`, { sessionID, model: sisyphusModel })
+            state = createFallbackState(sisyphusModel)
+            sessionStates.set(sessionID, state)
+            sessionLastAccess.set(sessionID, Date.now())
+          } else {
+            log(`[${HOOK_NAME}] No model info available, cannot fallback`, { sessionID })
+            return
+          }
         }
       }
     } else {

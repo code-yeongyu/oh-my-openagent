@@ -2396,11 +2396,10 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const retryToast = toastCalls.find((t) => t.title === "Provider Retrying")
+      const retryToast = toastCalls.find((t) => t.title === "Retry Detected — Switching Model")
       expect(retryToast).toBeDefined()
-      expect(retryToast?.message).toContain("Retry attempt 2")
       expect(retryToast?.message).toContain("Server overloaded")
-      expect(retryToast?.variant).toBe("info")
+      expect(retryToast?.variant).toBe("warning")
     })
 
     test("should ignore non-retry session.status events", async () => {

@@ -148,6 +148,26 @@ export function containsErrorContent(
   return { hasError: false }
 }
 
+export function detectErrorInTextParts(
+  parts: Array<{ type?: string; text?: string }> | undefined,
+): { hasError: boolean; errorType?: string; errorMessage?: string } {
+  if (!parts || parts.length === 0) return { hasError: false }
+
+  const textContent = parts
+    .filter((p) => p.type === "text" && typeof p.text === "string" && p.text.length > 0)
+    .map((p) => p.text!)
+    .join("\n")
+
+  if (!textContent) return { hasError: false }
+
+  const errorType = classifyErrorType({ message: textContent, name: "TextContent" })
+  if (errorType) {
+    return { hasError: true, errorType, errorMessage: textContent }
+  }
+
+  return { hasError: false }
+}
+
 export function extractErrorContentFromParts(
   parts: Array<{ type?: string; text?: string }> | undefined,
 ): { hasError: boolean; errorMessage?: string } {

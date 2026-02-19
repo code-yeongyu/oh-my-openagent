@@ -127,6 +127,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
           sessionAwaitingFallbackResult.add(sessionID)
           scheduleSessionFallbackTimeout(sessionID, retryAgent)
 
+          await abortSessionRequest(sessionID, `pre-retry:${source}`)
           await ctx.client.session.promptAsync({
             path: { id: sessionID },
             body: {
