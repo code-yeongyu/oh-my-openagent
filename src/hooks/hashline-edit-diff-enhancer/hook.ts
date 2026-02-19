@@ -1,4 +1,5 @@
 import { log } from "../../shared"
+import { computeLineHash } from "../../tools/hashline-edit/hash-computation"
 
 interface HashlineEditDiffEnhancerConfig {
 	hashline_edit?: { enabled: boolean }
@@ -26,8 +27,88 @@ function cleanupStaleEntries(): void {
 	}
 }
 
-function isEditTool(toolName: string): boolean {
-	return toolName === "edit"
+function isEditOrWriteTool(toolName: string): boolean {
+	const lower = toolName.toLowerCase()
+	return lower === "edit" || lower === "write"
+}
+
+function extractFilePath(args: Record<string, unknown>): string | undefined {
+	const path = args.path ?? args.filePath ?? args.file_path
+	return typeof path === "string" ? path : undefined
+}
+
+function toHashlineContent(content: string): string {
+	if (!content) return content
+	const lines = content.split("\n")
+	const lastLine = lines[lines.length - 1]
+	const hasTrailingNewline = lastLine === ""
+	const contentLines = hasTrailingNewline ? lines.slice(0, -1) : lines
+	const hashlined = contentLines.map((line, i) => {
+		const lineNum = i + 1
+		const hash = computeLineHash(lineNum, line)
+		return `${lineNum}:${hash}|${line}`
+	})
+	return hasTrailingNewline ? hashlined.join("\n") + "\n" : hashlined.join("\n")
+}
+
+function generateUnifiedDiff(oldContent: string, newContent: string, filePath: string): string {
+	const oldLines = oldContent.split("\n")
+	const newLines = newContent.split("\n")
+	const maxLines = Math.max(oldLines.length, newLines.length)
+	
+	let diff = `--- ${filePath}\n+++ ${filePath}\n`
+	let inHunk = false
+	let oldStart = 1
+	let newStart = 1
+	let oldCount = 0
+	let newCount = 0
+	let hunkLines: string[] = []
+	
+	for (let i = 0; i < maxLines; i++) {
+		const oldLine = oldLines[i] ?? ""
+		const newLine = newLines[i] ?? ""
+		
+		if (oldLine !== newLine) {
+			if (!inHunk) {
+				// Start new hunk
+				oldStart = i + 1
+				newStart = i + 1
+				oldCount = 0
+				newCount = 0
+				hunkLines = []
+				inHunk = true
+			}
+			
+			if (oldLines[i] !== undefined) {
+				hunkLines.push(`-${oldLine}`)
+				oldCount++
+			}
+			if (newLines[i] !== undefined) {
+				hunkLines.push(`+${newLine}`)
+				newCount++
+			}
+		} else if (inHunk) {
+			// Context line within hunk
+			hunkLines.push(` ${oldLine}`)
+			oldCount++
+			newCount++
+			
+			// End hunk if we've seen enough context
+			if (hunkLines.length > 6) {
+				diff += `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@\n`
+				diff += hunkLines.join("\n") + "\n"
+				inHunk = false
+			}
+		}
+	}
+	
+	// Close remaining hunk
+	if (inHunk && hunkLines.length > 0) {
+		diff += `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@\n`
+		diff += hunkLines.join("\n") + "\n"
+	}
+	
+	return diff || `--- ${filePath}\n+++ ${filePath}\n`
 }
 
 function countLineDiffs(oldContent: string, newContent: string): { additions: number; deletions: number } {
@@ -80,9 +161,9 @@ export function createHashlineEditDiffEnhancerHook(config: HashlineEditDiffEnhan
 
 	return {
 		"tool.execute.before": async (input: BeforeInput, output: BeforeOutput) => {
-			if (!enabled || !isEditTool(input.tool)) return
+			if (!enabled || !isEditOrWriteTool(input.tool)) return
 
-			const filePath = typeof output.args.path === "string" ? output.args.path : undefined
+			const filePath = extractFilePath(output.args)
 			if (!filePath) return
 
 			cleanupStaleEntries()
@@ -95,7 +176,7 @@ export function createHashlineEditDiffEnhancerHook(config: HashlineEditDiffEnhan
 		},
 
 		"tool.execute.after": async (input: AfterInput, output: AfterOutput) => {
-			if (!enabled || !isEditTool(input.tool)) return
+			if (!enabled || !isEditOrWriteTool(input.tool)) return
 
 			const key = makeKey(input.sessionID, input.callID)
 			const captured = pendingCaptures.get(key)
@@ -114,14 +195,19 @@ export function createHashlineEditDiffEnhancerHook(config: HashlineEditDiffEnhan
 
 			const { additions, deletions } = countLineDiffs(oldContent, newContent)
 
+			const unifiedDiff = generateUnifiedDiff(oldContent, newContent, filePath)
+			
 			output.metadata.filediff = {
 				file: filePath,
 				path: filePath,
-				before: oldContent,
-				after: newContent,
+				before: toHashlineContent(oldContent),
+				after: toHashlineContent(newContent),
 				additions,
 				deletions,
 			}
+			
+			// TUI reads metadata.diff (unified diff string), not filediff object
+			output.metadata.diff = unifiedDiff
 
 			output.title = filePath
 		},
