@@ -738,15 +738,33 @@ Automatically switch to backup models when the primary model encounters retryabl
 | `retry_on_errors`       | `[400, 429, 503, 529]` | HTTP status codes that trigger fallback (rate limit, service unavailable). Also supports certain classified provider errors (for example, missing API key) that do not expose HTTP status codes.   |
 | `max_fallback_attempts` | `3`                    | Maximum fallback attempts per session (1-20)                                |
 | `cooldown_seconds`      | `60`                   | Cooldown in seconds before retrying a failed model                          |
-| `timeout_seconds`       | `30`                   | Timeout in seconds for an in-flight fallback request before forcing the next fallback model. Set to `0` to disable timeout-based fallback and provider quota retry signal detection. |
+| `timeout_seconds`       | `30`                   | Timeout in seconds for an in-flight fallback request before forcing the next fallback model. **⚠️ Set to `0` to disable auto-retry signal detection** (see below). |
 | `notify_on_fallback`    | `true`                 | Show toast notification when switching to a fallback model                  |
+
+### timeout_seconds: Understanding the 0 Value
+
+**⚠️ IMPORTANT**: Setting `timeout_seconds: 0` **disables auto-retry signal detection**. This is a critical behavior change:
+
+| Setting | Behavior |
+|---------|----------|
+| `timeout_seconds: 30` (default) | ✅ **Full fallback coverage**: Error-based fallback (429, 503, etc.) + auto-retry signal detection (provider messages like "retrying in 8h") |
+| `timeout_seconds: 0` | ⚠️ **Limited fallback**: Only error-based fallback works. Provider retry messages are **completely ignored**. Timeout-based escalation is **disabled**. |
+
+**When `timeout_seconds: 0`:**
+- ✅ HTTP errors (429, 503, 529) still trigger fallback
+- ✅ Provider key errors (missing API key) still trigger fallback
+- ❌ Provider retry messages ("retrying in Xh") are **ignored**
+- ❌ Timeout-based escalation is **disabled**
+- ❌ Hanging requests do **not** advance to the next fallback model
+
+**Recommendation**: Use a non-zero value (e.g., `30` seconds) to enable full fallback coverage. Only set to `0` if you explicitly want to disable auto-retry signal detection.
 
 ### How It Works
 
 1. When an API error matching `retry_on_errors` occurs (or a classified provider key error such as missing API key), the hook intercepts it
 2. The next request automatically uses the next available model from `fallback_models`
 3. Failed models enter a cooldown period before being retried
-4. If a fallback provider hangs, timeout advances to the next fallback model
+4. If `timeout_seconds > 0` and a fallback provider hangs, timeout advances to the next fallback model
 5. Toast notification (optional) informs you of the model switch
 
 ### Configuring Fallback Models
