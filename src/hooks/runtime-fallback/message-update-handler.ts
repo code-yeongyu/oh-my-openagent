@@ -2,7 +2,7 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal } from "./error-classifier"
+import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
 import { createFallbackState, prepareFallback } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 
@@ -60,7 +60,11 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
     const retrySignalResult = extractAutoRetrySignal(info)
     const retrySignal = retrySignalResult?.signal
     const timeoutEnabled = config.timeout_seconds > 0
-    const error = info?.error ?? (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined)
+    const parts = props?.parts as Array<{ type?: string; text?: string }> | undefined
+    const errorContentResult = containsErrorContent(parts)
+    const error = info?.error ?? 
+      (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined) ??
+      (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
     const role = info?.role as string | undefined
     const model = info?.model as string | undefined
 
