@@ -44,19 +44,19 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(last.model).toBe("big-pickle")
   })
 
-  test("librarian has valid fallbackChain with minimax-m2.5-free as primary", () => {
+  test("librarian has valid fallbackChain with gemini-3-flash as primary", () => {
     // given - librarian agent requirement
     const librarian = AGENT_MODEL_REQUIREMENTS["librarian"]
 
     // when - accessing librarian requirement
-    // then - fallbackChain exists with minimax-m2.5-free as first entry
+    // then - fallbackChain exists with gemini-3-flash as first entry
     expect(librarian).toBeDefined()
     expect(librarian.fallbackChain).toBeArray()
     expect(librarian.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = librarian.fallbackChain[0]
-    expect(primary.providers[0]).toBe("opencode")
-    expect(primary.model).toBe("minimax-m2.5-free")
+    expect(primary.providers[0]).toBe("google")
+    expect(primary.model).toBe("gemini-3-flash")
   })
 
   test("explore has valid fallbackChain with grok-code-fast-1 as primary", () => {
