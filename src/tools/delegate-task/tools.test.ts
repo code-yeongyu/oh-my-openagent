@@ -2679,11 +2679,9 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - skill content should be injected
-      expect(result).not.toContain("Skills not found")
-      expect(promptBody).toBeDefined()
-      expect(promptBody.system).toContain("<Category_Context>")
-      expect(String(promptBody.system).startsWith("<Category_Context>")).toBe(false)
+      // then - agent-browser skill should NOT resolve without browserProvider
+      expect(result).toContain("Skills not found")
+      expect(result).toContain("agent-browser")
     })
   })
 
