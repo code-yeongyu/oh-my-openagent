@@ -4,6 +4,7 @@ import * as fs from "node:fs"
 import { createSkillTool } from "./tools"
 import { SkillMcpManager } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import type { CommandInfo } from "../slashcommand/types"
 import type { Tool as McpTool } from "@modelcontextprotocol/sdk/types.js"
 
 const originalReadFileSync = fs.readFileSync.bind(fs)
@@ -67,7 +68,7 @@ const mockContext: ToolContext = {
 }
 
 describe("skill tool - synchronous description", () => {
-  it("includes available_skills immediately when skills are pre-provided", () => {
+  it("includes available_items immediately when skills are pre-provided", () => {
     // given
     const loadedSkills = [createMockSkill("test-skill")]
 
@@ -75,11 +76,11 @@ describe("skill tool - synchronous description", () => {
     const tool = createSkillTool({ skills: loadedSkills })
 
     // then
-    expect(tool.description).toContain("<available_skills>")
+    expect(tool.description).toContain("<available_items>")
     expect(tool.description).toContain("test-skill")
   })
 
-  it("includes all pre-provided skills in available_skills immediately", () => {
+  it("includes all pre-provided skills in available_items immediately", () => {
     // given
     const loadedSkills = [
       createMockSkill("playwright"),
@@ -91,6 +92,7 @@ describe("skill tool - synchronous description", () => {
     const tool = createSkillTool({ skills: loadedSkills })
 
     // then
+    expect(tool.description).toContain("<available_items>")
     expect(tool.description).toContain("playwright")
     expect(tool.description).toContain("frontend-ui-ux")
     expect(tool.description).toContain("git-master")
@@ -351,5 +353,133 @@ describe("skill tool - MCP schema display", () => {
       expect(result).toContain("required")
       expect(result).toMatch(/sql[\s\S]*string/i)
     })
+  })
+})
+
+
+describe("skill tool - ordering and priority", () => {
+  function createMockSkillWithScope(name: string, scope: string): LoadedSkill {
+    return {
+      name,
+      path: `/test/skills/${name}/SKILL.md`,
+      resolvedPath: `/test/skills/${name}`,
+      definition: {
+        name,
+        description: `Test skill ${name}`,
+        template: "Test template",
+      },
+      scope: scope as LoadedSkill["scope"],
+    }
+  }
+
+  function createMockCommand(name: string, scope: string) {
+    return {
+      name,
+      path: `/test/commands/${name}.md`,
+      metadata: {
+        name,
+        description: `Test command ${name}`,
+      },
+      scope: scope as CommandInfo["scope"],
+    }
+  }
+
+  it("lists skills before commands in available_items", () => {
+    //#given: mix of skills and commands
+    const skills = [
+      createMockSkillWithScope("builtin-skill", "builtin"),
+      createMockSkillWithScope("project-skill", "project"),
+    ]
+    const commands = [
+      createMockCommand("project-cmd", "project"),
+      createMockCommand("builtin-cmd", "builtin"),
+    ]
+
+    //#when: creating tool with both
+    const tool = createSkillTool({ skills, commands })
+
+    //#then: skills should appear before commands
+    const desc = tool.description
+    const skillIndex = desc.indexOf("<skill>")
+    const commandIndex = desc.indexOf("<command>")
+    expect(skillIndex).toBeGreaterThan(0)
+    expect(commandIndex).toBeGreaterThan(0)
+    expect(skillIndex).toBeLessThan(commandIndex)
+  })
+
+  it("sorts skills by priority: project > user > opencode > builtin", () => {
+    //#given: skills in random order
+    const skills = [
+      createMockSkillWithScope("builtin-skill", "builtin"),
+      createMockSkillWithScope("opencode-skill", "opencode"),
+      createMockSkillWithScope("project-skill", "project"),
+      createMockSkillWithScope("user-skill", "user"),
+    ]
+
+    //#when: creating tool
+    const tool = createSkillTool({ skills })
+
+    //#then: should be sorted by priority
+    const desc = tool.description
+    const projectIndex = desc.indexOf("project-skill")
+    const userIndex = desc.indexOf("user-skill")
+    const opencodeIndex = desc.indexOf("opencode-skill")
+    const builtinIndex = desc.indexOf("builtin-skill")
+
+    expect(projectIndex).toBeLessThan(userIndex)
+    expect(userIndex).toBeLessThan(opencodeIndex)
+    expect(opencodeIndex).toBeLessThan(builtinIndex)
+  })
+
+  it("sorts commands by priority: project > user > opencode > builtin", () => {
+    //#given: commands in random order
+    const commands = [
+      createMockCommand("builtin-cmd", "builtin"),
+      createMockCommand("opencode-cmd", "opencode"),
+      createMockCommand("project-cmd", "project"),
+      createMockCommand("user-cmd", "user"),
+    ]
+
+    //#when: creating tool
+    const tool = createSkillTool({ commands })
+
+    //#then: should be sorted by priority
+    const desc = tool.description
+    const projectIndex = desc.indexOf("project-cmd")
+    const userIndex = desc.indexOf("user-cmd")
+    const opencodeIndex = desc.indexOf("opencode-cmd")
+    const builtinIndex = desc.indexOf("builtin-cmd")
+
+    expect(projectIndex).toBeLessThan(userIndex)
+    expect(userIndex).toBeLessThan(opencodeIndex)
+    expect(opencodeIndex).toBeLessThan(builtinIndex)
+  })
+
+  it("includes priority documentation in description", () => {
+    //#given: some skills and commands
+    const skills = [createMockSkillWithScope("test-skill", "project")]
+    const commands = [createMockCommand("test-cmd", "project")]
+
+    //#when: creating tool
+    const tool = createSkillTool({ skills, commands })
+
+    //#then: should include priority info
+    expect(tool.description).toContain("Priority: project > user > opencode > builtin")
+    expect(tool.description).toContain("Skills listed before commands")
+  })
+
+  it("uses <available_items> wrapper with unified format", () => {
+    //#given: mix of skills and commands
+    const skills = [createMockSkillWithScope("test-skill", "project")]
+    const commands = [createMockCommand("test-cmd", "project")]
+
+    //#when: creating tool
+    const tool = createSkillTool({ skills, commands })
+
+    //#then: should use unified wrapper
+    expect(tool.description).toContain("<available_items>")
+    expect(tool.description).toContain("</available_items>")
+    expect(tool.description).toContain("<skill>")
+    expect(tool.description).toContain("<command>")
   })
 })

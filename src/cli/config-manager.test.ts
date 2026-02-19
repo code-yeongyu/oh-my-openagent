@@ -240,52 +240,6 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
 })
 
 describe("generateOmoConfig - model fallback system", () => {
-  test("generates sonnet model with ultrawork opus for Claude standard subscription", () => {
-    // #given user has Claude standard subscription (not max20)
-    const config: InstallConfig = {
-      hasClaude: true,
-      isMax20: false,
-      hasOpenAI: false,
-      hasGemini: false,
-      hasCopilot: false,
-      hasOpencodeZen: false,
-      hasZaiCodingPlan: false,
-      hasKimiForCoding: false,
-    }
-
-    // #when generating config
-    const result = generateOmoConfig(config)
-
-    // #then Sisyphus uses sonnet for daily driving with ultrawork opus override
-    const sisyphus = (result.agents as Record<string, { model: string; variant?: string; ultrawork?: { model: string; variant?: string } }>).sisyphus
-    expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
-    expect(sisyphus.model).toBe("anthropic/claude-sonnet-4-6")
-    expect(sisyphus.variant).toBe("max")
-    expect(sisyphus.ultrawork).toEqual({ model: "anthropic/claude-opus-4-6", variant: "max" })
-  })
-
-  test("generates native opus models without ultrawork when Claude max20 subscription", () => {
-    // #given user has Claude max20 subscription
-    const config: InstallConfig = {
-      hasClaude: true,
-      isMax20: true,
-      hasOpenAI: false,
-      hasGemini: false,
-      hasCopilot: false,
-      hasOpencodeZen: false,
-      hasZaiCodingPlan: false,
-      hasKimiForCoding: false,
-    }
-
-    // #when generating config
-    const result = generateOmoConfig(config)
-
-    // #then Sisyphus uses opus directly, no ultrawork override needed
-    const sisyphus = (result.agents as Record<string, { model: string; ultrawork?: unknown }>).sisyphus
-    expect(sisyphus.model).toBe("anthropic/claude-opus-4-6")
-    expect(sisyphus.ultrawork).toBeUndefined()
-  })
-
   test("uses github-copilot sonnet fallback when only copilot available", () => {
     // #given user has only copilot (no max plan)
     const config: InstallConfig = {
@@ -327,7 +281,7 @@ describe("generateOmoConfig - model fallback system", () => {
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
   })
 
-  test("uses zai-coding-plan/glm-4.7 for librarian when Z.ai available", () => {
+  test("uses opencode/minimax-m2.5-free for librarian regardless of Z.ai", () => {
     // #given user has Z.ai and Claude max20
     const config: InstallConfig = {
       hasClaude: true,
@@ -343,8 +297,8 @@ describe("generateOmoConfig - model fallback system", () => {
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then librarian should use zai-coding-plan/glm-4.7
-    expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("zai-coding-plan/glm-4.7")
+    // #then librarian should use opencode/minimax-m2.5-free
+    expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("opencode/minimax-m2.5-free")
     // #then Sisyphus uses Claude (OR logic)
     expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-6")
   })

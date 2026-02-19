@@ -390,36 +390,36 @@ describe("resolveModelWithFallback", () => {
     })
 
     test("cross-provider fuzzy match when preferred provider unavailable (librarian scenario)", () => {
-      // given - glm-4.7 is defined for zai-coding-plan, but only opencode has it
+      // given - glm-5 is defined for zai-coding-plan, but only opencode has it
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
-          { providers: ["zai-coding-plan"], model: "glm-4.7" },
+          { providers: ["zai-coding-plan"], model: "glm-5" },
           { providers: ["anthropic"], model: "claude-sonnet-4-6" },
         ],
-        availableModels: new Set(["opencode/glm-4.7", "anthropic/claude-sonnet-4-6"]),
+        availableModels: new Set(["opencode/glm-5", "anthropic/claude-sonnet-4-6"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
       // when
       const result = resolveModelWithFallback(input)
 
-      // then - should find glm-4.7 from opencode via cross-provider fuzzy match
-      expect(result!.model).toBe("opencode/glm-4.7")
+      // then - should find glm-5 from opencode via cross-provider fuzzy match
+      expect(result!.model).toBe("opencode/glm-5")
       expect(result!.source).toBe("provider-fallback")
       expect(logSpy).toHaveBeenCalledWith("Model resolved via fallback chain (cross-provider fuzzy match)", {
-        model: "glm-4.7",
-        match: "opencode/glm-4.7",
+        model: "glm-5",
+        match: "opencode/glm-5",
         variant: undefined,
       })
     })
 
     test("prefers specified provider over cross-provider match", () => {
-      // given - both zai-coding-plan and opencode have glm-4.7
+      // given - both zai-coding-plan and opencode have glm-5
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
-          { providers: ["zai-coding-plan"], model: "glm-4.7" },
+          { providers: ["zai-coding-plan"], model: "glm-5" },
         ],
-        availableModels: new Set(["zai-coding-plan/glm-4.7", "opencode/glm-4.7"]),
+        availableModels: new Set(["zai-coding-plan/glm-5", "opencode/glm-5"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
@@ -427,7 +427,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should prefer zai-coding-plan (specified provider) over opencode
-      expect(result!.model).toBe("zai-coding-plan/glm-4.7")
+      expect(result!.model).toBe("zai-coding-plan/glm-5")
       expect(result!.source).toBe("provider-fallback")
     })
 
@@ -435,9 +435,9 @@ describe("resolveModelWithFallback", () => {
       // given - entry has variant, model found via cross-provider
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
-          { providers: ["zai-coding-plan"], model: "glm-4.7", variant: "high" },
+          { providers: ["zai-coding-plan"], model: "glm-5", variant: "high" },
         ],
-        availableModels: new Set(["opencode/glm-4.7"]),
+        availableModels: new Set(["opencode/glm-5"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
@@ -445,7 +445,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - variant should be preserved
-      expect(result!.model).toBe("opencode/glm-4.7")
+      expect(result!.model).toBe("opencode/glm-5")
       expect(result!.variant).toBe("high")
     })
 

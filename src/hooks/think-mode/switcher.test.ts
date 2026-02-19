@@ -498,9 +498,9 @@ describe("think-mode switcher", () => {
 
   describe("Z.AI GLM-4.7 provider support", () => {
     describe("getThinkingConfig for zai-coding-plan", () => {
-      it("should return thinking config for glm-4.7", () => {
+      it("should return thinking config for glm-5", () => {
         //#given a Z.ai GLM model
-        const config = getThinkingConfig("zai-coding-plan", "glm-4.7")
+        const config = getThinkingConfig("zai-coding-plan", "glm-5")
 
         //#when thinking config is resolved
 
@@ -535,9 +535,9 @@ describe("think-mode switcher", () => {
     })
 
     describe("HIGH_VARIANT_MAP for GLM", () => {
-      it("should NOT have high variant for glm-4.7", () => {
-        // given glm-4.7 model
-        const variant = getHighVariant("glm-4.7")
+      it("should NOT have high variant for glm-5", () => {
+        // given glm-5 model
+        const variant = getHighVariant("glm-5")
 
         // then should return null (no high variant needed)
         expect(variant).toBeNull()

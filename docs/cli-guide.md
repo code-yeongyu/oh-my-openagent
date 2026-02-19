@@ -23,8 +23,8 @@ npx oh-my-opencode
 | `install` | Interactive Setup Wizard |
 | `doctor` | Environment diagnostics and health checks |
 | `run` | OpenCode session runner |
-| `auth` | Google Antigravity authentication management |
-| `version` | Display version information |
+| `mcp oauth` | MCP OAuth authentication management |
+| `get-local-version` | Display local version information |
 
 ---
 
@@ -131,6 +131,15 @@ bunx oh-my-opencode run [prompt]
 |--------|-------------|
 | `--enforce-completion` | Keep session active until all TODOs are completed |
 | `--timeout <seconds>` | Set maximum execution time |
+| `--agent <name>` | Specify agent to use |
+| `--directory <path>` | Set working directory |
+| `--port <number>` | Set port for session |
+| `--attach` | Attach to existing session |
+| `--json` | Output in JSON format |
+| `--no-timestamp` | Disable timestamped output |
+| `--session-id <id>` | Resume existing session |
+| `--on-complete <action>` | Action on completion |
+| `--verbose` | Enable verbose logging |
 
 ---
 
@@ -267,14 +276,17 @@ bunx oh-my-opencode doctor --json > doctor-report.json
 
 ```
 src/cli/
-├── index.ts              # Commander.js-based main entry
+├── cli-program.ts        # Commander.js-based main entry
 ├── install.ts            # @clack/prompts-based TUI installer
-├── config-manager.ts     # JSONC parsing, multi-source config management
+├── config-manager/       # JSONC parsing, multi-source config management
+│   └── *.ts
 ├── doctor/               # Health check system
 │   ├── index.ts          # Doctor command entry
 │   └── checks/           # 17+ individual check modules
 ├── run/                  # Session runner
-└── commands/auth.ts      # Authentication management
+│   └── *.ts
+└── mcp-oauth/            # OAuth management commands
+    └── *.ts
 ```
 
 ### Adding New Doctor Checks

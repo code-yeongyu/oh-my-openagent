@@ -107,25 +107,6 @@ Yes, technically possible. But I cannot recommend using it.
 
 ---
 
-## Contents
-
-- [Oh My OpenCode](#oh-my-opencode)
-  - [Just Skip Reading This Readme](#just-skip-reading-this-readme)
-    - [It's the Age of Agents](#its-the-age-of-agents)
-    - [🪄 The Magic Word: `ultrawork`](#-the-magic-word-ultrawork)
-    - [For Those Who Want to Read: Meet Sisyphus](#for-those-who-want-to-read-meet-sisyphus)
-      - [Just Install This](#just-install-this)
-    - [For Those Who Want Autonomy: Meet Hephaestus](#for-those-who-want-autonomy-meet-hephaestus)
-  - [Installation](#installation)
-    - [For Humans](#for-humans)
-    - [For LLM Agents](#for-llm-agents)
-  - [Uninstallation](#uninstallation)
-  - [Features](#features)
-  - [Configuration](#configuration)
-  - [Author's Note](#authors-note)
-  - [Warnings](#warnings)
-  - [Loved by professionals at](#loved-by-professionals-at)
-
 # Oh My OpenCode
 
 [Claude Code](https://www.claude.com/product/claude-code) is great.
@@ -222,6 +203,10 @@ Need to look something up? It scours official docs, your entire codebase history
 
 If you don't want all this, as mentioned, you can just pick and choose specific features.
 
+#### Which Model Should I Use?
+
+New to oh-my-opencode and not sure which model to pair with which agent? Check the **[Agent-Model Matching Guide](docs/guide/agent-model-matching.md)** — a quick reference for newcomers covering recommended models, fallback chains, and common pitfalls for each agent.
+
 ### For Those Who Want Autonomy: Meet Hephaestus
 
 ![Meet Hephaestus](.github/assets/hephaestus.png)
@@ -244,14 +229,6 @@ Hephaestus is inspired by [AmpCode's deep mode](https://ampcode.com)—autonomou
 
 ### For Humans
 
-Fetch the installation guide and follow it:
-
-```bash
-curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
-```
-
-### For LLM Agents
-
 Copy and paste this prompt to your LLM agent (Claude Code, AmpCode, Cursor, etc.):
 
 ```
@@ -260,6 +237,14 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/
 ```
 
 Or read the [Installation Guide](docs/guide/installation.md) directly—but **we strongly recommend letting an agent handle it. Humans make mistakes.**
+
+### For LLM Agents
+
+Fetch the installation guide and follow it:
+
+```bash
+curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+```
 
 ## Uninstallation
 
@@ -307,6 +292,7 @@ See the full [Features Documentation](docs/features.md) for detailed information
 - **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search)
 - **Session Tools**: List, read, search, and analyze session history
 - **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
+- **[Agent-Model Matching Guide](docs/guide/agent-model-matching.md)**: Which model works best with which agent
 
 ## Configuration
 

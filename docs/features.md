@@ -10,12 +10,12 @@ Oh-My-OpenCode provides 11 specialized AI agents. Each has distinct expertise, o
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| **Sisyphus** | `anthropic/claude-opus-4-6` | **The default orchestrator.** Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: k2p5 → kimi-k2.5-free → glm-4.7 → glm-4.7-free. |
+| **Sisyphus** | `anthropic/claude-opus-4-6` | **The default orchestrator.** Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: k2p5 → kimi-k2.5-free → glm-5 → big-pickle. |
 | **Hephaestus** | `openai/gpt-5.3-codex` | **The Legitimate Craftsman.** Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Requires gpt-5.3-codex (no fallback - only activates when this model is available). |
 | **oracle** | `openai/gpt-5.2` | Architecture decisions, code review, debugging. Read-only consultation - stellar logical reasoning and deep analysis. Inspired by AmpCode. |
-| **librarian** | `zai-coding-plan/glm-4.7` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: glm-4.7-free → claude-sonnet-4-6. |
-| **explore** | `github-copilot/grok-code-fast-1` | Fast codebase exploration and contextual grep. Fallback: claude-haiku-4-5 → gpt-5-nano. |
-| **multimodal-looker** | `google/gemini-3-flash` | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: gpt-5.2 → glm-4.6v → k2p5 → kimi-k2.5-free → claude-haiku-4-5 → gpt-5-nano. |
+| **librarian** | `google/gemini-3-flash` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: minimax-m2.5-free → big-pickle. |
+| **explore** | `github-copilot/grok-code-fast-1` | Fast codebase exploration and contextual grep. Fallback: minimax-m2.5-free → claude-haiku-4-5 → gpt-5-nano. |
+| **multimodal-looker** | `kimi-for-coding/k2p5` | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: kimi-k2.5-free → gemini-3-flash → gpt-5.2 → glm-4.6v. |
 
 ### Planning Agents
 

@@ -109,18 +109,20 @@ After making changes, you can test your local build in OpenCode:
 ```
 oh-my-opencode/
 ├── src/
-│   ├── agents/        # AI agents (OmO, oracle, librarian, explore, etc.)
-│   ├── hooks/         # 21 lifecycle hooks
-│   ├── tools/         # LSP (11), AST-Grep, Grep, Glob, etc.
-│   ├── mcp/           # MCP server integrations (context7, grep_app)
-│   ├── features/      # Claude Code compatibility layers
-│   ├── config/        # Zod schemas and TypeScript types
-│   ├── auth/          # Google Antigravity OAuth
-│   ├── shared/        # Common utilities
-│   └── index.ts       # Main plugin entry (OhMyOpenCodePlugin)
-├── script/            # Build utilities (build-schema.ts, publish.ts)
-├── assets/            # JSON schema
-└── dist/              # Build output (ESM + .d.ts)
+│   ├── index.ts         # Plugin entry (OhMyOpenCodePlugin)
+│   ├── plugin-config.ts # JSONC multi-level config (Zod v4)
+│   ├── agents/          # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
+│   ├── hooks/           # 44 lifecycle hooks across 39 directories
+│   ├── tools/           # 26 tools across 15 directories
+│   ├── mcp/             # 3 built-in remote MCPs (websearch, context7, grep_app)
+│   ├── features/        # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
+│   ├── config/          # Zod v4 schema system
+│   ├── shared/          # Cross-cutting utilities
+│   ├── cli/             # CLI: install, run, doctor, mcp-oauth (Commander.js)
+│   ├── plugin/          # 8 OpenCode hook handlers + hook composition
+│   └── plugin-handlers/ # 6-phase config loading pipeline
+├── packages/            # Monorepo: comment-checker, opencode-sdk
+└── dist/                # Build output (ESM + .d.ts)
 ```
 
 ## Development Workflow

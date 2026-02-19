@@ -1,4 +1,4 @@
-import { describe, it, expect, mock } from "bun:test"
+import { afterEach, describe, it, expect, mock } from "bun:test"
 
 const mockShowConfigErrorsIfAny = mock(async () => {})
 const mockShowModelCacheWarningIfNeeded = mock(async () => {})
@@ -48,6 +48,11 @@ mock.module("../../shared/logger", () => ({
 
 const { createAutoUpdateCheckerHook } = await import("./hook")
 
+afterEach(() => {
+  delete process.env.OPENCODE_CLI_RUN_MODE
+  mock.restore()
+})
+
 describe("createAutoUpdateCheckerHook", () => {
   it("skips startup toasts and checks in CLI run mode", async () => {
     //#given - CLI run mode enabled
@@ -81,6 +86,5 @@ describe("createAutoUpdateCheckerHook", () => {
     expect(mockShowLocalDevToast).not.toHaveBeenCalled()
     expect(mockShowVersionToast).not.toHaveBeenCalled()
 
-    delete process.env.OPENCODE_CLI_RUN_MODE
   })
 })

@@ -44,7 +44,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   Gemini        Native google/ models (Gemini 3 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-6, etc.)
-  Z.ai          zai-coding-plan/glm-4.7 (Librarian priority)
+   Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
 `)
   .action(async (options) => {
@@ -74,6 +74,7 @@ program
   .option("--attach <url>", "Attach to existing opencode server URL")
   .option("--on-complete <command>", "Shell command to run after completion")
   .option("--json", "Output structured JSON result to stdout")
+  .option("--no-timestamp", "Disable timestamp prefix in run output")
   .option("--verbose", "Show full event stream (default: messages/tools only)")
   .option("--session-id <id>", "Resume existing session instead of creating new one")
   .addHelpText("after", `
@@ -112,6 +113,7 @@ Unlike 'opencode run', this command waits until:
       attach: options.attach,
       onComplete: options.onComplete,
       json: options.json ?? false,
+      timestamp: options.timestamp ?? true,
       verbose: options.verbose ?? false,
       sessionId: options.sessionId,
     }

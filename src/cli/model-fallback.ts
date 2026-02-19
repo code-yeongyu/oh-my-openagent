@@ -16,7 +16,7 @@ import {
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
-const ZAI_MODEL = "zai-coding-plan/glm-4.7"
+const LIBRARIAN_MODEL = "opencode/minimax-m2.5-free"
 
 const ULTIMATE_FALLBACK = "opencode/big-pickle"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
@@ -52,8 +52,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const categories: Record<string, CategoryConfig> = {}
 
   for (const [role, req] of Object.entries(AGENT_MODEL_REQUIREMENTS)) {
-    if (role === "librarian" && avail.zai) {
-      agents[role] = { model: ZAI_MODEL }
+    if (role === "librarian") {
+      agents[role] = { model: LIBRARIAN_MODEL }
       continue
     }
 
@@ -73,15 +73,6 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     if (role === "sisyphus") {
       const fallbackChain = getSisyphusFallbackChain()
       if (req.requiresAnyModel && !isAnyFallbackEntryAvailable(fallbackChain, avail)) {
-        continue
-      }
-
-      if (avail.native.claude && !avail.isMaxPlan) {
-        agents[role] = {
-          model: "anthropic/claude-sonnet-4-6",
-          variant: "max",
-          ultrawork: { model: "anthropic/claude-opus-4-6", variant: "max" },
-        }
         continue
       }
 

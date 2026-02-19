@@ -1,6 +1,7 @@
 import type { SkillScope, LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { SkillMcpManager } from "../../features/skill-mcp-manager"
 import type { GitMasterConfig } from "../../config/schema"
+import type { CommandInfo } from "../slashcommand/types"
 
 export interface SkillArgs {
   name: string
@@ -22,6 +23,8 @@ export interface SkillLoadOptions {
   opencodeOnly?: boolean
   /** Pre-merged skills to use instead of discovering */
   skills?: LoadedSkill[]
+  /** Pre-discovered commands to use instead of discovering */
+  commands?: CommandInfo[]
   /** MCP manager for querying skill-embedded MCP servers */
   mcpManager?: SkillMcpManager
   /** Session ID getter for MCP client identification */

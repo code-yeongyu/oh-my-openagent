@@ -30,6 +30,18 @@ describe("computeLineHash", () => {
     expect(hash1).toBe(hash2)
   })
 
+  it("uses line number in hash input", () => {
+    //#given
+    const content = "const stable = true"
+
+    //#when
+    const hash1 = computeLineHash(1, content)
+    const hash2 = computeLineHash(2, content)
+
+    //#then
+    expect(hash1).not.toBe(hash2)
+  })
+
   it("handles empty lines", () => {
     //#given
     const lineNumber = 1

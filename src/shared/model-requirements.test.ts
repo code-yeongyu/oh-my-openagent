@@ -44,19 +44,19 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(last.model).toBe("big-pickle")
   })
 
-  test("librarian has valid fallbackChain with glm-4.7 as primary", () => {
+  test("librarian has valid fallbackChain with gemini-3-flash as primary", () => {
     // given - librarian agent requirement
     const librarian = AGENT_MODEL_REQUIREMENTS["librarian"]
 
     // when - accessing librarian requirement
-    // then - fallbackChain exists with glm-4.7 as first entry
+    // then - fallbackChain exists with gemini-3-flash as first entry
     expect(librarian).toBeDefined()
     expect(librarian.fallbackChain).toBeArray()
     expect(librarian.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = librarian.fallbackChain[0]
-    expect(primary.providers[0]).toBe("zai-coding-plan")
-    expect(primary.model).toBe("glm-4.7")
+    expect(primary.providers[0]).toBe("google")
+    expect(primary.model).toBe("gemini-3-flash")
   })
 
   test("explore has valid fallbackChain with grok-code-fast-1 as primary", () => {
@@ -64,38 +64,41 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
     // when - accessing explore requirement
-    // then - fallbackChain exists with grok-code-fast-1 as first entry, claude-haiku-4-5 as second
+    // then - fallbackChain: grok → minimax-free → haiku → nano
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
-    expect(explore.fallbackChain).toHaveLength(3)
+    expect(explore.fallbackChain).toHaveLength(4)
 
     const primary = explore.fallbackChain[0]
     expect(primary.providers).toContain("github-copilot")
     expect(primary.model).toBe("grok-code-fast-1")
 
     const secondary = explore.fallbackChain[1]
-    expect(secondary.providers).toContain("anthropic")
     expect(secondary.providers).toContain("opencode")
-    expect(secondary.model).toBe("claude-haiku-4-5")
+    expect(secondary.model).toBe("minimax-m2.5-free")
 
     const tertiary = explore.fallbackChain[2]
-    expect(tertiary.providers).toContain("opencode")
-    expect(tertiary.model).toBe("gpt-5-nano")
+    expect(tertiary.providers).toContain("anthropic")
+    expect(tertiary.model).toBe("claude-haiku-4-5")
+
+    const quaternary = explore.fallbackChain[3]
+    expect(quaternary.providers).toContain("opencode")
+    expect(quaternary.model).toBe("gpt-5-nano")
   })
 
-  test("multimodal-looker has valid fallbackChain with gemini-3-flash as primary", () => {
+  test("multimodal-looker has valid fallbackChain with k2p5 as primary", () => {
     // given - multimodal-looker agent requirement
     const multimodalLooker = AGENT_MODEL_REQUIREMENTS["multimodal-looker"]
 
     // when - accessing multimodal-looker requirement
-    // then - fallbackChain exists with gemini-3-flash as first entry
+    // then - fallbackChain exists with k2p5 as first entry
     expect(multimodalLooker).toBeDefined()
     expect(multimodalLooker.fallbackChain).toBeArray()
     expect(multimodalLooker.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = multimodalLooker.fallbackChain[0]
-    expect(primary.providers[0]).toBe("google")
-    expect(primary.model).toBe("gemini-3-flash")
+    expect(primary.providers[0]).toBe("kimi-for-coding")
+    expect(primary.model).toBe("k2p5")
   })
 
   test("prometheus has claude-opus-4-6 as primary", () => {

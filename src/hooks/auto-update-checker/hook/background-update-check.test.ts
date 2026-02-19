@@ -16,7 +16,7 @@ mock.module("../checker", () => ({
   getCachedVersion: mockGetCachedVersion,
   getLatestVersion: mockGetLatestVersion,
   updatePinnedVersion: mockUpdatePinnedVersion,
-  revertPinnedVersion: mockRevertPinnedVersion,
+  revertPinnedVersion: mock(() => false),
 }))
 
 mock.module("../version-channel", () => ({
@@ -40,7 +40,7 @@ mock.module("../../../shared/logger", () => ({
   log: () => {},
 }))
 
-const { runBackgroundUpdateCheck } = await import("./background-update-check")
+const { runBackgroundUpdateCheck } = await import("./background-update-check?test")
 
 describe("runBackgroundUpdateCheck", () => {
   const mockCtx = { directory: "/test" } as any

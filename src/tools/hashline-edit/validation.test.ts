@@ -1,4 +1,5 @@
 import { describe, it, expect } from "bun:test"
+import { computeLineHash } from "./hash-computation"
 import { parseLineRef, validateLineRef } from "./validation"
 
 describe("parseLineRef", () => {
@@ -61,7 +62,7 @@ describe("validateLineRef", () => {
   it("validates matching hash", () => {
     //#given
     const lines = ["function hello() {", "  return 42", "}"]
-    const ref = "1:42"
+    const ref = `1:${computeLineHash(1, lines[0])}`
 
     //#when & #then
     expect(() => validateLineRef(lines, ref)).not.toThrow()

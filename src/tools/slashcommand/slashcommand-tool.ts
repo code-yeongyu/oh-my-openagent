@@ -5,6 +5,7 @@ import { discoverCommandsSync } from "./command-discovery"
 import { buildDescriptionFromItems, TOOL_DESCRIPTION_PREFIX } from "./slashcommand-description"
 import { formatCommandList, formatLoadedCommand } from "./command-output-formatter"
 import { skillToCommandInfo } from "./skill-command-converter"
+import { formatSkillOutput } from "./skill-formatter"
 
 export function createSlashcommandTool(options: SlashcommandToolOptions = {}): ToolDefinition {
   let cachedCommands: CommandInfo[] | null = options.commands ?? null
@@ -75,6 +76,18 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
       )
 
       if (exactMatch) {
+        const skills = await getSkills()
+        const matchedSkill = skills.find(s => s.name === exactMatch.name)
+        
+        if (matchedSkill) {
+          return await formatSkillOutput(
+            matchedSkill,
+            options.mcpManager,
+            options.getSessionID,
+            options.gitMasterConfig
+          )
+        }
+        
         return await formatLoadedCommand(exactMatch, args.user_message)
       }
 

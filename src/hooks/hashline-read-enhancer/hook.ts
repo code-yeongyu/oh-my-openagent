@@ -8,7 +8,8 @@ interface HashlineReadEnhancerConfig {
 const READ_LINE_PATTERN = /^(\d+): (.*)$/
 
 function isReadTool(toolName: string): boolean {
-  return toolName.toLowerCase() === "read"
+  const lower = toolName.toLowerCase()
+  return lower === "read" || lower === "write"
 }
 
 function shouldProcess(config: HashlineReadEnhancerConfig): boolean {
@@ -39,7 +40,24 @@ function transformOutput(output: string): string {
     return output
   }
   const lines = output.split("\n")
-  return lines.map(transformLine).join("\n")
+  const result: string[] = []
+  for (const line of lines) {
+    if (!READ_LINE_PATTERN.test(line)) {
+      result.push(line)
+      result.push(...lines.slice(result.length))
+      break
+    }
+    result.push(transformLine(line))
+  }
+  return result.join("\n")
+}
+
+function transformWriteOutput(output: string): string {
+  if (!output) {
+    return output
+  }
+  const lines = output.split("\n")
+  return lines.map((line) => (READ_LINE_PATTERN.test(line) ? transformLine(line) : line)).join("\n")
 }
 
 export function createHashlineReadEnhancerHook(
@@ -60,7 +78,7 @@ export function createHashlineReadEnhancerHook(
       if (!shouldProcess(config)) {
         return
       }
-      output.output = transformOutput(output.output)
+      output.output = input.tool.toLowerCase() === "write" ? transformWriteOutput(output.output) : transformOutput(output.output)
     },
   }
 }

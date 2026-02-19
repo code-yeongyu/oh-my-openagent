@@ -29,6 +29,7 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.prometheusMdOnly?.["tool.execute.before"]?.(input, output)
     await hooks.sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
+    await hooks.hashlineEditDiffEnhancer?.["tool.execute.before"]?.(input, output)
     if (input.tool === "task") {
       const argsObject = output.args
       const category = typeof argsObject.category === "string" ? argsObject.category : undefined
@@ -43,13 +44,13 @@ export function createToolExecuteBeforeHandler(args: {
       }
     }
 
-    if (hooks.ralphLoop && input.tool === "slashcommand") {
-      const rawCommand = typeof output.args.command === "string" ? output.args.command : undefined
-      const command = rawCommand?.replace(/^\//, "").toLowerCase()
+    if (hooks.ralphLoop && input.tool === "skill") {
+      const rawName = typeof output.args.name === "string" ? output.args.name : undefined
+      const command = rawName?.replace(/^\//, "").toLowerCase()
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "ralph-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(ralph-loop)\s*/i, "") || ""
+        const rawArgs = rawName?.replace(/^\/?(ralph-loop)\s*/i, "") || ""
         const taskMatch = rawArgs.match(/^["'](.+?)["']/)
         const prompt =
           taskMatch?.[1] ||
@@ -66,7 +67,7 @@ export function createToolExecuteBeforeHandler(args: {
       } else if (command === "cancel-ralph" && sessionID) {
         hooks.ralphLoop.cancelLoop(sessionID)
       } else if (command === "ulw-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(ulw-loop)\s*/i, "") || ""
+        const rawArgs = rawName?.replace(/^\/?(ulw-loop)\s*/i, "") || ""
         const taskMatch = rawArgs.match(/^["'](.+?)["']/)
         const prompt =
           taskMatch?.[1] ||
@@ -84,9 +85,9 @@ export function createToolExecuteBeforeHandler(args: {
       }
     }
 
-    if (input.tool === "slashcommand") {
-      const rawCommand = typeof output.args.command === "string" ? output.args.command : undefined
-      const command = rawCommand?.replace(/^\//, "").toLowerCase()
+    if (input.tool === "skill") {
+      const rawName = typeof output.args.name === "string" ? output.args.name : undefined
+      const command = rawName?.replace(/^\//, "").toLowerCase()
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "stop-continuation" && sessionID) {

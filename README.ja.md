@@ -234,14 +234,6 @@ Windows から Linux に初めて乗り換えた時のこと、自分の思い�
 
 ### 人間の方へ
 
-インストールガイドを取得して、その指示に従ってください：
-
-```bash
-curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
-```
-
-### LLM エージェントの方へ
-
 以下のプロンプトをコピーして、LLM エージェント（Claude Code、AmpCode、Cursor など）に貼り付けてください：
 
 ```
@@ -250,6 +242,14 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/
 ```
 
 または [インストールガイド](docs/guide/installation.md) を直接読んでください。ただし、エージェントに任せることを強くお勧めします。人間はミスをしますが、エージェントはしません。
+
+### LLM エージェントの方へ
+
+インストールガイドを取得して、その指示に従ってください：
+
+```bash
+curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+```
 
 
 ## アンインストール
