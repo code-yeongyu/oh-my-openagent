@@ -229,14 +229,6 @@ Hephaestus is inspired by [AmpCode's deep mode](https://ampcode.com)—autonomou
 
 ### For Humans
 
-Fetch the installation guide and follow it:
-
-```bash
-curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
-```
-
-### For LLM Agents
-
 Copy and paste this prompt to your LLM agent (Claude Code, AmpCode, Cursor, etc.):
 
 ```
@@ -245,6 +237,14 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/
 ```
 
 Or read the [Installation Guide](docs/guide/installation.md) directly—but **we strongly recommend letting an agent handle it. Humans make mistakes.**
+
+### For LLM Agents
+
+Fetch the installation guide and follow it:
+
+```bash
+curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+```
 
 ## Uninstallation
 
