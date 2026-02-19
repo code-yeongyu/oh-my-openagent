@@ -56,7 +56,6 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     edit: false,
     task: false,
     call_omo_agent: false,
-    athena_council: false,
   },
 }
 

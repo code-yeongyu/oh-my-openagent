@@ -36,7 +36,6 @@ import type { BackgroundManager } from "../features/background-agent"
 type OpencodeClient = PluginInput["client"]
 
 export { createCallOmoAgent } from "./call-omo-agent"
-export { createAthenaCouncilTool } from "./athena-council"
 export { createLookAt } from "./look-at"
 export { createDelegateTask } from "./delegate-task"
 export { createSwitchAgentTool } from "./switch-agent"

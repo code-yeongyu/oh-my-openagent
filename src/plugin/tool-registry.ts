@@ -10,7 +10,6 @@ import {
   builtinTools,
   createBackgroundTools,
   createCallOmoAgent,
-  createAthenaCouncilTool,
   createSwitchAgentTool,
   createLookAt,
   createSkillMcpTool,
@@ -51,11 +50,6 @@ export function createToolRegistry(args: {
 
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
   const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
-  const athenaCouncilConfig = pluginConfig.agents?.athena?.council
-  const athenaCouncilTool = createAthenaCouncilTool({
-    backgroundManager: managers.backgroundManager,
-    councilConfig: athenaCouncilConfig,
-  })
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
@@ -133,7 +127,6 @@ export function createToolRegistry(args: {
     ...createSessionManagerTools(ctx),
     ...backgroundTools,
     call_omo_agent: callOmoAgent,
-    athena_council: athenaCouncilTool,
     switch_agent: createSwitchAgentTool({
       client: ctx.client,
     }),
