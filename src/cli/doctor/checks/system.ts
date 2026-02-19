@@ -93,7 +93,7 @@ export async function checkSystem(): Promise<CheckResult> {
     issues.push({
       title: "Loaded plugin version mismatch",
       description: `Cache expects ${loadedInfo.expectedVersion} but loaded ${loadedInfo.loadedVersion}.`,
-      fix: "Reinstall plugin dependencies in OpenCode cache",
+      fix: `Reinstall: cd ${loadedInfo.cacheDir} && bun install`,
       severity: "warning",
       affects: ["plugin loading"],
     })
@@ -107,7 +107,7 @@ export async function checkSystem(): Promise<CheckResult> {
     issues.push({
       title: "Loaded plugin is outdated",
       description: `Loaded ${systemInfo.loadedVersion}, latest ${latestVersion}.`,
-      fix: "Update: cd ~/.config/opencode && bun update oh-my-opencode",
+      fix: `Update: cd ${loadedInfo.cacheDir} && bun add oh-my-opencode@latest`,
       severity: "warning",
       affects: ["plugin features"],
     })
