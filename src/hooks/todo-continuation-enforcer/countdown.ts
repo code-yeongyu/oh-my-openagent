@@ -38,6 +38,7 @@ export function startCountdown(args: {
   backgroundManager?: BackgroundManager
   skipAgents: string[]
   sessionStateStore: SessionStateStore
+  isContinuationStopped?: (sessionID: string) => boolean
 }): void {
   const {
     ctx,
@@ -47,6 +48,7 @@ export function startCountdown(args: {
     backgroundManager,
     skipAgents,
     sessionStateStore,
+    isContinuationStopped,
   } = args
 
   const state = sessionStateStore.getState(sessionID)
@@ -72,6 +74,7 @@ export function startCountdown(args: {
       skipAgents,
       resolvedInfo,
       sessionStateStore,
+      isContinuationStopped,
     })
   }, COUNTDOWN_SECONDS * 1000)
 
