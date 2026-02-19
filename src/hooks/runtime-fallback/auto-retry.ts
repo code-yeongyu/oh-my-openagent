@@ -6,6 +6,7 @@ import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { prepareFallback } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -127,11 +128,15 @@ export function createAutoRetryHelpers(deps: HookDeps) {
           sessionAwaitingFallbackResult.add(sessionID)
           scheduleSessionFallbackTimeout(sessionID, retryAgent)
 
-          await abortSessionRequest(sessionID, `pre-retry:${source}`)
+          const agentDisplayName = retryAgent ? getAgentDisplayName(retryAgent) : undefined
+          log(`[${HOOK_NAME}] Sending fallback prompt (${source})`, {
+            sessionID, agent: agentDisplayName, model: fallbackModelObj,
+            partsCount: retryParts.length, firstPart: retryParts[0]?.text?.slice(0, 80),
+          })
           await ctx.client.session.promptAsync({
             path: { id: sessionID },
             body: {
-              ...(retryAgent ? { agent: retryAgent } : {}),
+              ...(agentDisplayName ? { agent: agentDisplayName } : {}),
               model: fallbackModelObj,
               parts: retryParts,
             },
