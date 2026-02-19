@@ -2,7 +2,7 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
+import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent, extractErrorContentFromParts } from "./error-classifier"
 import { createFallbackState, prepareFallback } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 
@@ -50,6 +50,38 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
   }
 }
 
+async function checkLastAssistantForErrorContent(
+  ctx: HookDeps["ctx"],
+  sessionID: string,
+): Promise<string | undefined> {
+  try {
+    const messagesResp = await ctx.client.session.messages({
+      path: { id: sessionID },
+      query: { directory: ctx.directory },
+    })
+
+    const msgs = (messagesResp as {
+      data?: Array<{
+        info?: Record<string, unknown>
+        parts?: Array<{ type?: string; text?: string }>
+      }>
+    }).data
+
+    if (!msgs || msgs.length === 0) return undefined
+
+    const lastAssistant = [...msgs].reverse().find((m) => m.info?.role === "assistant")
+    if (!lastAssistant) return undefined
+
+    const parts = lastAssistant.parts ??
+      (lastAssistant.info?.parts as Array<{ type?: string; text?: string }> | undefined)
+
+    const result = extractErrorContentFromParts(parts)
+    return result.hasError ? result.errorMessage : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { ctx, config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult } = deps
   const checkVisibleResponse = hasVisibleAssistantResponse(extractAutoRetrySignal)
@@ -62,11 +94,19 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
     const timeoutEnabled = config.timeout_seconds > 0
     const parts = props?.parts as Array<{ type?: string; text?: string }> | undefined
     const errorContentResult = containsErrorContent(parts)
-    const error = info?.error ?? 
+    let error = info?.error ??
       (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined) ??
       (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
     const role = info?.role as string | undefined
     const model = info?.model as string | undefined
+
+    if (sessionID && role === "assistant" && !error) {
+      const errorContent = await checkLastAssistantForErrorContent(ctx, sessionID)
+      if (errorContent) {
+        log(`[${HOOK_NAME}] Detected error content in message parts`, { sessionID, errorContent: errorContent.slice(0, 200) })
+        error = { name: "ContentError", message: errorContent }
+      }
+    }
 
     if (sessionID && role === "assistant" && !error) {
       if (!sessionAwaitingFallbackResult.has(sessionID)) {

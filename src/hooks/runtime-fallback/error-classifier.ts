@@ -148,6 +148,23 @@ export function containsErrorContent(
   return { hasError: false }
 }
 
+export function extractErrorContentFromParts(
+  parts: Array<{ type?: string; text?: string }> | undefined,
+): { hasError: boolean; errorMessage?: string } {
+  if (!parts || parts.length === 0) return { hasError: false }
+
+  const errorParts = parts.filter(
+    (p) => p.type === "error" && typeof p.text === "string" && p.text.length > 0,
+  )
+
+  if (errorParts.length > 0) {
+    const errorMessage = errorParts.map((p) => p.text).join("\n")
+    return { hasError: true, errorMessage }
+  }
+
+  return { hasError: false }
+}
+
 export function isRetryableError(error: unknown, retryOnErrors: number[]): boolean {
   const statusCode = extractStatusCode(error, retryOnErrors)
   const message = getErrorMessage(error)
