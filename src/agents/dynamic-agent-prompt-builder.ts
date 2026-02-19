@@ -1,5 +1,4 @@
 import type { AgentPromptMetadata } from "./types"
-import { truncateDescription } from "../shared/truncate-description"
 
 export interface AvailableAgent {
   name: string
@@ -158,29 +157,6 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
   return rows.join("\n")
 }
 
-/**
- * Renders the "User-Installed Skills (HIGH PRIORITY)" block used across multiple agent prompts.
- * Extracted to avoid duplication between buildCategorySkillsDelegationGuide, buildSkillsSection, etc.
- */
-export function formatCustomSkillsBlock(
-  customRows: string[],
-  customSkills: AvailableSkill[],
-  headerLevel: "####" | "**" = "####"
-): string {
-  const header = headerLevel === "####"
-    ? `#### User-Installed Skills (HIGH PRIORITY)`
-    : `**User-Installed Skills (HIGH PRIORITY):**`
-
-  return `${header}
-
-**The user has installed these custom skills. They MUST be evaluated for EVERY delegation.**
-Subagents are STATELESS — they lose all custom knowledge unless you pass these skills via \`load_skills\`.
-
-${customRows.join("\n")}
-
-> **CRITICAL**: Ignoring user-installed skills when they match the task domain is a failure.
-> The user installed custom skills for a reason — USE THEM when the task overlaps with their domain.`
-}
 
 export function buildCategorySkillsDelegationGuide(categories: AvailableCategory[], skills: AvailableSkill[]): string {
   if (categories.length === 0 && skills.length === 0) return ""
@@ -193,35 +169,37 @@ export function buildCategorySkillsDelegationGuide(categories: AvailableCategory
   const builtinSkills = skills.filter((s) => s.location === "plugin")
   const customSkills = skills.filter((s) => s.location !== "plugin")
 
-   const builtinRows = builtinSkills.map((s) => {
-     const desc = truncateDescription(s.description)
-     return `- \`${s.name}\` — ${desc}`
-   })
-
-   const customRows = customSkills.map((s) => {
-     const desc = truncateDescription(s.description)
-     const source = s.location === "project" ? "project" : "user"
-     return `- \`${s.name}\` (${source}) — ${desc}`
-   })
-
-  const customSkillBlock = formatCustomSkillsBlock(customRows, customSkills)
+  const builtinNames = builtinSkills.map((s) => s.name).join(", ")
+  const customNames = customSkills.map((s) => {
+    const source = s.location === "project" ? "project" : "user"
+    return `${s.name} (${source})`
+  }).join(", ")
 
   let skillsSection: string
 
   if (customSkills.length > 0 && builtinSkills.length > 0) {
-    skillsSection = `#### Built-in Skills
+    skillsSection = `#### Available Skills (via \`skill\` tool)
 
-${builtinRows.join("\n")}
+**Built-in**: ${builtinNames}
+**⚡ YOUR SKILLS (PRIORITY)**: ${customNames}
 
-${customSkillBlock}`
+> User-installed skills OVERRIDE built-in defaults. ALWAYS prefer YOUR SKILLS when domain matches.
+> Full skill descriptions → use the \`skill\` tool to check before EVERY delegation.`
   } else if (customSkills.length > 0) {
-    skillsSection = customSkillBlock
+    skillsSection = `#### Available Skills (via \`skill\` tool)
+
+**⚡ YOUR SKILLS (PRIORITY)**: ${customNames}
+
+> User-installed skills OVERRIDE built-in defaults. ALWAYS prefer YOUR SKILLS when domain matches.
+> Full skill descriptions → use the \`skill\` tool to check before EVERY delegation.`
+  } else if (builtinSkills.length > 0) {
+    skillsSection = `#### Available Skills (via \`skill\` tool)
+
+**Built-in**: ${builtinNames}
+
+> Full skill descriptions → use the \`skill\` tool to check before EVERY delegation.`
   } else {
-    skillsSection = `#### Available Skills (Domain Expertise Injection)
-
-Skills inject specialized instructions into the subagent. Read the description to understand when each skill applies.
-
-${builtinRows.join("\n")}`
+    skillsSection = ""
   }
 
   return `### Category + Skills Delegation System
@@ -245,33 +223,14 @@ ${skillsSection}
 - Match task requirements to category domain
 - Select the category whose domain BEST fits the task
 
-**STEP 2: Evaluate ALL Skills (Built-in AND User-Installed)**
-For EVERY skill listed above, ask yourself:
+**STEP 2: Evaluate ALL Skills**
+Check the \`skill\` tool for available skills and their descriptions. For EVERY skill, ask:
 > "Does this skill's expertise domain overlap with my task?"
 
 - If YES → INCLUDE in \`load_skills=[...]\`
-- If NO → You MUST justify why (see below)
+- If NO → OMIT (no justification needed)
 ${customSkills.length > 0 ? `
-> **User-installed skills get PRIORITY.** The user explicitly installed them for their workflow.
-> When in doubt about a user-installed skill, INCLUDE it rather than omit it.` : ""}
-
-**STEP 3: Justify Omissions**
-
-If you choose NOT to include a skill that MIGHT be relevant, you MUST provide:
-
-\`\`\`
-SKILL EVALUATION for "[skill-name]":
-- Skill domain: [what the skill description says]
-- Task domain: [what your task is about]
-- Decision: OMIT
-- Reason: [specific explanation of why domains don't overlap]
-\`\`\`
-
-**WHY JUSTIFICATION IS MANDATORY:**
-- Forces you to actually READ skill descriptions
-- Prevents lazy omission of potentially useful skills
-- Subagents are STATELESS - they only know what you tell them
-- Missing a relevant skill = suboptimal output
+> **User-installed skills get PRIORITY.** When in doubt, INCLUDE rather than omit.` : ""}
 
 ---
 
