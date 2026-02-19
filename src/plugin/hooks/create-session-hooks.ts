@@ -7,6 +7,7 @@ import {
   createSessionRecoveryHook,
   createSessionNotification,
   createThinkModeHook,
+  createModelFallbackHook,
   createAnthropicContextWindowLimitRecoveryHook,
   createAutoUpdateCheckerHook,
   createAgentUsageReminderHook,
@@ -30,6 +31,7 @@ import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
   log,
+  normalizeSDKResponse,
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
@@ -40,6 +42,7 @@ export type SessionHooks = {
   sessionRecovery: ReturnType<typeof createSessionRecoveryHook> | null
   sessionNotification: ReturnType<typeof createSessionNotification> | null
   thinkMode: ReturnType<typeof createThinkModeHook> | null
+  modelFallback: ReturnType<typeof createModelFallbackHook> | null
   anthropicContextWindowLimitRecovery: ReturnType<typeof createAnthropicContextWindowLimitRecoveryHook> | null
   autoUpdateChecker: ReturnType<typeof createAutoUpdateCheckerHook> | null
   agentUsageReminder: ReturnType<typeof createAgentUsageReminderHook> | null
@@ -101,6 +104,64 @@ export function createSessionHooks(args: {
   const thinkMode = isHookEnabled("think-mode")
     ? safeHook("think-mode", () => createThinkModeHook())
     : null
+
+  const fallbackTitleState = new Map<string, { baseTitle?: string; lastKey?: string }>()
+  const updateFallbackTitle = async (input: {
+    sessionID: string
+    providerID: string
+    modelID: string
+    variant?: string
+  }) => {
+    const key = `${input.providerID}/${input.modelID}${input.variant ? `:${input.variant}` : ""}`
+    const existing = fallbackTitleState.get(input.sessionID) ?? {}
+    if (existing.lastKey === key) return
+
+    if (!existing.baseTitle) {
+      const sessionResp = await ctx.client.session.get({ path: { id: input.sessionID } }).catch(() => null)
+      const sessionInfo = sessionResp
+        ? normalizeSDKResponse(sessionResp, null as { title?: string } | null, { preferResponseOnMissingData: true })
+        : null
+      const rawTitle = sessionInfo?.title
+      if (typeof rawTitle === "string" && rawTitle.length > 0) {
+        existing.baseTitle = rawTitle.replace(/\s*\[fallback:[^\]]+\]$/i, "").trim()
+      } else {
+        existing.baseTitle = "Session"
+      }
+    }
+
+    const variantLabel = input.variant ? ` ${input.variant}` : ""
+    const newTitle = `${existing.baseTitle} [fallback: ${input.providerID}/${input.modelID}${variantLabel}]`
+
+    await ctx.client.session
+      .update({
+        path: { id: input.sessionID },
+        body: { title: newTitle },
+        query: { directory: ctx.directory },
+      })
+      .catch(() => {})
+
+    existing.lastKey = key
+    fallbackTitleState.set(input.sessionID, existing)
+  }
+
+  // Model fallback hook - always enabled (no feature flag)
+  // This handles automatic model switching when model errors occur
+  const modelFallback = safeHook("model-fallback", () =>
+    createModelFallbackHook({
+      toast: async ({ title, message, variant, duration }) => {
+        await ctx.client.tui
+          .showToast({
+            body: {
+              title,
+              message,
+              variant: variant ?? "warning",
+              duration: duration ?? 5000,
+            },
+          })
+          .catch(() => {})
+      },
+      onApplied: updateFallbackTitle,
+    }))
 
   const anthropicContextWindowLimitRecovery = isHookEnabled("anthropic-context-window-limit-recovery")
     ? safeHook("anthropic-context-window-limit-recovery", () =>
@@ -181,6 +242,7 @@ export function createSessionHooks(args: {
     sessionRecovery,
     sessionNotification,
     thinkMode,
+    modelFallback,
     anthropicContextWindowLimitRecovery,
     autoUpdateChecker,
     agentUsageReminder,
