@@ -281,7 +281,7 @@ describe("generateOmoConfig - model fallback system", () => {
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
   })
 
-  test("uses zai-coding-plan/glm-4.7 for librarian when Z.ai available", () => {
+  test("uses zai-coding-plan/glm-5 for librarian when Z.ai available", () => {
     // #given user has Z.ai and Claude max20
     const config: InstallConfig = {
       hasClaude: true,
@@ -297,8 +297,8 @@ describe("generateOmoConfig - model fallback system", () => {
     // #when generating config
     const result = generateOmoConfig(config)
 
-    // #then librarian should use zai-coding-plan/glm-4.7
-    expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("zai-coding-plan/glm-4.7")
+    // #then librarian should use zai-coding-plan/glm-5
+    expect((result.agents as Record<string, { model: string }>).librarian.model).toBe("zai-coding-plan/glm-5")
     // #then Sisyphus uses Claude (OR logic)
     expect((result.agents as Record<string, { model: string }>).sisyphus.model).toBe("anthropic/claude-opus-4-6")
   })

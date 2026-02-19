@@ -163,7 +163,7 @@ describe("resolveVariantForModel", () => {
   test("returns variant for zai-coding-plan provider without variant", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "zai-coding-plan", modelID: "glm-4.7" }
+    const model = { providerID: "zai-coding-plan", modelID: "glm-5" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)

@@ -378,7 +378,7 @@ describe("createThinkModeHook integration", () => {
       const hook = createThinkModeHook()
       const input = createMockInput(
         "zai-coding-plan",
-        "glm-4.7",
+        "glm-5",
         "ultrathink mode"
       )
 
@@ -387,7 +387,7 @@ describe("createThinkModeHook integration", () => {
 
       //#then thinking config should be omitted from request
       const message = input.message as MessageWithInjectedProps
-      expect(input.message.model?.modelID).toBe("glm-4.7")
+      expect(input.message.model?.modelID).toBe("glm-5")
       expect(message.thinking).toBeUndefined()
       expect(message.providerOptions).toBeUndefined()
     })

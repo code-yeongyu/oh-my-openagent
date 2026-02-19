@@ -81,7 +81,7 @@ export function fuzzyMatchModel(
 	}
 
 	// Priority 2: Exact model ID match (part after provider/)
-	// This ensures "big-pickle" matches "zai-coding-plan/big-pickle" over "zai-coding-plan/glm-4.7"
+	// This ensures "big-pickle" matches "zai-coding-plan/big-pickle" over "zai-coding-plan/glm-5"
 	// Use filter + shortest to handle multi-provider cases (e.g., openai/gpt-5.2 + opencode/gpt-5.2)
 	const exactModelIdMatches = matches.filter((model) => {
 		const modelId = model.split("/").slice(1).join("/")
