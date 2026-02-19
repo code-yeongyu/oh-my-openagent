@@ -16,6 +16,10 @@ type ToolContextWithCallID = ToolContext & {
   call_id?: string
 }
 
+type ToolContextWithMetadata = ToolContextWithCallID & {
+  metadata?: (value: unknown) => void
+}
+
 function resolveToolCallID(ctx: ToolContextWithCallID): string | undefined {
   if (typeof ctx.callID === "string" && ctx.callID.trim() !== "") return ctx.callID
   if (typeof ctx.callId === "string" && ctx.callId.trim() !== "") return ctx.callId
@@ -135,6 +139,7 @@ Use \\n in text to represent literal newlines.`,
     },
     execute: async (args: HashlineEditArgs, context: ToolContext) => {
       try {
+        const metadataContext = context as ToolContextWithMetadata
         const filePath = args.filePath
         const { edits } = args
 
@@ -179,9 +184,11 @@ Use \\n in text to represent literal newlines.`,
           },
         }
 
-        context.metadata(meta)
+        if (typeof metadataContext.metadata === "function") {
+          metadataContext.metadata(meta)
+        }
 
-        const callID = resolveToolCallID(context)
+        const callID = resolveToolCallID(metadataContext)
         if (callID) {
           storeToolMetadata(context.sessionID, callID, meta)
         }
