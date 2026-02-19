@@ -113,6 +113,26 @@ describe("createHashlineReadEnhancerHook", () => {
       expect(lines[1]).toMatch(/^2:[a-f0-9]{2}\|const y = 2$/)
     })
 
+    it("should transform numbered write lines even when header lines come first", async () => {
+      //#given
+      const hook = createHashlineReadEnhancerHook(mockCtx, createMockConfig(true))
+      const input = { tool: "write", sessionID, callID: "call-1" }
+      const output = {
+        title: "Write",
+        output: ["# Wrote /tmp/demo-edit.txt", "1: This is line one", "2: This is line two"].join("\n"),
+        metadata: {},
+      }
+
+      //#when
+      await hook["tool.execute.after"](input, output)
+
+      //#then
+      const lines = output.output.split("\n")
+      expect(lines[0]).toBe("# Wrote /tmp/demo-edit.txt")
+      expect(lines[1]).toMatch(/^1:[a-f0-9]{2}\|This is line one$/)
+      expect(lines[2]).toMatch(/^2:[a-f0-9]{2}\|This is line two$/)
+    })
+
     it("should skip non-read tools", async () => {
       //#given
       const hook = createHashlineReadEnhancerHook(mockCtx, createMockConfig(true))
