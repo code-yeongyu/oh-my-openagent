@@ -35,7 +35,7 @@ export function categorizeTools(toolNames: string[]): AvailableTool[] {
       category = "search"
     } else if (name.startsWith("session_")) {
       category = "session"
-    } else if (name === "slashcommand") {
+    } else if (name === "skill") {
       category = "command"
     }
     return { name, category }
@@ -167,7 +167,6 @@ export function formatCustomSkillsBlock(
   customSkills: AvailableSkill[],
   headerLevel: "####" | "**" = "####"
 ): string {
-  const customSkillNames = customSkills.map((s) => `"${s.name}"`).join(", ")
   const header = headerLevel === "####"
     ? `#### User-Installed Skills (HIGH PRIORITY)`
     : `**User-Installed Skills (HIGH PRIORITY):**`
@@ -180,7 +179,7 @@ Subagents are STATELESS — they lose all custom knowledge unless you pass these
 ${customRows.join("\n")}
 
 > **CRITICAL**: Ignoring user-installed skills when they match the task domain is a failure.
-> The user installed ${customSkillNames} for a reason — USE THEM when the task overlaps with their domain.`
+> The user installed custom skills for a reason — USE THEM when the task overlaps with their domain.`
 }
 
 export function buildCategorySkillsDelegationGuide(categories: AvailableCategory[], skills: AvailableSkill[]): string {

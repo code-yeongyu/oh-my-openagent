@@ -6,7 +6,7 @@
  */
 
 import type { CategoryConfig } from "../../config/schema"
-import { formatCustomSkillsBlock, type AvailableAgent, type AvailableSkill } from "../dynamic-agent-prompt-builder"
+import type { AvailableAgent, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { CATEGORY_DESCRIPTIONS } from "../../tools/delegate-task/constants"
 import { mergeCategories } from "../../shared/merge-categories"
 import { truncateDescription } from "../../shared/truncate-description"
@@ -58,43 +58,16 @@ export function buildSkillsSection(skills: AvailableSkill[]): string {
   const builtinSkills = skills.filter((s) => s.location === "plugin")
   const customSkills = skills.filter((s) => s.location !== "plugin")
 
-   const builtinRows = builtinSkills.map((s) => {
-     const shortDesc = truncateDescription(s.description)
-     return `- **\`${s.name}\`** — ${shortDesc}`
-   })
-
-   const customRows = customSkills.map((s) => {
-     const shortDesc = truncateDescription(s.description)
-     const source = s.location === "project" ? "project" : "user"
-     return `- **\`${s.name}\`** (${source}): ${shortDesc}`
-   })
-
-  const customSkillBlock = formatCustomSkillsBlock(customRows, customSkills, "**")
-
-  let skillsTable: string
-
-  if (customSkills.length > 0 && builtinSkills.length > 0) {
-    skillsTable = `**Built-in Skills:**
-
-${builtinRows.join("\n")}
-
-${customSkillBlock}`
-  } else if (customSkills.length > 0) {
-    skillsTable = customSkillBlock
-  } else {
-    skillsTable = `${builtinRows.join("\n")}`
-  }
-
   return `
 #### 3.2.2: Skill Selection (PREPEND TO PROMPT)
 
-**Skills are specialized instructions that guide subagent behavior. Consider them alongside category selection.**
-
-${skillsTable}
+**Use the \`Category + Skills Delegation System\` section below as the single source of truth for skill details.**
+- Built-in skills available: ${builtinSkills.length}
+- User-installed skills available: ${customSkills.length}
 
 **MANDATORY: Evaluate ALL skills (built-in AND user-installed) for relevance to your task.**
 
-Read each skill's description and ask: "Does this skill's domain overlap with my task?"
+Read each skill's description in the section below and ask: "Does this skill's domain overlap with my task?"
 - If YES: INCLUDE in load_skills=[...]
 - If NO: You MUST justify why in your pre-delegation declaration
 

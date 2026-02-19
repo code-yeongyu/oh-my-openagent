@@ -43,16 +43,16 @@ describe("buildCategorySkillsDelegationGuide", () => {
     expect(result).toContain("HIGH PRIORITY")
   })
 
-  it("should include custom skill names in CRITICAL warning", () => {
+  it("should list custom skills and keep CRITICAL warning", () => {
     //#given: custom skills installed
     const allSkills = [...builtinSkills, ...customUserSkills]
 
     //#when: building the delegation guide
     const result = buildCategorySkillsDelegationGuide(categories, allSkills)
 
-    //#then: should mention custom skills by name in the warning
-    expect(result).toContain('"react-19"')
-    expect(result).toContain('"tailwind-4"')
+    //#then: should mention custom skills by name and include warning
+    expect(result).toContain("`react-19`")
+    expect(result).toContain("`tailwind-4`")
     expect(result).toContain("CRITICAL")
   })
 
@@ -180,8 +180,8 @@ describe("formatCustomSkillsBlock", () => {
     //#then: contains all expected elements
     expect(result).toContain("User-Installed Skills (HIGH PRIORITY)")
     expect(result).toContain("CRITICAL")
-    expect(result).toContain('"react-19"')
-    expect(result).toContain('"tailwind-4"')
+    expect(result).toContain("`react-19`")
+    expect(result).toContain("`tailwind-4`")
     expect(result).toContain("| user |")
     expect(result).toContain("| project |")
   })
