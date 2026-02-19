@@ -1,4 +1,4 @@
-# src/tools/ — 26 Tools Across 14 Directories
+# src/tools/ — 26 Tools Across 15 Directories
 
 **Generated:** 2026-02-19
 

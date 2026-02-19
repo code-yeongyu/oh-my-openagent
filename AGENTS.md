@@ -1,6 +1,6 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-02-19 | **Commit:** 5dc437f4 | **Branch:** dev
+**Generated:** 2026-02-19 | **Commit:** 29ebd8c4 | **Branch:** dev
 
 ## OVERVIEW
 
@@ -86,7 +86,7 @@ Fields: agents (14 overridable), categories (8 built-in + custom), disabled_* ar
 
 - **Test pattern**: Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style
 - **Factory pattern**: `createXXX()` for all tools, hooks, agents
-- **Hook tiers**: Session (22) → Tool-Guard (9) → Transform (4) → Continuation (7) → Skill (2)
+- **Hook tiers**: Session (21) → Tool-Guard (10) → Transform (4) → Continuation (7) → Skill (2)
 - **Agent modes**: `primary` (respects UI model) vs `subagent` (own fallback chain) vs `all`
 - **Model resolution**: 3-step: override → category-default → provider-fallback → system-default
 - **Config format**: JSONC with comments, Zod v4 validation, snake_case keys
