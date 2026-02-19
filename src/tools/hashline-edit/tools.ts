@@ -14,6 +14,7 @@ type ToolContextWithCallID = ToolContext & {
   callID?: string
   callId?: string
   call_id?: string
+  metadata?: (data: Record<string, unknown>) => void
 }
 
 function resolveToolCallID(ctx: ToolContextWithCallID): string | undefined {
@@ -179,7 +180,7 @@ Use \\n in text to represent literal newlines.`,
           },
         }
 
-        context.metadata(meta)
+        ;(context as ToolContextWithCallID).metadata?.(meta)
 
         const callID = resolveToolCallID(context)
         if (callID) {
