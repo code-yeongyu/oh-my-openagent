@@ -95,6 +95,7 @@ export class BackgroundManager {
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
   private onShutdown?: () => void
+  public onStaleFallback?: (task: BackgroundTask) => Promise<void>
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
@@ -157,6 +158,7 @@ export class BackgroundManager {
       parentTools: input.parentTools,
       model: input.model,
       category: input.category,
+      fallbackModels: input.fallbackModels,
     }
 
     this.tasks.set(task.id, task)
@@ -1518,12 +1520,13 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       const runtime = now - startedAt.getTime()
 
       if (!task.progress?.lastUpdate) {
-        if (sessionIsRunning) continue
         if (runtime <= messageStalenessMs) continue
 
         const staleMinutes = Math.round(runtime / 60000)
         task.status = "cancelled"
-        task.error = `Stale timeout (no activity for ${staleMinutes}min since start)`
+        task.error = sessionIsRunning
+          ? `Stale timeout (no activity for ${staleMinutes}min since start — possible API hang)`
+          : `Stale timeout (no activity for ${staleMinutes}min since start)`
         task.completedAt = new Date()
 
         if (task.concurrencyKey) {
@@ -1533,6 +1536,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
         this.client.session.abort({ path: { id: sessionID } }).catch(() => {})
         log(`[background-agent] Task ${task.id} interrupted: no progress since start`)
+
+        this.onStaleFallback?.(task).catch((err) => {
+          log("[background-agent] Error in onStaleFallback for stale task:", { taskId: task.id, error: err })
+        })
 
         try {
           await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
@@ -1562,6 +1569,10 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
       this.client.session.abort({ path: { id: sessionID } }).catch(() => {})
       log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
+
+      this.onStaleFallback?.(task).catch((err) => {
+        log("[background-agent] Error in onStaleFallback for stale task:", { taskId: task.id, error: err })
+      })
 
       try {
         await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))

@@ -180,7 +180,7 @@ describe("atlas hook", () => {
 
       // then - standalone verification reminder appended
       expect(output.output).toContain("Task completed successfully")
-      expect(output.output).toContain("MANDATORY:")
+      expect(output.output).toContain("PROBABLY LYING")
       expect(output.output).toContain("task(session_id=")
       
       cleanupMessageStorage(sessionID)
@@ -219,7 +219,7 @@ describe("atlas hook", () => {
       expect(output.output).toContain("Task completed successfully")
       expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.output).toContain("test-plan")
-      expect(output.output).toContain("LIE")
+      expect(output.output).toContain("PROBABLY LYING")
       expect(output.output).toContain("task(session_id=")
       
       cleanupMessageStorage(sessionID)
@@ -404,7 +404,7 @@ describe("atlas hook", () => {
       // then - should include session_id instructions and verification
       expect(output.output).toContain("task(session_id=")
       expect(output.output).toContain("[x]")
-      expect(output.output).toContain("MANDATORY:")
+      expect(output.output).toContain("PROBABLY LYING")
       
       cleanupMessageStorage(sessionID)
     })

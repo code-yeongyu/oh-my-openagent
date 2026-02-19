@@ -2583,8 +2583,9 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     //#when — session is running despite no progress
     await manager["checkAndInterruptStaleTasks"]({ "session-rnp": { type: "running" } })
 
-    //#then — running sessions are NEVER killed
-    expect(task.status).toBe("running")
+    //#then — running sessions with zero progress ARE killed (possible API hang)
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("possible API hang")
   })
 
   test("should interrupt task with no lastUpdate after messageStalenessTimeout", async () => {

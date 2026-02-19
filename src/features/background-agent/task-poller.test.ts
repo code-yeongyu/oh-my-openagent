@@ -184,14 +184,14 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("running")
   })
 
-  it("should NOT interrupt busy session even with no progress (undefined lastUpdate)", async () => {
-    //#given — task has no progress at all, but session is busy
+  it("should interrupt busy session with no progress when exceeding staleness timeout (possible API hang)", async () => {
+    //#given — task has no progress at all, session is busy but likely hung
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
     })
 
-    //#when — session is busy
+    //#when — session is busy but has had zero progress for 15min > 10min timeout
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -201,8 +201,9 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
-    //#then — task should survive because session is actively running
-    expect(task.status).toBe("running")
+    //#then — task should be killed as possible API hang (no progress despite being "busy")
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("possible API hang")
   })
 
   it("should interrupt task when session is idle and lastUpdate exceeds stale timeout", async () => {
@@ -254,14 +255,14 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("running")
   })
 
-  it("should NOT interrupt running session even with no progress (undefined lastUpdate)", async () => {
-    //#given — task has no progress at all, but session is running
+  it("should interrupt running session with no progress when exceeding staleness timeout (possible API hang)", async () => {
+    //#given — task has no progress at all, session is running but likely hung
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 15 * 60 * 1000),
       progress: undefined,
     })
 
-    //#when — session is running
+    //#when — session is running but has had zero progress for 15min > 10min timeout
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -271,8 +272,9 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "running" } },
     })
 
-    //#then — running sessions are NEVER killed, even without progress
-    expect(task.status).toBe("running")
+    //#then — task should be killed as possible API hang (no progress despite being "running")
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("possible API hang")
   })
 
   it("should use default stale timeout when session status is unknown/missing", async () => {
@@ -348,14 +350,14 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("running")
   })
 
-  it("should NOT interrupt busy session even with no progress (undefined lastUpdate)", async () => {
-    //#given — no progress at all, session is "busy" (thinking model with no streamed tokens yet)
+  it("should NOT interrupt busy session with no progress when within staleness timeout", async () => {
+    //#given — no progress, session is busy, but within staleness timeout
     const task = createRunningTask({
-      startedAt: new Date(Date.now() - 15 * 60 * 1000),
+      startedAt: new Date(Date.now() - 5 * 60 * 1000),
       progress: undefined,
     })
 
-    //#when — session is busy
+    //#when — session is busy and runtime (5min) < messageStalenessTimeoutMs (10min)
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,
@@ -365,7 +367,7 @@ describe("checkAndInterruptStaleTasks", () => {
       sessionStatuses: { "ses-1": { type: "busy" } },
     })
 
-    //#then — busy sessions with no progress must survive
+    //#then — session is within timeout so should survive
     expect(task.status).toBe("running")
   })
 

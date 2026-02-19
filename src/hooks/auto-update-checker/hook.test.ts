@@ -5,7 +5,6 @@ const mockShowModelCacheWarningIfNeeded = mock(async () => {})
 const mockUpdateAndShowConnectedProvidersCacheStatus = mock(async () => {})
 const mockShowLocalDevToast = mock(async () => {})
 const mockShowVersionToast = mock(async () => {})
-const mockRunBackgroundUpdateCheck = mock(async () => {})
 const mockGetCachedVersion = mock(() => "3.6.0")
 const mockGetLocalDevVersion = mock(() => "3.6.0")
 
@@ -27,13 +26,20 @@ mock.module("./hook/startup-toasts", () => ({
   showVersionToast: mockShowVersionToast,
 }))
 
-mock.module("./hook/background-update-check", () => ({
-  runBackgroundUpdateCheck: mockRunBackgroundUpdateCheck,
+mock.module("./checker/cached-version", () => ({
+  getCachedVersion: mockGetCachedVersion,
 }))
 
-mock.module("./checker", () => ({
-  getCachedVersion: mockGetCachedVersion,
+mock.module("./checker/local-dev-version", () => ({
   getLocalDevVersion: mockGetLocalDevVersion,
+}))
+
+mock.module("./checker/plugin-entry", () => ({
+  findPluginEntry: mock(() => null),
+}))
+
+mock.module("./checker/latest-version", () => ({
+  getLatestVersion: mock(async () => null),
 }))
 
 mock.module("../../shared/logger", () => ({
@@ -51,8 +57,6 @@ describe("createAutoUpdateCheckerHook", () => {
     mockUpdateAndShowConnectedProvidersCacheStatus.mockClear()
     mockShowLocalDevToast.mockClear()
     mockShowVersionToast.mockClear()
-    mockRunBackgroundUpdateCheck.mockClear()
-
     const hook = createAutoUpdateCheckerHook(
       {
         directory: "/test",
@@ -76,7 +80,6 @@ describe("createAutoUpdateCheckerHook", () => {
     expect(mockUpdateAndShowConnectedProvidersCacheStatus).not.toHaveBeenCalled()
     expect(mockShowLocalDevToast).not.toHaveBeenCalled()
     expect(mockShowVersionToast).not.toHaveBeenCalled()
-    expect(mockRunBackgroundUpdateCheck).not.toHaveBeenCalled()
 
     delete process.env.OPENCODE_CLI_RUN_MODE
   })

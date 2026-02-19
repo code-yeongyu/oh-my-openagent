@@ -85,12 +85,13 @@ export async function checkAndInterruptStaleTasks(args: {
     const runtime = now - startedAt.getTime()
 
     if (!task.progress?.lastUpdate) {
-      if (sessionIsRunning) continue
       if (runtime <= messageStalenessMs) continue
 
       const staleMinutes = Math.round(runtime / 60000)
       task.status = "cancelled"
-      task.error = `Stale timeout (no activity for ${staleMinutes}min since start)`
+      task.error = sessionIsRunning
+        ? `Stale timeout (no activity for ${staleMinutes}min since start — possible API hang)`
+        : `Stale timeout (no activity for ${staleMinutes}min since start)`
       task.completedAt = new Date()
 
       if (task.concurrencyKey) {

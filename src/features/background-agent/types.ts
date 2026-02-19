@@ -43,6 +43,8 @@ export interface BackgroundTask {
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
+  /** Remaining fallback models for automatic retry on stale timeout */
+  fallbackModels?: string[]
 
   /** Last message count for stability detection */
   lastMsgCount?: number
@@ -64,6 +66,7 @@ export interface LaunchInput {
   skills?: string[]
   skillContent?: string
   category?: string
+  fallbackModels?: string[]
 }
 
 export interface ResumeInput {
