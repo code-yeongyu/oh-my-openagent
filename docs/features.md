@@ -98,7 +98,7 @@ Different models have different blind spots. Unanimous findings are high-confide
 
 1. User asks Athena to analyze something (or Sisyphus delegates to Athena).
 2. Athena uses the Question tool to let the user pick council members.
-3. Athena calls `athena_council` and receives task IDs immediately.
+3. Athena uses the `task` tool to launch council members as background tasks and receives task IDs immediately.
 4. Athena calls `background_output` for each task ID so each member's full analysis appears in the conversation.
 5. Athena synthesizes findings by agreement level and flags solo findings.
 6. Athena uses the Question tool to ask: Fix now (Atlas), Create plan (Prometheus), or No action.

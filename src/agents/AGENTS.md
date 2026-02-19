@@ -34,8 +34,8 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | Multimodal-Looker | ALL except read |
 | Atlas | task, call_omo_agent |
 | Momus | write, edit, task |
-| Athena | write, edit |
-| Council-Member | write, edit, task, call_omo_agent, athena_council |
+| Athena | write, edit, call_omo_agent |
+| Council-Member | write, edit, task, call_omo_agent |
 
 ## STRUCTURE
 
@@ -53,8 +53,6 @@ agents/
 ├── athena/                # Multi-model council orchestrator
 │   ├── agent.ts           # Athena agent factory
 │   ├── council-member-agent.ts  # Council member agent factory
-│   ├── council-orchestrator.ts  # Council execution logic
-│   ├── council-prompt.ts  # Council prompt builder
 │   ├── model-parser.ts    # Model string parser
 │   ├── types.ts           # Council types
 │   └── index.ts           # Barrel exports
@@ -66,6 +64,7 @@ agents/
     ├── sisyphus-agent.ts
     ├── hephaestus-agent.ts
     ├── atlas-agent.ts
+    ├── council-member-agents.ts  # Council member registration
     ├── general-agents.ts  # collectPendingBuiltinAgents
     └── available-skills.ts
 ```
