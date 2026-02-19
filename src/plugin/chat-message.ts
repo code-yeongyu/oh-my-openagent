@@ -10,6 +10,7 @@ import { hasConnectedProvidersCache } from "../shared"
 import {
   setSessionAgent,
 } from "../features/claude-code-session-state"
+import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -138,5 +139,7 @@ export function createChatMessageHandler(args: {
         hooks.ralphLoop.cancelLoop(input.sessionID)
       }
     }
+
+    applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, ctx.client.tui)
   }
 }

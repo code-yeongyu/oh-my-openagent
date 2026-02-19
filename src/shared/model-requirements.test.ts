@@ -64,7 +64,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
     // when - accessing explore requirement
-    // then - fallbackChain exists with grok-code-fast-1 as first entry, minimax-m2.5-free as second
+    // then - fallbackChain: grok → minimax-free → haiku → nano
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
     expect(explore.fallbackChain).toHaveLength(4)

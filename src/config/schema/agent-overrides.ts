@@ -38,6 +38,13 @@ export const AgentOverrideConfigSchema = z.object({
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   /** Provider-specific options. Passed directly to OpenCode SDK. */
   providerOptions: z.record(z.string(), z.unknown()).optional(),
+  /** Per-message ultrawork override model/variant when ultrawork keyword is detected. */
+  ultrawork: z
+    .object({
+      model: z.string().optional(),
+      variant: z.string().optional(),
+    })
+    .optional(),
 })
 
 export const AgentOverridesSchema = z.object({
