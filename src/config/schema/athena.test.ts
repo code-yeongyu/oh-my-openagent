@@ -20,6 +20,7 @@ describe("CouncilMemberSchema", () => {
       model: "openai/gpt-5.3-codex",
       variant: "high",
       name: "analyst-a",
+      temperature: 0.3,
     }
 
     //#when
@@ -110,11 +111,48 @@ describe("CouncilMemberSchema", () => {
     //#then
     expect(parsed.variant).toBeUndefined()
     expect(parsed.name).toBeUndefined()
+    expect(parsed.temperature).toBeUndefined()
+  })
+
+  test("accepts member config with temperature", () => {
+    //#given
+    const config = { model: "openai/gpt-5.3-codex", temperature: 0.5 }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.temperature).toBe(0.5)
+    }
+  })
+
+  test("rejects temperature below 0", () => {
+    //#given
+    const config = { model: "openai/gpt-5.3-codex", temperature: -0.1 }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects temperature above 2", () => {
+    //#given
+    const config = { model: "openai/gpt-5.3-codex", temperature: 2.1 }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
   })
 
   test("rejects member config with unknown fields", () => {
     //#given
-    const config = { model: "openai/gpt-5.3-codex", temperature: 0.2 }
+    const config = { model: "openai/gpt-5.3-codex", unknownField: true }
 
     //#when
     const result = CouncilMemberSchema.safeParse(config)
