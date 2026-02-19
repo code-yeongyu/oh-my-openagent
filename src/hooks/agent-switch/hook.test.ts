@@ -139,6 +139,54 @@ describe("agent-switch hook", () => {
     expect(getPendingSwitch("ses-4")).toBeUndefined()
   })
 
+  test("clears pending switch on session.error with info.id", async () => {
+    const ctx = {
+      client: {
+        session: {
+          promptAsync: async () => {},
+          messages: async () => ({ data: [] }),
+          message: async () => ({ data: { parts: [] } }),
+        },
+      },
+    } as any
+
+    setPendingSwitch("ses-10", "atlas", "fix this")
+    const hook = createAgentSwitchHook(ctx)
+
+    await hook.event({
+      event: {
+        type: "session.error",
+        properties: { info: { id: "ses-10" } },
+      },
+    })
+
+    expect(getPendingSwitch("ses-10")).toBeUndefined()
+  })
+
+  test("clears pending switch on session.error with sessionID property", async () => {
+    const ctx = {
+      client: {
+        session: {
+          promptAsync: async () => {},
+          messages: async () => ({ data: [] }),
+          message: async () => ({ data: { parts: [] } }),
+        },
+      },
+    } as any
+
+    setPendingSwitch("ses-11", "atlas", "fix this")
+    const hook = createAgentSwitchHook(ctx)
+
+    await hook.event({
+      event: {
+        type: "session.error",
+        properties: { sessionID: "ses-11" },
+      },
+    })
+
+    expect(getPendingSwitch("ses-11")).toBeUndefined()
+  })
+
   test("recovers missing switch_agent tool call from Athena handoff text", async () => {
     const promptAsyncCalls: Array<Record<string, unknown>> = []
     let switched = false

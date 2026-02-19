@@ -56,6 +56,21 @@ export function createAgentSwitchHook(ctx: PluginInput) {
         return
       }
 
+      if (input.event.type === "session.error") {
+        const props = input.event.properties as Record<string, unknown> | undefined
+        const info = props?.info as Record<string, unknown> | undefined
+        const erroredSessionID = info?.id ?? props?.sessionID
+        if (typeof erroredSessionID === "string") {
+          clearPendingSwitchRuntime(erroredSessionID)
+          for (const key of Array.from(processedFallbackMessages)) {
+            if (key.startsWith(`${erroredSessionID}:`)) {
+              processedFallbackMessages.delete(key)
+            }
+          }
+        }
+        return
+      }
+
       if (input.event.type === "message.updated") {
         const props = input.event.properties as Record<string, unknown> | undefined
         const info = props?.info as Record<string, unknown> | undefined
