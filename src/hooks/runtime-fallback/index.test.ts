@@ -62,8 +62,11 @@ describe("runtime-fallback", () => {
     }
   }
 
-  function createMockPluginConfigWithCategoryFallback(fallbackModels: string[]): OhMyOpenCodeConfig {
+  function createMockPluginConfigWithCategoryFallback(fallbackModels: string[], initialModel = "google/gemini-2.5-pro"): OhMyOpenCodeConfig {
     return {
+      agents: {
+        sisyphus: { model: initialModel },
+      },
       categories: {
         test: {
           fallback_models: fallbackModels,
@@ -472,21 +475,20 @@ describe("runtime-fallback", () => {
   })
 
   describe("session lifecycle", () => {
-    test("should create state on session.created", async () => {
+    test("should log on-demand state creation on session.created", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), { config: createMockConfig() })
       const sessionID = "test-session-create"
-      const model = "anthropic/claude-opus-4-5"
 
       await hook.event({
         event: {
           type: "session.created",
-          properties: { info: { id: sessionID, model } },
+          properties: { info: { id: sessionID } },
         },
       })
 
-      const createLog = logCalls.find((c) => c.msg.includes("Session created with model"))
+      const createLog = logCalls.find((c) => c.msg.includes("state will be created on-demand"))
       expect(createLog).toBeDefined()
-      expect(createLog?.data).toMatchObject({ sessionID, model })
+      expect(createLog?.data).toMatchObject({ sessionID })
     })
 
     test("should cleanup state on session.deleted", async () => {
@@ -1076,7 +1078,7 @@ describe("runtime-fallback", () => {
       void sessionErrorPromise
     })
 
-    test("should not advance fallback after session.stop cancels timeout-driven retry", async () => {
+    test("should not advance fallback after session.deleted cancels timeout-driven retry", async () => {
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -1105,13 +1107,13 @@ describe("runtime-fallback", () => {
         }
       )
 
-      const sessionID = "test-session-stop-cancels-timeout-fallback"
+      const sessionID = "test-session-deleted-cancels-timeout-fallback"
       SessionCategoryRegistry.register(sessionID, "test")
 
       await hook.event({
         event: {
           type: "session.created",
-          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+          properties: { info: { id: sessionID } },
         },
       })
 
@@ -1136,8 +1138,8 @@ describe("runtime-fallback", () => {
 
       await hook.event({
         event: {
-          type: "session.stop",
-          properties: { sessionID },
+          type: "session.deleted",
+          properties: { info: { id: sessionID } },
         },
       })
 
@@ -1902,10 +1904,11 @@ describe("runtime-fallback", () => {
   })
 
   describe("fallback models configuration", () => {
-    function createMockPluginConfigWithAgentFallback(agentName: string, fallbackModels: string[]): OhMyOpenCodeConfig {
+    function createMockPluginConfigWithAgentFallback(agentName: string, fallbackModels: string[], initialModel = "anthropic/claude-opus-4-5"): OhMyOpenCodeConfig {
       return {
         agents: {
           [agentName]: {
+            model: initialModel,
             fallback_models: fallbackModels,
           },
         },
@@ -2020,7 +2023,7 @@ describe("runtime-fallback", () => {
         pluginConfig: createMockPluginConfigWithCategoryFallback([
           "openai/gpt-5.2",
           "anthropic/claude-opus-4-5",
-        ]),
+        ], "anthropic/claude-opus-4-5"),
       })
       const sessionID = "test-session-cooldown"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -2028,7 +2031,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.created",
-          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-5" } },
+          properties: { info: { id: sessionID } },
         },
       })
 
@@ -2423,7 +2426,7 @@ describe("runtime-fallback", () => {
   })
 
   describe("on-demand state creation in session.created", () => {
-    test("should create state when session.created has model", async () => {
+    test("should always log on-demand state creation on session.created", async () => {
       const hook = createRuntimeFallbackHook(
         createMockPluginInput(),
         {
@@ -2434,30 +2437,7 @@ describe("runtime-fallback", () => {
         }
       )
 
-      const sessionID = "test-created-with-model"
-      await hook.event({
-        event: {
-          type: "session.created",
-          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
-        },
-      })
-
-      const createdLog = logCalls.find((c) => c.msg.includes("Session created with model"))
-      expect(createdLog).toBeDefined()
-    })
-
-    test("should log when session.created lacks model info", async () => {
-      const hook = createRuntimeFallbackHook(
-        createMockPluginInput(),
-        {
-          config: createMockConfig(),
-          pluginConfig: createMockPluginConfigWithCategoryFallback([
-            "anthropic/claude-opus-4-6",
-          ]),
-        }
-      )
-
-      const sessionID = "test-created-no-model"
+      const sessionID = "test-created-on-demand"
       await hook.event({
         event: {
           type: "session.created",

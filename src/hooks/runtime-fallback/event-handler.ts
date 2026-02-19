@@ -10,31 +10,14 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts } = deps
 
-  const handleSessionCreated = async (props: Record<string, unknown> | undefined) => {
-    const sessionInfo = props?.info as { id?: string; model?: string; agent?: string } | undefined
+  const handleSessionCreated = (props: Record<string, unknown> | undefined) => {
+    const sessionInfo = props?.info as { id?: string } | undefined
     const sessionID = sessionInfo?.id
     if (!sessionID) return
 
-    let model = sessionInfo?.model
-    if (!model) {
-      const agent = sessionInfo?.agent
-      const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-      const agentConfig = resolvedAgent
-        ? pluginConfig?.agents?.[resolvedAgent as keyof typeof pluginConfig.agents]
-        : undefined
-      model = agentConfig?.model as string | undefined
-      if (model) {
-        log(`[${HOOK_NAME}] Session created without model, derived from agent config`, { sessionID, agent: resolvedAgent, model })
-      }
-    }
-
-    if (model) {
-      log(`[${HOOK_NAME}] Session created with model`, { sessionID, model })
-      sessionStates.set(sessionID, createFallbackState(model))
-      sessionLastAccess.set(sessionID, Date.now())
-    } else {
-      log(`[${HOOK_NAME}] Session created without model info, state will be created on-demand`, { sessionID })
-    }
+    // SDK Session type has no model/agent fields — state is created on-demand
+    // by handleSessionError or handleSessionStatus when the actual model is known
+    log(`[${HOOK_NAME}] Session created, state will be created on-demand`, { sessionID })
   }
 
   const handleSessionDeleted = (props: Record<string, unknown> | undefined) => {
@@ -50,27 +33,6 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       helpers.clearSessionFallbackTimeout(sessionID)
       SessionCategoryRegistry.remove(sessionID)
     }
-  }
-
-  const handleSessionStop = async (props: Record<string, unknown> | undefined) => {
-    const sessionID = props?.sessionID as string | undefined
-    if (!sessionID) return
-
-    helpers.clearSessionFallbackTimeout(sessionID)
-
-    if (sessionRetryInFlight.has(sessionID)) {
-      await helpers.abortSessionRequest(sessionID, "session.stop")
-    }
-
-    sessionRetryInFlight.delete(sessionID)
-    sessionAwaitingFallbackResult.delete(sessionID)
-
-    const state = sessionStates.get(sessionID)
-    if (state?.pendingFallbackModel) {
-      state.pendingFallbackModel = undefined
-    }
-
-    log(`[${HOOK_NAME}] Cleared fallback retry state on session.stop`, { sessionID })
   }
 
   const handleSessionIdle = (props: Record<string, unknown> | undefined) => {
@@ -270,9 +232,8 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     const props = event.properties as Record<string, unknown> | undefined
 
-    if (event.type === "session.created") { await handleSessionCreated(props); return }
+    if (event.type === "session.created") { handleSessionCreated(props); return }
     if (event.type === "session.deleted") { handleSessionDeleted(props); return }
-    if (event.type === "session.stop") { await handleSessionStop(props); return }
     if (event.type === "session.idle") { handleSessionIdle(props); return }
     if (event.type === "session.error") { await handleSessionError(props); return }
     if (event.type === "session.status") { await handleSessionStatus(props); return }
