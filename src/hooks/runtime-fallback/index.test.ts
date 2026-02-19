@@ -1616,6 +1616,165 @@ describe("runtime-fallback", () => {
 
       expect(retriedModels).toContain("openai/gpt-5.3-codex")
     })
+
+    test("triggers fallback when message contains type:error parts (e.g. Minimax insufficient balance)", async () => {
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "test" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2"]),
+        }
+      )
+
+      const sessionID = "test-session-error-content"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "minimax/minimax-text-01" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "minimax/minimax-text-01",
+            },
+            parts: [{ type: "error", text: "Upstream error from Minimax: insufficient balance (1008)" }],
+          },
+        },
+      })
+
+      expect(retriedModels).toContain("openai/gpt-5.2")
+    })
+
+    test("triggers fallback when message has mixed text and error parts", async () => {
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "test" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["anthropic/claude-opus-4-6"]),
+        }
+      )
+
+      const sessionID = "test-session-mixed-content"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "google/gemini-2.5-pro",
+            },
+            parts: [
+              { type: "text", text: "Hello" },
+              { type: "error", text: "Rate limit exceeded" },
+            ],
+          },
+        },
+      })
+
+      expect(retriedModels).toContain("anthropic/claude-opus-4-6")
+    })
+
+    test("does NOT trigger fallback for normal type:error-free messages", async () => {
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                { info: { role: "user" }, parts: [{ type: "text", text: "test" }] },
+                { info: { role: "assistant" }, parts: [{ type: "text", text: "Normal response" }] },
+              ],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2"]),
+        }
+      )
+
+      const sessionID = "test-session-normal-content"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-5" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID,
+              role: "assistant",
+              model: "anthropic/claude-opus-4-5",
+            },
+            parts: [{ type: "text", text: "Normal response" }],
+          },
+        },
+      })
+
+      expect(retriedModels).toHaveLength(0)
+    })
   })
 
   describe("edge cases", () => {

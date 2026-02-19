@@ -133,6 +133,21 @@ export function extractAutoRetrySignal(info: Record<string, unknown> | undefined
   return undefined
 }
 
+export function containsErrorContent(
+  parts: Array<{ type?: string; text?: string }> | undefined
+): { hasError: boolean; errorMessage?: string } {
+  if (!parts || parts.length === 0) return { hasError: false }
+
+  const errorParts = parts.filter((p) => p.type === "error")
+  if (errorParts.length > 0) {
+    const errorMessages = errorParts.map((p) => p.text).filter((text): text is string => typeof text === "string")
+    const errorMessage = errorMessages.length > 0 ? errorMessages.join("\n") : undefined
+    return { hasError: true, errorMessage }
+  }
+
+  return { hasError: false }
+}
+
 export function isRetryableError(error: unknown, retryOnErrors: number[]): boolean {
   const statusCode = extractStatusCode(error, retryOnErrors)
   const message = getErrorMessage(error)
