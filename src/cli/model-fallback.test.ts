@@ -491,18 +491,18 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then librarian should use ZAI_MODEL
-      expect(result.agents?.librarian?.model).toBe("zai-coding-plan/glm-5")
+      expect(result.agents?.librarian?.model).toBe("opencode/minimax-m2.5-free")
     })
 
-    test("librarian uses claude-sonnet when ZAI not available but Claude is", () => {
+    test("librarian always uses minimax-m2.5-free regardless of provider availability", () => {
       // #given only Claude is available (no ZAI)
       const config = createConfig({ hasClaude: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then librarian should use claude-sonnet-4-6 (third in fallback chain after ZAI and opencode/glm)
-      expect(result.agents?.librarian?.model).toBe("anthropic/claude-sonnet-4-6")
+      // #then librarian should use opencode/minimax-m2.5-free (always first in chain)
+      expect(result.agents?.librarian?.model).toBe("opencode/minimax-m2.5-free")
     })
   })
 
