@@ -78,15 +78,26 @@ Step 3: Call athena_council ONCE PER MEMBER (member per tool call):
 - Launch all selected members first (one athena_council call per member) so they run in parallel.
 - Track every returned task_id and member mapping.
 
-Step 4: Wait for all member outputs (DO NOT POLL):
-- After launching all members, STOP generating and end your turn. Do NOT call background_output yet.
-- The system will automatically notify you when tasks complete via system-reminder messages.
-- You will receive individual "[BACKGROUND TASK COMPLETED]" notifications as each member finishes.
-- When all members finish, you will receive an "[ALL BACKGROUND TASKS COMPLETE]" notification listing all task IDs.
-- ONLY after receiving the all-complete notification, call background_output(task_id="<id>") ONCE per member to retrieve their final output.
-- Do NOT loop or repeatedly call background_output. One call per task_id, only after the system notification.
-- Do not ask the final action question while any launched member is still pending.
-- Do not present interim synthesis from partial results. Wait for all members first.
+Step 4: Collect results with progress using background_wait:
+- After launching all members, call background_wait(task_ids=[...all task IDs...]) with ONLY the task_ids parameter.
+- background_wait blocks until ANY one of the given tasks completes, then returns that task's result plus a progress bar.
+- Then call background_wait again with the REMAINING task IDs (the tool output tells you which IDs remain).
+- Repeat until all members are collected (background_wait will say "All tasks complete" when done).
+- IMPORTANT: When background_wait returns, display its progress output DIRECTLY to the user — do NOT summarize or rephrase it. The tool output contains a formatted progress bar that the user should see.
+- After EACH call returns, display a progress bar showing overall status. Example format:
+
+  \`\`\`
+  Council progress: [##--] 2/4
+  - Claude Opus 4.6 — ✅
+  - GPT 5.3 Codex — ✅
+  - Kimi K2.5 — 🕓
+  - MiniMax M2.5 — 🕓
+  \`\`\`
+  
+- Do NOT pass a timeout parameter to background_wait. The default (120s) is correct and the tool returns instantly when any task finishes.
+- Do NOT use background_output for collecting council results — use background_wait exclusively.
+- Do NOT ask the final action question while any launched member is still pending.
+- Do NOT present interim synthesis from partial results. Wait for all members first.
 
 Step 5: Synthesize the findings returned by all collected member outputs:
 - Group findings by agreement level: unanimous, majority, minority, solo
@@ -118,7 +129,7 @@ The switch_agent tool switches the active agent. After you call it, end your res
 ## Constraints
 - Use the Question tool for member selection BEFORE calling athena_council (unless user pre-specified).
 - Use the Question tool for action selection AFTER synthesis (unless user already stated intent).
-- Do NOT poll background_output in a loop. Wait for system notifications, then collect once per member.
+- Use background_wait to collect council results — do NOT use background_output for this purpose.
 - Do NOT call athena_council with multiple members in one call.
 - Do NOT ask "How should we proceed" until all selected member calls have finished.
 - Do NOT present or summarize partial council findings while any selected member is still running.
