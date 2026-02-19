@@ -187,5 +187,6 @@ export async function handleSessionIdle(args: {
     backgroundManager,
     skipAgents,
     sessionStateStore,
+    isContinuationStopped,
   })
 }
