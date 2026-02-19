@@ -20,6 +20,7 @@ export class TaskToastManager {
 
   addTask(task: {
     id: string
+    sessionID?: string
     description: string
     agent: string
     isBackground: boolean
@@ -30,6 +31,7 @@ export class TaskToastManager {
   }): void {
     const trackedTask: TrackedTask = {
       id: task.id,
+      sessionID: task.sessionID,
       description: task.description,
       agent: task.agent,
       status: task.status ?? "running",
@@ -52,6 +54,18 @@ export class TaskToastManager {
     if (task) {
       task.status = status
     }
+  }
+
+  /**
+   * Update model info for a task by session ID
+   */
+  updateTaskModelBySession(sessionID: string, modelInfo: ModelFallbackInfo): void {
+    if (!sessionID) return
+    const task = Array.from(this.tasks.values()).find((t) => t.sessionID === sessionID)
+    if (!task) return
+    if (task.modelInfo?.model === modelInfo.model && task.modelInfo?.type === modelInfo.type) return
+    task.modelInfo = modelInfo
+    this.showTaskListToast(task)
   }
 
   /**
@@ -110,14 +124,17 @@ export class TaskToastManager {
     const lines: string[] = []
 
     const isFallback = newTask.modelInfo && (
-      newTask.modelInfo.type === "inherited" || newTask.modelInfo.type === "system-default"
+      newTask.modelInfo.type === "inherited" ||
+      newTask.modelInfo.type === "system-default" ||
+      newTask.modelInfo.type === "runtime-fallback"
     )
     if (isFallback) {
-      const suffixMap: Record<"inherited" | "system-default", string> = {
+      const suffixMap: Record<"inherited" | "system-default" | "runtime-fallback", string> = {
         inherited: " (inherited from parent)",
         "system-default": " (system default fallback)",
+        "runtime-fallback": " (runtime fallback)",
       }
-      const suffix = suffixMap[newTask.modelInfo!.type as "inherited" | "system-default"]
+      const suffix = suffixMap[newTask.modelInfo!.type as "inherited" | "system-default" | "runtime-fallback"]
       lines.push(`[FALLBACK] Model: ${newTask.modelInfo!.model}${suffix}`)
       lines.push("")
     }

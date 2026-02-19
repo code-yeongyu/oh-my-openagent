@@ -164,6 +164,7 @@ Prompts MUST be in English.`
       let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
       let actualModel: string | undefined
       let isUnstableAgent = false
+      let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
 
       if (args.category) {
         const resolution = await resolveCategoryExecution(args, options, inheritedModel, systemDefaultModel)
@@ -176,6 +177,7 @@ Prompts MUST be in English.`
         modelInfo = resolution.modelInfo
         actualModel = resolution.actualModel
         isUnstableAgent = resolution.isUnstableAgent
+        fallbackChain = resolution.fallbackChain
 
         const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 
@@ -206,6 +208,7 @@ Prompts MUST be in English.`
         }
         agentToUse = resolution.agentToUse
         categoryModel = resolution.categoryModel
+        fallbackChain = resolution.fallbackChain
       }
 
       const systemContent = buildSystemContent({
@@ -217,7 +220,7 @@ Prompts MUST be in English.`
       })
 
       if (runInBackground) {
-        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent)
+        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
       }
 
       return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo)
