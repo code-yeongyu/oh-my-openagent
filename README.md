@@ -107,26 +107,6 @@ Yes, technically possible. But I cannot recommend using it.
 
 ---
 
-## Contents
-
-- [Oh My OpenCode](#oh-my-opencode)
-  - [Just Skip Reading This Readme](#just-skip-reading-this-readme)
-    - [It's the Age of Agents](#its-the-age-of-agents)
-    - [🪄 The Magic Word: `ultrawork`](#-the-magic-word-ultrawork)
-    - [For Those Who Want to Read: Meet Sisyphus](#for-those-who-want-to-read-meet-sisyphus)
-      - [Just Install This](#just-install-this)
-    - [Which Model Should I Use?](#which-model-should-i-use)
-    - [For Those Who Want Autonomy: Meet Hephaestus](#for-those-who-want-autonomy-meet-hephaestus)
-  - [Installation](#installation)
-    - [For Humans](#for-humans)
-    - [For LLM Agents](#for-llm-agents)
-  - [Uninstallation](#uninstallation)
-  - [Features](#features)
-  - [Configuration](#configuration)
-  - [Author's Note](#authors-note)
-  - [Warnings](#warnings)
-  - [Loved by professionals at](#loved-by-professionals-at)
-
 # Oh My OpenCode
 
 [Claude Code](https://www.claude.com/product/claude-code) is great.
