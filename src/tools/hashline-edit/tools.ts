@@ -64,11 +64,13 @@ VALIDATION:
 - Each edit must be one of: set_line, replace_lines, insert_after, replace
 - text/new_text must contain plain replacement text only (no LINE:HASH prefixes, no diff + markers)
 
-LINE:HASH FORMAT:
+LINE:HASH FORMAT (CRITICAL - READ CAREFULLY):
 Each line reference must be in "LINE:HASH" format where:
 - LINE: 1-based line number
-- HASH: First 2 characters of xxHash32 hash of line content (computed with computeLineHash)
-- Example: "5:a3|const x = 1" means line 5 with hash "a3"
+- HASH: First 2 characters of xxHash32 hash of line content (hex characters 0-9, a-f only)
+- Example: "5:a3" means line 5 with hash "a3"
+- WRONG: "2:co" (contains non-hex 'o') - will fail!
+- CORRECT: "2:e8" (hex characters only)
 
 GETTING HASHES:
 Use the read tool - it returns lines in "LINE:HASH|content" format.

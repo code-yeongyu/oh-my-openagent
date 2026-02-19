@@ -6,13 +6,18 @@ import {
   applyReplaceLines,
   applySetLine,
 } from "./edit-operations"
+import { computeLineHash } from "./hash-computation"
 import type { HashlineEdit, InsertAfter, Replace, ReplaceLines, SetLine } from "./types"
 
 describe("applySetLine", () => {
+  function anchorFor(lines: string[], line: number): string {
+    return `${line}:${computeLineHash(line, lines[line - 1])}`
+  }
+
   it("replaces a single line at the specified anchor", () => {
     //#given
     const lines = ["line 1", "line 2", "line 3"]
-    const anchor = "2:b2" // line 2 hash
+    const anchor = anchorFor(lines, 2)
 
     //#when
     const result = applySetLine(lines, anchor, "new line 2")
@@ -24,7 +29,7 @@ describe("applySetLine", () => {
   it("handles newline escapes in replacement text", () => {
     //#given
     const lines = ["line 1", "line 2", "line 3"]
-    const anchor = "2:b2"
+    const anchor = anchorFor(lines, 2)
 
     //#when
     const result = applySetLine(lines, anchor, "new\\nline")
@@ -56,8 +61,8 @@ describe("applyReplaceLines", () => {
   it("replaces a range of lines", () => {
     //#given
     const lines = ["line 1", "line 2", "line 3", "line 4", "line 5"]
-    const startAnchor = "2:b2"
-    const endAnchor = "4:5f"
+    const startAnchor = `${2}:${computeLineHash(2, lines[1])}`
+    const endAnchor = `${4}:${computeLineHash(4, lines[3])}`
 
     //#when
     const result = applyReplaceLines(lines, startAnchor, endAnchor, "replacement")
@@ -69,8 +74,8 @@ describe("applyReplaceLines", () => {
   it("handles newline escapes in replacement text", () => {
     //#given
     const lines = ["line 1", "line 2", "line 3"]
-    const startAnchor = "2:b2"
-    const endAnchor = "2:b2"
+    const startAnchor = `${2}:${computeLineHash(2, lines[1])}`
+    const endAnchor = `${2}:${computeLineHash(2, lines[1])}`
 
     //#when
     const result = applyReplaceLines(lines, startAnchor, endAnchor, "a\\nb")
@@ -83,7 +88,7 @@ describe("applyReplaceLines", () => {
     //#given
     const lines = ["line 1", "line 2", "line 3"]
     const startAnchor = "2:ff"
-    const endAnchor = "3:83"
+    const endAnchor = `${3}:${computeLineHash(3, lines[2])}`
 
     //#when / #then
     expect(() => applyReplaceLines(lines, startAnchor, endAnchor, "new")).toThrow(
@@ -94,7 +99,7 @@ describe("applyReplaceLines", () => {
   it("throws on end hash mismatch", () => {
     //#given
     const lines = ["line 1", "line 2", "line 3"]
-    const startAnchor = "2:b2"
+    const startAnchor = `${2}:${computeLineHash(2, lines[1])}`
     const endAnchor = "3:ff"
 
     //#when / #then
@@ -106,8 +111,8 @@ describe("applyReplaceLines", () => {
   it("throws when start > end", () => {
     //#given
     const lines = ["line 1", "line 2", "line 3"]
-    const startAnchor = "3:83"
-    const endAnchor = "2:b2"
+    const startAnchor = `${3}:${computeLineHash(3, lines[2])}`
+    const endAnchor = `${2}:${computeLineHash(2, lines[1])}`
 
     //#when / #then
     expect(() => applyReplaceLines(lines, startAnchor, endAnchor, "new")).toThrow(
@@ -120,7 +125,7 @@ describe("applyInsertAfter", () => {
   it("inserts text after the specified line", () => {
     //#given
     const lines = ["line 1", "line 2", "line 3"]
-    const anchor = "2:b2"
+    const anchor = `${2}:${computeLineHash(2, lines[1])}`
 
     //#when
     const result = applyInsertAfter(lines, anchor, "inserted")
@@ -132,7 +137,7 @@ describe("applyInsertAfter", () => {
   it("handles newline escapes to insert multiple lines", () => {
     //#given
     const lines = ["line 1", "line 2", "line 3"]
-    const anchor = "2:b2"
+    const anchor = `${2}:${computeLineHash(2, lines[1])}`
 
     //#when
     const result = applyInsertAfter(lines, anchor, "a\\nb\\nc")
@@ -144,7 +149,7 @@ describe("applyInsertAfter", () => {
   it("inserts at end when anchor is last line", () => {
     //#given
     const lines = ["line 1", "line 2"]
-    const anchor = "2:b2"
+    const anchor = `${2}:${computeLineHash(2, lines[1])}`
 
     //#when
     const result = applyInsertAfter(lines, anchor, "inserted")
@@ -218,7 +223,8 @@ describe("applyHashlineEdits", () => {
   it("applies single set_line edit", () => {
     //#given
     const content = "line 1\nline 2\nline 3"
-    const edits: SetLine[] = [{ type: "set_line", line: "2:b2", text: "new line 2" }]
+    const line2Hash = computeLineHash(2, "line 2")
+    const edits: SetLine[] = [{ type: "set_line", line: `2:${line2Hash}`, text: "new line 2" }]
 
     //#when
     const result = applyHashlineEdits(content, edits)
@@ -230,9 +236,11 @@ describe("applyHashlineEdits", () => {
   it("applies multiple edits bottom-up (descending line order)", () => {
     //#given
     const content = "line 1\nline 2\nline 3\nline 4\nline 5"
+    const line2Hash = computeLineHash(2, "line 2")
+    const line4Hash = computeLineHash(4, "line 4")
     const edits: SetLine[] = [
-      { type: "set_line", line: "2:b2", text: "new 2" },
-      { type: "set_line", line: "4:5f", text: "new 4" },
+      { type: "set_line", line: `2:${line2Hash}`, text: "new 2" },
+      { type: "set_line", line: `4:${line4Hash}`, text: "new 4" },
     ]
 
     //#when
@@ -245,9 +253,11 @@ describe("applyHashlineEdits", () => {
   it("applies mixed edit types", () => {
     //#given
     const content = "line 1\nline 2\nline 3"
+    const line1Hash = computeLineHash(1, "line 1")
+    const line3Hash = computeLineHash(3, "line 3")
     const edits: HashlineEdit[] = [
-      { type: "insert_after", line: "1:02", text: "inserted" },
-      { type: "set_line", line: "3:83", text: "modified" },
+      { type: "insert_after", line: `1:${line1Hash}`, text: "inserted" },
+      { type: "set_line", line: `3:${line3Hash}`, text: "modified" },
     ]
 
     //#when
@@ -260,8 +270,10 @@ describe("applyHashlineEdits", () => {
   it("applies replace_lines edit", () => {
     //#given
     const content = "line 1\nline 2\nline 3\nline 4"
+    const line2Hash = computeLineHash(2, "line 2")
+    const line3Hash = computeLineHash(3, "line 3")
     const edits: ReplaceLines[] = [
-      { type: "replace_lines", start_line: "2:b2", end_line: "3:83", text: "replaced" },
+      { type: "replace_lines", start_line: `2:${line2Hash}`, end_line: `3:${line3Hash}`, text: "replaced" },
     ]
 
     //#when
@@ -307,9 +319,11 @@ describe("applyHashlineEdits", () => {
   it("correctly handles index shifting with multiple edits", () => {
     //#given
     const content = "a\nb\nc\nd\ne"
+    const line2Hash = computeLineHash(2, "b")
+    const line4Hash = computeLineHash(4, "d")
     const edits: InsertAfter[] = [
-      { type: "insert_after", line: "2:bf", text: "x" },
-      { type: "insert_after", line: "4:90", text: "y" },
+      { type: "insert_after", line: `2:${line2Hash}`, text: "x" },
+      { type: "insert_after", line: `4:${line4Hash}`, text: "y" },
     ]
 
     //#when
