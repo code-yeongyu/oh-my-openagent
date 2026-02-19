@@ -50,13 +50,8 @@ export async function addAuthPlugins(config: InstallConfig): Promise<ConfigMerge
     const rawPlugins = existingConfig?.plugin
     const plugins: string[] = Array.isArray(rawPlugins) ? rawPlugins : []
 
-    if (config.hasGemini) {
-      const version = await fetchLatestVersion("opencode-antigravity-auth")
-      const pluginEntry = version ? `opencode-antigravity-auth@${version}` : "opencode-antigravity-auth"
-      if (!plugins.some((p) => p.startsWith("opencode-antigravity-auth"))) {
-        plugins.push(pluginEntry)
-      }
-    }
+    // Note: opencode-antigravity-auth plugin auto-installation has been removed
+    // Users can manually add auth plugins if needed
 
     const newConfig = { ...(existingConfig ?? {}), plugin: plugins }
 
