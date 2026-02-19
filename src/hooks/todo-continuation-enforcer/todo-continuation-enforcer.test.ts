@@ -1608,6 +1608,31 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should not inject when isContinuationStopped becomes true during countdown", async () => {
+    // given - session where continuation is not stopped at idle time but stops during countdown
+    const sessionID = "main-race-condition"
+    setMainSession(sessionID)
+    let stopped = false
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+      isContinuationStopped: () => stopped,
+    })
+
+    // when - session goes idle with continuation not yet stopped
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    // when - stop-continuation fires during the 2s countdown window
+    stopped = true
+
+    // when - countdown elapses and injectContinuation fires
+    await fakeTimers.advanceBy(3000)
+
+    // then - no injection because isContinuationStopped became true before injectContinuation ran
+    expect(promptCalls).toHaveLength(0)
+  })
+
   test("should inject when isContinuationStopped returns false", async () => {
     fakeTimers.restore()
     // given - session with continuation not stopped
