@@ -1133,6 +1133,7 @@ Opt-in experimental features that may change or be removed in future versions. U
     "truncate_all_tool_outputs": true,
     "aggressive_truncation": true,
     "auto_resume": true,
+    "disable_omo_env": false,
     "dynamic_context_pruning": {
       "enabled": false,
       "notification": "detailed",
@@ -1164,6 +1165,7 @@ Opt-in experimental features that may change or be removed in future versions. U
 | `truncate_all_tool_outputs` | `false` | Truncates ALL tool outputs instead of just whitelisted tools (Grep, Glob, LSP, AST-grep). Tool output truncator is enabled by default - disable via `disabled_hooks`.                         |
 | `aggressive_truncation`     | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
 | `auto_resume`               | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts last user message and continues.                             |
+| `disable_omo_env`           | `false` | When `true`, disables auto-injected `<omo-env>` block generation (date, time, timezone, locale). When unset or `false`, current behavior is preserved. Set to `true` will improve the cache hit rate and reduce the API cost. |
 | `dynamic_context_pruning`    | See below | Dynamic context pruning configuration for managing context window usage automatically. See [Dynamic Context Pruning](#dynamic-context-pruning) below.                              |
 
 ### Dynamic Context Pruning
