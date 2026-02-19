@@ -1,5 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { AgentOverrides } from "../config/schema/agent-overrides"
+import { getSessionAgent } from "../features/claude-code-session-state"
 import { log } from "../shared"
 import { getAgentConfigKey } from "../shared/agent-display-names"
 import { scheduleDeferredModelOverride } from "./ultrawork-db-model-override"
@@ -35,6 +36,18 @@ export type UltraworkOverrideResult = {
   variant?: string
 }
 
+function isSameModel(
+  current: unknown,
+  target: { providerID: string; modelID: string },
+): boolean {
+  if (typeof current !== "object" || current === null) return false
+  const currentRecord = current as Record<string, unknown>
+  return (
+    currentRecord["providerID"] === target.providerID
+    && currentRecord["modelID"] === target.modelID
+  )
+}
+
 /**
  * Resolves the ultrawork model override config for the given agent and prompt text.
  * Returns null if no override should be applied.
@@ -46,13 +59,15 @@ export function resolveUltraworkOverride(
     message: Record<string, unknown>
     parts: Array<{ type: string; text?: string; [key: string]: unknown }>
   },
+  sessionID?: string,
 ): UltraworkOverrideResult | null {
   const promptText = extractPromptText(output.parts)
   if (!detectUltrawork(promptText)) return null
 
   const messageAgentName =
     typeof output.message["agent"] === "string" ? (output.message["agent"] as string) : undefined
-  const rawAgentName = inputAgentName ?? messageAgentName
+  const sessionAgentName = sessionID ? getSessionAgent(sessionID) : undefined
+  const rawAgentName = inputAgentName ?? messageAgentName ?? sessionAgentName
   if (!rawAgentName || !pluginConfig.agents) return null
 
   const agentConfigKey = getAgentConfigKey(rawAgentName)
@@ -94,8 +109,9 @@ export function applyUltraworkModelOverrideOnMessage(
     parts: Array<{ type: string; text?: string; [key: string]: unknown }>
   },
   tui: unknown,
+  sessionID?: string,
 ): void {
-  const override = resolveUltraworkOverride(pluginConfig, inputAgentName, output)
+  const override = resolveUltraworkOverride(pluginConfig, inputAgentName, output, sessionID)
   if (!override) return
 
   if (!override.providerID || !override.modelID) {
@@ -106,10 +122,16 @@ export function applyUltraworkModelOverrideOnMessage(
     return
   }
 
+  const targetModel = { providerID: override.providerID, modelID: override.modelID }
+  if (isSameModel(output.message.model, targetModel)) {
+    log(`[ultrawork-model-override] Skip override; target model already active: ${override.modelID}`)
+    return
+  }
+
   const messageId = output.message["id"] as string | undefined
   if (!messageId) {
     log("[ultrawork-model-override] No message ID found, falling back to direct mutation")
-    output.message.model = { providerID: override.providerID, modelID: override.modelID }
+    output.message.model = targetModel
     if (override.variant) {
       output.message["variant"] = override.variant
       output.message["thinking"] = override.variant
@@ -125,7 +147,7 @@ export function applyUltraworkModelOverrideOnMessage(
 
   scheduleDeferredModelOverride(
     messageId,
-    { providerID: override.providerID, modelID: override.modelID },
+    targetModel,
     override.variant,
   )
 
