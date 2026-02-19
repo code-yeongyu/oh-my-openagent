@@ -767,7 +767,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(textPart!.text).not.toContain("[search-mode]")
     expect(textPart!.text).not.toContain("MAXIMIZE SEARCH EFFORT")
 
-    const skipLog = logCalls.find(c => c.msg.includes("Skipping all keywords for Athena"))
+    const skipLog = logCalls.find(c => c.msg.includes("Skipping keywords for Athena"))
     expect(skipLog).toBeDefined()
 
     clearSessionAgent(sessionID)
@@ -792,7 +792,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(textPart!.text).toBe("search for the implementation")
     expect(textPart!.text).not.toContain("[search-mode]")
 
-    const skipLog = logCalls.find(c => c.msg.includes("Skipping all keywords for Athena"))
+    const skipLog = logCalls.find(c => c.msg.includes("Skipping keywords for Athena"))
     expect(skipLog).toBeDefined()
   })
 })
