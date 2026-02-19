@@ -335,7 +335,7 @@ describe("decideSpawnActions", () => {
 
       // then
       expect(result.canSpawn).toBe(false)
-      expect(result.reason).toContain("too small")
+      expect(result.reason).toContain("defer attach")
     })
 
     it("spawns at exact minimum splittable width with 0 agent panes", () => {
@@ -634,7 +634,7 @@ describe("decideSpawnActions with custom agentPaneWidth", () => {
     }
   })
 
-	it("#given wider main pane #when capacity needs two evictions #then replace is chosen", () => {
+	it("#given wider main pane #when capacity needs two evictions #then defer is chosen", () => {
 		//#given
 		const config: CapacityConfig = { mainPaneMinWidth: 120, agentPaneWidth: 40 }
 		const state = createWindowState(220, 44, [
@@ -665,8 +665,8 @@ describe("decideSpawnActions with custom agentPaneWidth", () => {
 		const result = decideSpawnActions(state, "ses-new", "new task", config, mappings)
 
 		//#then
-		expect(result.canSpawn).toBe(true)
-		expect(result.actions).toHaveLength(1)
-		expect(result.actions[0].type).toBe("replace")
+		expect(result.canSpawn).toBe(false)
+		expect(result.actions).toHaveLength(0)
+		expect(result.reason).toContain("defer attach")
 	})
 })
