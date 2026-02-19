@@ -16,7 +16,7 @@ import {
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
-const ZAI_MODEL = "zai-coding-plan/glm-4.7"
+const ZAI_MODEL = "zai-coding-plan/glm-5"
 
 const ULTIMATE_FALLBACK = "opencode/big-pickle"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
