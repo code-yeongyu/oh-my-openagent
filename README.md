@@ -115,6 +115,7 @@ Yes, technically possible. But I cannot recommend using it.
     - [🪄 The Magic Word: `ultrawork`](#-the-magic-word-ultrawork)
     - [For Those Who Want to Read: Meet Sisyphus](#for-those-who-want-to-read-meet-sisyphus)
       - [Just Install This](#just-install-this)
+    - [Which Model Should I Use?](#which-model-should-i-use)
     - [For Those Who Want Autonomy: Meet Hephaestus](#for-those-who-want-autonomy-meet-hephaestus)
   - [Installation](#installation)
     - [For Humans](#for-humans)
@@ -222,6 +223,10 @@ Need to look something up? It scours official docs, your entire codebase history
 
 If you don't want all this, as mentioned, you can just pick and choose specific features.
 
+#### Which Model Should I Use?
+
+New to oh-my-opencode and not sure which model to pair with which agent? Check the **[Agent-Model Matching Guide](docs/guide/agent-model-matching.md)** — a quick reference for newcomers covering recommended models, fallback chains, and common pitfalls for each agent.
+
 ### For Those Who Want Autonomy: Meet Hephaestus
 
 ![Meet Hephaestus](.github/assets/hephaestus.png)
@@ -307,6 +312,7 @@ See the full [Features Documentation](docs/features.md) for detailed information
 - **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search)
 - **Session Tools**: List, read, search, and analyze session history
 - **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
+- **[Agent-Model Matching Guide](docs/guide/agent-model-matching.md)**: Which model works best with which agent
 
 ## Configuration
 

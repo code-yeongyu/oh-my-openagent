@@ -259,6 +259,18 @@ opencode auth login
 
 The plugin works perfectly by default. Do not change settings or turn off features without an explicit request.
 
+### Custom Model Configuration
+
+If the user wants to override which model an agent uses, refer to the **[Agent-Model Matching Guide](./agent-model-matching.md)** before making changes. That guide explains:
+
+- **Why each agent uses its default model** — prompt optimization, model family compatibility
+- **Which substitutions are safe** — staying within the same model family (e.g., Opus → Sonnet for Sisyphus)
+- **Which substitutions are dangerous** — crossing model families without prompt support (e.g., GPT for Sisyphus)
+- **How auto-routing works** — Prometheus and Atlas detect GPT models and switch to GPT-optimized prompts automatically
+- **Full fallback chains** — what happens when the preferred model is unavailable
+
+Always explain to the user *why* a model is assigned to an agent when making custom changes. The guide provides the rationale for every assignment.
+
 ### Verify the setup
 
 Read this document again, think about you have done everything correctly.
