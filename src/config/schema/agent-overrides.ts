@@ -48,11 +48,9 @@ export const AgentOverrideConfigSchema = z.object({
     .optional(),
 })
 
-export const AthenaOverrideConfigSchema = AgentOverrideConfigSchema.merge(
-  z.object({
-    council: AthenaConfigSchema.shape.council.optional(),
-  })
-)
+export const AthenaOverrideConfigSchema = AgentOverrideConfigSchema.extend({
+  council: AthenaConfigSchema.shape.council.optional(),
+})
 
 export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
@@ -69,6 +67,7 @@ export const AgentOverridesSchema = z.object({
   explore: AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
   atlas: AgentOverrideConfigSchema.optional(),
+  "council-member": AgentOverrideConfigSchema.optional(),
   athena: AthenaOverrideConfigSchema.optional(),
 })
 
