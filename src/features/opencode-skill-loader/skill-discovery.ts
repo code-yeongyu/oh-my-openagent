@@ -3,19 +3,20 @@ import { discoverSkills } from "./loader"
 import type { LoadedSkill } from "./types"
 import type { SkillResolutionOptions } from "./skill-resolution-options"
 
-const cachedSkillsByProvider = new Map<string, LoadedSkill[]>()
+const skillCache = new Map<string, LoadedSkill[]>()
 
 export function clearSkillCache(): void {
-	cachedSkillsByProvider.clear()
+	skillCache.clear()
 }
 
 export async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSkill[]> {
-	const cacheKey = options?.browserProvider ?? "playwright"
+	const directory = options?.directory ?? process.cwd()
+	const cacheKey = `${options?.browserProvider ?? "playwright"}:${directory}`
 	const hasDisabledSkills = options?.disabledSkills && options.disabledSkills.size > 0
 
 	// Skip cache if disabledSkills is provided (varies between calls)
 	if (!hasDisabledSkills) {
-		const cached = cachedSkillsByProvider.get(cacheKey)
+		const cached = skillCache.get(cacheKey)
 		if (cached) return cached
 	}
 
@@ -69,7 +70,7 @@ export async function getAllSkills(options?: SkillResolutionOptions): Promise<Lo
 	if (hasDisabledSkills) {
 		allSkills = allSkills.filter((skill) => !options!.disabledSkills!.has(skill.name))
 	} else {
-		cachedSkillsByProvider.set(cacheKey, allSkills)
+		skillCache.set(cacheKey, allSkills)
 	}
 
 	return allSkills

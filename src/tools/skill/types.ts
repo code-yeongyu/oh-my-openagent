@@ -32,4 +32,6 @@ export interface SkillLoadOptions {
   /** Git master configuration for watermark/co-author settings */
   gitMasterConfig?: GitMasterConfig
   disabledSkills?: Set<string>
+  /** Project directory for skill discovery. Falls back to process.cwd() if not provided. */
+  directory?: string
 }
