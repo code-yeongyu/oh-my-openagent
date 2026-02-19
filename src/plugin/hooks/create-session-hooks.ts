@@ -105,6 +105,8 @@ export function createSessionHooks(args: {
     ? safeHook("think-mode", () => createThinkModeHook())
     : null
 
+  const enableFallbackTitle = pluginConfig.experimental?.model_fallback_title ?? false
+  const fallbackTitleMaxEntries = 200
   const fallbackTitleState = new Map<string, { baseTitle?: string; lastKey?: string }>()
   const updateFallbackTitle = async (input: {
     sessionID: string
@@ -112,6 +114,7 @@ export function createSessionHooks(args: {
     modelID: string
     variant?: string
   }) => {
+    if (!enableFallbackTitle) return
     const key = `${input.providerID}/${input.modelID}${input.variant ? `:${input.variant}` : ""}`
     const existing = fallbackTitleState.get(input.sessionID) ?? {}
     if (existing.lastKey === key) return
@@ -142,26 +145,32 @@ export function createSessionHooks(args: {
 
     existing.lastKey = key
     fallbackTitleState.set(input.sessionID, existing)
+    if (fallbackTitleState.size > fallbackTitleMaxEntries) {
+      const oldestKey = fallbackTitleState.keys().next().value
+      if (oldestKey) fallbackTitleState.delete(oldestKey)
+    }
   }
 
-  // Model fallback hook - always enabled (no feature flag)
+  // Model fallback hook (configurable via disabled_hooks)
   // This handles automatic model switching when model errors occur
-  const modelFallback = safeHook("model-fallback", () =>
-    createModelFallbackHook({
-      toast: async ({ title, message, variant, duration }) => {
-        await ctx.client.tui
-          .showToast({
-            body: {
-              title,
-              message,
-              variant: variant ?? "warning",
-              duration: duration ?? 5000,
-            },
-          })
-          .catch(() => {})
-      },
-      onApplied: updateFallbackTitle,
-    }))
+  const modelFallback = isHookEnabled("model-fallback")
+    ? safeHook("model-fallback", () =>
+      createModelFallbackHook({
+        toast: async ({ title, message, variant, duration }) => {
+          await ctx.client.tui
+            .showToast({
+              body: {
+                title,
+                message,
+                variant: variant ?? "warning",
+                duration: duration ?? 5000,
+              },
+            })
+            .catch(() => {})
+        },
+        onApplied: enableFallbackTitle ? updateFallbackTitle : undefined,
+      }))
+    : null
 
   const anthropicContextWindowLimitRecovery = isHookEnabled("anthropic-context-window-limit-recovery")
     ? safeHook("anthropic-context-window-limit-recovery", () =>

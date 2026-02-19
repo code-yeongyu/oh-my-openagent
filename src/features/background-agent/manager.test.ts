@@ -2920,6 +2920,39 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
 })
 
 describe("BackgroundManager.handleEvent - session.error", () => {
+  const defaultRetryFallbackChain = [
+    { providers: ["quotio"], model: "claude-opus-4-6", variant: "max" },
+    { providers: ["quotio"], model: "gpt-5.3-codex", variant: "high" },
+  ]
+
+  const stubProcessKey = (manager: BackgroundManager) => {
+    ;(manager as unknown as { processKey: (key: string) => Promise<void> }).processKey = async () => {}
+  }
+
+  const createRetryTask = (manager: BackgroundManager, input: {
+    id: string
+    sessionID: string
+    description: string
+    concurrencyKey?: string
+    fallbackChain?: typeof defaultRetryFallbackChain
+  }) => {
+    const task = createMockTask({
+      id: input.id,
+      sessionID: input.sessionID,
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-retry",
+      description: input.description,
+      agent: "sisyphus",
+      status: "running",
+      concurrencyKey: input.concurrencyKey,
+      model: { providerID: "quotio", modelID: "claude-opus-4-6-thinking" },
+      fallbackChain: input.fallbackChain ?? defaultRetryFallbackChain,
+      attemptCount: 0,
+    })
+    getTaskMap(manager).set(task.id, task)
+    return task
+  }
+
   test("sets task to error, releases concurrency, and cleans up", async () => {
     //#given
     const manager = createBackgroundManager()
@@ -3054,26 +3087,19 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     const concurrencyKey = "quotio/claude-opus-4-6-thinking"
     await concurrencyManager.acquire(concurrencyKey)
 
-    ;(manager as unknown as { processKey: (key: string) => Promise<void> }).processKey = async () => {}
+    stubProcessKey(manager)
 
     const sessionID = "ses_error_retry"
-    const task = createMockTask({
+    const task = createRetryTask(manager, {
       id: "task-session-error-retry",
       sessionID,
-      parentSessionID: "parent-session",
-      parentMessageID: "msg-retry",
       description: "task that should retry",
-      agent: "sisyphus",
-      status: "running",
       concurrencyKey,
-      model: { providerID: "quotio", modelID: "claude-opus-4-6-thinking" },
       fallbackChain: [
         { providers: ["quotio"], model: "claude-opus-4-6", variant: "max" },
         { providers: ["quotio"], model: "claude-opus-4-5" },
       ],
-      attemptCount: 0,
     })
-    getTaskMap(manager).set(task.id, task)
 
     //#when
     manager.handleEvent({
@@ -3107,25 +3133,14 @@ describe("BackgroundManager.handleEvent - session.error", () => {
   test("retry path triggers on session.status retry events", async () => {
     //#given
     const manager = createBackgroundManager()
-    ;(manager as unknown as { processKey: (key: string) => Promise<void> }).processKey = async () => {}
+    stubProcessKey(manager)
 
     const sessionID = "ses_status_retry"
-    const task = createMockTask({
+    const task = createRetryTask(manager, {
       id: "task-status-retry",
       sessionID,
-      parentSessionID: "parent-session",
-      parentMessageID: "msg-status",
       description: "task that should retry on status",
-      agent: "sisyphus",
-      status: "running",
-      model: { providerID: "quotio", modelID: "claude-opus-4-6-thinking" },
-      fallbackChain: [
-        { providers: ["quotio"], model: "claude-opus-4-6", variant: "max" },
-        { providers: ["quotio"], model: "gpt-5.3-codex", variant: "high" },
-      ],
-      attemptCount: 0,
     })
-    getTaskMap(manager).set(task.id, task)
 
     //#when
     manager.handleEvent({
@@ -3154,25 +3169,14 @@ describe("BackgroundManager.handleEvent - session.error", () => {
   test("retry path triggers on message.updated assistant error events", async () => {
     //#given
     const manager = createBackgroundManager()
-    ;(manager as unknown as { processKey: (key: string) => Promise<void> }).processKey = async () => {}
+    stubProcessKey(manager)
 
     const sessionID = "ses_message_updated_retry"
-    const task = createMockTask({
+    const task = createRetryTask(manager, {
       id: "task-message-updated-retry",
       sessionID,
-      parentSessionID: "parent-session",
-      parentMessageID: "msg-message-updated",
       description: "task that should retry on message.updated",
-      agent: "sisyphus",
-      status: "running",
-      model: { providerID: "quotio", modelID: "claude-opus-4-6-thinking" },
-      fallbackChain: [
-        { providers: ["quotio"], model: "claude-opus-4-6", variant: "max" },
-        { providers: ["quotio"], model: "gpt-5.3-codex", variant: "high" },
-      ],
-      attemptCount: 0,
     })
-    getTaskMap(manager).set(task.id, task)
 
     //#when
     manager.handleEvent({

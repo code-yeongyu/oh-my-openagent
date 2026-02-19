@@ -3011,6 +3011,9 @@
         },
         "disable_omo_env": {
           "type": "boolean"
+        },
+        "model_fallback_title": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

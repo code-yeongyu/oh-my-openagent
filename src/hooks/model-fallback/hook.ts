@@ -36,6 +36,20 @@ export type ModelFallbackState = {
  */
 const pendingModelFallbacks = new Map<string, ModelFallbackState>()
 const lastToastKey = new Map<string, string>()
+const sessionFallbackChains = new Map<string, FallbackEntry[]>()
+
+export function setSessionFallbackChain(sessionID: string, fallbackChain: FallbackEntry[] | undefined): void {
+  if (!sessionID) return
+  if (!fallbackChain || fallbackChain.length === 0) {
+    sessionFallbackChains.delete(sessionID)
+    return
+  }
+  sessionFallbackChains.set(sessionID, fallbackChain)
+}
+
+export function clearSessionFallbackChain(sessionID: string): void {
+  sessionFallbackChains.delete(sessionID)
+}
 
 /**
  * Sets a pending model fallback for a session.
@@ -49,12 +63,16 @@ export function setPendingModelFallback(
 ): boolean {
   const agentKey = getAgentConfigKey(agentName)
   const requirements = AGENT_MODEL_REQUIREMENTS[agentKey]
-  if (!requirements || !requirements.fallbackChain || requirements.fallbackChain.length === 0) {
+  const sessionFallback = sessionFallbackChains.get(sessionID)
+  const fallbackChain = sessionFallback && sessionFallback.length > 0
+    ? sessionFallback
+    : requirements?.fallbackChain
+
+  if (!fallbackChain || fallbackChain.length === 0) {
     log("[model-fallback] No fallback chain for agent: " + agentName + " (key: " + agentKey + ")")
     return false
   }
 
-  const fallbackChain = requirements.fallbackChain
   const existing = pendingModelFallbacks.get(sessionID)
 
   if (existing) {

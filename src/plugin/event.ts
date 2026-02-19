@@ -13,7 +13,7 @@ import {
 import { resetMessageCursor } from "../shared"
 import { lspManager } from "../tools"
 import { shouldRetryError } from "../shared/model-error-classifier"
-import { clearPendingModelFallback, setPendingModelFallback } from "../hooks/model-fallback/hook"
+import { clearPendingModelFallback, clearSessionFallbackChain, setPendingModelFallback } from "../hooks/model-fallback/hook"
 import { clearSessionModel, setSessionModel } from "../shared/session-model-state"
 
 import type { CreatedHooks } from "../create-hooks"
@@ -135,11 +135,11 @@ export function createEventHandler(args: {
   const DEDUP_WINDOW_MS = 500
 
   const shouldAutoRetrySession = (sessionID: string): boolean => {
+    if (syncSubagentSessions.has(sessionID)) return true
     const mainSessionID = getMainSessionID()
     if (mainSessionID) return sessionID === mainSessionID
     // Headless runs (or resumed sessions) may not emit session.created, so mainSessionID can be unset.
     // In that case, treat any non-subagent session as the "main" interactive session.
-    if (syncSubagentSessions.has(sessionID)) return true
     return !subagentSessions.has(sessionID)
   }
 
@@ -213,6 +213,7 @@ export function createEventHandler(args: {
         lastHandledRetryStatusKey.delete(sessionInfo.id)
         lastKnownModelBySession.delete(sessionInfo.id)
         clearPendingModelFallback(sessionInfo.id)
+        clearSessionFallbackChain(sessionInfo.id)
         resetMessageCursor(sessionInfo.id)
         firstMessageVariantGate.clear(sessionInfo.id)
         clearSessionModel(sessionInfo.id)

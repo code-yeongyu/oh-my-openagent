@@ -6,15 +6,9 @@ import { _resetForTesting, setMainSession } from "../features/claude-code-sessio
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 
 describe("createEventHandler - model fallback", () => {
-  afterEach(() => {
-    _resetForTesting()
-  })
-
-  test("triggers retry prompt for assistant message.updated APIError payloads (headless resume)", async () => {
-    //#given
+  const createHandler = (args?: { hooks?: any }) => {
     const abortCalls: string[] = []
     const promptCalls: string[] = []
-    const sessionID = "ses_message_updated_fallback"
 
     const handler = createEventHandler({
       ctx: {
@@ -46,8 +40,20 @@ describe("createEventHandler - model fallback", () => {
           disconnectSession: async () => {},
         },
       } as any,
-      hooks: {} as any,
+      hooks: args?.hooks ?? ({} as any),
     })
+
+    return { handler, abortCalls, promptCalls }
+  }
+
+  afterEach(() => {
+    _resetForTesting()
+  })
+
+  test("triggers retry prompt for assistant message.updated APIError payloads (headless resume)", async () => {
+    //#given
+    const sessionID = "ses_message_updated_fallback"
+    const { handler, abortCalls, promptCalls } = createHandler()
 
     //#when
     await handler({
@@ -87,43 +93,9 @@ describe("createEventHandler - model fallback", () => {
 
   test("triggers retry prompt for nested model error payloads", async () => {
     //#given
-    const abortCalls: string[] = []
-    const promptCalls: string[] = []
     const sessionID = "ses_main_fallback_nested"
     setMainSession(sessionID)
-
-    const handler = createEventHandler({
-      ctx: {
-        directory: "/tmp",
-        client: {
-          session: {
-            abort: async ({ path }: { path: { id: string } }) => {
-              abortCalls.push(path.id)
-              return {}
-            },
-            prompt: async ({ path }: { path: { id: string } }) => {
-              promptCalls.push(path.id)
-              return {}
-            },
-          },
-        },
-      } as any,
-      pluginConfig: {} as any,
-      firstMessageVariantGate: {
-        markSessionCreated: () => {},
-        clear: () => {},
-      },
-      managers: {
-        tmuxSessionManager: {
-          onSessionCreated: async () => {},
-          onSessionDeleted: async () => {},
-        },
-        skillMcpManager: {
-          disconnectSession: async () => {},
-        },
-      } as any,
-      hooks: {} as any,
-    })
+    const { handler, abortCalls, promptCalls } = createHandler()
 
     //#when
     await handler({
@@ -151,48 +123,13 @@ describe("createEventHandler - model fallback", () => {
 
   test("triggers retry prompt on session.status retry events and applies fallback", async () => {
     //#given
-    const abortCalls: string[] = []
-    const promptCalls: string[] = []
     const sessionID = "ses_status_retry_fallback"
     setMainSession(sessionID)
     clearPendingModelFallback(sessionID)
 
     const modelFallback = createModelFallbackHook()
 
-    const handler = createEventHandler({
-      ctx: {
-        directory: "/tmp",
-        client: {
-          session: {
-            abort: async ({ path }: { path: { id: string } }) => {
-              abortCalls.push(path.id)
-              return {}
-            },
-            prompt: async ({ path }: { path: { id: string } }) => {
-              promptCalls.push(path.id)
-              return {}
-            },
-          },
-        },
-      } as any,
-      pluginConfig: {} as any,
-      firstMessageVariantGate: {
-        markSessionCreated: () => {},
-        clear: () => {},
-      },
-      managers: {
-        tmuxSessionManager: {
-          onSessionCreated: async () => {},
-          onSessionDeleted: async () => {},
-        },
-        skillMcpManager: {
-          disconnectSession: async () => {},
-        },
-      } as any,
-      hooks: {
-        modelFallback,
-      } as any,
-    })
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
 
     const chatMessageHandler = createChatMessageHandler({
       ctx: {
