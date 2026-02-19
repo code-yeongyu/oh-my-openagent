@@ -13,7 +13,7 @@ This guide helps you match the right AI model to each oh-my-opencode agent based
 | **Sisyphus** | Claude Opus, Sonnet, Kimi K2.5, GLM 5 | GPT ❌ |
 | **Hephaestus** | GPT-5.3-codex only | Non-GPT ❌ |
 | **Prometheus** | Claude Opus | GPT (untested) |
-| **Atlas** | Claude Opus, GPT-5.2+ | — |
+| **Atlas** | Kimi K2.5, Claude Sonnet, GPT-5.2+ | — |
 
 ---
 
@@ -92,9 +92,10 @@ Prometheus is optimized for Claude's reasoning capabilities. GPT compatibility i
 ### Atlas (orchestrator)
 **Purpose**: Todo list orchestration and multi-agent coordination
 
-**Recommended Models**:
-1. **Claude Opus-4-6** — Best performance (recommended)
-2. **GPT-5.2+** — Good enough, has GPT-optimized prompt
+**Recommended Models** (in order of preference):
+1. **Kimi K2.5** — Best for Atlas orchestration
+2. **Claude Sonnet-4-6** — Strong alternative
+3. **GPT-5.2+** — Good enough, has GPT-optimized prompt
 
 Atlas has model-specific prompt detection and will automatically use GPT-optimized instructions when running on GPT models.
 
@@ -103,7 +104,7 @@ Atlas has model-specific prompt detection and will automatically use GPT-optimiz
 {
   "agent": {
     "atlas": {
-      "model": "anthropic/claude-opus-4-6"
+      "model": "kimi/kimi-k2.5"
     }
   }
 }
