@@ -30,8 +30,8 @@ function showToast(tui: unknown, title: string, message: string): void {
 }
 
 export type UltraworkOverrideResult = {
-  providerID: string
-  modelID: string
+  providerID?: string
+  modelID?: string
   variant?: string
 }
 
@@ -58,7 +58,13 @@ export function resolveUltraworkOverride(
   const agentConfigKey = getAgentConfigKey(rawAgentName)
   const agentConfig = pluginConfig.agents[agentConfigKey as keyof AgentOverrides]
   const ultraworkConfig = agentConfig?.ultrawork
-  if (!ultraworkConfig?.model) return null
+  if (!ultraworkConfig?.model && !ultraworkConfig?.variant) return null
+
+  if (!ultraworkConfig.model) {
+    return {
+      variant: ultraworkConfig.variant,
+    }
+  }
 
   const modelParts = ultraworkConfig.model.split("/")
   if (modelParts.length < 2) return null
@@ -91,6 +97,14 @@ export function applyUltraworkModelOverrideOnMessage(
 ): void {
   const override = resolveUltraworkOverride(pluginConfig, inputAgentName, output)
   if (!override) return
+
+  if (!override.providerID || !override.modelID) {
+    if (override.variant) {
+      output.message["variant"] = override.variant
+      output.message["thinking"] = override.variant
+    }
+    return
+  }
 
   const messageId = output.message["id"] as string | undefined
   if (!messageId) {
