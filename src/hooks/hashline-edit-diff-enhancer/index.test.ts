@@ -79,8 +79,8 @@ describe("hashline-edit-diff-enhancer", () => {
 			expect(filediff).toBeDefined()
 			expect(filediff.file).toBe(tmpFile)
 			expect(filediff.path).toBe(tmpFile)
-			expect(filediff.before).toBe(oldContent)
-			expect(filediff.after).toBe(newContent)
+			expect(filediff.before).toMatch(/^\d+:[a-f0-9]{2}\|/)
+			expect(filediff.after).toMatch(/^\d+:[a-f0-9]{2}\|/)
 			expect(filediff.additions).toBeGreaterThan(0)
 			expect(filediff.deletions).toBeGreaterThan(0)
 
@@ -154,7 +154,7 @@ describe("hashline-edit-diff-enhancer", () => {
 			const filediff = afterOutput.metadata.filediff as any
 			expect(filediff).toBeDefined()
 			expect(filediff.before).toBe("")
-			expect(filediff.after).toBe("new content\n")
+			expect(filediff.after).toMatch(/^1:[a-f0-9]{2}\|new content/)
 			expect(filediff.additions).toBeGreaterThan(0)
 			expect(filediff.deletions).toBe(0)
 
@@ -178,6 +178,124 @@ describe("hashline-edit-diff-enhancer", () => {
 
 			// then - no filediff injected
 			expect(afterOutput.metadata.filediff).toBeUndefined()
+
+			await (await import("fs/promises")).unlink(tmpFile).catch(() => {})
+		})
+	})
+
+	describe("write tool support", () => {
+		test("captures filediff for write tool (path arg)", async () => {
+			//#given - a temp file
+			const tmpDir = (await import("os")).tmpdir()
+			const tmpFile = `${tmpDir}/hashline-diff-write-${Date.now()}.ts`
+			const oldContent = "line 1\nline 2\n"
+			await Bun.write(tmpFile, oldContent)
+
+			const input = makeInput("write", "call-write-1")
+			const beforeOutput = makeBeforeOutput({ path: tmpFile })
+
+			//#when - before hook captures old content
+			await hook["tool.execute.before"](input, beforeOutput)
+
+			//#when - file is written
+			const newContent = "line 1\nmodified line 2\nnew line 3\n"
+			await Bun.write(tmpFile, newContent)
+
+			//#when - after hook computes filediff
+			const afterOutput = makeAfterOutput()
+			await hook["tool.execute.after"](input, afterOutput)
+
+			//#then - metadata should contain filediff
+			const filediff = afterOutput.metadata.filediff as { file: string; before: string; after: string; additions: number; deletions: number }
+			expect(filediff).toBeDefined()
+			expect(filediff.file).toBe(tmpFile)
+			expect(filediff.additions).toBeGreaterThan(0)
+
+			await (await import("fs/promises")).unlink(tmpFile).catch(() => {})
+		})
+
+		test("captures filediff for write tool (filePath arg)", async () => {
+			//#given
+			const tmpDir = (await import("os")).tmpdir()
+			const tmpFile = `${tmpDir}/hashline-diff-write-fp-${Date.now()}.ts`
+			await Bun.write(tmpFile, "original content\n")
+
+			const input = makeInput("write", "call-write-fp")
+
+			//#when - before hook uses filePath arg
+			await hook["tool.execute.before"](input, makeBeforeOutput({ filePath: tmpFile }))
+			await Bun.write(tmpFile, "new content\n")
+
+			const afterOutput = makeAfterOutput()
+			await hook["tool.execute.after"](input, afterOutput)
+
+			//#then
+			expect((afterOutput.metadata.filediff as any)).toBeDefined()
+
+			await (await import("fs/promises")).unlink(tmpFile).catch(() => {})
+		})
+	})
+
+	describe("hashline format in filediff", () => {
+		test("filediff.before and filediff.after are in hashline format", async () => {
+			//#given - a temp file
+			const tmpDir = (await import("os")).tmpdir()
+			const tmpFile = `${tmpDir}/hashline-diff-format-${Date.now()}.ts`
+			const oldContent = "const x = 1\nconst y = 2\n"
+			await Bun.write(tmpFile, oldContent)
+
+			const input = makeInput("edit", "call-hashline-format")
+			await hook["tool.execute.before"](input, makeBeforeOutput({ path: tmpFile }))
+
+			//#when - file is modified and after hook runs
+			const newContent = "const x = 1\nconst y = 42\n"
+			await Bun.write(tmpFile, newContent)
+
+			const afterOutput = makeAfterOutput()
+			await hook["tool.execute.after"](input, afterOutput)
+
+			//#then - before and after should be in LINE:HASH|content format
+			const filediff = afterOutput.metadata.filediff as { before: string; after: string }
+			const beforeLines = filediff.before.split("\n").filter(Boolean)
+			const afterLines = filediff.after.split("\n").filter(Boolean)
+
+			for (const line of beforeLines) {
+				expect(line).toMatch(/^\d+:[a-f0-9]{2}\|/)
+			}
+			for (const line of afterLines) {
+				expect(line).toMatch(/^\d+:[a-f0-9]{2}\|/)
+			}
+
+			await (await import("fs/promises")).unlink(tmpFile).catch(() => {})
+		})
+	})
+
+	describe("TUI diff support (metadata.diff)", () => {
+		test("injects unified diff string in metadata.diff for TUI", async () => {
+			//#given - a temp file
+			const tmpDir = (await import("os")).tmpdir()
+			const tmpFile = `${tmpDir}/hashline-tui-diff-${Date.now()}.ts`
+			const oldContent = "line 1\nline 2\nline 3\n"
+			await Bun.write(tmpFile, oldContent)
+
+			const input = makeInput("edit", "call-tui-diff")
+			await hook["tool.execute.before"](input, makeBeforeOutput({ path: tmpFile }))
+
+			//#when - file is modified
+			const newContent = "line 1\nmodified line 2\nline 3\n"
+			await Bun.write(tmpFile, newContent)
+
+			const afterOutput = makeAfterOutput()
+			await hook["tool.execute.after"](input, afterOutput)
+
+			//#then - metadata.diff should be a unified diff string
+			expect(afterOutput.metadata.diff).toBeDefined()
+			expect(typeof afterOutput.metadata.diff).toBe("string")
+			expect(afterOutput.metadata.diff).toContain("---")
+			expect(afterOutput.metadata.diff).toContain("+++")
+			expect(afterOutput.metadata.diff).toContain("@@")
+			expect(afterOutput.metadata.diff).toContain("-line 2")
+			expect(afterOutput.metadata.diff).toContain("+modified line 2")
 
 			await (await import("fs/promises")).unlink(tmpFile).catch(() => {})
 		})
