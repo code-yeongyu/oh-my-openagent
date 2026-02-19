@@ -25,6 +25,7 @@ export { createSkillMcpTool } from "./skill-mcp"
 import {
   createBackgroundOutput,
   createBackgroundCancel,
+  createBackgroundWait,
   type BackgroundOutputManager,
   type BackgroundCancelClient,
 } from "./background-task"
@@ -53,6 +54,7 @@ export function createBackgroundTools(manager: BackgroundManager, client: Openco
   return {
     background_output: createBackgroundOutput(outputManager, client),
     background_cancel: createBackgroundCancel(manager, cancelClient),
+    background_wait: createBackgroundWait(outputManager, client),
   }
 }
 
