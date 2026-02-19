@@ -1275,3 +1275,65 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     expect(agentResult[getAgentDisplayName("sisyphus")]?.permission?.todoread).toBeUndefined()
   })
 })
+
+describe("disable_omo_env pass-through", () => {
+  test("passes disable_omo_env=true to createBuiltinAgents", async () => {
+    //#given
+    const pluginConfig: OhMyOpenCodeConfig = {
+      experimental: { disable_omo_env: true },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mock: { calls: unknown[][] }
+    }
+    const callArgs =
+      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
+    expect(callArgs).toBeDefined()
+    expect(callArgs?.[12]).toBe(true)
+  })
+
+  test("passes disable_omo_env=false when config field is omitted", async () => {
+    //#given
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    //#when
+    await handler(config)
+
+    //#then
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mock: { calls: unknown[][] }
+    }
+    const callArgs =
+      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
+    expect(callArgs).toBeDefined()
+    expect(callArgs?.[12]).toBe(false)
+  })
+})

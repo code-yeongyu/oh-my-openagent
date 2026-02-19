@@ -4,7 +4,7 @@ import type { CategoryConfig } from "../../config/schema"
 import type { AvailableAgent, AvailableCategory, AvailableSkill } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isAnyProviderConnected } from "../../shared"
 import { createHephaestusAgent } from "../hephaestus"
-import { createEnvContext } from "../env-context"
+import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 
@@ -20,6 +20,7 @@ export function maybeCreateHephaestusConfig(input: {
   mergedCategories: Record<string, CategoryConfig>
   directory?: string
   useTaskSystem: boolean
+  disableOmoEnv?: boolean
 }): AgentConfig | undefined {
   const {
     disabledAgents,
@@ -33,6 +34,7 @@ export function maybeCreateHephaestusConfig(input: {
     mergedCategories,
     directory,
     useTaskSystem,
+    disableOmoEnv = false,
   } = input
 
   if (disabledAgents.includes("hephaestus")) return undefined
@@ -79,10 +81,7 @@ export function maybeCreateHephaestusConfig(input: {
     hephaestusConfig = applyCategoryOverride(hephaestusConfig, hepOverrideCategory, mergedCategories)
   }
 
-  if (directory && hephaestusConfig.prompt) {
-    const envContext = createEnvContext()
-    hephaestusConfig = { ...hephaestusConfig, prompt: hephaestusConfig.prompt + envContext }
-  }
+  hephaestusConfig = applyEnvironmentContext(hephaestusConfig, directory, { disableOmoEnv })
 
   if (hephaestusOverride) {
     hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride, directory)

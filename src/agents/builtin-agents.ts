@@ -69,8 +69,10 @@ export async function createBuiltinAgents(
   browserProvider?: BrowserAutomationProvider,
   uiSelectedModel?: string,
   disabledSkills?: Set<string>,
-  useTaskSystem = false
+  useTaskSystem = false,
+  disableOmoEnv = false
 ): Promise<Record<string, AgentConfig>> {
+
   const connectedProviders = readConnectedProvidersCache()
   const providerModelsConnected = connectedProviders
     ? (readProviderModelsCache()?.connected ?? [])
@@ -112,6 +114,7 @@ export async function createBuiltinAgents(
     uiSelectedModel,
     availableModels,
     disabledSkills,
+    disableOmoEnv,
   })
 
   const registeredAgents = parseRegisteredAgentSummaries(customAgentSummaries)
@@ -145,6 +148,7 @@ export async function createBuiltinAgents(
     directory,
     userCategories: categories,
     useTaskSystem,
+    disableOmoEnv,
   })
   if (sisyphusConfig) {
     result["sisyphus"] = sisyphusConfig
@@ -162,6 +166,7 @@ export async function createBuiltinAgents(
     mergedCategories,
     directory,
     useTaskSystem,
+    disableOmoEnv,
   })
   if (hephaestusConfig) {
     result["hephaestus"] = hephaestusConfig

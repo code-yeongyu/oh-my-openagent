@@ -76,6 +76,7 @@ export async function applyAgentConfig(params: {
   const currentModel = params.config.model as string | undefined;
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
+  const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
@@ -90,6 +91,7 @@ export async function applyAgentConfig(params: {
     currentModel,
     disabledSkills,
     useTaskSystem,
+    disableOmoEnv,
   );
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
