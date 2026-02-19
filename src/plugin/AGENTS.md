@@ -23,8 +23,8 @@ Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and com
 
 | File | Tier | Count |
 |------|------|-------|
-| `create-session-hooks.ts` | Session | 22 |
-| `create-tool-guard-hooks.ts` | Tool Guard | 9 |
+| `create-session-hooks.ts` | Session | 21 |
+| `create-tool-guard-hooks.ts` | Tool Guard | 10 |
 | `create-transform-hooks.ts` | Transform | 4 |
 | `create-continuation-hooks.ts` | Continuation | 7 |
 | `create-skill-hooks.ts` | Skill | 2 |
@@ -40,6 +40,8 @@ Core glue layer. 20 source files assembling the 8 OpenCode hook handlers and com
 | `recent-synthetic-idles.ts` | Dedup rapid idle events |
 | `unstable-agent-babysitter.ts` | Track unstable agent behavior across sessions |
 | `types.ts` | `PluginContext`, `PluginInterface`, `ToolsRecord`, `TmuxConfig` |
+| `ultrawork-model-override.ts` | Ultrawork mode model override logic |
+| `ultrawork-db-model-override.ts` | DB-level model override for ultrawork |
 
 ## KEY PATTERNS
 
