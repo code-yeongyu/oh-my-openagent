@@ -1,10 +1,11 @@
 import type { HookDeps } from "./types"
+import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { createFallbackState } from "./fallback-state"
 
-export function createChatMessageHandler(deps: HookDeps) {
-  const { config, sessionStates, sessionLastAccess } = deps
+export function createChatMessageHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
+  const { config, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult } = deps
 
   return async (
     input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } },
@@ -34,6 +35,15 @@ export function createChatMessageHandler(deps: HookDeps) {
         from: state.currentModel,
         to: requestedModel,
       })
+
+      helpers.clearSessionFallbackTimeout(sessionID)
+      sessionAwaitingFallbackResult.delete(sessionID)
+
+      if (sessionRetryInFlight.has(sessionID)) {
+        await helpers.abortSessionRequest(sessionID, "manual-model-change")
+        sessionRetryInFlight.delete(sessionID)
+      }
+
       state = createFallbackState(requestedModel)
       sessionStates.set(sessionID, state)
       return

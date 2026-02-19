@@ -2083,4 +2083,248 @@ describe("runtime-fallback", () => {
       expect(maxLog).toBeDefined()
     })
   })
+
+  describe("manual model change cleanup", () => {
+    test("should clear fallback timeout and abort in-flight request on manual model change", async () => {
+      const abortCalls: Array<{ path?: { id?: string } }> = []
+      const retriedModels: string[] = []
+      const pending = new Promise<never>(() => {})
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              if (retriedModels.length === 1) {
+                await pending
+              }
+              return {}
+            },
+            abort: async (args: unknown) => {
+              abortCalls.push(args as { path?: { id?: string } })
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "anthropic/claude-opus-4-6",
+          ]),
+          session_timeout_ms: 500,
+        }
+      )
+
+      const sessionID = "test-manual-switch-cleanup"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      const sessionErrorPromise = hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message: "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      const output: { message: { model?: { providerID: string; modelID: string } }; parts: Array<{ type: string; text?: string }> } = {
+        message: {},
+        parts: [],
+      }
+
+      await hook["chat.message"]?.(
+        {
+          sessionID,
+          model: { providerID: "openai", modelID: "gpt-5.2" },
+        },
+        output
+      )
+
+      const manualChangeLog = logCalls.find((c) => c.msg.includes("Detected manual model change"))
+      expect(manualChangeLog).toBeDefined()
+
+      const abortLog = logCalls.find((c) => c.msg.includes("Aborted in-flight session request (manual-model-change)"))
+      expect(abortLog).toBeDefined()
+
+      await new Promise((resolve) => setTimeout(resolve, 600))
+
+      const timeoutAbort = abortCalls.filter((c) => c.path?.id === sessionID)
+      const timeoutLog = logCalls.find((c) => c.msg.includes("Session fallback timeout reached"))
+      expect(timeoutLog).toBeUndefined()
+
+      void sessionErrorPromise
+    })
+
+    test("should not kill new prompt after manual model switch", async () => {
+      const abortCalls: Array<{ path?: { id?: string } }> = []
+      const retriedModels: string[] = []
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async (args: unknown) => {
+              const model = (args as { body?: { model?: { providerID?: string; modelID?: string } } })?.body?.model
+              if (model?.providerID && model?.modelID) {
+                retriedModels.push(`${model.providerID}/${model.modelID}`)
+              }
+              return {}
+            },
+            abort: async (args: unknown) => {
+              abortCalls.push(args as { path?: { id?: string } })
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-no-kill-after-manual-switch"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message: "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      const output: { message: { model?: { providerID: string; modelID: string } }; parts: Array<{ type: string; text?: string }> } = {
+        message: {},
+        parts: [],
+      }
+
+      await hook["chat.message"]?.(
+        {
+          sessionID,
+          model: { providerID: "openai", modelID: "gpt-5.2" },
+        },
+        output
+      )
+
+      const abortCountBeforeTimeout = abortCalls.length
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      const postSwitchAborts = abortCalls.slice(abortCountBeforeTimeout)
+      const timeoutAborts = postSwitchAborts.filter((c) => c.path?.id === sessionID)
+      expect(timeoutAborts).toHaveLength(0)
+    })
+  })
+
+  describe("auto-retry failure cleanup", () => {
+    test("should clear awaiting state when promptAsync throws", async () => {
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async () => {
+              throw new Error("Network failure")
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 30 }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "github-copilot/claude-opus-4.6",
+            "openai/gpt-5.2",
+          ]),
+          session_timeout_ms: 20,
+        }
+      )
+
+      const sessionID = "test-retry-failure-cleanup"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              name: "ProviderAuthError",
+              data: {
+                providerID: "google",
+                message: "Google Generative AI API key is missing. Pass it using the 'apiKey' parameter or the GOOGLE_GENERATIVE_AI_API_KEY environment variable.",
+              },
+            },
+          },
+        },
+      })
+
+      const retryFailedLog = logCalls.find((c) => c.msg.includes("Auto-retry failed"))
+      expect(retryFailedLog).toBeDefined()
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID },
+        },
+      })
+
+      const stuckLog = logCalls.find((c) => c.msg.includes("session.idle while awaiting fallback result"))
+      expect(stuckLog).toBeUndefined()
+
+      await new Promise((resolve) => setTimeout(resolve, 50))
+
+      const timeoutLog = logCalls.find((c) => c.msg.includes("Session fallback timeout reached"))
+      expect(timeoutLog).toBeUndefined()
+    })
+  })
 })

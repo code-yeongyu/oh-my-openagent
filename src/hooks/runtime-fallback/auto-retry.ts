@@ -142,6 +142,8 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       }
     } catch (retryError) {
       log(`[${HOOK_NAME}] Auto-retry failed (${source})`, { sessionID, error: String(retryError) })
+      sessionAwaitingFallbackResult.delete(sessionID)
+      clearSessionFallbackTimeout(sessionID)
     } finally {
       const state = sessionStates.get(sessionID)
       if (state?.pendingFallbackModel === newModel) {

@@ -45,7 +45,7 @@ export function createRuntimeFallbackHook(
   const helpers = createAutoRetryHelpers(deps)
   const baseEventHandler = createEventHandler(deps, helpers)
   const messageUpdateHandler = createMessageUpdateHandler(deps, helpers)
-  const chatMessageHandler = createChatMessageHandler(deps)
+  const chatMessageHandler = createChatMessageHandler(deps, helpers)
 
   const cleanupInterval = setInterval(helpers.cleanupStaleSessions, 5 * 60 * 1000)
   cleanupInterval.unref()
