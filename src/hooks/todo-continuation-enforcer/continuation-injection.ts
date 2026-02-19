@@ -37,6 +37,7 @@ export async function injectContinuation(args: {
   skipAgents?: string[]
   resolvedInfo?: ResolvedMessageInfo
   sessionStateStore: SessionStateStore
+  isContinuationStopped?: (sessionID: string) => boolean
 }): Promise<void> {
   const {
     ctx,
@@ -45,11 +46,17 @@ export async function injectContinuation(args: {
     skipAgents = DEFAULT_SKIP_AGENTS,
     resolvedInfo,
     sessionStateStore,
+    isContinuationStopped,
   } = args
 
   const state = sessionStateStore.getExistingState(sessionID)
   if (state?.isRecovering) {
     log(`[${HOOK_NAME}] Skipped injection: in recovery`, { sessionID })
+    return
+  }
+
+  if (isContinuationStopped?.(sessionID)) {
+    log(`[${HOOK_NAME}] Skipped injection: continuation stopped for session`, { sessionID })
     return
   }
 
