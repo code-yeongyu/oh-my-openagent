@@ -19,6 +19,7 @@ import {
   fetchAvailableModels,
   readConnectedProvidersCache,
   readProviderModelsCache,
+  log,
 } from "../shared"
 import { CATEGORY_DESCRIPTIONS } from "../tools/delegate-task/constants"
 import { mergeCategories } from "../shared/merge-categories"
@@ -196,13 +197,13 @@ export async function createBuiltinAgents(
     result["atlas"] = atlasConfig
   }
 
-  if (councilConfig && councilConfig.members.length >= 2) {
+  if (councilConfig && councilConfig.members.length >= 2 && result["athena"]) {
     const { agents: councilAgents, registeredKeys } = registerCouncilMemberAgents(councilConfig)
     for (const [key, config] of Object.entries(councilAgents)) {
       result[key] = config
     }
 
-    if (result["athena"] && registeredKeys.length > 0) {
+    if (registeredKeys.length > 0) {
       const memberList = registeredKeys.map((key) => `- "${key}"`).join("\n")
       const councilTaskInstructions = `\n\n## Registered Council Members (use these as subagent_type in task calls)\n\n${memberList}`
       result["athena"] = {
@@ -210,6 +211,8 @@ export async function createBuiltinAgents(
         prompt: (result["athena"].prompt ?? "") + councilTaskInstructions,
       }
     }
+  } else if (councilConfig && councilConfig.members.length >= 2 && !result["athena"]) {
+    log("[builtin-agents] Skipping council member registration — Athena is disabled")
   }
 
   return result

@@ -71,11 +71,19 @@ export function registerCouncilMemberAgents(
     const friendlyName = member.name ?? humanizeModelId(member.model)
     const description = `Council member: ${friendlyName} (${member.model}). Independent read-only code analyst for Athena council. (OhMyOpenCode)`
 
+    if (agents[key]) {
+      const existingModel = agents[key].model ?? "unknown"
+      throw new Error(
+        `Council member key "${key}" is already registered (model: ${existingModel}). Use distinct "name" fields to avoid collisions.`
+      )
+    }
+
     agents[key] = {
       ...config,
       description,
       model: member.model,
       ...(member.variant ? { variant: member.variant } : {}),
+      ...(member.temperature !== undefined ? { temperature: member.temperature } : {}),
     }
 
     registeredKeys.push(key)
@@ -85,6 +93,11 @@ export function registerCouncilMemberAgents(
       model: member.model,
       variant: member.variant,
     })
+  }
+
+  if (registeredKeys.length < 2) {
+    log("[council-member-agents] Fewer than 2 valid council members after model parsing — disabling council mode")
+    return { agents: {}, registeredKeys: [] }
   }
 
   return { agents, registeredKeys }
