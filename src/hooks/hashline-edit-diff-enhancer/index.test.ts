@@ -17,6 +17,15 @@ function makeAfterOutput(overrides?: Partial<{ title: string; output: string; me
 	}
 }
 
+type FileDiffMetadata = {
+	file: string
+	path: string
+	before: string
+	after: string
+	additions: number
+	deletions: number
+}
+
 describe("hashline-edit-diff-enhancer", () => {
 	let hook: ReturnType<typeof createHashlineEditDiffEnhancerHook>
 
@@ -25,9 +34,9 @@ describe("hashline-edit-diff-enhancer", () => {
 	})
 
 	describe("tool.execute.before", () => {
-		test("captures old file content for edit tool", async () => {
+		test("captures old file content for write tool", async () => {
 			const filePath = import.meta.dir + "/index.test.ts"
-			const input = makeInput("edit")
+			const input = makeInput("write")
 			const output = makeBeforeOutput({ path: filePath, edits: [] })
 
 			await hook["tool.execute.before"](input, output)
@@ -36,7 +45,7 @@ describe("hashline-edit-diff-enhancer", () => {
 			// we verify in the after hook test that it produces filediff
 		})
 
-		test("ignores non-edit tools", async () => {
+		test("ignores non-write tools", async () => {
 			const input = makeInput("read")
 			const output = makeBeforeOutput({ path: "/some/file.ts" })
 
@@ -46,20 +55,20 @@ describe("hashline-edit-diff-enhancer", () => {
 	})
 
 	describe("tool.execute.after", () => {
-		test("injects filediff metadata after edit tool execution", async () => {
+		test("injects filediff metadata after write tool execution", async () => {
 			// given - a temp file that we can modify between before/after
 			const tmpDir = (await import("os")).tmpdir()
 			const tmpFile = `${tmpDir}/hashline-diff-test-${Date.now()}.ts`
 			const oldContent = "line 1\nline 2\nline 3\n"
 			await Bun.write(tmpFile, oldContent)
 
-			const input = makeInput("edit", "call-diff-1")
+			const input = makeInput("write", "call-diff-1")
 			const beforeOutput = makeBeforeOutput({ path: tmpFile, edits: [] })
 
 			// when - before hook captures old content
 			await hook["tool.execute.before"](input, beforeOutput)
 
-			// when - file is modified (simulating hashline edit execution)
+			// when - file is modified (simulating write execution)
 			const newContent = "line 1\nmodified line 2\nline 3\nnew line 4\n"
 			await Bun.write(tmpFile, newContent)
 
@@ -91,7 +100,7 @@ describe("hashline-edit-diff-enhancer", () => {
 			await Bun.file(tmpFile).exists() && (await import("fs/promises")).unlink(tmpFile)
 		})
 
-		test("does nothing for non-edit tools", async () => {
+		test("does nothing for non-write tools", async () => {
 			const input = makeInput("read", "call-other")
 			const afterOutput = makeAfterOutput()
 			const originalMetadata = { ...afterOutput.metadata }
@@ -104,7 +113,7 @@ describe("hashline-edit-diff-enhancer", () => {
 
 		test("does nothing when no before capture exists", async () => {
 			// given - no before hook was called for this callID
-			const input = makeInput("edit", "call-no-before")
+			const input = makeInput("write", "call-no-before")
 			const afterOutput = makeAfterOutput()
 			const originalMetadata = { ...afterOutput.metadata }
 
@@ -119,7 +128,7 @@ describe("hashline-edit-diff-enhancer", () => {
 			const tmpFile = `${tmpDir}/hashline-diff-cleanup-${Date.now()}.ts`
 			await Bun.write(tmpFile, "original")
 
-			const input = makeInput("edit", "call-cleanup")
+			const input = makeInput("write", "call-cleanup")
 			await hook["tool.execute.before"](input, makeBeforeOutput({ path: tmpFile }))
 			await Bun.write(tmpFile, "modified")
 
@@ -141,17 +150,17 @@ describe("hashline-edit-diff-enhancer", () => {
 			const tmpFile = `${tmpDir}/hashline-diff-create-${Date.now()}.ts`
 
 			// given - file doesn't exist during before hook
-			const input = makeInput("edit", "call-create")
+			const input = makeInput("write", "call-create")
 			await hook["tool.execute.before"](input, makeBeforeOutput({ path: tmpFile }))
 
-			// when - file created during edit
+			// when - file created during write
 			await Bun.write(tmpFile, "new content\n")
 
 			const afterOutput = makeAfterOutput()
 			await hook["tool.execute.after"](input, afterOutput)
 
 			// then - filediff shows creation (before is empty)
-			const filediff = afterOutput.metadata.filediff as any
+			const filediff = afterOutput.metadata.filediff as FileDiffMetadata
 			expect(filediff).toBeDefined()
 			expect(filediff.before).toBe("")
 			expect(filediff.after).toMatch(/^1:[a-f0-9]{2}\|new content/)
@@ -169,7 +178,7 @@ describe("hashline-edit-diff-enhancer", () => {
 			const tmpFile = `${tmpDir}/hashline-diff-disabled-${Date.now()}.ts`
 			await Bun.write(tmpFile, "content")
 
-			const input = makeInput("edit", "call-disabled")
+			const input = makeInput("write", "call-disabled")
 			await disabledHook["tool.execute.before"](input, makeBeforeOutput({ path: tmpFile }))
 			await Bun.write(tmpFile, "modified")
 
@@ -230,7 +239,8 @@ describe("hashline-edit-diff-enhancer", () => {
 			await hook["tool.execute.after"](input, afterOutput)
 
 			//#then
-			expect((afterOutput.metadata.filediff as any)).toBeDefined()
+			const filediff = afterOutput.metadata.filediff as FileDiffMetadata | undefined
+			expect(filediff).toBeDefined()
 
 			await (await import("fs/promises")).unlink(tmpFile).catch(() => {})
 		})
@@ -244,7 +254,7 @@ describe("hashline-edit-diff-enhancer", () => {
 			const oldContent = "const x = 1\nconst y = 2\n"
 			await Bun.write(tmpFile, oldContent)
 
-			const input = makeInput("edit", "call-hashline-format")
+			const input = makeInput("write", "call-hashline-format")
 			await hook["tool.execute.before"](input, makeBeforeOutput({ path: tmpFile }))
 
 			//#when - file is modified and after hook runs
@@ -271,14 +281,14 @@ describe("hashline-edit-diff-enhancer", () => {
 	})
 
 	describe("TUI diff support (metadata.diff)", () => {
-		test("injects unified diff string in metadata.diff for TUI", async () => {
+		test("injects unified diff string in metadata.diff for write tool TUI", async () => {
 			//#given - a temp file
 			const tmpDir = (await import("os")).tmpdir()
 			const tmpFile = `${tmpDir}/hashline-tui-diff-${Date.now()}.ts`
 			const oldContent = "line 1\nline 2\nline 3\n"
 			await Bun.write(tmpFile, oldContent)
 
-			const input = makeInput("edit", "call-tui-diff")
+			const input = makeInput("write", "call-tui-diff")
 			await hook["tool.execute.before"](input, makeBeforeOutput({ path: tmpFile }))
 
 			//#when - file is modified

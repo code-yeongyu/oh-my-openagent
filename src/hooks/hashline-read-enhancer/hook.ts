@@ -52,6 +52,14 @@ function transformOutput(output: string): string {
   return result.join("\n")
 }
 
+function transformWriteOutput(output: string): string {
+  if (!output) {
+    return output
+  }
+  const lines = output.split("\n")
+  return lines.map((line) => (READ_LINE_PATTERN.test(line) ? transformLine(line) : line)).join("\n")
+}
+
 export function createHashlineReadEnhancerHook(
   _ctx: PluginInput,
   config: HashlineReadEnhancerConfig
@@ -70,7 +78,7 @@ export function createHashlineReadEnhancerHook(
       if (!shouldProcess(config)) {
         return
       }
-      output.output = transformOutput(output.output)
+      output.output = input.tool.toLowerCase() === "write" ? transformWriteOutput(output.output) : transformOutput(output.output)
     },
   }
 }
