@@ -703,7 +703,7 @@ describe('TmuxSessionManager', () => {
       await manager.onSessionDeleted({ sessionID: 'ses_timeout' })
 
       // then
-      expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+      expect(mockExecuteAction).toHaveBeenCalledTimes(1)
     })
 
     test('closes pane when tracked session is deleted', async () => {

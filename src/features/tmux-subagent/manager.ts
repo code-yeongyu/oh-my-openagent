@@ -5,6 +5,7 @@ import { log, normalizeSDKResponse } from "../../shared"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
+  POLL_INTERVAL_BACKGROUND_MS,
   SESSION_READY_POLL_INTERVAL_MS,
   SESSION_READY_TIMEOUT_MS,
 } from "../../shared/tmux"
@@ -398,10 +399,12 @@ export class TmuxSessionManager {
             })),
           })
 
-          await executeAction(
-            { type: "close", paneId: result.spawnedPaneId, sessionId },
-            { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
-          )
+          if (result.spawnedPaneId) {
+            await executeAction(
+              { type: "close", paneId: result.spawnedPaneId, sessionId },
+              { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state }
+            )
+          }
 
           return
         }
