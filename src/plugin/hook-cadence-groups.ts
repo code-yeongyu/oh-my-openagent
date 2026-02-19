@@ -5,7 +5,7 @@ export type CadenceGroup = "tool_guidance" | "context_injection" | "reminders" |
 /**
  * Maps each cadence group to the hook names it controls.
  * 
- * Only 16 of 45 hooks are cadence-gatable. The remaining 29 are either:
+ * Only 13 of 45 hooks are cadence-gatable. The remaining 32 are either:
  * - Zero token cost (toasts, events, notifications)
  * - Reactive safety hooks (only fire on errors, must not be skipped)
  * - Transform/infrastructure (breaking if skipped)
@@ -24,7 +24,6 @@ export const CADENCE_GROUPS: Record<CadenceGroup, HookName[]> = {
     "start-work",                // boulder state + plan context (~heavy)
   ],
   reminders: [
-    "task-reminder",             // "use task tools" nag
     "sisyphus-junior-notepad",   // notepad directive for Atlas workers
     "anthropic-effort",          // effort=max param injection
   ],

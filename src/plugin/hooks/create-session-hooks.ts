@@ -216,11 +216,6 @@ export function createSessionHooks(args: {
         wrapHookWithCadence("edit-error-recovery", createEditErrorRecoveryHook(ctx), cadenceTracker))
     : null
 
-  const jsonErrorRecovery = isHookEnabled("json-error-recovery")
-    ? safeHook("json-error-recovery", () =>
-        wrapHookWithCadence("json-error-recovery", createJsonErrorRecoveryHook(ctx), cadenceTracker))
-    : null
-
   const delegateTaskRetry = isHookEnabled("delegate-task-retry")
     ? safeHook("delegate-task-retry", () =>
         wrapHookWithCadence("delegate-task-retry", createDelegateTaskRetryHook(ctx), cadenceTracker))
