@@ -26,7 +26,6 @@ import {
   createRuntimeFallbackHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
-import { createUltraworkModelOverrideHook } from "../../hooks/ultrawork-model-override"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -58,7 +57,6 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
-  ultraworkModelOverride: ReturnType<typeof createUltraworkModelOverrideHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -180,11 +178,6 @@ export function createSessionHooks(args: {
           pluginConfig,
         }))
     : null
-
-  const ultraworkModelOverride = isHookEnabled("ultrawork-model-override")
-    ? safeHook("ultrawork-model-override", () => createUltraworkModelOverrideHook({ agents: pluginConfig.agents }))
-    : null
-
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -208,6 +201,5 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     anthropicEffort,
     runtimeFallback,
-    ultraworkModelOverride,
   }
 }

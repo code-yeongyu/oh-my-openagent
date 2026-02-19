@@ -96,7 +96,7 @@ export function createToolGuardHooks(args: {
     : null
 
   const hashlineReadEnhancer = isHookEnabled("hashline-read-enhancer")
-    ? safeHook("hashline-read-enhancer", () => createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.experimental?.hashline_edit ?? false } }))
+    ? safeHook("hashline-read-enhancer", () => createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.experimental?.hashline_edit ?? true } }))
     : null
 
   return {

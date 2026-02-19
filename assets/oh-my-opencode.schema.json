@@ -80,7 +80,6 @@
           "non-interactive-env",
           "interactive-bash-session",
           "thinking-block-validator",
-          "ultrawork-model-override",
           "ralph-loop",
           "category-skill-reminder",
           "compaction-context-injector",
@@ -167,9 +166,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -215,9 +211,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -286,21 +279,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -320,9 +298,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -377,9 +352,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -425,9 +397,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -496,21 +465,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -530,9 +484,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -587,9 +538,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -635,9 +583,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -706,21 +651,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -740,9 +670,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -797,9 +724,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -845,9 +769,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -916,21 +837,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -950,9 +856,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -1007,9 +910,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -1055,9 +955,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1126,21 +1023,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -1160,9 +1042,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -1217,9 +1096,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -1265,9 +1141,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1336,21 +1209,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -1370,9 +1228,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -1427,9 +1282,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -1475,9 +1327,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1546,21 +1395,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -1580,9 +1414,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -1637,9 +1468,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -1685,9 +1513,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1756,21 +1581,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -1790,9 +1600,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -1847,9 +1654,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -1895,9 +1699,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -1966,21 +1767,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -2000,9 +1786,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -2057,9 +1840,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2105,9 +1885,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -2176,21 +1953,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -2210,9 +1972,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -2267,9 +2026,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2315,9 +2071,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -2386,21 +2139,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -2420,9 +2158,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -2477,9 +2212,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2525,9 +2257,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -2596,21 +2325,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -2630,9 +2344,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -2687,9 +2398,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2735,9 +2443,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -2806,21 +2511,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -2840,9 +2530,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -2897,9 +2584,6 @@
             },
             "tools": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {
                 "type": "boolean"
               }
@@ -2945,9 +2629,6 @@
                     },
                     {
                       "type": "object",
-                      "propertyNames": {
-                        "type": "string"
-                      },
                       "additionalProperties": {
                         "type": "string",
                         "enum": [
@@ -3016,21 +2697,6 @@
               ],
               "additionalProperties": false
             },
-            "ultrawork": {
-              "type": "object",
-              "properties": {
-                "model": {
-                  "type": "string"
-                },
-                "variant": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "model"
-              ],
-              "additionalProperties": false
-            },
             "reasoningEffort": {
               "type": "string",
               "enum": [
@@ -3050,9 +2716,6 @@
             },
             "providerOptions": {
               "type": "object",
-              "propertyNames": {
-                "type": "string"
-              },
               "additionalProperties": {}
             },
             "fallback_models": {
@@ -3076,9 +2739,6 @@
     },
     "categories": {
       "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
       "additionalProperties": {
         "type": "object",
         "properties": {
@@ -3142,9 +2802,6 @@
           },
           "tools": {
             "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
             "additionalProperties": {
               "type": "boolean"
             }
@@ -3198,9 +2855,6 @@
         },
         "plugins_override": {
           "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
           "additionalProperties": {
             "type": "boolean"
           }
@@ -3474,9 +3128,6 @@
                   },
                   "metadata": {
                     "type": "object",
-                    "propertyNames": {
-                      "type": "string"
-                    },
                     "additionalProperties": {}
                   },
                   "allowed-tools": {
@@ -3559,9 +3210,6 @@
         },
         "providerConcurrency": {
           "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
           "additionalProperties": {
             "type": "number",
             "minimum": 0
@@ -3569,9 +3217,6 @@
         },
         "modelConcurrency": {
           "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
           "additionalProperties": {
             "type": "number",
             "minimum": 0

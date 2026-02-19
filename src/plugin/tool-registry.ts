@@ -119,7 +119,7 @@ export function createToolRegistry(args: {
       }
     : {}
 
-  const hashlineEnabled = pluginConfig.experimental?.hashline_edit ?? false
+  const hashlineEnabled = pluginConfig.experimental?.hashline_edit ?? true
   const hashlineToolsRecord: Record<string, ToolDefinition> = hashlineEnabled
     ? { edit: createHashlineEditTool() }
     : {}

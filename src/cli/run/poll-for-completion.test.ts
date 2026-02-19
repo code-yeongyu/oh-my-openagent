@@ -45,7 +45,7 @@ describe("pollForCompletion", () => {
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
-      minStabilizationMs: 0,
+      minStabilizationMs: 10,
     })
 
     //#then - exits with 0 but only after 3 consecutive checks
@@ -136,7 +136,7 @@ describe("pollForCompletion", () => {
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
-      minStabilizationMs: 0,
+      minStabilizationMs: 10,
     })
     const elapsedMs = Date.now() - startMs
 
@@ -227,7 +227,7 @@ describe("pollForCompletion", () => {
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 2,
-      minStabilizationMs: 0,
+      minStabilizationMs: 10,
     })
 
     //#then - completion succeeds without idle event
@@ -253,6 +253,48 @@ describe("pollForCompletion", () => {
 
     //#then - completion succeeds after stabilization window
     expect(result).toBe(0)
+  })
+
+  it("uses default stabilization to avoid indefinite wait when no meaningful work arrives", async () => {
+    //#given - idle with no meaningful work and no explicit minStabilization override
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.hasReceivedMeaningfulWork = false
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+    })
+
+    //#then - command exits without manual Ctrl+C
+    expect(result).toBe(0)
+  })
+
+  it("coerces non-positive stabilization values to default stabilization", async () => {
+    //#given - explicit zero stabilization should still wait for default window
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.hasReceivedMeaningfulWork = false
+    const abortController = new AbortController()
+
+    //#when - abort before default 1s window elapses
+    setTimeout(() => abortController.abort(), 100)
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+      minStabilizationMs: 0,
+    })
+
+    //#then - should not complete early
+    expect(result).toBe(130)
   })
 
   it("simulates race condition: brief idle with 0 todos does not cause immediate exit", async () => {

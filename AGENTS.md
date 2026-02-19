@@ -1,10 +1,10 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-02-18 | **Commit:** 04e95d7e | **Branch:** dev
+**Generated:** 2026-02-19 | **Commit:** 5dc437f4 | **Branch:** dev
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 44 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1149 TypeScript files, 132k LOC.
+OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 44 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1161 TypeScript files, 133k LOC.
 
 ## STRUCTURE
 
@@ -84,7 +84,7 @@ Fields: agents (14 overridable), categories (8 built-in + custom), disabled_* ar
 
 ## CONVENTIONS
 
-- **Test pattern**: Vitest, co-located `*.test.ts`, given/when/then style
+- **Test pattern**: Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style
 - **Factory pattern**: `createXXX()` for all tools, hooks, agents
 - **Hook tiers**: Session (22) → Tool-Guard (9) → Transform (4) → Continuation (7) → Skill (2)
 - **Agent modes**: `primary` (respects UI model) vs `subagent` (own fallback chain) vs `all`
@@ -103,7 +103,7 @@ Fields: agents (14 overridable), categories (8 built-in + custom), disabled_* ar
 ## COMMANDS
 
 ```bash
-bun test                    # Vitest test suite
+bun test                    # Bun test suite
 bun run build              # Build plugin
 bunx oh-my-opencode install # Interactive setup
 bunx oh-my-opencode doctor  # Health diagnostics

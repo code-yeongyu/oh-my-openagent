@@ -1,6 +1,6 @@
 # src/plugin/ — 8 OpenCode Hook Handlers + Hook Composition
 
-**Generated:** 2026-02-18
+**Generated:** 2026-02-19
 
 ## OVERVIEW
 

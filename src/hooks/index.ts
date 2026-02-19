@@ -48,4 +48,3 @@ export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createRuntimeFallbackHook, type RuntimeFallbackHook, type RuntimeFallbackOptions } from "./runtime-fallback";
 export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 
-export { createUltraworkModelOverrideHook } from "./ultrawork-model-override";

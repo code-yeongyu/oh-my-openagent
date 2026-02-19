@@ -94,11 +94,7 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-sonnet-4-6",
-      "ultrawork": {
-        "model": "anthropic/claude-opus-4-6",
-        "variant": "max",
-      },
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -483,11 +479,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-sonnet-4-6",
-      "ultrawork": {
-        "model": "anthropic/claude-opus-4-6",
-        "variant": "max",
-      },
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -1044,11 +1036,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-sonnet-4-6",
-      "ultrawork": {
-        "model": "anthropic/claude-opus-4-6",
-        "variant": "max",
-      },
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -1192,11 +1180,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-sonnet-4-6",
-      "ultrawork": {
-        "model": "anthropic/claude-opus-4-6",
-        "variant": "max",
-      },
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -1257,11 +1241,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-sonnet-4-6",
-      "ultrawork": {
-        "model": "anthropic/claude-opus-4-6",
-        "variant": "max",
-      },
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
@@ -1405,11 +1385,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "variant": "max",
     },
     "sisyphus": {
-      "model": "anthropic/claude-sonnet-4-6",
-      "ultrawork": {
-        "model": "anthropic/claude-opus-4-6",
-        "variant": "max",
-      },
+      "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
   },
