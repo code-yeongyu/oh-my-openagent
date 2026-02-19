@@ -91,7 +91,6 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode"], model: "kimi-k2.5-free" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
-      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
     ],
   },
 }
