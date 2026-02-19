@@ -7,6 +7,7 @@ import {
   resolveVariantForModel,
 } from "../shared/agent-variant"
 import { hasConnectedProvidersCache } from "../shared"
+import { setSessionModel } from "../shared/session-model-state"
 import {
   setSessionAgent,
 } from "../features/claude-code-session-state"
@@ -19,7 +20,12 @@ type FirstMessageVariantGate = {
 }
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
-type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
+export type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
+export type ChatMessageInput = {
+  sessionID: string
+  agent?: string
+  model?: { providerID: string; modelID: string }
+}
 type StartWorkHookOutput = { parts: Array<{ type: string; text?: string }> }
 
 function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
@@ -40,13 +46,13 @@ export function createChatMessageHandler(args: {
   firstMessageVariantGate: FirstMessageVariantGate
   hooks: CreatedHooks
 }): (
-  input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } },
+  input: ChatMessageInput,
   output: ChatMessageHandlerOutput
 ) => Promise<void> {
   const { ctx, pluginConfig, firstMessageVariantGate, hooks } = args
 
   return async (
-    input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } },
+    input: ChatMessageInput,
     output: ChatMessageHandlerOutput
   ): Promise<void> => {
     if (input.agent) {
@@ -77,6 +83,22 @@ export function createChatMessageHandler(args: {
       }
     }
 
+    await hooks.modelFallback?.["chat.message"]?.(input, output)
+    const modelOverride = output.message["model"]
+    if (
+      modelOverride &&
+      typeof modelOverride === "object" &&
+      "providerID" in modelOverride &&
+      "modelID" in modelOverride
+    ) {
+      const providerID = (modelOverride as { providerID?: string }).providerID
+      const modelID = (modelOverride as { modelID?: string }).modelID
+      if (typeof providerID === "string" && typeof modelID === "string") {
+        setSessionModel(input.sessionID, { providerID, modelID })
+      }
+    } else if (input.model) {
+      setSessionModel(input.sessionID, input.model)
+    }
     await hooks.stopContinuationGuard?.["chat.message"]?.(input)
     await hooks.keywordDetector?.["chat.message"]?.(input, output)
     await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)

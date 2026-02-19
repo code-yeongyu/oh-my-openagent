@@ -217,6 +217,27 @@ describe("TaskToastManager", () => {
       expect(call.body.message).toContain("(inherited from parent)")
     })
 
+    test("should display warning when model is runtime fallback", () => {
+      // given - runtime-fallback indicates a model swap mid-run
+      const task = {
+        id: "task_runtime",
+        description: "Task with runtime fallback model",
+        agent: "explore",
+        isBackground: false,
+        modelInfo: { model: "quotio/oswe-vscode-prime", type: "runtime-fallback" as const },
+      }
+
+      // when - addTask is called
+      toastManager.addTask(task)
+
+      // then - toast should show fallback warning
+      expect(mockClient.tui.showToast).toHaveBeenCalled()
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("[FALLBACK]")
+      expect(call.body.message).toContain("quotio/oswe-vscode-prime")
+      expect(call.body.message).toContain("(runtime fallback)")
+    })
+
     test("should not display model info when user-defined", () => {
       // given - a task with user-defined model
       const task = {
@@ -255,6 +276,34 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).not.toContain("[FALLBACK] Model:")
+    })
+  })
+
+  describe("updateTaskModelBySession", () => {
+    test("updates task model info and shows fallback toast", () => {
+      // given - task without model info
+      const task = {
+        id: "task_update",
+        sessionID: "ses_update_1",
+        description: "Task that will fallback",
+        agent: "explore",
+        isBackground: false,
+      }
+      toastManager.addTask(task)
+      mockClient.tui.showToast.mockClear()
+
+      // when - runtime fallback applied by session
+      toastManager.updateTaskModelBySession("ses_update_1", {
+        model: "nvidia/stepfun-ai/step-3.5-flash",
+        type: "runtime-fallback",
+      })
+
+      // then - new toast shows fallback model
+      expect(mockClient.tui.showToast).toHaveBeenCalled()
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("[FALLBACK]")
+      expect(call.body.message).toContain("nvidia/stepfun-ai/step-3.5-flash")
+      expect(call.body.message).toContain("(runtime fallback)")
     })
   })
 })

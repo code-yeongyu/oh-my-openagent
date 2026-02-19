@@ -18,25 +18,24 @@ interface WorkerOutputError {
   error: { message: string; stack?: string }
 }
 
-const { signal } = workerData as { signal: Int32Array }
+const { signalBuffer } = workerData as { signalBuffer: SharedArrayBuffer }
+const signal = new Int32Array(signalBuffer)
 
 if (!parentPort) {
   throw new Error("Worker must be run with parentPort")
 }
 
-parentPort.once("message", (data: { port: MessagePort }) => {
-  const { port } = data
+parentPort.once("message", (data: { port: MessagePort; input: WorkerInput }) => {
+  const { port, input } = data
 
-  port.on("message", async (input: WorkerInput) => {
+  void (async () => {
     try {
-      const results = await Promise.all(
-        input.dirs.map(dir => discoverSkillsInDirAsync(dir))
-      )
-      
+      const results = await Promise.all(input.dirs.map((dir) => discoverSkillsInDirAsync(dir)))
+
       const skills = results.flat()
-      
+
       const output: WorkerOutputSuccess = { ok: true, skills }
-      
+
       port.postMessage(output)
       Atomics.store(signal, 0, 1)
       Atomics.notify(signal, 0)
@@ -48,10 +47,10 @@ parentPort.once("message", (data: { port: MessagePort }) => {
           stack: error instanceof Error ? error.stack : undefined,
         },
       }
-      
+
       port.postMessage(output)
       Atomics.store(signal, 0, 1)
       Atomics.notify(signal, 0)
     }
-  })
+  })()
 })

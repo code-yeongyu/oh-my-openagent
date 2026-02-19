@@ -3,7 +3,7 @@ import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
-import { subagentSessions } from "../../features/claude-code-session-state"
+import { subagentSessions, syncSubagentSessions, setSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
@@ -40,6 +40,8 @@ export async function executeSyncTask(
     const sessionID = createSessionResult.sessionID
     syncSessionID = sessionID
     subagentSessions.add(sessionID)
+    syncSubagentSessions.add(sessionID)
+    setSessionAgent(sessionID, agentToUse)
 
     if (onSyncSessionCreated) {
       log("[task] Invoking onSyncSessionCreated callback", { sessionID, parentID: parentContext.sessionID })
@@ -59,6 +61,7 @@ export async function executeSyncTask(
     if (toastManager) {
       toastManager.addTask({
         id: taskId,
+        sessionID,
         description: args.description,
         agent: agentToUse,
         isBackground: false,
@@ -145,6 +148,7 @@ session_id: ${sessionID}
   } finally {
     if (syncSessionID) {
       subagentSessions.delete(syncSessionID)
+      syncSubagentSessions.delete(syncSessionID)
     }
   }
 }
