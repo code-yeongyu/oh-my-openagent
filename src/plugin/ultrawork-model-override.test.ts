@@ -131,7 +131,7 @@ describe("resolveUltraworkOverride", () => {
     expect(result).toBeNull()
   })
 
-  test("should return null when ultrawork.model is not set", () => {
+  test("should resolve variant-only override when ultrawork.model is not set", () => {
     //#given
     const config = createConfig("sisyphus", { variant: "max" })
     const output = createOutput("ultrawork do something")
@@ -140,7 +140,7 @@ describe("resolveUltraworkOverride", () => {
     const result = resolveUltraworkOverride(config, "sisyphus", output)
 
     //#then
-    expect(result).toBeNull()
+    expect(result).toEqual({ variant: "max" })
   })
 
   test("should handle model string with multiple slashes", () => {
@@ -292,6 +292,22 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     expect(output.message.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
     expect(output.message["variant"]).toBe("max")
     expect(output.message["thinking"]).toBe("max")
+    expect(dbOverrideSpy).not.toHaveBeenCalled()
+  })
+
+  test("should apply variant-only override when no message ID", () => {
+    //#given
+    const config = createConfig("sisyphus", { variant: "high" })
+    const output = createOutput("ultrawork do something")
+    const tui = createMockTui()
+
+    //#when
+    applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui)
+
+    //#then
+    expect(output.message.model).toBeUndefined()
+    expect(output.message["variant"]).toBe("high")
+    expect(output.message["thinking"]).toBe("high")
     expect(dbOverrideSpy).not.toHaveBeenCalled()
   })
 
