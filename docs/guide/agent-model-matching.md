@@ -12,44 +12,58 @@ Each oh-my-opencode agent has a **dedicated system prompt** optimized for a spec
 
 ---
 
+## Design Philosophy: Intelligence Where It Matters, Speed Everywhere Else
+
+The model catalog follows a clear hierarchy:
+
+1. **Core agents get premium models** — Sisyphus (Claude Opus), Hephaestus (GPT-5.3-codex), Prometheus (Opus/GPT-5.2). These agents handle complex multi-step reasoning where model quality directly impacts output.
+
+2. **Utility agents get fast, free-tier models** — Explore (Grok Code Fast → MiniMax M2.5 Free), Librarian (MiniMax M2.5 Free → Gemini Flash → Big Pickle). These agents do search, grep, and doc retrieval where speed matters more than deep reasoning.
+
+3. **Orchestrator agents get balanced models** — Atlas (Kimi K2.5 → Sonnet), Metis (Opus → Kimi K2.5). These need good instruction-following but don't need maximum intelligence.
+
+4. **Free-tier models are first-class citizens** — MiniMax M2.5 Free, Big Pickle, GPT-5-Nano, and Kimi K2.5 Free appear throughout fallback chains. This means oh-my-opencode works well even with OpenCode Zen (free) as the only provider.
+
+---
+
 ## Agent-Model Map (Source of Truth)
 
 This table reflects the actual fallback chains in `src/shared/model-requirements.ts`. The first available model in the chain is used.
 
 ### Core Agents
 
-| Agent | Role | Primary Model Family | Fallback Chain | Has GPT Prompt? |
-|-------|------|---------------------|----------------|-----------------|
-| **Sisyphus** | Main ultraworker | Claude | Opus → Kimi K2.5 → GLM 5 → Big Pickle | No — **never use GPT** |
-| **Hephaestus** | Deep autonomous worker | GPT (only) | GPT-5.3-codex (medium) | N/A (GPT-native) |
-| **Prometheus** | Strategic planner | Claude (default), GPT (auto-detected) | Opus → GPT-5.2 → Kimi K2.5 → Gemini 3 Pro | **Yes** — `src/agents/prometheus/gpt.ts` |
-| **Atlas** | Todo orchestrator | Kimi K2.5 (default), GPT (auto-detected) | Kimi K2.5 → Sonnet → GPT-5.2 | **Yes** — `src/agents/atlas/gpt.ts` |
-| **Oracle** | Architecture/debugging | GPT | GPT-5.2 → Gemini 3 Pro → Opus | No |
-| **Metis** | Plan review consultant | Claude | Opus → Kimi K2.5 → GPT-5.2 → Gemini 3 Pro | No |
-| **Momus** | High-accuracy reviewer | GPT | GPT-5.2 → Opus → Gemini 3 Pro | No |
+| Agent | Role | Fallback Chain (in order) | Has GPT Prompt? |
+|-------|------|---------------------------|-----------------|
+| **Sisyphus** | Main ultraworker | Opus (max) → Kimi K2.5 → Kimi K2.5 Free → GLM 5 → Big Pickle | No — **never use GPT** |
+| **Hephaestus** | Deep autonomous worker | GPT-5.3-codex (medium) — no fallback | N/A (GPT-native) |
+| **Prometheus** | Strategic planner | Opus (max) → **GPT-5.2 (high)** → Kimi K2.5 → Kimi K2.5 Free → Gemini 3 Pro | **Yes** — auto-switches |
+| **Atlas** | Todo orchestrator | **Kimi K2.5** → Kimi K2.5 Free → Sonnet → GPT-5.2 | **Yes** — auto-switches |
+| **Oracle** | Architecture/debugging | GPT-5.2 (high) → Gemini 3 Pro (high) → Opus (max) | No |
+| **Metis** | Plan review consultant | Opus (max) → Kimi K2.5 → Kimi K2.5 Free → GPT-5.2 (high) → Gemini 3 Pro (high) | No |
+| **Momus** | High-accuracy reviewer | GPT-5.2 (medium) → Opus (max) → Gemini 3 Pro (high) | No |
 
 ### Utility Agents
 
-| Agent | Role | Primary Model Family | Fallback Chain |
-|-------|------|---------------------|----------------|
-| **Explore** | Fast codebase grep | Grok/lightweight | Grok Code Fast 1 → MiniMax M2.5 → Haiku → GPT-5-nano |
-| **Librarian** | Docs/code search | Lightweight | MiniMax M2.5 → Gemini 3 Flash → Big Pickle |
-| **Multimodal Looker** | Vision/screenshots | Kimi/multimodal | Kimi K2.5 → Gemini 3 Flash → GPT-5.2 → GLM-4.6v |
+| Agent | Role | Fallback Chain (in order) | Design Rationale |
+|-------|------|---------------------------|------------------|
+| **Explore** | Fast codebase grep | Grok Code Fast 1 → **MiniMax M2.5 Free** → Haiku → GPT-5-Nano | Speed over intelligence. Grok Code is fastest for grep-style work. MiniMax Free as cheap fallback. |
+| **Librarian** | Docs/code search | **MiniMax M2.5 Free** → Gemini 3 Flash → Big Pickle | Entirely free-tier chain. Doc retrieval doesn't need Opus-level reasoning. |
+| **Multimodal Looker** | Vision/screenshots | **Kimi K2.5** → Kimi K2.5 Free → Gemini 3 Flash → GPT-5.2 → GLM-4.6v | Kimi excels at multimodal. Gemini Flash as lightweight vision fallback. |
 
 ### Task Categories
 
 Categories are used for `background_task` and `delegate_task` dispatching:
 
-| Category | Purpose | Primary Model | Notes |
-|----------|---------|---------------|-------|
-| `visual-engineering` | Frontend/UI work | Gemini 3 Pro | Gemini excels at visual tasks |
-| `ultrabrain` | Maximum intelligence | GPT-5.3-codex (xhigh) | Highest reasoning variant |
-| `deep` | Deep coding | GPT-5.3-codex (medium) | Requires GPT availability |
-| `artistry` | Creative/design | Gemini 3 Pro | Requires Gemini availability |
-| `quick` | Fast simple tasks | Claude Haiku | Cheapest, fastest |
-| `unspecified-high` | General high-quality | Claude Opus | Default for complex tasks |
-| `unspecified-low` | General standard | Claude Sonnet | Default for standard tasks |
-| `writing` | Text/docs | Kimi K2.5 | Best prose quality |
+| Category | Purpose | Fallback Chain | Notes |
+|----------|---------|----------------|-------|
+| `visual-engineering` | Frontend/UI work | Gemini 3 Pro (high) → GLM 5 → Opus (max) → Kimi K2.5 | Gemini excels at visual tasks |
+| `ultrabrain` | Maximum intelligence | GPT-5.3-codex (xhigh) → Gemini 3 Pro (high) → Opus (max) | Highest reasoning variant |
+| `deep` | Deep coding | GPT-5.3-codex (medium) → Opus (max) → Gemini 3 Pro (high) | Requires GPT availability |
+| `artistry` | Creative/design | Gemini 3 Pro (high) → Opus (max) → GPT-5.2 | Requires Gemini availability |
+| `quick` | Fast simple tasks | Haiku → Gemini 3 Flash → GPT-5-Nano | Cheapest, fastest |
+| `unspecified-high` | General high-quality | Opus (max) → GPT-5.2 (high) → Gemini 3 Pro | Default for complex tasks |
+| `unspecified-low` | General standard | Sonnet → GPT-5.3-codex (medium) → Gemini 3 Flash | Default for standard tasks |
+| `writing` | Text/docs | **Kimi K2.5** → Gemini 3 Flash → Sonnet | Kimi produces best prose quality |
 
 ---
 
@@ -129,6 +143,8 @@ These swaps are safe because they stay within the same prompt family:
 | **Prometheus** | Claude Opus | Claude Sonnet (Claude prompt) OR GPT-5.2 (auto-switches to GPT prompt) |
 | **Atlas** | Kimi K2.5 | Claude Sonnet (Claude prompt) OR GPT-5.2 (auto-switches to GPT prompt) |
 | **Oracle** | GPT-5.2 | Gemini 3 Pro, Claude Opus |
+| **Librarian** | MiniMax M2.5 Free | Gemini 3 Flash, Big Pickle, any lightweight model |
+| **Explore** | Grok Code Fast 1 | MiniMax M2.5 Free, Haiku, GPT-5-Nano — speed is key |
 
 ### Dangerous Substitutions (cross-family without prompt support)
 
@@ -137,6 +153,7 @@ These swaps are safe because they stay within the same prompt family:
 | **Sisyphus** → GPT | No GPT-optimized prompt exists. Sisyphus is deeply tuned for Claude-style reasoning. Performance drops dramatically. |
 | **Hephaestus** → Claude | Hephaestus is purpose-built for GPT's Codex capabilities. Claude cannot replicate this. |
 | **Explore** → Opus | Massive overkill and cost waste. Explore needs speed, not intelligence. |
+| **Librarian** → Opus | Same — doc retrieval is a search task, not a reasoning task. Opus is wasted here. |
 
 ### Explaining to Users
 
@@ -146,8 +163,10 @@ When a user asks about model configuration, explain:
 2. **Each agent has a "home" model family** — Sisyphus is Claude-native, Hephaestus is GPT-native
 3. **Some agents auto-adapt** — Prometheus and Atlas detect GPT models and switch to optimized prompts
 4. **Cross-family overrides are risky** — unless the agent has a dedicated prompt for that family
-5. **Cost optimization is valid** — swapping Opus → Sonnet or Kimi K2.5 for Sisyphus is fine and saves money
-6. **Point to this guide** for the full fallback chains and rationale
+5. **Cost optimization is valid** — swapping Opus → Sonnet or Kimi K2.5 for Sisyphus saves money with acceptable quality trade-off
+6. **Utility agents are intentionally cheap** — Librarian and Explore use free-tier models by design. Don't "upgrade" them to Opus thinking it'll help — it just wastes tokens on simple search tasks
+7. **Kimi K2.5 is a versatile workhorse** — it appears as primary for Atlas (orchestration), Multimodal Looker (vision), and writing tasks. It's consistently good across these roles without being expensive.
+8. **Point to this guide** for the full fallback chains and rationale
 
 ---
 
@@ -161,6 +180,11 @@ Native (anthropic/, openai/, google/) > Kimi for Coding > GitHub Copilot > OpenC
 
 Each fallback chain entry specifies which providers can serve that model. The system picks the first entry where at least one provider is connected.
 
+**Notable provider mappings:**
+- `venice` — alternative provider for Grok Code Fast 1 (Explore agent)
+- `opencode` — serves free-tier models (Kimi K2.5 Free, MiniMax M2.5 Free, Big Pickle, GPT-5-Nano) and premium models via OpenCode Zen
+- `zai-coding-plan` — GLM 5 and GLM-4.6v models
+
 ---
 
 ## Quick Decision Tree for Users
@@ -172,8 +196,9 @@ What subscriptions do you have?
 ├── OpenAI/ChatGPT → Hephaestus unlocked. Oracle/Momus use GPT. Prometheus auto-switches.
 ├── Both Claude + OpenAI → Full agent roster. Best experience.
 ├── Gemini only → Visual-engineering category excels. Other agents use Gemini as fallback.
+├── Kimi for Coding → Atlas, Multimodal Looker, writing tasks work great. Sisyphus usable.
 ├── GitHub Copilot only → Works as fallback provider for all model families.
-├── OpenCode Zen only → Free-tier access to multiple models. Functional but rate-limited.
+├── OpenCode Zen only → Free-tier access. Librarian/Explore work perfectly. Core agents functional but rate-limited.
 └── No subscription → Limited functionality. Consider OpenCode Zen (free).
 
 For each user scenario, the installer (`bunx oh-my-opencode install`) auto-configures the optimal assignment.
