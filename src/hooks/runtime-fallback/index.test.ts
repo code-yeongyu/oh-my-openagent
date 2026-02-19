@@ -2327,4 +2327,184 @@ describe("runtime-fallback", () => {
       expect(timeoutLog).toBeUndefined()
     })
   })
+
+  describe("session.status retry handling", () => {
+    test("should log provider retry events", async () => {
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput(),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "anthropic/claude-opus-4-6",
+          ]),
+        }
+      )
+
+      const sessionID = "test-retry-status"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.status",
+          properties: {
+            sessionID,
+            status: { type: "retry", attempt: 1, message: "Rate limited, retrying", next: 5000 },
+          },
+        },
+      })
+
+      const retryLog = logCalls.find((c) => c.msg.includes("Provider retry detected"))
+      expect(retryLog).toBeDefined()
+      expect((retryLog?.data as Record<string, unknown>)?.attempt).toBe(1)
+    })
+
+    test("should show toast on retry when notify_on_fallback is enabled", async () => {
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput(),
+        {
+          config: createMockConfig({ notify_on_fallback: true }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "anthropic/claude-opus-4-6",
+          ]),
+        }
+      )
+
+      const sessionID = "test-retry-toast"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.status",
+          properties: {
+            sessionID,
+            status: { type: "retry", attempt: 2, message: "Server overloaded", next: 3000 },
+          },
+        },
+      })
+
+      const retryToast = toastCalls.find((t) => t.title === "Provider Retrying")
+      expect(retryToast).toBeDefined()
+      expect(retryToast?.message).toContain("Retry attempt 2")
+      expect(retryToast?.message).toContain("Server overloaded")
+      expect(retryToast?.variant).toBe("info")
+    })
+
+    test("should ignore non-retry session.status events", async () => {
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput(),
+        { config: createMockConfig() }
+      )
+
+      await hook.event({
+        event: {
+          type: "session.status",
+          properties: {
+            sessionID: "test-busy",
+            status: { type: "busy" },
+          },
+        },
+      })
+
+      const retryLog = logCalls.find((c) => c.msg.includes("Provider retry detected"))
+      expect(retryLog).toBeUndefined()
+    })
+  })
+
+  describe("on-demand state creation in session.created", () => {
+    test("should create state when session.created has model", async () => {
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput(),
+        {
+          config: createMockConfig(),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "anthropic/claude-opus-4-6",
+          ]),
+        }
+      )
+
+      const sessionID = "test-created-with-model"
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      const createdLog = logCalls.find((c) => c.msg.includes("Session created with model"))
+      expect(createdLog).toBeDefined()
+    })
+
+    test("should log when session.created lacks model info", async () => {
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput(),
+        {
+          config: createMockConfig(),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "anthropic/claude-opus-4-6",
+          ]),
+        }
+      )
+
+      const sessionID = "test-created-no-model"
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID } },
+        },
+      })
+
+      const onDemandLog = logCalls.find((c) => c.msg.includes("state will be created on-demand"))
+      expect(onDemandLog).toBeDefined()
+    })
+  })
+
+  describe("enhanced toast notifications", () => {
+    test("should show attempt count in fallback toast", async () => {
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput(),
+        {
+          config: createMockConfig({ notify_on_fallback: true }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback([
+            "anthropic/claude-opus-4-6",
+            "openai/gpt-5.2",
+          ]),
+        }
+      )
+
+      const sessionID = "test-attempt-toast"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429 } },
+        },
+      })
+
+      const fallbackToast = toastCalls.find((t) => t.title === "Model Fallback")
+      expect(fallbackToast).toBeDefined()
+      expect(fallbackToast?.message).toContain("attempt 1 of 2")
+    })
+  })
 })
