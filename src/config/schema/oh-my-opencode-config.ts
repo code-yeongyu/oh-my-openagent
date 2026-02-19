@@ -27,7 +27,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   /** Default agent name for `oh-my-opencode run` (env: OPENCODE_DEFAULT_AGENT) */
   default_run_agent: z.string().optional(),
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
-  disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
+  disabled_agents: z.array(z.string()).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
   disabled_hooks: z.array(z.string()).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
