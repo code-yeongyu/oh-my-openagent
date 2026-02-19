@@ -38,9 +38,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
    librarian: {
      fallbackChain: [
-       { providers: ["zai-coding-plan"], model: "glm-5" },
+       { providers: ["opencode"], model: "minimax-m2.5-free" },
+       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },
        { providers: ["opencode"], model: "big-pickle" },
-       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
      ],
    },
   explore: {
