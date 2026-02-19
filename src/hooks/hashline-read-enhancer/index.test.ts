@@ -71,6 +71,48 @@ describe("createHashlineReadEnhancerHook", () => {
       expect(output.output).toContain("|")
     })
 
+
+    it("should process 'write' tool (lowercase)", async () => {
+      //#given
+      const hook = createHashlineReadEnhancerHook(mockCtx, createMockConfig(true))
+      const input = { tool: "write", sessionID, callID: "call-1" }
+      const output = { title: "Write", output: "1: hello\n2: world", metadata: {} }
+
+      //#when
+      await hook["tool.execute.after"](input, output)
+
+      //#then
+      expect(output.output).toContain("|")
+    })
+
+    it("should process 'Write' tool (mixed case)", async () => {
+      //#given
+      const hook = createHashlineReadEnhancerHook(mockCtx, createMockConfig(true))
+      const input = { tool: "Write", sessionID, callID: "call-1" }
+      const output = { title: "Write", output: "1: hello\n2: world", metadata: {} }
+
+      //#when
+      await hook["tool.execute.after"](input, output)
+
+      //#then
+      expect(output.output).toContain("|")
+    })
+
+    it("should transform write tool output to LINE:HASH|content format", async () => {
+      //#given
+      const hook = createHashlineReadEnhancerHook(mockCtx, createMockConfig(true))
+      const input = { tool: "write", sessionID, callID: "call-1" }
+      const output = { title: "Write", output: "1: const x = 1\n2: const y = 2", metadata: {} }
+
+      //#when
+      await hook["tool.execute.after"](input, output)
+
+      //#then
+      const lines = output.output.split("\n")
+      expect(lines[0]).toMatch(/^1:[a-f0-9]{2}\|const x = 1$/)
+      expect(lines[1]).toMatch(/^2:[a-f0-9]{2}\|const y = 2$/)
+    })
+
     it("should skip non-read tools", async () => {
       //#given
       const hook = createHashlineReadEnhancerHook(mockCtx, createMockConfig(true))
@@ -209,22 +251,20 @@ describe("createHashlineReadEnhancerHook", () => {
       const hook = createHashlineReadEnhancerHook(mockCtx, createMockConfig(true))
       const input = { tool: "read", sessionID, callID: "call-1" }
       const fileLines = ["import { foo } from './bar'", "  const x = 1", "", "export default x"]
-      const readOutput = fileLines.map((line, i) => `${i + 1}: ${line}`).join("
-")
+      const readOutput = fileLines.map((line, i) => `${i + 1}: ${line}`).join("\n")
       const output = { title: "Read", output: readOutput, metadata: {} }
 
       //#when
       await hook["tool.execute.after"](input, output)
 
       //#then - each hash in Read output must satisfy validateLineRef
-      const transformedLines = output.output.split("
-")
+      const transformedLines = output.output.split("\n")
       for (let i = 0; i < fileLines.length; i++) {
         const lineNum = i + 1
         const expectedHash = computeLineHash(lineNum, fileLines[i])
         expect(transformedLines[i]).toBe(`${lineNum}:${expectedHash}|${fileLines[i]}`)
         // Must not throw when used with validateLineRef
-        expect(() => validateLineRef({ line: lineNum, hash: expectedHash }, fileLines)).not.toThrow()
+        expect(() => validateLineRef(fileLines, `${lineNum}:${expectedHash}`)).not.toThrow()
       }
     })
   })
@@ -236,11 +276,7 @@ describe("createHashlineReadEnhancerHook", () => {
       const input = { tool: "read", sessionID, callID: "call-1" }
       const output = {
         title: "Read",
-        output: "1: const x = 1
-2: const y = 2
-[Project README]
-1: First item
-2: Second item",
+        output: ["1: const x = 1", "2: const y = 2", "[Project README]", "1: First item", "2: Second item"].join("\n"),
         metadata: {},
       }
 
@@ -248,8 +284,7 @@ describe("createHashlineReadEnhancerHook", () => {
       await hook["tool.execute.after"](input, output)
 
       //#then - only original file content gets hashified
-      const lines = output.output.split("
-")
+      const lines = output.output.split("\n")
       expect(lines[0]).toMatch(/^1:[a-f0-9]{2}\|const x = 1$/)
       expect(lines[1]).toMatch(/^2:[a-f0-9]{2}\|const y = 2$/)
       expect(lines[2]).toBe("[Project README]")
@@ -263,10 +298,7 @@ describe("createHashlineReadEnhancerHook", () => {
       const input = { tool: "read", sessionID, callID: "call-1" }
       const output = {
         title: "Read",
-        output: "1: const x = 1
-2: const y = 2
-
-(File has more lines. Use 'offset' parameter to read beyond line 2)",
+        output: ["1: const x = 1", "2: const y = 2", "", "(File has more lines. Use 'offset' parameter to read beyond line 2)"].join("\n"),
         metadata: {},
       }
 
@@ -274,8 +306,7 @@ describe("createHashlineReadEnhancerHook", () => {
       await hook["tool.execute.after"](input, output)
 
       //#then - footer passes through unchanged
-      const lines = output.output.split("
-")
+      const lines = output.output.split("\n")
       expect(lines[0]).toMatch(/^1:[a-f0-9]{2}\|const x = 1$/)
       expect(lines[1]).toMatch(/^2:[a-f0-9]{2}\|const y = 2$/)
       expect(lines[2]).toBe("")
@@ -288,13 +319,7 @@ describe("createHashlineReadEnhancerHook", () => {
       const input = { tool: "read", sessionID, callID: "call-1" }
       const output = {
         title: "Read",
-        output: "1: export function hello() {
-2:   return 42
-3: }
-
-[System Reminder]
-1: Do not forget X
-2: Always do Y",
+        output: ["1: export function hello() {", "2:   return 42", "3: }", "", "[System Reminder]", "1: Do not forget X", "2: Always do Y"].join("\n"),
         metadata: {},
       }
 
@@ -302,8 +327,7 @@ describe("createHashlineReadEnhancerHook", () => {
       await hook["tool.execute.after"](input, output)
 
       //#then
-      const lines = output.output.split("
-")
+      const lines = output.output.split("\n")
       expect(lines[0]).toMatch(/^1:[a-f0-9]{2}\|export function hello\(\) \{$/)
       expect(lines[1]).toMatch(/^2:[a-f0-9]{2}\|  return 42$/)
       expect(lines[2]).toMatch(/^3:[a-f0-9]{2}\|}$/)
