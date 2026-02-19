@@ -75,13 +75,13 @@ export function createToolGuardHooks(args: {
       })
     } else {
       directoryAgentsInjector = safeHook("directory-agents-injector", () =>
-        createDirectoryAgentsInjectorHook(ctx, modelCacheState))
+        wrapHookWithCadence("directory-agents-injector", createDirectoryAgentsInjectorHook(ctx, modelCacheState), cadenceTracker))
     }
   }
 
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
     ? safeHook("directory-readme-injector", () =>
-        createDirectoryReadmeInjectorHook(ctx, modelCacheState))
+        wrapHookWithCadence("directory-readme-injector", createDirectoryReadmeInjectorHook(ctx, modelCacheState), cadenceTracker))
     : null
 
   const emptyTaskResponseDetector = isHookEnabled("empty-task-response-detector")

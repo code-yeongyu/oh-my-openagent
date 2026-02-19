@@ -13,6 +13,7 @@ import {
 } from "../../hooks"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { createUnstableAgentBabysitter } from "../unstable-agent-babysitter"
+import { wrapHookWithCadence } from "../wrap-hook-with-cadence"
 
 export type ContinuationHooks = {
   stopContinuationGuard: ReturnType<typeof createStopContinuationGuardHook> | null
@@ -108,13 +109,13 @@ export function createContinuationHooks(args: {
 
   const atlasHook = isHookEnabled("atlas")
     ? safeHook("atlas", () =>
-        createAtlasHook(ctx, {
+        wrapHookWithCadence("atlas", createAtlasHook(ctx, {
           directory: ctx.directory,
           backgroundManager,
           isContinuationStopped: (sessionID: string) =>
             stopContinuationGuard?.isStopped(sessionID) ?? false,
           agentOverrides: pluginConfig.agents,
-        }))
+        }), cadenceTracker))
     : null
 
   return {

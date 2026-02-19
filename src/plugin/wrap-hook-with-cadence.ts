@@ -30,7 +30,7 @@ interface EventInput {
   }
 }
 
-export function wrapHookWithCadence<T extends HookHandlers>(
+export function wrapHookWithCadence<T extends Record<string, unknown>>(
   hookName: HookName,
   hook: T,
   cadenceTracker: HookCadenceTracker
@@ -38,6 +38,11 @@ export function wrapHookWithCadence<T extends HookHandlers>(
   const wrappedHook: any = {}
 
   for (const [handlerName, handler] of Object.entries(hook)) {
+    // Skip non-function properties (copy them directly later)
+    if (typeof handler !== "function") {
+      wrappedHook[handlerName] = handler
+      continue
+    }
     if (handlerName === "event") {
       // Special handling for event handlers
       wrappedHook[handlerName] = async (input: EventInput) => {
@@ -64,9 +69,9 @@ export function wrapHookWithCadence<T extends HookHandlers>(
           return handler(input)
         }
 
-        // For other events, check cadence
-        // Note: Most events don't have sessionID, so we can't gate them
-        // This is acceptable as most cadence-controlled hooks use tool.execute.after
+        // Event handlers are not cadence-gated: most events lack sessionID,
+        // and events often represent state transitions that must not be skipped.
+        // Cadence gating applies only to tool.execute.before/after handlers.
         return handler(input)
       }
     } else if (handlerName === "tool.execute.after" || handlerName === "tool.execute.before") {
@@ -84,6 +89,13 @@ export function wrapHookWithCadence<T extends HookHandlers>(
     } else {
       // Pass through other handlers unchanged
       wrappedHook[handlerName] = handler
+    }
+  }
+
+  // Copy any non-handler properties (methods, state) from the original hook
+  for (const [key, value] of Object.entries(hook)) {
+    if (!(key in wrappedHook)) {
+      wrappedHook[key] = value
     }
   }
 

@@ -1,19 +1,20 @@
 import { describe, expect, test } from "bun:test"
 import { HookCadenceTracker } from "./hook-cadence-tracker"
+import { resolveHookCadence, CADENCE_GROUPS, CADENCE_DEFAULTS } from "./hook-cadence-groups"
 
 describe("HookCadenceTracker", () => {
-  test("default cadence of 1 fires every turn", () => {
+  test("hook not in any group fires every turn (cadence 1)", () => {
     const tracker = new HookCadenceTracker()
     const sessionID = "test-session"
-    const hookName = "agent-usage-reminder"
+    const hookName = "think-mode" // Not in any group
 
     expect(tracker.shouldFire(hookName, sessionID)).toBe(true)
     expect(tracker.shouldFire(hookName, sessionID)).toBe(true)
     expect(tracker.shouldFire(hookName, sessionID)).toBe(true)
   })
 
-  test("cadence of 3 fires on turns 1, 4, 7, 10", () => {
-    const tracker = new HookCadenceTracker({ "agent-usage-reminder": 3 })
+  test("grouped cadence: tool_guidance group with cadence 3", () => {
+    const tracker = new HookCadenceTracker({ tool_guidance: 3 })
     const sessionID = "test-session"
     const hookName = "agent-usage-reminder"
 
@@ -37,8 +38,8 @@ describe("HookCadenceTracker", () => {
     expect(tracker.shouldFire(hookName, sessionID)).toBe(true)
   })
 
-  test("cadence of 5 fires on turns 1, 6, 11", () => {
-    const tracker = new HookCadenceTracker({ "rules-injector": 5 })
+  test("grouped cadence: context_injection group with cadence 5", () => {
+    const tracker = new HookCadenceTracker({ context_injection: 5 })
     const sessionID = "test-session"
     const hookName = "rules-injector"
 
@@ -62,19 +63,19 @@ describe("HookCadenceTracker", () => {
     expect(tracker.shouldFire(hookName, sessionID)).toBe(true)
   })
 
-  test("different hooks have independent counters", () => {
+  test("different groups have independent cadences", () => {
     const tracker = new HookCadenceTracker({
-      "agent-usage-reminder": 2,
-      "rules-injector": 3,
+      tool_guidance: 2,
+      context_injection: 3,
     })
     const sessionID = "test-session"
 
-    // Hook 1 with cadence 2: fires on 1, 3, 5
+    // tool_guidance hook with cadence 2: fires on 1, 3, 5
     expect(tracker.shouldFire("agent-usage-reminder", sessionID)).toBe(true)
     expect(tracker.shouldFire("agent-usage-reminder", sessionID)).toBe(false)
     expect(tracker.shouldFire("agent-usage-reminder", sessionID)).toBe(true)
 
-    // Hook 2 with cadence 3: fires on 1, 4, 7
+    // context_injection hook with cadence 3: fires on 1, 4, 7
     expect(tracker.shouldFire("rules-injector", sessionID)).toBe(true)
     expect(tracker.shouldFire("rules-injector", sessionID)).toBe(false)
     expect(tracker.shouldFire("rules-injector", sessionID)).toBe(false)
@@ -82,7 +83,7 @@ describe("HookCadenceTracker", () => {
   })
 
   test("different sessions have independent counters", () => {
-    const tracker = new HookCadenceTracker({ "agent-usage-reminder": 2 })
+    const tracker = new HookCadenceTracker({ tool_guidance: 2 })
     const hookName = "agent-usage-reminder"
 
     // Session 1
@@ -98,7 +99,7 @@ describe("HookCadenceTracker", () => {
   })
 
   test("cleanupSession removes session counters", () => {
-    const tracker = new HookCadenceTracker({ "agent-usage-reminder": 2 })
+    const tracker = new HookCadenceTracker({ tool_guidance: 2 })
     const sessionID = "test-session"
     const hookName = "agent-usage-reminder"
 
@@ -116,31 +117,75 @@ describe("HookCadenceTracker", () => {
     expect(tracker.getTurnCount(hookName, sessionID)).toBe(1)
   })
 
-  test("hook without configured cadence defaults to 1", () => {
-    const tracker = new HookCadenceTracker({ "agent-usage-reminder": 3 })
+  test("hook without configured group defaults to group default", () => {
+    const tracker = new HookCadenceTracker({ tool_guidance: 5 })
     const sessionID = "test-session"
-    const hookName = "rules-injector" // Not in config
+    const hookName = "rules-injector" // context_injection group, not configured
 
-    // Should fire every turn (default cadence = 1)
+    // Should use CADENCE_DEFAULTS.context_injection = 3
+    expect(tracker.shouldFire(hookName, sessionID)).toBe(true) // Turn 1
+    expect(tracker.shouldFire(hookName, sessionID)).toBe(false) // Turn 2
+    expect(tracker.shouldFire(hookName, sessionID)).toBe(false) // Turn 3
+    expect(tracker.shouldFire(hookName, sessionID)).toBe(true) // Turn 4
+  })
+
+  test("hook not in any group always fires (cadence 1)", () => {
+    const tracker = new HookCadenceTracker({ tool_guidance: 3 })
+    const sessionID = "test-session"
+    const hookName = "think-mode" // Not in any group
+
+    // Should fire every turn
     expect(tracker.shouldFire(hookName, sessionID)).toBe(true)
     expect(tracker.shouldFire(hookName, sessionID)).toBe(true)
     expect(tracker.shouldFire(hookName, sessionID)).toBe(true)
   })
 
-  test("empty config behaves like no cadence control", () => {
+  test("empty config uses group defaults", () => {
     const tracker = new HookCadenceTracker({})
     const sessionID = "test-session"
 
+    // tool_guidance default = 2
     expect(tracker.shouldFire("agent-usage-reminder", sessionID)).toBe(true)
-    expect(tracker.shouldFire("rules-injector", sessionID)).toBe(true)
-    expect(tracker.shouldFire("think-mode", sessionID)).toBe(true)
+    expect(tracker.shouldFire("agent-usage-reminder", sessionID)).toBe(false)
+    expect(tracker.shouldFire("agent-usage-reminder", sessionID)).toBe(true)
   })
 
-  test("undefined config behaves like no cadence control", () => {
+  test("undefined config uses group defaults", () => {
     const tracker = new HookCadenceTracker(undefined)
     const sessionID = "test-session"
 
-    expect(tracker.shouldFire("agent-usage-reminder", sessionID)).toBe(true)
+    // context_injection default = 3
     expect(tracker.shouldFire("rules-injector", sessionID)).toBe(true)
+    expect(tracker.shouldFire("rules-injector", sessionID)).toBe(false)
+    expect(tracker.shouldFire("rules-injector", sessionID)).toBe(false)
+    expect(tracker.shouldFire("rules-injector", sessionID)).toBe(true)
+  })
+})
+
+describe("resolveHookCadence", () => {
+  test("returns configured cadence for hook in group", () => {
+    expect(resolveHookCadence("agent-usage-reminder", { tool_guidance: 5 })).toBe(5)
+    expect(resolveHookCadence("rules-injector", { context_injection: 10 })).toBe(10)
+  })
+
+  test("returns group default when group not configured", () => {
+    expect(resolveHookCadence("agent-usage-reminder", {})).toBe(CADENCE_DEFAULTS.tool_guidance)
+    expect(resolveHookCadence("rules-injector", {})).toBe(CADENCE_DEFAULTS.context_injection)
+    expect(resolveHookCadence("anthropic-effort", {})).toBe(CADENCE_DEFAULTS.reminders)
+  })
+
+  test("returns 1 for hook not in any group", () => {
+    expect(resolveHookCadence("think-mode", { tool_guidance: 5 })).toBe(1)
+    expect(resolveHookCadence("comment-checker", {})).toBe(1)
+  })
+
+  test("all hooks in CADENCE_GROUPS are valid HookNames", () => {
+    // This is a compile-time check - if it compiles, the test passes
+    // TypeScript will error if any hook name is invalid
+    for (const group of Object.values(CADENCE_GROUPS)) {
+      for (const hookName of group) {
+        expect(typeof hookName).toBe("string")
+      }
+    }
   })
 })

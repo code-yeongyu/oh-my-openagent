@@ -1,8 +1,10 @@
 {
   "$schema": "../assets/oh-my-opencode.schema.json",
   "hook_cadence": {
-    "agent-usage-reminder": 3,
-    "rules-injector": 5,
-    "category-skill-reminder": 4
+    "tool_guidance": 2,
+    "context_injection": 3,
+    "reminders": 3,
+    "continuation": 2,
+    "error_recovery": 1
   }
 }

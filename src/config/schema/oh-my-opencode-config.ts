@@ -30,8 +30,19 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_agents: z.array(z.string()).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
   disabled_hooks: z.array(z.string()).optional(),
-  /** Per-hook cadence control: hook fires every N qualifying events (default: 1 = every event) */
-  hook_cadence: z.record(z.string(), z.number().int().positive()).optional(),
+  /** Grouped cadence control: configure firing frequency for logical hook groups */
+  hook_cadence: z.object({
+    /** How to use delegation tools (agent-usage-reminder, category-skill-reminder, atlas). Default: 2 */
+    tool_guidance: z.number().int().positive().default(2).optional(),
+    /** Project rules, directory READMEs, agents, start-work prompts. Default: 3 */
+    context_injection: z.number().int().positive().default(3).optional(),
+    /** Task reminders, notepad reminders, anthropic-effort. Default: 3 */
+    reminders: z.number().int().positive().default(3).optional(),
+    /** Todo continuation enforcer. Default: 2 */
+    continuation: z.number().int().positive().default(2).optional(),
+    /** Error recovery hooks (edit, JSON, delegate-task, session, context-window-limit). Default: 1 */
+    error_recovery: z.number().int().positive().default(1).optional(),
+  }).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
   disabled_tools: z.array(z.string()).optional(),

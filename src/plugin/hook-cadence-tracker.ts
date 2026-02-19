@@ -1,4 +1,6 @@
 import type { HookName } from "../config"
+import type { CadenceGroup } from "./hook-cadence-groups"
+import { resolveHookCadence } from "./hook-cadence-groups"
 
 /**
  * Tracks turn counts per hook per session to implement cadence-based firing.
@@ -13,10 +15,10 @@ interface SessionHookCounters {
 
 export class HookCadenceTracker {
   private sessionCounters: Map<string, SessionHookCounters> = new Map()
-  private cadenceConfig: Record<string, number>
+  private groupConfig?: Partial<Record<CadenceGroup, number>>
 
-  constructor(cadenceConfig?: Record<string, number>) {
-    this.cadenceConfig = cadenceConfig ?? {}
+  constructor(groupConfig?: Partial<Record<CadenceGroup, number>>) {
+    this.groupConfig = groupConfig
   }
 
   /**
@@ -27,7 +29,7 @@ export class HookCadenceTracker {
    * @returns true if the hook should fire on this turn
    */
   shouldFire(hookName: HookName, sessionID: string): boolean {
-    const cadence = this.cadenceConfig[hookName] ?? 1
+    const cadence = resolveHookCadence(hookName, this.groupConfig)
 
     // Cadence of 1 means fire every turn (default behavior)
     if (cadence === 1) {
