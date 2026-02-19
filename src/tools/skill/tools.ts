@@ -31,8 +31,26 @@ function formatCombinedDescription(skills: SkillInfo[], commands: CommandInfo[])
     return TOOL_DESCRIPTION_NO_SKILLS
   }
 
+  // Priority: project > user > opencode/opencode-project > builtin/config
+  const scopePriority: Record<string, number> = {
+    project: 4,
+    user: 3,
+    opencode: 2,
+    "opencode-project": 2,
+    config: 1,
+    builtin: 1,
+  }
+
+  const allItems: string[] = []
+
+  // Sort and add skills first (skills before commands)
   if (skills.length > 0) {
-    const skillsXml = skills.map(skill => {
+    const sortedSkills = [...skills].sort((a, b) => {
+      const priorityA = scopePriority[a.scope] || 0
+      const priorityB = scopePriority[b.scope] || 0
+      return priorityB - priorityA // Higher priority first
+    })
+    sortedSkills.forEach(skill => {
       const parts = [
         "  <skill>",
         `    <name>${skill.name}</name>`,
@@ -42,17 +60,35 @@ function formatCombinedDescription(skills: SkillInfo[], commands: CommandInfo[])
         parts.push(`    <compatibility>${skill.compatibility}</compatibility>`)
       }
       parts.push("  </skill>")
-      return parts.join("\n")
-    }).join("\n")
-    lines.push(`\n<available_skills>\n${skillsXml}\n</available_skills>`)
+      allItems.push(parts.join("\n"))
+    })
   }
 
+  // Sort and add commands second (commands after skills)
   if (commands.length > 0) {
-    const commandLines = commands.map(cmd => {
+    const sortedCommands = [...commands].sort((a, b) => {
+      const priorityA = scopePriority[a.scope] || 0
+      const priorityB = scopePriority[b.scope] || 0
+      return priorityB - priorityA // Higher priority first
+    })
+    sortedCommands.forEach(cmd => {
       const hint = cmd.metadata.argumentHint ? ` ${cmd.metadata.argumentHint}` : ""
-      return `  - /${cmd.name}${hint}: ${cmd.metadata.description || "(no description)"} (${cmd.scope})`
-    }).join("\n")
-    lines.push(`\n<available_commands>\n${commandLines}\n</available_commands>`)
+      const parts = [
+        "  <command>",
+        `    <name>/${cmd.name}</name>`,
+        `    <description>${cmd.metadata.description || "(no description)"}</description>`,
+        `    <scope>${cmd.scope}</scope>`,
+      ]
+      if (hint) {
+        parts.push(`    <argument>${hint.trim()}</argument>`)
+      }
+      parts.push("  </command>")
+      allItems.push(parts.join("\n"))
+    })
+  }
+
+  if (allItems.length > 0) {
+    lines.push(`\n<available_items>\nPriority: project > user > opencode > builtin | Skills listed before commands\nInvoke via: skill(name="item-name") — omit leading slash for commands.\n${allItems.join("\n")}\n</available_items>`)
   }
 
   return TOOL_DESCRIPTION_PREFIX + lines.join("")
