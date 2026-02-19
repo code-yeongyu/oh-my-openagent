@@ -15,7 +15,7 @@ export const ExperimentalConfigSchema = z.object({
   plugin_load_timeout_ms: z.number().min(1000).optional(),
   /** Wrap hook creation in try/catch to prevent one failing hook from crashing the plugin (default: true at call site) */
   safe_hook_creation: z.boolean().optional(),
-  /** Disable the OhMyOpenCode environment setup (experimental) */
+  /** Disable auto-injected <omo-env> context in prompts (experimental) */
   disable_omo_env: z.boolean().optional(),
   /** Enable hashline_edit tool for improved file editing with hash-based line anchors */
   hashline_edit: z.boolean().optional(),
