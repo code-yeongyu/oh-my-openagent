@@ -298,7 +298,8 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="Task 3..
 
 **Background management**:
 - Collect: \`background_output(task_id="...")\`
-- Cleanup: \`background_cancel(all=true)\`
+- Before final answer, cancel DISPOSABLE tasks individually: \`background_cancel(taskId="bg_explore_xxx")\`, \`background_cancel(taskId="bg_librarian_xxx")\`
+- **NEVER use \`background_cancel(all=true)\`** — it kills tasks whose results you haven't collected yet
 </parallel_execution>
 
 <notepad_protocol>
