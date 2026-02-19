@@ -1277,8 +1277,13 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 })
 
 describe("disable_omo_env pass-through", () => {
-  test("passes disable_omo_env=true to createBuiltinAgents", async () => {
+  test("omits <omo-env> in generated sisyphus prompt when disable_omo_env is true", async () => {
     //#given
+    ;(agents.createBuiltinAgents as any)?.mockRestore?.()
+    ;(shared.fetchAvailableModels as any).mockResolvedValue(
+      new Set(["anthropic/claude-opus-4-6", "google/gemini-3-flash"])
+    )
+
     const pluginConfig: OhMyOpenCodeConfig = {
       experimental: { disable_omo_env: true },
     }
@@ -1299,17 +1304,19 @@ describe("disable_omo_env pass-through", () => {
     await handler(config)
 
     //#then
-    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
-      mock: { calls: unknown[][] }
-    }
-    const callArgs =
-      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
-    expect(callArgs).toBeDefined()
-    expect(callArgs?.[12]).toBe(true)
+    const agentResult = config.agent as Record<string, { prompt?: string }>
+    const sisyphusPrompt = agentResult[getAgentDisplayName("sisyphus")]?.prompt
+    expect(sisyphusPrompt).toBeDefined()
+    expect(sisyphusPrompt).not.toContain("<omo-env>")
   })
 
-  test("passes disable_omo_env=false when config field is omitted", async () => {
+  test("keeps <omo-env> in generated sisyphus prompt when disable_omo_env is omitted", async () => {
     //#given
+    ;(agents.createBuiltinAgents as any)?.mockRestore?.()
+    ;(shared.fetchAvailableModels as any).mockResolvedValue(
+      new Set(["anthropic/claude-opus-4-6", "google/gemini-3-flash"])
+    )
+
     const pluginConfig: OhMyOpenCodeConfig = {}
     const config: Record<string, unknown> = {
       model: "anthropic/claude-opus-4-6",
@@ -1328,12 +1335,9 @@ describe("disable_omo_env pass-through", () => {
     await handler(config)
 
     //#then
-    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
-      mock: { calls: unknown[][] }
-    }
-    const callArgs =
-      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
-    expect(callArgs).toBeDefined()
-    expect(callArgs?.[12]).toBe(false)
+    const agentResult = config.agent as Record<string, { prompt?: string }>
+    const sisyphusPrompt = agentResult[getAgentDisplayName("sisyphus")]?.prompt
+    expect(sisyphusPrompt).toBeDefined()
+    expect(sisyphusPrompt).toContain("<omo-env>")
   })
 })
