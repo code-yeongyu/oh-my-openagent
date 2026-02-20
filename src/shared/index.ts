@@ -34,6 +34,7 @@ export * from "./system-directive"
 export * from "./agent-tool-restrictions"
 export * from "./model-requirements"
 export * from "./model-resolver"
+export { normalizeFallbackModels } from "./model-resolver"
 export { resolveModelPipeline } from "./model-resolution-pipeline"
 export type {
   ModelResolutionRequest,
@@ -58,3 +59,4 @@ export * from "./normalize-sdk-response"
 export * from "./session-directory-resolver"
 export * from "./prompt-tools"
 export * from "./internal-initiator-marker"
+export { SessionCategoryRegistry } from "./session-category-registry"

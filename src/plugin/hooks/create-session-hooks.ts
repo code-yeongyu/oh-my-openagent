@@ -25,6 +25,7 @@ import {
   createNoHephaestusNonGptHook,
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
+  createRuntimeFallbackHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
@@ -60,6 +61,7 @@ export type SessionHooks = {
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook>
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
+  runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -245,6 +247,13 @@ export function createSessionHooks(args: {
     ? safeHook("anthropic-effort", () => createAnthropicEffortHook())
     : null
 
+  const runtimeFallback = isHookEnabled("runtime-fallback")
+    ? safeHook("runtime-fallback", () =>
+        createRuntimeFallbackHook(ctx, {
+          config: pluginConfig.runtime_fallback,
+          pluginConfig,
+        }))
+    : null
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -269,5 +278,6 @@ export function createSessionHooks(args: {
     questionLabelTruncator,
     taskResumeInfo,
     anthropicEffort,
+    runtimeFallback,
   }
 }

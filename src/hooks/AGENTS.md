@@ -9,6 +9,45 @@
 ## HOOK TIERS
 
 ### Tier 1: Session Hooks (22) — `create-session-hooks.ts`
+## STRUCTURE
+```
+hooks/
+├── atlas/                      # Main orchestration (757 lines)
+├── anthropic-context-window-limit-recovery/ # Auto-summarize
+├── todo-continuation-enforcer.ts # Force TODO completion
+├── ralph-loop/                 # Self-referential dev loop
+├── claude-code-hooks/          # settings.json compat layer - see AGENTS.md
+├── comment-checker/            # Prevents AI slop
+├── auto-slash-command/         # Detects /command patterns
+├── rules-injector/             # Conditional rules
+├── directory-agents-injector/  # Auto-injects AGENTS.md
+├── directory-readme-injector/  # Auto-injects README.md
+├── edit-error-recovery/        # Recovers from failures
+├── thinking-block-validator/   # Ensures valid <thinking>
+├── context-window-monitor.ts   # Reminds of headroom
+├── session-recovery/           # Auto-recovers from crashes
+├── think-mode/                 # Dynamic thinking budget
+├── keyword-detector/           # ultrawork/search/analyze modes
+├── background-notification/    # OS notification
+├── prometheus-md-only/         # Planner read-only mode
+├── agent-usage-reminder/       # Specialized agent hints
+├── auto-update-checker/        # Plugin update check
+├── tool-output-truncator.ts    # Prevents context bloat
+├── compaction-context-injector/ # Injects context on compaction
+├── delegate-task-retry/        # Retries failed delegations
+├── interactive-bash-session/   # Tmux session management
+├── non-interactive-env/        # Non-TTY environment handling
+├── start-work/                 # Sisyphus work session starter
+├── task-resume-info/           # Resume info for cancelled tasks
+├── question-label-truncator/   # Auto-truncates question labels
+├── category-skill-reminder/    # Reminds of category skills
+├── empty-task-response-detector.ts # Detects empty responses
+├── sisyphus-junior-notepad/    # Sisyphus Junior notepad
+├── stop-continuation-guard/    # Guards stop continuation
+├── subagent-question-blocker/  # Blocks subagent questions
+├── runtime-fallback/           # Auto-switch models on API errors
+└── index.ts                    # Hook aggregation + registration
+```
 
 | Hook | Event | Purpose |
 |------|-------|---------|

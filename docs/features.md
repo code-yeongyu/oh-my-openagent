@@ -352,6 +352,7 @@ Hooks intercept and modify behavior at key points in the agent lifecycle.
 | **session-recovery** | Stop | Recovers from session errors - missing tool results, thinking block issues, empty messages. |
 | **anthropic-context-window-limit-recovery** | Stop | Handles Claude context window limits gracefully. |
 | **background-compaction** | Stop | Auto-compacts sessions hitting token limits. |
+| **runtime-fallback** | Event | Automatically switches to backup models on retryable API errors (e.g., 429, 503, 529), provider key misconfiguration errors (e.g., missing API key), and auto-retry signals (when `timeout_seconds > 0`). Configurable retry logic with per-model cooldown. See [Runtime Fallback Configuration](configurations.md#runtime-fallback) for details on `timeout_seconds` behavior. |
 
 #### Truncation & Context Management
 

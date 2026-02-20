@@ -5,6 +5,7 @@ import { getTaskToastManager } from "../../features/task-toast-manager"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { subagentSessions, syncSubagentSessions, setSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
@@ -45,6 +46,10 @@ export async function executeSyncTask(
     syncSubagentSessions.add(sessionID)
     setSessionAgent(sessionID, agentToUse)
     setSessionFallbackChain(sessionID, fallbackChain)
+
+    if (args.category) {
+      SessionCategoryRegistry.register(sessionID, args.category)
+    }
 
     if (onSyncSessionCreated) {
       log("[task] Invoking onSyncSessionCreated callback", { sessionID, parentID: parentContext.sessionID })
@@ -153,6 +158,7 @@ session_id: ${sessionID}
       subagentSessions.delete(syncSessionID)
       syncSubagentSessions.delete(syncSessionID)
       clearSessionFallbackChain(syncSessionID)
+      SessionCategoryRegistry.remove(syncSessionID)
     }
   }
 }
