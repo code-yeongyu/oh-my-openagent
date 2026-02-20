@@ -17,8 +17,6 @@ export const ExperimentalConfigSchema = z.object({
   safe_hook_creation: z.boolean().optional(),
   /** Disable auto-injected <omo-env> context in prompts (experimental) */
   disable_omo_env: z.boolean().optional(),
-  /** Enable hashline_edit tool for improved file editing with hash-based line anchors */
-  hashline_edit: z.boolean().optional(),
 })
 
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>

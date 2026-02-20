@@ -13,6 +13,7 @@ import {
   normalizeSDKResponse,
   promptWithModelSuggestionRetry,
   resolveInheritedPromptTools,
+  createInternalAgentTextPart,
 } from "../../shared"
 import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 import { setSessionTools } from "../../shared/session-tools-store"
@@ -1313,7 +1314,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               ...(promptAgent !== undefined ? { agent: promptAgent } : {}),
               ...(model !== undefined ? { model } : {}),
               ...(tools ? { tools } : {}),
-              parts: [{ type: "text", text: notification }],
+              parts: [createInternalAgentTextPart(notification)],
             },
           })
           log("[background-agent] Sent notification to parent session:", {

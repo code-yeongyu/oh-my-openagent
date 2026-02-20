@@ -152,8 +152,15 @@ session_id: ${sessionID}
       return `No assistant response found (task ran in background mode).\n\nSession ID: ${sessionID}`
     }
 
-    const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-    const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+    let textContent = ""
+    for (const msg of assistantMessages) {
+      const textParts = msg.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
+      const content = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+      if (content) {
+        textContent = content
+        break
+      }
+    }
     const duration = formatDuration(startTime)
 
     return `SUPERVISED TASK COMPLETED SUCCESSFULLY

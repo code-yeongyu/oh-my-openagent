@@ -1,5 +1,5 @@
 import { log } from "../../shared"
-import { toHashlineContent, generateUnifiedDiff, countLineDiffs } from "../../tools/hashline-edit/diff-utils"
+import { generateUnifiedDiff, countLineDiffs } from "../../tools/hashline-edit/diff-utils"
 
 interface HashlineEditDiffEnhancerConfig {
 	hashline_edit?: { enabled: boolean }
@@ -86,16 +86,13 @@ export function createHashlineEditDiffEnhancerHook(config: HashlineEditDiffEnhan
 			}
 
 			const { additions, deletions } = countLineDiffs(oldContent, newContent)
-			const oldHashlined = toHashlineContent(oldContent)
-			const newHashlined = toHashlineContent(newContent)
-
 			const unifiedDiff = generateUnifiedDiff(oldContent, newContent, filePath)
 			
 			output.metadata.filediff = {
 				file: filePath,
 				path: filePath,
-				before: oldHashlined,
-				after: newHashlined,
+				before: oldContent,
+				after: newContent,
 				additions,
 				deletions,
 			}

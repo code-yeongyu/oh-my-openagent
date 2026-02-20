@@ -2,7 +2,7 @@ export { computeLineHash, formatHashLine, formatHashLines } from "./hash-computa
 export { parseLineRef, validateLineRef } from "./validation"
 export type { LineRef } from "./validation"
 export type { SetLine, ReplaceLines, InsertAfter, Replace, HashlineEdit } from "./types"
-export { HASH_DICT, HASHLINE_PATTERN } from "./constants"
+export { NIBBLE_STR, HASHLINE_DICT, HASHLINE_REF_PATTERN, HASHLINE_OUTPUT_PATTERN } from "./constants"
 export {
   applyHashlineEdits,
   applyInsertAfter,

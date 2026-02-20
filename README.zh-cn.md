@@ -183,6 +183,7 @@
   - Librarian：官方文档、开源实现、代码库探索 (GLM-4.7)
    - Explore：极速代码库探索（上下文感知 Grep）(Grok Code Fast 1)
 - 完整 LSP / AstGrep 支持：果断重构。
+- 哈希锚定编辑工具：`LINE#ID` 格式在每次更改前验证内容哈希。再也没有陈旧行编辑。
 - Todo 继续执行器：如果智能体中途退出，强制它继续。**这就是让 Sisyphus 继续推动巨石的关键。**
 - 注释检查器：防止 AI 添加过多注释。Sisyphus 生成的代码应该与人类编写的代码无法区分。
 - Claude Code 兼容性：Command、Agent、Skill、MCP、Hook（PreToolUse、PostToolUse、UserPromptSubmit、Stop）
@@ -300,6 +301,7 @@ curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads
 - **智能体**：Sisyphus（主智能体）、Prometheus（规划器）、Oracle（架构/调试）、Librarian（文档/代码搜索）、Explore（快速代码库 grep）、Multimodal Looker
 - **后台智能体**：像真正的开发团队一样并行运行多个智能体
 - **LSP & AST 工具**：重构、重命名、诊断、AST 感知代码搜索
+- **哈希锚定编辑工具**：`LINE#ID` 引用在每次更改前验证内容 — 精准编辑，零陈旧行错误
 - **上下文注入**：自动注入 AGENTS.md、README.md、条件规则
 - **Claude Code 兼容性**：完整的钩子系统、命令、技能、智能体、MCP
 - **内置 MCP**：websearch (Exa)、context7 (文档)、grep_app (GitHub 搜索)

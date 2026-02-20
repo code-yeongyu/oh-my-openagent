@@ -21,6 +21,7 @@ import {
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
   createNoSisyphusGptHook,
+  createNoHephaestusNonGptHook,
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
 } from "../../hooks"
@@ -52,6 +53,7 @@ export type SessionHooks = {
   prometheusMdOnly: ReturnType<typeof createPrometheusMdOnlyHook> | null
   sisyphusJuniorNotepad: ReturnType<typeof createSisyphusJuniorNotepadHook> | null
   noSisyphusGpt: ReturnType<typeof createNoSisyphusGptHook> | null
+  noHephaestusNonGpt: ReturnType<typeof createNoHephaestusNonGptHook> | null
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook>
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
@@ -162,6 +164,10 @@ export function createSessionHooks(args: {
     ? safeHook("no-sisyphus-gpt", () => createNoSisyphusGptHook(ctx))
     : null
 
+  const noHephaestusNonGpt = isHookEnabled("no-hephaestus-non-gpt")
+    ? safeHook("no-hephaestus-non-gpt", () => createNoHephaestusNonGptHook(ctx))
+    : null
+
   const questionLabelTruncator = createQuestionLabelTruncatorHook()
   const taskResumeInfo = createTaskResumeInfoHook()
 
@@ -188,6 +194,7 @@ export function createSessionHooks(args: {
     prometheusMdOnly,
     sisyphusJuniorNotepad,
     noSisyphusGpt,
+    noHephaestusNonGpt,
     questionLabelTruncator,
     taskResumeInfo,
     anthropicEffort,

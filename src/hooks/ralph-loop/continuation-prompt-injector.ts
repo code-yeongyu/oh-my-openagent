@@ -3,7 +3,11 @@ import { log } from "../../shared/logger"
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { getMessageDir } from "./message-storage-directory"
 import { withTimeout } from "./with-timeout"
-import { normalizeSDKResponse, resolveInheritedPromptTools } from "../../shared"
+import {
+	createInternalAgentTextPart,
+	normalizeSDKResponse,
+	resolveInheritedPromptTools,
+} from "../../shared"
 import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 
 type MessageInfo = {
@@ -66,7 +70,7 @@ export async function injectContinuationPrompt(
 			...(promptAgent ? { agent: promptAgent } : {}),
 			...(model !== undefined ? { model } : {}),
 			...(inheritedTools ? { tools: inheritedTools } : {}),
-			parts: [{ type: "text", text: options.prompt }],
+			parts: [createInternalAgentTextPart(options.prompt)],
 		},
 		query: { directory: options.directory },
 	})

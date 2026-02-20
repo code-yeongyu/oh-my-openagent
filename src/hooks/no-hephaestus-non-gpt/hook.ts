@@ -4,13 +4,13 @@ import { getSessionAgent, updateSessionAgent } from "../../features/claude-code-
 import { log } from "../../shared"
 import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
 
-const TOAST_TITLE = "NEVER Use Sisyphus with GPT"
+const TOAST_TITLE = "NEVER Use Hephaestus with Non-GPT"
 const TOAST_MESSAGE = [
-  "Sisyphus works best with Claude Opus, and works fine with Kimi/GLM models.",
-  "Do NOT use Sisyphus with GPT.",
-  "For GPT models, always use Hephaestus.",
+  "Hephaestus is designed exclusively for GPT models.",
+  "Hephaestus is trash without GPT.",
+  "For Claude/Kimi/GLM models, always use Sisyphus.",
 ].join("\n")
-const HEPHAESTUS_DISPLAY = getAgentDisplayName("hephaestus")
+const SISYPHUS_DISPLAY = getAgentDisplayName("sisyphus")
 
 function showToast(ctx: PluginInput, sessionID: string): void {
   ctx.client.tui.showToast({
@@ -21,14 +21,14 @@ function showToast(ctx: PluginInput, sessionID: string): void {
       duration: 10000,
     },
   }).catch((error) => {
-    log("[no-sisyphus-gpt] Failed to show toast", {
+    log("[no-hephaestus-non-gpt] Failed to show toast", {
       sessionID,
       error,
     })
   })
 }
 
-export function createNoSisyphusGptHook(ctx: PluginInput) {
+export function createNoHephaestusNonGptHook(ctx: PluginInput) {
   return {
     "chat.message": async (input: {
       sessionID: string
@@ -41,13 +41,13 @@ export function createNoSisyphusGptHook(ctx: PluginInput) {
       const agentKey = getAgentConfigKey(rawAgent)
       const modelID = input.model?.modelID
 
-      if (agentKey === "sisyphus" && modelID && isGptModel(modelID)) {
+      if (agentKey === "hephaestus" && modelID && !isGptModel(modelID)) {
         showToast(ctx, input.sessionID)
-        input.agent = HEPHAESTUS_DISPLAY
+        input.agent = SISYPHUS_DISPLAY
         if (output?.message) {
-          output.message.agent = HEPHAESTUS_DISPLAY
+          output.message.agent = SISYPHUS_DISPLAY
         }
-        updateSessionAgent(input.sessionID, HEPHAESTUS_DISPLAY)
+        updateSessionAgent(input.sessionID, SISYPHUS_DISPLAY)
       }
     },
   }

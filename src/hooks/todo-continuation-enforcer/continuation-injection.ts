@@ -1,7 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
-import { normalizeSDKResponse, resolveInheritedPromptTools } from "../../shared"
+import {
+  createInternalAgentTextPart,
+  normalizeSDKResponse,
+  resolveInheritedPromptTools,
+} from "../../shared"
 import {
   findNearestMessageWithFields,
   findNearestMessageWithFieldsFromSDK,
@@ -151,7 +155,7 @@ ${todoList}`
         agent: agentName,
         ...(model !== undefined ? { model } : {}),
         ...(inheritedTools ? { tools: inheritedTools } : {}),
-        parts: [{ type: "text", text: prompt }],
+        parts: [createInternalAgentTextPart(prompt)],
       },
       query: { directory: ctx.directory },
     })

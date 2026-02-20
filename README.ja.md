@@ -183,6 +183,7 @@ Windows から Linux に初めて乗り換えた時のこと、自分の思い�
   - Librarian: 公式ドキュメント、オープンソース実装、コードベース探索 (GLM-4.7)
    - Explore: 超高速コードベース探索 (Contextual Grep) (Grok Code Fast 1)
 - Full LSP / AstGrep Support: 決定的にリファクタリングしましょう。
+- ハッシュアンカード編集ツール: `LINE#ID` 形式で変更前にコンテンツハッシュを検証します。古い行の編集はもう不要です。
 - Todo Continuation Enforcer: 途中で諦めたら、続行を強制します。これがシジフォスに岩を転がし続けさせる秘訣です。
 - Comment Checker: AIが過剰なコメントを付けないようにします。シジフォスが生成したコードは、人間が書いたものと区別がつかないべきです。
 - Claude Code Compatibility: Command, Agent, Skill, MCP, Hook(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
@@ -294,6 +295,7 @@ oh-my-opencode を削除するには：
 - **エージェント**: Sisyphus（メインエージェント）、Prometheus（プランナー）、Oracle（アーキテクチャ/デバッグ）、Librarian（ドキュメント/コード検索）、Explore（高速コードベース grep）、Multimodal Looker
 - **バックグラウンドエージェント**: 本物の開発チームのように複数エージェントを並列実行
 - **LSP & AST ツール**: リファクタリング、リネーム、診断、AST 認識コード検索
+- **ハッシュアンカード編集ツール**: `LINE#ID` 参照で変更前にコンテンツを検証 — 外科的な編集、古い行エラーなし
 - **コンテキスト注入**: AGENTS.md、README.md、条件付きルールの自動注入
 - **Claude Code 互換性**: 完全なフックシステム、コマンド、スキル、エージェント、MCP
 - **内蔵 MCP**: websearch (Exa)、context7 (ドキュメント)、grep_app (GitHub 検索)
