@@ -3343,11 +3343,20 @@
         },
         "state_dir": {
           "type": "string"
+        },
+        "default_strategy": {
+          "default": "continue",
+          "type": "string",
+          "enum": [
+            "reset",
+            "continue"
+          ]
         }
       },
       "required": [
         "enabled",
-        "default_max_iterations"
+        "default_max_iterations",
+        "default_strategy"
       ],
       "additionalProperties": false
     },
