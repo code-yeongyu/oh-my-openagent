@@ -1,5 +1,5 @@
 import { describe, it, expect, spyOn } from "bun:test"
-import { createEventState, serializeError, type EventState } from "./events"
+import { createEventState, processEvents, serializeError, type EventState } from "./events"
 import type { RunContext, EventPayload } from "./types"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
@@ -99,7 +99,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -121,7 +120,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -144,7 +142,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -164,7 +161,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -184,7 +180,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -207,7 +202,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -229,7 +223,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     //#when
     await processEvents(ctx, events, state)
@@ -251,7 +244,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -275,7 +267,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -299,7 +290,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -328,7 +318,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
