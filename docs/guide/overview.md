@@ -42,19 +42,29 @@ Hephaestus runs on GPT-5.3 Codex. Give him a goal, not a recipe. He explores the
 
 Use Hephaestus when you need deep architectural reasoning, complex debugging across many files, or cross-domain knowledge synthesis. Switch to him explicitly when the work demands GPT-5.3 Codex's particular strengths.
 
+**Why this beats vanilla Codex CLI:**
+
+ **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. Haiku for speed. The right brain for the right job.
+ **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
+ **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` gets GPT-5.3 Codex. `quick` gets Haiku. No manual juggling.
+ **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
+
 ---
 
-## Better Than Pure Codex
+## Better Than Pure Claude Code
 
-Sisyphus + Hephaestus outperform vanilla Codex CLI. Here's why:
+Claude Code is good. But it's a single agent running a single model doing everything alone.
 
-**Multi-model orchestration.** Pure Codex is single-model. Oh My OpenCode routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. Haiku for speed tasks. The right brain for the right job.
+Oh My OpenCode turns that into a coordinated team:
 
-**Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
+ **Parallel execution.** Claude Code processes one thing at a time. OmO fires background agents in parallel — research, implementation, and verification happening simultaneously. Like having 5 engineers instead of 1.
+ **Hash-anchored edits.** Claude Code's edit tool fails when the model can't reproduce lines exactly. OmO's `LINE#ID` content hashing validates every edit before applying. Grok Code Fast 1 went from 6.7% to 68.3% success rate just from this change.
+ **Intent Gate.** Claude Code takes your prompt and runs. OmO classifies your true intent first — research, implementation, investigation, fix — then routes accordingly. Fewer misinterpretations, better results.
+ **LSP + AST tools.** Workspace-level rename, go-to-definition, find-references, pre-build diagnostics, AST-aware code rewrites. IDE precision that vanilla Claude Code doesn't have.
+ **Skills with embedded MCPs.** Each skill brings its own MCP servers, scoped to the task. Context window stays clean instead of bloating with every tool.
+ **Discipline enforcement.** Todo enforcer yanks idle agents back to work. Comment checker strips AI slop. Ralph Loop keeps going until 100% done. The system doesn't let the agent slack off.
 
-**Category system.** Tasks are routed by intent, not model name. `category="visual-engineering"` gets Gemini. `category="ultrabrain"` gets GPT-5.3 Codex. `category="quick"` gets Haiku. No manual juggling.
-
-**Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
+**The fundamental advantage.** Models have different temperaments. Claude thinks deeply. GPT reasons architecturally. Gemini visualizes. Haiku moves fast. Single-model tools force you to pick one personality for all tasks. Oh My OpenCode leverages them all, routing by task type. This isn't a temporary hack — it's the only architecture that makes sense as models specialize further. The gap between multi-model orchestration and single-model limitation widens every month. We're betting on that future.
 
 ---
 
@@ -64,7 +74,7 @@ Before acting on any request, Sisyphus classifies your true intent.
 
 Are you asking for research? Implementation? Investigation? A fix? The Intent Gate figures out what you actually want, not just the literal words you typed. This means the agent understands context, nuance, and the real goal behind your request.
 
-Regular Codex doesn't have this. It takes your prompt and runs. Oh My OpenCode thinks first, then acts.
+Claude Code doesn't have this. It takes your prompt and runs. Oh My OpenCode thinks first, then acts.
 
 ---
 

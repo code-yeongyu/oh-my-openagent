@@ -88,6 +88,25 @@ We did the work. Tested everything. Kept what actually shipped.
 
 Install OmO. Type `ultrawork`. Done.
 
+## The Bet
+
+We're betting on a future where models are cheaper, smarter, and no single provider dominates.
+That future is arriving faster than anyone expected.
+
+**Models get cheaper every month.** What cost $20 last year costs $2 now. The race to the bottom is real, and we're here for it.
+**Models get smarter every month.** Today's cheap model beats last year's flagship. The gap between frontier and affordable is collapsing.
+**No one wins.** Anthropic, OpenAI, Google, DeepSeek, Alibaba - they're all building incredible models. The future isn't locked to one provider. It's a multi-model world.
+
+We built for that future.
+
+Sisyphus doesn't care if he's running on Claude, Kimi, or GLM. He picks the right model for the task. Frontend work? Kimi K2.5. Deep reasoning? Claude Opus. Code generation? GPT-5.3 Codex. The architecture treats models as interchangeable commodities, not sacred cows.
+
+This gets more valuable as models specialize. When Gemini dominates visual tasks and Qwen crushes long-context, we plug them in. Zero rewrites. Zero lock-in.
+
+Anthropic wants you locked in. We're building for the open market.
+
+The harness that wins isn't the one married to a single model. It's the one that rides them all.
+
 ## Installation
 
 ### For Humans
