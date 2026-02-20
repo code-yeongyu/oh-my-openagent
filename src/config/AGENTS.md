@@ -17,7 +17,7 @@ config/schema/
 ├── hooks.ts                    # HookNameSchema (46 hooks)
 ├── skills.ts                   # SkillsConfigSchema (sources, paths, recursive)
 ├── commands.ts                 # BuiltinCommandNameSchema
-├── experimental.ts             # Feature flags (plugin_load_timeout_ms min 1000, hashline_edit)
+├── experimental.ts             # Feature flags (plugin_load_timeout_ms min 1000)
 ├── sisyphus.ts                 # SisyphusConfigSchema (task system)
 ├── sisyphus-agent.ts           # SisyphusAgentConfigSchema
 ├── ralph-loop.ts               # RalphLoopConfigSchema
@@ -34,9 +34,9 @@ config/schema/
 └── internal/permission.ts      # AgentPermissionSchema
 ```
 
-## ROOT SCHEMA FIELDS (26)
+## ROOT SCHEMA FIELDS (27)
 
-`$schema`, `new_task_system_enabled`, `default_run_agent`, `disabled_mcps`, `disabled_agents`, `disabled_skills`, `disabled_hooks`, `disabled_commands`, `disabled_tools`, `agents`, `categories`, `claude_code`, `sisyphus_agent`, `comment_checker`, `experimental`, `auto_update`, `skills`, `ralph_loop`, `background_task`, `notification`, `babysitting`, `git_master`, `browser_automation_engine`, `websearch`, `tmux`, `sisyphus`, `_migrations`
+`$schema`, `new_task_system_enabled`, `default_run_agent`, `disabled_mcps`, `disabled_agents`, `disabled_skills`, `disabled_hooks`, `disabled_commands`, `disabled_tools`, `hashline_edit`, `agents`, `categories`, `claude_code`, `sisyphus_agent`, `comment_checker`, `experimental`, `auto_update`, `skills`, `ralph_loop`, `background_task`, `notification`, `babysitting`, `git_master`, `browser_automation_engine`, `websearch`, `tmux`, `sisyphus`, `_migrations`
 
 ## AGENT OVERRIDE FIELDS (21)
 
