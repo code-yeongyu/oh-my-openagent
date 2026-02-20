@@ -6,15 +6,19 @@ import {
 	detectCompletionInSessionMessages,
 	detectCompletionInTranscript,
 } from "./completion-promise-detector"
-import { buildContinuationPrompt } from "./continuation-prompt-builder"
-import { injectContinuationPrompt } from "./continuation-prompt-injector"
+import { continueIteration } from "./iteration-continuation"
 
 type SessionRecovery = {
 	isRecovering: (sessionID: string) => boolean
 	markRecovering: (sessionID: string) => void
 	clear: (sessionID: string) => void
 }
-type LoopStateController = { getState: () => RalphLoopState | null; clear: () => boolean; incrementIteration: () => RalphLoopState | null }
+type LoopStateController = {
+	getState: () => RalphLoopState | null
+	clear: () => boolean
+	incrementIteration: () => RalphLoopState | null
+	setSessionID: (sessionID: string) => RalphLoopState | null
+}
 type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; sessionRecovery: SessionRecovery; loopState: LoopStateController }
 
 export function createRalphLoopEventHandler(
@@ -128,11 +132,11 @@ export function createRalphLoopEventHandler(
 				.catch(() => {})
 
 			try {
-				await injectContinuationPrompt(ctx, {
-					sessionID,
-					prompt: buildContinuationPrompt(newState),
+				await continueIteration(ctx, newState, {
+					previousSessionID: sessionID,
 					directory: options.directory,
 					apiTimeoutMs: options.apiTimeoutMs,
+					loopState: options.loopState,
 				})
 			} catch (err) {
 				log(`[${HOOK_NAME}] Failed to inject continuation`, {
