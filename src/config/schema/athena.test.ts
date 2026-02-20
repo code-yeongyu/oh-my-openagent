@@ -3,9 +3,9 @@ import { z } from "zod"
 import { AthenaConfigSchema, CouncilConfigSchema, CouncilMemberSchema } from "./athena"
 
 describe("CouncilMemberSchema", () => {
-  test("accepts model-only member config", () => {
+  test("accepts member config with model and name", () => {
     //#given
-    const config = { model: "anthropic/claude-opus-4-6" }
+    const config = { model: "anthropic/claude-opus-4-6", name: "member-a" }
 
     //#when
     const result = CouncilMemberSchema.safeParse(config)
@@ -103,20 +103,41 @@ describe("CouncilMemberSchema", () => {
 
   test("optional fields are optional without runtime defaults", () => {
     //#given
-    const config = { model: "xai/grok-code-fast-1" }
+    const config = { model: "xai/grok-code-fast-1", name: "member-x" }
 
     //#when
     const parsed = CouncilMemberSchema.parse(config)
 
     //#then
     expect(parsed.variant).toBeUndefined()
-    expect(parsed.name).toBeUndefined()
     expect(parsed.temperature).toBeUndefined()
+  })
+
+  test("rejects member config missing name", () => {
+    //#given
+    const config = { model: "anthropic/claude-opus-4-6" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects member config with empty name", () => {
+    //#given
+    const config = { model: "anthropic/claude-opus-4-6", name: "" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
   })
 
   test("accepts member config with temperature", () => {
     //#given
-    const config = { model: "openai/gpt-5.3-codex", temperature: 0.5 }
+    const config = { model: "openai/gpt-5.3-codex", name: "member-a", temperature: 0.5 }
 
     //#when
     const result = CouncilMemberSchema.safeParse(config)
@@ -166,7 +187,10 @@ describe("CouncilConfigSchema", () => {
   test("accepts council with 2 members", () => {
     //#given
     const config = {
-      members: [{ model: "anthropic/claude-opus-4-6" }, { model: "openai/gpt-5.3-codex" }],
+      members: [
+        { model: "anthropic/claude-opus-4-6", name: "member-a" },
+        { model: "openai/gpt-5.3-codex", name: "member-b" },
+      ],
     }
 
     //#when
@@ -206,7 +230,7 @@ describe("CouncilConfigSchema", () => {
 
   test("rejects council with 1 member", () => {
     //#given
-    const config = { members: [{ model: "anthropic/claude-opus-4-6" }] }
+    const config = { members: [{ model: "anthropic/claude-opus-4-6", name: "member-a" }] }
 
     //#when
     const result = CouncilConfigSchema.safeParse(config)
@@ -233,7 +257,10 @@ describe("AthenaConfigSchema", () => {
     const config = {
       model: "anthropic/claude-opus-4-6",
       council: {
-        members: [{ model: "openai/gpt-5.3-codex" }, { model: "xai/grok-code-fast-1" }],
+        members: [
+          { model: "openai/gpt-5.3-codex", name: "member-a" },
+          { model: "xai/grok-code-fast-1", name: "member-b" },
+        ],
       },
     }
 

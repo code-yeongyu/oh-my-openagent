@@ -2,32 +2,35 @@ import { describe, expect, test } from "bun:test"
 import { registerCouncilMemberAgents } from "./council-member-agents"
 
 describe("council-member-agents", () => {
-  test("throws on duplicate model without name", () => {
+  test("skips duplicate names and disables council when below minimum", () => {
     //#given
     const config = {
       members: [
-        { model: "openai/gpt-5.3-codex" },
-        { model: "openai/gpt-5.3-codex" },
+        { model: "openai/gpt-5.3-codex", name: "GPT" },
+        { model: "anthropic/claude-opus-4-6", name: "GPT" },
       ],
     }
-    //#when + #then
-    expect(() => registerCouncilMemberAgents(config)).toThrow("already registered")
+    //#when
+    const result = registerCouncilMemberAgents(config)
+    //#then
+    expect(result.registeredKeys).toHaveLength(0)
+    expect(result.agents).toEqual({})
   })
 
   test("registers different models without error", () => {
     //#given
     const config = {
       members: [
-        { model: "openai/gpt-5.3-codex" },
-        { model: "anthropic/claude-opus-4-6" },
+        { model: "openai/gpt-5.3-codex", name: "GPT" },
+        { model: "anthropic/claude-opus-4-6", name: "Claude" },
       ],
     }
     //#when
     const result = registerCouncilMemberAgents(config)
     //#then
     expect(result.registeredKeys).toHaveLength(2)
-    expect(result.registeredKeys).toContain("Council: GPT 5.3 Codex")
-    expect(result.registeredKeys).toContain("Council: Claude Opus 4.6")
+    expect(result.registeredKeys).toContain("Council: GPT")
+    expect(result.registeredKeys).toContain("Council: Claude")
   })
 
   test("allows same model with different names", () => {
@@ -50,8 +53,8 @@ describe("council-member-agents", () => {
     //#given - one valid model, one invalid (no slash separator)
     const config = {
       members: [
-        { model: "openai/gpt-5.3-codex" },
-        { model: "invalid-no-slash" },
+        { model: "openai/gpt-5.3-codex", name: "GPT" },
+        { model: "invalid-no-slash", name: "Invalid" },
       ],
     }
     //#when

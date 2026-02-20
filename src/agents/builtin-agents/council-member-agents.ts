@@ -7,44 +7,11 @@ import { log } from "../../shared/logger"
 /** Prefix used for all dynamically-registered council member agent keys. */
 export const COUNCIL_MEMBER_KEY_PREFIX = "Council: "
 
-const UPPERCASE_TOKENS = new Set(["gpt", "llm", "ai", "api"])
-
 /**
- * Derives a human-friendly display name from a model string.
- * "anthropic/claude-opus-4-6" → "Claude Opus 4.6"
- * "openai/gpt-5.3-codex" → "GPT 5.3 Codex"
- */
-function humanizeModelId(model: string): string {
-  const modelId = model.includes("/") ? model.split("/").pop() ?? model : model
-  const parts = modelId.split("-")
-  const result: string[] = []
-
-  for (let i = 0; i < parts.length; i++) {
-    const part = parts[i]
-    if (/^\d+$/.test(part)) {
-      const versionParts = [part]
-      while (i + 1 < parts.length && /^\d+$/.test(parts[i + 1])) {
-        i++
-        versionParts.push(parts[i])
-      }
-      result.push(versionParts.join("."))
-    } else if (UPPERCASE_TOKENS.has(part.toLowerCase())) {
-      result.push(part.toUpperCase())
-    } else {
-      result.push(part.charAt(0).toUpperCase() + part.slice(1))
-    }
-  }
-
-  return result.join(" ")
-}
-
-/**
- * Generates a stable agent registration key from a council member config.
- * Uses the member's name if present, otherwise derives a friendly name from the model ID.
+ * Generates a stable agent registration key from a council member's name.
  */
 export function getCouncilMemberAgentKey(member: CouncilMemberConfig): string {
-  const displayName = member.name ?? humanizeModelId(member.model)
-  return `${COUNCIL_MEMBER_KEY_PREFIX}${displayName}`
+  return `${COUNCIL_MEMBER_KEY_PREFIX}${member.name}`
 }
 
 /**
@@ -68,14 +35,15 @@ export function registerCouncilMemberAgents(
     const key = getCouncilMemberAgentKey(member)
     const config = createCouncilMemberAgent(member.model)
 
-    const friendlyName = member.name ?? humanizeModelId(member.model)
-    const description = `Council member: ${friendlyName} (${member.model}). Independent read-only code analyst for Athena council. (OhMyOpenCode)`
+    const description = `Council member: ${member.name} (${member.model}). Independent read-only code analyst for Athena council. (OhMyOpenCode)`
 
     if (agents[key]) {
-      const existingModel = agents[key].model ?? "unknown"
-      throw new Error(
-        `Council member key "${key}" is already registered (model: ${existingModel}). Use distinct "name" fields to avoid collisions.`
-      )
+      log("[council-member-agents] Skipping duplicate council member name", {
+        name: member.name,
+        model: member.model,
+        existingModel: agents[key].model ?? "unknown",
+      })
+      continue
     }
 
     agents[key] = {

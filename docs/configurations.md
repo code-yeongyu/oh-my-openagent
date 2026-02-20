@@ -235,8 +235,9 @@ Athena requires at least 2 council members. Each member runs an independent anal
 | Field | Required | Description |
 |-------|----------|-------------|
 | `model` | Yes | Provider/model ID (for example, `openai/gpt-5.2`) |
-| `name` | No | Display name (defaults to model ID) |
+| `name` | Yes | Display name for the council member (must be unique) |
 | `variant` | No | Model variant override |
+| `temperature` | No | Temperature override (0-2) |
 
 Minimum 2 members are required. The installer (`bunx oh-my-opencode install`) auto-configures council members based on your available providers.
 

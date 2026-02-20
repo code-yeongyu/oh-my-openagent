@@ -1,7 +1,7 @@
 export interface CouncilMemberConfig {
   model: string
   variant?: string
-  name?: string
+  name: string
   temperature?: number
 }
 

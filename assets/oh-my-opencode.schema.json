@@ -2896,6 +2896,18 @@
             "providerOptions": {
               "type": "object",
               "additionalProperties": {}
+            },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -3070,6 +3082,18 @@
               "type": "object",
               "additionalProperties": {}
             },
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string"
+                },
+                "variant": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
             "council": {
               "type": "object",
               "properties": {
@@ -3087,7 +3111,8 @@
                         "type": "string"
                       },
                       "name": {
-                        "type": "string"
+                        "type": "string",
+                        "minLength": 1
                       },
                       "temperature": {
                         "type": "number",
@@ -3096,7 +3121,8 @@
                       }
                     },
                     "required": [
-                      "model"
+                      "model",
+                      "name"
                     ],
                     "additionalProperties": false
                   }

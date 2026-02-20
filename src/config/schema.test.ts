@@ -557,7 +557,7 @@ describe("Athena agent override", () => {
       agents: {
         athena: {
           council: {
-            members: [{ model: "openai/gpt-5.3-codex" }],
+            members: [{ model: "openai/gpt-5.3-codex", name: "GPT" }],
           },
         },
       },

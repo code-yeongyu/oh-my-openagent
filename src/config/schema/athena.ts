@@ -13,7 +13,7 @@ const ModelStringSchema = z
 export const CouncilMemberSchema = z.object({
   model: ModelStringSchema,
   variant: z.string().optional(),
-  name: z.string().optional(),
+  name: z.string().min(1),
   temperature: z.number().min(0).max(2).optional(),
 }).strict()
 
