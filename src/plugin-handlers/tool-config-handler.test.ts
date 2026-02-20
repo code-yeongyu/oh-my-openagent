@@ -80,4 +80,33 @@ describe("applyToolConfig", () => {
       })
     })
   })
+
+  describe("#given external_directory permission", () => {
+    it("#then should preserve user-configured external_directory value", () => {
+      const params = createParams({ taskSystem: false })
+      params.config.permission = {
+        external_directory: "ask",
+      }
+
+      applyToolConfig(params)
+
+      expect(params.config.permission).toEqual({
+        webfetch: "allow",
+        external_directory: "ask",
+        task: "deny",
+      })
+    })
+
+    it("#then should default external_directory to allow when unset", () => {
+      const params = createParams({ taskSystem: false })
+
+      applyToolConfig(params)
+
+      expect(params.config.permission).toEqual({
+        webfetch: "allow",
+        external_directory: "allow",
+        task: "deny",
+      })
+    })
+  })
 })
