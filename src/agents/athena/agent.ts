@@ -1,7 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
 import { isGptModel } from "../types"
-import { createAgentToolRestrictions } from "../../shared/permission-compat"
+import { createAgentToolRestrictions, type PermissionValue } from "../../shared/permission-compat"
 
 const MODE: AgentMode = "primary"
 
@@ -211,10 +211,10 @@ The switch_agent tool switches the active agent. After you call it, end your res
 export function createAthenaAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions(["write", "edit", "call_omo_agent"])
 
-  const permission = {
+  const permission: Record<string, PermissionValue> = {
     ...restrictions.permission,
     question: "allow",
-  } as AgentConfig["permission"]
+  }
 
   const base = {
     description:
