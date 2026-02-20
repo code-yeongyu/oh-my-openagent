@@ -14,7 +14,6 @@ import { log, resetMessageCursor } from "../shared"
 import { lspManager } from "../tools"
 import { shouldRetryError } from "../shared/model-error-classifier"
 import { clearPendingModelFallback, clearSessionFallbackChain, setPendingModelFallback } from "../hooks/model-fallback/hook"
-import { log } from "../shared/logger"
 import { clearSessionModel, setSessionModel } from "../shared/session-model-state"
 
 import type { CreatedHooks } from "../create-hooks"
