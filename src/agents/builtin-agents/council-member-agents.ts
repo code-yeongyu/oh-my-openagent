@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { CouncilConfig, CouncilMemberConfig } from "../athena/types"
+import type { CouncilConfig, CouncilMemberConfig } from "../../config/schema/athena"
 import { createCouncilMemberAgent } from "../athena/council-member-agent"
 import { parseModelString } from "../../tools/delegate-task/model-string-parser"
 import { log } from "../../shared/logger"

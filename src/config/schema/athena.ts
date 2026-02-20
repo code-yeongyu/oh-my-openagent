@@ -21,6 +21,9 @@ export const CouncilConfigSchema = z.object({
   members: z.array(CouncilMemberSchema).min(2),
 }).strict()
 
+export type CouncilMemberConfig = z.infer<typeof CouncilMemberSchema>
+export type CouncilConfig = z.infer<typeof CouncilConfigSchema>
+
 export const AthenaConfigSchema = z.object({
   model: z.string().optional(),
   council: CouncilConfigSchema,
