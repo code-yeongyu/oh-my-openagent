@@ -203,8 +203,8 @@ export async function createBuiltinAgents(
     result["atlas"] = atlasConfig
   }
 
-  if (councilConfig && councilConfig.members.length >= 2 && result["athena"]) {
-    const { agents: councilAgents, registeredKeys } = registerCouncilMemberAgents(councilConfig)
+  if (councilConfig?.members && councilConfig.members.length >= 2 && result["athena"]) {
+    const { agents: councilAgents, registeredKeys, skippedMembers } = registerCouncilMemberAgents(councilConfig)
     for (const [key, config] of Object.entries(councilAgents)) {
       result[key] = config
     }
@@ -217,9 +217,9 @@ export async function createBuiltinAgents(
         prompt: (result["athena"].prompt ?? "") + councilTaskInstructions,
       }
     } else {
-      result["athena"] = appendMissingCouncilPrompt(result["athena"])
+      result["athena"] = appendMissingCouncilPrompt(result["athena"], skippedMembers)
     }
-  } else if (councilConfig && councilConfig.members.length >= 2 && !result["athena"]) {
+  } else if (councilConfig?.members && councilConfig.members.length >= 2 && !result["athena"]) {
     log("[builtin-agents] Skipping council member registration — Athena is disabled")
   } else if (result["athena"]) {
     result["athena"] = appendMissingCouncilPrompt(result["athena"])

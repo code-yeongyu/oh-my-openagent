@@ -19,25 +19,33 @@ function getCouncilMemberAgentKey(member: CouncilMemberConfig): string {
  * Each member becomes a separate agent callable via task(subagent_type="Council: <name>").
  * Returns a record of agent keys to configs and the list of registered keys.
  */
+type SkippedMember = { name: string; reason: string }
+
 export function registerCouncilMemberAgents(
   councilConfig: CouncilConfig
-): { agents: Record<string, AgentConfig>; registeredKeys: string[] } {
+): { agents: Record<string, AgentConfig>; registeredKeys: string[]; skippedMembers: SkippedMember[] } {
   const agents: Record<string, AgentConfig> = {}
   const registeredKeys: string[] = []
+  const skippedMembers: SkippedMember[] = []
 
   for (const member of councilConfig.members) {
     const parsed = parseModelString(member.model)
     if (!parsed) {
+      skippedMembers.push({
+        name: member.name,
+        reason: `Invalid model format: '${member.model}' (expected 'provider/model-id')`,
+      })
       log("[council-member-agents] Skipping member with invalid model", { model: member.model })
       continue
     }
 
     const key = getCouncilMemberAgentKey(member)
-    const config = createCouncilMemberAgent(member.model)
-
-    const description = `Council member: ${member.name} (${member.model}). Independent read-only code analyst for Athena council. (OhMyOpenCode)`
 
     if (agents[key]) {
+      skippedMembers.push({
+        name: member.name,
+        reason: `Duplicate name: '${member.name}' already registered`,
+      })
       log("[council-member-agents] Skipping duplicate council member name", {
         name: member.name,
         model: member.model,
@@ -45,6 +53,9 @@ export function registerCouncilMemberAgents(
       })
       continue
     }
+
+    const config = createCouncilMemberAgent(member.model)
+    const description = `Council member: ${member.name} (${parsed.providerID}/${parsed.modelID}). Independent read-only code analyst for Athena council. (OhMyOpenCode)`
 
     agents[key] = {
       ...config,
@@ -65,8 +76,8 @@ export function registerCouncilMemberAgents(
 
   if (registeredKeys.length < 2) {
     log("[council-member-agents] Fewer than 2 valid council members after model parsing — disabling council mode")
-    return { agents: {}, registeredKeys: [] }
+    return { agents: {}, registeredKeys: [], skippedMembers }
   }
 
-  return { agents, registeredKeys }
+  return { agents, registeredKeys, skippedMembers }
 }

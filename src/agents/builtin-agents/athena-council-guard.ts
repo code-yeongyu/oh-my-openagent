@@ -42,9 +42,16 @@ After informing the user, **end your turn**. Do NOT try to work around this by u
  * Replaces Athena's prompt with a guard that tells the user to configure council members.
  * Used when Athena is registered but no valid council config exists.
  */
-export function appendMissingCouncilPrompt(athenaConfig: AgentConfig): AgentConfig {
-  return {
-    ...athenaConfig,
-    prompt: (athenaConfig.prompt ?? "") + MISSING_COUNCIL_PROMPT,
+export function appendMissingCouncilPrompt(
+  athenaConfig: AgentConfig,
+  skippedMembers?: Array<{ name: string; reason: string }>,
+): AgentConfig {
+  let prompt = (athenaConfig.prompt ?? "") + MISSING_COUNCIL_PROMPT
+
+  if (skippedMembers && skippedMembers.length > 0) {
+    const skipDetails = skippedMembers.map((m) => `- **${m.name}**: ${m.reason}`).join("\n")
+    prompt += `\n\n### Why Council Failed\n\nThe following members were skipped:\n${skipDetails}`
   }
+
+  return { ...athenaConfig, prompt }
 }
