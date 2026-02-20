@@ -166,5 +166,26 @@ describe("TaskHistory", () => {
       expect(result).not.toContain("\n\n")
       expect(result).toContain("Line1 Line2 Line3")
     })
+
+    it("handles entries with undefined description without throwing", () => {
+      //#given
+      const history = new TaskHistory()
+      history.record("parent-1", { id: "t1", agent: "explore", description: "", status: "pending" })
+      const state = history as unknown as {
+        entries: Map<string, Array<{ description?: string }>>
+      }
+      const list = state.entries.get("parent-1")
+      if (!list) {
+        throw new Error("Expected task history entries for parent-1")
+      }
+      list[0].description = undefined
+
+      //#when
+      const result = history.formatForCompaction("parent-1")
+
+      //#then
+      expect(result).toContain("**explore**")
+      expect(result).toContain("(pending)")
+    })
   })
 })
