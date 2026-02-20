@@ -332,10 +332,10 @@ describe("createEventHandler - model fallback", () => {
 
     //#then - second fallback entry applied (chain advanced)
     expect(second.message["model"]).toEqual({
-      providerID: "anthropic",
-      modelID: "gpt-5.3-codex",
+      providerID: "opencode",
+      modelID: "kimi-k2.5-free",
     })
-    expect(second.message["variant"]).toBe("high")
+    expect(second.message["variant"]).toBeUndefined()
     expect(abortCalls).toEqual([sessionID, sessionID])
     expect(promptCalls).toEqual([sessionID, sessionID])
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)

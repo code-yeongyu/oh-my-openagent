@@ -51,3 +51,4 @@ export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 export { createBeastModeSystemHook, BEAST_MODE_SYSTEM_PROMPT } from "./beast-mode-system";
 export { createHashlineEditDiffEnhancerHook } from "./hashline-edit-diff-enhancer";
 export { createAgentSwitchHook } from "./agent-switch";
+export { createJsonErrorRecoveryHook, JSON_ERROR_TOOL_EXCLUDE_LIST, JSON_ERROR_PATTERNS, JSON_ERROR_REMINDER } from "./json-error-recovery";

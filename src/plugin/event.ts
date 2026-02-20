@@ -126,8 +126,6 @@ export function createEventHandler(args: {
   }
 
   const dispatchToHooks = async (input: EventInput): Promise<void> => {
-    // Keep agent switch early and resilient so queued handoffs are not blocked
-    // by unrelated hook failures in the same idle cycle.
     await runHookSafely("agent-switch", () => Promise.resolve(hooks.agentSwitchHook?.event?.(input)))
     await runHookSafely("auto-update-checker", () => Promise.resolve(hooks.autoUpdateChecker?.event?.(input)))
     await runHookSafely("claude-code-hooks", () => Promise.resolve(hooks.claudeCodeHooks?.event?.(input)))

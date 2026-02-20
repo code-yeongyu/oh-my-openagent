@@ -1,6 +1,6 @@
 # src/cli/ — CLI: install, run, doctor, mcp-oauth
 
-**Generated:** 2026-02-19
+**Generated:** 2026-02-21
 
 ## OVERVIEW
 
