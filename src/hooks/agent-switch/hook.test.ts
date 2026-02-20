@@ -187,56 +187,6 @@ describe("agent-switch hook", () => {
     expect(getPendingSwitch("ses-11")).toBeUndefined()
   })
 
-  test("recovers missing switch_agent tool call from Athena handoff text", async () => {
-    const promptAsyncCalls: Array<Record<string, unknown>> = []
-    let switched = false
-    const ctx = {
-      client: {
-        session: {
-          promptAsync: async (args: Record<string, unknown>) => {
-            promptAsyncCalls.push(args)
-            switched = true
-          },
-          messages: async () => switched
-            ? ({ data: [{ info: { role: "user", agent: "Prometheus (Plan Builder)" } }] })
-            : ({ data: [] }),
-          message: async () => ({
-            data: {
-              parts: [
-                {
-                  type: "text",
-                  text: "Switching to **Prometheus** now — they'll take it from here and craft a plan for you!",
-                },
-              ],
-            },
-          }),
-        },
-      },
-    } as any
-
-    const hook = createAgentSwitchHook(ctx)
-
-    await hook.event({
-      event: {
-        type: "message.updated",
-        properties: {
-          info: {
-            id: "msg-athena-1",
-            sessionID: "ses-5",
-            role: "assistant",
-            agent: "Athena (Council)",
-            finish: "stop",
-          },
-        },
-      },
-    })
-
-    expect(promptAsyncCalls).toHaveLength(1)
-    const body = promptAsyncCalls[0]?.body as { agent?: string } | undefined
-    expect(body?.agent).toBe("Prometheus (Plan Builder)")
-    expect(getPendingSwitch("ses-5")).toBeUndefined()
-  })
-
   test("applies queued pending switch on terminal message.updated", async () => {
     const promptAsyncCalls: Array<Record<string, unknown>> = []
     let switched = false

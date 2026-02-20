@@ -1,27 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getPendingSwitch, setPendingSwitch } from "../../features/agent-switch"
+import { getPendingSwitch } from "../../features/agent-switch"
 import { applyPendingSwitch, clearPendingSwitchRuntime } from "../../features/agent-switch/applier"
-import { getAgentConfigKey } from "../../shared/agent-display-names"
-import { log } from "../../shared/logger"
 import {
-  buildFallbackContext,
-  detectFallbackHandoffTarget,
-  extractTextPartsFromMessageResponse,
   isTerminalFinishValue,
   isTerminalStepFinishPart,
 } from "./fallback-handoff"
-
-const processedFallbackMessages = new Set<string>()
-const MAX_PROCESSED_FALLBACK_MARKERS = 500
-
-function clearFallbackMarkersForSession(sessionID: string): void {
-  clearPendingSwitchRuntime(sessionID)
-  for (const key of Array.from(processedFallbackMessages)) {
-    if (key.startsWith(`${sessionID}:`)) {
-      processedFallbackMessages.delete(key)
-    }
-  }
-}
 
 function getSessionIDFromStatusEvent(input: { event: { properties?: Record<string, unknown> } }): string | undefined {
   const props = input.event.properties as Record<string, unknown> | undefined
@@ -55,7 +38,7 @@ export function createAgentSwitchHook(ctx: PluginInput) {
         const info = props?.info as Record<string, unknown> | undefined
         const deletedSessionID = info?.id
         if (typeof deletedSessionID === "string") {
-          clearFallbackMarkersForSession(deletedSessionID)
+          clearPendingSwitchRuntime(deletedSessionID)
         }
         return
       }
@@ -65,7 +48,7 @@ export function createAgentSwitchHook(ctx: PluginInput) {
         const info = props?.info as Record<string, unknown> | undefined
         const erroredSessionID = info?.id ?? props?.sessionID
         if (typeof erroredSessionID === "string") {
-          clearFallbackMarkersForSession(erroredSessionID)
+          clearPendingSwitchRuntime(erroredSessionID)
         }
         return
       }
@@ -74,8 +57,6 @@ export function createAgentSwitchHook(ctx: PluginInput) {
         const props = input.event.properties as Record<string, unknown> | undefined
         const info = props?.info as Record<string, unknown> | undefined
         const sessionID = typeof info?.sessionID === "string" ? info.sessionID : undefined
-        const messageID = typeof info?.id === "string" ? info.id : undefined
-        const agent = typeof info?.agent === "string" ? info.agent : undefined
         const finish = info?.finish
 
         if (!sessionID) {
@@ -94,66 +75,6 @@ export function createAgentSwitchHook(ctx: PluginInput) {
             sessionID,
             client: ctx.client,
             source: "message-updated",
-          })
-          return
-        }
-
-        if (!messageID) {
-          return
-        }
-
-        if (getAgentConfigKey(agent ?? "") !== "athena") {
-          return
-        }
-
-        const marker = `${sessionID}:${messageID}`
-        if (processedFallbackMessages.has(marker)) {
-          return
-        }
-        processedFallbackMessages.add(marker)
-
-        // Prevent unbounded growth of the Set
-        if (processedFallbackMessages.size >= MAX_PROCESSED_FALLBACK_MARKERS) {
-          const iterator = processedFallbackMessages.values()
-          const oldest = iterator.next().value
-          if (oldest) {
-            processedFallbackMessages.delete(oldest)
-          }
-        }
-
-        // If switch_agent already queued a handoff, do not synthesize fallback behavior.
-        if (getPendingSwitch(sessionID)) {
-          return
-        }
-
-        try {
-          const response = await ctx.client.session.message({
-            path: { id: sessionID, messageID },
-          })
-          const text = extractTextPartsFromMessageResponse(response)
-          const target = detectFallbackHandoffTarget(text)
-          if (!target) {
-            return
-          }
-
-          setPendingSwitch(sessionID, target, buildFallbackContext(target))
-          log("[agent-switch] Recovered missing switch_agent tool call from Athena handoff text", {
-            sessionID,
-            messageID,
-            target,
-          })
-
-          await applyPendingSwitch({
-            sessionID,
-            client: ctx.client,
-            source: "athena-message-fallback",
-          })
-        } catch (error) {
-          processedFallbackMessages.delete(marker)
-          log("[agent-switch] Failed to recover fallback handoff from Athena message", {
-            sessionID,
-            messageID,
-            error: String(error),
           })
         }
 
