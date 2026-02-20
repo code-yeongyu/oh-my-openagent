@@ -2,17 +2,29 @@ import { describe, it, expect } from "bun:test"
 import { computeLineHash, formatHashLine, formatHashLines } from "./hash-computation"
 
 describe("computeLineHash", () => {
-  it("returns deterministic 2-char CID hash", () => {
+  it("returns deterministic 2-char CID hash per line", () => {
     //#given
     const content = "function hello() {"
 
     //#when
     const hash1 = computeLineHash(1, content)
-    const hash2 = computeLineHash(999, content)
+    const hash2 = computeLineHash(1, content)
 
     //#then
     expect(hash1).toBe(hash2)
     expect(hash1).toMatch(/^[ZPMQVRWSNKTXJBYH]{2}$/)
+  })
+
+  it("produces different hashes for same content on different lines", () => {
+    //#given
+    const content = "function hello() {"
+
+    //#when
+    const hash1 = computeLineHash(1, content)
+    const hash2 = computeLineHash(2, content)
+
+    //#then
+    expect(hash1).not.toBe(hash2)
   })
 
   it("ignores whitespace differences", () => {
