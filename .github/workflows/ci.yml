@@ -58,6 +58,7 @@ jobs:
           bun test src/tools/call-omo-agent/session-creator.test.ts
           bun test src/tools/session-manager
           bun test src/features/opencode-skill-loader/loader.test.ts
+          bun test src/hooks/anthropic-context-window-limit-recovery/recovery-hook.test.ts
 
       - name: Run remaining tests
         run: |
@@ -65,6 +66,7 @@ jobs:
           # that were already run in isolation above.
           # Excluded from src/cli: doctor/formatter.test.ts, doctor/format-default.test.ts
           # Excluded from src/tools: call-omo-agent/sync-executor.test.ts, call-omo-agent/session-creator.test.ts, session-manager (all)
+          # Excluded from src/hooks/anthropic-context-window-limit-recovery: recovery-hook.test.ts
           bun test bin script src/config src/mcp src/index.test.ts \
             src/agents src/shared \
             src/cli/run src/cli/config-manager src/cli/mcp-oauth \
@@ -78,7 +80,7 @@ jobs:
             src/tools/call-omo-agent/background-agent-executor.test.ts \
             src/tools/call-omo-agent/background-executor.test.ts \
             src/tools/call-omo-agent/subagent-session-creator.test.ts \
-            src/hooks/anthropic-context-window-limit-recovery \
+            src/hooks/anthropic-context-window-limit-recovery/empty-content-recovery-sdk.test.ts src/hooks/anthropic-context-window-limit-recovery/executor.test.ts src/hooks/anthropic-context-window-limit-recovery/parser.test.ts src/hooks/anthropic-context-window-limit-recovery/pruning-deduplication.test.ts src/hooks/anthropic-context-window-limit-recovery/recovery-deduplication.test.ts src/hooks/anthropic-context-window-limit-recovery/storage.test.ts \
             src/hooks/claude-code-compatibility \
             src/hooks/context-injection \
             src/hooks/provider-toast \
