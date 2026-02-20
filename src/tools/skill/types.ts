@@ -5,6 +5,7 @@ import type { CommandInfo } from "../slashcommand/types"
 
 export interface SkillArgs {
   name: string
+  user_message?: string
 }
 
 export interface SkillInfo {
