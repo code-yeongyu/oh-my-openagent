@@ -7,17 +7,6 @@ export type ModelResolutionInput = {
 	systemDefault?: string
 }
 
-/**
- * Normalizes fallback_models to an array.
- * Handles single string or array input, returns undefined for falsy values.
- */
-export function normalizeFallbackModels(
-	fallbackModels: string | string[] | undefined | null
-): string[] | undefined {
-	if (!fallbackModels) return undefined
-	return Array.isArray(fallbackModels) ? fallbackModels : [fallbackModels]
-}
-
 export type ModelSource =
 	| "override"
 	| "category-default"

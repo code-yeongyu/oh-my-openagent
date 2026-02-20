@@ -91,7 +91,8 @@
           "delegate-task-retry",
           "prometheus-md-only",
           "sisyphus-junior-notepad",
-          "sisyphus-gpt-hephaestus-reminder",
+          "no-sisyphus-gpt",
+          "no-hephaestus-non-gpt",
           "start-work",
           "atlas",
           "unstable-agent-babysitter",
@@ -99,10 +100,11 @@
           "task-resume-info",
           "stop-continuation-guard",
           "tasks-todowrite-disabler",
+          "runtime-fallback",
           "write-existing-file-guard",
           "anthropic-effort",
-          "runtime-fallback",
-          "hashline-read-enhancer"
+          "hashline-read-enhancer",
+          "hashline-edit-diff-enhancer"
         ]
       }
     },
@@ -127,6 +129,9 @@
         "type": "string"
       }
     },
+    "hashline_edit": {
+      "type": "boolean"
+    },
     "agents": {
       "type": "object",
       "properties": {
@@ -135,6 +140,19 @@
           "properties": {
             "model": {
               "type": "string"
+            },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
             },
             "variant": {
               "type": "string"
@@ -300,18 +318,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -322,6 +339,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -486,18 +516,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -508,6 +537,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -672,18 +714,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -694,6 +735,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -858,18 +912,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -880,6 +933,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -1044,18 +1110,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1066,6 +1131,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -1230,18 +1308,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1252,6 +1329,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -1416,18 +1506,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1438,6 +1527,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -1602,18 +1704,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1624,6 +1725,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -1788,18 +1902,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1810,6 +1923,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -1974,18 +2100,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -1996,6 +2121,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -2160,18 +2298,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2182,6 +2319,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -2346,18 +2496,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2368,6 +2517,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -2532,18 +2694,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2554,6 +2715,19 @@
             "model": {
               "type": "string"
             },
+            "fallback_models": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              ]
+            },
             "variant": {
               "type": "string"
             },
@@ -2718,18 +2892,17 @@
               "type": "object",
               "additionalProperties": {}
             },
-            "fallback_models": {
-              "anyOf": [
-                {
+            "ultrawork": {
+              "type": "object",
+              "properties": {
+                "model": {
                   "type": "string"
                 },
-                {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                "variant": {
+                  "type": "string"
                 }
-              ]
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -2747,6 +2920,19 @@
           },
           "model": {
             "type": "string"
+          },
+          "fallback_models": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
           },
           "variant": {
             "type": "string"
@@ -2811,19 +2997,6 @@
           },
           "is_unstable_agent": {
             "type": "boolean"
-          },
-          "fallback_models": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            ]
           },
           "disable": {
             "type": "boolean"
@@ -3030,7 +3203,7 @@
         "safe_hook_creation": {
           "type": "boolean"
         },
-        "hashline_edit": {
+        "disable_omo_env": {
           "type": "boolean"
         }
       },
