@@ -5,6 +5,7 @@ import {
   createClaudeCodeHooksHook,
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
+  createAnsiStripperHook,
 } from "../../hooks"
 import {
   contextCollector,
@@ -17,6 +18,7 @@ export type TransformHooks = {
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
+  ansiStripper: ReturnType<typeof createAnsiStripperHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -63,10 +65,19 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const ansiStripper = isHookEnabled("ansi-stripper")
+    ? safeCreateHook(
+        "ansi-stripper",
+        () => createAnsiStripperHook(),
+        { enabled: safeHookEnabled },
+      )
+    : null
+
   return {
     claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
+    ansiStripper,
   }
 }

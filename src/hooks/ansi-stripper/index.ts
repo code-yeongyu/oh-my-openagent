@@ -1,0 +1,1 @@
+export { createAnsiStripperHook } from "./hook"
