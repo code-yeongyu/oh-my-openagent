@@ -5,6 +5,7 @@ import { hasConnectedProvidersCache } from "../shared"
 import { setSessionModel } from "../shared/session-model-state"
 import { setSessionAgent } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
+import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -119,20 +120,12 @@ export function createChatMessageHandler(args: {
       if (isRalphLoopTemplate) {
         const taskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i)
         const rawTask = taskMatch?.[1]?.trim() || ""
-        const quotedMatch = rawTask.match(/^["'](.+?)["']/)
-        const prompt =
-          quotedMatch?.[1] ||
-          rawTask.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
+        const parsedArguments = parseRalphLoopArguments(rawTask)
 
-        const maxIterMatch = rawTask.match(/--max-iterations=(\d+)/i)
-        const promiseMatch = rawTask.match(
-          /--completion-promise=["']?([^"'\s]+)["']?/i,
-        )
-
-        hooks.ralphLoop.startLoop(input.sessionID, prompt, {
-          maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
-          completionPromise: promiseMatch?.[1],
+        hooks.ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
+          maxIterations: parsedArguments.maxIterations,
+          completionPromise: parsedArguments.completionPromise,
+          strategy: parsedArguments.strategy,
         })
       } else if (isCancelRalphTemplate) {
         hooks.ralphLoop.cancelLoop(input.sessionID)
