@@ -67,7 +67,7 @@ export async function injectContinuationPrompt(
 		tools = currentMessage?.tools
 	}
 
-	const inheritedTools = resolveInheritedPromptTools(options.sessionID, tools)
+	const inheritedTools = resolveInheritedPromptTools(sourceSessionID, tools)
 
 	await ctx.client.session.promptAsync({
 		path: { id: options.sessionID },
