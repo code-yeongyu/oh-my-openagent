@@ -20,16 +20,20 @@ type FirstMessageVariantGate = {
   clear: (sessionID: string) => void
 }
 
+type EventInput = Parameters<
+  NonNullable<NonNullable<CreatedHooks["writeExistingFileGuard"]>["event"]>
+>[0]
+
 export function createEventHandler(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
   firstMessageVariantGate: FirstMessageVariantGate
   managers: Managers
   hooks: CreatedHooks
-}): (input: { event: { type: string; properties?: Record<string, unknown> } }) => Promise<void> {
+}): (input: EventInput) => Promise<void> {
   const { ctx, firstMessageVariantGate, managers, hooks } = args
 
-  const dispatchToHooks = async (input: { event: { type: string; properties?: Record<string, unknown> } }): Promise<void> => {
+  const dispatchToHooks = async (input: EventInput): Promise<void> => {
     await Promise.resolve(hooks.autoUpdateChecker?.event?.(input))
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input))
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input))
@@ -45,7 +49,7 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.runtimeFallback?.event?.(input))
     await Promise.resolve(hooks.agentUsageReminder?.event?.(input))
     await Promise.resolve(hooks.categorySkillReminder?.event?.(input))
-    await Promise.resolve(hooks.interactiveBashSession?.event?.(input))
+    await Promise.resolve(hooks.interactiveBashSession?.event?.(input as EventInput))
     await Promise.resolve(hooks.ralphLoop?.event?.(input))
     await Promise.resolve(hooks.stopContinuationGuard?.event?.(input))
     await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input))
@@ -88,7 +92,7 @@ export function createEventHandler(args: {
         return
       }
       recentSyntheticIdles.set(sessionID, Date.now())
-      await dispatchToHooks(syntheticIdle)
+      await dispatchToHooks(syntheticIdle as EventInput)
     }
 
     const { event } = input
