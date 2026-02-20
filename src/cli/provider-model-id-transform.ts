@@ -1,4 +1,14 @@
-export function transformModelForProvider(provider: string, model: string): string {
+export function transformModelForProvider(
+	provider: string,
+	model: string,
+	options: { hasAntigravity?: boolean } = {}
+): string {
+	if (provider === "google" && options.hasAntigravity) {
+		if (model.startsWith("gemini-")) {
+			return `antigravity-${model}`
+		}
+	}
+
 	if (provider === "github-copilot") {
 		return model
 			.replace("claude-opus-4-6", "claude-opus-4.6")

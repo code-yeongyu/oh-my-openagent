@@ -13,7 +13,9 @@ export function resolveModelFromChain(
 	for (const entry of fallbackChain) {
 		for (const provider of entry.providers) {
 			if (isProviderAvailable(provider, availability)) {
-				const transformedModel = transformModelForProvider(provider, entry.model)
+				const transformedModel = transformModelForProvider(provider, entry.model, {
+					hasAntigravity: availability.native.gemini,
+				})
 				return {
 					model: `${provider}/${transformedModel}`,
 					variant: entry.variant,
