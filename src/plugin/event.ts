@@ -130,6 +130,7 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.ralphLoop?.event?.(input))
     await Promise.resolve(hooks.stopContinuationGuard?.event?.(input))
     await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input))
+    await Promise.resolve(hooks.writeExistingFileGuard?.event?.(input))
     await Promise.resolve(hooks.atlasHook?.handler?.(input))
   }
 
