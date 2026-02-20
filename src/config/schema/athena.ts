@@ -13,18 +13,25 @@ const ModelStringSchema = z
 export const CouncilMemberSchema = z.object({
   model: ModelStringSchema,
   variant: z.string().optional(),
-  name: z.string().min(1),
+  name: z.string().min(1).trim().regex(/^[a-zA-Z0-9][a-zA-Z0-9 .\-]*$/, {
+    message: "Council member name must contain only letters, numbers, spaces, hyphens, and dots",
+  }),
   temperature: z.number().min(0).max(2).optional(),
 }).strict()
 
 export const CouncilConfigSchema = z.object({
-  members: z.array(CouncilMemberSchema).min(2),
+  members: z.array(CouncilMemberSchema).min(2).refine(
+    (members) => {
+      const names = members.map(m => m.name.toLowerCase())
+      return new Set(names).size === names.length
+    },
+    { message: "Council member names must be unique (case-insensitive)" },
+  ),
 }).strict()
 
 export type CouncilMemberConfig = z.infer<typeof CouncilMemberSchema>
 export type CouncilConfig = z.infer<typeof CouncilConfigSchema>
 
 export const AthenaConfigSchema = z.object({
-  model: z.string().optional(),
   council: CouncilConfigSchema,
 }).strict()

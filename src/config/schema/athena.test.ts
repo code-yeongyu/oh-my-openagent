@@ -181,6 +181,86 @@ describe("CouncilMemberSchema", () => {
     //#then
     expect(result.success).toBe(false)
   })
+
+  test("trims leading and trailing whitespace from name", () => {
+    //#given
+    const config = { model: "anthropic/claude-opus-4-6", name: "  member-a  " }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.name).toBe("member-a")
+    }
+  })
+
+  test("accepts name with spaces like 'Claude Opus 4'", () => {
+    //#given
+    const config = { model: "anthropic/claude-opus-4-6", name: "Claude Opus 4" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+
+  test("accepts name with dots like 'Claude 4.6'", () => {
+    //#given
+    const config = { model: "anthropic/claude-opus-4-6", name: "Claude 4.6" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+
+  test("accepts name with hyphens like 'my-model-1'", () => {
+    //#given
+    const config = { model: "anthropic/claude-opus-4-6", name: "my-model-1" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+
+  test("rejects name with special characters like '@'", () => {
+    //#given
+    const config = { model: "anthropic/claude-opus-4-6", name: "member@1" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects name with exclamation mark", () => {
+    //#given
+    const config = { model: "anthropic/claude-opus-4-6", name: "member!" }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects name starting with a space after trim", () => {
+    //#given
+    const config = { model: "anthropic/claude-opus-4-6", name: " " }
+
+    //#when
+    const result = CouncilMemberSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("CouncilConfigSchema", () => {
@@ -249,13 +329,60 @@ describe("CouncilConfigSchema", () => {
     //#then
     expect(result.success).toBe(false)
   })
+
+  test("rejects council with duplicate member names", () => {
+    //#given
+    const config = {
+      members: [
+        { model: "anthropic/claude-opus-4-6", name: "analyst" },
+        { model: "openai/gpt-5.3-codex", name: "analyst" },
+      ],
+    }
+
+    //#when
+    const result = CouncilConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects council with case-insensitive duplicate names", () => {
+    //#given
+    const config = {
+      members: [
+        { model: "anthropic/claude-opus-4-6", name: "Claude" },
+        { model: "openai/gpt-5.3-codex", name: "claude" },
+      ],
+    }
+
+    //#when
+    const result = CouncilConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("accepts council with unique member names", () => {
+    //#given
+    const config = {
+      members: [
+        { model: "anthropic/claude-opus-4-6", name: "analyst-a" },
+        { model: "openai/gpt-5.3-codex", name: "analyst-b" },
+      ],
+    }
+
+    //#when
+    const result = CouncilConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
 })
 
 describe("AthenaConfigSchema", () => {
-  test("accepts Athena config with model and council", () => {
+  test("accepts Athena config with council", () => {
     //#given
     const config = {
-      model: "anthropic/claude-opus-4-6",
       council: {
         members: [
           { model: "openai/gpt-5.3-codex", name: "member-a" },
@@ -273,7 +400,26 @@ describe("AthenaConfigSchema", () => {
 
   test("rejects Athena config without council", () => {
     //#given
-    const config = { model: "anthropic/claude-opus-4-6" }
+    const config = {}
+
+    //#when
+    const result = AthenaConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects Athena config with unknown model field", () => {
+    //#given
+    const config = {
+      model: "anthropic/claude-opus-4-6",
+      council: {
+        members: [
+          { model: "openai/gpt-5.3-codex", name: "member-a" },
+          { model: "xai/grok-code-fast-1", name: "member-b" },
+        ],
+      },
+    }
 
     //#when
     const result = AthenaConfigSchema.safeParse(config)
