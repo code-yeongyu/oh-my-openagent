@@ -4,7 +4,7 @@ const PACKAGE_NAME = "oh-my-opencode"
 const PRIORITIZED_TAGS = ["latest", "beta", "next"] as const
 
 function getFallbackEntry(version: string): string {
-  const prereleaseMatch = version.match(/-([a-zA-Z][a-zA-Z0-9]*)\./)
+  const prereleaseMatch = version.match(/-([a-zA-Z][a-zA-Z0-9-]*)(?:\.|$)/)
   if (prereleaseMatch) {
     return `${PACKAGE_NAME}@${prereleaseMatch[1]}`
   }
