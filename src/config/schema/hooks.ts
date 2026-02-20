@@ -38,6 +38,7 @@ export const HookNameSchema = z.enum([
   "prometheus-md-only",
   "sisyphus-junior-notepad",
   "no-sisyphus-gpt",
+  "no-hephaestus-non-gpt",
   "start-work",
   "atlas",
   "unstable-agent-babysitter",
