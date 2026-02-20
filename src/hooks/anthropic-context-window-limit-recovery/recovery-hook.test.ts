@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import * as originalExecutor from "./executor"
 import * as originalParser from "./parser"
@@ -79,6 +79,10 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
     executeCompactMock.mockClear()
     getLastAssistantMock.mockClear()
     parseAnthropicTokenLimitErrorMock.mockClear()
+  })
+
+  afterEach(() => {
+    mock.restore()
   })
 
   test("cancels pending timer when session.idle handles compaction first", async () => {

@@ -82,7 +82,7 @@ export async function applyAgentConfig(params: {
     migratedDisabledAgents,
     params.pluginConfig.agents,
     params.ctx.directory,
-    undefined,
+    currentModel,
     params.pluginConfig.categories,
     params.pluginConfig.git_master,
     allDiscoveredSkills,
