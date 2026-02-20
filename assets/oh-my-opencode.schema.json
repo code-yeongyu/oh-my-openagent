@@ -92,6 +92,7 @@
           "prometheus-md-only",
           "sisyphus-junior-notepad",
           "no-sisyphus-gpt",
+          "no-hephaestus-non-gpt",
           "start-work",
           "atlas",
           "unstable-agent-babysitter",
@@ -3136,6 +3137,9 @@
           "minimum": 1000
         },
         "safe_hook_creation": {
+          "type": "boolean"
+        },
+        "disable_omo_env": {
           "type": "boolean"
         },
         "hashline_edit": {
