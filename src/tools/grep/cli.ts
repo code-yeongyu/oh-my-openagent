@@ -8,14 +8,17 @@ import {
   DEFAULT_MAX_COLUMNS,
   DEFAULT_TIMEOUT_MS,
   DEFAULT_MAX_OUTPUT_BYTES,
+  DEFAULT_RG_THREADS,
   RG_SAFETY_FLAGS,
   GREP_SAFETY_FLAGS,
 } from "./constants"
 import type { GrepOptions, GrepMatch, GrepResult, CountResult } from "./types"
+import { rgSemaphore } from "../shared/semaphore"
 
 function buildRgArgs(options: GrepOptions): string[] {
   const args: string[] = [
     ...RG_SAFETY_FLAGS,
+    `--threads=${Math.min(options.threads ?? DEFAULT_RG_THREADS, DEFAULT_RG_THREADS)}`,
     `--max-depth=${Math.min(options.maxDepth ?? DEFAULT_MAX_DEPTH, DEFAULT_MAX_DEPTH)}`,
     `--max-filesize=${options.maxFilesize ?? DEFAULT_MAX_FILESIZE}`,
     `--max-count=${Math.min(options.maxCount ?? DEFAULT_MAX_COUNT, DEFAULT_MAX_COUNT)}`,
@@ -49,6 +52,12 @@ function buildRgArgs(options: GrepOptions): string[] {
     for (const glob of options.excludeGlobs) {
       args.push(`--glob=!${glob}`)
     }
+  }
+
+  if (options.outputMode === "files_with_matches") {
+    args.push("--files-with-matches")
+  } else if (options.outputMode === "count") {
+    args.push("--count")
   }
 
   return args
@@ -130,6 +139,15 @@ function parseCountOutput(output: string): CountResult[] {
 }
 
 export async function runRg(options: GrepOptions): Promise<GrepResult> {
+  await rgSemaphore.acquire()
+  try {
+    return await runRgInternal(options)
+  } finally {
+    rgSemaphore.release()
+  }
+}
+
+async function runRgInternal(options: GrepOptions): Promise<GrepResult> {
   const cli = resolveGrepCli()
   const args = buildArgs(options, cli.backend)
   const timeout = Math.min(options.timeout ?? DEFAULT_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
@@ -174,13 +192,16 @@ export async function runRg(options: GrepOptions): Promise<GrepResult> {
     }
 
     const matches = parseOutput(outputToProcess)
-    const filesSearched = new Set(matches.map((m) => m.file)).size
+    const limited = options.headLimit && options.headLimit > 0
+      ? matches.slice(0, options.headLimit)
+      : matches
+    const filesSearched = new Set(limited.map((m) => m.file)).size
 
     return {
-      matches,
-      totalMatches: matches.length,
+      matches: limited,
+      totalMatches: limited.length,
       filesSearched,
-      truncated,
+      truncated: truncated || (options.headLimit ? matches.length > options.headLimit : false),
     }
   } catch (e) {
     return {
@@ -194,6 +215,15 @@ export async function runRg(options: GrepOptions): Promise<GrepResult> {
 }
 
 export async function runRgCount(options: Omit<GrepOptions, "context">): Promise<CountResult[]> {
+  await rgSemaphore.acquire()
+  try {
+    return await runRgCountInternal(options)
+  } finally {
+    rgSemaphore.release()
+  }
+}
+
+async function runRgCountInternal(options: Omit<GrepOptions, "context">): Promise<CountResult[]> {
   const cli = resolveGrepCli()
   const args = buildArgs({ ...options, context: 0 }, cli.backend)
 
