@@ -10,8 +10,7 @@ import {
   setMainSession,
   updateSessionAgent,
 } from "../features/claude-code-session-state"
-import { log } from "../shared"
-import { resetMessageCursor } from "../shared"
+import { log, resetMessageCursor } from "../shared"
 import { lspManager } from "../tools"
 import { shouldRetryError } from "../shared/model-error-classifier"
 import { clearPendingModelFallback, clearSessionFallbackChain, setPendingModelFallback } from "../hooks/model-fallback/hook"
