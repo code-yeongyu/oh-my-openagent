@@ -4,7 +4,7 @@ import { applyPendingSwitch, clearPendingSwitchRuntime } from "../../features/ag
 import {
   isTerminalFinishValue,
   isTerminalStepFinishPart,
-} from "./fallback-handoff"
+} from "./terminal-detection"
 
 function getSessionIDFromStatusEvent(input: { event: { properties?: Record<string, unknown> } }): string | undefined {
   const props = input.event.properties as Record<string, unknown> | undefined
