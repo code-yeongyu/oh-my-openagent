@@ -36,6 +36,9 @@ const defaultTmuxDeps: TmuxUtilDeps = {
   getCurrentPaneId: defaultGetCurrentPaneId,
 }
 
+const DEFERRED_SESSION_TTL_MS = 5 * 60 * 1000
+const MAX_DEFERRED_QUEUE_SIZE = 20
+
 /**
  * State-first Tmux Session Manager
  * 
@@ -60,6 +63,7 @@ export class TmuxSessionManager {
   private deferredQueue: string[] = []
   private deferredAttachInterval?: ReturnType<typeof setInterval>
   private deferredAttachTickScheduled = false
+  private nullStateCount = 0
   private deps: TmuxUtilDeps
   private pollingManager: TmuxPollingManager
   constructor(ctx: PluginInput, tmuxConfig: TmuxConfig, deps: TmuxUtilDeps = defaultTmuxDeps) {
@@ -104,6 +108,14 @@ export class TmuxSessionManager {
 
   private enqueueDeferredSession(sessionId: string, title: string): void {
     if (this.deferredSessions.has(sessionId)) return
+    if (this.deferredQueue.length >= MAX_DEFERRED_QUEUE_SIZE) {
+      log("[tmux-session-manager] deferred queue full, dropping session", {
+        sessionId,
+        queueLength: this.deferredQueue.length,
+        maxQueueSize: MAX_DEFERRED_QUEUE_SIZE,
+      })
+      return
+    }
     this.deferredSessions.set(sessionId, {
       sessionId,
       title,
@@ -131,6 +143,7 @@ export class TmuxSessionManager {
 
   private startDeferredAttachLoop(): void {
     if (this.deferredAttachInterval) return
+    this.nullStateCount = 0
     this.deferredAttachInterval = setInterval(() => {
       if (this.deferredAttachTickScheduled) return
       this.deferredAttachTickScheduled = true
@@ -152,6 +165,7 @@ export class TmuxSessionManager {
     clearInterval(this.deferredAttachInterval)
     this.deferredAttachInterval = undefined
     this.deferredAttachTickScheduled = false
+    this.nullStateCount = 0
     log("[tmux-session-manager] deferred attach polling stopped")
   }
 
@@ -169,8 +183,36 @@ export class TmuxSessionManager {
       return
     }
 
+    if (Date.now() - deferred.queuedAt.getTime() > DEFERRED_SESSION_TTL_MS) {
+      this.deferredQueue.shift()
+      this.deferredSessions.delete(sessionId)
+      log("[tmux-session-manager] deferred session expired", {
+        sessionId,
+        queuedAt: deferred.queuedAt.toISOString(),
+        ttlMs: DEFERRED_SESSION_TTL_MS,
+        queueLength: this.deferredQueue.length,
+      })
+      if (this.deferredQueue.length === 0) {
+        this.stopDeferredAttachLoop()
+      }
+      return
+    }
+
     const state = await queryWindowState(this.sourcePaneId)
-    if (!state) return
+    if (!state) {
+      this.nullStateCount += 1
+      log("[tmux-session-manager] deferred attach window state is null", {
+        nullStateCount: this.nullStateCount,
+      })
+      if (this.nullStateCount >= 3) {
+        log("[tmux-session-manager] stopping deferred attach loop after consecutive null states", {
+          nullStateCount: this.nullStateCount,
+        })
+        this.stopDeferredAttachLoop()
+      }
+      return
+    }
+    this.nullStateCount = 0
 
     const decision = decideSpawnActions(
       state,
@@ -365,6 +407,11 @@ export class TmuxSessionManager {
           }
         }
 
+        const closeActionSucceeded = result.results.some(
+          ({ action, result: actionResult }) => action.type === "close" && actionResult.success,
+        )
+        const spawnFailed = !result.success || !result.spawnedPaneId
+
         if (result.success && result.spawnedPaneId) {
           const sessionReady = await this.waitForSessionReady(sessionId)
 
@@ -398,6 +445,13 @@ export class TmuxSessionManager {
               error: r.result.error,
             })),
           })
+
+          if (closeActionSucceeded) {
+            log("[tmux-session-manager] re-queueing deferred session after close+spawn failure", {
+              sessionId,
+            })
+            this.enqueueDeferredSession(sessionId, title)
+          }
 
           if (result.spawnedPaneId) {
             await executeAction(
