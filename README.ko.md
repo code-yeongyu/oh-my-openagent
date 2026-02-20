@@ -137,8 +137,8 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 | :---: | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **기강 잡힌 에이전트 (Discipline Agents)** | Sisyphus가 Hephaestus, Oracle, Librarian, Explore를 오케스트레이션합니다. 완전한 AI 개발팀이 병렬로 돌아갑니다. |
 |   ⚡   | **`ultrawork` / `ulw`**      | 단어 하나면 됩니다. 모든 에이전트가 활성화되고 다 끝날 때까지 멈추지 않습니다. |
-|   🚪   | **IntentGate**                 | 사용자의 진짜 의도를 분석한 뒤 분류하거나 행동합니다. 더 이상 문자 그대로 오해해서 헛짓거리하는 일이 없습니다. |
-|   🔗   | **해시 기반 편집 툴**  | `LINE#ID` 콘텐츠 해시로 모든 변경 사항을 검증합니다. stale-line 에러 0%. |
+|   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)**                 | 사용자의 진짜 의도를 분석한 뒤 분류하거나 행동합니다. 더 이상 문자 그대로 오해해서 헛짓거리하는 일이 없습니다. |
+|   🔗   | **해시 기반 편집 툴**  | `LINE#ID` 콘텐츠 해시로 모든 변경 사항을 검증합니다. stale-line 에러 0%. [oh-my-pi](https://github.com/can1357/oh-my-pi)에서 영감을 받았습니다. [하니스 프로블러 →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
 |   🛠️   | **LSP + AST-Grep**           | 워크스페이스 단위 이름 변경, 빌드 전 진단, AST 기반 재작성. 에이전트에게 IDE급 정밀도를 제공합니다. |
 |   🧠   | **백그라운드 에이전트**        | 5명 이상의 전문가를 병렬로 투입합니다. 컨텍스트는 가볍게 유지하고 결과는 준비될 때 받습니다. |
 |   📚   | **기본 내장 MCP**            | Exa(웹 검색), Context7(공식 문서), Grep.app(GitHub 검색). 항상 켜져 있습니다. |

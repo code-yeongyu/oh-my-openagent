@@ -140,8 +140,8 @@ Even only with following subscriptions, ultrawork will work well (this project i
 | :---: | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **Discipline Agents**        | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                       |
 |   ⚡   | **`ultrawork` / `ulw`**      | One word. Every agent activates. Doesn't stop until done.                                                                           |
-|   🚪   | **IntentGate**                 | Analyzes true user intent before classifying or acting. No more literal misinterpretations.                                         |
-|   🔗   | **Hash-Anchored Edit Tool**  | `LINE#ID` content hash validates every change. Zero stale-line errors.                                                              |
+|   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)**                 | Analyzes true user intent before classifying or acting. No more literal misinterpretations.                                         |
+|   🔗   | **Hash-Anchored Edit Tool**  | `LINE#ID` content hash validates every change. Zero stale-line errors. Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
 |   🛠️   | **LSP + AST-Grep**           | Workspace rename, pre-build diagnostics, AST-aware rewrites. IDE precision for agents.                                              |
 |   🧠   | **Background Agents**        | Fire 5+ specialists in parallel. Context stays lean. Results when ready.                                                            |
 |   📚   | **Built-in MCPs**            | Exa (web search), Context7 (official docs), Grep.app (GitHub search). Always on.                                                    |
