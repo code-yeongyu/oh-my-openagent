@@ -2046,8 +2046,8 @@ describe("sisyphus-task", () => {
       expect(result).toContain("Artistry result here")
     }, { timeout: 20000 })
 
-    test("writing category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {
-      // given - writing uses gemini-3-flash
+    test("writing category (kimi) with run_in_background=false should force background but wait for result", async () => {
+      // given - writing uses kimi-for-coding/k2p5
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
