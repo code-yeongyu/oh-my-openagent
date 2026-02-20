@@ -67,6 +67,20 @@ export function migrateConfigFile(
     needsWrite = true
   }
 
+  if (copy.experimental && typeof copy.experimental === "object") {
+    const experimental = copy.experimental as Record<string, unknown>
+    if ("hashline_edit" in experimental) {
+      if (copy.hashline_edit === undefined) {
+        copy.hashline_edit = experimental.hashline_edit
+      }
+      delete experimental.hashline_edit
+      if (Object.keys(experimental).length === 0) {
+        delete copy.experimental
+      }
+      needsWrite = true
+    }
+  }
+
   if (copy.disabled_agents && Array.isArray(copy.disabled_agents)) {
     const migrated: string[] = []
     let changed = false
