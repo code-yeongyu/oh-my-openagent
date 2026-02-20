@@ -114,7 +114,7 @@ export function createAgentSwitchHook(ctx: PluginInput) {
         processedFallbackMessages.add(marker)
 
         // Prevent unbounded growth of the Set
-        if (processedFallbackMessages.size > MAX_PROCESSED_FALLBACK_MARKERS) {
+        if (processedFallbackMessages.size >= MAX_PROCESSED_FALLBACK_MARKERS) {
           const iterator = processedFallbackMessages.values()
           const oldest = iterator.next().value
           if (oldest) {
