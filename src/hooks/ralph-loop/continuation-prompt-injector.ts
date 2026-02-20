@@ -30,9 +30,9 @@ export async function injectContinuationPrompt(
 	let agent: string | undefined
 	let model: { providerID: string; modelID: string } | undefined
 	let tools: Record<string, boolean | "allow" | "deny" | "ask"> | undefined
+	const sourceSessionID = options.inheritFromSessionID ?? options.sessionID
 
 	try {
-		const sourceSessionID = options.inheritFromSessionID ?? options.sessionID
 		const messagesResp = await withTimeout(
 			ctx.client.session.messages({
 				path: { id: sourceSessionID },
@@ -54,7 +54,7 @@ export async function injectContinuationPrompt(
 			}
 		}
 	} catch {
-		const messageDir = getMessageDir(options.sessionID)
+		const messageDir = getMessageDir(sourceSessionID)
 		const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
 		agent = currentMessage?.agent
 		model =
