@@ -489,7 +489,14 @@ describe("ralph-loop", () => {
       // given - active loop with assistant message containing completion promise
       mockSessionMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }] },
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool_use", text: "read file" },
+            { type: "tool_result", text: "contents" },
+            { type: "text", text: "I have completed the task. <promise>API_DONE</promise>" },
+          ],
+        },
       ]
       const hook = createRalphLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
@@ -510,7 +517,7 @@ describe("ralph-loop", () => {
       expect(hook.getState()).toBeNull()
 
       // then - messages API was called with correct session ID
-      expect(messagesCalls.length).toBe(1)
+      expect(messagesCalls.length).toBe(2)
       expect(messagesCalls[0].sessionID).toBe("session-123")
     })
 
@@ -519,7 +526,14 @@ describe("ralph-loop", () => {
       mockMessagesApiResponseShape = "array"
       mockSessionMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "I have completed the task. <promise>API_DONE</promise>" }] },
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool_use", text: "read file" },
+            { type: "tool_result", text: "contents" },
+            { type: "text", text: "I have completed the task. <promise>API_DONE</promise>" },
+          ],
+        },
       ]
       const hook = createRalphLoopHook(createMockPluginInput(), {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
@@ -540,8 +554,96 @@ describe("ralph-loop", () => {
       expect(hook.getState()).toBeNull()
 
       // then - messages API was called with correct session ID
-      expect(messagesCalls.length).toBe(1)
+      expect(messagesCalls.length).toBe(2)
       expect(messagesCalls[0].sessionID).toBe("session-123")
+    })
+
+    test("should reject completion promise when no tool calls were made (bypass prevention)", async () => {
+      // given - active loop, assistant message with promise but NO tool_use parts
+      mockSessionMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "Done! <promise>DONE</promise>" }] },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE", maxIterations: 10 })
+
+      // when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // then - promise should be REJECTED (continuation injected instead of completion)
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain("WORK REQUIRED")
+      expect(promptCalls[0].text).toContain("REJECTED")
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(false)
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
+    test("should accept completion promise when tool calls were made", async () => {
+      // given - assistant message with promise AND tool_use parts
+      mockSessionMessages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Build something" }] },
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool_use", text: "read file" },
+            { type: "tool_result", text: "file contents" },
+            { type: "text", text: "Done! <promise>DONE</promise>" },
+          ],
+        },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      // when - session goes idle
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // then - promise should be ACCEPTED (work was done)
+      expect(promptCalls.length).toBe(0)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(hook.getState()).toBeNull()
+    })
+
+    test("should fail open when work verification API errors", async () => {
+      // given - API that throws during work verification
+      let apiCallCount = 0
+      const errorMock = createMockPluginInput()
+      Object.defineProperty(errorMock.client.session, "messages", {
+        value: async () => {
+          apiCallCount++
+          if (apiCallCount > 1) throw new Error("API error")
+          // First call for promise detection succeeds
+          return {
+            data: [
+              {
+                info: { role: "assistant" },
+                parts: [{ type: "text", text: "<promise>DONE</promise>" }],
+              },
+            ],
+          }
+        },
+      })
+      const hook = createRalphLoopHook(errorMock, {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+        apiTimeout: 100,
+      })
+      hook.startLoop("session-123", "Build something")
+
+      // when - session goes idle (work verification will fail)
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      // then - should fail open (accept the promise since we can't verify)
+      expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
+      expect(hook.getState()).toBeNull()
     })
 
     test("should ignore completion promise in reasoning part via session messages API", async () => {
@@ -671,7 +773,14 @@ describe("ralph-loop", () => {
         { info: { role: "user" }, parts: [{ type: "text", text: "Start task" }] },
         { info: { role: "assistant" }, parts: [{ type: "text", text: "Working on it." }] },
         { info: { role: "user" }, parts: [{ type: "text", text: "Continue" }] },
-        { info: { role: "assistant" }, parts: [{ type: "text", text: "Nearly there... <promise>DONE</promise>" }] },
+        {
+          info: { role: "assistant" },
+          parts: [
+            { type: "tool_use", text: "edit file" },
+            { type: "tool_result", text: "updated" },
+            { type: "text", text: "Nearly there... <promise>DONE</promise>" },
+          ],
+        },
         { info: { role: "assistant" }, parts: [{ type: "text", text: "(extra output after promise)" }] },
       ]
       const hook = createRalphLoopHook(createMockPluginInput(), {
@@ -972,20 +1081,14 @@ Original task: Build something`
     test("should not hang when session.messages() throws", async () => {
       // given - API that throws (simulates timeout error)
       let apiCallCount = 0
-      const errorMock = {
-        ...createMockPluginInput(),
-        client: {
-          ...createMockPluginInput().client,
-          session: {
-            ...createMockPluginInput().client.session,
-            messages: async () => {
-              apiCallCount++
-              throw new Error("API timeout")
-            },
-          },
+      const errorMock = createMockPluginInput()
+      Object.defineProperty(errorMock.client.session, "messages", {
+        value: async () => {
+          apiCallCount++
+          throw new Error("API timeout")
         },
-      }
-      const hook = createRalphLoopHook(errorMock as any, {
+      })
+      const hook = createRalphLoopHook(errorMock, {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
         apiTimeout: 100,
       })

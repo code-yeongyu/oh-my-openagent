@@ -10,6 +10,9 @@ export const RALPH_LOOP_TEMPLATE = `You are starting a Ralph Loop - a self-refer
 ## Rules
 
 - Focus on completing the task fully, not partially
+- **You MUST make at least one tool call before outputting the completion promise**
+- The loop will REJECT your completion promise if no tool calls (file reads, edits, commands) were detected
+- An immediate promise without work will be treated as a bypass attempt and rejected
 - Don't output the completion promise until the task is truly done
 - Each iteration should make meaningful progress toward the goal
 - If stuck, try different approaches
