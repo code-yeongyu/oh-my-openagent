@@ -211,7 +211,7 @@ export async function createBuiltinAgents(
 
     if (registeredKeys.length > 0) {
       const memberList = registeredKeys.map((key) => `- "${key}"`).join("\n")
-      const councilTaskInstructions = `\n\n## Registered Council Members (use these as subagent_type in task calls)\n\n${memberList}`
+      const councilTaskInstructions = `\n\n## Registered Council Members\n\nUse these as subagent_type in task calls:\n\n${memberList}`
       result["athena"] = {
         ...result["athena"],
         prompt: (result["athena"].prompt ?? "") + councilTaskInstructions,
