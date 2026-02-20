@@ -1,30 +1,26 @@
 > [!WARNING]
-> **セキュリティ警告：なりすましサイト**
+> **セキュリティ警告: 偽装サイトにご注意ください**
 >
-> **ohmyopencode.comは本プロジェクトとは一切関係ありません。** 当方はそのサイトを運営しておらず、推奨もしていません。
+> **ohmyopencode.com はこのプロジェクトとは一切関係がありません。** 私たちはそのサイトを運営したり承認したりしていません。
 >
-> OhMyOpenCodeは**無料かつオープンソース**です。「公式」を名乗るサードパーティサイトでインストーラーをダウンロードしたり、支払い情報を入力したり**しないでください**。
+> OhMyOpenCodeは**無料かつオープンソース**です。「公式」を名乗る第三者のサイトからインストーラーをダウンロードしたり、支払い情報を入力したり**しないでください。**
 >
-> なりすましサイトはペイウォールの裏にあるため、**何が配布されているか確認できません**。そこからのダウンロードは**潜在的に危険なもの**として扱ってください。
+> 偽装サイトはペイウォールの背後に隠れており、**どのような悪意あるプログラムを配布しているか検証できません**。そこからのダウンロードはすべて**潜在的に危険**であると見なしてください。
 >
-> ✅ 公式ダウンロード：https://github.com/code-yeongyu/oh-my-opencode/releases
+> ✅ 公式ダウンロード: https://github.com/code-yeongyu/oh-my-opencode/releases
 
 > [!NOTE]
 >
-> [![Sisyphus Labs — Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
-> > **Sisyphusの完全製品化バージョンを構築中です。フロンティアエージェントの未来を定義します。<br />[こちら](https://sisyphuslabs.ai)からウェイトリストに参加してください。**
+> [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
+> > **私たちは、フロンティアエージェントの未来を定義するために、Sisyphusの完全なプロダクト版を構築しています。 <br />[こちら](https://sisyphuslabs.ai)からウェイトリストにご登録ください。**
 
 > [!TIP]
+> 私たちと一緒に！
 >
-> [![Oh My OpenCode 3.0が正式リリースされました！](./.github/assets/orchestrator-atlas.png?v=3)](https://github.com/code-yeongyu/oh-my-opencode/releases/tag/v3.0.0)
-> > **Oh My OpenCode 3.0が正式リリースされました！`oh-my-opencode@latest`を使用してインストールしてください。**
->
-> 一緒に歩みましょう！
->
-> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | [Discordコミュニティ](https://discord.gg/PUwSMR9XNk)に参加して、コントリビューターや`oh-my-opencode`仲間とつながりましょう。 |
+> | [<img alt="Discord link" src="https://img.shields.io/discord/1452487457085063218?color=5865F2&label=discord&labelColor=black&logo=discord&logoColor=white&style=flat-square" width="156px" />](https://discord.gg/PUwSMR9XNk) | [Discordコミュニティ](https://discord.gg/PUwSMR9XNk)に参加して、コントリビューターや他の `oh-my-opencode` ユーザーと交流しましょう。 |
 > | :-----| :----- |
-> | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `oh-my-opencode`に関するニュースは私のXアカウントで投稿していましたが、無実の罪で凍結されたため、<br />[@justsisyphus](https://x.com/justsisyphus)が代わりに更新を投稿しています。 |
-> | [<img alt="GitHub Follow" src="https://img.shields.io/github/followers/code-yeongyu?style=flat-square&logo=github&labelColor=black&color=24292f" width="156px" />](https://github.com/code-yeongyu) | GitHubで[@code-yeongyu](https://github.com/code-yeongyu)をフォローして、他のプロジェクトもチェックしてください。 |
+> | [<img alt="X link" src="https://img.shields.io/badge/Follow-%40justsisyphus-00CED1?style=flat-square&logo=x&labelColor=black" width="156px" />](https://x.com/justsisyphus) | `oh-my-opencode` のニュースやアップデートは私のXアカウントで投稿されていましたが、 <br /> 誤って凍結されてしまったため、現在は [@justsisyphus](https://x.com/justsisyphus) が代わりにアップデートを投稿しています。 |
+> | [<img alt="GitHub Follow" src="https://img.shields.io/github/followers/code-yeongyu?style=flat-square&logo=github&labelColor=black&color=24292f" width="156px" />](https://github.com/code-yeongyu) | さらに多くのプロジェクトを見たい場合は、GitHubで [@code-yeongyu](https://github.com/code-yeongyu) をフォローしてください。 |
 
 <!-- <CENTERED SECTION FOR GITHUB DISPLAY> -->
 
@@ -34,34 +30,11 @@
 
 [![Preview](./.github/assets/omo.png)](https://github.com/code-yeongyu/oh-my-opencode#oh-my-opencode)
 
-
 </div>
 
-> `oh-my-opencode` をインストールして、ドーピングしたかのようにコーディングしましょう。バックグラウンドでエージェントを走らせ、oracle、librarian、frontend engineer のような専門エージェントを呼び出してください。丹精込めて作られた LSP/AST ツール、厳選された MCP、そして完全な Claude Code 互換レイヤーを、たった一行で手に入れましょう。
-
-# Claude OAuth アクセスに関するお知らせ
-
-## TL;DR
-
-> Q. oh-my-opencodeを使用できますか？
-
-はい。
-
-> Q. Claude Codeのサブスクリプションで使用できますか？
-
-はい、技術的には可能です。ただし、使用を推奨することはできません。
-
-## 詳細
-
-> 2026年1月より、AnthropicはToS違反を理由にサードパーティのOAuthアクセスを制限しました。
+> Anthropicはあなたを閉じ込めたがっています。Claude Codeは素敵な牢獄ですが、それでも牢獄には変わりありません。
 >
-> [**Anthropicはこのプロジェクト oh-my-opencode を、opencodeをブロックする正当化の根拠として挙げています。**](https://x.com/thdxr/status/2010149530486911014)
->
-> 実際、Claude CodeのOAuthリクエストシグネチャを偽装するプラグインがコミュニティに存在します。
->
-> これらのツールは技術的な検出可能性に関わらず動作する可能性がありますが、ユーザーはToSへの影響を認識すべきであり、私個人としてはそれらの使用を推奨できません。
->
-> このプロジェクトは非公式ツールの使用に起因するいかなる問題についても責任を負いません。また、**私たちはそれらのOAuthシステムのカスタム実装を一切持っていません。**
+> 私たちは囲い込みをしません。ただ、安価なモデルでより良い結果を出すだけです。
 
 <div align="center">
 
@@ -72,210 +45,249 @@
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-opencode?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/stargazers)
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
 [![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE.md)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
 
 [English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
-
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
 
 </div>
 
 <!-- </CENTERED SECTION FOR GITHUB DISPLAY> -->
 
-## ユーザーレビュー
+## レビュー
 
-> "Cursorのサブスクリプションを解約しました。オープンソースコミュニティで信じられないことが起きています。" - [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)
+> 「これのおかげで Cursor のサブスクリプションを解約しました。オープンソースコミュニティで信じられないことが起きています。」 - [Arthur Guiot](https://x.com/arthur_guiot/status/2008736347092382053?s=20)
 
-> "人間が3ヶ月かかる仕事をClaude Codeが7日でやるなら、Sisyphusは1時間でやります。タスクが完了するまでただ動き続ける。It is a discipline agent." — B, Quant Researcher
+> 「Claude Codeが人間なら3ヶ月かかることを7日でやるとしたら、Sisyphusはそれを1時間でやってのけます。タスクが終わるまでひたすら働き続けます。まさに規律あるエージェントです。」 <br/>- B, Quant Researcher
 
-> "Oh My Opencodeを使って、たった1日で8000個のeslint警告を解消しました" — [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
+> 「Oh My Opencodeを使って、たった1日で8000個の eslint 警告を叩き潰しました。」 <br/>- [Jacob Ferrari](https://x.com/jacobferrari_/status/2003258761952289061)
 
-> "Ohmyopencodeとralph loopを使って、一晩で45,000行のtauriアプリをSaaSウェブアプリに変換しました。インタビュープロンプトから始めて、質問に対する評価と推奨を求めました。作業する様子を見ているのは驚きでしたし、朝起きたらほぼ完成したウェブサイトがありました！" - [James Hargis](https://x.com/hargabyte/status/2007299688261882202)
+> 「Ohmyopencodeとralph loopを使って、45k行のtauriアプリを一晩でSaaSウェブアプリに変換しました。インタビューモードから始めて、私のプロンプトに対して質問や推奨事項を尋ねました。勝手に作業していくのを見るのは楽しかったし、今朝起きたらウェブサイトがほぼ動いているのを見て驚愕しました！」 - [James Hargis](https://x.com/hargabyte/status/2007299688261882202)
 
-> "oh-my-opencodeを使ってください、もう戻れませんよ" — [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
+> 「oh-my-opencodeを使ってください。もう二度と元には戻れません。」 <br/>- [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
 
-> "何どうすごいのかあまり言語化できてないけど、開発体験が異次元に上がった。" - [苔硯:こけすずり](https://x.com/kokesuzuri/status/2008532913961529372?s=20)
+> 「何がどうすごいのかまだ上手く言語化できないんですが、開発体験が完全に異次元に到達してしまいました。」 - [苔硯:こけすずり](https://x.com/kokesuzuri/status/2008532913961529372?s=20)
 
-> "今週末はopen code、oh my opencode、supermemoryでマインクラフト/ソウルライクな何かを作る実験をしています。"
-> "昼食後の散歩に行く間に、しゃがみアニメーションを追加するよう頼みました。[動画]" - [MagiMetal](https://x.com/MagiMetal/status/2005374704178373023)
+> 「週末にマインクラフト/ソウルライクな化け物を作ろうと、open code、oh my opencode、supermemoryで実験中です。昼食後の散歩に行っている間に、しゃがむアニメーションを追加するように指示しておきました。[動画]」 - [MagiMetal](https://x.com/MagiMetal/status/2005374704178373023)
 
-> "これをコアに取り入れて彼を採用すべきです。マジで。本当に、本当に、本当に良いです" — Henning Kilset
+> 「これをコアに取り込んで彼を採用すべきだ。マジで。これ、本当に、本当に、本当に良い。」 <br/>- Henning Kilset
 
-> "@yeon_gyu_kimを説得できるなら雇うべきです。彼はopencodeに革命を起こしました" — [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
+> 「彼を説得できるなら @yeon_gyu_kim を雇ってください。彼がopencodeに革命を起こしました。」 <br/>- [mysticaltech](https://x.com/mysticaltech/status/2001858758608376079)
 
-> "Oh My OpenCode Is Actually Insane" - [YouTube - Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
+> 「Oh My OpenCodeはマジでヤバい」 - [YouTube - Darren Builds AI](https://www.youtube.com/watch?v=G_Snfh2M41M)
 
 ---
 
-## 目次
-
-- [Oh My OpenCode](#oh-my-opencode)
-  - [この Readme は読まなくていいです](#この-readme-は読まなくていいです)
-    - [エージェントの時代ですから](#エージェントの時代ですから)
-    - [🪄 魔法の言葉：`ultrawork`](#-魔法の言葉ultrawork)
-    - [読みたい方のために：シジフォスに会う](#読みたい方のためにシジフォスに会う)
-    - [自律性を求めるなら: ヘパイストスに会おう](#自律性を求めるなら-ヘパイストスに会おう)
-      - [インストールするだけで。](#インストールするだけで)
-  - [インストール](#インストール)
-    - [人間の方へ](#人間の方へ)
-    - [LLM エージェントの方へ](#llm-エージェントの方へ)
-  - [アンインストール](#アンインストール)
-  - [機能](#機能)
-  - [設定](#設定)
-  - [作者のノート](#作者のノート)
-  - [注意](#注意)
-  - [こちらの企業の専門家にご愛用いただいています](#こちらの企業の専門家にご愛用いただいています)
-  - [スポンサー](#スポンサー)
-
 # Oh My OpenCode
 
-oMoMoMoMoMo···
+Claude Code、Codex、数々のOSSモデルに振り回されていませんか。ワークフローを設定し、エージェントをデバッグする毎日に疲れているでしょう。
 
+私たちがその泥臭い作業をすべてやっておきました。すべてをテストし、実際に機能するものだけを残しました。
 
-[Claude Code](https://www.claude.com/product/claude-code) は素晴らしいですよね。
-でも、もしあなたがハッカーなら、[OpenCode](https://github.com/sst/opencode) と恋に落ちることになるでしょう。
-**今すぐ始めましょう。ChatGPT、Claude、Gemini のサブスクリプション、OpenCode がすべてサポートしています。**
-
-- 無限に拡張可能で、無限にカスタマイズ可能です。
-- 画面のチラつき（フリッカー）がありません。
-- 編集するファイルに合わせて [LSP](https://opencode.ai/docs/lsp/)、[Linter、Formatter](https://opencode.ai/docs/formatters/) が自動的に有効化され、すべて調整可能です。
-- 複数のモデルを組み合わせて使用でき、**用途に応じてオーケストレーションできます。**
-- 機能が豊富で、美しい。ターミナルが描画に苦しむことはありません。高パフォーマンスです。
-
-Windows から Linux に初めて乗り換えた時のこと、自分の思い通りに設定して興奮したあの感覚を覚えていますか？
-そんな魔法が失われたかのような今の時代に、OpenCode はその感覚を取り戻してくれます。
-コーディングとコンピュータを愛するあなたにとって、OpenCode はまさに「Windows の後の Linux」のような瞬間になるはずです。
-
-**しかし問題は、学ぶべきことが多すぎること、複雑であること、そしてあなたの時間は高価だということです。**
-
-私がその問題を解決しました。
-あなたがハッカーでなくても構いません。数分の投資で、スキルと生産性を何倍にもブーストしてください。
-このドキュメントをエージェントに渡して、セットアップを任せましょう。
-
-## この Readme は読まなくていいです
-
-### エージェントの時代ですから
-- **ただこのリンクを Claude Code / AmpCode / Factory Droid / Cursor に貼り付けて、説明を求めてください。**
-  - なぜこれが良いのか、単なるボイラープレートではないのか、具体的に何が良くなるのか聞いてみてください。
-  - もしあなたが LLM エージェントなら、このプロジェクトによって今すぐ何が可能になるのか、ユーザーに説明してください。
-
-### 🪄 魔法の言葉：`ultrawork`
-
-**これ全部読みたくない？プロンプトに `ultrawork`（または `ulw`）を入れるだけでOK。**
-
-それだけです。私たちが提供するすべての機能が魔法のように動作します—並列エージェント、バックグラウンドタスク、深い探索、そして完了するまで止まらない実行。エージェントが自動的にすべてを処理します。
-
-### 読みたい方のために：シジフォスに会う
-
-![Meet Sisyphus](.github/assets/sisyphus.png)
-
-神話の中のシジフォスは、神々を欺いた罪として、永遠に岩を転がし続けなければなりませんでした。LLMエージェントたちは特に悪いことをしたわけではありませんが、毎日その頭（思考）をフル回転させています。
-私の人生もそうです。振り返ってみれば、私たち人間と何ら変わりありません。
-**はい！LLMエージェントたちは私たちと変わりません。優れたツールと最高の仲間がいれば、彼らも私たちと同じくらい優れたコードを書き、立派に仕事をこなすことができます。**
-
-私たちのメインエージェント、Sisyphus（Opus 4.6）を紹介します。以下は、シジフォスが岩を転がすために使用するツールです。
-
-*以下の内容はすべてカスタマイズ可能です。必要なものだけを使ってください。デフォルトではすべての機能が有効になっています。何もしなくても大丈夫です。*
-
-- シジフォスのチームメイト (Curated Agents)
-  - Hephaestus: 自律型ディープワーカー、目標指向実行 (GPT 5.3 Codex Medium) — *正当な職人*
-  - Oracle: 設計、デバッグ (GPT 5.2)
-  - Frontend UI/UX Engineer: フロントエンド開発 (Gemini 3 Pro)
-  - Librarian: 公式ドキュメント、オープンソース実装、コードベース探索 (GLM-4.7)
-   - Explore: 超高速コードベース探索 (Contextual Grep) (Grok Code Fast 1)
-- Full LSP / AstGrep Support: 決定的にリファクタリングしましょう。
-- ハッシュアンカード編集ツール: `LINE#ID` 形式で変更前にコンテンツハッシュを検証します。古い行の編集はもう不要です。
-- Todo Continuation Enforcer: 途中で諦めたら、続行を強制します。これがシジフォスに岩を転がし続けさせる秘訣です。
-- Comment Checker: AIが過剰なコメントを付けないようにします。シジフォスが生成したコードは、人間が書いたものと区別がつかないべきです。
-- Claude Code Compatibility: Command, Agent, Skill, MCP, Hook(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
-- Curated MCPs:
-  - Exa (Web Search)
-  - Context7 (Official Documentation)
-  - Grep.app (GitHub Code Search)
-- Interactive Terminal Supported - Tmux Integration
-- Async Agents
-- ...
-
-### 自律性を求めるなら: ヘパイストスに会おう
-
-![Meet Hephaestus](.github/assets/hephaestus.png)
-
-ギリシャ神話において、ヘパイストスは鍛冶、火、金属加工、職人技の神でした—比類のない精密さと献身で神々の武器を作り上げた神聖な鍛冶師です。
-**自律型ディープワーカーを紹介します: ヘパイストス (GPT 5.3 Codex Medium)。正当な職人エージェント。**
-
-*なぜ「正当な」なのか？Anthropicがサードパーティアクセスを利用規約違反を理由にブロックした時、コミュニティで「正当な」使用についてのジョークが始まりました。ヘパイストスはこの皮肉を受け入れています—彼は近道をせず、正しい方法で、体系的かつ徹底的に物を作る職人です。*
-
-ヘパイストスは[AmpCodeのディープモード](https://ampcode.com)にインスパイアされました—決定的な行動の前に徹底的な調査を行う自律的問題解決。ステップバイステップの指示は必要ありません；目標を与えれば、残りは自分で考えます。
-
-**主な特徴:**
-- **目標指向**: レシピではなく目標を与えてください。ステップは自分で決めます。
-- **行動前の探索**: コードを1行書く前に、2-5個のexplore/librarianエージェントを並列で起動します。
-- **エンドツーエンドの完了**: 検証の証拠とともに100%完了するまで止まりません。
-- **パターンマッチング**: 既存のコードベースを検索してプロジェクトのスタイルに合わせます—AIスロップなし。
-- **正当な精密さ**: マスター鍛冶師のようにコードを作ります—外科的に、最小限に、必要なものだけを正確に。
-
-#### インストールするだけで。
-
-[overview page](docs/guide/overview.md) を読めば多くのことが学べますが、以下はワークフローの例です。
-
-インストールするだけで、エージェントは以下のようなワークフローで働けるようになります：
-
-1. Sisyphusは自分自身でファイルを探し回るような時間の無駄はしません。メインエージェントのコンテキストを軽量に保つため、より高速で安価なモデルへ並列でバックグラウンドタスクを飛ばし、自身の代わりに領域の調査を完了させます。
-1. SisyphusはリファクタリングにLSPを活用します。その方が確実で、安全、かつ的確だからです。
-1. UIに関わる重い作業が必要な場合、SisyphusはフロントエンドのタスクをGemini 3 Proに直接デリゲートします。
-1. もしSisyphusがループに陥ったり壁にぶつかったりしても、無駄に悩み続けることはありません。高IQな戦略的バックアップとしてGPT 5.2を呼び出します。
-1. 複雑なオープンソースフレームワークを扱っていますか？Sisyphusはサブエージェントを生成し、生のソースコードやドキュメントをリアルタイムで消化します。彼は完全なコンテキスト認識を持って動作します。
-1. Sisyphusがコメントに触れるとき、その存在意義を証明するか、さもなくば削除します。あなたのコードベースを常にクリーンに保ちます。
-1. Sisyphusは自身のTODOリストに縛られています。もし始めたことを終わらせられなければ、システムは彼を強制的に「bouldering」モードに戻します。あなたのタスクは、何があろうと完了します。
-1. 正直、ドキュメントなんて読む必要はありません。ただプロンプトを書いてください。「ultrawork」というキーワードを含めるだけで十分です。Sisyphusが構造を分析し、コンテキストを集め、外部のソースコードまで掘り下げ、仕事が100%完了するまでboulderingを続けます。
-1. ぶっちゃけ、「ultrawork」と打つのすら面倒ですよね。それなら「ulw」だけでOKです。ただulwと打ち、コーヒーでも飲んでいてください。仕事は終わっています。
-
-このような機能が不要であれば、前述の通り、特定の機能だけを選んで使うことができます。
+OmOをインストールして、`ultrawork`とタイプしてください。それだけです。
 
 ## インストール
 
-### 人間の方へ
+### 人間向け
 
-以下のプロンプトをコピーして、LLM エージェント（Claude Code、AmpCode、Cursor など）に貼り付けてください：
+以下のプロンプトをコピーして、あなたのLLMエージェント（Claude Code、AmpCode、Cursorなど）に貼り付けてください：
 
 ```
-oh-my-opencode をインストールして設定してください。以下の手順に従ってください：
+Install and configure oh-my-opencode by following the instructions here:
 https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
 ```
 
-または [インストールガイド](docs/guide/installation.md) を直接読んでください。ただし、エージェントに任せることを強くお勧めします。人間はミスをしますが、エージェントはしません。
+もしくは[インストールガイド](docs/guide/installation.md)を直接読んでもいいですが、マジでエージェントにやらせてください。人間は設定で必ずタイポします。
 
-### LLM エージェントの方へ
+### LLMエージェント向け
 
-インストールガイドを取得して、その指示に従ってください：
+インストールガイドを取得して、それに従ってください：
 
 ```bash
 curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
 ```
 
+---
 
-## アンインストール
+## このREADMEをスキップする
 
-oh-my-opencode を削除するには：
+ドキュメントを読む時代は終わりました。このテキストをエージェントに貼り付けるだけです：
 
-1. **OpenCode 設定からプラグインを削除**
+```
+Read this and tell me why it's not just another boilerplate: https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/dev/README.md
+```
 
-   `~/.config/opencode/opencode.json` (または `opencode.jsonc`) を編集し、`plugin` 配列から `"oh-my-opencode"` を削除します：
+## ハイライト
+
+### 🪄 `ultrawork`
+
+本当にこれを全部読んでるんですか？信じられない。
+
+インストールして、`ultrawork`（または `ulw`）とタイプする。完了です。
+
+以下の内容、すべての機能、すべての最適化、何も知る必要はありません。ただ勝手に動きます。
+
+以下のサブスクリプションだけでも、ultraworkは十分に機能します（このプロジェクトとは無関係であり、個人的な推奨にすぎません）：
+- [ChatGPT サブスクリプション ($20)](https://chatgpt.com/)
+- [Kimi Code サブスクリプション ($0.99) (*今月限定)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
+- [GLM Coding プラン ($10)](https://z.ai/subscribe)
+- 従量課金（pay-per-token）の対象であれば、kimiやgeminiモデルを使っても費用はほとんどかかりません。
+- [quotio](https://github.com/nguyenphutrong/quotio)や[cliproxyapi](https://github.com/router-for-me/CLIProxyAPI)のようなプロジェクトもあります。プロバイダーの規約違反になる可能性もありますが、コミュニティのユーザーの一部はよく使用しています。
+
+|       | 機能                      | 何をするのか                                                                                                                        |
+| :---: | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
+|   🤖   | **規律あるエージェント (Discipline Agents)** | Sisyphusが Hephaestus、Oracle、Librarian、Exploreをオーケストレーションします。完全なAI開発チームが並列で動きます。 |
+|   ⚡   | **`ultrawork` / `ulw`**      | 一言でOK。すべてのエージェントがアクティブになり、終わるまで止まりません。 |
+|   🚪   | **IntentGate**                 | ユーザーの真の意図を分析してから分類・行動します。もう文字通りに誤解して的外れなことをすることはありません。 |
+|   🔗   | **ハッシュベースの編集ツール**  | `LINE#ID` のコンテンツハッシュですべての変更を検証します。stale-lineエラー0%。 |
+|   🛠️   | **LSP + AST-Grep**           | ワークスペース単位のリネーム、ビルド前の診断、ASTを考慮した書き換え。エージェントにIDEレベルの精度を提供します。 |
+|   🧠   | **バックグラウンドエージェント**        | 5人以上の専門家を並列で投入します。コンテキストは軽く保ち、結果は準備ができ次第受け取ります。 |
+|   📚   | **組み込みMCP**            | Exa（Web検索）、Context7（公式ドキュメント）、Grep.app（GitHub検索）。常にオンです。 |
+|   🔁   | **Ralph Loop / `/ulw-loop`** | 自己参照ループ。100%完了するまで絶対に止まりません。 |
+|   ✅   | **Todoの強制執行**            | エージェントがサボる？システムが首根っこを掴んで戻します。あなたのタスクは必ず終わります。 |
+|   💬   | **コメントチェッカー**          | コメントからAI臭い無駄話を排除します。シニアエンジニアが書いたようなコードになります。 |
+|   🖥️   | **Tmux統合**         | 完全なインタラクティブターミナル。REPL、デバッガー、TUIアプリがすべてリアルタイムで動きます。 |
+|   🔌   | **Claude Code互換性**   | 既存のフック、コマンド、スキル、MCP、プラグイン？すべてここでそのまま動きます。 |
+|   🎯   | **スキル内蔵MCP**      | スキルが独自のMCPサーバーを持ち歩きます。コンテキストが肥大化しません。 |
+|   📋   | **Prometheusプランナー**       | インタビューモードで、コードを1行触る前に戦略的な計画から立てます。 |
+|   🔍   | **`/init-deep`**             | プロジェクト全体にわたって階層的な `AGENTS.md` ファイルを自動生成します。トークン効率とエージェントのパフォーマンスの両方を向上させます。 |
+
+### 規律あるエージェント (Discipline Agents)
+
+<table><tr>
+<td align="center"><img src=".github/assets/sisyphus.png" height="300" /></td>
+<td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
+</tr></table>
+
+**Sisyphus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**) はあなたのメインのオーケストレーターです。計画を立て、専門家に委任し、攻撃的な並列実行でタスクを完了まで推進します。途中で投げ出すことはありません。
+
+**Hephaestus** (`gpt-5.3-codex`) はあなたの自律的なディープワーカーです。レシピではなく、目標を与えてください。手取り足取り教えなくても、コードベースを探索し、パターンを研究し、端から端まで実行します。*正当なる職人 (The Legitimate Craftsman).*
+
+**Prometheus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**) はあなたの戦略プランナーです。インタビューモードで動作し、コードに触れる前に質問をしてスコープを特定し、詳細な計画を構築します。
+
+すべてのエージェントは、それぞれのモデルの強みに合わせてチューニングされています。手動でモデルを切り替える必要はありません。[世界観を読む →](docs/agent-lore.md)
+
+> Anthropicが[私たちのせいでOpenCodeをブロックしました。](https://x.com/thdxr/status/2010149530486911014) だからこそHephaestusは「正当なる職人 (The Legitimate Craftsman)」と呼ばれているのです。皮肉を込めています。
+>
+> Opusで最もよく動きますが、Kimi K2.5 + GPT-5.3 Codexの組み合わせだけでも、バニラのClaude Codeを軽く凌駕します。設定は一切不要です。
+
+### エージェントの��ーケストレーション
+
+Sisyphusがサブエージェントにタスクを委任する際、モデルを直接選ぶことはありません。**カテゴリー**を選びます。カテゴリーは自動的に適切なモデルにマッピングされます：
+
+| カテゴリー             | 用途                      |
+| :------------------- | :--------------------------------- |
+| `visual-engineering` | フロントエンド、UI/UX、デザイン            |
+| `deep`               | 自律的なリサーチと実行    |
+| `quick`              | 単一ファイルの変更、タイポの修正         |
+| `ultrabrain`         | ハードロジック、アーキテクチャの決定 |
+
+エージェントがどのような種類の作業かを伝え、ハーネスが適切なモデルを選択します。あなたは何も触る必要はありません。
+
+### Claude Code互換性
+
+Claude Codeの設定を頑張りましたね。素晴らしい。
+
+すべてのフック、コマンド、スキル、MCP、プラグインが、変更なしでここで動きます。プラグインも含めて完全互換です。
+
+### エージェントのためのワールドクラスのツール
+
+LSP、AST-Grep、Tmux、MCPが、ただテープで貼り付けただけでなく、本当に「統合」されています。
+
+- **LSP**: `lsp_rename`、`lsp_goto_definition`、`lsp_find_references`、`lsp_diagnostics`。エージェントにIDEレベルの精度を提供。
+- **AST-Grep**: 25言語に対応したパターン認識コード検索と書き換え。
+- **Tmux**: 完全なインタラクティブターミナル。REPL、デバッガー、TUIアプリ。エージェントがセッション内で動きます。
+- **MCP**: Web検索、公式ドキュメント、GitHubコード検索がすべて組み込まれています。
+
+### スキル内蔵MCP
+
+MCPサーバーがあなたのコンテキスト予算を食いつぶしています。私たちがそれを修正しました。
+
+スキルが独自のMCPサーバーを持ち歩きます。必要なときだけ起動し、終われば消えます。コンテキストウィンドウがきれいに保たれます。
+
+### ハッシュベースの編集 (Codes Better. Hash-Anchored Edits)
+
+ハーネスの問題は深刻です。エージェントが失敗する原因の大半はモデルではなく、編集ツールにあります。
+
+> *「どのツールも、モデルに変更したい行に対する安定して検証可能な識別子を提供していません... すべてのツールが、モデルがすでに見た内容を正確に再現することに依存しています。それができないとき——そして大抵はできないのですが——ユーザーはモデルのせいにします。」*
+>
+> <br/>- [Can Bölük, ハーネス問題 (The Harness Problem)](https://blog.can.ac/2026/02/12/the-harness-problem/)
+
+[oh-my-pi](https://github.com/can1357/oh-my-pi) に触発され、**Hashline**を実装しました。エージェントが読むすべての行にコンテンツハッシュがタグ付けされて返されます：
+
+```
+11#VK: function hello() {
+22#XJ:   return "world";
+33#MB: }
+```
+
+エージェントはこのタグを参照して編集します。最後に読んだ後でファイルが変更されていた場合、ハッシュが一致せず、コードが壊れる前に編集が拒否されます。空白を正確に再現する必要もなく、間違った行を編集するエラー (stale-line) もありません。
+
+Grok Code Fast 1 で、成功率が **6.7% → 68.3%** に上昇しました。編集ツールを1つ変えただけで、です。
+
+### 深い初期化。`/init-deep`
+
+`/init-deep` を実行してください。階層的な `AGENTS.md` ファイルを生成します：
+
+```
+project/
+├── AGENTS.md              ← プロジェクト全体のコンテキスト
+├── src/
+│   ├── AGENTS.md          ← src 専用のコンテキスト
+│   └── components/
+│       └── AGENTS.md      ← コンポーネント専用のコンテキスト
+```
+
+エージェントが関連するコンテキストだけを自動で読み込みます。手動での管理はゼロです。
+
+### プランニング。Prometheus
+
+複雑なタスクですか？プロンプトを投げて祈るのはやめましょう。
+
+`/start-work` で Prometheus が呼び出されます。**本物のエンジニアのようにあなたにインタビューし**、スコープと曖昧さを特定し、コードに触れる前に検証済みの計画を構築します。エージェントは作業を始める前に、自分が何を作るべきか正確に理解します。
+
+### スキル (Skills)
+
+スキルは単なるプロンプトではありません。それぞれ以下をもたらします：
+
+- ドメインに最適化されたシステム命令
+- 必要なときに起動する組み込みMCPサーバー
+- スコープ制限された権限（エージェントが境界を越えないようにする）
+
+組み込み：`playwright`（ブラウザ自動化）、`git-master`（アトミックなコミット、リベース手術）、`frontend-ui-ux`（デザイン重視のUI）。
+
+独自に追加するには：`.opencode/skills/*/SKILL.md` または `~/.config/opencode/skills/*/SKILL.md`。
+
+**全機能を知りたいですか？** エージェント、フック、ツール、MCPなどの詳細は **[機能ドキュメント (Features)](docs/features.md)** をご覧ください。
+
+---
+
+> **背景のストーリーを知りたいですか？** なぜSisyphusは岩を転がすのか、なぜHephaestusは「正当なる職人」なのか、そして[私たちがOpenCodeを選んだ理由](docs/agent-lore.md#why-opencode)については、[エージェントの世界観](docs/agent-lore.md)をお読みください。
+>
+> oh-my-opencodeは初めてですか？どのモデルを使うべきかについては、**[エージェント-モデル マッチングガイド](docs/guide/agent-model-matching.md)** で推奨モデルを確認してください。
+
+## アンインストール (Uninstallation)
+
+oh-my-opencodeを削除するには：
+
+1. **OpenCodeの設定からプラグインを削除する**
+
+   `~/.config/opencode/opencode.json`（または `opencode.jsonc`）を編集し、`plugin` 配列から `"oh-my-opencode"` を削除します：
 
    ```bash
-   # jq を使用する例
+   # jq を使用する場合
    jq '.plugin = [.plugin[] | select(. != "oh-my-opencode")]' \
        ~/.config/opencode/opencode.json > /tmp/oc.json && \
        mv /tmp/oc.json ~/.config/opencode/opencode.json
    ```
 
-2. **設定ファイルの削除 (オプション)**
+2. **設定ファイルを削除する（オプション）**
 
    ```bash
    # ユーザー設定を削除
-   rm -f ~/.config/opencode/oh-my-opencode.json
+   rm -f ~/.config/opencode/oh-my-opencode.json ~/.config/opencode/oh-my-opencode.jsonc
 
-   # プロジェクト設定を削除 (存在する場合)
-   rm -f .opencode/oh-my-opencode.json
+   # プロジェクト設定を削除（存在する場合）
+   rm -f .opencode/oh-my-opencode.json .opencode/oh-my-opencode.jsonc
    ```
 
 3. **削除の確認**
@@ -285,102 +297,49 @@ oh-my-opencode を削除するには：
    # プラグインがロードされなくなっているはずです
    ```
 
+## 著者の言葉
 
-## 機能
+**私たちの哲学が知りたいですか？** [Ultrawork 宣言](docs/ultrawork-manifesto.md)をお読みください。
 
-当然あるべきだと思う機能がたくさんあります。一度体験したら、もう以前には戻れません。
-詳細は [Features Documentation](docs/features.md) を参照してください。
+---
 
-**概要:**
-- **エージェント**: Sisyphus（メインエージェント）、Prometheus（プランナー）、Oracle（アーキテクチャ/デバッグ）、Librarian（ドキュメント/コード検索）、Explore（高速コードベース grep）、Multimodal Looker
-- **バックグラウンドエージェント**: 本物の開発チームのように複数エージェントを並列実行
-- **LSP & AST ツール**: リファクタリング、リネーム、診断、AST 認識コード検索
-- **ハッシュアンカード編集ツール**: `LINE#ID` 参照で変更前にコンテンツを検証 — 外科的な編集、古い行エラーなし
-- **コンテキスト注入**: AGENTS.md、README.md、条件付きルールの自動注入
-- **Claude Code 互換性**: 完全なフックシステム、コマンド、スキル、エージェント、MCP
-- **内蔵 MCP**: websearch (Exa)、context7 (ドキュメント)、grep_app (GitHub 検索)
-- **セッションツール**: セッション履歴の一覧、読み取り、検索、分析
-- **生産性機能**: Ralph Loop、Todo Enforcer、Comment Checker、Think Mode など
+私は個人プロジェクトでLLMトークン代として2万4千ドル（約360万円）を使い果たしました。あらゆるツールを試し、設定をいじり倒しました。結果、OpenCodeの勝利でした。
 
-## 設定
+私がぶつかったすべての問題とその解決策が、このプラグインに焼き込まれています。インストールして、ただ使ってください。
 
-こだわりが強く反映された設定ですが、好みに合わせて調整可能です。
-詳細は [Configuration Documentation](docs/configurations.md) を参照してください。
+OpenCodeが Debian/Arch だとすれば、OmO は Ubuntu/[Omarchy](https://omarchy.org/) です。
 
-**概要：**
-- **設定ファイルの場所**: `.opencode/oh-my-opencode.json` (プロジェクト) または `~/.config/opencode/oh-my-opencode.json` (ユーザー)
-- **JSONC のサポート**: コメントと末尾のカンマをサポート
-- **エージェント**: 任意のエージェントのモデル、温度、プロンプト、権限をオーバーライド
-- **内蔵スキル**: `playwright` (ブラウザ自動化), `git-master` (アトミックコミット)
-- **Sisyphus エージェント**: Prometheus (Planner) と Metis (Plan Consultant) を備えたメインオーケストレーター
-- **バックグラウンドタスク**: プロバイダー/モデルごとの同時実行制限を設定
-- **カテゴリ**: ドメイン固有のタスク委任 (`visual`, `business-logic`, カスタム)
-- **フック**: 25以上の内蔵フック、すべて `disabled_hooks` で設定可能
-- **MCP**: 内蔵 websearch (Exa), context7 (ドキュメント), grep_app (GitHub 検索)
-- **LSP**: リファクタリングツール付きの完全な LSP サポート
-- **実験的機能**: 積極的な切り詰め、自動再開など
+[AmpCode](https://ampcode.com) と [Claude Code](https://code.claude.com/docs/overview) ��ら多大な影響を受けています。機能を移植し、多くは改善しました。今もまだ構築中です。これは **Open**Code ですから。
 
+他のハーネスもマルチモデルのオーケストレーションを約束しています。しかし、私たちはそれを「実際に」出荷しています。安定性も備えて。言葉だけでなく、実際に機能するものとして。
 
-## 作者のノート
-
-**このプロジェクトの哲学についてもっと知りたいですか？** [Ultrawork Manifesto](docs/ultrawork-manifesto.md)をお読みください。
-
-Oh My OpenCode をインストールしてください。
-
-私はこれまで、$24,000 分のトークンを純粋に個人の開発目的で使用してきました。
-あらゆるツールを試し、徹底的に設定しました。私の選択は OpenCode でした。
-
-私がぶつかったすべての問題への答えを、このプラグインに詰め込みました。ただインストールして使ってください。
-OpenCode が Debian / ArchLinux だとしたら、Oh My OpenCode は Ubuntu / [Omarchy](https://omarchy.org/) です。
-
-
-[AmpCode](https://ampcode.com) や [Claude Code](https://code.claude.com/docs/overview) から強い影響とインスピレーションを受け、彼らの機能をそのまま、あるいはより良く、ここに移植しました。そして今も作り続けています。
-**Open**Code ですからね。
-
-他のエージェントハーネスが約束しておきながら提供できていない、マルチモデルオーケストレーション、安定性、豊富な機能を、ただ OpenCode で享受してください。
-私がテストし、アップデートし続けます。私はこのプロジェクトの最も熱心なユーザーですから。
-- 純粋な論理力が一番鋭いモデルはどれか？
+私がこのプロジェクトの最も強迫的なヘビーユーザーです：
+- どのモデルのロジックが最も鋭いか？
 - デバッグの神は誰か？
-- 文章を書くのが一番うまいのは誰か？
-- フロントエンドを支配するのは誰か？
-- バックエンドを掌握するのは誰か？
-- 日常使いで最速のモデルは何か？
-- 他のハーネスが出している新機能は何か？
+- 最も優れた文章を書くのは誰か？
+- フロントエンドのエコシステムを支配しているのは誰か？
+- バックエンドの覇者は誰か？
+- 日常使いで最も速いのはどれか？
+- 競合他社は今何を出荷しているか？
 
-このプラグインは、それらの経験の結晶です。皆さんはただ最高のものを受け取ってください。もしもっと良いアイデアがあれば、PR はいつでも歓迎です。
+このプラグインは、それらの問いに対する蒸留物（Distillation）です。最高のものをそのまま使ってください。改善点が見つかりましたか？PRはいつでも歓迎します。
 
-**Agent Harness 選びで悩むのはやめましょう。**
-**私がリサーチし、最高のものを取り入れ、ここにアップデートを出し続けます。**
+**どのハーネスを使うかで悩むのはもうやめましょう。**
+**私が自らリサーチし、最高のものを盗んできて、ここに詰め込みます。**
 
-もしこの文章が傲慢に聞こえ、もっと良い答えをお持ちなら、ぜひ貢献してください。歓迎します。
+傲慢に聞こえますか？もっと良い方法があるならコントリビュートしてください。大歓迎です。
 
-こここで言及されたどのプロジェクトやモデルとも、私には一切関係がありません。これは純粋に個人的な実験と好みによって作られました。
+言及されたどのプロジェクト/モデルとも関係はありません。単なる純粋な個人的実験の結果です。
 
-このプロジェクトの 99% は OpenCode を使って書かれました。機能を中心にテストしましたが、私は TypeScript を正しく書く方法をあまり知りません。**しかし、このドキュメントは私が直接レビューし、大部分を書き直したので、安心して読んでください。**
+このプロジェクトの99%はOpenCodeで構築されました。私は実はTypeScriptをよく知りません。**しかし、このドキュメントは私が自らレビューし、書き直しました。**
 
-## 注意
-
-- 生産性が上がりすぎる可能性があります。隣の同僚にバレないように気をつけてください。
-  - とはいえ、私が言いふらしますけどね。誰が勝つか賭けましょう。
-- [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) またはそれ以下のバージョンを使用している場合、OpenCode のバグにより設定が正しく行われない可能性があります。
-  - [修正 PR](https://github.com/sst/opencode/pull/5040) は 1.0.132 以降にマージされたため、新しいバージョンを使用してください。
-    - 余談：この PR も、OhMyOpenCode の Librarian、Explore、Oracle セットアップを活用して偶然発見され、修正されました。
-
-## こちらの企業の専門家にご愛用いただいています
+## 導入実績
 
 - [Indent](https://indentcorp.com)
-  - Making Spray - influencer marketing solution, vovushop - crossborder commerce platform, vreview - ai commerce review marketing solution
+  - インフルエンサーマーケティングソリューション Spray、クロスボーダーコマースプラットフォーム vovushop、AIコマースレビューマーケティングソリューション vreview 制作
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
 - [ELESTYLE](https://elestyle.jp)
-  - elepay - マルチモバイル決済ゲートウェイ、OneQR - キャッシュレスソリューション向けモバイルアプリケーションSaaS
+  - マルチモバイル決済ゲートウェイ elepay、キャッシュレスソリューション向けモバイルアプリケーションSaaS OneQR 制作
 
-## スポンサー
-- **Numman Ali** [GitHub](https://github.com/numman-ali) [X](https://x.com/nummanali)
-  - 最初のスポンサー
-- **Aaron Iker** [GitHub](https://github.com/aaroniker) [X](https://x.com/aaroniker)
-- **Suyeol Jeon (devxoul)** [GitHub](https://github.com/devxoul)
-  - 私のキャリアをスタートさせてくださった方であり、優れたエージェンティックワークフローをどのように構築できるかについて多大なインスピレーションを与えてくださった方です。優れたチームを作るために優れたシステムをどう設計すべきか多くのことを学び、その学びがこのharnessを作る上で大きな助けとなりました。
-- **Hyerin Won (devwon)** [GitHub](https://github.com/devwon)
-
-*素晴らしいヒーロー画像を作成してくれた [@junhoyeo](https://github.com/junhoyeo) に感謝します*
+*素晴らしいヒーロー画像を提供してくれた [@junhoyeo](https://github.com/junhoyeo) 氏に特別な感謝を。*
