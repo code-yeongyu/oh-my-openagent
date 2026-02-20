@@ -8,11 +8,15 @@ const DEFAULT_POLL_INTERVAL_MS = 500
 const DEFAULT_REQUIRED_CONSECUTIVE = 1
 const ERROR_GRACE_CYCLES = 3
 const MIN_STABILIZATION_MS = 1_000
+const DEFAULT_EVENT_WATCHDOG_MS = 30_000 // 30 seconds
+const DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS = 60_000 // 60 seconds
 
 export interface PollOptions {
   pollIntervalMs?: number
   requiredConsecutive?: number
   minStabilizationMs?: number
+  eventWatchdogMs?: number
+  secondaryMeaningfulWorkTimeoutMs?: number
 }
 
 export async function pollForCompletion(
@@ -28,6 +32,11 @@ export async function pollForCompletion(
     options.minStabilizationMs ?? MIN_STABILIZATION_MS
   const minStabilizationMs =
     rawMinStabilizationMs > 0 ? rawMinStabilizationMs : MIN_STABILIZATION_MS
+  const eventWatchdogMs =
+    options.eventWatchdogMs ?? DEFAULT_EVENT_WATCHDOG_MS
+  const secondaryMeaningfulWorkTimeoutMs =
+    options.secondaryMeaningfulWorkTimeoutMs ??
+    DEFAULT_SECONDARY_MEANINGFUL_WORK_TIMEOUT_MS
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
   let firstWorkTimestamp: number | null = null
@@ -59,6 +68,32 @@ export async function pollForCompletion(
       errorCycleCount = 0
     }
 
+    // Watchdog: if no events received for N seconds, verify session status via API
+    if (eventState.lastEventTimestamp !== null) {
+      const timeSinceLastEvent = Date.now() - eventState.lastEventTimestamp
+      if (timeSinceLastEvent > eventWatchdogMs) {
+        // Events stopped coming - verify actual session state
+        console.log(
+          pc.yellow(
+            `\n  No events for ${Math.round(
+              timeSinceLastEvent / 1000
+            )}s, verifying session status...`
+          )
+        )
+
+        // Force check session status directly
+        const directStatus = await getMainSessionStatus(ctx)
+        if (directStatus === "idle") {
+          eventState.mainSessionIdle = true
+        } else if (directStatus === "busy" || directStatus === "retry") {
+          eventState.mainSessionIdle = false
+        }
+
+        // Reset timestamp to avoid repeated checks
+        eventState.lastEventTimestamp = Date.now()
+      }
+    }
+
     const mainSessionStatus = await getMainSessionStatus(ctx)
     if (mainSessionStatus === "busy" || mainSessionStatus === "retry") {
       eventState.mainSessionIdle = false
@@ -80,6 +115,47 @@ export async function pollForCompletion(
       if (Date.now() - pollStartTimestamp < minStabilizationMs) {
         consecutiveCompleteChecks = 0
         continue
+      }
+
+      // Secondary timeout: if we've been polling for reasonable time but haven't
+      // received meaningful work via events, check if there's active work via API
+      if (Date.now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs) {
+        // Check if session actually has pending work (children, todos, etc.)
+        const childrenRes = await ctx.client.session.children({
+          path: { id: ctx.sessionID },
+          query: { directory: ctx.directory },
+        })
+        const children = normalizeSDKResponse(childrenRes, [] as unknown[])
+        const todosRes = await ctx.client.session.todo({
+          path: { id: ctx.sessionID },
+          query: { directory: ctx.directory },
+        })
+        const todos = normalizeSDKResponse(todosRes, [] as unknown[])
+
+        const hasActiveWork =
+          Array.isArray(children)
+            ? children.length > 0
+            : false || Array.isArray(todos)
+            ? todos.some(
+                (
+                  t: unknown
+                ) =>
+                  (t as { status?: string })?.status !== "completed" &&
+                  (t as { status?: string })?.status !== "cancelled"
+              )
+            : false
+
+        if (hasActiveWork) {
+          // Assume meaningful work is happening even without events
+          eventState.hasReceivedMeaningfulWork = true
+          console.log(
+            pc.yellow(
+              `\n  No meaningful work events for ${Math.round(
+                secondaryMeaningfulWorkTimeoutMs / 1000
+              )}s but session has active work - assuming in progress`
+            )
+          )
+        }
       }
     } else {
       // Track when first meaningful work was received
