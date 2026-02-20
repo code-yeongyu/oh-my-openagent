@@ -10,20 +10,27 @@ Oh-My-OpenCode provides 11 specialized AI agents. Each has distinct expertise, o
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| **Sisyphus** | `anthropic/claude-opus-4-6` | **The default orchestrator.** Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: k2p5 → kimi-k2.5-free → glm-5 → big-pickle. |
-| **Hephaestus** | `openai/gpt-5.3-codex` | **The Legitimate Craftsman.** Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Requires gpt-5.3-codex (no fallback - only activates when this model is available). |
-| **oracle** | `openai/gpt-5.2` | Architecture decisions, code review, debugging. Read-only consultation - stellar logical reasoning and deep analysis. Inspired by AmpCode. |
-| **librarian** | `google/gemini-3-flash` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: minimax-m2.5-free → big-pickle. |
-| **explore** | `github-copilot/grok-code-fast-1` | Fast codebase exploration and contextual grep. Fallback: minimax-m2.5-free → claude-haiku-4-5 → gpt-5-nano. |
-| **multimodal-looker** | `kimi-for-coding/k2p5` | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: kimi-k2.5-free → gemini-3-flash → gpt-5.2 → glm-4.6v. |
+| **Sisyphus** | `claude-opus-4-6` | **The default orchestrator.** Plans, delegates, and executes complex tasks using specialized subagents with aggressive parallel execution. Todo-driven workflow with extended thinking (32k budget). Fallback: gpt-5.3-codex → deep quality chain. |
+| **Hephaestus** | `gpt-5.3-codex` | **The Legitimate Craftsman.** Autonomous deep worker inspired by AmpCode's deep mode. Goal-oriented execution with thorough research before action. Explores codebase patterns, completes tasks end-to-end without premature stopping. Named after the Greek god of forge and craftsmanship. Fallback: deep quality chain (claude-opus-4-6-thinking → step-3.5-flash → glm-5 → ...). Requires at least one model in the chain to be available. |
+| **Oracle** | `gpt-5.3-codex` | Architecture decisions, code review, debugging. Read-only consultation — stellar logical reasoning and deep analysis. Inspired by AmpCode. Fallback: claude-opus-4-6-thinking → claude-sonnet-4-5-thinking → deep quality chain. |
+| **Librarian** | `claude-sonnet-4-5` | Multi-repo analysis, documentation lookup, OSS implementation examples. Deep codebase understanding with evidence-based answers. Fallback: speed chain (claude-haiku-4-5 → gpt-5-mini → ...) → quality chain. |
+| **Explore** | `claude-haiku-4-5` | Fast codebase exploration and contextual grep. Fallback: oswe-vscode-prime → gpt-5-mini → gpt-4.1 → extended speed chain. |
+| **Multimodal-Looker** | `gemini-3-pro-image` | Visual content specialist. Analyzes PDFs, images, diagrams to extract information. Fallback: gemini-3-pro-high → gemini-3-flash → kimi-k2.5 → claude-opus-4-6-thinking → claude-sonnet-4-5-thinking → claude-haiku-4-5 → gpt-5-nano. |
 
 ### Planning Agents
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| **Prometheus** | `anthropic/claude-opus-4-6` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. Fallback: k2p5 → kimi-k2.5-free → gpt-5.2 → gemini-3-pro. |
-| **Metis** | `anthropic/claude-opus-4-6` | Plan consultant - pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: k2p5 → kimi-k2.5-free → gpt-5.2 → gemini-3-pro. |
-| **Momus** | `openai/gpt-5.2` | Plan reviewer - validates plans against clarity, verifiability, and completeness standards. Fallback: claude-opus-4-6 → gemini-3-pro. |
+| **Prometheus** | `claude-opus-4-6-thinking` | Strategic planner with interview mode. Creates detailed work plans through iterative questioning. Fallback: gpt-5.3-codex → claude-sonnet-4-5-thinking → deep quality chain. |
+| **Metis** | `claude-opus-4-6-thinking` | Plan consultant — pre-planning analysis. Identifies hidden intentions, ambiguities, and AI failure points. Fallback: gpt-5.3-codex → claude-sonnet-4-5-thinking → deep quality chain. |
+| **Momus** | `gpt-5.3-codex` | Plan reviewer — validates plans against clarity, verifiability, and completeness standards. Fallback: claude-opus-4-6-thinking → deep quality chain. |
+
+### Orchestration Agents
+
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| **Atlas** | `claude-sonnet-4-5-thinking` | Todo-list orchestrator. Executes planned tasks systematically, managing todo items and coordinating work. Fallback: claude-opus-4-6-thinking → gpt-5.3-codex → deep quality chain. |
+| **Sisyphus-Junior** | *(category-dependent)* | Category-spawned executor. Model is selected automatically based on the task category (visual-engineering, quick, deep, etc.). Used when the main agent delegates work via the `task` tool. |
 
 ### Invoking Agents
 
@@ -39,10 +46,12 @@ Ask @explore for the policy on this feature
 
 | Agent | Restrictions |
 |-------|-------------|
-| oracle | Read-only: cannot write, edit, or delegate |
-| librarian | Cannot write, edit, or delegate |
-| explore | Cannot write, edit, or delegate |
-| multimodal-looker | Allowlist only: read, glob, grep |
+| oracle | Read-only: cannot write, edit, or delegate (blocked: write, edit, task, call_omo_agent) |
+| librarian | Cannot write, edit, or delegate (blocked: write, edit, task, call_omo_agent) |
+| explore | Cannot write, edit, or delegate (blocked: write, edit, task, call_omo_agent) |
+| multimodal-looker | Allowlist: `read` only |
+| atlas | Cannot delegate (blocked: task, call_omo_agent) |
+| momus | Cannot write, edit, or delegate (blocked: write, edit, task) |
 
 ### Background Agents
 
@@ -195,11 +204,14 @@ Three specializations in one:
 
 ### Custom Skills
 
-Load custom skills from:
-- `.opencode/skills/*/SKILL.md` (project)
-- `~/.config/opencode/skills/*/SKILL.md` (user)
-- `.claude/skills/*/SKILL.md` (Claude Code compat)
-- `~/.claude/skills/*/SKILL.md` (Claude Code user)
+Load custom skills from (priority order, highest first):
+- `.opencode/skills/*/SKILL.md` (project, OpenCode native)
+- `~/.config/opencode/skills/*/SKILL.md` (user, OpenCode native)
+- `.claude/skills/*/SKILL.md` (project, Claude Code compat)
+- `.agents/skills/*/SKILL.md` (project, Agents convention)
+- `~/.agents/skills/*/SKILL.md` (user, Agents convention)
+
+Same-named skill at higher priority overrides lower.
 
 Disable built-in skills via `disabled_skills: ["playwright"]` in config.
 
@@ -219,6 +231,8 @@ Commands are slash-triggered workflows that execute predefined templates.
 | `/cancel-ralph` | Cancel active Ralph Loop |
 | `/refactor` | Intelligent refactoring with LSP, AST-grep, architecture analysis, and TDD verification |
 | `/start-work` | Start Sisyphus work session from Prometheus plan |
+| `/stop-continuation` | Stop all continuation mechanisms (ralph loop, todo continuation, boulder) for this session |
+| `/handoff` | Create a detailed context summary for continuing work in a new session |
 
 ### Command: /init-deep
 
@@ -292,19 +306,31 @@ Everything runs at maximum intensity - parallel agents, background tasks, aggres
 
 Uses atlas agent to execute planned tasks systematically.
 
+### Command: /stop-continuation
+
+**Purpose**: Stop all continuation mechanisms for this session
+
+Stops ralph loop, todo continuation, and boulder state. Use when you want the agent to stop its current multi-step workflow.
+
+### Command: /handoff
+
+**Purpose**: Create a detailed context summary for continuing work in a new session
+
+Generates a structured handoff document capturing the current state, what was done, what remains, and relevant file paths — enabling seamless continuation in a fresh session.
+
 ### Custom Commands
 
 Load custom commands from:
-- `.opencode/command/*.md` (project)
-- `~/.config/opencode/command/*.md` (user)
-- `.claude/commands/*.md` (Claude Code compat)
-- `~/.claude/commands/*.md` (Claude Code user)
+- `.opencode/command/*.md` (project, OpenCode native)
+- `~/.config/opencode/command/*.md` (user, OpenCode native)
+- `.claude/commands/*.md` (project, Claude Code compat)
+- `~/.config/opencode/commands/*.md` (user, Claude Code compat)
 
 ---
 
 ## Hooks: Lifecycle Automation
 
-Hooks intercept and modify behavior at key points in the agent lifecycle.
+Hooks intercept and modify behavior at key points in the agent lifecycle. 44 hooks across 5 tiers.
 
 ### Hook Events
 
@@ -312,8 +338,10 @@ Hooks intercept and modify behavior at key points in the agent lifecycle.
 |-------|------|-----|
 | **PreToolUse** | Before tool execution | Block, modify input, inject context |
 | **PostToolUse** | After tool execution | Add warnings, modify output, inject messages |
-| **UserPromptSubmit** | When user submits prompt | Block, inject messages, transform prompt |
-| **Stop** | When session goes idle | Inject follow-up prompts |
+| **Message** | During message processing | Transform content, detect keywords, activate modes |
+| **Event** | On session lifecycle changes | Recovery, fallback, notifications |
+| **Transform** | During context transformation | Inject context, validate blocks |
+| **Params** | When setting API parameters | Adjust model settings, effort level |
 
 ### Built-in Hooks
 
@@ -321,76 +349,97 @@ Hooks intercept and modify behavior at key points in the agent lifecycle.
 
 | Hook | Event | Description |
 |------|-------|-------------|
-| **directory-agents-injector** | PostToolUse | Auto-injects AGENTS.md when reading files. Walks from file to project root, collecting all AGENTS.md files. **Deprecated for OpenCode 1.1.37+** - Auto-disabled when native AGENTS.md injection is available. |
-| **directory-readme-injector** | PostToolUse | Auto-injects README.md for directory context. |
-| **rules-injector** | PostToolUse | Injects rules from `.claude/rules/` when conditions match. Supports globs and alwaysApply. |
-| **compaction-context-injector** | Stop | Preserves critical context during session compaction. |
+| **directory-agents-injector** | PreToolUse + PostToolUse | Auto-injects AGENTS.md when reading files. Walks from file to project root, collecting all AGENTS.md files. **Deprecated for OpenCode 1.1.37+** — Auto-disabled when native AGENTS.md injection is available. |
+| **directory-readme-injector** | PreToolUse + PostToolUse | Auto-injects README.md for directory context. |
+| **rules-injector** | PreToolUse + PostToolUse | Injects rules from `.claude/rules/` when conditions match. Supports globs and alwaysApply. |
+| **compaction-context-injector** | Event | Preserves critical context during session compaction. |
+| **context-window-monitor** | Event | Monitors context window usage and tracks token consumption. |
+| **preemptive-compaction** | Event | Proactively compacts sessions before hitting token limits. |
 
 #### Productivity & Control
 
 | Hook | Event | Description |
 |------|-------|-------------|
-| **keyword-detector** | UserPromptSubmit | Detects keywords and activates modes: `ultrawork`/`ulw` (max performance), `search`/`find` (parallel exploration), `analyze`/`investigate` (deep analysis). |
-| **think-mode** | UserPromptSubmit | Auto-detects extended thinking needs. Catches "think deeply", "ultrathink" and adjusts model settings. |
-| **ralph-loop** | Stop | Manages self-referential loop continuation. |
-| **start-work** | PostToolUse | Handles /start-work command execution. |
-| **auto-slash-command** | UserPromptSubmit | Automatically executes slash commands from prompts. |
+| **keyword-detector** | Message + Transform | Detects keywords and activates modes: `ultrawork`/`ulw` (max performance), `search`/`find` (parallel exploration), `analyze`/`investigate` (deep analysis). |
+| **think-mode** | Params | Auto-detects extended thinking needs. Catches "think deeply", "ultrathink" and adjusts model settings. |
+| **ralph-loop** | Event + Message | Manages self-referential loop continuation. |
+| **start-work** | Message | Handles /start-work command execution. |
+| **auto-slash-command** | Message | Automatically executes slash commands from prompts. |
+| **stop-continuation-guard** | Event + Message | Guards the stop-continuation mechanism. |
+| **category-skill-reminder** | Event + PostToolUse | Reminds agents about available category skills for delegation. |
+| **anthropic-effort** | Params | Adjusts Anthropic API effort level based on context. |
 
 #### Quality & Safety
 
 | Hook | Event | Description |
 |------|-------|-------------|
 | **comment-checker** | PostToolUse | Reminds agents to reduce excessive comments. Smartly ignores BDD, directives, docstrings. |
-| **thinking-block-validator** | PreToolUse | Validates thinking blocks to prevent API errors. |
-| **empty-message-sanitizer** | PreToolUse | Prevents API errors from empty chat messages. |
-| **edit-error-recovery** | PostToolUse | Recovers from edit tool failures. |
+| **thinking-block-validator** | Transform | Validates thinking blocks to prevent API errors. |
+| **edit-error-recovery** | PostToolUse + Event | Recovers from edit tool failures. |
+| **write-existing-file-guard** | PreToolUse | Prevents accidental overwrites of existing files without reading them first. |
+| **hashline-read-enhancer** | PostToolUse | Enhances read output with hash-anchored line markers for the hashline edit tool. |
+| **hashline-edit-diff-enhancer** | PreToolUse + PostToolUse | Enhances edit operations with diff markers for the hashline edit tool. |
 
 #### Recovery & Stability
 
 | Hook | Event | Description |
 |------|-------|-------------|
-| **session-recovery** | Stop | Recovers from session errors - missing tool results, thinking block issues, empty messages. |
-| **anthropic-context-window-limit-recovery** | Stop | Handles Claude context window limits gracefully. |
-| **background-compaction** | Stop | Auto-compacts sessions hitting token limits. |
-| **runtime-fallback** | Event | Automatically switches to backup models on retryable API errors (e.g., 429, 503, 529), provider key misconfiguration errors (e.g., missing API key), and auto-retry signals (when `timeout_seconds > 0`). Configurable retry logic with per-model cooldown. See [Runtime Fallback Configuration](configurations.md#runtime-fallback) for details on `timeout_seconds` behavior. |
+| **session-recovery** | Event | Recovers from session errors — missing tool results, thinking block issues, empty messages. |
+| **anthropic-context-window-limit-recovery** | Event | Handles Claude context window limits gracefully. |
+| **runtime-fallback** | Event + Message | Automatically switches to backup models on retryable API errors (e.g., 429, 503, 529), provider key misconfiguration errors (e.g., missing API key), and auto-retry signals (when `timeout_seconds > 0`). Configurable retry logic with per-model cooldown. See [Runtime Fallback Configuration](configurations.md#runtime-fallback) for details on `timeout_seconds` behavior. |
+| **model-fallback** | Event + Message | Manages model fallback chain when primary model is unavailable. |
+| **json-error-recovery** | PostToolUse | Recovers from JSON parse errors in tool outputs. |
 
 #### Truncation & Context Management
 
 | Hook | Event | Description |
 |------|-------|-------------|
-| **grep-output-truncator** | PostToolUse | Dynamically truncates grep output based on context window. Keeps 50% headroom, caps at 50k tokens. |
-| **tool-output-truncator** | PostToolUse | Truncates output from Grep, Glob, LSP, AST-grep tools. |
+| **tool-output-truncator** | PostToolUse | Truncates output from Grep, Glob, LSP, AST-grep tools. Dynamically adjusts based on context window. |
 
 #### Notifications & UX
 
 | Hook | Event | Description |
 |------|-------|-------------|
-| **auto-update-checker** | UserPromptSubmit | Checks for new versions, shows startup toast with version and Sisyphus status. |
-| **background-notification** | Stop | Notifies when background agent tasks complete. |
-| **session-notification** | Stop | OS notifications when agents go idle. Works on macOS, Linux, Windows. |
-| **agent-usage-reminder** | PostToolUse | Reminds you to leverage specialized agents for better results. |
+| **auto-update-checker** | Event | Checks for new versions on session creation, shows startup toast with version and Sisyphus status. |
+| **background-notification** | Event | Notifies when background agent tasks complete. |
+| **session-notification** | Event | OS notifications when agents go idle. Works on macOS, Linux, Windows. |
+| **agent-usage-reminder** | PostToolUse + Event | Reminds you to leverage specialized agents for better results. |
+| **question-label-truncator** | PreToolUse | Truncates long question labels in the Question tool UI. |
 
 #### Task Management
 
 | Hook | Event | Description |
 |------|-------|-------------|
 | **task-resume-info** | PostToolUse | Provides task resume information for continuity. |
-| **delegate-task-retry** | PostToolUse | Retries failed task calls. |
+| **delegate-task-retry** | PostToolUse + Event | Retries failed task delegation calls. |
+| **empty-task-response-detector** | PostToolUse | Detects empty responses from delegated tasks. |
+| **tasks-todowrite-disabler** | PreToolUse | Disables TodoWrite tool when task system is active. |
+
+#### Continuation
+
+| Hook | Event | Description |
+|------|-------|-------------|
+| **todo-continuation-enforcer** | Event | Enforces todo completion — yanks idle agents back to work. |
+| **compaction-todo-preserver** | Event | Preserves todo state during session compaction. |
+| **unstable-agent-babysitter** | Event | Handles unstable agent behavior with recovery strategies. |
 
 #### Integration
 
 | Hook | Event | Description |
 |------|-------|-------------|
 | **claude-code-hooks** | All | Executes hooks from Claude Code's settings.json. |
-| **atlas** | All | Main orchestration logic (771 lines). |
-| **interactive-bash-session** | PreToolUse | Manages tmux sessions for interactive CLI. |
+| **atlas** | Multiple | Main orchestration logic for todo-driven work sessions. |
+| **interactive-bash-session** | PostToolUse + Event | Manages tmux sessions for interactive CLI. |
 | **non-interactive-env** | PreToolUse | Handles non-interactive environment constraints. |
 
 #### Specialized
 
 | Hook | Event | Description |
 |------|-------|-------------|
-| **prometheus-md-only** | PostToolUse | Enforces markdown-only output for Prometheus planner. |
+| **prometheus-md-only** | PreToolUse | Enforces markdown-only output for Prometheus planner. |
+| **no-sisyphus-gpt** | Message | Prevents Sisyphus from running on incompatible GPT models. |
+| **no-hephaestus-non-gpt** | Message | Prevents Hephaestus from running on non-GPT models. |
+| **sisyphus-junior-notepad** | PreToolUse | Manages notepad state for Sisyphus-Junior agents. |
 
 ### Claude Code Hooks Integration
 
@@ -422,8 +471,7 @@ Disable specific hooks in config:
 {
   "disabled_hooks": [
     "comment-checker",
-    "auto-update-checker",
-    "startup-toast"
+    "auto-update-checker"
   ]
 }
 ```
@@ -431,6 +479,19 @@ Disable specific hooks in config:
 ---
 
 ## Tools: Agent Capabilities
+
+### Code Search Tools
+
+| Tool | Description |
+|------|-------------|
+| **grep** | Content search using regular expressions. Filter by file pattern. |
+| **glob** | Fast file pattern matching. Find files by name patterns. |
+
+### Edit Tools
+
+| Tool | Description |
+|------|-------------|
+| **edit** | Hash-anchored edit tool. Uses `LINE#ID` format for precise, safe modifications. Validates content hashes before applying changes — zero stale-line errors. |
 
 ### LSP Tools (IDE Features for Agents)
 
@@ -455,9 +516,22 @@ Disable specific hooks in config:
 | Tool | Description |
 |------|-------------|
 | **call_omo_agent** | Spawn explore/librarian agents. Supports `run_in_background`. |
-| **task** | Category-based task delegation. Supports categories (visual, business-logic) or direct agent targeting. |
+| **task** | Category-based task delegation. Supports categories (visual-engineering, deep, quick, ultrabrain) or direct agent targeting via `subagent_type`. |
 | **background_output** | Retrieve background task results |
 | **background_cancel** | Cancel running background tasks |
+
+### Visual Analysis Tools
+
+| Tool | Description |
+|------|-------------|
+| **look_at** | Analyze media files (PDFs, images, diagrams) via Multimodal-Looker agent. Extracts specific information or summaries from documents, describes visual content. |
+
+### Skill Tools
+
+| Tool | Description |
+|------|-------------|
+| **skill** | Load and execute a skill or slash command by name. Returns detailed instructions with context applied. |
+| **skill_mcp** | Invoke MCP server operations from skill-embedded MCPs. |
 
 ### Session Tools
 
@@ -467,6 +541,17 @@ Disable specific hooks in config:
 | **session_read** | Read messages and history from a session |
 | **session_search** | Full-text search across session messages |
 | **session_info** | Get session metadata and statistics |
+
+### Task Management Tools (Experimental)
+
+Requires `experimental.task_system: true` in config.
+
+| Tool | Description |
+|------|-------------|
+| **task_create** | Create a new task with auto-generated ID |
+| **task_get** | Retrieve a task by ID |
+| **task_list** | List all active tasks |
+| **task_update** | Update an existing task |
 
 ### Interactive Terminal Tools
 
@@ -601,19 +686,12 @@ Full compatibility layer for Claude Code configurations.
 
 | Type | Locations |
 |------|-----------|
-| **Commands** | `~/.claude/commands/`, `.claude/commands/` |
-| **Skills** | `~/.claude/skills/*/SKILL.md`, `.claude/skills/*/SKILL.md` |
-| **Agents** | `~/.claude/agents/*.md`, `.claude/agents/*.md` |
-| **MCPs** | `~/.claude/.mcp.json`, `.mcp.json`, `.claude/.mcp.json` |
+| **Commands** | `~/.config/opencode/commands/`, `.claude/commands/` |
+| **Skills** | `~/.config/opencode/skills/*/SKILL.md`, `.claude/skills/*/SKILL.md` |
+| **Agents** | `~/.config/opencode/agents/*.md`, `.claude/agents/*.md` |
+| **MCPs** | `~/.claude.json`, `~/.config/opencode/.mcp.json`, `.mcp.json`, `.claude/.mcp.json` |
 
 MCP configs support environment variable expansion: `${VAR}`.
-
-### Data Storage
-
-| Data | Location | Format |
-|------|----------|--------|
-| Todos | `~/.claude/todos/` | Claude Code compatible |
-| Transcripts | `~/.claude/transcripts/` | JSONL |
 
 ### Compatibility Toggles
 
@@ -635,9 +713,9 @@ Disable specific features:
 | Toggle | Disables |
 |--------|----------|
 | `mcp` | `.mcp.json` files (keeps built-in MCPs) |
-| `commands` | `~/.claude/commands/`, `.claude/commands/` |
-| `skills` | `~/.claude/skills/`, `.claude/skills/` |
-| `agents` | `~/.claude/agents/` (keeps built-in agents) |
+| `commands` | Command loading from Claude Code paths |
+| `skills` | Skill loading from Claude Code paths |
+| `agents` | Agent loading from Claude Code paths (keeps built-in agents) |
 | `hooks` | settings.json hooks |
 | `plugins` | Claude Code marketplace plugins |
 
