@@ -164,7 +164,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 **Prometheus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**)는 당신의 전략 플래너입니다. 인터뷰 모드로 작동합니다. 코드 한 줄 만지기 전에 질문을 던져 스코프를 파악하고 상세한 계획부터 세웁니다.
 
-모든 에이전트는 해당 모델의 특장점에 맞춰 튜닝되어 있습니다. 수동으로 모델 바꿔가며 뻘짓하지 마세요. [세계관 읽어보기 →](docs/agent-lore.md)
+모든 에이전트는 해당 모델의 특장점에 맞춰 튜닝되어 있습니다. 수동으로 모델 바꿔가며 뻘짓하지 마세요. [더 알아보기 →](docs/guide/overview.md)
 
 > Anthropic이 [우리 때문에 OpenCode를 막아버렸습니다.](https://x.com/thdxr/status/2010149530486911014) 그래서 Hephaestus의 별명이 "진정한 장인(The Legitimate Craftsman)"인 겁니다. (어디서 많이 들어본 이름이죠?) 아이러니를 노렸습니다.
 >
@@ -257,13 +257,13 @@ project/
 
 직접 추가하려면: `.opencode/skills/*/SKILL.md` 또는 `~/.config/opencode/skills/*/SKILL.md`.
 
-**전체 기능이 궁금하신가요?** 에이전트, 훅, 툴, MCP 등 모든 디테일은 **[기능 문서 (Features)](docs/features.md)** 를 확인하세요.
+**전체 기능이 궁금하신가요?** 에이전트, 훅, 툴, MCP 등 모든 디테일은 **[기능 문서 (Features)](docs/reference/features.md)** 를 확인하세요.
 
 ---
 
-> **비하인드 스토리가 궁금하신가요?** 왜 Sisyphus가 돌을 굴리는지, 왜 Hephaestus가 "진정한 장인"인지, 그리고 [우리가 왜 OpenCode를 선택했는지](docs/agent-lore.md#why-opencode)에 대한 [에이전트 세계관](docs/agent-lore.md)을 읽어보세요.
+> **비하인드 스토리가 궁금하신가요?** 왜 Sisyphus가 돌을 굴리는지, 왜 Hephaestus가 "진정한 장인"인지, 그리고 [오케스트레이션 가이드](docs/guide/orchestration.md)를 읽어보세요.
 >
-> oh-my-opencode가 처음이신가요? 어떤 모델을 써야 할지 **[에이전트-모델 매칭 가이드](docs/guide/agent-model-matching.md)** 에서 추천 조합을 확인하세요.
+> oh-my-opencode가 처음이신가요? 어떤 모델을 써야 할지 **[설치 가이드](docs/guide/installation.md#step-5-understand-your-model-setup)** 에서 추천 조합을 확인하세요.
 
 ## 제거 (Uninstallation)
 
@@ -299,7 +299,7 @@ oh-my-opencode를 지우려면:
 
 ## 작가의 말
 
-**우리의 철학이 궁금하다면?** [Ultrawork 선언문](docs/ultrawork-manifesto.md)을 읽어보세요.
+**우리의 철학이 궁금하다면?** [Ultrawork 선언문](docs/manifesto.md)을 읽어보세요.
 
 ---
 

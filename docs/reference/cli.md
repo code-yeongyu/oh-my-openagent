@@ -1,36 +1,33 @@
-# Oh-My-OpenCode CLI Guide
+# CLI Reference
 
-This document provides a comprehensive guide to using the Oh-My-OpenCode CLI tools.
+Complete reference for the `oh-my-opencode` command-line interface.
 
-## 1. Overview
-
-Oh-My-OpenCode provides CLI tools accessible via the `bunx oh-my-opencode` command. The CLI supports various features including plugin installation, environment diagnostics, and session execution.
+## Basic Usage
 
 ```bash
-# Basic execution (displays help)
+# Display help
 bunx oh-my-opencode
 
-# Or run with npx
+# Or with npx
 npx oh-my-opencode
 ```
 
----
-
-## 2. Available Commands
+## Commands
 
 | Command | Description |
 |---------|-------------|
-| `install` | Interactive Setup Wizard |
+| `install` | Interactive setup wizard |
 | `doctor` | Environment diagnostics and health checks |
 | `run` | OpenCode session runner |
 | `mcp oauth` | MCP OAuth authentication management |
+| `auth` | Google Antigravity OAuth authentication |
 | `get-local-version` | Display local version information |
 
 ---
 
-## 3. `install` - Interactive Setup Wizard
+## install
 
-An interactive installation tool for initial Oh-My-OpenCode setup. Provides a beautiful TUI (Text User Interface) based on `@clack/prompts`.
+Interactive installation tool for initial Oh-My-OpenCode setup. Provides a TUI based on `@clack/prompts`.
 
 ### Usage
 
@@ -40,10 +37,10 @@ bunx oh-my-opencode install
 
 ### Installation Process
 
-1. **Provider Selection**: Choose your AI provider from Claude, ChatGPT, or Gemini.
-2. **API Key Input**: Enter the API key for your selected provider.
-3. **Configuration File Creation**: Generates `opencode.json` or `oh-my-opencode.json` files.
-4. **Plugin Registration**: Automatically registers the oh-my-opencode plugin in OpenCode settings.
+1. **Provider Selection**: Choose your AI provider (Claude, ChatGPT, or Gemini)
+2. **API Key Input**: Enter the API key for your selected provider
+3. **Configuration File Creation**: Generates `opencode.json` or `oh-my-opencode.json` files
+4. **Plugin Registration**: Automatically registers the oh-my-opencode plugin in OpenCode settings
 
 ### Options
 
@@ -54,7 +51,7 @@ bunx oh-my-opencode install
 
 ---
 
-## 4. `doctor` - Environment Diagnostics
+## doctor
 
 Diagnoses your environment to ensure Oh-My-OpenCode is functioning correctly. Performs 17+ health checks.
 
@@ -115,7 +112,7 @@ Summary: 10 passed, 1 warning, 1 failed
 
 ---
 
-## 5. `run` - OpenCode Session Runner
+## run
 
 Executes OpenCode sessions and monitors task completion.
 
@@ -143,7 +140,7 @@ bunx oh-my-opencode run [prompt]
 
 ---
 
-## 6. `mcp oauth` - MCP OAuth Management
+## mcp oauth
 
 Manages OAuth 2.1 authentication for remote MCP servers.
 
@@ -177,7 +174,7 @@ Tokens are stored in `~/.config/opencode/mcp-oauth.json` with `0600` permissions
 
 ---
 
-## 7. `auth` - Authentication Management
+## auth
 
 Manages Google Antigravity OAuth authentication. Required for using Gemini models.
 
@@ -196,7 +193,7 @@ bunx oh-my-opencode auth status
 
 ---
 
-## 8. Configuration Files
+## Configuration Files
 
 The CLI searches for configuration files in the following locations (in priority order):
 
@@ -214,7 +211,7 @@ Configuration files support **JSONC (JSON with Comments)** format. You can use c
     "disabled": false,
     "planner_enabled": true,
   },
-  
+
   /* Category customization */
   "categories": {
     "visual-engineering": {
@@ -226,7 +223,7 @@ Configuration files support **JSONC (JSON with Comments)** format. You can use c
 
 ---
 
-## 9. Troubleshooting
+## Troubleshooting
 
 ### "OpenCode version too old" Error
 
@@ -256,7 +253,7 @@ bunx oh-my-opencode doctor --category authentication
 
 ---
 
-## 10. Non-Interactive Mode
+## Non-Interactive Mode
 
 Use the `--no-tui` option for CI/CD environments.
 
@@ -270,7 +267,7 @@ bunx oh-my-opencode doctor --json > doctor-report.json
 
 ---
 
-## 11. Developer Information
+## Developer Information
 
 ### CLI Structure
 
@@ -291,7 +288,7 @@ src/cli/
 
 ### Adding New Doctor Checks
 
-1. Create `src/cli/doctor/checks/my-check.ts`:
+Create `src/cli/doctor/checks/my-check.ts`:
 
 ```typescript
 import type { DoctorCheck } from "../types"
@@ -302,7 +299,7 @@ export const myCheck: DoctorCheck = {
   check: async () => {
     // Check logic
     const isOk = await someValidation()
-    
+
     return {
       status: isOk ? "pass" : "fail",
       message: isOk ? "Everything looks good" : "Something is wrong",
@@ -311,7 +308,7 @@ export const myCheck: DoctorCheck = {
 }
 ```
 
-2. Register in `src/cli/doctor/checks/index.ts`:
+Register in `src/cli/doctor/checks/index.ts`:
 
 ```typescript
 export { myCheck } from "./my-check"

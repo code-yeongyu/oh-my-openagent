@@ -1,168 +1,110 @@
-# Oh My OpenCode Overview
+# What Is Oh My OpenCode?
 
-Learn about Oh My OpenCode, a plugin that transforms OpenCode into the best agent harness.
+Oh My OpenCode is a multi-model agent orchestration harness for OpenCode. It transforms a single AI agent into a coordinated development team that actually ships code.
 
----
+Not locked to Claude. Not locked to OpenAI. Not locked to anyone.
 
-## TL;DR
-
-> **Sisyphus agent strongly recommends Opus 4.6 model. Using other models may result in significantly degraded experience.**
-
-**Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. That's it. The agent figures out the rest.
-
-**Need precision?** Press **Tab** to enter Prometheus (Planner) mode, create a work plan through an interview process, then run `/start-work` to execute it with full orchestration.
+Just better results, cheaper models, real orchestration.
 
 ---
 
-## What Oh My OpenCode Does for You
+## The Old Framing Is Dead
 
-- **Build features from descriptions**: Just tell the agent what you want. It makes a plan, writes the code, and ensures it works. Automatically. You don't have to care about the details.
-- **Debug and fix issues**: Describe a bug or paste an error. The agent analyzes your codebase, identifies the problem, and implements a fix.
-- **Navigate any codebase**: Ask anything about your codebase. The agent maintains awareness of your entire project structure.
-- **Automate tedious tasks**: Fix lint issues, resolve merge conflicts, write release notes - all in a single command.
+We used to call this "Claude Code on steroids." That was wrong.
+
+This isn't about making Claude Code better. It's about breaking free from the idea that one model, one provider, one way of working is enough. Anthropic wants you locked in. OpenAI wants you locked in. Everyone wants you locked in.
+
+Oh My OpenCode doesn't play that game. It orchestrates across models, picking the right brain for the right job. Claude for orchestration. GPT for deep reasoning. Gemini for frontend. Haiku for quick tasks. All working together, automatically.
+
+---
+
+## Meet the Agents
+
+### Sisyphus: The Discipline Agent
+
+Named after the Greek myth. He rolls the boulder every day. Never stops. Never gives up.
+
+Sisyphus is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He doesn't stop halfway. He doesn't get distracted. He finishes.
+
+**Recommended models:**
+- **Claude Opus 4.6** - Best overall experience. Sisyphus was built with Claude-optimized prompts.
+- **Claude Sonnet 4.6** - Good balance of capability and cost.
+- **Kimi K2.5** - Great Claude-like alternative. Many users run this combo exclusively.
+- **GLM 5** - Solid option, especially via Z.ai.
+
+Sisyphus has Claude-optimized prompts. No GPT prompt exists for Sisyphus. Claude-family models work best because that's what the prompts were engineered for.
+
+### Hephaestus: The Legitimate Craftsman
+
+Named with intentional irony. Anthropic blocked OpenCode from using their API because of this project. So the team built an autonomous GPT-native agent instead.
+
+Hephaestus runs on GPT-5.3 Codex. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. He is the legitimate craftsman because he was born from necessity, not privilege.
+
+Use Hephaestus when you need deep architectural reasoning, complex debugging across many files, or cross-domain knowledge synthesis. Switch to him explicitly when the work demands GPT-5.3 Codex's particular strengths.
+
+---
+
+## Better Than Pure Codex
+
+Sisyphus + Hephaestus outperform vanilla Codex CLI. Here's why:
+
+**Multi-model orchestration.** Pure Codex is single-model. Oh My OpenCode routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. Haiku for speed tasks. The right brain for the right job.
+
+**Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
+
+**Category system.** Tasks are routed by intent, not model name. `category="visual-engineering"` gets Gemini. `category="ultrabrain"` gets GPT-5.3 Codex. `category="quick"` gets Haiku. No manual juggling.
+
+**Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
+
+---
+
+## The Intent Gate
+
+Before acting on any request, Sisyphus classifies your true intent.
+
+Are you asking for research? Implementation? Investigation? A fix? The Intent Gate figures out what you actually want, not just the literal words you typed. This means the agent understands context, nuance, and the real goal behind your request.
+
+Regular Codex doesn't have this. It takes your prompt and runs. Oh My OpenCode thinks first, then acts.
 
 ---
 
 ## Two Ways to Work
 
-### Option 1: Ultrawork Mode (For Quick Work)
+### Ultrawork Mode: For the Lazy
 
-If you're feeling lazy, just include **`ultrawork`** (or **`ulw`**) in your prompt:
+Type `ultrawork` or just `ulw`. That's it.
 
-```
-ulw add authentication to my Next.js app
-```
+The agent figures everything out. Explores your codebase. Researches patterns. Implements the feature. Verifies with diagnostics. Keeps working until done.
 
-The agent will automatically:
-1. Explore your codebase to understand existing patterns
-2. Research best practices via specialized agents
-3. Implement the feature following your conventions
-4. Verify with diagnostics and tests
-5. Keep working until complete
+This is the "just do it" mode. Full automatic. You don't have to think deep because the agent thinks deep for you.
 
-This is the "just do it" mode. Full automatic mode.
-The agent is already smart enough, so it explores the codebase and make plans itself.
-**You don't have to think that deep. Agent will think that deep.**
+### Prometheus Mode: For the Precise
 
-### Option 2: Prometheus Mode (For Precise Work)
+Press **Tab** to enter Prometheus mode.
 
-For complex or critical tasks, press **Tab** to switch to Prometheus (Planner) mode.
+Prometheus interviews you like a real engineer. Asks clarifying questions. Identifies scope and ambiguities. Builds a detailed plan before a single line of code is touched.
 
-**How it works:**
+Then run `/start-work` and Atlas takes over. Tasks are distributed to specialized subagents. Each completion is verified independently. Learnings accumulate across tasks. Progress tracks across sessions.
 
-1. **Prometheus interviews you** - Acts as your personal consultant, asking clarifying questions while researching your codebase to understand exactly what you need.
-
-2. **Plan generation** - Based on the interview, Prometheus generates a detailed work plan with tasks, acceptance criteria, and guardrails. Optionally reviewed by Momus (plan reviewer) for high-accuracy validation.
-
-3. **Run `/start-work`** - The Atlas takes over:
-   - Distributes tasks to specialized sub-agents
-   - Verifies each task completion independently
-   - Accumulates learnings across tasks
-   - Tracks progress across sessions (resume anytime)
-
-**When to use Prometheus:**
-- Multi-day or multi-session projects
-- Critical production changes
-- Complex refactoring spanning many files
-- When you want a documented decision trail
-
----
-
-## Critical Usage Guidelines
-
-### Always Use Prometheus + Orchestrator Together
-
-**Do NOT use `atlas` without `/start-work`.**
-
-The orchestrator is designed to execute work plans created by Prometheus. Using it directly without a plan leads to unpredictable behavior.
-
-**Correct workflow:**
-```
-1. Press Tab → Enter Prometheus mode
-2. Describe work → Prometheus interviews you
-3. Confirm plan → Review .sisyphus/plans/*.md
-4. Run /start-work → Orchestrator executes
-```
-
-**Prometheus and Atlas are a pair. Always use them together.**
+Use Prometheus for multi-day projects, critical production changes, complex refactoring, or when you want a documented decision trail.
 
 ---
 
 ## Model Configuration
 
-Oh My OpenCode automatically configures models based on your available providers. You don't need to manually specify every model.
+Models are auto-configured at install time. The interactive installer asks which providers you have, then generates optimal model assignments for each agent and category.
 
-### How Models Are Determined
+At runtime, fallback chains ensure work continues even if your preferred provider is down. Each agent has a provider priority chain. The system tries providers in order until it finds an available model.
 
-**1. At Installation Time (Interactive Installer)**
+You can override specific agents or categories in your config, but you don't have to. The defaults work. The fallbacks work. Everything just works.
 
-When you run `bunx oh-my-opencode install`, the installer asks which providers you have:
-- Claude Pro/Max subscription?
-- OpenAI/ChatGPT Plus?
-- Google Gemini?
-- GitHub Copilot?
-- OpenCode Zen?
-- Z.ai Coding Plan?
-
-Based on your answers, it generates `~/.config/opencode/oh-my-opencode.json` with optimal model assignments for each agent and category.
-
-**2. At Runtime (Fallback Chain)**
-
-Each agent has a **provider priority chain**. The system tries providers in order until it finds an available model:
-
-```
-Example: multimodal-looker
-google → openai → zai-coding-plan → anthropic → opencode
-   ↓        ↓           ↓              ↓           ↓
-gemini   gpt-5.2     glm-4.6v       haiku     gpt-5-nano
-```
-
-If you have Gemini, it uses `google/gemini-3-flash`. No Gemini but have Claude? Uses `anthropic/claude-haiku-4-5`. And so on.
-
-### Example Configuration
-
-Here's a real-world config for a user with **Claude, OpenAI, Gemini, and Z.ai** all available:
-
-```jsonc
-{
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
-  "agents": {
-    // Override specific agents only - rest use fallback chain
-    "atlas": { "model": "anthropic/claude-sonnet-4-6", "variant": "max" },
-    "librarian": { "model": "zai-coding-plan/glm-4.7" },
-    "explore": { "model": "opencode/gpt-5-nano" },
-    "multimodal-looker": { "model": "zai-coding-plan/glm-4.6v" }
-  },
-  "categories": {
-    // Override categories for cost optimization
-    "quick": { "model": "opencode/gpt-5-nano" },
-    "unspecified-low": { "model": "zai-coding-plan/glm-4.7" }
-  },
-  "experimental": {
-    "aggressive_truncation": true
-  }
-}
-```
-
-**Key points:**
-- You only need to override what you want to change
-- Unspecified agents/categories use the automatic fallback chain
-- Mix providers freely (Claude for main work, Z.ai for cheap tasks, etc.)
-
-### Finding Available Models
-
-Run `opencode models` to see all available models in your environment. Model names follow the format `provider/model-name`.
-
-### Learn More
-
-For detailed configuration options including per-agent settings, category customization, and more, see the [Configuration Guide](../configurations.md).
+See the [Installation Guide](./installation.md) for details on initial setup and provider configuration.
 
 ---
 
 ## Next Steps
 
-- [Understanding the Orchestration System](./understanding-orchestration-system.md) - Deep dive into Prometheus → Orchestrator → Junior workflow
-- [Ultrawork Manifesto](../ultrawork-manifesto.md) - Philosophy and principles behind Oh My OpenCode
-- [Installation Guide](./installation.md) - Detailed installation instructions
-- [Configuration Guide](../configurations.md) - Customize agents, models, and behaviors
-- [Features Reference](../features.md) - Complete feature documentation
+- [Orchestration Guide](./orchestration.md) - Deep dive into agent collaboration
+- [Features Reference](../reference/features.md) - Complete feature documentation
+- [Configuration Reference](../reference/configuration.md) - Customize everything
+- [Manifesto](../manifesto.md) - Philosophy behind the project

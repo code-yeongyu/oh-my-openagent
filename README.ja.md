@@ -164,7 +164,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 **Prometheus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**) はあなたの戦略プランナーです。インタビューモードで動作し、コードに触れる前に質問をしてスコープを特定し、詳細な計画を構築します。
 
-すべてのエージェントは、それぞれのモデルの強みに合わせてチューニングされています。手動でモデルを切り替える必要はありません。[世界観を読む →](docs/agent-lore.md)
+すべてのエージェントは、それぞれのモデルの強みに合わせてチューニングされています。手動でモデルを切り替える必要はありません。[詳しくはこちら →](docs/guide/overview.md)
 
 > Anthropicが[私たちのせいでOpenCodeをブロックしました。](https://x.com/thdxr/status/2010149530486911014) だからこそHephaestusは「正当なる職人 (The Legitimate Craftsman)」と呼ばれているのです。皮肉を込めています。
 >
@@ -257,13 +257,13 @@ project/
 
 独自に追加するには：`.opencode/skills/*/SKILL.md` または `~/.config/opencode/skills/*/SKILL.md`。
 
-**全機能を知りたいですか？** エージェント、フック、ツール、MCPなどの詳細は **[機能ドキュメント (Features)](docs/features.md)** をご覧ください。
+**全機能を知りたいですか？** エージェント、フック、ツール、MCPなどの詳細は **[機能ドキュメント (Features)](docs/reference/features.md)** をご覧ください。
 
 ---
 
-> **背景のストーリーを知りたいですか？** なぜSisyphusは岩を転がすのか、なぜHephaestusは「正当なる職人」なのか、そして[私たちがOpenCodeを選んだ理由](docs/agent-lore.md#why-opencode)については、[エージェントの世界観](docs/agent-lore.md)をお読みください。
+> **背景のストーリーを知りたいですか？** なぜSisyphusは岩を転がすのか、なぜHephaestusは「正当なる職人」なのか、そして[オーケストレーションガイド](docs/guide/orchestration.md)をお読みください。
 >
-> oh-my-opencodeは初めてですか？どのモデルを使うべきかについては、**[エージェント-モデル マッチングガイド](docs/guide/agent-model-matching.md)** で推奨モデルを確認してください。
+> oh-my-opencodeは初めてですか？どのモデルを使うべきかについては、**[インストールガイド](docs/guide/installation.md#step-5-understand-your-model-setup)** で推奨モデルを確認してください。
 
 ## アンインストール (Uninstallation)
 
@@ -299,7 +299,7 @@ oh-my-opencodeを削除するには：
 
 ## 著者の言葉
 
-**私たちの哲学が知りたいですか？** [Ultrawork 宣言](docs/ultrawork-manifesto.md)をお読みください。
+**私たちの哲学が知りたいですか？** [Ultrawork 宣言](docs/manifesto.md)をお読みください。
 
 ---
 

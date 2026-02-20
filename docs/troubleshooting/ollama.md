@@ -1,6 +1,8 @@
-# Ollama Streaming Issue - JSON Parse Error
+# Ollama Troubleshooting
 
-## Problem
+## Streaming Issue: JSON Parse Error
+
+### Problem
 
 When using Ollama as a provider with oh-my-opencode agents, you may encounter:
 
@@ -10,7 +12,7 @@ JSON Parse error: Unexpected EOF
 
 This occurs when agents attempt tool calls (e.g., `explore` agent using `mcp_grep_search`).
 
-## Root Cause
+### Root Cause
 
 Ollama returns **NDJSON** (newline-delimited JSON) when `stream: true` is used in API requests:
 
@@ -21,15 +23,14 @@ Ollama returns **NDJSON** (newline-delimited JSON) when `stream: true` is used i
 
 Claude Code SDK expects a single JSON object, not multiple NDJSON lines, causing the parse error.
 
-### Why This Happens
-
+**Why this happens:**
 - **Ollama API**: Returns streaming responses as NDJSON by design
 - **Claude Code SDK**: Doesn't properly handle NDJSON responses for tool calls
 - **oh-my-opencode**: Passes through the SDK's behavior (can't fix at this layer)
 
 ## Solutions
 
-### Option 1: Disable Streaming (Recommended - Immediate Fix)
+### Option 1: Disable Streaming (Recommended)
 
 Configure your Ollama provider to use `stream: false`:
 
@@ -54,10 +55,10 @@ Configure your Ollama provider to use `stream: false`:
 
 If you need streaming, avoid agents that use tools:
 
-- ✅ **Safe**: Simple text generation, non-tool tasks
-- ❌ **Problematic**: Any agent with tool calls (explore, librarian, etc.)
+- **Safe**: Simple text generation, non-tool tasks
+- **Problematic**: Any agent with tool calls (explore, librarian, etc.)
 
-### Option 3: Wait for SDK Fix (Long-term)
+### Option 3: Wait for SDK Fix
 
 The proper fix requires Claude Code SDK to:
 
