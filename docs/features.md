@@ -97,6 +97,19 @@ Customize agent models, prompts, and permissions in `oh-my-opencode.json`. See [
 
 ---
 
+## IntentGate
+
+Every prompt a user enters goes through the **IntentGate** before action is taken.
+
+Agent models often take user instructions too literally—resulting in premature execution or shallow responses. IntentGate fixes this.
+
+1. **Verbalization Before Action:** The orchestrator agent (Sisyphus) and the autonomous worker (Hephaestus) explicitly verbalize the user's *true* intent (e.g. Investigation, Implementation, Fix, Research) before proceeding.
+2. **Pre-Planning Analysis:** The `metis` plan consultant specifically looks for hidden intents, missing context, and ambiguity.
+3. **Exploration Default:** If the true intent implies missing knowledge, the agents will automatically spawn `explore` or `librarian` background tasks *before* taking action or asking clarification questions.
+
+IntentGate ensures your tasks are solved thoroughly rather than treated as simple string-matching instructions.
+
+---
 ## Skills: Specialized Knowledge
 
 Skills provide specialized workflows with embedded MCP servers and detailed instructions.
