@@ -22,7 +22,7 @@ export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition
         .optional()
         .describe("The directory to search in. Defaults to the current working directory."),
       output_mode: tool.schema
-        .string()
+        .enum(["content", "files_with_matches", "count"])
         .optional()
         .describe(
           "Output mode: \"content\" shows matching lines, \"files_with_matches\" shows only file paths (default), \"count\" shows match counts per file."
@@ -37,7 +37,7 @@ export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition
         const globs = args.include ? [args.include] : undefined
         const searchPath = args.path ?? ctx.directory
         const paths = [searchPath]
-        const outputMode = (args.output_mode as "content" | "files_with_matches" | "count") ?? "files_with_matches"
+        const outputMode = args.output_mode ?? "files_with_matches"
         const headLimit = args.head_limit ?? 0
 
         if (outputMode === "count") {
