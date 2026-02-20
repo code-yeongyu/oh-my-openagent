@@ -3,6 +3,7 @@ export type RecoveryErrorType =
   | "thinking_block_order"
   | "thinking_disabled_violation"
   | "assistant_prefill_unsupported"
+  | "unavailable_tool"
   | null
 
 function getErrorMessage(error: unknown): string {
@@ -43,6 +44,16 @@ export function extractMessageIndex(error: unknown): number | null {
   }
 }
 
+export function extractUnavailableToolName(error: unknown): string | null {
+  try {
+    const message = getErrorMessage(error)
+    const match = message.match(/(?:unavailable tool|no such tool)[:\s'"]+([^'".\s]+)/)
+    return match ? match[1] : null
+  } catch {
+    return null
+  }
+}
+
 export function detectErrorType(error: unknown): RecoveryErrorType {
   try {
     const message = getErrorMessage(error)
@@ -72,6 +83,16 @@ export function detectErrorType(error: unknown): RecoveryErrorType {
 
     if (message.includes("tool_use") && message.includes("tool_result")) {
       return "tool_result_missing"
+    }
+
+    if (
+      message.includes("dummy_tool") ||
+      message.includes("unavailable tool") ||
+      message.includes("model tried to call unavailable") ||
+      message.includes("nosuchtoolerror") ||
+      message.includes("no such tool")
+    ) {
+      return "unavailable_tool"
     }
 
     return null

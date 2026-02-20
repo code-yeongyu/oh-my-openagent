@@ -15,7 +15,6 @@ import {
   createInteractiveBashSessionHook,
   createRalphLoopHook,
   createEditErrorRecoveryHook,
-  createJsonErrorRecoveryHook,
   createDelegateTaskRetryHook,
   createTaskResumeInfoHook,
   createStartWorkHook,
@@ -51,7 +50,6 @@ export type SessionHooks = {
   interactiveBashSession: ReturnType<typeof createInteractiveBashSessionHook> | null
   ralphLoop: ReturnType<typeof createRalphLoopHook> | null
   editErrorRecovery: ReturnType<typeof createEditErrorRecoveryHook> | null
-  jsonErrorRecovery: ReturnType<typeof createJsonErrorRecoveryHook> | null
   delegateTaskRetry: ReturnType<typeof createDelegateTaskRetryHook> | null
   startWork: ReturnType<typeof createStartWorkHook> | null
   prometheusMdOnly: ReturnType<typeof createPrometheusMdOnlyHook> | null
@@ -212,10 +210,6 @@ export function createSessionHooks(args: {
     ? safeHook("edit-error-recovery", () => createEditErrorRecoveryHook(ctx))
     : null
 
-  const jsonErrorRecovery = isHookEnabled("json-error-recovery")
-    ? safeHook("json-error-recovery", () => createJsonErrorRecoveryHook(ctx))
-    : null
-
   const delegateTaskRetry = isHookEnabled("delegate-task-retry")
     ? safeHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx))
     : null
@@ -268,7 +262,6 @@ export function createSessionHooks(args: {
     interactiveBashSession,
     ralphLoop,
     editErrorRecovery,
-    jsonErrorRecovery,
     delegateTaskRetry,
     startWork,
     prometheusMdOnly,
