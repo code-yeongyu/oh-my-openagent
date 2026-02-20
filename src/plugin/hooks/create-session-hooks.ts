@@ -7,6 +7,7 @@ import {
   createSessionRecoveryHook,
   createSessionNotification,
   createThinkModeHook,
+  createModelFallbackHook,
   createAnthropicContextWindowLimitRecoveryHook,
   createAutoUpdateCheckerHook,
   createAgentUsageReminderHook,
@@ -24,12 +25,14 @@ import {
   createNoHephaestusNonGptHook,
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
+  createRuntimeFallbackHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
   log,
+  normalizeSDKResponse,
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
@@ -40,6 +43,7 @@ export type SessionHooks = {
   sessionRecovery: ReturnType<typeof createSessionRecoveryHook> | null
   sessionNotification: ReturnType<typeof createSessionNotification> | null
   thinkMode: ReturnType<typeof createThinkModeHook> | null
+  modelFallback: ReturnType<typeof createModelFallbackHook> | null
   anthropicContextWindowLimitRecovery: ReturnType<typeof createAnthropicContextWindowLimitRecoveryHook> | null
   autoUpdateChecker: ReturnType<typeof createAutoUpdateCheckerHook> | null
   agentUsageReminder: ReturnType<typeof createAgentUsageReminderHook> | null
@@ -57,6 +61,7 @@ export type SessionHooks = {
   questionLabelTruncator: ReturnType<typeof createQuestionLabelTruncatorHook>
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
+  runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -100,6 +105,73 @@ export function createSessionHooks(args: {
 
   const thinkMode = isHookEnabled("think-mode")
     ? safeHook("think-mode", () => createThinkModeHook())
+    : null
+
+  const enableFallbackTitle = pluginConfig.experimental?.model_fallback_title ?? false
+  const fallbackTitleMaxEntries = 200
+  const fallbackTitleState = new Map<string, { baseTitle?: string; lastKey?: string }>()
+  const updateFallbackTitle = async (input: {
+    sessionID: string
+    providerID: string
+    modelID: string
+    variant?: string
+  }) => {
+    if (!enableFallbackTitle) return
+    const key = `${input.providerID}/${input.modelID}${input.variant ? `:${input.variant}` : ""}`
+    const existing = fallbackTitleState.get(input.sessionID) ?? {}
+    if (existing.lastKey === key) return
+
+    if (!existing.baseTitle) {
+      const sessionResp = await ctx.client.session.get({ path: { id: input.sessionID } }).catch(() => null)
+      const sessionInfo = sessionResp
+        ? normalizeSDKResponse(sessionResp, null as { title?: string } | null, { preferResponseOnMissingData: true })
+        : null
+      const rawTitle = sessionInfo?.title
+      if (typeof rawTitle === "string" && rawTitle.length > 0) {
+        existing.baseTitle = rawTitle.replace(/\s*\[fallback:[^\]]+\]$/i, "").trim()
+      } else {
+        existing.baseTitle = "Session"
+      }
+    }
+
+    const variantLabel = input.variant ? ` ${input.variant}` : ""
+    const newTitle = `${existing.baseTitle} [fallback: ${input.providerID}/${input.modelID}${variantLabel}]`
+
+    await ctx.client.session
+      .update({
+        path: { id: input.sessionID },
+        body: { title: newTitle },
+        query: { directory: ctx.directory },
+      })
+      .catch(() => {})
+
+    existing.lastKey = key
+    fallbackTitleState.set(input.sessionID, existing)
+    if (fallbackTitleState.size > fallbackTitleMaxEntries) {
+      const oldestKey = fallbackTitleState.keys().next().value
+      if (oldestKey) fallbackTitleState.delete(oldestKey)
+    }
+  }
+
+  // Model fallback hook (configurable via disabled_hooks)
+  // This handles automatic model switching when model errors occur
+  const modelFallback = isHookEnabled("model-fallback")
+    ? safeHook("model-fallback", () =>
+      createModelFallbackHook({
+        toast: async ({ title, message, variant, duration }) => {
+          await ctx.client.tui
+            .showToast({
+              body: {
+                title,
+                message,
+                variant: variant ?? "warning",
+                duration: duration ?? 5000,
+              },
+            })
+            .catch(() => {})
+        },
+        onApplied: enableFallbackTitle ? updateFallbackTitle : undefined,
+      }))
     : null
 
   const anthropicContextWindowLimitRecovery = isHookEnabled("anthropic-context-window-limit-recovery")
@@ -175,12 +247,20 @@ export function createSessionHooks(args: {
     ? safeHook("anthropic-effort", () => createAnthropicEffortHook())
     : null
 
+  const runtimeFallback = isHookEnabled("runtime-fallback")
+    ? safeHook("runtime-fallback", () =>
+        createRuntimeFallbackHook(ctx, {
+          config: pluginConfig.runtime_fallback,
+          pluginConfig,
+        }))
+    : null
   return {
     contextWindowMonitor,
     preemptiveCompaction,
     sessionRecovery,
     sessionNotification,
     thinkMode,
+    modelFallback,
     anthropicContextWindowLimitRecovery,
     autoUpdateChecker,
     agentUsageReminder,
@@ -198,5 +278,6 @@ export function createSessionHooks(args: {
     questionLabelTruncator,
     taskResumeInfo,
     anthropicEffort,
+    runtimeFallback,
   }
 }

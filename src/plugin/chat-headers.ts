@@ -14,6 +14,9 @@ type ChatHeadersOutput = {
   headers: Record<string, string>
 }
 
+const INTERNAL_MARKER_CACHE_LIMIT = 1000
+const internalMarkerCache = new Map<string, boolean>()
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
@@ -56,22 +59,45 @@ async function hasInternalMarker(
   sessionID: string,
   messageID: string,
 ): Promise<boolean> {
+  const cacheKey = `${sessionID}:${messageID}`
+  const cached = internalMarkerCache.get(cacheKey)
+  if (cached !== undefined) {
+    return cached
+  }
+
   try {
     const response = await client.session.message({
       path: { id: sessionID, messageID },
     })
 
     const data = response.data
-    if (!isRecord(data) || !Array.isArray(data.parts)) return false
+    if (!isRecord(data) || !Array.isArray(data.parts)) {
+      internalMarkerCache.set(cacheKey, false)
+      if (internalMarkerCache.size > INTERNAL_MARKER_CACHE_LIMIT) {
+        internalMarkerCache.clear()
+      }
+      return false
+    }
 
-    return data.parts.some((part) => {
+    const hasMarker = data.parts.some((part) => {
       if (!isRecord(part) || part.type !== "text" || typeof part.text !== "string") {
         return false
       }
 
       return part.text.includes(OMO_INTERNAL_INITIATOR_MARKER)
     })
+
+    internalMarkerCache.set(cacheKey, hasMarker)
+    if (internalMarkerCache.size > INTERNAL_MARKER_CACHE_LIMIT) {
+      internalMarkerCache.clear()
+    }
+
+    return hasMarker
   } catch {
+    internalMarkerCache.set(cacheKey, false)
+    if (internalMarkerCache.size > INTERNAL_MARKER_CACHE_LIMIT) {
+      internalMarkerCache.clear()
+    }
     return false
   }
 }
