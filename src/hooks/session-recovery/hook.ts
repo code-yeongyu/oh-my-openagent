@@ -110,11 +110,6 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
         success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg)
       } else if (errorType === "unavailable_tool") {
         success = await recoverUnavailableTool(ctx.client, sessionID, failedMsg)
-        if (success && experimental?.auto_resume) {
-          const lastUser = findLastUserMessage(msgs ?? [])
-          const resumeConfig = extractResumeConfig(lastUser, sessionID)
-          await resumeSession(ctx.client, resumeConfig)
-        }
       } else if (errorType === "thinking_block_order") {
         success = await recoverThinkingBlockOrder(ctx.client, sessionID, failedMsg, ctx.directory, info.error)
         if (success && experimental?.auto_resume) {

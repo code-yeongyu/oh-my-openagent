@@ -47,7 +47,7 @@ export function extractMessageIndex(error: unknown): number | null {
 export function extractUnavailableToolName(error: unknown): string | null {
   try {
     const message = getErrorMessage(error)
-    const match = message.match(/unavailable tool ['"]?([^'".\s]+)['"]?/)
+    const match = message.match(/(?:unavailable tool|no such tool)[:\s'"]+([^'".\s]+)/)
     return match ? match[1] : null
   } catch {
     return null
@@ -90,6 +90,7 @@ export function detectErrorType(error: unknown): RecoveryErrorType {
       message.includes("unavailable tool") ||
       message.includes("model tried to call unavailable") ||
       message.includes("nosuchtoolarror") ||
+      message.includes("nosuchtoolerror") ||
       message.includes("no such tool")
     ) {
       return "unavailable_tool"

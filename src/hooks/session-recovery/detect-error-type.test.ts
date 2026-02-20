@@ -124,6 +124,17 @@ describe("detectErrorType", () => {
     expect(result).toBe("unavailable_tool")
   })
 
+  it("#given a NoSuchToolError token #when detecting #then returns unavailable_tool", () => {
+    //#given
+    const error = { message: "NoSuchToolError: no such tool invalid" }
+
+    //#when
+    const result = detectErrorType(error)
+
+    //#then
+    expect(result).toBe("unavailable_tool")
+  })
+
   it("#given a dummy_tool token in nested error #when detecting #then returns unavailable_tool", () => {
     //#given
     const error = {
@@ -188,5 +199,16 @@ describe("extractUnavailableToolName", () => {
 
     //#then
     expect(result).toBeNull()
+  })
+
+  it("#given no such tool error with colon format #when extracting #then returns tool name", () => {
+    //#given
+    const error = { message: "No such tool: invalid_tool" }
+
+    //#when
+    const result = extractUnavailableToolName(error)
+
+    //#then
+    expect(result).toBe("invalid_tool")
   })
 })
