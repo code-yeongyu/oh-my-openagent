@@ -95,7 +95,7 @@ function buildArgs(options: GrepOptions, backend: GrepBackend): string[] {
   return backend === "rg" ? buildRgArgs(options) : buildGrepArgs(options)
 }
 
-function parseOutput(output: string): GrepMatch[] {
+function parseOutput(output: string, filesOnly = false): GrepMatch[] {
   if (!output.trim()) return []
 
   const matches: GrepMatch[] = []
@@ -103,6 +103,16 @@ function parseOutput(output: string): GrepMatch[] {
 
   for (const line of lines) {
     if (!line.trim()) continue
+
+    if (filesOnly) {
+      // --files-with-matches outputs only file paths, one per line
+      matches.push({
+        file: line.trim(),
+        line: 0,
+        text: "",
+      })
+      continue
+    }
 
     const match = line.match(/^(.+?):(\d+):(.*)$/)
     if (match) {
@@ -191,7 +201,7 @@ async function runRgInternal(options: GrepOptions): Promise<GrepResult> {
       }
     }
 
-    const matches = parseOutput(outputToProcess)
+    const matches = parseOutput(outputToProcess, options.outputMode === "files_with_matches")
     const limited = options.headLimit && options.headLimit > 0
       ? matches.slice(0, options.headLimit)
       : matches
