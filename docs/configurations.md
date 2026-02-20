@@ -163,19 +163,20 @@ Override built-in agent settings:
 }
 ```
 
-Each agent supports: `model`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`, `category`, `variant`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `providerOptions`.
+Each agent supports: `model`, `fallback_models`, `temperature`, `top_p`, `prompt`, `prompt_append`, `tools`, `disable`, `description`, `mode`, `color`, `permission`, `category`, `variant`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `providerOptions`.
 
 ### Additional Agent Options
 
-| Option              | Type    | Description                                                                                     |
-| ------------------- | ------- | ----------------------------------------------------------------------------------------------- |
-| `category`          | string  | Category name to inherit model and other settings from category defaults                             |
-| `variant`           | string  | Model variant (e.g., `max`, `high`, `medium`, `low`, `xhigh`)                                 |
-| `maxTokens`         | number  | Maximum tokens for response. Passed directly to OpenCode SDK.                                      |
-| `thinking`          | object  | Extended thinking configuration for Anthropic models. See [Thinking Options](#thinking-options) below. |
-| `reasoningEffort`   | string  | OpenAI reasoning effort level. Values: `low`, `medium`, `high`, `xhigh`.                         |
-| `textVerbosity`      | string  | Text verbosity level. Values: `low`, `medium`, `high`.                                        |
-| `providerOptions`    | object  | Provider-specific options passed directly to OpenCode SDK.                                      |
+| Option              | Type           | Description                                                                                     |
+| ------------------- | -------------- | ----------------------------------------------------------------------------------------------- |
+| `fallback_models`   | string/array   | Fallback models for runtime switching on API errors. Single string or array of model strings.  |
+| `category`          | string         | Category name to inherit model and other settings from category defaults                        |
+| `variant`           | string         | Model variant (e.g., `max`, `high`, `medium`, `low`, `xhigh`)                                   |
+| `maxTokens`         | number         | Maximum tokens for response. Passed directly to OpenCode SDK.                                   |
+| `thinking`          | object         | Extended thinking configuration for Anthropic models. See [Thinking Options](#thinking-options) below. |
+| `reasoningEffort`   | string         | OpenAI reasoning effort level. Values: `low`, `medium`, `high`, `xhigh`.                        |
+| `textVerbosity`     | string         | Text verbosity level. Values: `low`, `medium`, `high`.                                          |
+| `providerOptions`   | object         | Provider-specific options passed directly to OpenCode SDK.                                      |
 
 #### Thinking Options (Anthropic)
 
@@ -714,6 +715,84 @@ Configure concurrency limits for background agent tasks. This controls how many 
 - Allow more concurrent tasks for fast/cheap models (e.g., Gemini Flash)
 - Respect provider rate limits by setting provider-level caps
 
+## Runtime Fallback
+
+Automatically switch to backup models when the primary model encounters retryable API errors (rate limits, overload, etc.) or provider key misconfiguration errors (for example, missing API key). This keeps conversations running without manual intervention.
+
+```json
+{
+  "runtime_fallback": {
+    "enabled": true,
+    "retry_on_errors": [400, 429, 503, 529],
+    "max_fallback_attempts": 3,
+    "cooldown_seconds": 60,
+    "timeout_seconds": 30,
+    "notify_on_fallback": true
+  }
+}
+```
+
+| Option                  | Default                | Description                                                                 |
+| ----------------------- | ---------------------- | --------------------------------------------------------------------------- |
+| `enabled`               | `true`                 | Enable runtime fallback                                                     |
+| `retry_on_errors`       | `[400, 429, 503, 529]` | HTTP status codes that trigger fallback (rate limit, service unavailable). Also supports certain classified provider errors (for example, missing API key) that do not expose HTTP status codes.   |
+| `max_fallback_attempts` | `3`                    | Maximum fallback attempts per session (1-20)                                |
+| `cooldown_seconds`      | `60`                   | Cooldown in seconds before retrying a failed model                          |
+| `timeout_seconds`       | `30`                   | Timeout in seconds for an in-flight fallback request before forcing the next fallback model. **⚠️ Set to `0` to disable auto-retry signal detection** (see below). |
+| `notify_on_fallback`    | `true`                 | Show toast notification when switching to a fallback model                  |
+
+### timeout_seconds: Understanding the 0 Value
+
+**⚠️ IMPORTANT**: Setting `timeout_seconds: 0` **disables auto-retry signal detection**. This is a critical behavior change:
+
+| Setting | Behavior |
+|---------|----------|
+| `timeout_seconds: 30` (default) | ✅ **Full fallback coverage**: Error-based fallback (429, 503, etc.) + auto-retry signal detection (provider messages like "retrying in 8h") |
+| `timeout_seconds: 0` | ⚠️ **Limited fallback**: Only error-based fallback works. Provider retry messages are **completely ignored**. Timeout-based escalation is **disabled**. |
+
+**When `timeout_seconds: 0`:**
+- ✅ HTTP errors (429, 503, 529) still trigger fallback
+- ✅ Provider key errors (missing API key) still trigger fallback
+- ❌ Provider retry messages ("retrying in Xh") are **ignored**
+- ❌ Timeout-based escalation is **disabled**
+- ❌ Hanging requests do **not** advance to the next fallback model
+
+**Recommendation**: Use a non-zero value (e.g., `30` seconds) to enable full fallback coverage. Only set to `0` if you explicitly want to disable auto-retry signal detection.
+
+### How It Works
+
+1. When an API error matching `retry_on_errors` occurs (or a classified provider key error such as missing API key), the hook intercepts it
+2. The next request automatically uses the next available model from `fallback_models`
+3. Failed models enter a cooldown period before being retried
+4. If `timeout_seconds > 0` and a fallback provider hangs, timeout advances to the next fallback model
+5. Toast notification (optional) informs you of the model switch
+
+### Configuring Fallback Models
+
+Define `fallback_models` at the agent or category level:
+
+```json
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-5",
+      "fallback_models": ["openai/gpt-5.2", "google/gemini-3-pro"]
+    }
+  },
+  "categories": {
+    "ultrabrain": {
+      "model": "openai/gpt-5.2-codex",
+      "fallback_models": ["anthropic/claude-opus-4-5", "google/gemini-3-pro"]
+    }
+  }
+}
+```
+
+When the primary model fails:
+1. First fallback: `openai/gpt-5.2`
+2. Second fallback: `google/gemini-3-pro`
+3. After `max_fallback_attempts`, returns to primary model
+
 ## Categories
 
 Categories enable domain-specific task delegation via the `task` tool. Each category applies runtime presets (model, temperature, prompt additions) when calling the `Sisyphus-Junior` agent.
@@ -830,15 +909,75 @@ Add your own categories or override built-in ones:
 }
 ```
 
-Each category supports: `model`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `tools`, `prompt_append`, `variant`, `description`, `is_unstable_agent`.
+Each category supports: `model`, `fallback_models`, `temperature`, `top_p`, `maxTokens`, `thinking`, `reasoningEffort`, `textVerbosity`, `tools`, `prompt_append`, `variant`, `description`, `is_unstable_agent`.
 
 ### Additional Category Options
 
-| Option             | Type    | Default | Description                                                                                         |
-| ------------------ | ------- | ------- | --------------------------------------------------------------------------------------------------- |
-| `description`       | string  | -       | Human-readable description of the category's purpose. Shown in task prompt.                     |
-| `is_unstable_agent`| boolean | `false`  | Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini models. |
+| Option              | Type         | Default | Description                                                                                         |
+| ------------------- | ------------ | ------- | --------------------------------------------------------------------------------------------------- |
+| `fallback_models`   | string/array | -       | Fallback models for runtime switching on API errors. Single string or array of model strings.      |
+| `description`       | string       | -       | Human-readable description of the category's purpose. Shown in delegate_task prompt.                |
+| `is_unstable_agent` | boolean      | `false` | Mark agent as unstable - forces background mode for monitoring. Auto-enabled for gemini models.    |
 
+## Runtime Fallback
+
+Automatically switch to backup models when the primary model encounters retryable API errors (rate limits, overload, etc.) or provider key misconfiguration errors (for example, missing API key). This keeps conversations running without manual intervention.
+
+```json
+{
+  "runtime_fallback": {
+    "enabled": true,
+    "retry_on_errors": [429, 503, 529],
+    "max_fallback_attempts": 3,
+    "cooldown_seconds": 60,
+    "timeout_seconds": 30,
+    "notify_on_fallback": true
+  }
+}
+```
+
+| Option                  | Default           | Description                                                                 |
+| ----------------------- | ----------------- | --------------------------------------------------------------------------- |
+| `enabled`               | `true`            | Enable runtime fallback                                                     |
+| `retry_on_errors`       | `[429, 503, 529]` | HTTP status codes that trigger fallback (rate limit, service unavailable). Also supports certain classified provider errors (for example, missing API key) that do not expose HTTP status codes.   |
+| `max_fallback_attempts` | `3`               | Maximum fallback attempts per session (1-10)                                |
+| `cooldown_seconds`      | `60`              | Cooldown in seconds before retrying a failed model                          |
+| `timeout_seconds`       | `30`              | Timeout in seconds for an in-flight fallback request before forcing the next fallback model. Set to `0` to disable timeout-based fallback and provider quota retry signal detection. |
+| `notify_on_fallback`    | `true`            | Show toast notification when switching to a fallback model                  |
+
+### How It Works
+
+1. When an API error matching `retry_on_errors` occurs (or a classified provider key error such as missing API key), the hook intercepts it
+2. The next request automatically uses the next available model from `fallback_models`
+3. Failed models enter a cooldown period before being retried
+4. If a fallback provider hangs, timeout advances to the next fallback model
+5. Toast notification (optional) informs you of the model switch
+
+### Configuring Fallback Models
+
+Define `fallback_models` at the agent or category level:
+
+```json
+{
+  "agents": {
+    "sisyphus": {
+      "model": "anthropic/claude-opus-4-5",
+      "fallback_models": ["openai/gpt-5.2", "google/gemini-3-pro"]
+    }
+  },
+  "categories": {
+    "ultrabrain": {
+      "model": "openai/gpt-5.2-codex",
+      "fallback_models": ["anthropic/claude-opus-4-5", "google/gemini-3-pro"]
+    }
+  }
+}
+```
+
+When the primary model fails:
+1. First fallback: `openai/gpt-5.2`
+2. Second fallback: `google/gemini-3-pro`
+3. After `max_fallback_attempts`, returns to primary model
 ## Model Resolution System
 
 At runtime, Oh My OpenCode uses a 3-step resolution process to determine which model to use for each agent and category. This happens dynamically based on your configuration and available models.
@@ -973,7 +1112,7 @@ Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-m
 }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`
 
 **Note on `directory-agents-injector`**: This hook is **automatically disabled** when running on OpenCode 1.1.37+ because OpenCode now has native support for dynamically resolving AGENTS.md files from subdirectories (PR #10678). This prevents duplicate AGENTS.md injection. For older OpenCode versions, the hook remains active to provide the same functionality.
 

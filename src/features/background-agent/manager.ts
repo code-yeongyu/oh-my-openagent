@@ -19,6 +19,7 @@ import {
   createInternalAgentTextPart,
 } from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -910,6 +911,7 @@ export class BackgroundManager {
           subagentSessions.delete(task.sessionID)
         }
       }
+      SessionCategoryRegistry.remove(sessionID)
     }
 
     if (event.type === "session.status") {
@@ -1196,6 +1198,8 @@ export class BackgroundManager {
       this.client.session.abort({
         path: { id: task.sessionID },
       }).catch(() => {})
+
+      SessionCategoryRegistry.remove(task.sessionID)
     }
 
     if (options?.skipNotification) {
@@ -1343,6 +1347,8 @@ export class BackgroundManager {
       this.client.session.abort({
         path: { id: task.sessionID },
       }).catch(() => {})
+
+      SessionCategoryRegistry.remove(task.sessionID)
     }
 
     try {
@@ -1688,6 +1694,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         this.tasks.delete(taskId)
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
+          SessionCategoryRegistry.remove(task.sessionID)
         }
       }
     }
