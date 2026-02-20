@@ -5,7 +5,7 @@ import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
 import type { MessageMeta, OriginalMessageContext, TextPart, ToolPermission } from "./types"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import { normalizeSDKResponse } from "../../shared"
+import { createInternalAgentTextPart, normalizeSDKResponse } from "../../shared"
 
 export interface StoredMessage {
   agent?: string
@@ -331,7 +331,7 @@ export function injectHookMessage(
   const textPart: TextPart = {
     id: partID,
     type: "text",
-    text: hookContent,
+    text: createInternalAgentTextPart(hookContent).text,
     synthetic: true,
     time: {
       start: now,
