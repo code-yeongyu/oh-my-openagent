@@ -110,9 +110,7 @@ export function createEventHandler(args: {
   const lastHandledRetryStatusKey = new Map<string, string>()
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>()
 
-  const dispatchToHooks = async (input: { event: { type: string; properties?: Record<string, unknown> } }): Promise<void> => {
-
-const dispatchToHooks = async (input: EventInput): Promise<void> => {
+  const dispatchToHooks = async (input: EventInput): Promise<void> => {
     await Promise.resolve(hooks.autoUpdateChecker?.event?.(input))
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input))
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input))
