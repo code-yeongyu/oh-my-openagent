@@ -43,6 +43,8 @@ export interface SpawnDecision {
 }
 
 export interface CapacityConfig {
+  layout?: string
+  mainPaneSize?: number
   mainPaneMinWidth: number
   agentPaneWidth: number
 }

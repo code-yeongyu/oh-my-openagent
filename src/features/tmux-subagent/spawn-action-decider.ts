@@ -5,7 +5,7 @@ import type {
 	TmuxPaneInfo,
 	WindowState,
 } from "./types"
-import { DIVIDER_SIZE } from "./tmux-grid-constants"
+import { computeAgentAreaWidth } from "./tmux-grid-constants"
 import {
 	canSplitPane,
 	findMinimalEvictions,
@@ -13,6 +13,14 @@ import {
 } from "./pane-split-availability"
 import { findSpawnTarget } from "./spawn-target-finder"
 import { findOldestAgentPane, type SessionMapping } from "./oldest-agent-pane"
+
+function getInitialSplitDirection(layout?: string): "-h" | "-v" {
+	return layout === "main-horizontal" ? "-v" : "-h"
+}
+
+function isStrictMainLayout(layout?: string): boolean {
+	return layout === "main-vertical" || layout === "main-horizontal"
+}
 
 export function decideSpawnActions(
 	state: WindowState,
@@ -25,14 +33,13 @@ export function decideSpawnActions(
 		return { canSpawn: false, actions: [], reason: "no main pane found" }
 	}
 
-	const minPaneWidth = config.agentPaneWidth
-	const agentAreaWidth = Math.max(
-		0,
-		state.windowWidth - state.mainPane.width - DIVIDER_SIZE,
-	)
+	const agentAreaWidth = computeAgentAreaWidth(state.windowWidth, config)
+	const minAgentPaneWidth = config.agentPaneWidth
 	const currentCount = state.agentPanes.length
+	const strictLayout = isStrictMainLayout(config.layout)
+	const initialSplitDirection = getInitialSplitDirection(config.layout)
 
-	if (agentAreaWidth < minPaneWidth && currentCount > 0) {
+	if (agentAreaWidth < minAgentPaneWidth && currentCount > 0) {
 		return {
 			canSpawn: false,
 			actions: [],
@@ -47,7 +54,7 @@ export function decideSpawnActions(
 
 	if (currentCount === 0) {
 		const virtualMainPane: TmuxPaneInfo = { ...state.mainPane, width: state.windowWidth }
-		if (canSplitPane(virtualMainPane, "-h", minPaneWidth)) {
+		if (canSplitPane(virtualMainPane, initialSplitDirection, minAgentPaneWidth)) {
 			return {
 				canSpawn: true,
 				actions: [
@@ -56,7 +63,7 @@ export function decideSpawnActions(
 						sessionId,
 						description,
 						targetPaneId: state.mainPane.paneId,
-						splitDirection: "-h",
+						splitDirection: initialSplitDirection,
 					},
 				],
 			}
@@ -64,8 +71,12 @@ export function decideSpawnActions(
 		return { canSpawn: false, actions: [], reason: "mainPane too small to split" }
 	}
 
-	if (isSplittableAtCount(agentAreaWidth, currentCount, minPaneWidth)) {
-		const spawnTarget = findSpawnTarget(state, minPaneWidth)
+	const canEvaluateSpawnTarget =
+		strictLayout ||
+		isSplittableAtCount(agentAreaWidth, currentCount, minAgentPaneWidth)
+
+	if (canEvaluateSpawnTarget) {
+		const spawnTarget = findSpawnTarget(state, config)
 		if (spawnTarget) {
 			return {
 				canSpawn: true,
@@ -82,40 +93,43 @@ export function decideSpawnActions(
 		}
 	}
 
-	const minEvictions = findMinimalEvictions(agentAreaWidth, currentCount, minPaneWidth)
-	if (minEvictions === 1 && oldestPane) {
-		return {
-			canSpawn: true,
-			actions: [
-				{
-					type: "replace",
-					paneId: oldestPane.paneId,
-					oldSessionId: oldestMapping?.sessionId || "",
-					newSessionId: sessionId,
-					description,
-				},
-			],
-			reason: "replaced oldest pane to avoid split churn",
+	if (!strictLayout) {
+		const minEvictions = findMinimalEvictions(
+			agentAreaWidth,
+			currentCount,
+			minAgentPaneWidth,
+		)
+		if (minEvictions === 1 && oldestPane) {
+			return {
+				canSpawn: true,
+				actions: [
+					{
+						type: "close",
+						paneId: oldestPane.paneId,
+						sessionId: oldestMapping?.sessionId || "",
+					},
+					{
+						type: "spawn",
+						sessionId,
+						description,
+						targetPaneId: state.mainPane.paneId,
+						splitDirection: initialSplitDirection,
+					},
+				],
+				reason: "closed 1 pane to make room for split",
+			}
 		}
 	}
 
 	if (oldestPane) {
 		return {
-			canSpawn: true,
-			actions: [
-				{
-					type: "replace",
-					paneId: oldestPane.paneId,
-					oldSessionId: oldestMapping?.sessionId || "",
-					newSessionId: sessionId,
-					description,
-				},
-			],
-			reason: "replaced oldest pane (no split possible)",
+			canSpawn: false,
+			actions: [],
+			reason: "no split target available (defer attach)",
 		}
 	}
 
-	return { canSpawn: false, actions: [], reason: "no pane available to replace" }
+	return { canSpawn: false, actions: [], reason: "no split target available (defer attach)" }
 }
 
 export function decideCloseAction(
