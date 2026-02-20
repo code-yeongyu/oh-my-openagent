@@ -219,8 +219,8 @@ describe("keyword-detector session filtering", () => {
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 
-  test("should not override existing variant", async () => {
-    // given - main session set with pre-existing variant
+  test("should override existing variant when ultrawork keyword is used", async () => {
+    // given - main session set with pre-existing variant from TUI
     setMainSession("main-123")
 
     const toastCalls: string[] = []
@@ -236,8 +236,8 @@ describe("keyword-detector session filtering", () => {
       output
     )
 
-    // then - existing variant should remain
-    expect(output.message.variant).toBe("low")
+    // then - ultrawork should override TUI variant to max
+    expect(output.message.variant).toBe("max")
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 })
