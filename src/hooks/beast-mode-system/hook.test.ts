@@ -23,7 +23,7 @@ describe("beast-mode-system hook", () => {
   test("does not inject for other models", async () => {
     //#given
     const sessionID = "ses_no_beast"
-    setSessionModel(sessionID, { providerID: "quotio", modelID: "gpt-5.3-codex" })
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "gpt-5.3-codex" })
     const hook = createBeastModeSystemHook()
     const output = { system: [] as string[] }
 

@@ -224,7 +224,7 @@ describe("TaskToastManager", () => {
         description: "Task with runtime fallback model",
         agent: "explore",
         isBackground: false,
-        modelInfo: { model: "quotio/oswe-vscode-prime", type: "runtime-fallback" as const },
+        modelInfo: { model: "anthropic/oswe-vscode-prime", type: "runtime-fallback" as const },
       }
 
       // when - addTask is called
@@ -234,7 +234,7 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
-      expect(call.body.message).toContain("quotio/oswe-vscode-prime")
+      expect(call.body.message).toContain("anthropic/oswe-vscode-prime")
       expect(call.body.message).toContain("(runtime fallback)")
     })
 

@@ -131,5 +131,5 @@ export function selectFallbackProvider(
     }
   }
 
-  return providers[0] || preferredProviderID || "quotio"
+  return providers[0] || preferredProviderID || "opencode"
 }
