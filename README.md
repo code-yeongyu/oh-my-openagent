@@ -33,9 +33,9 @@
 
 </div>
 
-> 그래서 언제까지 Claude Code 쓰실거에요?
-> 그들은 여러분을 가두고 싶어합니다.
-> 우리와 함께하세요. 우리는 가두지 않습니다. 그들의 비싼 모델 없이도 더 좋은 결과를 약속합니다.
+> So how long are you going to keep using Claude Code?
+> They want to lock you in.
+> Join us. We don't lock you in. We promise better results — even without their expensive models.
 
 <div align="center">
 
