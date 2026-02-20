@@ -179,7 +179,9 @@ Use \\n in text to represent literal newlines.`,
           },
         }
 
-        context.metadata(meta)
+        if ("metadata" in context && typeof context.metadata === "function") {
+          context.metadata(meta)
+        }
 
         const callID = resolveToolCallID(context)
         if (callID) {
