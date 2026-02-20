@@ -40,14 +40,14 @@ describe("model-error-classifier", () => {
     //#given
     writeFileSync(
       join(TEST_CACHE_DIR, "connected-providers.json"),
-      JSON.stringify({ connected: ["quotio", "nvidia"], updatedAt: new Date().toISOString() }, null, 2),
+      JSON.stringify({ connected: ["anthropic", "nvidia"], updatedAt: new Date().toISOString() }, null, 2),
     )
 
     //#when
-    const provider = selectFallbackProvider(["quotio", "nvidia"], "nvidia")
+    const provider = selectFallbackProvider(["anthropic", "nvidia"], "nvidia")
 
     //#then
-    expect(provider).toBe("quotio")
+    expect(provider).toBe("anthropic")
   })
 
   test("selectFallbackProvider falls back to next connected provider when first is disconnected", () => {
@@ -58,7 +58,7 @@ describe("model-error-classifier", () => {
     )
 
     //#when
-    const provider = selectFallbackProvider(["quotio", "nvidia"])
+    const provider = selectFallbackProvider(["anthropic", "nvidia"])
 
     //#then
     expect(provider).toBe("nvidia")
@@ -68,9 +68,9 @@ describe("model-error-classifier", () => {
     //#given - no cache file
 
     //#when
-    const provider = selectFallbackProvider(["quotio", "nvidia"], "nvidia")
+    const provider = selectFallbackProvider(["anthropic", "nvidia"], "nvidia")
 
     //#then
-    expect(provider).toBe("quotio")
+    expect(provider).toBe("anthropic")
   })
 })
