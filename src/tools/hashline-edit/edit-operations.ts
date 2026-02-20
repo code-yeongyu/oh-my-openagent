@@ -124,7 +124,11 @@ export function applyReplaceLines(
 
   const result = [...lines]
   const stripped = stripRangeBoundaryEcho(lines, startLine, endLine, toNewLines(newText))
-  result.splice(startLine - 1, endLine - startLine + 1, ...stripped)
+  const restored = stripped.map((entry, idx) => {
+    if (idx !== 0) return entry
+    return restoreLeadingIndent(lines[startLine - 1], entry)
+  })
+  result.splice(startLine - 1, endLine - startLine + 1, ...restored)
   return result
 }
 
