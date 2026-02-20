@@ -1,7 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
-import { isGptModel } from "../types"
 import { createAgentToolRestrictions, type PermissionValue } from "../../shared/permission-compat"
+import { applyModelThinkingConfig } from "./model-thinking-config"
 
 const MODE: AgentMode = "primary"
 
@@ -227,10 +227,6 @@ export function createAthenaAgent(model: string): AgentConfig {
     color: "#1F8EFA",
   }
 
-  if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" }
-  }
-
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  return applyModelThinkingConfig(base, model)
 }
 createAthenaAgent.mode = MODE

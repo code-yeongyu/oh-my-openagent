@@ -1,7 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGptModel } from "../types"
 import { createAgentToolRestrictions } from "../../shared/permission-compat"
+import { applyModelThinkingConfig } from "./model-thinking-config"
 
 const MODE: AgentMode = "subagent"
 
@@ -43,10 +43,6 @@ export function createCouncilMemberAgent(model: string): AgentConfig {
     ...restrictions,
   }
 
-  if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" }
-  }
-
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  return applyModelThinkingConfig(base, model)
 }
 createCouncilMemberAgent.mode = MODE
