@@ -183,14 +183,15 @@ describe("session-notification", () => {
     expect(notificationCalls).toHaveLength(0)
   })
 
-  test("should cancel pending notification on session activity", async () => {
+test("should cancel pending notification on session activity", async () => {
     // given - main session is set
     const mainSessionID = "main-cancel"
     setMainSession(mainSessionID)
 
     const hook = createSessionNotification(createMockPluginInput(), {
-      idleConfirmationDelay: 100, // Long delay
+      idleConfirmationDelay: 100,
       skipIfIncompleteTodos: false,
+      activityGracePeriodMs: 0,
     })
 
     // when - session goes idle
@@ -258,7 +259,7 @@ describe("session-notification", () => {
     expect(notificationCalls).toHaveLength(0)
   })
 
-  test("should mark session activity on message.updated event", async () => {
+test("should mark session activity on message.updated event", async () => {
     // given - main session is set
     const mainSessionID = "main-message"
     setMainSession(mainSessionID)
@@ -266,6 +267,7 @@ describe("session-notification", () => {
     const hook = createSessionNotification(createMockPluginInput(), {
       idleConfirmationDelay: 50,
       skipIfIncompleteTodos: false,
+      activityGracePeriodMs: 0,
     })
 
     // when - session goes idle, then message.updated fires
@@ -292,7 +294,7 @@ describe("session-notification", () => {
     expect(notificationCalls).toHaveLength(0)
   })
 
-  test("should mark session activity on tool.execute.before event", async () => {
+test("should mark session activity on tool.execute.before event", async () => {
     // given - main session is set
     const mainSessionID = "main-tool"
     setMainSession(mainSessionID)
@@ -300,6 +302,7 @@ describe("session-notification", () => {
     const hook = createSessionNotification(createMockPluginInput(), {
       idleConfirmationDelay: 50,
       skipIfIncompleteTodos: false,
+      activityGracePeriodMs: 0,
     })
 
     // when - session goes idle, then tool.execute.before fires
@@ -324,7 +327,7 @@ describe("session-notification", () => {
     expect(notificationCalls).toHaveLength(0)
   })
 
-  test("should not send duplicate notification for same session", async () => {
+test("should not send duplicate notification for same session", async () => {
     // given - main session is set
     const mainSessionID = "main-dup"
     setMainSession(mainSessionID)
@@ -357,5 +360,76 @@ describe("session-notification", () => {
 
     // then - only one notification should be sent
     expect(notificationCalls).toHaveLength(1)
+  })
+
+  test("should ignore activity events within grace period", async () => {
+    // given - main session is set
+    const mainSessionID = "main-grace"
+    setMainSession(mainSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {
+      idleConfirmationDelay: 50,
+      skipIfIncompleteTodos: false,
+      activityGracePeriodMs: 100,
+    })
+
+    // when - session goes idle
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    // when - activity happens immediately (within grace period)
+    await hook({
+      event: {
+        type: "tool.execute.before",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    // Wait for idle delay to pass
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // then - notification SHOULD be sent (activity was within grace period, ignored)
+    expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
+  })
+
+  test("should cancel notification for activity after grace period", async () => {
+    // given - main session is set
+    const mainSessionID = "main-grace-cancel"
+    setMainSession(mainSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {
+      idleConfirmationDelay: 200,
+      skipIfIncompleteTodos: false,
+      activityGracePeriodMs: 50,
+    })
+
+    // when - session goes idle
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    // when - wait for grace period to pass
+    await new Promise((resolve) => setTimeout(resolve, 60))
+
+    // when - activity happens after grace period
+    await hook({
+      event: {
+        type: "tool.execute.before",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    // Wait for original delay to pass
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // then - notification should NOT be sent (activity cancelled it after grace period)
+    expect(notificationCalls).toHaveLength(0)
   })
 })
