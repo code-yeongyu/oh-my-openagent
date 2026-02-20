@@ -4,10 +4,13 @@ import {
   getSessionAgent,
   clearSessionAgent,
   updateSessionAgent,
+  pinSessionAgent,
+  unpinSessionAgent,
   setMainSession,
   getMainSessionID,
   _resetForTesting,
 } from "./state"
+
 
 describe("claude-code-session-state", () => {
   beforeEach(() => {
@@ -159,6 +162,96 @@ describe("claude-code-session-state", () => {
 
       // then - should be updated
       expect(getSessionAgent(sessionID)).toBe(newAgent)
+    })
+  })
+
+  describe("pinSessionAgent", () => {
+    test("should store pinned agent for session", () => {
+      // given
+      const sessionID = "test-pin-1"
+
+      // when
+      pinSessionAgent(sessionID, "atlas")
+
+      // then
+      expect(getSessionAgent(sessionID)).toBe("atlas")
+    })
+
+    test("should take precedence over updateSessionAgent", () => {
+      // given - pin atlas
+      const sessionID = "test-pin-priority"
+      pinSessionAgent(sessionID, "atlas")
+
+      // when - SDK event tries to overwrite via updateSessionAgent
+      updateSessionAgent(sessionID, "prometheus")
+
+      // then - pinned agent still wins
+      expect(getSessionAgent(sessionID)).toBe("atlas")
+    })
+
+    test("should take precedence over setSessionAgent", () => {
+      // given - pin atlas
+      const sessionID = "test-pin-over-set"
+      pinSessionAgent(sessionID, "atlas")
+
+      // when - setSessionAgent tries to set
+      setSessionAgent(sessionID, "prometheus")
+
+      // then - pinned agent still wins
+      expect(getSessionAgent(sessionID)).toBe("atlas")
+    })
+
+    test("should allow re-pinning to a different agent", () => {
+      // given - pin atlas
+      const sessionID = "test-repin"
+      pinSessionAgent(sessionID, "atlas")
+
+      // when - re-pin to hephaestus
+      pinSessionAgent(sessionID, "hephaestus")
+
+      // then
+      expect(getSessionAgent(sessionID)).toBe("hephaestus")
+    })
+  })
+
+  describe("unpinSessionAgent", () => {
+    test("should allow updateSessionAgent to take effect after unpin", () => {
+      // given - pin atlas, then unpin
+      const sessionID = "test-unpin-then-update"
+      pinSessionAgent(sessionID, "atlas")
+      unpinSessionAgent(sessionID)
+
+      // when - update via SDK event
+      updateSessionAgent(sessionID, "prometheus")
+
+      // then - update takes effect since no pin exists
+      expect(getSessionAgent(sessionID)).toBe("prometheus")
+    })
+
+    test("should be a no-op when no pin exists", () => {
+      // given - only regular agent
+      const sessionID = "test-unpin-noop"
+      setSessionAgent(sessionID, "prometheus")
+
+      // when - unpin (nothing pinned)
+      unpinSessionAgent(sessionID)
+
+      // then - regular agent unchanged
+      expect(getSessionAgent(sessionID)).toBe("prometheus")
+    })
+  })
+
+  describe("clearSessionAgent with pinned agents", () => {
+    test("should clear both pinned and regular agents", () => {
+      // given - pinned agent set
+      const sessionID = "test-clear-pinned"
+      pinSessionAgent(sessionID, "atlas")
+
+      // when
+      clearSessionAgent(sessionID)
+
+      // then - both cleared
+      expect(getSessionAgent(sessionID)).toBeUndefined()
     })
   })
 })

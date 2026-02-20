@@ -17,10 +17,10 @@ export const AGENT_NAMES = [
 ]
 
 export const agentPattern = new RegExp(
-  `\\b(${AGENT_NAMES
+  `(?:^|[\\s_\\-/])(${AGENT_NAMES
     .sort((a, b) => b.length - a.length)
     .map((a) => a.replace(/-/g, "\\-"))
-    .join("|")})\\b`,
+    .join("|")})(?:$|[\\s_\\-/])`,
   "i",
 )
 
@@ -46,9 +46,12 @@ export function normalizeAgentName(agent: string | undefined): string | undefine
 }
 
 export function resolveAgentForSession(sessionID: string, eventAgent?: string): string | undefined {
+  // Session agent (set by updateSessionAgent, e.g. /start-work switching to atlas)
+  // takes priority over event agent (which can be stale — e.g. SDK still reports
+  // "prometheus" after /start-work already switched the session to "atlas").
   return (
-    normalizeAgentName(eventAgent) ??
     normalizeAgentName(getSessionAgent(sessionID)) ??
+    normalizeAgentName(eventAgent) ??
     detectAgentFromSession(sessionID)
   )
 }

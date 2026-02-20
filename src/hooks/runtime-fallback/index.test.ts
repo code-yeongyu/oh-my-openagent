@@ -28,6 +28,7 @@ describe("runtime-fallback", () => {
       messages?: (args: unknown) => Promise<unknown>
       promptAsync?: (args: unknown) => Promise<unknown>
       abort?: (args: unknown) => Promise<unknown>
+      get?: (args: { path: { id: string } }) => Promise<{ data?: Record<string, unknown> }>
     }
   }) {
     return {
@@ -45,6 +46,7 @@ describe("runtime-fallback", () => {
           messages: overrides?.session?.messages ?? (async () => ({ data: [] })),
           promptAsync: overrides?.session?.promptAsync ?? (async () => ({})),
           abort: overrides?.session?.abort ?? (async () => ({})),
+          get: overrides?.session?.get ?? (async () => ({ data: {} })),
         },
       },
       directory: "/test/dir",
@@ -2483,6 +2485,326 @@ describe("runtime-fallback", () => {
       const fallbackToast = toastCalls.find((t) => t.title === "Model Fallback")
       expect(fallbackToast).toBeDefined()
       expect(fallbackToast?.message).toContain("attempt 1 of 2")
+    })
+  })
+
+  describe("agent resolution priority (bug #2 fix)", () => {
+    function createMockPluginConfigWithAgentFallback2(agentName: string, fallbackModels: string[], initialModel = "anthropic/claude-opus-4-6"): OhMyOpenCodeConfig {
+      return {
+        agents: {
+          [agentName]: {
+            model: initialModel,
+            fallback_models: fallbackModels,
+          },
+        },
+      }
+    }
+
+    test("should prefer session agent over stale SDK event agent (/start-work scenario)", async () => {
+      // given - atlas has its own fallback models, prometheus has different ones
+      const { updateSessionAgent, clearSessionAgent } = await import("../../features/claude-code-session-state")
+      const promptCalls: Array<Record<string, unknown>> = []
+      const sessionID = "test-start-work-agent-resolution"
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "start work" }],
+                },
+              ],
+            }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: {
+            agents: {
+              atlas: {
+                model: "anthropic/claude-opus-4-6",
+                fallback_models: ["openai/gpt-5.2"],
+              },
+              prometheus: {
+                model: "anthropic/claude-opus-4-6",
+                fallback_models: ["google/gemini-3-pro"],
+              },
+            },
+          },
+        },
+      )
+
+      // when - /start-work sets session agent to atlas, but SDK event still says prometheus
+      updateSessionAgent(sessionID, "atlas")
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            model: "anthropic/claude-opus-4-6",
+            error: { statusCode: 429, message: "Rate limit exceeded" },
+            agent: "prometheus", // stale SDK event agent
+          },
+        },
+      })
+
+      // then - should use atlas's fallback (openai/gpt-5.2), not prometheus's (google/gemini-3-pro)
+      expect(promptCalls.length).toBe(1)
+      const callBody = promptCalls[0]?.body as Record<string, unknown>
+      expect(callBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
+
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({ to: "openai/gpt-5.2" })
+
+      // cleanup
+      clearSessionAgent(sessionID)
+    })
+
+    test("should fall back to event agent when no session agent is set", async () => {
+      // given - no session agent set, event agent is the only signal
+      const promptCalls: Array<Record<string, unknown>> = []
+      const sessionID = "test-event-agent-fallback"
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "hello" }],
+                },
+              ],
+            }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: {
+            agents: {
+              oracle: {
+                model: "openai/gpt-5.2",
+                fallback_models: ["anthropic/claude-opus-4-6"],
+              },
+            },
+          },
+        },
+      )
+
+      // when - event agent is oracle and no session agent override exists
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            model: "openai/gpt-5.2",
+            error: { statusCode: 503, message: "Service unavailable" },
+            agent: "oracle",
+          },
+        },
+      })
+
+      // then - should use oracle's fallback since event agent is the only signal
+      expect(promptCalls.length).toBe(1)
+      const callBody = promptCalls[0]?.body as Record<string, unknown>
+      expect(callBody?.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
+    })
+  })
+
+  describe("abort before promptAsync (Bug #1)", () => {
+    test("should call abort before promptAsync on session.error fallback", async () => {
+      // given - track call order to verify abort fires before promptAsync
+      const callOrder: string[] = []
+      const sessionID = "test-abort-before-prompt"
+
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "hello" }],
+                },
+              ],
+            }),
+            abort: async () => {
+              callOrder.push("abort")
+              return {}
+            },
+            promptAsync: async (args: unknown) => {
+              callOrder.push("promptAsync")
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: {
+            agents: {
+              sisyphus: {
+                model: "anthropic/claude-opus-4-6",
+                fallback_models: ["openai/gpt-5.2"],
+              },
+            },
+          },
+        },
+      )
+
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-6" } },
+        },
+      })
+
+      // when - retryable error triggers fallback
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            model: "anthropic/claude-opus-4-6",
+            error: { statusCode: 429, message: "Rate limit exceeded" },
+          },
+        },
+      })
+
+      // then - abort must fire before promptAsync
+      expect(callOrder).toContain("abort")
+      expect(callOrder).toContain("promptAsync")
+      const abortIndex = callOrder.indexOf("abort")
+      const promptIndex = callOrder.indexOf("promptAsync")
+      expect(abortIndex).toBeLessThan(promptIndex)
+    })
+  })
+
+  describe("agent resolution fallback when chat.message never fires", () => {
+    test("should resolve agent from session.get when messages have no agent info", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "test" }] }],
+            }),
+            get: async () => ({ data: { agent: "Atlas (Work Orchestrator)" } }),
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: {
+            agents: {
+              atlas: {
+                model: "anthropic/claude-opus-4-6",
+                fallback_models: ["openai/gpt-5.2"],
+              },
+              sisyphus: {
+                model: "anthropic/claude-opus-4-6",
+                fallback_models: ["google/gemini-3-pro"],
+              },
+            },
+          },
+        }
+      )
+      const sessionID = "test-session-get-resolution"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-6" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429 } },
+        },
+      })
+
+      const resolveLog = logCalls.find((c) => c.msg.includes("Resolved agent from session.get"))
+      expect(resolveLog).toBeDefined()
+      expect(resolveLog?.data).toMatchObject({ sessionID, agent: "atlas" })
+
+      expect(promptCalls.length).toBeGreaterThanOrEqual(1)
+      const callBody = promptCalls[0]?.body as Record<string, unknown>
+      expect(callBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
+    })
+
+    test("should fall back to sisyphus when all agent resolution methods fail", async () => {
+      const promptCalls: Array<Record<string, unknown>> = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "test" }] }],
+            }),
+            get: async () => ({ data: {} }), // no agent, no modelID
+            promptAsync: async (args: unknown) => {
+              promptCalls.push(args as Record<string, unknown>)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: {
+            agents: {
+              sisyphus: {
+                model: "anthropic/claude-opus-4-6",
+                fallback_models: ["openai/gpt-5.2"],
+              },
+            },
+          },
+        }
+      )
+      const sessionID = "test-session-no-agent-info"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-6" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429 } },
+        },
+      })
+
+      const sisyphusLog = logCalls.find(
+        (c) =>
+          c.msg.includes("Using sisyphus fallback models (no agent detected)") ||
+          c.msg.includes("Using sisyphus model for state creation (no agent detected)")
+      )
+      expect(sisyphusLog).toBeDefined()
+
+      expect(promptCalls.length).toBeGreaterThanOrEqual(1)
+      const callBody = promptCalls[0]?.body as Record<string, unknown>
+      expect(callBody?.model).toEqual({ providerID: "openai", modelID: "gpt-5.2" })
     })
   })
 })

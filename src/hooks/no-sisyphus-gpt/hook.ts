@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { isGptModel } from "../../agents/types"
-import { getSessionAgent, updateSessionAgent } from "../../features/claude-code-session-state"
+import { getSessionAgent, pinSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-display-names"
 
@@ -48,7 +48,7 @@ export function createNoSisyphusGptHook(ctx: PluginInput) {
         if (output?.message) {
           output.message.agent = HEPHAESTUS_DISPLAY
         }
-        updateSessionAgent(input.sessionID, HEPHAESTUS_DISPLAY)
+        pinSessionAgent(input.sessionID, HEPHAESTUS_DISPLAY)
       }
     },
   }

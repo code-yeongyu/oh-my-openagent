@@ -96,6 +96,12 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       modelID: modelParts.slice(1).join("/"),
     }
 
+    // Abort any in-flight request before sending the fallback prompt.
+    // The SDK cannot process two concurrent prompts on a single session —
+    // without this abort, the new promptAsync is silently dropped while the
+    // previous model's request still occupies the session.
+    await abortSessionRequest(sessionID, `pre-fallback.${source}`)
+
     sessionRetryInFlight.add(sessionID)
     try {
       const messagesResp = await ctx.client.session.messages({
@@ -183,7 +189,23 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         }
       }
     } catch {
-      return undefined
+      // messages query failed, continue to session.get fallback
+    }
+
+    // Fallback: query SDK session.get for agent field
+    // Handles case where model fails before chat.message fires (e.g., model not found)
+    try {
+      const sessionInfo = await ctx.client.session.get({ path: { id: sessionID } })
+      const sessionData = (sessionInfo?.data ?? sessionInfo) as Record<string, unknown>
+      const sdkAgent = typeof sessionData?.agent === "string" ? sessionData.agent : undefined
+      const normalized = normalizeAgentName(sdkAgent)
+      if (normalized) {
+        log(`[${HOOK_NAME}] Resolved agent from session.get`, { sessionID, agent: normalized })
+        return normalized
+      }
+
+    } catch {
+      // session.get failed, no agent available
     }
 
     return undefined
