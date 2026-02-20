@@ -43,7 +43,7 @@ describe("no-hephaestus-non-gpt hook", () => {
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
       body: {
         title: "NEVER Use Hephaestus with Non-GPT",
-        message: expect.stringContaining("For Claude/Kimi/GLM models, always use Sisyphus."),
+        message: expect.stringContaining("Hephaestus is trash without GPT."),
         variant: "error",
       },
     })
