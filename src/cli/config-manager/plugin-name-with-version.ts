@@ -15,5 +15,5 @@ export async function getPluginNameWithVersion(currentVersion: string): Promise<
     }
   }
 
-  return `${PACKAGE_NAME}@${currentVersion}`
+  return PACKAGE_NAME
 }

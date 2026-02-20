@@ -58,7 +58,7 @@ describe("getPluginNameWithVersion", () => {
     expect(result).toBe("oh-my-opencode@next")
   })
 
-  test("returns pinned version when no tag matches", async () => {
+  test("returns unpinned package name when no tag matches", async () => {
     // #given npm dist-tags with beta=3.0.0-beta.3
     globalThis.fetch = mock(() =>
       Promise.resolve({
@@ -70,22 +70,22 @@ describe("getPluginNameWithVersion", () => {
     // #when current version is old beta 3.0.0-beta.2
     const result = await getPluginNameWithVersion("3.0.0-beta.2")
 
-    // #then should pin to specific version
-    expect(result).toBe("oh-my-opencode@3.0.0-beta.2")
+    // #then should return unpinned package name for auto-update
+    expect(result).toBe("oh-my-opencode")
   })
 
-  test("returns pinned version when fetch fails", async () => {
+  test("returns unpinned package name when fetch fails", async () => {
     // #given network failure
     globalThis.fetch = mock(() => Promise.reject(new Error("Network error"))) as unknown as typeof fetch
 
     // #when current version is 3.0.0-beta.3
     const result = await getPluginNameWithVersion("3.0.0-beta.3")
 
-    // #then should fall back to pinned version
-    expect(result).toBe("oh-my-opencode@3.0.0-beta.3")
+    // #then should fall back to unpinned package name for auto-update
+    expect(result).toBe("oh-my-opencode")
   })
 
-  test("returns pinned version when npm returns non-ok response", async () => {
+  test("returns unpinned package name when npm returns non-ok response", async () => {
     // #given npm returns 404
     globalThis.fetch = mock(() =>
       Promise.resolve({
@@ -97,8 +97,8 @@ describe("getPluginNameWithVersion", () => {
     // #when current version is 2.14.0
     const result = await getPluginNameWithVersion("2.14.0")
 
-    // #then should fall back to pinned version
-    expect(result).toBe("oh-my-opencode@2.14.0")
+    // #then should fall back to unpinned package name for auto-update
+    expect(result).toBe("oh-my-opencode")
   })
 
   test("prioritizes latest over other tags when version matches multiple", async () => {
