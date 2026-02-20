@@ -1,10 +1,12 @@
+/// <reference types="bun-types" />
+
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { executeCompact } from "./executor"
 import type { AutoCompactState } from "./types"
 import * as storage from "./storage"
 import * as messagesReader from "../session-recovery/storage/messages-reader"
 
-type TimerCallback = (...args: any[]) => void
+type TimerCallback = (...args: unknown[]) => void
 
 interface FakeTimeouts {
   advanceBy: (ms: number) => Promise<void>
@@ -14,7 +16,7 @@ interface FakeTimeouts {
 function createFakeTimeouts(): FakeTimeouts {
   let now = 0
   let nextId = 1
-  const timers = new Map<number, { id: number; time: number; callback: TimerCallback; args: any[] }>()
+  const timers = new Map<number, { id: number; time: number; callback: TimerCallback; args: unknown[] }>()
   const cleared = new Set<number>()
 
   const original = {
@@ -27,7 +29,7 @@ function createFakeTimeouts(): FakeTimeouts {
     return delay < 0 ? 0 : delay
   }
 
-  globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
+  globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: unknown[]) => {
     const id = nextId++
     timers.set(id, {
       id,
@@ -47,7 +49,7 @@ function createFakeTimeouts(): FakeTimeouts {
   const advanceBy = async (ms: number) => {
     const target = now + Math.max(0, ms)
     while (true) {
-      let next: { id: number; time: number; callback: TimerCallback; args: any[] } | undefined
+      let next: { id: number; time: number; callback: TimerCallback; args: unknown[] } | undefined
       for (const timer of timers.values()) {
         if (timer.time <= target && (!next || timer.time < next.time)) {
           next = timer
@@ -78,7 +80,6 @@ function createFakeTimeouts(): FakeTimeouts {
 describe("executeCompact lock management", () => {
   let autoCompactState: AutoCompactState
   let mockClient: any
-  let fakeTimeouts: FakeTimeouts
   const sessionID = "test-session-123"
   const directory = "/test/dir"
   const msg = { providerID: "anthropic", modelID: "claude-opus-4-6" }
@@ -105,12 +106,10 @@ describe("executeCompact lock management", () => {
         showToast: mock(() => Promise.resolve()),
       },
     }
-
-    fakeTimeouts = createFakeTimeouts()
   })
 
   afterEach(() => {
-    fakeTimeouts.restore()
+    mock.restore()
   })
 
   test("clears lock on successful summarize completion", async () => {
@@ -285,6 +284,7 @@ describe("executeCompact lock management", () => {
 
   test("clears lock when promptAsync in continuation throws", async () => {
     // given: promptAsync will fail during continuation
+    const fakeTimeouts = createFakeTimeouts()
     mockClient.session.promptAsync = mock(() =>
       Promise.reject(new Error("Prompt failed")),
     )
@@ -297,12 +297,12 @@ describe("executeCompact lock management", () => {
     // when: Execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // Wait for setTimeout callback
     await fakeTimeouts.advanceBy(600)
 
     // then: Lock should be cleared
     // The continuation happens in setTimeout, but lock is cleared in finally before that
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+    fakeTimeouts.restore()
   })
 
   test("falls through to summarize when truncation is insufficient", async () => {
@@ -348,6 +348,7 @@ describe("executeCompact lock management", () => {
 
   test("does NOT call summarize when truncation is sufficient", async () => {
     // given: Over token limit with truncation returning sufficient
+    const fakeTimeouts = createFakeTimeouts()
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 250000,
@@ -369,7 +370,6 @@ describe("executeCompact lock management", () => {
     // when: Execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // Wait for setTimeout callback
     await fakeTimeouts.advanceBy(600)
 
     // then: Truncation was attempted
@@ -385,5 +385,6 @@ describe("executeCompact lock management", () => {
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
 
     truncateSpy.mockRestore()
+    fakeTimeouts.restore()
   })
 })

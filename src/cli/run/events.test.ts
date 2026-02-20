@@ -1,5 +1,7 @@
+/// <reference types="bun-types" />
+
 import { describe, it, expect, spyOn } from "bun:test"
-import { createEventState, serializeError, type EventState } from "./events"
+import { createEventState, processEvents, serializeError } from "./events"
 import type { RunContext, EventPayload } from "./types"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
@@ -99,7 +101,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -121,7 +122,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -144,7 +144,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -164,7 +163,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -184,7 +182,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -207,7 +204,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -229,7 +225,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     //#when
     await processEvents(ctx, events, state)
@@ -251,7 +246,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -275,7 +269,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -299,7 +292,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -311,16 +303,8 @@ describe("event handling", () => {
   it("session.status with busy type sets mainSessionIdle to false", async () => {
     // given
     const ctx = createMockContext("my-session")
-    const state: EventState = {
-      mainSessionIdle: true,
-      mainSessionError: false,
-      lastError: null,
-      lastOutput: "",
-      lastPartText: "",
-      currentTool: null,
-      hasReceivedMeaningfulWork: false,
-      messageCount: 0,
-    }
+    const state = createEventState()
+    state.mainSessionIdle = true
 
     const payload: EventPayload = {
       type: "session.status",
@@ -328,7 +312,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
