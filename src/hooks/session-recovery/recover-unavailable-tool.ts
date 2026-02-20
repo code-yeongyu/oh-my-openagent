@@ -7,6 +7,17 @@ import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
+interface ToolResultPart {
+  type: "tool_result"
+  tool_use_id: string
+  content: string
+}
+
+interface PromptWithToolResultInput {
+  path: { id: string }
+  body: { parts: ToolResultPart[] }
+}
+
 interface ToolUsePart {
   type: "tool_use"
   id: string
@@ -80,23 +91,16 @@ export async function recoverUnavailableTool(
   const toolResultParts = targetToolUses.map((part) => ({
     type: "tool_result" as const,
     tool_use_id: part.id,
-    content: {
-      status: "error",
-      error: "Tool not available. Please continue without this tool.",
-    },
+    content: '{"status":"error","error":"Tool not available. Please continue without this tool."}',
   }))
 
   try {
-    const promptAsyncKey = ["prompt", "Async"].join("")
-    const promptAsync = Reflect.get(client.session, promptAsyncKey)
-    if (typeof promptAsync !== "function") {
-      return false
-    }
-
-    await promptAsync({
+    const promptInput: PromptWithToolResultInput = {
       path: { id: sessionID },
       body: { parts: toolResultParts },
-    })
+    }
+    const promptAsync = client.session.promptAsync as (...args: never[]) => unknown
+    await Reflect.apply(promptAsync, client.session, [promptInput])
     return true
   } catch {
     return false
