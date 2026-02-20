@@ -164,7 +164,7 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 **Prometheus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`**) 是你的战略规划师。他通过访谈模式，在动一行代码之前，先通过提问确定范围并构建详尽的执行计划。
 
-每一个 Agent 都针对其底层模型的特点进行了专门调优。你无需手动来回切换模型。[阅读背景设定了解更多 →](docs/agent-lore.md)
+每一个 Agent 都针对其底层模型的特点进行了专门调优。你无需手动来回切换模型。[阅读背景设定了解更多 →](docs/guide/overview.md)
 
 > Anthropic [因为我们屏蔽了 OpenCode](https://x.com/thdxr/status/2010149530486911014)。这就是为什么我们将 Hephaestus 命名为“正牌工匠 (The Legitimate Craftsman)”。这是一个故意的讽刺。
 >
@@ -257,13 +257,11 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 
 想加你自己的？放进 `.opencode/skills/*/SKILL.md` 或者 `~/.config/opencode/skills/*/SKILL.md` 就行。
 
-**想看所有的硬核功能说明吗？** 点击查看 **[详细特性文档 (Features)](docs/features.md)** ，深入了解 Agent 架构、Hook 流水线、核心工具链和所有的内置 MCP 等等。
+**想看所有的硬核功能说明吗？** 点击查看 **[详细特性文档 (Features)](docs/reference/features.md)** ，深入了解 Agent 架构、Hook 流水线、核心工具链和所有的内置 MCP 等等。
 
 ---
 
-> **想了解背后的故事吗？** 阅读我们的 [智能体神话故事 (Agent Lore)](docs/agent-lore.md) 了解为什么我们选择叫 Sisyphus（西西弗斯），为什么 Hephaestus（赫菲斯托斯）是“正牌工匠”，以及[我们为什么选择了 OpenCode 分支](docs/agent-lore.md#why-opencode)。
->
-> 第一次用 oh-my-opencode？去看一下 **[Agent-模型最佳搭配指南](docs/guide/agent-model-matching.md)**。
+> **第一次用 oh-my-opencode？** 阅读 **[概述](docs/guide/overview.md)** 了解你拥有哪些功能，或查看 **[编排指南](docs/guide/orchestration.md)** 了解 Agent 如何协作。
 
 ## 如何卸载 (Uninstallation)
 
@@ -299,7 +297,7 @@ Agent 会自动顺藤摸瓜加载对应的 Context，免去了你所有的手动
 
 ## 闲聊环节 (Author's Note)
 
-**想知道做这个插件的哲学理念吗？** 阅读 [Ultrawork 宣言](docs/ultrawork-manifesto.md)。
+**想知道做这个插件的哲学理念吗？** 阅读 [Ultrawork 宣言](docs/manifesto.md)。
 
 ---
 

@@ -167,7 +167,7 @@ Even only with following subscriptions, ultrawork will work well (this project i
 
 **Prometheus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`** ) is your strategic planner. Interview mode: it questions, identifies scope, and builds a detailed plan before a single line of code is touched.
 
-Every agent is tuned to its model's specific strengths. No manual model-juggling. [Read the lore →](docs/agent-lore.md)
+Every agent is tuned to its model's specific strengths. No manual model-juggling. [Learn more →](docs/guide/overview.md)
 
 > Anthropic [blocked OpenCode because of us.](https://x.com/thdxr/status/2010149530486911014) That's why Hephaestus is called "The Legitimate Craftsman." The irony is intentional.
 >
@@ -260,13 +260,11 @@ Built-ins: `playwright` (browser automation), `git-master` (atomic commits, reba
 
 Add your own: `.opencode/skills/*/SKILL.md` or `~/.config/opencode/skills/*/SKILL.md`.
 
-**Want the full feature breakdown?** See the **[Features Documentation](docs/features.md)** for agents, hooks, tools, MCPs, and everything else in detail.
+**Want the full feature breakdown?** See the **[Features Documentation](docs/reference/features.md)** for agents, hooks, tools, MCPs, and everything else in detail.
 
 ---
 
-> **Want the backstory?** Read the [mythology behind our agents](docs/agent-lore.md) for why Sisyphus rolls boulders, why Hephaestus is "The Legitimate Craftsman", and [why we chose OpenCode](docs/agent-lore.md#why-opencode).
->
-> New to oh-my-opencode? Check the **[Agent-Model Matching Guide](docs/guide/agent-model-matching.md)** for model recommendations.
+> **New to oh-my-opencode?** Read the **[Overview](docs/guide/overview.md)** to understand what you have, or check the **[Orchestration Guide](docs/guide/orchestration.md)** for how agents collaborate.
 
 ## Uninstallation
 
@@ -304,7 +302,7 @@ To remove oh-my-opencode:
 
 Features you'll think should've always existed. Once you use them, you can't go back.
 
-See full [Features Documentation](docs/features.md).
+See full [Features Documentation](docs/reference/features.md).
 
 **Quick Overview:**
 - **Agents**: Sisyphus (the main agent), Prometheus (planner), Oracle (architecture/debugging), Librarian (docs/code search), Explore (fast codebase grep), Multimodal Looker
@@ -316,13 +314,13 @@ See full [Features Documentation](docs/features.md).
 - **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search)
 - **Session Tools**: List, read, search, and analyze session history
 - **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
-- **[Agent-Model Matching Guide](docs/guide/agent-model-matching.md)**: Which model works best with which agent
+- **Model Setup**: Agent-model matching is built into the [Installation Guide](docs/guide/installation.md#step-5-understand-your-model-setup)
 
 ## Configuration
 
 Opinionated defaults, adjustable if you insist.
 
-See [Configuration Documentation](docs/configurations.md).
+See [Configuration Documentation](docs/reference/configuration.md).
 
 **Quick Overview:**
 - **Config Locations**: `.opencode/oh-my-opencode.jsonc` or `.opencode/oh-my-opencode.json` (project), `~/.config/opencode/oh-my-opencode.jsonc` or `~/.config/opencode/oh-my-opencode.json` (user)
@@ -340,7 +338,7 @@ See [Configuration Documentation](docs/configurations.md).
 
 ## Author's Note
 
-**Want the philosophy?** Read the [Ultrawork Manifesto](docs/ultrawork-manifesto.md).
+**Want the philosophy?** Read the [Ultrawork Manifesto](docs/manifesto.md).
 
 ---
 
