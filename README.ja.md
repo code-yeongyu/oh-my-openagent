@@ -369,7 +369,7 @@ OpenCode が Debian / ArchLinux だとしたら、Oh My OpenCode は Ubuntu / [O
 ## こちらの企業の専門家にご愛用いただいています
 
 - [Indent](https://indentcorp.com)
-  - Making Spray - influencer marketing solution, vovushop - crossborder commerce platform, vreview - ai commerce review marketing solution
+  - Making Spray - インフルエンサーマーケティングソリューション, vovushop - 越境Eコマースプラットフォーム, vreview - AIコマースレビューマーケティングソリューション
 - [Google](https://google.com)
 - [Microsoft](https://microsoft.com)
 - [ELESTYLE](https://elestyle.jp)
