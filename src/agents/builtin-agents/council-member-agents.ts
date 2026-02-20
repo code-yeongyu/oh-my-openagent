@@ -10,7 +10,7 @@ export const COUNCIL_MEMBER_KEY_PREFIX = "Council: "
 /**
  * Generates a stable agent registration key from a council member's name.
  */
-export function getCouncilMemberAgentKey(member: CouncilMemberConfig): string {
+function getCouncilMemberAgentKey(member: CouncilMemberConfig): string {
   return `${COUNCIL_MEMBER_KEY_PREFIX}${member.name}`
 }
 
