@@ -19,16 +19,23 @@ type MessageInfo = {
 
 export async function injectContinuationPrompt(
 	ctx: PluginInput,
-	options: { sessionID: string; prompt: string; directory: string; apiTimeoutMs: number },
+	options: {
+		sessionID: string
+		prompt: string
+		directory: string
+		apiTimeoutMs: number
+		inheritFromSessionID?: string
+	},
 ): Promise<void> {
 	let agent: string | undefined
 	let model: { providerID: string; modelID: string } | undefined
 	let tools: Record<string, boolean | "allow" | "deny" | "ask"> | undefined
 
 	try {
+		const sourceSessionID = options.inheritFromSessionID ?? options.sessionID
 		const messagesResp = await withTimeout(
 			ctx.client.session.messages({
-				path: { id: options.sessionID },
+				path: { id: sourceSessionID },
 			}),
 			options.apiTimeoutMs,
 		)

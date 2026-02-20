@@ -24,6 +24,7 @@ export function createLoopStateController(options: {
 				maxIterations?: number
 				completionPromise?: string
 				ultrawork?: boolean
+				strategy?: "reset" | "continue"
 			},
 		): boolean {
 			const state: RalphLoopState = {
@@ -37,6 +38,7 @@ export function createLoopStateController(options: {
 					loopOptions?.completionPromise ??
 					DEFAULT_COMPLETION_PROMISE,
 				ultrawork: loopOptions?.ultrawork,
+				strategy: loopOptions?.strategy ?? config?.default_strategy ?? "continue",
 				started_at: new Date().toISOString(),
 				prompt,
 				session_id: sessionID,
@@ -76,6 +78,20 @@ export function createLoopStateController(options: {
 
 		incrementIteration(): RalphLoopState | null {
 			return incrementIteration(directory, stateDir)
+		},
+
+		setSessionID(sessionID: string): RalphLoopState | null {
+			const state = readState(directory, stateDir)
+			if (!state) {
+				return null
+			}
+
+			state.session_id = sessionID
+			if (!writeState(directory, state, stateDir)) {
+				return null
+			}
+
+			return state
 		},
 	}
 }
