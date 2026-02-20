@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { parseModelString } from "./model-parser"
+import { parseModelString } from "./model-string-parser"
 
 describe("parseModelString", () => {
   describe("valid model strings", () => {
@@ -52,22 +52,47 @@ describe("parseModelString", () => {
   describe("invalid model strings", () => {
     //#given malformed or empty model strings
     //#when parsing model strings
-    //#then it returns null
+    //#then it returns undefined
 
-    test("returns null for empty string", () => {
-      expect(parseModelString("")).toBeNull()
+    test("returns undefined for empty string", () => {
+      expect(parseModelString("")).toBeUndefined()
     })
 
-    test("returns null for model without slash", () => {
-      expect(parseModelString("no-slash-model")).toBeNull()
+    test("returns undefined for model without slash", () => {
+      expect(parseModelString("no-slash-model")).toBeUndefined()
     })
 
-    test("returns null for empty provider", () => {
-      expect(parseModelString("/missing-provider")).toBeNull()
+    test("returns undefined for empty provider", () => {
+      expect(parseModelString("/missing-provider")).toBeUndefined()
     })
 
-    test("returns null for empty model", () => {
-      expect(parseModelString("missing-model/")).toBeNull()
+    test("returns undefined for empty model", () => {
+      expect(parseModelString("missing-model/")).toBeUndefined()
+    })
+  })
+
+  describe("whitespace handling", () => {
+    //#given model strings with whitespace
+    //#when parsing
+    //#then it rejects whitespace-only parts and trims valid parts
+
+    test("returns undefined for whitespace-only string", () => {
+      expect(parseModelString("   ")).toBeUndefined()
+    })
+
+    test("returns undefined for whitespace-only provider", () => {
+      expect(parseModelString("  /model")).toBeUndefined()
+    })
+
+    test("returns undefined for whitespace-only model", () => {
+      expect(parseModelString("provider/  ")).toBeUndefined()
+    })
+
+    test("trims whitespace from provider and model", () => {
+      expect(parseModelString(" openai / gpt-5.3-codex ")).toEqual({
+        providerID: "openai",
+        modelID: "gpt-5.3-codex",
+      })
     })
   })
 })

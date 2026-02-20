@@ -1,12 +1,12 @@
 import { z } from "zod"
-import { parseModelString } from "../../agents/athena/model-parser"
+import { parseModelString } from "../../tools/delegate-task/model-string-parser"
 
 /** Validates model string format: "provider/model-id" (e.g., "openai/gpt-5.3-codex"). */
 const ModelStringSchema = z
   .string()
   .min(1)
   .refine(
-    (model) => parseModelString(model) !== null,
+    (model) => parseModelString(model) !== undefined,
     { message: 'Model must be in "provider/model-id" format (e.g., "openai/gpt-5.3-codex")' }
   )
 
