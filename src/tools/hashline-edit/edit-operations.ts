@@ -1,15 +1,106 @@
-import { parseLineRef, validateLineRef } from "./validation"
+import { parseLineRef, validateLineRef, validateLineRefs } from "./validation"
 import type { HashlineEdit } from "./types"
 
-function unescapeNewlines(text: string): string {
-  return text.replace(/\\n/g, "\n")
+const HASHLINE_PREFIX_RE = /^\s*(?:>>>|>>)?\s*\d+#[A-Z]{2}:/
+const DIFF_PLUS_RE = /^[+-](?![+-])/
+
+function stripLinePrefixes(lines: string[]): string[] {
+  let hashPrefixCount = 0
+  let diffPlusCount = 0
+  let nonEmpty = 0
+
+  for (const line of lines) {
+    if (line.length === 0) continue
+    nonEmpty += 1
+    if (HASHLINE_PREFIX_RE.test(line)) hashPrefixCount += 1
+    if (DIFF_PLUS_RE.test(line)) diffPlusCount += 1
+  }
+
+  if (nonEmpty === 0) {
+    return lines
+  }
+
+  const stripHash = hashPrefixCount > 0 && hashPrefixCount >= nonEmpty * 0.5
+  const stripPlus = !stripHash && diffPlusCount > 0 && diffPlusCount >= nonEmpty * 0.5
+
+  if (!stripHash && !stripPlus) {
+    return lines
+  }
+
+  return lines.map((line) => {
+    if (stripHash) return line.replace(HASHLINE_PREFIX_RE, "")
+    if (stripPlus) return line.replace(DIFF_PLUS_RE, "")
+    return line
+  })
 }
 
-export function applySetLine(lines: string[], anchor: string, newText: string): string[] {
+function equalsIgnoringWhitespace(a: string, b: string): boolean {
+  if (a === b) return true
+  return a.replace(/\s+/g, "") === b.replace(/\s+/g, "")
+}
+
+function leadingWhitespace(text: string): string {
+  const match = text.match(/^\s*/)
+  return match ? match[0] : ""
+}
+
+function restoreLeadingIndent(templateLine: string, line: string): string {
+  if (line.length === 0) return line
+  const templateIndent = leadingWhitespace(templateLine)
+  if (templateIndent.length === 0) return line
+  if (leadingWhitespace(line).length > 0) return line
+  return `${templateIndent}${line}`
+}
+
+function stripInsertAnchorEcho(anchorLine: string, newLines: string[]): string[] {
+  if (newLines.length <= 1) return newLines
+  if (equalsIgnoringWhitespace(newLines[0], anchorLine)) {
+    return newLines.slice(1)
+  }
+  return newLines
+}
+
+function stripRangeBoundaryEcho(
+  lines: string[],
+  startLine: number,
+  endLine: number,
+  newLines: string[]
+): string[] {
+  const replacedCount = endLine - startLine + 1
+  if (newLines.length <= 1 || newLines.length <= replacedCount) {
+    return newLines
+  }
+
+  let out = newLines
+  const beforeIdx = startLine - 2
+  if (beforeIdx >= 0 && equalsIgnoringWhitespace(out[0], lines[beforeIdx])) {
+    out = out.slice(1)
+  }
+
+  const afterIdx = endLine
+  if (afterIdx < lines.length && out.length > 0 && equalsIgnoringWhitespace(out[out.length - 1], lines[afterIdx])) {
+    out = out.slice(0, -1)
+  }
+
+  return out
+}
+
+function toNewLines(input: string | string[]): string[] {
+  if (Array.isArray(input)) {
+    return stripLinePrefixes(input)
+  }
+  return stripLinePrefixes(input.split("\n"))
+}
+
+export function applySetLine(lines: string[], anchor: string, newText: string | string[]): string[] {
   validateLineRef(lines, anchor)
   const { line } = parseLineRef(anchor)
   const result = [...lines]
-  result[line - 1] = unescapeNewlines(newText)
+  const replacement = toNewLines(newText).map((entry, idx) => {
+    if (idx !== 0) return entry
+    return restoreLeadingIndent(lines[line - 1], entry)
+  })
+  result.splice(line - 1, 1, ...replacement)
   return result
 }
 
@@ -17,7 +108,7 @@ export function applyReplaceLines(
   lines: string[],
   startAnchor: string,
   endAnchor: string,
-  newText: string
+  newText: string | string[]
 ): string[] {
   validateLineRef(lines, startAnchor)
   validateLineRef(lines, endAnchor)
@@ -32,25 +123,31 @@ export function applyReplaceLines(
   }
 
   const result = [...lines]
-  const newLines = unescapeNewlines(newText).split("\n")
+  const stripped = stripRangeBoundaryEcho(lines, startLine, endLine, toNewLines(newText))
+  const newLines = stripped.map((entry, idx) => {
+    const oldLine = lines[startLine - 1 + idx]
+    if (!oldLine) return entry
+    return restoreLeadingIndent(oldLine, entry)
+  })
   result.splice(startLine - 1, endLine - startLine + 1, ...newLines)
   return result
 }
 
-export function applyInsertAfter(lines: string[], anchor: string, text: string): string[] {
+export function applyInsertAfter(lines: string[], anchor: string, text: string | string[]): string[] {
   validateLineRef(lines, anchor)
   const { line } = parseLineRef(anchor)
   const result = [...lines]
-  const newLines = unescapeNewlines(text).split("\n")
+  const newLines = stripInsertAnchorEcho(lines[line - 1], toNewLines(text))
   result.splice(line, 0, ...newLines)
   return result
 }
 
-export function applyReplace(content: string, oldText: string, newText: string): string {
+export function applyReplace(content: string, oldText: string, newText: string | string[]): string {
   if (!content.includes(oldText)) {
     throw new Error(`Text not found: "${oldText}"`)
   }
-  return content.replaceAll(oldText, unescapeNewlines(newText))
+  const replacement = Array.isArray(newText) ? newText.join("\n") : newText
+  return content.replaceAll(oldText, replacement)
 }
 
 function getEditLineNumber(edit: HashlineEdit): number {
@@ -78,33 +175,34 @@ export function applyHashlineEdits(content: string, edits: HashlineEdit[]): stri
   let result = content
   let lines = result.split("\n")
 
+  const refs = sortedEdits.flatMap((edit) => {
+    switch (edit.type) {
+      case "set_line":
+        return [edit.line]
+      case "replace_lines":
+        return [edit.start_line, edit.end_line]
+      case "insert_after":
+        return [edit.line]
+      case "replace":
+        return []
+      default:
+        return []
+    }
+  })
+  validateLineRefs(lines, refs)
+
   for (const edit of sortedEdits) {
     switch (edit.type) {
       case "set_line": {
-        validateLineRef(lines, edit.line)
-        const { line } = parseLineRef(edit.line)
-        lines[line - 1] = unescapeNewlines(edit.text)
+        lines = applySetLine(lines, edit.line, edit.text)
         break
       }
       case "replace_lines": {
-        validateLineRef(lines, edit.start_line)
-        validateLineRef(lines, edit.end_line)
-        const { line: startLine } = parseLineRef(edit.start_line)
-        const { line: endLine } = parseLineRef(edit.end_line)
-        if (startLine > endLine) {
-          throw new Error(
-            `Invalid range: start line ${startLine} cannot be greater than end line ${endLine}`
-          )
-        }
-        const newLines = unescapeNewlines(edit.text).split("\n")
-        lines.splice(startLine - 1, endLine - startLine + 1, ...newLines)
+        lines = applyReplaceLines(lines, edit.start_line, edit.end_line, edit.text)
         break
       }
       case "insert_after": {
-        validateLineRef(lines, edit.line)
-        const { line } = parseLineRef(edit.line)
-        const newLines = unescapeNewlines(edit.text).split("\n")
-        lines.splice(line, 0, ...newLines)
+        lines = applyInsertAfter(lines, edit.line, edit.text)
         break
       }
       case "replace": {
@@ -112,7 +210,8 @@ export function applyHashlineEdits(content: string, edits: HashlineEdit[]): stri
         if (!result.includes(edit.old_text)) {
           throw new Error(`Text not found: "${edit.old_text}"`)
         }
-        result = result.replaceAll(edit.old_text, unescapeNewlines(edit.new_text))
+        const replacement = Array.isArray(edit.new_text) ? edit.new_text.join("\n") : edit.new_text
+        result = result.replaceAll(edit.old_text, replacement)
         lines = result.split("\n")
         break
       }
