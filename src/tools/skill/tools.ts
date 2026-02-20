@@ -224,6 +224,10 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     },
     args: {
       name: tool.schema.string().describe("The skill or command name (e.g., 'code-review' or 'publish'). Use without leading slash for commands."),
+      user_message: tool.schema
+        .string()
+        .optional()
+        .describe("Optional arguments or context for command invocation. Example: name='publish', user_message='patch'"),
     },
     async execute(args: SkillArgs, ctx?: { agent?: string }) {
       const skills = await getSkills()
@@ -273,7 +277,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       const matchedCommand = commands.find(c => c.name.toLowerCase() === requestedName.toLowerCase())
 
       if (matchedCommand) {
-        return await formatLoadedCommand(matchedCommand)
+        return await formatLoadedCommand(matchedCommand, args.user_message)
       }
 
       // No match found — provide helpful error with partial matches
