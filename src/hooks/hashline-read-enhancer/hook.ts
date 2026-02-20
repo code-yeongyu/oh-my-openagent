@@ -6,7 +6,7 @@ interface HashlineReadEnhancerConfig {
   hashline_edit?: { enabled: boolean }
 }
 
-const READ_LINE_PATTERN = /^(\d+): (.*)$/
+const READ_LINE_PATTERN = /^(\d+): ?(.*)$/
 const CONTENT_OPEN_TAG = "<content>"
 const CONTENT_CLOSE_TAG = "</content>"
 
@@ -47,25 +47,38 @@ function transformOutput(output: string): string {
   const contentStart = lines.indexOf(CONTENT_OPEN_TAG)
   const contentEnd = lines.indexOf(CONTENT_CLOSE_TAG)
 
-  if (contentStart === -1 || contentEnd === -1 || contentEnd <= contentStart + 1) {
-    return output
+  if (contentStart !== -1 && contentEnd !== -1 && contentEnd > contentStart + 1) {
+    const fileLines = lines.slice(contentStart + 1, contentEnd)
+    if (!isTextFile(fileLines[0] ?? "")) {
+      return output
+    }
+
+    const result: string[] = []
+    for (const line of fileLines) {
+      if (!READ_LINE_PATTERN.test(line)) {
+        result.push(...fileLines.slice(result.length))
+        break
+      }
+      result.push(transformLine(line))
+    }
+
+    return [...lines.slice(0, contentStart + 1), ...result, ...lines.slice(contentEnd)].join("\n")
   }
 
-  const fileLines = lines.slice(contentStart + 1, contentEnd)
-  if (!isTextFile(fileLines[0] ?? "")) {
+  if (!isTextFile(lines[0] ?? "")) {
     return output
   }
 
   const result: string[] = []
-  for (const line of fileLines) {
+  for (const line of lines) {
     if (!READ_LINE_PATTERN.test(line)) {
-      result.push(...fileLines.slice(result.length))
+      result.push(...lines.slice(result.length))
       break
     }
     result.push(transformLine(line))
   }
 
-  return [...lines.slice(0, contentStart + 1), ...result, ...lines.slice(contentEnd)].join("\n")
+  return result.join("\n")
 }
 
 function extractFilePath(metadata: unknown): string | undefined {

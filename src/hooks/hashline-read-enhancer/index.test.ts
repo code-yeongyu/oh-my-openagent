@@ -50,6 +50,33 @@ describe("hashline-read-enhancer", () => {
     expect(lines[10]).toBe("1: keep this unchanged")
   })
 
+  it("hashifies plain read output without content tags", async () => {
+    //#given
+    const hook = createHashlineReadEnhancerHook(mockCtx(), { hashline_edit: { enabled: true } })
+    const input = { tool: "read", sessionID: "s", callID: "c" }
+    const output = {
+      title: "README.md",
+      output: [
+        "1: # Oh-My-OpenCode Features",
+        "2:",
+        "3: Hashline test",
+        "",
+        "(End of file - total 3 lines)",
+      ].join("\n"),
+      metadata: {},
+    }
+
+    //#when
+    await hook["tool.execute.after"](input, output)
+
+    //#then
+    const lines = output.output.split("\n")
+    expect(lines[0]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}:# Oh-My-OpenCode Features$/)
+    expect(lines[1]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}:$/)
+    expect(lines[2]).toMatch(/^3#[ZPMQVRWSNKTXJBYH]{2}:Hashline test$/)
+    expect(lines[4]).toBe("(End of file - total 3 lines)")
+  })
+
   it("appends LINE#ID output for write tool using metadata filepath", async () => {
     //#given
     const hook = createHashlineReadEnhancerHook(mockCtx(), { hashline_edit: { enabled: true } })
