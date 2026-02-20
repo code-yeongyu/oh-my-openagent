@@ -981,6 +981,34 @@ Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `sessio
 
 **Note on `auto-update-checker` and `startup-toast`**: The `startup-toast` hook is a sub-feature of `auto-update-checker`. To disable only the startup toast notification while keeping update checking enabled, add `"startup-toast"` to `disabled_hooks`. To disable all update checking features (including the toast), add `"auto-update-checker"` to `disabled_hooks`.
 
+## Hashline Edit
+
+Oh My OpenCode replaces OpenCode's built-in `Edit` tool with a hash-anchored version that uses `LINE#ID` references (e.g. `5#VK`) instead of bare line numbers. This prevents stale-line edits by validating content hash before applying each change.
+
+Enabled by default. Set `hashline_edit: false` to opt out and restore standard file editing.
+
+```json
+{
+  "hashline_edit": false
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `hashline_edit` | `true` | Enable hash-anchored `Edit` tool and companion hooks. When `false`, falls back to standard editing without hash validation. |
+
+When enabled, two companion hooks are also active:
+
+- **`hashline-read-enhancer`** — Appends `LINE#ID:content` annotations to `Read` output so agents always have fresh anchors.
+- **`hashline-edit-diff-enhancer`** — Shows a unified diff in `Edit` / `Write` output for immediate change visibility.
+
+To disable only the hooks while keeping the hash-anchored Edit tool:
+
+```json
+{
+  "disabled_hooks": ["hashline-read-enhancer", "hashline-edit-diff-enhancer"]
+}
+
 ## Disabled Commands
 
 Disable specific built-in commands via `disabled_commands` in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
