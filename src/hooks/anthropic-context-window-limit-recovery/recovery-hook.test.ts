@@ -1,5 +1,8 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
+import * as originalExecutor from "./executor"
+import * as originalParser from "./parser"
+import * as originalLogger from "../../shared/logger"
 
 const executeCompactMock = mock(async () => {})
 const getLastAssistantMock = mock(async () => ({
@@ -23,6 +26,12 @@ mock.module("./parser", () => ({
 mock.module("../../shared/logger", () => ({
   log: () => {},
 }))
+
+afterAll(() => {
+  mock.module("./executor", () => originalExecutor)
+  mock.module("./parser", () => originalParser)
+  mock.module("../../shared/logger", () => originalLogger)
+})
 
 function createMockContext(): PluginInput {
   return {
