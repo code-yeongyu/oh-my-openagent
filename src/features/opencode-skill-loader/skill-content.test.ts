@@ -185,7 +185,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		const skillNames = ["playwright", "git-master"]
 
 		// when: resolving multiple skills async
-		const result = await resolveMultipleSkillsAsync(skillNames)
+		const result = await resolveMultipleSkillsAsync(skillNames, { directory: process.cwd() })
 
 		// then: all builtin skills resolved
 		expect(result.resolved.size).toBe(2)
@@ -199,7 +199,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		const skillNames = ["playwright", "nonexistent-skill-12345"]
 
 		// when: resolving multiple skills async
-		const result = await resolveMultipleSkillsAsync(skillNames)
+		const result = await resolveMultipleSkillsAsync(skillNames, { directory: process.cwd() })
 
 		// then: existing skills resolved, non-existing in notFound
 		expect(result.resolved.size).toBe(1)
@@ -286,7 +286,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		const skillNames = ["git-master"]
 
 		// when: resolving without any gitMasterConfig
-		const result = await resolveMultipleSkillsAsync(skillNames)
+		const result = await resolveMultipleSkillsAsync(skillNames, { directory: process.cwd() })
 
 		// then: watermark is injected (default is ON)
 		expect(result.resolved.size).toBe(1)
@@ -357,7 +357,7 @@ describe("resolveMultipleSkillsAsync", () => {
 		const skillNames: string[] = []
 
 		// when: resolving multiple skills async
-		const result = await resolveMultipleSkillsAsync(skillNames)
+		const result = await resolveMultipleSkillsAsync(skillNames, { directory: process.cwd() })
 
 		// then: empty results
 		expect(result.resolved.size).toBe(0)

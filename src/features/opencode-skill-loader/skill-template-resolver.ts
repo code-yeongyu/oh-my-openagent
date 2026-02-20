@@ -51,7 +51,7 @@ export function resolveMultipleSkills(
 
 export async function resolveSkillContentAsync(
 	skillName: string,
-	options?: SkillResolutionOptions
+	options: SkillResolutionOptions & { directory: string }
 ): Promise<string | null> {
 	const allSkills = await getAllSkills(options)
 	const skill = allSkills.find((loadedSkill) => loadedSkill.name === skillName)
@@ -68,7 +68,7 @@ export async function resolveSkillContentAsync(
 
 export async function resolveMultipleSkillsAsync(
 	skillNames: string[],
-	options?: SkillResolutionOptions
+	options: SkillResolutionOptions & { directory: string }
 ): Promise<{ resolved: Map<string, string>; notFound: string[] }> {
 	const allSkills = await getAllSkills(options)
 	const skillMap = new Map<string, LoadedSkill>()

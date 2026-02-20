@@ -9,8 +9,8 @@ export function clearSkillCache(): void {
 	skillCache.clear()
 }
 
-export async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSkill[]> {
-	const directory = options?.directory ?? process.cwd()
+export async function getAllSkills(options: SkillResolutionOptions & { directory: string }): Promise<LoadedSkill[]> {
+	const directory = options.directory
 	const cacheKey = `${options?.browserProvider ?? "playwright"}:${directory}`
 	const hasDisabledSkills = options?.disabledSkills && options.disabledSkills.size > 0
 

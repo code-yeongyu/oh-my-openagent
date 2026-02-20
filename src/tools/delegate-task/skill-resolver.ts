@@ -3,7 +3,7 @@ import { resolveMultipleSkillsAsync, getAllSkills } from "../../features/opencod
 
 export async function resolveSkillContent(
   skills: string[],
-  options: { gitMasterConfig?: GitMasterConfig; browserProvider?: BrowserAutomationProvider; disabledSkills?: Set<string>; directory?: string }
+  options: { gitMasterConfig?: GitMasterConfig; browserProvider?: BrowserAutomationProvider; disabledSkills?: Set<string>; directory: string }
 ): Promise<{ content: string | undefined; error: string | null }> {
   if (skills.length === 0) {
     return { content: undefined, error: null }

@@ -27,7 +27,7 @@ const COUNCIL_CANDIDATES: Array<{
   },
   {
     provider: (a) => a.kimiForCoding,
-    model: "kimi-for-coding/k2p5",
+    model: "kimi-for-coding/kimi-k2.5",
     name: "Kimi 2.5",
   }
 ]
