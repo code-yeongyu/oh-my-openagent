@@ -5,6 +5,7 @@ import { discoverCommandsSync } from "./command-discovery"
 import { buildDescriptionFromItems, TOOL_DESCRIPTION_PREFIX } from "./slashcommand-description"
 import { formatCommandList, formatLoadedCommand } from "./command-output-formatter"
 import { skillToCommandInfo } from "./skill-command-converter"
+import { formatSkillOutput } from "./skill-formatter"
 
 export function createSlashcommandTool(options: SlashcommandToolOptions = {}): ToolDefinition {
   let cachedCommands: CommandInfo[] | null = options.commands ?? null
@@ -31,14 +32,13 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
 
   const buildDescription = async (): Promise<string> => {
     if (cachedDescription) return cachedDescription
-    const allItems = await getAllItems()
-    cachedDescription = buildDescriptionFromItems(allItems)
+    const commands = getCommands()
+    cachedDescription = buildDescriptionFromItems(commands)
     return cachedDescription
   }
 
-  if (options.commands !== undefined && options.skills !== undefined) {
-    const allItems = [...options.commands, ...options.skills.map(skillToCommandInfo)]
-    cachedDescription = buildDescriptionFromItems(allItems)
+  if (options.commands !== undefined) {
+    cachedDescription = buildDescriptionFromItems(options.commands)
   } else {
     void buildDescription()
   }
@@ -76,6 +76,18 @@ export function createSlashcommandTool(options: SlashcommandToolOptions = {}): T
       )
 
       if (exactMatch) {
+        const skills = await getSkills()
+        const matchedSkill = skills.find(s => s.name === exactMatch.name)
+        
+        if (matchedSkill) {
+          return await formatSkillOutput(
+            matchedSkill,
+            options.mcpManager,
+            options.getSessionID,
+            options.gitMasterConfig
+          )
+        }
+        
         return await formatLoadedCommand(exactMatch, args.user_message)
       }
 

@@ -22,6 +22,7 @@ export function maybeCreateSisyphusConfig(input: {
   directory?: string
   userCategories?: CategoriesConfig
   useTaskSystem: boolean
+  disableOmoEnv?: boolean
 }): AgentConfig | undefined {
   const {
     disabledAgents,
@@ -36,6 +37,7 @@ export function maybeCreateSisyphusConfig(input: {
     mergedCategories,
     directory,
     useTaskSystem,
+    disableOmoEnv = false,
   } = input
 
   const sisyphusOverride = agentOverrides["sisyphus"]
@@ -77,8 +79,10 @@ export function maybeCreateSisyphusConfig(input: {
     sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
   }
 
-  sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories)
-  sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory)
+  sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories, directory)
+  sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory, {
+    disableOmoEnv,
+  })
 
   return sisyphusConfig
 }

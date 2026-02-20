@@ -552,12 +552,68 @@ Skill body.
         expect(names.length).toBe(uniqueNames.length)
       } finally {
         process.chdir(originalCwd)
-        if (originalOpenCodeConfigDir === undefined) {
+         if (originalOpenCodeConfigDir === undefined) {
           delete process.env.OPENCODE_CONFIG_DIR
         } else {
           process.env.OPENCODE_CONFIG_DIR = originalOpenCodeConfigDir
         }
       }
+    })
+  })
+
+  describe("agents skills discovery (.agents/skills/)", () => {
+    it("#given a skill in .agents/skills/ #when discoverProjectAgentsSkills is called #then it discovers the skill", async () => {
+      //#given
+      const skillContent = `---
+name: agent-project-skill
+description: A skill from project .agents/skills directory
+---
+Skill body.
+`
+      const agentsProjectSkillsDir = join(TEST_DIR, ".agents", "skills")
+      const skillDir = join(agentsProjectSkillsDir, "agent-project-skill")
+      mkdirSync(skillDir, { recursive: true })
+      writeFileSync(join(skillDir, "SKILL.md"), skillContent)
+
+      //#when
+      const { discoverProjectAgentsSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverProjectAgentsSkills()
+        const skill = skills.find(s => s.name === "agent-project-skill")
+
+        //#then
+        expect(skill).toBeDefined()
+        expect(skill?.scope).toBe("project")
+        expect(skill?.definition.description).toContain("A skill from project .agents/skills directory")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
+
+    it("#given a skill in .agents/skills/ #when discoverProjectAgentsSkills is called with directory #then it discovers the skill", async () => {
+      //#given
+      const skillContent = `---
+name: agent-dir-skill
+description: A skill via explicit directory param
+---
+Skill body.
+`
+      const agentsProjectSkillsDir = join(TEST_DIR, ".agents", "skills")
+      const skillDir = join(agentsProjectSkillsDir, "agent-dir-skill")
+      mkdirSync(skillDir, { recursive: true })
+      writeFileSync(join(skillDir, "SKILL.md"), skillContent)
+
+      //#when
+      const { discoverProjectAgentsSkills } = await import("./loader")
+      const skills = await discoverProjectAgentsSkills(TEST_DIR)
+      const skill = skills.find(s => s.name === "agent-dir-skill")
+
+      //#then
+      expect(skill).toBeDefined()
+      expect(skill?.scope).toBe("project")
     })
   })
 })

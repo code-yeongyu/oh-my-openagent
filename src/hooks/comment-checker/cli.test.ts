@@ -1,68 +1,205 @@
-import { describe, test, expect, beforeEach, mock } from "bun:test"
+import { describe, test, expect, mock } from "bun:test"
+import { chmodSync, mkdtempSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 
-describe("comment-checker CLI path resolution", () => {
+import type { PendingCall } from "./types"
+
+function createMockInput() {
+  return {
+    session_id: "test",
+    tool_name: "Write",
+    transcript_path: "",
+    cwd: "/tmp",
+    hook_event_name: "PostToolUse",
+    tool_input: { file_path: "/tmp/test.ts", content: "const x = 1" },
+  }
+}
+
+function createScriptBinary(scriptContent: string): string {
+  const directory = mkdtempSync(join(tmpdir(), "comment-checker-cli-test-"))
+  const binaryPath = join(directory, "comment-checker")
+  writeFileSync(binaryPath, scriptContent)
+  chmodSync(binaryPath, 0o755)
+  return binaryPath
+}
+
+describe("comment-checker CLI", () => {
   describe("lazy initialization", () => {
-    // given module is imported
-    // when COMMENT_CHECKER_CLI_PATH is accessed
-    // then findCommentCheckerPathSync should NOT have been called during import
-    
-    test("getCommentCheckerPathSync should be lazy - not called on module import", async () => {
-      // given a fresh module import
-      // We need to verify that importing the module doesn't immediately call findCommentCheckerPathSync
-      
-      // when we import the module
+    test("getCommentCheckerPathSync should be lazy and callable", async () => {
+      // given
       const cliModule = await import("./cli")
-      
-      // then getCommentCheckerPathSync should exist and be callable
-      expect(typeof cliModule.getCommentCheckerPathSync).toBe("function")
-      
-      // The key test: calling getCommentCheckerPathSync should work
-      // (we can't easily test that it wasn't called on import without mocking,
-      // but we can verify the function exists and returns expected types)
+      // when
       const result = cliModule.getCommentCheckerPathSync()
+      // then
+      expect(typeof cliModule.getCommentCheckerPathSync).toBe("function")
       expect(result === null || typeof result === "string").toBe(true)
     })
 
-    test("getCommentCheckerPathSync should cache result after first call", async () => {
-      // given getCommentCheckerPathSync is called once
+    test("COMMENT_CHECKER_CLI_PATH export should not exist", async () => {
+      // given
       const cliModule = await import("./cli")
-      const firstResult = cliModule.getCommentCheckerPathSync()
-      
-      // when called again
-      const secondResult = cliModule.getCommentCheckerPathSync()
-      
-      // then should return same cached result
-      expect(secondResult).toBe(firstResult)
-    })
-
-    test("COMMENT_CHECKER_CLI_PATH export should not exist (removed for lazy loading)", async () => {
-      // given the cli module
-      const cliModule = await import("./cli")
-      
-      // when checking for COMMENT_CHECKER_CLI_PATH
-      // then it should not exist (replaced with lazy getter)
+      // when
+      // then
       expect("COMMENT_CHECKER_CLI_PATH" in cliModule).toBe(false)
     })
   })
 
   describe("runCommentChecker", () => {
-    test("should use getCommentCheckerPathSync for fallback path resolution", async () => {
-      // given runCommentChecker is called without explicit path
+    test("returns CheckResult shape without explicit CLI path", async () => {
+      // given
       const { runCommentChecker } = await import("./cli")
-      
-      // when called with input containing no comments
-      const result = await runCommentChecker({
-        session_id: "test",
-        tool_name: "Write",
-        transcript_path: "",
-        cwd: "/tmp",
-        hook_event_name: "PostToolUse",
-        tool_input: { file_path: "/tmp/test.ts", content: "const x = 1" },
-      })
-      
-      // then should return CheckResult type (binary may or may not exist)
+      // when
+      const result = await runCommentChecker(createMockInput())
+      // then
       expect(typeof result.hasComments).toBe("boolean")
       expect(typeof result.message).toBe("string")
+    })
+
+    test("sends SIGKILL after grace period when process ignores SIGTERM", async () => {
+      // given
+      const { runCommentChecker } = await import("./cli")
+      const binaryPath = createScriptBinary(`#!/bin/sh
+if [ "$1" != "check" ]; then
+  exit 1
+fi
+trap '' TERM
+while :; do
+  :
+done
+`)
+      const originalSetTimeout = globalThis.setTimeout
+      globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
+        fn()
+        return 0 as unknown as ReturnType<typeof setTimeout>
+      }) as typeof setTimeout
+
+      try {
+        // when
+        const result = await runCommentChecker(createMockInput(), binaryPath)
+        // then
+        expect(result).toEqual({ hasComments: false, message: "" })
+      } finally {
+        globalThis.setTimeout = originalSetTimeout
+      }
+    })
+
+    test("returns empty result on timeout", async () => {
+      // given
+      const { runCommentChecker } = await import("./cli")
+      const binaryPath = createScriptBinary(`#!/bin/sh
+if [ "$1" != "check" ]; then
+  exit 1
+fi
+trap '' TERM
+while :; do
+  :
+done
+`)
+      const originalSetTimeout = globalThis.setTimeout
+      globalThis.setTimeout = ((fn: (...args: unknown[]) => void, _ms?: number) => {
+        fn()
+        return 0 as unknown as ReturnType<typeof setTimeout>
+      }) as typeof setTimeout
+
+      try {
+        // when
+        const result = await runCommentChecker(createMockInput(), binaryPath)
+        // then
+        expect(result).toEqual({ hasComments: false, message: "" })
+      } finally {
+        globalThis.setTimeout = originalSetTimeout
+      }
+    })
+
+    test("keeps non-timeout flow unchanged", async () => {
+      // given
+      const { runCommentChecker } = await import("./cli")
+      const binaryPath = createScriptBinary(`#!/bin/sh
+if [ "$1" != "check" ]; then
+  exit 1
+fi
+cat >/dev/null
+echo "found comments" 1>&2
+exit 2
+`)
+      // when
+      const result = await runCommentChecker(createMockInput(), binaryPath)
+      // then
+      expect(result).toEqual({ hasComments: true, message: "found comments\n" })
+    })
+  })
+
+  describe("processWithCli semaphore", () => {
+    test("skips second concurrent processWithCli call", async () => {
+      // given
+      let callCount = 0
+      let resolveFirst = () => {}
+      const firstCallPromise = new Promise<void>((resolve) => {
+        resolveFirst = resolve
+      })
+      const cliMockFactory = () => ({
+        runCommentChecker: mock(async () => {
+          callCount += 1
+          if (callCount === 1) {
+            await firstCallPromise
+          }
+          return { hasComments: false, message: "" }
+        }),
+        getCommentCheckerPath: mock(async () => "/fake"),
+        startBackgroundInit: mock(() => {}),
+      })
+      mock.module("./cli", cliMockFactory)
+      mock.module("./cli.ts", cliMockFactory)
+      mock.module(new URL("./cli.ts", import.meta.url).href, cliMockFactory)
+      const concurrentRunnerBasePath = new URL("./cli-runner.ts", import.meta.url).pathname
+      const concurrentModulePath = `${concurrentRunnerBasePath}?semaphore-concurrent`
+      const { processWithCli } = await import(concurrentModulePath)
+      const pendingCall: PendingCall = {
+        tool: "write",
+        sessionID: "ses-1",
+        filePath: "/tmp/a.ts",
+        timestamp: Date.now(),
+      }
+      const firstCall = processWithCli({ tool: "write", sessionID: "ses-1", callID: "call-1" }, pendingCall, { output: "" }, "/fake", undefined, () => {})
+      const secondCall = processWithCli({ tool: "write", sessionID: "ses-2", callID: "call-2" }, pendingCall, { output: "" }, "/fake", undefined, () => {})
+
+      // when
+      await secondCall
+      resolveFirst()
+      await firstCall
+      // then
+      expect(callCount).toBe(1)
+    })
+
+    test("allows second call after first call completes", async () => {
+      // given
+      let callCount = 0
+      const cliMockFactory = () => ({
+        runCommentChecker: mock(async () => {
+          callCount += 1
+          return { hasComments: false, message: "" }
+        }),
+        getCommentCheckerPath: mock(async () => "/fake"),
+        startBackgroundInit: mock(() => {}),
+      })
+      mock.module("./cli", cliMockFactory)
+      mock.module("./cli.ts", cliMockFactory)
+      mock.module(new URL("./cli.ts", import.meta.url).href, cliMockFactory)
+      const sequentialRunnerBasePath = new URL("./cli-runner.ts", import.meta.url).pathname
+      const sequentialModulePath = `${sequentialRunnerBasePath}?semaphore-sequential`
+      const { processWithCli } = await import(sequentialModulePath)
+      const pendingCall: PendingCall = {
+        tool: "write",
+        sessionID: "ses-1",
+        filePath: "/tmp/a.ts",
+        timestamp: Date.now(),
+      }
+      // when
+      await processWithCli({ tool: "write", sessionID: "ses-1", callID: "call-1" }, pendingCall, { output: "" }, "/fake", undefined, () => {})
+      await processWithCli({ tool: "write", sessionID: "ses-2", callID: "call-2" }, pendingCall, { output: "" }, "/fake", undefined, () => {})
+      // then
+      expect(callCount).toBe(2)
     })
   })
 })

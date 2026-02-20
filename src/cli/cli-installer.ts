@@ -77,7 +77,9 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
   )
 
-  if (config.hasGemini) {
+  const needsProviderSetup = config.hasGemini || config.hasOpenAI || config.hasCopilot
+
+  if (needsProviderSetup) {
     printStep(step++, totalSteps, "Adding auth plugins...")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
@@ -128,7 +130,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     !config.hasCopilot &&
     !config.hasOpencodeZen
   ) {
-    printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
+    printWarning("No model providers configured. Using opencode/big-pickle as fallback.")
   }
 
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)

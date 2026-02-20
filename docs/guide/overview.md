@@ -6,7 +6,7 @@ Learn about Oh My OpenCode, a plugin that transforms OpenCode into the best agen
 
 ## TL;DR
 
-> **Sisyphus agent strongly recommends Opus 4.5 model. Using other models may result in significantly degraded experience.**
+> **Sisyphus agent strongly recommends Opus 4.6 model. Using other models may result in significantly degraded experience.**
 
 **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. That's it. The agent figures out the rest.
 
@@ -128,7 +128,7 @@ Here's a real-world config for a user with **Claude, OpenAI, Gemini, and Z.ai** 
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     // Override specific agents only - rest use fallback chain
-    "atlas": { "model": "anthropic/claude-sonnet-4-5", "variant": "max" },
+    "atlas": { "model": "anthropic/claude-sonnet-4-6", "variant": "max" },
     "librarian": { "model": "zai-coding-plan/glm-4.7" },
     "explore": { "model": "opencode/gpt-5-nano" },
     "multimodal-looker": { "model": "zai-coding-plan/glm-4.6v" }

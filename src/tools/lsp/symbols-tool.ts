@@ -17,7 +17,7 @@ export const lsp_symbols: ToolDefinition = tool({
     query: tool.schema.string().optional().describe("Symbol name to search (required for workspace scope)"),
     limit: tool.schema.number().optional().describe("Max results (default 50)"),
   },
-  execute: async (args, context) => {
+  execute: async (args, _context) => {
     try {
       const scope = args.scope ?? "document"
 

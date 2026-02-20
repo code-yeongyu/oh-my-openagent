@@ -11,9 +11,8 @@ import {
   createBackgroundTools,
   createCallOmoAgent,
   createLookAt,
-  createSkillTool,
   createSkillMcpTool,
-  createSlashcommandTool,
+  createSkillTool,
   createGrepTools,
   createGlobTools,
   createAstGrepTools,
@@ -25,6 +24,7 @@ import {
   createTaskGetTool,
   createTaskList,
   createTaskUpdateTool,
+  createHashlineEditTool,
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
@@ -48,7 +48,7 @@ export function createToolRegistry(args: {
   const { ctx, pluginConfig, managers, skillContext, availableCategories } = args
 
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
-  const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager)
+  const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
@@ -60,6 +60,7 @@ export function createToolRegistry(args: {
     client: ctx.client,
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
+    agentOverrides: pluginConfig.agents,
     gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
     browserProvider: skillContext.browserProvider,
@@ -87,24 +88,19 @@ export function createToolRegistry(args: {
 
   const getSessionIDForMcp = (): string => getMainSessionID() || ""
 
-  const skillTool = createSkillTool({
-    skills: skillContext.mergedSkills,
-    mcpManager: managers.skillMcpManager,
-    getSessionID: getSessionIDForMcp,
-    gitMasterConfig: pluginConfig.git_master,
-    disabledSkills: skillContext.disabledSkills,
-  })
-
   const skillMcpTool = createSkillMcpTool({
     manager: managers.skillMcpManager,
     getLoadedSkills: () => skillContext.mergedSkills,
     getSessionID: getSessionIDForMcp,
   })
 
-  const commands = discoverCommandsSync()
-  const slashcommandTool = createSlashcommandTool({
+  const commands = discoverCommandsSync(ctx.directory)
+  const skillTool = createSkillTool({
     commands,
     skills: skillContext.mergedSkills,
+    mcpManager: managers.skillMcpManager,
+    getSessionID: getSessionIDForMcp,
+    gitMasterConfig: pluginConfig.git_master,
   })
 
   const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false
@@ -117,6 +113,11 @@ export function createToolRegistry(args: {
       }
     : {}
 
+  const hashlineEnabled = pluginConfig.hashline_edit ?? true
+  const hashlineToolsRecord: Record<string, ToolDefinition> = hashlineEnabled
+    ? { edit: createHashlineEditTool() }
+    : {}
+
   const allTools: Record<string, ToolDefinition> = {
     ...builtinTools,
     ...createGrepTools(ctx),
@@ -127,11 +128,11 @@ export function createToolRegistry(args: {
     call_omo_agent: callOmoAgent,
     ...(lookAt ? { look_at: lookAt } : {}),
     task: delegateTask,
-    skill: skillTool,
     skill_mcp: skillMcpTool,
-    slashcommand: slashcommandTool,
+    skill: skillTool,
     interactive_bash,
     ...taskToolsRecord,
+    ...hashlineToolsRecord,
   }
 
   const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)

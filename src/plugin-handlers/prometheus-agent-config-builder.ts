@@ -1,5 +1,6 @@
 import type { CategoryConfig } from "../config/schema";
-import { PROMETHEUS_PERMISSION, PROMETHEUS_SYSTEM_PROMPT } from "../agents/prometheus";
+import { PROMETHEUS_PERMISSION, getPrometheusPrompt } from "../agents/prometheus";
+import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import {
   fetchAvailableModels,
@@ -65,11 +66,10 @@ export async function buildPrometheusAgentConfig(params: {
     params.pluginPrometheusOverride?.maxTokens ?? categoryConfig?.maxTokens;
 
   const base: Record<string, unknown> = {
-    name: "prometheus",
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",
-    prompt: PROMETHEUS_SYSTEM_PROMPT,
+    prompt: getPrometheusPrompt(resolvedModel),
     permission: PROMETHEUS_PERMISSION,
     description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
     color: (params.configAgentPlan?.color as string) ?? "#FF5722",
@@ -92,7 +92,7 @@ export async function buildPrometheusAgentConfig(params: {
   const { prompt_append, ...restOverride } = override;
   const merged = { ...base, ...restOverride };
   if (prompt_append && typeof merged.prompt === "string") {
-    merged.prompt = merged.prompt + "\n" + prompt_append;
+    merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append);
   }
   return merged;
 }

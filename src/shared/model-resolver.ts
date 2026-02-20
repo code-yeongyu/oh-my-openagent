@@ -1,4 +1,3 @@
-import { log } from "./logger"
 import type { FallbackEntry } from "./model-requirements"
 import { resolveModelPipeline } from "./model-resolution-pipeline"
 

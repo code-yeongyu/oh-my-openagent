@@ -21,7 +21,7 @@ function createMockInput(sessionID: string, messageID?: string): AutoSlashComman
     sessionID,
     messageID: messageID ?? `msg-${Date.now()}-${Math.random()}`,
     agent: "test-agent",
-    model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+    model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
   }
 }
 
@@ -29,7 +29,7 @@ function createMockOutput(text: string): AutoSlashCommandHookOutput {
   return {
     message: {
       agent: "test-agent",
-      model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" },
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
       path: { cwd: "/test", root: "/test" },
       tools: {},
     },

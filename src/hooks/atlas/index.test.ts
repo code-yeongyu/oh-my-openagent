@@ -9,6 +9,7 @@ import {
   readBoulderState,
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
+import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -18,6 +19,17 @@ mock.module("../../features/hook-message-injector/constants", () => ({
   OPENCODE_STORAGE: TEST_STORAGE_ROOT,
   MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
   PART_STORAGE: TEST_PART_STORAGE,
+}))
+
+mock.module("../../shared/opencode-message-dir", () => ({
+  getMessageDir: (sessionID: string) => {
+    const dir = join(TEST_MESSAGE_STORAGE, sessionID)
+    return existsSync(dir) ? dir : null
+  },
+}))
+
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => false,
 }))
 
 const { createAtlasHook } = await import("./index")
@@ -77,7 +89,6 @@ describe("atlas hook", () => {
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true })
     }
-    rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
   })
 
   describe("tool.execute.after handler", () => {
@@ -169,8 +180,8 @@ describe("atlas hook", () => {
 
       // then - standalone verification reminder appended
       expect(output.output).toContain("Task completed successfully")
-      expect(output.output).toContain("MANDATORY:")
-      expect(output.output).toContain("task(session_id=")
+      expect(output.output).toContain("LYING")
+      expect(output.output).toContain("PHASE 1")
       
       cleanupMessageStorage(sessionID)
     })
@@ -208,8 +219,8 @@ describe("atlas hook", () => {
       expect(output.output).toContain("Task completed successfully")
       expect(output.output).toContain("SUBAGENT WORK COMPLETED")
       expect(output.output).toContain("test-plan")
-      expect(output.output).toContain("LIE")
-      expect(output.output).toContain("task(session_id=")
+      expect(output.output).toContain("LYING")
+      expect(output.output).toContain("PHASE 1")
       
       cleanupMessageStorage(sessionID)
     })
@@ -390,10 +401,10 @@ describe("atlas hook", () => {
         output
       )
 
-      // then - should include session_id instructions and verification
-      expect(output.output).toContain("task(session_id=")
-      expect(output.output).toContain("[x]")
-      expect(output.output).toContain("MANDATORY:")
+      // then - should include verification instructions
+      expect(output.output).toContain("LYING")
+      expect(output.output).toContain("PHASE 1")
+      expect(output.output).toContain("PHASE 2")
       
       cleanupMessageStorage(sessionID)
     })
@@ -631,15 +642,14 @@ describe("atlas hook", () => {
     }
 
      beforeEach(() => {
-       mock.module("../../features/claude-code-session-state", () => ({
-         getMainSessionID: () => MAIN_SESSION_ID,
-         subagentSessions: new Set<string>(),
-       }))
+       _resetForTesting()
+       subagentSessions.clear()
        setupMessageStorage(MAIN_SESSION_ID, "atlas")
      })
 
     afterEach(() => {
       cleanupMessageStorage(MAIN_SESSION_ID)
+      _resetForTesting()
     })
 
     test("should inject continuation when boulder has incomplete tasks", async () => {

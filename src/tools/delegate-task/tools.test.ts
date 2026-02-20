@@ -3,23 +3,29 @@ const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES, isPlanFamily, PLAN_FAMILY_NAMES } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
+import type { DelegateTaskArgs } from "./types"
 import { __resetModelCache } from "../../shared/model-availability"
 import { clearSkillCache } from "../../features/opencode-skill-loader/skill-content"
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
+import * as executor from "./executor"
 
-const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
+const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
 
 const TEST_CONNECTED_PROVIDERS = ["anthropic", "google", "openai"]
 const TEST_AVAILABLE_MODELS = new Set([
   "anthropic/claude-opus-4-6",
-  "anthropic/claude-sonnet-4-5",
+  "anthropic/claude-sonnet-4-6",
   "anthropic/claude-haiku-4-5",
   "google/gemini-3-pro",
   "google/gemini-3-flash",
   "openai/gpt-5.2",
   "openai/gpt-5.3-codex",
 ])
+
+type DelegateTaskArgsWithSerializedSkills = Omit<DelegateTaskArgs, "load_skills"> & {
+  load_skills: string
+}
 
 function createTestAvailableModels(): Set<string> {
   return new Set(TEST_AVAILABLE_MODELS)
@@ -45,7 +51,7 @@ describe("sisyphus-task", () => {
     cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
-        anthropic: ["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"],
+        anthropic: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
         google: ["gemini-3-pro", "gemini-3-flash"],
         openai: ["gpt-5.2", "gpt-5.3-codex"],
       },
@@ -61,13 +67,14 @@ describe("sisyphus-task", () => {
   })
 
   describe("DEFAULT_CATEGORIES", () => {
-    test("visual-engineering category has model config", () => {
+    test("visual-engineering category has model and variant config", () => {
       // given
       const category = DEFAULT_CATEGORIES["visual-engineering"]
 
       // when / #then
       expect(category).toBeDefined()
       expect(category.model).toBe("google/gemini-3-pro")
+      expect(category.variant).toBe("high")
     })
 
     test("ultrabrain category has model and variant config", () => {
@@ -256,6 +263,134 @@ describe("sisyphus-task", () => {
     })
   })
 
+  describe("load_skills parsing", () => {
+    test("parses valid JSON string into array before validation", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = {
+        launch: async () => ({
+          id: "task-123",
+          status: "pending",
+          description: "Parse test",
+          agent: "sisyphus-junior",
+          sessionID: "test-session",
+        }),
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockResolvedValue({
+        content: "resolved skill content",
+        error: null,
+      })
+
+      const args: DelegateTaskArgsWithSerializedSkills = {
+        description: "Parse valid string",
+        prompt: "Load skill parsing test",
+        category: "quick",
+        run_in_background: true,
+        load_skills: '["playwright", "git-master"]',
+      }
+
+      //#when
+      await tool.execute(args as unknown as DelegateTaskArgs, toolContext)
+
+      //#then
+      expect(args.load_skills).toEqual(["playwright", "git-master"])
+      expect(resolveSkillContentSpy).toHaveBeenCalledWith(["playwright", "git-master"], expect.any(Object))
+    }, { timeout: 10000 })
+
+    test("defaults to [] when load_skills is malformed JSON", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+
+      const mockManager = {
+        launch: async () => ({
+          id: "task-456",
+          status: "pending",
+          description: "Parse test",
+          agent: "sisyphus-junior",
+          sessionID: "test-session",
+        }),
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({}) },
+        provider: { list: async () => ({ data: { connected: ["openai"] } }) },
+        model: { list: async () => ({ data: [{ provider: "openai", id: "gpt-5.3-codex" }] }) },
+        session: {
+          create: async () => ({ data: { id: "test-session" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      const resolveSkillContentSpy = spyOn(executor, "resolveSkillContent").mockResolvedValue({
+        content: "resolved skill content",
+        error: null,
+      })
+
+      const args: DelegateTaskArgsWithSerializedSkills = {
+        description: "Parse malformed string",
+        prompt: "Load skill parsing test",
+        category: "quick",
+        run_in_background: true,
+        load_skills: '["playwright", "git-master"',
+      }
+
+      //#when
+      await tool.execute(args as unknown as DelegateTaskArgs, toolContext)
+
+      //#then
+      expect(args.load_skills).toEqual([])
+      expect(resolveSkillContentSpy).toHaveBeenCalledWith([], expect.any(Object))
+    }, { timeout: 10000 })
+  })
+
   describe("category delegation config validation", () => {
     test("fills subagent_type as sisyphus-junior when category is provided without subagent_type", async () => {
       // given
@@ -317,7 +452,7 @@ describe("sisyphus-task", () => {
        await tool.execute(args, toolContext)
 
        // then
-       expect(args.subagent_type).toBe("sisyphus-junior")
+       expect(args.subagent_type).toBe("Sisyphus-Junior")
     }, { timeout: 10000 })
 
     test("category overrides subagent_type and still maps to sisyphus-junior", async () => {
@@ -382,7 +517,7 @@ describe("sisyphus-task", () => {
       const result = await tool.execute(args, toolContext)
 
       //#then
-      expect(args.subagent_type).toBe("sisyphus-junior")
+      expect(args.subagent_type).toBe("Sisyphus-Junior")
       expect(result).toContain("Background task launched")
     }, { timeout: 10000 })
 
@@ -1012,7 +1147,7 @@ describe("sisyphus-task", () => {
           run_in_background: false,
         },
         toolContext
-      )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
+      )).rejects.toThrow("Invalid arguments: 'load_skills' parameter is REQUIRED")
     })
 
      test("null skills throws error", async () => {
@@ -1054,7 +1189,7 @@ describe("sisyphus-task", () => {
            load_skills: null,
          },
          toolContext
-       )).rejects.toThrow("IT IS HIGHLY RECOMMENDED")
+        )).rejects.toThrow("Invalid arguments: load_skills=null is not allowed")
     })
 
      test("empty array [] is allowed and proceeds without skill content", async () => {
@@ -1132,52 +1267,58 @@ describe("sisyphus-task", () => {
       launch: async () => mockTask,
     }
     
-     let messagesCallCount = 0
+      let messagesCallCount = 0
 
-     const mockClient = {
-        session: {
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => {
-            messagesCallCount++
-            const now = Date.now()
+      const mockClient = {
+         session: {
+           prompt: async () => ({ data: {} }),
+           promptAsync: async () => ({ data: {} }),
+           messages: async (args?: { path?: { id?: string } }) => {
+             const sessionID = args?.path?.id
+             // Only track calls for the target session (ses_continue_test),
+             // not for parent-session calls from resolveParentContext
+             if (sessionID !== "ses_continue_test") {
+               return { data: [] }
+             }
+             messagesCallCount++
+             const now = Date.now()
 
-            const beforeContinuation = [
-              {
-                info: { id: "msg_001", role: "user", time: { created: now } },
-                parts: [{ type: "text", text: "Previous context" }],
-              },
-              {
-                info: { id: "msg_002", role: "assistant", time: { created: now + 1 }, finish: "end_turn" },
-                parts: [{ type: "text", text: "Previous result" }],
-              },
-            ]
+             const beforeContinuation = [
+               {
+                 info: { id: "msg_001", role: "user", time: { created: now } },
+                 parts: [{ type: "text", text: "Previous context" }],
+               },
+               {
+                 info: { id: "msg_002", role: "assistant", time: { created: now + 1 }, finish: "end_turn" },
+                 parts: [{ type: "text", text: "Previous result" }],
+               },
+             ]
 
-            if (messagesCallCount === 1) {
-              return { data: beforeContinuation }
-            }
+             if (messagesCallCount === 1) {
+               return { data: beforeContinuation }
+             }
 
-            return {
-              data: [
-                ...beforeContinuation,
-                {
-                  info: { id: "msg_003", role: "user", time: { created: now + 2 } },
-                  parts: [{ type: "text", text: "Continue the task" }],
-                },
-                {
-                  info: { id: "msg_004", role: "assistant", time: { created: now + 3 }, finish: "end_turn" },
-                  parts: [{ type: "text", text: "This is the continued task result" }],
-                },
-              ],
-            }
-          },
-          status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
+             return {
+               data: [
+                 ...beforeContinuation,
+                 {
+                   info: { id: "msg_003", role: "user", time: { created: now + 2 } },
+                   parts: [{ type: "text", text: "Continue the task" }],
+                 },
+                 {
+                   info: { id: "msg_004", role: "assistant", time: { created: now + 3 }, finish: "end_turn" },
+                   parts: [{ type: "text", text: "This is the continued task result" }],
+                 },
+               ],
+             }
+           },
+           status: async () => ({ data: { "ses_continue_test": { type: "idle" } } }),
+         },
+         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+         app: {
+           agents: async () => ({ data: [] }),
         },
-        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-        app: {
-          agents: async () => ({ data: [] }),
-       },
-     }
+      }
      
      const tool = createDelegateTask({
        manager: mockManager,
@@ -1579,17 +1720,19 @@ describe("sisyphus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-unstable",
+        sessionID: "ses_unstable_gemini",
+        description: "Unstable gemini task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-unstable",
-            sessionID: "ses_unstable_gemini",
-            description: "Unstable gemini task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
        const mockClient = {
@@ -1704,17 +1847,19 @@ describe("sisyphus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
 
+      const launchedTask = {
+        id: "task-unstable-minimax",
+        sessionID: "ses_unstable_minimax",
+        description: "Unstable minimax task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-unstable-minimax",
-            sessionID: "ses_unstable_minimax",
-            description: "Unstable minimax task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
 
        const mockClient = {
@@ -1838,17 +1983,19 @@ describe("sisyphus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-artistry",
+        sessionID: "ses_artistry_gemini",
+        description: "Artistry gemini task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-artistry",
-            sessionID: "ses_artistry_gemini",
-            description: "Artistry gemini task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
        const mockClient = {
@@ -1904,17 +2051,19 @@ describe("sisyphus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-writing",
+        sessionID: "ses_writing_gemini",
+        description: "Writing gemini task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-writing",
-            sessionID: "ses_writing_gemini",
-            description: "Writing gemini task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
        const mockClient = {
@@ -1970,17 +2119,19 @@ describe("sisyphus-task", () => {
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
+      const launchedTask = {
+        id: "task-custom-unstable",
+        sessionID: "ses_custom_unstable",
+        description: "Custom unstable task",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
       const mockManager = {
         launch: async () => {
           launchCalled = true
-          return {
-            id: "task-custom-unstable",
-            sessionID: "ses_custom_unstable",
-            description: "Custom unstable task",
-            agent: "sisyphus-junior",
-            status: "running",
-          }
+          return launchedTask
         },
+        getTask: () => launchedTask,
       }
       
       const mockClient = {
@@ -2100,7 +2251,7 @@ describe("sisyphus-task", () => {
       )
 
       // then - model should be anthropic/claude-haiku-4-5 from DEFAULT_CATEGORIES
-      //         NOT anthropic/claude-sonnet-4-5 (system default)
+      //         NOT anthropic/claude-sonnet-4-6 (system default)
       expect(launchInput.model.providerID).toBe("anthropic")
       expect(launchInput.model.modelID).toBe("claude-haiku-4-5")
     })
@@ -2201,7 +2352,7 @@ describe("sisyphus-task", () => {
       const tool = createDelegateTask({
         manager: mockManager,
         client: mockClient,
-        sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
+        sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
         availableModelsOverride: createTestAvailableModels(),
       })
@@ -2227,7 +2378,7 @@ describe("sisyphus-task", () => {
 
       // then - override model should be used instead of category model
       expect(launchInput.model.providerID).toBe("anthropic")
-      expect(launchInput.model.modelID).toBe("claude-sonnet-4-5")
+      expect(launchInput.model.modelID).toBe("claude-sonnet-4-6")
     })
 
     test("explicit category model takes precedence over sisyphus-junior model", async () => {
@@ -2263,7 +2414,7 @@ describe("sisyphus-task", () => {
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
-         sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
+         sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
          userCategories: {
            ultrabrain: { model: "openai/gpt-5.3-codex" },
          },
@@ -2327,7 +2478,7 @@ describe("sisyphus-task", () => {
       const tool = createDelegateTask({
         manager: mockManager,
         client: mockClient,
-        sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
+        sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
         availableModelsOverride: createTestAvailableModels(),
       })
@@ -2353,7 +2504,7 @@ describe("sisyphus-task", () => {
 
       // then - sisyphus-junior override model should be used, not category default
       expect(launchInput.model.providerID).toBe("anthropic")
-      expect(launchInput.model.modelID).toBe("claude-sonnet-4-5")
+      expect(launchInput.model.modelID).toBe("claude-sonnet-4-6")
     })
 
     test("sisyphus-junior model override works with user-defined category (#1295)", async () => {
@@ -2659,7 +2810,7 @@ describe("sisyphus-task", () => {
         {
           name: "writing",
           description: "Documentation, prose, technical writing",
-          model: "google/gemini-3-flash",
+          model: "kimi-for-coding/k2p5",
         },
       ]
       const availableSkills = [
@@ -2735,7 +2886,7 @@ describe("sisyphus-task", () => {
       
       // then - default model from DEFAULT_CATEGORIES is used
       expect(resolved).not.toBeNull()
-      expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {
@@ -2815,7 +2966,7 @@ describe("sisyphus-task", () => {
       // given a custom category with no default model
       const categoryName = "custom-no-default"
       const userCategories = { "custom-no-default": { temperature: 0.5 } } as unknown as Record<string, CategoryConfig>
-      const systemDefaultModel = "anthropic/claude-sonnet-4-5"
+      const systemDefaultModel = "anthropic/claude-sonnet-4-6"
       
       // when no inheritedModel is provided, only systemDefaultModel
       const resolved = resolveCategoryConfig(categoryName, { 
@@ -2825,7 +2976,7 @@ describe("sisyphus-task", () => {
       
       // then systemDefaultModel should be returned
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(resolved!.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("FIXED: userConfig.model always takes priority over everything", () => {
@@ -2833,7 +2984,7 @@ describe("sisyphus-task", () => {
       const categoryName = "ultrabrain"
       const userCategories = { "ultrabrain": { model: "custom/user-model" } }
       const inheritedModel = "anthropic/claude-opus-4-6"
-      const systemDefaultModel = "anthropic/claude-sonnet-4-5"
+      const systemDefaultModel = "anthropic/claude-sonnet-4-6"
       
       // when resolveCategoryConfig is called with all sources
       const resolved = resolveCategoryConfig(categoryName, { 
@@ -2881,7 +3032,7 @@ describe("sisyphus-task", () => {
       const categoryName = "my-custom"
       // Using type assertion since we're testing fallback behavior for categories without model
       const userCategories = { "my-custom": { temperature: 0.5 } } as unknown as Record<string, CategoryConfig>
-      const systemDefaultModel = "anthropic/claude-sonnet-4-5"
+      const systemDefaultModel = "anthropic/claude-sonnet-4-6"
       
       // when
       const resolved = resolveCategoryConfig(categoryName, { userCategories, systemDefaultModel })
@@ -3567,7 +3718,7 @@ describe("sisyphus-task", () => {
       )
 
       // then - title should follow OpenCode format
-      expect(createBody.title).toBe("Implement feature X (@sisyphus-junior subagent)")
+      expect(createBody.title).toBe("Implement feature X (@Sisyphus-Junior subagent)")
     }, { timeout: 10000 })
 
     test("sync task output includes <task_metadata> block with session_id", async () => {
@@ -3650,7 +3801,7 @@ describe("sisyphus-task", () => {
          manager: mockManager,
          client: mockClient,
          userCategories: {
-           "sisyphus-junior": { model: "anthropic/claude-sonnet-4-5" },
+           "sisyphus-junior": { model: "anthropic/claude-sonnet-4-6" },
          },
        })
 

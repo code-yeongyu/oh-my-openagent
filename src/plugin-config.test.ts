@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mergeConfigs } from "./plugin-config";
+import { mergeConfigs, parseConfigPartially } from "./plugin-config";
 import type { OhMyOpenCodeConfig } from "./config";
 
 describe("mergeConfigs", () => {
@@ -114,6 +114,126 @@ describe("mergeConfigs", () => {
       expect(result.disabled_hooks).toContain("think-mode");
       expect(result.disabled_hooks).toContain("session-recovery");
       expect(result.disabled_hooks?.length).toBe(3);
+    });
+  });
+});
+
+describe("parseConfigPartially", () => {
+  describe("fully valid config", () => {
+    //#given a config where all sections are valid
+    //#when parsing the config
+    //#then should return the full parsed config unchanged
+
+    it("should return the full config when everything is valid", () => {
+      const rawConfig = {
+        agents: {
+          oracle: { model: "openai/gpt-5.2" },
+          momus: { model: "openai/gpt-5.2" },
+        },
+        disabled_hooks: ["comment-checker"],
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result).not.toBeNull();
+      expect(result!.agents?.oracle?.model).toBe("openai/gpt-5.2");
+      expect(result!.agents?.momus?.model).toBe("openai/gpt-5.2");
+      expect(result!.disabled_hooks).toEqual(["comment-checker"]);
+    });
+  });
+
+  describe("partially invalid config", () => {
+    //#given a config where one section is invalid but others are valid
+    //#when parsing the config
+    //#then should return valid sections and skip invalid ones
+
+    it("should preserve valid agent overrides when another section is invalid", () => {
+      const rawConfig = {
+        agents: {
+          oracle: { model: "openai/gpt-5.2" },
+          momus: { model: "openai/gpt-5.2" },
+          prometheus: {
+            permission: {
+              edit: { "*": "ask", ".sisyphus/**": "allow" },
+            },
+          },
+        },
+        disabled_hooks: ["comment-checker"],
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result).not.toBeNull();
+      expect(result!.disabled_hooks).toEqual(["comment-checker"]);
+      expect(result!.agents).toBeUndefined();
+    });
+
+    it("should preserve valid agents when a non-agent section is invalid", () => {
+      const rawConfig = {
+        agents: {
+          oracle: { model: "openai/gpt-5.2" },
+        },
+        disabled_hooks: ["not-a-real-hook"],
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result).not.toBeNull();
+      expect(result!.agents?.oracle?.model).toBe("openai/gpt-5.2");
+      expect(result!.disabled_hooks).toBeUndefined();
+    });
+  });
+
+  describe("completely invalid config", () => {
+    //#given a config where all sections are invalid
+    //#when parsing the config
+    //#then should return an empty object (not null)
+
+    it("should return empty object when all sections are invalid", () => {
+      const rawConfig = {
+        agents: { oracle: { temperature: "not-a-number" } },
+        disabled_hooks: ["not-a-real-hook"],
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result).not.toBeNull();
+      expect(result!.agents).toBeUndefined();
+      expect(result!.disabled_hooks).toBeUndefined();
+    });
+  });
+
+  describe("empty config", () => {
+    //#given an empty config object
+    //#when parsing the config
+    //#then should return an empty object (fast path - full parse succeeds)
+
+    it("should return empty object for empty input", () => {
+      const result = parseConfigPartially({});
+
+      expect(result).not.toBeNull();
+      expect(Object.keys(result!).length).toBe(0);
+    });
+  });
+
+  describe("unknown keys", () => {
+    //#given a config with keys not in the schema
+    //#when parsing the config
+    //#then should silently ignore unknown keys and preserve valid ones
+
+    it("should ignore unknown keys and return valid sections", () => {
+      const rawConfig = {
+        agents: {
+          oracle: { model: "openai/gpt-5.2" },
+        },
+        some_future_key: { foo: "bar" },
+      };
+
+      const result = parseConfigPartially(rawConfig);
+
+      expect(result).not.toBeNull();
+      expect(result!.agents?.oracle?.model).toBe("openai/gpt-5.2");
+      expect((result as Record<string, unknown>)["some_future_key"]).toBeUndefined();
     });
   });
 });

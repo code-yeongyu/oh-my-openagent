@@ -1,6 +1,9 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
+import {
+  clearContinuationMarker,
+} from "../../features/run-continuation-state"
 import { log } from "../../shared/logger"
 
 import { DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
@@ -45,6 +48,7 @@ export function createTodoContinuationHandler(args: {
     if (event.type === "session.idle") {
       const sessionID = props?.sessionID as string | undefined
       if (!sessionID) return
+
       await handleSessionIdle({
         ctx,
         sessionID,
@@ -54,6 +58,13 @@ export function createTodoContinuationHandler(args: {
         isContinuationStopped,
       })
       return
+    }
+
+    if (event.type === "session.deleted") {
+      const sessionInfo = props?.info as { id?: string } | undefined
+      if (sessionInfo?.id) {
+        clearContinuationMarker(ctx.directory, sessionInfo.id)
+      }
     }
 
     handleNonIdleEvent({

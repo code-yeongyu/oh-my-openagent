@@ -3,6 +3,7 @@ import type { PluginContext } from "./types"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { clearBoulderState } from "../features/boulder-state"
 import { log } from "../shared"
+import { resolveSessionAgent } from "./session-agent-resolver"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -16,7 +17,6 @@ export function createToolExecuteBeforeHandler(args: {
   const { ctx, hooks } = args
 
   return async (input, output): Promise<void> => {
-    await hooks.subagentQuestionBlocker?.["tool.execute.before"]?.(input, output)
     await hooks.writeExistingFileGuard?.["tool.execute.before"]?.(input, output)
     await hooks.questionLabelTruncator?.["tool.execute.before"]?.(input, output)
     await hooks.claudeCodeHooks?.["tool.execute.before"]?.(input, output)
@@ -29,23 +29,28 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.prometheusMdOnly?.["tool.execute.before"]?.(input, output)
     await hooks.sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
-
+    await hooks.hashlineEditDiffEnhancer?.["tool.execute.before"]?.(input, output)
     if (input.tool === "task") {
       const argsObject = output.args
       const category = typeof argsObject.category === "string" ? argsObject.category : undefined
       const subagentType = typeof argsObject.subagent_type === "string" ? argsObject.subagent_type : undefined
-      if (category && !subagentType) {
+      const sessionId = typeof argsObject.session_id === "string" ? argsObject.session_id : undefined
+
+      if (category) {
         argsObject.subagent_type = "sisyphus-junior"
+      } else if (!subagentType && sessionId) {
+        const resolvedAgent = await resolveSessionAgent(ctx.client, sessionId)
+        argsObject.subagent_type = resolvedAgent ?? "continue"
       }
     }
 
-    if (hooks.ralphLoop && input.tool === "slashcommand") {
-      const rawCommand = typeof output.args.command === "string" ? output.args.command : undefined
-      const command = rawCommand?.replace(/^\//, "").toLowerCase()
+    if (hooks.ralphLoop && input.tool === "skill") {
+      const rawName = typeof output.args.name === "string" ? output.args.name : undefined
+      const command = rawName?.replace(/^\//, "").toLowerCase()
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "ralph-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(ralph-loop)\s*/i, "") || ""
+        const rawArgs = rawName?.replace(/^\/?(ralph-loop)\s*/i, "") || ""
         const taskMatch = rawArgs.match(/^["'](.+?)["']/)
         const prompt =
           taskMatch?.[1] ||
@@ -62,7 +67,7 @@ export function createToolExecuteBeforeHandler(args: {
       } else if (command === "cancel-ralph" && sessionID) {
         hooks.ralphLoop.cancelLoop(sessionID)
       } else if (command === "ulw-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(ulw-loop)\s*/i, "") || ""
+        const rawArgs = rawName?.replace(/^\/?(ulw-loop)\s*/i, "") || ""
         const taskMatch = rawArgs.match(/^["'](.+?)["']/)
         const prompt =
           taskMatch?.[1] ||
@@ -80,9 +85,9 @@ export function createToolExecuteBeforeHandler(args: {
       }
     }
 
-    if (input.tool === "slashcommand") {
-      const rawCommand = typeof output.args.command === "string" ? output.args.command : undefined
-      const command = rawCommand?.replace(/^\//, "").toLowerCase()
+    if (input.tool === "skill") {
+      const rawName = typeof output.args.name === "string" ? output.args.name : undefined
+      const command = rawName?.replace(/^\//, "").toLowerCase()
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "stop-continuation" && sessionID) {

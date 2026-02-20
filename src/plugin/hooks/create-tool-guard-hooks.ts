@@ -1,4 +1,5 @@
 import type { HookName, OhMyOpenCodeConfig } from "../../config"
+import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
 
 import {
@@ -10,6 +11,8 @@ import {
   createRulesInjectorHook,
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
+  createHashlineReadEnhancerHook,
+  createHashlineEditDiffEnhancerHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -28,15 +31,18 @@ export type ToolGuardHooks = {
   rulesInjector: ReturnType<typeof createRulesInjectorHook> | null
   tasksTodowriteDisabler: ReturnType<typeof createTasksTodowriteDisablerHook> | null
   writeExistingFileGuard: ReturnType<typeof createWriteExistingFileGuardHook> | null
+  hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
+  hashlineEditDiffEnhancer: ReturnType<typeof createHashlineEditDiffEnhancerHook> | null
 }
 
 export function createToolGuardHooks(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
+  modelCacheState: ModelCacheState
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
 }): ToolGuardHooks {
-  const { ctx, pluginConfig, isHookEnabled, safeHookEnabled } = args
+  const { ctx, pluginConfig, modelCacheState, isHookEnabled, safeHookEnabled } = args
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
     safeCreateHook(hookName, factory, { enabled: safeHookEnabled })
 
@@ -46,7 +52,10 @@ export function createToolGuardHooks(args: {
 
   const toolOutputTruncator = isHookEnabled("tool-output-truncator")
     ? safeHook("tool-output-truncator", () =>
-        createToolOutputTruncatorHook(ctx, { experimental: pluginConfig.experimental }))
+        createToolOutputTruncatorHook(ctx, {
+          modelCacheState,
+          experimental: pluginConfig.experimental,
+        }))
     : null
 
   let directoryAgentsInjector: ReturnType<typeof createDirectoryAgentsInjectorHook> | null = null
@@ -60,12 +69,14 @@ export function createToolGuardHooks(args: {
         nativeVersion: OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
       })
     } else {
-      directoryAgentsInjector = safeHook("directory-agents-injector", () => createDirectoryAgentsInjectorHook(ctx))
+      directoryAgentsInjector = safeHook("directory-agents-injector", () =>
+        createDirectoryAgentsInjectorHook(ctx, modelCacheState))
     }
   }
 
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
-    ? safeHook("directory-readme-injector", () => createDirectoryReadmeInjectorHook(ctx))
+    ? safeHook("directory-readme-injector", () =>
+        createDirectoryReadmeInjectorHook(ctx, modelCacheState))
     : null
 
   const emptyTaskResponseDetector = isHookEnabled("empty-task-response-detector")
@@ -73,7 +84,8 @@ export function createToolGuardHooks(args: {
     : null
 
   const rulesInjector = isHookEnabled("rules-injector")
-    ? safeHook("rules-injector", () => createRulesInjectorHook(ctx))
+    ? safeHook("rules-injector", () =>
+        createRulesInjectorHook(ctx, modelCacheState))
     : null
 
   const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")
@@ -85,6 +97,14 @@ export function createToolGuardHooks(args: {
     ? safeHook("write-existing-file-guard", () => createWriteExistingFileGuardHook(ctx))
     : null
 
+  const hashlineReadEnhancer = isHookEnabled("hashline-read-enhancer")
+    ? safeHook("hashline-read-enhancer", () => createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.hashline_edit ?? true } }))
+    : null
+
+  const hashlineEditDiffEnhancer = isHookEnabled("hashline-edit-diff-enhancer")
+    ? safeHook("hashline-edit-diff-enhancer", () => createHashlineEditDiffEnhancerHook({ hashline_edit: { enabled: pluginConfig.hashline_edit ?? true } }))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -94,5 +114,7 @@ export function createToolGuardHooks(args: {
     rulesInjector,
     tasksTodowriteDisabler,
     writeExistingFileGuard,
+    hashlineReadEnhancer,
+    hashlineEditDiffEnhancer,
   }
 }

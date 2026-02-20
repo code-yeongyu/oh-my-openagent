@@ -21,8 +21,8 @@
  * Custom providers may use prefixes for routing (e.g., vertex_ai/, openai/).
  *
  * @example
- * extractModelPrefix("vertex_ai/claude-sonnet-4-5") // { prefix: "vertex_ai/", base: "claude-sonnet-4-5" }
- * extractModelPrefix("claude-sonnet-4-5") // { prefix: "", base: "claude-sonnet-4-5" }
+ * extractModelPrefix("vertex_ai/claude-sonnet-4-6") // { prefix: "vertex_ai/", base: "claude-sonnet-4-6" }
+ * extractModelPrefix("claude-sonnet-4-6") // { prefix: "", base: "claude-sonnet-4-6" }
  * extractModelPrefix("openai/gpt-5.2") // { prefix: "openai/", base: "gpt-5.2" }
  */
 function extractModelPrefix(modelID: string): { prefix: string; base: string } {
@@ -87,7 +87,7 @@ function resolveProvider(providerID: string, modelID: string): string {
 // For OpenAI models, this signals that reasoning_effort should be set to "high"
 const HIGH_VARIANT_MAP: Record<string, string> = {
   // Claude
-  "claude-sonnet-4-5": "claude-sonnet-4-5-high",
+  "claude-sonnet-4-6": "claude-sonnet-4-6-high",
   "claude-opus-4-6": "claude-opus-4-6-high",
    // Gemini
    "gemini-3-pro": "gemini-3-pro-high",
@@ -115,6 +115,13 @@ const ALREADY_HIGH: Set<string> = new Set(Object.values(HIGH_VARIANT_MAP))
 
 export const THINKING_CONFIGS = {
   anthropic: {
+    thinking: {
+      type: "enabled",
+      budgetTokens: 64000,
+    },
+    maxTokens: 128000,
+  },
+  "google-vertex-anthropic": {
     thinking: {
       type: "enabled",
       budgetTokens: 64000,
@@ -154,8 +161,7 @@ export const THINKING_CONFIGS = {
       "zai-coding-plan": {
         extra_body: {
           thinking: {
-            type: "enabled",
-            clear_thinking: false,
+            type: "disabled",
           },
         },
       },
@@ -165,6 +171,7 @@ export const THINKING_CONFIGS = {
 
 const THINKING_CAPABLE_MODELS = {
   anthropic: ["claude-sonnet-4", "claude-opus-4", "claude-3"],
+  "google-vertex-anthropic": ["claude-sonnet-4", "claude-opus-4", "claude-3"],
   "amazon-bedrock": ["claude", "anthropic"],
   google: ["gemini-2", "gemini-3"],
   "google-vertex": ["gemini-2", "gemini-3"],

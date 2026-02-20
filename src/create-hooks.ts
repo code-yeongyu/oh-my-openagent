@@ -3,6 +3,7 @@ import type { HookName, OhMyOpenCodeConfig } from "./config"
 import type { LoadedSkill } from "./features/opencode-skill-loader/types"
 import type { BackgroundManager } from "./features/background-agent"
 import type { PluginContext } from "./plugin/types"
+import type { ModelCacheState } from "./plugin-state"
 
 import { createCoreHooks } from "./plugin/hooks/create-core-hooks"
 import { createContinuationHooks } from "./plugin/hooks/create-continuation-hooks"
@@ -13,6 +14,7 @@ export type CreatedHooks = ReturnType<typeof createHooks>
 export function createHooks(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
+  modelCacheState: ModelCacheState
   backgroundManager: BackgroundManager
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
@@ -22,6 +24,7 @@ export function createHooks(args: {
   const {
     ctx,
     pluginConfig,
+    modelCacheState,
     backgroundManager,
     isHookEnabled,
     safeHookEnabled,
@@ -32,6 +35,7 @@ export function createHooks(args: {
   const core = createCoreHooks({
     ctx,
     pluginConfig,
+    modelCacheState,
     isHookEnabled,
     safeHookEnabled,
   })

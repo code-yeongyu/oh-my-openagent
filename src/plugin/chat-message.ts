@@ -10,6 +10,7 @@ import { hasConnectedProvidersCache } from "../shared"
 import {
   setSessionAgent,
 } from "../features/claude-code-session-state"
+import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -56,12 +57,14 @@ export function createChatMessageHandler(args: {
     const message = output.message
 
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-      const variant =
-        input.model && input.agent
-          ? resolveVariantForModel(pluginConfig, input.agent, input.model)
-          : resolveAgentVariant(pluginConfig, input.agent)
-      if (variant !== undefined) {
-        message["variant"] = variant
+      if (message["variant"] === undefined) {
+        const variant =
+          input.model && input.agent
+            ? resolveVariantForModel(pluginConfig, input.agent, input.model)
+            : resolveAgentVariant(pluginConfig, input.agent)
+        if (variant !== undefined) {
+          message["variant"] = variant
+        }
       }
       firstMessageVariantGate.markApplied(input.sessionID)
     } else {
@@ -79,6 +82,8 @@ export function createChatMessageHandler(args: {
     await hooks.keywordDetector?.["chat.message"]?.(input, output)
     await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
+    await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
+    await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }
@@ -135,5 +140,7 @@ export function createChatMessageHandler(args: {
         hooks.ralphLoop.cancelLoop(input.sessionID)
       }
     }
+
+    applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, ctx.client.tui, input.sessionID)
   }
 }

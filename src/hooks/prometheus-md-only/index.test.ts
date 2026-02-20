@@ -5,22 +5,17 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { clearSessionAgent } from "../../features/claude-code-session-state"
-
-const TEST_STORAGE_ROOT = join(tmpdir(), `prometheus-md-only-${randomUUID()}`)
-const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
-const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
-
-mock.module("../../features/hook-message-injector/constants", () => ({
-  OPENCODE_STORAGE: TEST_STORAGE_ROOT,
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: TEST_PART_STORAGE,
+// Force stable (JSON) mode for tests that rely on message file storage
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => false,
+  resetSqliteBackendCache: () => {},
 }))
 
 const { createPrometheusMdOnlyHook } = await import("./index")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
 describe("prometheus-md-only", () => {
-  const TEST_SESSION_ID = "test-session-prometheus"
+  const TEST_SESSION_ID = "ses_test_prometheus"
   let testMessageDir: string
 
   function createMockPluginInput() {
@@ -52,7 +47,6 @@ describe("prometheus-md-only", () => {
         // ignore
       }
     }
-    rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
   })
 
   describe("agent name matching", () => {
@@ -557,7 +551,7 @@ describe("prometheus-md-only", () => {
       writeFileSync(BOULDER_FILE, JSON.stringify({
         active_plan: "/test/plan.md",
         started_at: new Date().toISOString(),
-        session_ids: ["other-session-id"],
+        session_ids: ["ses_other_session_id"],
         plan_name: "test-plan",
         agent: "atlas"
       }))
@@ -589,7 +583,7 @@ describe("prometheus-md-only", () => {
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
         tool: "Write",
-        sessionID: "non-existent-session",
+        sessionID: "ses_non_existent_session",
         callID: "call-1",
       }
       const output = {

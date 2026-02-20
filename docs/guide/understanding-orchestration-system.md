@@ -23,17 +23,17 @@ The orchestration system solves these problems through **specialization and dele
 flowchart TB
     subgraph Planning["Planning Layer (Human + Prometheus)"]
         User[("👤 User")]
-        Prometheus["🔥 Prometheus<br/>(Planner)<br/>Claude Opus 4.5"]
-        Metis["🦉 Metis<br/>(Consultant)<br/>Claude Opus 4.5"]
+        Prometheus["🔥 Prometheus<br/>(Planner)<br/>Claude Opus 4.6"]
+        Metis["🦉 Metis<br/>(Consultant)<br/>Claude Opus 4.6"]
         Momus["👁️ Momus<br/>(Reviewer)<br/>GPT-5.2"]
     end
     
     subgraph Execution["Execution Layer (Orchestrator)"]
-        Orchestrator["⚡ Atlas<br/>(Conductor)<br/>Claude Opus 4.5"]
+        Orchestrator["⚡ Atlas<br/>(Conductor)<br/>K2P5 (Kimi)"]
     end
     
     subgraph Workers["Worker Layer (Specialized Agents)"]
-        Junior["🪨 Sisyphus-Junior<br/>(Task Executor)<br/>Claude Sonnet 4.5"]
+        Junior["🪨 Sisyphus-Junior<br/>(Task Executor)<br/>Claude Sonnet 4.6"]
         Oracle["🧠 Oracle<br/>(Architecture)<br/>GPT-5.2"]
         Explore["🔍 Explore<br/>(Codebase Grep)<br/>Grok Code"]
         Librarian["📚 Librarian<br/>(Docs/OSS)<br/>GLM-4.7"]
@@ -294,12 +294,13 @@ task(category="quick", prompt="...")          // "Just get it done fast"
 | Category | Model | When to Use |
 |----------|-------|-------------|
 | `visual-engineering` | Gemini 3 Pro | Frontend, UI/UX, design, styling, animation |
-| `ultrabrain` | GPT-5.2 Codex (xhigh) | Deep logical reasoning, complex architecture decisions |
+| `ultrabrain` | GPT-5.3 Codex (xhigh) | Deep logical reasoning, complex architecture decisions |
 | `artistry` | Gemini 3 Pro (max) | Highly creative/artistic tasks, novel ideas |
 | `quick` | Claude Haiku 4.5 | Trivial tasks - single file changes, typo fixes |
-| `unspecified-low` | Claude Sonnet 4.5 | Tasks that don't fit other categories, low effort |
-| `unspecified-high` | Claude Opus 4.5 (max) | Tasks that don't fit other categories, high effort |
-| `writing` | Gemini 3 Flash | Documentation, prose, technical writing |
+| `deep` | GPT-5.3 Codex (medium) | Goal-oriented autonomous problem-solving, thorough research |
+| `unspecified-low` | Claude Sonnet 4.6 | Tasks that don't fit other categories, low effort |
+| `unspecified-high` | Claude Opus 4.6 (max) | Tasks that don't fit other categories, high effort |
+| `writing` | K2P5 (Kimi) | Documentation, prose, technical writing |
 
 ### Custom Categories
 

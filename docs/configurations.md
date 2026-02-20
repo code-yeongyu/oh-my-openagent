@@ -38,13 +38,13 @@ It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optima
 ## Config File Locations
 
 Config file locations (priority order):
-1. `.opencode/oh-my-opencode.json` (project)
-2. User config (platform-specific):
+1. `.opencode/oh-my-opencode.jsonc` or `.opencode/oh-my-opencode.json` (project; prefers `.jsonc` when both exist)
+2. User config (platform-specific; prefers `.jsonc` when both exist):
 
-| Platform        | User Config Path                                                                                            |
-| --------------- | ----------------------------------------------------------------------------------------------------------- |
-| **Windows**     | `~/.config/opencode/oh-my-opencode.json` (preferred) or `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
-| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.json`                                                                    |
+| Platform        | User Config Path                                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| **Windows**     | `~/.config/opencode/oh-my-opencode.jsonc` (preferred) or `~/.config/opencode/oh-my-opencode.json` (fallback); `%APPDATA%\opencode\oh-my-opencode.jsonc` / `%APPDATA%\opencode\oh-my-opencode.json` (fallback) |
+| **macOS/Linux** | `~/.config/opencode/oh-my-opencode.jsonc` (preferred) or `~/.config/opencode/oh-my-opencode.json` (fallback)                |
 
 Schema autocomplete supported:
 
@@ -83,7 +83,7 @@ When both `oh-my-opencode.jsonc` and `oh-my-opencode.json` files exist, `.jsonc`
 
 ## Google Auth
 
-**Recommended**: For Google Gemini authentication, install the [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin (`@latest`). It provides multi-account load balancing, variant-based thinking levels, dual quota system (Antigravity + Gemini CLI), and active maintenance. See [Installation > Google Gemini](docs/guide/installation.md#google-gemini-antigravity-oauth).
+**Recommended**: For Google Gemini authentication, install the [`opencode-antigravity-auth`](https://github.com/NoeFabris/opencode-antigravity-auth) plugin (`@latest`). It provides multi-account load balancing, variant-based thinking levels, dual quota system (Antigravity + Gemini CLI), and active maintenance. See [Installation > Google Gemini](guide/installation.md#google-gemini-antigravity-oauth).
 
 ## Ollama Provider
 
@@ -245,7 +245,7 @@ Or disable via `disabled_agents` in `~/.config/opencode/oh-my-opencode.json` or 
 }
 ```
 
-Available agents: `sisyphus`, `prometheus`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`
+Available agents: `sisyphus`, `hephaestus`, `prometheus`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`
 
 ## Built-in Skills
 
@@ -609,7 +609,7 @@ Configure git-master skill behavior:
 
 When enabled (default), Sisyphus provides a powerful orchestrator with optional specialized agents:
 
-- **Sisyphus**: Primary orchestrator agent (Claude Opus 4.5)
+- **Sisyphus**: Primary orchestrator agent (Claude Opus 4.6)
 - **OpenCode-Builder**: OpenCode's default build agent, renamed due to SDK limitations (disabled by default)
 - **Prometheus (Planner)**: OpenCode's default plan agent with work-planner methodology (enabled by default)
 - **Metis (Plan Consultant)**: Pre-planning analysis agent that identifies hidden requirements and AI failure points
@@ -665,7 +665,7 @@ You can also customize Sisyphus agents like other agents:
       "model": "openai/gpt-5.2"
     },
     "Metis (Plan Consultant)": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-sonnet-4-6"
     }
   }
 }
@@ -720,17 +720,18 @@ Categories enable domain-specific task delegation via the `task` tool. Each cate
 
 ### Built-in Categories
 
-All 7 categories come with optimal model defaults, but **you must configure them to use those defaults**:
+All 8 categories come with optimal model defaults, but **you must configure them to use those defaults**:
 
 | Category             | Built-in Default Model             | Description                                                          |
 | -------------------- | ---------------------------------- | -------------------------------------------------------------------- |
-| `visual-engineering` | `google/gemini-3-pro-preview`      | Frontend, UI/UX, design, styling, animation                          |
+| `visual-engineering` | `google/gemini-3-pro` (high)       | Frontend, UI/UX, design, styling, animation                          |
 | `ultrabrain`         | `openai/gpt-5.3-codex` (xhigh)     | Deep logical reasoning, complex architecture decisions               |
-| `artistry`           | `google/gemini-3-pro-preview` (max)| Highly creative/artistic tasks, novel ideas                          |
+| `deep`               | `openai/gpt-5.3-codex` (medium)    | Goal-oriented autonomous problem-solving, thorough research before action |
+| `artistry`           | `google/gemini-3-pro` (high)       | Highly creative/artistic tasks, novel ideas                          |
 | `quick`              | `anthropic/claude-haiku-4-5`       | Trivial tasks - single file changes, typo fixes, simple modifications|
-| `unspecified-low`    | `anthropic/claude-sonnet-4-5`      | Tasks that don't fit other categories, low effort required           |
+| `unspecified-low`    | `anthropic/claude-sonnet-4-6`      | Tasks that don't fit other categories, low effort required           |
 | `unspecified-high`   | `anthropic/claude-opus-4-6` (max)  | Tasks that don't fit other categories, high effort required          |
-| `writing`            | `google/gemini-3-flash-preview`    | Documentation, prose, technical writing                              |
+| `writing`            | `kimi-for-coding/k2p5`             | Documentation, prose, technical writing                              |
 
 ### ⚠️ Critical: Model Resolution Priority
 
@@ -746,12 +747,12 @@ All 7 categories come with optimal model defaults, but **you must configure them
 
 ```json
 // opencode.json
-{ "model": "anthropic/claude-sonnet-4-5" }
+{ "model": "anthropic/claude-sonnet-4-6" }
 
 // oh-my-opencode.json (empty categories section)
 {}
 
-// Result: ALL categories use claude-sonnet-4-5 (wasteful!)
+// Result: ALL categories use claude-sonnet-4-6 (wasteful!)
 // - quick tasks use Sonnet instead of Haiku (expensive)
 // - ultrabrain uses Sonnet instead of GPT-5.2 (inferior reasoning)
 // - visual tasks use Sonnet instead of Gemini (suboptimal for UI)
@@ -765,28 +766,32 @@ All 7 categories come with optimal model defaults, but **you must configure them
 {
   "categories": {
     "visual-engineering": { 
-      "model": "google/gemini-3-pro-preview"
+      "model": "google/gemini-3-pro"
     },
     "ultrabrain": { 
       "model": "openai/gpt-5.3-codex",
       "variant": "xhigh"
     },
+    "deep": {
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium"
+    },
     "artistry": { 
-      "model": "google/gemini-3-pro-preview",
-      "variant": "max"
+      "model": "google/gemini-3-pro",
+      "variant": "high"
     },
     "quick": { 
       "model": "anthropic/claude-haiku-4-5"  // Fast + cheap for trivial tasks
     },
     "unspecified-low": { 
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-sonnet-4-6"
     },
     "unspecified-high": { 
       "model": "anthropic/claude-opus-4-6",
       "variant": "max"
     },
     "writing": { 
-      "model": "google/gemini-3-flash-preview"
+      "model": "kimi-for-coding/k2p5"
     }
   }
 }
@@ -813,7 +818,7 @@ Add your own categories or override built-in ones:
 {
   "categories": {
     "data-science": {
-      "model": "anthropic/claude-sonnet-4-5",
+      "model": "anthropic/claude-sonnet-4-6",
       "temperature": 0.2,
       "prompt_append": "Focus on data analysis, ML pipelines, and statistical methods."
     },
@@ -894,15 +899,16 @@ Each agent has a defined provider priority chain. The system tries providers in 
 
 | Agent | Model (no prefix) | Provider Priority Chain |
 |-------|-------------------|-------------------------|
-| **Sisyphus** | `claude-opus-4-6` | anthropic → kimi-for-coding → zai-coding-plan → openai → google |
-| **oracle** | `gpt-5.2` | openai → google → anthropic |
-| **librarian** | `glm-4.7` | zai-coding-plan → opencode → anthropic |
-| **explore** | `claude-haiku-4-5` | anthropic → github-copilot → opencode |
-| **multimodal-looker** | `gemini-3-flash` | google → openai → zai-coding-plan → kimi-for-coding → anthropic → opencode |
-| **Prometheus (Planner)** | `claude-opus-4-6` | anthropic → kimi-for-coding → openai → google |
-| **Metis (Plan Consultant)** | `claude-opus-4-6` | anthropic → kimi-for-coding → openai → google |
-| **Momus (Plan Reviewer)** | `gpt-5.2` | openai → anthropic → google |
-| **Atlas** | `claude-sonnet-4-5` | anthropic → kimi-for-coding → openai → google |
+| **Sisyphus** | `claude-opus-4-6` | anthropic/github-copilot/opencode → kimi-for-coding → opencode → zai-coding-plan → opencode |
+| **Hephaestus** | `gpt-5.3-codex` | openai/github-copilot/opencode (requires provider) |
+| **oracle** | `gpt-5.2` | openai/github-copilot/opencode → google/github-copilot/opencode → anthropic/github-copilot/opencode |
+| **librarian** | `glm-4.7` | zai-coding-plan → opencode → anthropic/github-copilot/opencode |
+| **explore** | `grok-code-fast-1` | github-copilot → anthropic/opencode → opencode |
+| **multimodal-looker** | `gemini-3-flash` | google/github-copilot/opencode → openai/github-copilot/opencode → zai-coding-plan → kimi-for-coding → opencode → anthropic/github-copilot/opencode → opencode |
+| **Prometheus (Planner)** | `claude-opus-4-6` | anthropic/github-copilot/opencode → kimi-for-coding → opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
+| **Metis (Plan Consultant)** | `claude-opus-4-6` | anthropic/github-copilot/opencode → kimi-for-coding → opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
+| **Momus (Plan Reviewer)** | `gpt-5.2` | openai/github-copilot/opencode → anthropic/github-copilot/opencode → google/github-copilot/opencode |
+| **Atlas** | `k2p5` | kimi-for-coding → opencode → anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
 
 ### Category Provider Chains
 
@@ -910,14 +916,14 @@ Categories follow the same resolution logic:
 
 | Category | Model (no prefix) | Provider Priority Chain |
 |----------|-------------------|-------------------------|
-| **visual-engineering** | `gemini-3-pro` | google → anthropic → zai-coding-plan |
-| **ultrabrain** | `gpt-5.3-codex` | openai → google → anthropic |
-| **deep** | `gpt-5.3-codex` | openai → anthropic → google |
-| **artistry** | `gemini-3-pro` | google → anthropic → openai |
-| **quick** | `claude-haiku-4-5` | anthropic → google → opencode |
-| **unspecified-low** | `claude-sonnet-4-5` | anthropic → openai → google |
-| **unspecified-high** | `claude-opus-4-6` | anthropic → openai → google |
-| **writing** | `gemini-3-flash` | google → anthropic → zai-coding-plan → openai |
+| **visual-engineering** | `gemini-3-pro` | google/github-copilot/opencode → zai-coding-plan → anthropic/github-copilot/opencode → kimi-for-coding |
+| **ultrabrain** | `gpt-5.3-codex` | openai/github-copilot/opencode → google/github-copilot/opencode → anthropic/github-copilot/opencode |
+| **deep** | `gpt-5.3-codex` | openai/github-copilot/opencode → anthropic/github-copilot/opencode → google/github-copilot/opencode |
+| **artistry** | `gemini-3-pro` | google/github-copilot/opencode → anthropic/github-copilot/opencode → openai/github-copilot/opencode |
+| **quick** | `claude-haiku-4-5` | anthropic/github-copilot/opencode → google/github-copilot/opencode → opencode |
+| **unspecified-low** | `claude-sonnet-4-6` | anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
+| **unspecified-high** | `claude-opus-4-6` | anthropic/github-copilot/opencode → openai/github-copilot/opencode → google/github-copilot/opencode |
+| **writing** | `k2p5` | kimi-for-coding → google/github-copilot/opencode → anthropic/github-copilot/opencode |
 
 ### Checking Your Configuration
 
@@ -941,7 +947,7 @@ Override any agent or category model in `oh-my-opencode.json`:
 {
   "agents": {
     "Sisyphus": {
-      "model": "anthropic/claude-sonnet-4-5"
+      "model": "anthropic/claude-sonnet-4-6"
     },
     "oracle": {
       "model": "openai/o3"
@@ -967,11 +973,41 @@ Disable specific built-in hooks via `disabled_hooks` in `~/.config/opencode/oh-m
 }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `start-work`
+Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`
 
 **Note on `directory-agents-injector`**: This hook is **automatically disabled** when running on OpenCode 1.1.37+ because OpenCode now has native support for dynamically resolving AGENTS.md files from subdirectories (PR #10678). This prevents duplicate AGENTS.md injection. For older OpenCode versions, the hook remains active to provide the same functionality.
 
+**Note on `no-sisyphus-gpt`**: Disabling this hook is **STRONGLY discouraged**. Sisyphus is NOT optimized for GPT models — running Sisyphus with GPT performs worse than vanilla Codex and wastes your money. This hook automatically switches to Hephaestus when a GPT model is detected, which is the correct agent for GPT. Only disable this if you fully understand the consequences.
+
 **Note on `auto-update-checker` and `startup-toast`**: The `startup-toast` hook is a sub-feature of `auto-update-checker`. To disable only the startup toast notification while keeping update checking enabled, add `"startup-toast"` to `disabled_hooks`. To disable all update checking features (including the toast), add `"auto-update-checker"` to `disabled_hooks`.
+
+## Hashline Edit
+
+Oh My OpenCode replaces OpenCode's built-in `Edit` tool with a hash-anchored version that uses `LINE#ID` references (e.g. `5#VK`) instead of bare line numbers. This prevents stale-line edits by validating content hash before applying each change.
+
+Enabled by default. Set `hashline_edit: false` to opt out and restore standard file editing.
+
+```json
+{
+  "hashline_edit": false
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `hashline_edit` | `true` | Enable hash-anchored `Edit` tool and companion hooks. When `false`, falls back to standard editing without hash validation. |
+
+When enabled, two companion hooks are also active:
+
+- **`hashline-read-enhancer`** — Appends `LINE#ID:content` annotations to `Read` output so agents always have fresh anchors.
+- **`hashline-edit-diff-enhancer`** — Shows a unified diff in `Edit` / `Write` output for immediate change visibility.
+
+To disable only the hooks while keeping the hash-anchored Edit tool:
+
+```json
+{
+  "disabled_hooks": ["hashline-read-enhancer", "hashline-edit-diff-enhancer"]
+}
 
 ## Disabled Commands
 
@@ -1061,9 +1097,10 @@ Don't want them? Disable via `disabled_mcps` in `~/.config/opencode/oh-my-openco
 
 OpenCode provides LSP tools for analysis.
 Oh My OpenCode adds refactoring tools (rename, code actions).
-All OpenCode LSP configs and custom settings (from opencode.json) are supported, plus additional Oh My OpenCode-specific settings.
+All OpenCode LSP configs and custom settings (from `opencode.jsonc` / `opencode.json`) are supported, plus additional Oh My OpenCode-specific settings.
+For config discovery, `.jsonc` takes precedence over `.json` when both exist (applies to both `opencode.*` and `oh-my-opencode.*`).
 
-Add LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.json`:
+Add LSP servers via the `lsp` option in `~/.config/opencode/oh-my-opencode.jsonc` / `~/.config/opencode/oh-my-opencode.json` or `.opencode/oh-my-opencode.jsonc` / `.opencode/oh-my-opencode.json`:
 
 ```json
 {
@@ -1124,6 +1161,7 @@ Opt-in experimental features that may change or be removed in future versions. U
     "truncate_all_tool_outputs": true,
     "aggressive_truncation": true,
     "auto_resume": true,
+    "disable_omo_env": false,
     "dynamic_context_pruning": {
       "enabled": false,
       "notification": "detailed",
@@ -1155,6 +1193,7 @@ Opt-in experimental features that may change or be removed in future versions. U
 | `truncate_all_tool_outputs` | `false` | Truncates ALL tool outputs instead of just whitelisted tools (Grep, Glob, LSP, AST-grep). Tool output truncator is enabled by default - disable via `disabled_hooks`.                         |
 | `aggressive_truncation`     | `false` | When token limit is exceeded, aggressively truncates tool outputs to fit within limits. More aggressive than the default truncation behavior. Falls back to summarize/revert if insufficient. |
 | `auto_resume`               | `false` | Automatically resumes session after successful recovery from thinking block errors or thinking disabled violations. Extracts last user message and continues.                             |
+| `disable_omo_env`           | `false` | When `true`, disables auto-injected `<omo-env>` block generation (date, time, timezone, locale). When unset or `false`, current behavior is preserved. Setting this to `true` will improve the cache hit rate and reduce the API cost. |
 | `dynamic_context_pruning`    | See below | Dynamic context pruning configuration for managing context window usage automatically. See [Dynamic Context Pruning](#dynamic-context-pruning) below.                              |
 
 ### Dynamic Context Pruning

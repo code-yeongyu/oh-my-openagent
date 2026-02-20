@@ -51,13 +51,33 @@ jobs:
           # Run them in separate processes to prevent cross-file contamination
           bun test src/plugin-handlers
           bun test src/hooks/atlas
+          bun test src/hooks/compaction-context-injector
           bun test src/features/tmux-subagent
+          bun test src/cli/doctor/formatter.test.ts
+          bun test src/cli/doctor/format-default.test.ts
+          bun test src/tools/call-omo-agent/sync-executor.test.ts
+          bun test src/tools/call-omo-agent/session-creator.test.ts
+          bun test src/features/opencode-skill-loader/loader.test.ts
 
       - name: Run remaining tests
         run: |
-          # Run all other tests (mock-heavy ones are re-run but that's acceptable)
-          bun test bin script src/cli src/config src/mcp src/index.test.ts \
-            src/agents src/tools src/shared \
+          # Enumerate subdirectories/files explicitly to EXCLUDE mock-heavy files
+          # that were already run in isolation above.
+          # Excluded from src/cli: doctor/formatter.test.ts, doctor/format-default.test.ts
+          # Excluded from src/tools: call-omo-agent/sync-executor.test.ts, call-omo-agent/session-creator.test.ts
+          bun test bin script src/config src/mcp src/index.test.ts \
+            src/agents src/shared \
+            src/cli/run src/cli/config-manager src/cli/mcp-oauth \
+            src/cli/index.test.ts src/cli/install.test.ts src/cli/model-fallback.test.ts \
+            src/cli/config-manager.test.ts \
+            src/cli/doctor/runner.test.ts src/cli/doctor/checks \
+            src/tools/ast-grep src/tools/background-task src/tools/delegate-task \
+            src/tools/glob src/tools/grep src/tools/interactive-bash \
+            src/tools/look-at src/tools/lsp src/tools/session-manager \
+            src/tools/skill src/tools/skill-mcp src/tools/slashcommand src/tools/task \
+            src/tools/call-omo-agent/background-agent-executor.test.ts \
+            src/tools/call-omo-agent/background-executor.test.ts \
+            src/tools/call-omo-agent/subagent-session-creator.test.ts \
             src/hooks/anthropic-context-window-limit-recovery \
             src/hooks/claude-code-compatibility \
             src/hooks/context-injection \
@@ -70,7 +90,11 @@ jobs:
             src/features/builtin-skills \
             src/features/claude-code-session-state \
             src/features/hook-message-injector \
-            src/features/opencode-skill-loader \
+            src/features/opencode-skill-loader/config-source-discovery.test.ts \
+            src/features/opencode-skill-loader/merger.test.ts \
+            src/features/opencode-skill-loader/skill-content.test.ts \
+            src/features/opencode-skill-loader/blocking.test.ts \
+            src/features/opencode-skill-loader/async-loader.test.ts \
             src/features/skill-mcp-manager
 
   typecheck:
@@ -223,118 +247,23 @@ jobs:
         with:
           fetch-depth: 0
 
+      - run: git fetch --force --tags
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+
       - name: Generate changelog
-        id: changelog
         run: |
-          VERSION="${{ needs.publish-main.outputs.version }}"
-          
-          PREV_TAG=""
-          if [[ "$VERSION" == *"-beta."* ]]; then
-            BASE="${VERSION%-beta.*}"
-            NUM="${VERSION##*-beta.}"
-            PREV_NUM=$((NUM - 1))
-            if [ $PREV_NUM -ge 1 ]; then
-              PREV_TAG="${BASE}-beta.${PREV_NUM}"
-              git rev-parse "v${PREV_TAG}" >/dev/null 2>&1 || PREV_TAG=""
-            fi
-          fi
-          
-          if [ -z "$PREV_TAG" ]; then
-            PREV_TAG=$(curl -s https://registry.npmjs.org/oh-my-opencode/latest | jq -r '.version // "0.0.0"')
-          fi
-          
-          echo "Comparing v${PREV_TAG}..v${VERSION}"
-          
-          # Get all commits between tags
-          COMMITS=$(git log "v${PREV_TAG}..v${VERSION}" --format="%s" 2>/dev/null || echo "")
-          
-          # Initialize sections
-          FEATURES=""
-          FIXES=""
-          REFACTOR=""
-          DOCS=""
-          OTHER=""
-          
-          # Store regexes in variables for bash 5.2+ compatibility
-          # (bash 5.2 changed how parentheses are parsed inside [[ =~ ]])
-          re_skip='^(chore|ci|release|test|ignore)'
-          re_feat_scoped='^feat\(([^)]+)\): (.+)$'
-          re_fix_scoped='^fix\(([^)]+)\): (.+)$'
-          re_refactor_scoped='^refactor\(([^)]+)\): (.+)$'
-          re_docs_scoped='^docs\(([^)]+)\): (.+)$'
-          
-          while IFS= read -r commit; do
-            [ -z "$commit" ] && continue
-            # Skip chore, ci, release, test commits
-            [[ "$commit" =~ $re_skip ]] && continue
-            
-            if [[ "$commit" =~ ^feat ]]; then
-              # Extract scope and message: feat(scope): message -> **scope**: message
-              if [[ "$commit" =~ $re_feat_scoped ]]; then
-                FEATURES="${FEATURES}\n- **${BASH_REMATCH[1]}**: ${BASH_REMATCH[2]}"
-              else
-                MSG="${commit#feat: }"
-                FEATURES="${FEATURES}\n- ${MSG}"
-              fi
-            elif [[ "$commit" =~ ^fix ]]; then
-              if [[ "$commit" =~ $re_fix_scoped ]]; then
-                FIXES="${FIXES}\n- **${BASH_REMATCH[1]}**: ${BASH_REMATCH[2]}"
-              else
-                MSG="${commit#fix: }"
-                FIXES="${FIXES}\n- ${MSG}"
-              fi
-            elif [[ "$commit" =~ ^refactor ]]; then
-              if [[ "$commit" =~ $re_refactor_scoped ]]; then
-                REFACTOR="${REFACTOR}\n- **${BASH_REMATCH[1]}**: ${BASH_REMATCH[2]}"
-              else
-                MSG="${commit#refactor: }"
-                REFACTOR="${REFACTOR}\n- ${MSG}"
-              fi
-            elif [[ "$commit" =~ ^docs ]]; then
-              if [[ "$commit" =~ $re_docs_scoped ]]; then
-                DOCS="${DOCS}\n- **${BASH_REMATCH[1]}**: ${BASH_REMATCH[2]}"
-              else
-                MSG="${commit#docs: }"
-                DOCS="${DOCS}\n- ${MSG}"
-              fi
-            else
-              OTHER="${OTHER}\n- ${commit}"
-            fi
-          done <<< "$COMMITS"
-          
-          # Build release notes
-          {
-            echo "## What's Changed"
-            echo ""
-            if [ -n "$FEATURES" ]; then
-              echo "### Features"
-              echo -e "$FEATURES"
-              echo ""
-            fi
-            if [ -n "$FIXES" ]; then
-              echo "### Bug Fixes"
-              echo -e "$FIXES"
-              echo ""
-            fi
-            if [ -n "$REFACTOR" ]; then
-              echo "### Refactoring"
-              echo -e "$REFACTOR"
-              echo ""
-            fi
-            if [ -n "$DOCS" ]; then
-              echo "### Documentation"
-              echo -e "$DOCS"
-              echo ""
-            fi
-            if [ -n "$OTHER" ]; then
-              echo "### Other Changes"
-              echo -e "$OTHER"
-              echo ""
-            fi
-            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/v${PREV_TAG}...v${VERSION}"
-          } > /tmp/changelog.md
-          
+          bun run script/generate-changelog.ts > /tmp/changelog.md
           cat /tmp/changelog.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub release
         run: |

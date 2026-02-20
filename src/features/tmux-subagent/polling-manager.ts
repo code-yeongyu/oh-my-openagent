@@ -3,6 +3,7 @@ import { POLL_INTERVAL_BACKGROUND_MS } from "../../shared/tmux"
 import type { TrackedSession } from "./types"
 import { SESSION_MISSING_GRACE_MS } from "../../shared/tmux"
 import { log } from "../../shared"
+import { normalizeSDKResponse } from "../../shared"
 
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000
@@ -10,6 +11,7 @@ const STABLE_POLLS_REQUIRED = 3
 
 export class TmuxPollingManager {
   private pollInterval?: ReturnType<typeof setInterval>
+  private pollingInFlight = false
 
   constructor(
     private client: OpencodeClient,
@@ -36,14 +38,16 @@ export class TmuxPollingManager {
   }
 
   private async pollSessions(): Promise<void> {
-    if (this.sessions.size === 0) {
-      this.stopPolling()
-      return
-    }
-
+    if (this.pollingInFlight) return
+    this.pollingInFlight = true
     try {
+      if (this.sessions.size === 0) {
+        this.stopPolling()
+        return
+      }
+
       const statusResult = await this.client.session.status({ path: undefined })
-      const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+      const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
 
       log("[tmux-session-manager] pollSessions", {
         trackedSessions: Array.from(this.sessions.keys()),
@@ -82,7 +86,7 @@ export class TmuxPollingManager {
               
               if (tracked.stableIdlePolls >= STABLE_POLLS_REQUIRED) {
                 const recheckResult = await this.client.session.status({ path: undefined })
-                const recheckStatuses = (recheckResult.data ?? {}) as Record<string, { type: string }>
+                const recheckStatuses = normalizeSDKResponse(recheckResult, {} as Record<string, { type: string }>)
                 const recheckStatus = recheckStatuses[sessionId]
                 
                 if (recheckStatus?.type === "idle") {
@@ -134,6 +138,8 @@ export class TmuxPollingManager {
       }
     } catch (err) {
       log("[tmux-session-manager] poll error", { error: String(err) })
+    } finally {
+      this.pollingInFlight = false
     }
   }
 }

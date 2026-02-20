@@ -15,10 +15,10 @@ export interface TodoContinuationEnforcer {
 }
 
 export interface Todo {
-  content: string
-  status: string
-  priority: string
-  id: string
+  content: string;
+  status: string;
+  priority: string;
+  id?: string;
 }
 
 export interface SessionState {
@@ -27,6 +27,9 @@ export interface SessionState {
   isRecovering?: boolean
   countdownStartedAt?: number
   abortDetectedAt?: number
+  lastInjectedAt?: number
+  inFlight?: boolean
+  consecutiveFailures: number
 }
 
 export interface MessageInfo {

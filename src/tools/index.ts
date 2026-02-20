@@ -13,13 +13,13 @@ export { lspManager }
 export { createAstGrepTools } from "./ast-grep"
 export { createGrepTools } from "./grep"
 export { createGlobTools } from "./glob"
-export { createSlashcommandTool, discoverCommandsSync } from "./slashcommand"
+export { createSkillTool } from "./skill"
+export { discoverCommandsSync } from "./slashcommand"
 export { createSessionManagerTools } from "./session-manager"
 
 export { sessionExists } from "./session-manager/storage"
 
 export { interactive_bash, startBackgroundCheck as startTmuxCheck } from "./interactive-bash"
-export { createSkillTool } from "./skill"
 export { createSkillMcpTool } from "./skill-mcp"
 
 import {
@@ -43,6 +43,7 @@ export {
   createTaskList,
   createTaskUpdateTool,
 } from "./task"
+export { createHashlineEditTool } from "./hashline-edit"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager

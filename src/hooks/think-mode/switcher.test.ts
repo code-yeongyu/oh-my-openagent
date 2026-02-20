@@ -30,7 +30,7 @@ describe("think-mode switcher", () => {
 
       it("should resolve github-copilot Claude Sonnet to anthropic config", () => {
         // given a github-copilot provider with Claude Sonnet model
-        const config = getThinkingConfig("github-copilot", "claude-sonnet-4-5")
+        const config = getThinkingConfig("github-copilot", "claude-sonnet-4-6")
 
         // then should return anthropic thinking config
         expect(config).not.toBeNull()
@@ -266,6 +266,24 @@ describe("think-mode switcher", () => {
       expect((config?.thinking as Record<string, unknown>)?.type).toBe("enabled")
     })
 
+    it("should work for direct google-vertex-anthropic provider", () => {
+      //#given direct google-vertex-anthropic provider
+      const config = getThinkingConfig(
+        "google-vertex-anthropic",
+        "claude-opus-4-6"
+      )
+
+      //#when thinking config is resolved
+
+      //#then it should return anthropic-style thinking config
+      expect(config).not.toBeNull()
+      expect(config?.thinking).toBeDefined()
+      expect((config?.thinking as Record<string, unknown>)?.type).toBe("enabled")
+      expect((config?.thinking as Record<string, unknown>)?.budgetTokens).toBe(
+        64000
+      )
+    })
+
     it("should still work for direct google provider", () => {
       // given direct google provider
       const config = getThinkingConfig("google", "gemini-3-pro")
@@ -277,7 +295,7 @@ describe("think-mode switcher", () => {
 
     it("should still work for amazon-bedrock provider", () => {
       // given amazon-bedrock provider with claude model
-      const config = getThinkingConfig("amazon-bedrock", "claude-sonnet-4-5")
+      const config = getThinkingConfig("amazon-bedrock", "claude-sonnet-4-6")
 
       // then should return bedrock thinking config
       expect(config).not.toBeNull()
@@ -314,6 +332,17 @@ describe("think-mode switcher", () => {
       expect(config.maxTokens).toBe(128000)
     })
 
+    it("should have correct structure for google-vertex-anthropic", () => {
+      //#given google-vertex-anthropic config entry
+      const config = THINKING_CONFIGS["google-vertex-anthropic"]
+
+      //#when structure is validated
+
+      //#then it should match anthropic style structure
+      expect(config.thinking).toBeDefined()
+      expect(config.maxTokens).toBe(128000)
+    })
+
     it("should have correct structure for google", () => {
       const config = THINKING_CONFIGS.google
       expect(config.providerOptions).toBeDefined()
@@ -335,10 +364,10 @@ describe("think-mode switcher", () => {
     describe("getHighVariant with prefixes", () => {
       it("should preserve vertex_ai/ prefix when getting high variant", () => {
         // given a model ID with vertex_ai/ prefix
-        const variant = getHighVariant("vertex_ai/claude-sonnet-4-5")
+        const variant = getHighVariant("vertex_ai/claude-sonnet-4-6")
 
         // then should return high variant with prefix preserved
-        expect(variant).toBe("vertex_ai/claude-sonnet-4-5-high")
+        expect(variant).toBe("vertex_ai/claude-sonnet-4-6-high")
       })
 
       it("should preserve openai/ prefix when getting high variant", () => {
@@ -360,7 +389,7 @@ describe("think-mode switcher", () => {
       it("should handle multiple different prefixes", () => {
         // given various custom prefixes
         expect(getHighVariant("azure/gpt-5")).toBe("azure/gpt-5-high")
-        expect(getHighVariant("bedrock/claude-sonnet-4-5")).toBe("bedrock/claude-sonnet-4-5-high")
+        expect(getHighVariant("bedrock/claude-sonnet-4-6")).toBe("bedrock/claude-sonnet-4-6-high")
         expect(getHighVariant("custom-llm/gemini-3-pro")).toBe("custom-llm/gemini-3-pro-high")
       })
 
@@ -401,7 +430,7 @@ describe("think-mode switcher", () => {
     describe("getThinkingConfig with prefixes", () => {
       it("should return null for custom providers (not in THINKING_CONFIGS)", () => {
         // given custom provider with prefixed Claude model
-        const config = getThinkingConfig("dia-llm", "vertex_ai/claude-sonnet-4-5")
+        const config = getThinkingConfig("dia-llm", "vertex_ai/claude-sonnet-4-6")
 
         // then should return null (custom provider not in THINKING_CONFIGS)
         expect(config).toBeNull()
@@ -430,13 +459,13 @@ describe("think-mode switcher", () => {
       it("should handle LLM proxy with vertex_ai prefix correctly", () => {
         // given a custom LLM proxy provider using vertex_ai/ prefix
         const providerID = "dia-llm"
-        const modelID = "vertex_ai/claude-sonnet-4-5"
+        const modelID = "vertex_ai/claude-sonnet-4-6"
 
         // when getting high variant
         const highVariant = getHighVariant(modelID)
 
         // then should preserve the prefix
-        expect(highVariant).toBe("vertex_ai/claude-sonnet-4-5-high")
+        expect(highVariant).toBe("vertex_ai/claude-sonnet-4-6-high")
 
         // #and when checking if already high
         expect(isAlreadyHighVariant(modelID)).toBe(false)
@@ -469,11 +498,13 @@ describe("think-mode switcher", () => {
 
   describe("Z.AI GLM-4.7 provider support", () => {
     describe("getThinkingConfig for zai-coding-plan", () => {
-      it("should return thinking config for glm-4.7", () => {
-        // given zai-coding-plan provider with glm-4.7 model
-        const config = getThinkingConfig("zai-coding-plan", "glm-4.7")
+      it("should return thinking config for glm-5", () => {
+        //#given a Z.ai GLM model
+        const config = getThinkingConfig("zai-coding-plan", "glm-5")
 
-        // then should return zai-coding-plan thinking config
+        //#when thinking config is resolved
+
+        //#then thinking type is "disabled"
         expect(config).not.toBeNull()
         expect(config?.providerOptions).toBeDefined()
         const zaiOptions = (config?.providerOptions as Record<string, unknown>)?.[
@@ -482,8 +513,7 @@ describe("think-mode switcher", () => {
         expect(zaiOptions?.extra_body).toBeDefined()
         const extraBody = zaiOptions?.extra_body as Record<string, unknown>
         expect(extraBody?.thinking).toBeDefined()
-        expect((extraBody?.thinking as Record<string, unknown>)?.type).toBe("enabled")
-        expect((extraBody?.thinking as Record<string, unknown>)?.clear_thinking).toBe(false)
+        expect((extraBody?.thinking as Record<string, unknown>)?.type).toBe("disabled")
       })
 
       it("should return thinking config for glm-4.6v (multimodal)", () => {
@@ -505,9 +535,9 @@ describe("think-mode switcher", () => {
     })
 
     describe("HIGH_VARIANT_MAP for GLM", () => {
-      it("should NOT have high variant for glm-4.7 (thinking enabled by default)", () => {
-        // given glm-4.7 model
-        const variant = getHighVariant("glm-4.7")
+      it("should NOT have high variant for glm-5", () => {
+        // given glm-5 model
+        const variant = getHighVariant("glm-5")
 
         // then should return null (no high variant needed)
         expect(variant).toBeNull()

@@ -12,6 +12,7 @@ export const AgentOverrideConfigSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   top_p: z.number().min(0).max(1).optional(),
   prompt: z.string().optional(),
+  /** Text to append to agent prompt. Supports file:// URIs (file:///abs, file://./rel, file://~/home) */
   prompt_append: z.string().optional(),
   tools: z.record(z.string(), z.boolean()).optional(),
   disable: z.boolean().optional(),
@@ -37,6 +38,13 @@ export const AgentOverrideConfigSchema = z.object({
   textVerbosity: z.enum(["low", "medium", "high"]).optional(),
   /** Provider-specific options. Passed directly to OpenCode SDK. */
   providerOptions: z.record(z.string(), z.unknown()).optional(),
+  /** Per-message ultrawork override model/variant when ultrawork keyword is detected. */
+  ultrawork: z
+    .object({
+      model: z.string().optional(),
+      variant: z.string().optional(),
+    })
+    .optional(),
 })
 
 export const AgentOverridesSchema = z.object({

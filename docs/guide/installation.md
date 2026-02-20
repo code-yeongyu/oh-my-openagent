@@ -162,8 +162,8 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 **Available models (Antigravity quota)**:
 - `google/antigravity-gemini-3-pro` — variants: `low`, `high`
 - `google/antigravity-gemini-3-flash` — variants: `minimal`, `low`, `medium`, `high`
-- `google/antigravity-claude-sonnet-4-5` — no variants
-- `google/antigravity-claude-sonnet-4-5-thinking` — variants: `low`, `max`
+- `google/antigravity-claude-sonnet-4-6` — no variants
+- `google/antigravity-claude-sonnet-4-6-thinking` — variants: `low`, `max`
 - `google/antigravity-claude-opus-4-5-thinking` — variants: `low`, `max`
 
 **Available models (Gemini CLI quota)**:
@@ -196,7 +196,7 @@ When GitHub Copilot is the best available provider, oh-my-opencode uses these mo
 
 | Agent         | Model                            |
 | ------------- | -------------------------------- |
-| **Sisyphus**  | `github-copilot/claude-opus-4.6` |
+| **Sisyphus**  | `github-copilot/claude-opus-4-6` |
 | **Oracle**    | `github-copilot/gpt-5.2`         |
 | **Explore**   | `opencode/gpt-5-nano`              |
 | **Librarian** | `zai-coding-plan/glm-4.7` (if Z.ai available) or fallback |
@@ -259,6 +259,18 @@ opencode auth login
 
 The plugin works perfectly by default. Do not change settings or turn off features without an explicit request.
 
+### Custom Model Configuration
+
+If the user wants to override which model an agent uses, refer to the **[Agent-Model Matching Guide](./agent-model-matching.md)** before making changes. That guide explains:
+
+- **Why each agent uses its default model** — prompt optimization, model family compatibility
+- **Which substitutions are safe** — staying within the same model family (e.g., Opus → Sonnet for Sisyphus)
+- **Which substitutions are dangerous** — crossing model families without prompt support (e.g., GPT for Sisyphus)
+- **How auto-routing works** — Prometheus and Atlas detect GPT models and switch to GPT-optimized prompts automatically
+- **Full fallback chains** — what happens when the preferred model is unavailable
+
+Always explain to the user *why* a model is assigned to an agent when making custom changes. The guide provides the rationale for every assignment.
+
 ### Verify the setup
 
 Read this document again, think about you have done everything correctly.
@@ -292,7 +304,7 @@ gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-opencode >/dev/nul
 
 Tell the user of following:
 
-1. **Sisyphus agent strongly recommends Opus 4.5 model. Using other models may result in significantly degraded experience.**
+1. **Sisyphus agent strongly recommends Opus 4.6 model. Using other models may result in significantly degraded experience.**
 
 2. **Feeling lazy?** Just include `ultrawork` (or `ulw`) in your prompt. That's it. The agent figures out the rest.
 

@@ -7,22 +7,21 @@
  * - Extended reasoning context for complex tasks
  */
 
+import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
+
 export function buildDefaultSisyphusJuniorPrompt(
   useTaskSystem: boolean,
   promptAppend?: string
 ): string {
   const todoDiscipline = buildTodoDisciplineSection(useTaskSystem)
-  const constraintsSection = buildConstraintsSection(useTaskSystem)
   const verificationText = useTaskSystem
     ? "All tasks marked completed"
     : "All todos marked completed"
 
   const prompt = `<Role>
 Sisyphus-Junior - Focused executor from OhMyOpenCode.
-Execute tasks directly. NEVER delegate or spawn other agents.
+Execute tasks directly.
 </Role>
-
-${constraintsSection}
 
 ${todoDiscipline}
 
@@ -40,39 +39,16 @@ Task NOT complete without:
 </Style>`
 
   if (!promptAppend) return prompt
-  return prompt + "\n\n" + promptAppend
-}
-
-function buildConstraintsSection(useTaskSystem: boolean): string {
-  if (useTaskSystem) {
-    return `<Critical_Constraints>
-BLOCKED ACTIONS (will fail if attempted):
-- task (agent delegation tool): BLOCKED — you cannot delegate work to other agents
-
-ALLOWED tools:
-- call_omo_agent: You CAN spawn explore/librarian agents for research
-- task_create, task_update, task_list, task_get: ALLOWED — use these for tracking your work
-
-You work ALONE for implementation. No delegation of implementation tasks.
-</Critical_Constraints>`
-  }
-
-  return `<Critical_Constraints>
-BLOCKED ACTIONS (will fail if attempted):
-- task (agent delegation tool): BLOCKED — you cannot delegate work to other agents
-
-ALLOWED: call_omo_agent - You CAN spawn explore/librarian agents for research.
-You work ALONE for implementation. No delegation of implementation tasks.
-</Critical_Constraints>`
+  return prompt + "\n\n" + resolvePromptAppend(promptAppend)
 }
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
     return `<Task_Discipline>
 TASK OBSESSION (NON-NEGOTIABLE):
-- 2+ steps → TaskCreate FIRST, atomic breakdown
-- TaskUpdate(status="in_progress") before starting (ONE at a time)
-- TaskUpdate(status="completed") IMMEDIATELY after each step
+- 2+ steps → task_create FIRST, atomic breakdown
+- task_update(status="in_progress") before starting (ONE at a time)
+- task_update(status="completed") IMMEDIATELY after each step
 - NEVER batch completions
 
 No tasks on multi-step work = INCOMPLETE WORK.

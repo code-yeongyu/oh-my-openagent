@@ -1,9 +1,11 @@
-import { describe, it, expect, mock, spyOn, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, mock, spyOn, beforeEach, afterEach, afterAll } from "bun:test"
 import type { RunResult } from "./types"
 import { createJsonOutputManager } from "./json-output"
 import { resolveSession } from "./session-resolver"
 import { executeOnCompleteHook } from "./on-complete-hook"
 import type { OpencodeClient } from "./types"
+import * as originalSdk from "@opencode-ai/sdk"
+import * as originalPortUtils from "../../shared/port-utils"
 
 const mockServerClose = mock(() => {})
 const mockCreateOpencode = mock(() =>
@@ -26,6 +28,11 @@ mock.module("../../shared/port-utils", () => ({
   getAvailableServerPort: mockGetAvailableServerPort,
   DEFAULT_SERVER_PORT: 4096,
 }))
+
+afterAll(() => {
+  mock.module("@opencode-ai/sdk", () => originalSdk)
+  mock.module("../../shared/port-utils", () => originalPortUtils)
+})
 
 const { createServerConnection } = await import("./server-connection")
 
@@ -120,11 +127,14 @@ describe("integration: --session-id", () => {
     const mockClient = createMockClient({ data: { id: sessionId } })
 
     // when
-    const result = await resolveSession({ client: mockClient, sessionId })
+    const result = await resolveSession({ client: mockClient, sessionId, directory: "/test" })
 
     // then
     expect(result).toBe(sessionId)
-    expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: sessionId } })
+    expect(mockClient.session.get).toHaveBeenCalledWith({
+      path: { id: sessionId },
+      query: { directory: "/test" },
+    })
     expect(mockClient.session.create).not.toHaveBeenCalled()
   })
 
@@ -134,11 +144,14 @@ describe("integration: --session-id", () => {
     const mockClient = createMockClient({ error: { message: "Session not found" } })
 
     // when
-    const result = resolveSession({ client: mockClient, sessionId })
+    const result = resolveSession({ client: mockClient, sessionId, directory: "/test" })
 
     // then
     await expect(result).rejects.toThrow(`Session not found: ${sessionId}`)
-    expect(mockClient.session.get).toHaveBeenCalledWith({ path: { id: sessionId } })
+    expect(mockClient.session.get).toHaveBeenCalledWith({
+      path: { id: sessionId },
+      query: { directory: "/test" },
+    })
     expect(mockClient.session.create).not.toHaveBeenCalled()
   })
 })

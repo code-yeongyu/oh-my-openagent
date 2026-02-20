@@ -4,11 +4,13 @@ import { isPlanFamily } from "./constants"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
-import { getMessageDir } from "../../shared/session-utils"
+import { getMessageDir } from "../../shared"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
+import { setSessionTools } from "../../shared/session-tools-store"
+import { normalizeSDKResponse } from "../../shared"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
@@ -55,7 +57,7 @@ export async function executeSyncContinuation(
   try {
     try {
       const messagesResp = await client.session.messages({ path: { id: args.session_id! } })
-      const messages = (messagesResp.data ?? []) as SessionMessage[]
+      const messages = normalizeSDKResponse(messagesResp, [] as SessionMessage[])
       anchorMessageCount = messages.length
       for (let i = messages.length - 1; i >= 0; i--) {
         const info = messages[i].info
@@ -77,6 +79,13 @@ export async function executeSyncContinuation(
     }
 
     const allowTask = isPlanFamily(resumeAgent)
+    const tools = {
+      ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
+      task: allowTask,
+      call_omo_agent: true,
+      question: false,
+    }
+    setSessionTools(args.session_id!, tools)
 
     await promptWithModelSuggestionRetry(client, {
       path: { id: args.session_id! },
@@ -84,12 +93,7 @@ export async function executeSyncContinuation(
         ...(resumeAgent !== undefined ? { agent: resumeAgent } : {}),
         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
         ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
-        tools: {
-          ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
-          task: allowTask,
-          call_omo_agent: true, // Intentionally overrides restrictions - continuation context needs delegation capability even for restricted agents
-          question: false,
-        },
+        tools,
         parts: [{ type: "text", text: args.prompt }],
       },
     })
@@ -128,7 +132,7 @@ ${result.textContent || "(No text output)"}
 
 <task_metadata>
 session_id: ${args.session_id}
-</task_metadata>`
+${resumeAgent ? `subagent: ${resumeAgent}\n` : ""}</task_metadata>`
    } finally {
      if (toastManager) {
        toastManager.removeTask(taskId)

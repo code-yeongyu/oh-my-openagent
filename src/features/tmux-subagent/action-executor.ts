@@ -1,13 +1,21 @@
 import type { TmuxConfig } from "../../config/schema"
 import type { PaneAction, WindowState } from "./types"
-import { spawnTmuxPane, closeTmuxPane, enforceMainPaneWidth, replaceTmuxPane } from "../../shared/tmux"
+import {
+  applyLayout,
+  spawnTmuxPane,
+  closeTmuxPane,
+  enforceMainPaneWidth,
+  replaceTmuxPane,
+} from "../../shared/tmux"
+import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
+import { queryWindowState } from "./pane-state-querier"
 import { log } from "../../shared"
+import type {
+  ActionResult,
+  ActionExecutorDeps,
+} from "./action-executor-core"
 
-export interface ActionResult {
-  success: boolean
-  paneId?: string
-  error?: string
-}
+export type { ActionExecutorDeps, ActionResult } from "./action-executor-core"
 
 export interface ExecuteActionsResult {
   success: boolean
@@ -19,11 +27,40 @@ export interface ExecuteContext {
   config: TmuxConfig
   serverUrl: string
   windowState: WindowState
+  sourcePaneId?: string
 }
 
-async function enforceMainPane(windowState: WindowState): Promise<void> {
+async function enforceMainPane(
+  windowState: WindowState,
+  config: TmuxConfig,
+): Promise<void> {
   if (!windowState.mainPane) return
-  await enforceMainPaneWidth(windowState.mainPane.paneId, windowState.windowWidth)
+  await enforceMainPaneWidth(windowState.mainPane.paneId, windowState.windowWidth, {
+    mainPaneSize: config.main_pane_size,
+    mainPaneMinWidth: config.main_pane_min_width,
+    agentPaneMinWidth: config.agent_pane_min_width,
+  })
+}
+
+async function enforceLayoutAndMainPane(ctx: ExecuteContext): Promise<void> {
+  const sourcePaneId = ctx.sourcePaneId
+  if (!sourcePaneId) {
+    await enforceMainPane(ctx.windowState, ctx.config)
+    return
+  }
+
+  const latestState = await queryWindowState(sourcePaneId)
+  if (!latestState?.mainPane) {
+    await enforceMainPane(ctx.windowState, ctx.config)
+    return
+  }
+
+  const tmux = await getTmuxPath()
+  if (tmux) {
+    await applyLayout(tmux, ctx.config.layout, ctx.config.main_pane_size)
+  }
+
+  await enforceMainPane(latestState, ctx.config)
 }
 
 export async function executeAction(
@@ -33,7 +70,7 @@ export async function executeAction(
   if (action.type === "close") {
     const success = await closeTmuxPane(action.paneId)
     if (success) {
-      await enforceMainPane(ctx.windowState)
+      await enforceLayoutAndMainPane(ctx)
     }
     return { success }
   }
@@ -46,6 +83,9 @@ export async function executeAction(
       ctx.config,
       ctx.serverUrl
     )
+    if (result.success) {
+      await enforceLayoutAndMainPane(ctx)
+    }
     return {
       success: result.success,
       paneId: result.paneId,
@@ -62,7 +102,7 @@ export async function executeAction(
   )
 
   if (result.success) {
-    await enforceMainPane(ctx.windowState)
+    await enforceLayoutAndMainPane(ctx)
   }
 
   return {
