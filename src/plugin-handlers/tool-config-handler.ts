@@ -97,6 +97,10 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
+  // NOTE: Athena/council tool restrictions are also defined in:
+  // - src/agents/athena/agent.ts (AgentConfig permission format)
+  // - src/shared/agent-tool-restrictions.ts (boolean format for session.prompt)
+  // Keep all three in sync when modifying.
   const athena = agentByKey(params.agentResult, "athena");
   if (athena) {
     athena.permission = {

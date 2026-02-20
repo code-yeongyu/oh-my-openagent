@@ -4,6 +4,8 @@
  * true = tool allowed, false = tool denied.
  */
 
+import { COUNCIL_MEMBER_KEY_PREFIX } from "../agents/builtin-agents/council-member-agents"
+
 const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   write: false,
   edit: false,
@@ -49,15 +51,26 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     call_omo_agent: false,
   },
 
+  // NOTE: Athena/council tool restrictions are also defined in:
+  // - src/agents/athena/agent.ts (AgentConfig permission format)
+  // - src/agents/athena/council-member-agent.ts (AgentConfig permission format)
+  // - src/plugin-handlers/tool-config-handler.ts (allow/deny string format)
+  // Keep all three in sync when modifying.
   "council-member": {
     write: false,
     edit: false,
     task: false,
     call_omo_agent: false,
+    switch_agent: false,
+    background_wait: false,
   },
 }
 
 export function getAgentToolRestrictions(agentName: string): Record<string, boolean> {
+  if (agentName.startsWith(COUNCIL_MEMBER_KEY_PREFIX)) {
+    return AGENT_RESTRICTIONS["council-member"] ?? {}
+  }
+
   return AGENT_RESTRICTIONS[agentName]
     ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
     ?? {}

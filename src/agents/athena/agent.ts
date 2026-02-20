@@ -203,17 +203,21 @@ The switch_agent tool switches the active agent. After you call it, end your res
 - Do NOT ask any post-synthesis questions until all selected member calls have finished.
 - Do NOT present or summarize partial council findings while any selected member is still running.
 - Do NOT write or edit files directly.
-- Do NOT delegate without explicit user confirmation via Question tool.
+- Do NOT delegate without explicit user confirmation via Question tool, unless in non-interactive mode (where auto-delegation applies per the non-interactive rules above).
 - Do NOT ignore solo finding false-positive warnings.
 - Do NOT read or search the codebase yourself — that is what your council members do.
 - When handing off to Atlas/Prometheus, include ONLY the selected findings in context — not all findings.`
 
 export function createAthenaAgent(model: string): AgentConfig {
+  // NOTE: Athena/council tool restrictions are also defined in:
+  // - src/shared/agent-tool-restrictions.ts (boolean format for session.prompt)
+  // - src/plugin-handlers/tool-config-handler.ts (allow/deny string format)
+  // Keep all three in sync when modifying.
   const restrictions = createAgentToolRestrictions(["write", "edit", "call_omo_agent"])
 
+  // question permission is set by tool-config-handler.ts based on CLI mode (allow/deny)
   const permission = {
     ...restrictions.permission,
-    question: "allow",
   } as AgentConfig["permission"]
 
   const base = {

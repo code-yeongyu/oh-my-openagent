@@ -37,13 +37,15 @@ export function createToolExecuteBeforeHandler(args: {
     const toolNameLower = input.tool?.toLowerCase()
 
     if (toolNameLower === "question" || toolNameLower === "askuserquestion" || toolNameLower === "ask_user_question" || toolNameLower === "switch_agent") {
-      const sessionAgent = await resolveSessionAgent(ctx.client, input.sessionID)
-      const sessionAgentKey = sessionAgent ? getAgentConfigKey(sessionAgent) : undefined
+      if (hasPendingCouncilMembers(input.sessionID)) {
+        const sessionAgent = await resolveSessionAgent(ctx.client, input.sessionID)
+        const sessionAgentKey = sessionAgent ? getAgentConfigKey(sessionAgent) : undefined
 
-      if (sessionAgentKey === "athena" && hasPendingCouncilMembers(input.sessionID)) {
-        throw new Error(
-          "Council members are still running. Wait for all launched members to finish and collect their outputs before asking next-step questions or switching agents."
-        )
+        if (sessionAgentKey === "athena") {
+          throw new Error(
+            "Council members are still running. Wait for all launched members to finish and collect their outputs before asking next-step questions or switching agents."
+          )
+        }
       }
     }
 

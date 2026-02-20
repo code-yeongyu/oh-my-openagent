@@ -45,7 +45,7 @@ After informing the user, **end your turn**. Do NOT try to work around this by u
  * The original prompt is discarded to avoid contradictory instructions.
  * Used when Athena is registered but no valid council config exists.
  */
-export function appendMissingCouncilPrompt(
+export function applyMissingCouncilGuard(
   athenaConfig: AgentConfig,
   skippedMembers?: Array<{ name: string; reason: string }>,
 ): AgentConfig {
