@@ -120,6 +120,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       fb("quotio", "claude-opus-4-6-thinking"),
       fb("quotio", "claude-sonnet-4-5-thinking"),
       fb("quotio", "claude-haiku-4-5"),
+      fb("quotio", "gpt-5-nano"),
     ],
   },
   prometheus: {
