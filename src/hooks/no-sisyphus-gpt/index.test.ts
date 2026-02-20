@@ -43,7 +43,7 @@ describe("no-sisyphus-gpt hook", () => {
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
       body: {
         title: "NEVER Use Sisyphus with GPT",
-        message: expect.stringContaining("burning money"),
+        message: expect.stringContaining("For GPT models, always use Hephaestus."),
         variant: "error",
       },
     })
