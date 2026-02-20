@@ -1,5 +1,17 @@
 import type { CommandDefinition } from "../claude-code-command-loader"
 
+export interface BuiltinCommandTemplateContext {
+  user_message?: string
+}
+
+export type BuiltinCommandRuntimeTemplate =
+  | string
+  | ((args: BuiltinCommandTemplateContext) => string)
+
+export type BuiltinRuntimeCommandDefinition = Omit<CommandDefinition, "template"> & {
+  template: BuiltinCommandRuntimeTemplate
+}
+
 export type BuiltinCommandName =
   | "init-deep"
   | "ralph-loop"
@@ -21,4 +33,9 @@ export interface BuiltinCommandConfig {
   disabled_commands?: BuiltinCommandName[]
 }
 
+export interface LoadBuiltinCommandsOptions {
+  runtimeTemplates?: boolean
+}
+
 export type BuiltinCommands = Record<string, CommandDefinition>
+export type BuiltinRuntimeCommands = Record<string, BuiltinRuntimeCommandDefinition>
