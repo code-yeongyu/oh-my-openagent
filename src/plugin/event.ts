@@ -14,6 +14,7 @@ import { resetMessageCursor } from "../shared"
 import { lspManager } from "../tools"
 import { shouldRetryError } from "../shared/model-error-classifier"
 import { clearPendingModelFallback, clearSessionFallbackChain, setPendingModelFallback } from "../hooks/model-fallback/hook"
+import { log } from "../shared/logger"
 import { clearSessionModel, setSessionModel } from "../shared/session-model-state"
 
 import type { CreatedHooks } from "../create-hooks"
@@ -250,57 +251,61 @@ export function createEventHandler(args: {
       // Model fallback: in practice, API/model failures often surface as assistant message errors.
       // session.error events are not guaranteed for all providers, so we also observe message.updated.
       if (sessionID && role === "assistant") {
-        const assistantMessageID = info?.id as string | undefined
-        const assistantError = info?.error
-        if (assistantMessageID && assistantError) {
-          const lastHandled = lastHandledModelErrorMessageID.get(sessionID)
-          if (lastHandled === assistantMessageID) {
-            return
-          }
-
-          const errorName = extractErrorName(assistantError)
-          const errorMessage = extractErrorMessage(assistantError)
-          const errorInfo = { name: errorName, message: errorMessage }
-
-          if (shouldRetryError(errorInfo)) {
-            // Prefer the agent/model/provider from the assistant message payload.
-            let agentName = agent ?? getSessionAgent(sessionID)
-            if (!agentName && sessionID === getMainSessionID()) {
-              if (errorMessage.includes("claude-opus") || errorMessage.includes("opus")) {
-                agentName = "sisyphus"
-              } else if (errorMessage.includes("gpt-5")) {
-                agentName = "hephaestus"
-              } else {
-                agentName = "sisyphus"
-              }
+        try {
+          const assistantMessageID = info?.id as string | undefined
+          const assistantError = info?.error
+          if (assistantMessageID && assistantError) {
+            const lastHandled = lastHandledModelErrorMessageID.get(sessionID)
+            if (lastHandled === assistantMessageID) {
+              return
             }
 
-            if (agentName) {
-              const currentProvider = (info?.providerID as string | undefined) ?? "opencode"
-              const rawModel = (info?.modelID as string | undefined) ?? "claude-opus-4-6"
-              const currentModel = normalizeFallbackModelID(rawModel)
+            const errorName = extractErrorName(assistantError)
+            const errorMessage = extractErrorMessage(assistantError)
+            const errorInfo = { name: errorName, message: errorMessage }
 
-              const setFallback = setPendingModelFallback(
-                sessionID,
-                agentName,
-                currentProvider,
-                currentModel,
-              )
+            if (shouldRetryError(errorInfo)) {
+              // Prefer the agent/model/provider from the assistant message payload.
+              let agentName = agent ?? getSessionAgent(sessionID)
+              if (!agentName && sessionID === getMainSessionID()) {
+                if (errorMessage.includes("claude-opus") || errorMessage.includes("opus")) {
+                  agentName = "sisyphus"
+                } else if (errorMessage.includes("gpt-5")) {
+                  agentName = "hephaestus"
+                } else {
+                  agentName = "sisyphus"
+                }
+              }
 
-              if (setFallback && shouldAutoRetrySession(sessionID) && !hooks.stopContinuationGuard?.isStopped(sessionID)) {
-                lastHandledModelErrorMessageID.set(sessionID, assistantMessageID)
+              if (agentName) {
+                const currentProvider = (info?.providerID as string | undefined) ?? "opencode"
+                const rawModel = (info?.modelID as string | undefined) ?? "claude-opus-4-6"
+                const currentModel = normalizeFallbackModelID(rawModel)
 
-                await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
-                await ctx.client.session
-                  .prompt({
-                    path: { id: sessionID },
-                    body: { parts: [{ type: "text", text: "continue" }] },
-                    query: { directory: ctx.directory },
-                  })
-                  .catch(() => {})
+                const setFallback = setPendingModelFallback(
+                  sessionID,
+                  agentName,
+                  currentProvider,
+                  currentModel,
+                )
+
+                if (setFallback && shouldAutoRetrySession(sessionID) && !hooks.stopContinuationGuard?.isStopped(sessionID)) {
+                  lastHandledModelErrorMessageID.set(sessionID, assistantMessageID)
+
+                  await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+                  await ctx.client.session
+                    .prompt({
+                      path: { id: sessionID },
+                      body: { parts: [{ type: "text", text: "continue" }] },
+                      query: { directory: ctx.directory },
+                    })
+                    .catch(() => {})
+                }
               }
             }
           }
+        } catch (err) {
+          log("[event] model-fallback error in message.updated:", { sessionID, error: err })
         }
       }
     }
@@ -312,31 +317,111 @@ export function createEventHandler(args: {
         | undefined
 
       if (sessionID && status?.type === "retry") {
-        const retryMessage = typeof status.message === "string" ? status.message : ""
-        const retryKey = `${status.attempt ?? "?"}:${status.next ?? "?"}:${retryMessage}`
-        if (lastHandledRetryStatusKey.get(sessionID) === retryKey) {
-          return
-        }
-        lastHandledRetryStatusKey.set(sessionID, retryKey)
+        try {
+          const retryMessage = typeof status.message === "string" ? status.message : ""
+          const retryKey = `${status.attempt ?? "?"}:${status.next ?? "?"}:${retryMessage}`
+          if (lastHandledRetryStatusKey.get(sessionID) === retryKey) {
+            return
+          }
+          lastHandledRetryStatusKey.set(sessionID, retryKey)
 
-        const errorInfo = { name: undefined, message: retryMessage }
-        if (shouldRetryError(errorInfo)) {
+          const errorInfo = { name: undefined as string | undefined, message: retryMessage }
+          if (shouldRetryError(errorInfo)) {
+            let agentName = getSessionAgent(sessionID)
+            if (!agentName && sessionID === getMainSessionID()) {
+              if (retryMessage.includes("claude-opus") || retryMessage.includes("opus")) {
+                agentName = "sisyphus"
+              } else if (retryMessage.includes("gpt-5")) {
+                agentName = "hephaestus"
+              } else {
+                agentName = "sisyphus"
+              }
+            }
+
+            if (agentName) {
+              const parsed = extractProviderModelFromErrorMessage(retryMessage)
+              const lastKnown = lastKnownModelBySession.get(sessionID)
+              const currentProvider = parsed.providerID ?? lastKnown?.providerID ?? "opencode"
+              let currentModel = parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-6"
+              currentModel = normalizeFallbackModelID(currentModel)
+
+              const setFallback = setPendingModelFallback(
+                sessionID,
+                agentName,
+                currentProvider,
+                currentModel,
+              )
+
+              if (setFallback && shouldAutoRetrySession(sessionID) && !hooks.stopContinuationGuard?.isStopped(sessionID)) {
+                await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+                await ctx.client.session
+                  .prompt({
+                    path: { id: sessionID },
+                    body: { parts: [{ type: "text", text: "continue" }] },
+                    query: { directory: ctx.directory },
+                  })
+                  .catch(() => {})
+              }
+            }
+          }
+        } catch (err) {
+          log("[event] model-fallback error in session.status:", { sessionID, error: err })
+        }
+      }
+    }
+
+    if (event.type === "session.error") {
+      try {
+        const sessionID = props?.sessionID as string | undefined
+        const error = props?.error
+
+        const errorName = extractErrorName(error)
+        const errorMessage = extractErrorMessage(error)
+        const errorInfo = { name: errorName, message: errorMessage }
+
+        // First, try session recovery for internal errors (thinking blocks, tool results, etc.)
+        if (hooks.sessionRecovery?.isRecoverableError(error)) {
+          const messageInfo = {
+            id: props?.messageID as string | undefined,
+            role: "assistant" as const,
+            sessionID,
+            error,
+          }
+          const recovered = await hooks.sessionRecovery.handleSessionRecovery(messageInfo)
+
+          if (
+            recovered &&
+            sessionID &&
+            sessionID === getMainSessionID() &&
+            !hooks.stopContinuationGuard?.isStopped(sessionID)
+          ) {
+            await ctx.client.session
+              .prompt({
+                path: { id: sessionID },
+                body: { parts: [{ type: "text", text: "continue" }] },
+                query: { directory: ctx.directory },
+              })
+              .catch(() => {})
+          }
+        } 
+        // Second, try model fallback for model errors (rate limit, quota, provider issues, etc.)
+        else if (sessionID && shouldRetryError(errorInfo)) {
           let agentName = getSessionAgent(sessionID)
+          
           if (!agentName && sessionID === getMainSessionID()) {
-            if (retryMessage.includes("claude-opus") || retryMessage.includes("opus")) {
+            if (errorMessage.includes("claude-opus") || errorMessage.includes("opus")) {
               agentName = "sisyphus"
-            } else if (retryMessage.includes("gpt-5")) {
+            } else if (errorMessage.includes("gpt-5")) {
               agentName = "hephaestus"
             } else {
               agentName = "sisyphus"
             }
           }
-
+          
           if (agentName) {
-            const parsed = extractProviderModelFromErrorMessage(retryMessage)
-            const lastKnown = lastKnownModelBySession.get(sessionID)
-            const currentProvider = parsed.providerID ?? lastKnown?.providerID ?? "opencode"
-            let currentModel = parsed.modelID ?? lastKnown?.modelID ?? "claude-opus-4-6"
+            const parsed = extractProviderModelFromErrorMessage(errorMessage)
+            const currentProvider = props?.providerID as string || parsed.providerID || "opencode"
+            let currentModel = props?.modelID as string || parsed.modelID || "claude-opus-4-6"
             currentModel = normalizeFallbackModelID(currentModel)
 
             const setFallback = setPendingModelFallback(
@@ -345,9 +430,10 @@ export function createEventHandler(args: {
               currentProvider,
               currentModel,
             )
-
+            
             if (setFallback && shouldAutoRetrySession(sessionID) && !hooks.stopContinuationGuard?.isStopped(sessionID)) {
               await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+              
               await ctx.client.session
                 .prompt({
                   path: { id: sessionID },
@@ -358,87 +444,9 @@ export function createEventHandler(args: {
             }
           }
         }
-      }
-    }
-
-    if (event.type === "session.error") {
-      const sessionID = props?.sessionID as string | undefined
-      const error = props?.error
-
-      const errorName = extractErrorName(error)
-      const errorMessage = extractErrorMessage(error)
-      const errorInfo = { name: errorName, message: errorMessage }
-
-      // First, try session recovery for internal errors (thinking blocks, tool results, etc.)
-      if (hooks.sessionRecovery?.isRecoverableError(error)) {
-        const messageInfo = {
-          id: props?.messageID as string | undefined,
-          role: "assistant" as const,
-          sessionID,
-          error,
-        }
-        const recovered = await hooks.sessionRecovery.handleSessionRecovery(messageInfo)
-
-        if (
-          recovered &&
-          sessionID &&
-          sessionID === getMainSessionID() &&
-          !hooks.stopContinuationGuard?.isStopped(sessionID)
-        ) {
-          await ctx.client.session
-            .prompt({
-              path: { id: sessionID },
-              body: { parts: [{ type: "text", text: "continue" }] },
-              query: { directory: ctx.directory },
-            })
-            .catch(() => {})
-        }
-      } 
-      // Second, try model fallback for model errors (rate limit, quota, provider issues, etc.)
-      else if (sessionID && shouldRetryError(errorInfo)) {
-        // Get the current agent for this session, or default to "sisyphus" for main sessions
-        let agentName = getSessionAgent(sessionID)
-        
-        // For main sessions, if no agent is set, try to infer from the error or default to sisyphus
-        if (!agentName && sessionID === getMainSessionID()) {
-          // Try to infer agent from model in error message
-          if (errorMessage.includes("claude-opus") || errorMessage.includes("opus")) {
-            agentName = "sisyphus"
-          } else if (errorMessage.includes("gpt-5")) {
-            agentName = "hephaestus"
-          } else {
-            // Default to sisyphus for main session errors
-            agentName = "sisyphus"
-          }
-        }
-        
-        if (agentName) {
-          const parsed = extractProviderModelFromErrorMessage(errorMessage)
-          const currentProvider = props?.providerID as string || parsed.providerID || "opencode"
-          let currentModel = props?.modelID as string || parsed.modelID || "claude-opus-4-6"
-          currentModel = normalizeFallbackModelID(currentModel)
-
-          // Try to set pending model fallback
-          const setFallback = setPendingModelFallback(
-            sessionID,
-            agentName,
-            currentProvider,
-            currentModel,
-          )
-          
-          if (setFallback && shouldAutoRetrySession(sessionID) && !hooks.stopContinuationGuard?.isStopped(sessionID)) {
-            // Abort the current session and prompt with "continue" to trigger the fallback
-            await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
-            
-            await ctx.client.session
-              .prompt({
-                path: { id: sessionID },
-                body: { parts: [{ type: "text", text: "continue" }] },
-                query: { directory: ctx.directory },
-              })
-              .catch(() => {})
-          }
-        }
+      } catch (err) {
+        const sessionID = props?.sessionID as string | undefined
+        log("[event] model-fallback error in session.error:", { sessionID, error: err })
       }
     }
   }

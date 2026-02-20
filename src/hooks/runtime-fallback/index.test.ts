@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
-import { createRuntimeFallbackHook, type RuntimeFallbackHook } from "./index"
+import { createRuntimeFallbackHook } from "./index"
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
 import * as sharedModule from "../../shared"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
@@ -2081,6 +2081,215 @@ describe("runtime-fallback", () => {
       //#then - should have stopped after max attempts
       const maxLog = logCalls.find((c) => c.msg.includes("Max fallback attempts reached") || c.msg.includes("No fallback models"))
       expect(maxLog).toBeDefined()
+    })
+  })
+
+  describe("race condition guards", () => {
+    test("session.error is skipped while retry request is in flight", async () => {
+      const never = new Promise<never>(() => {})
+
+      //#given
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async () => never,
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: {
+            categories: {
+              test: {
+                fallback_models: ["provider-a/model-a", "provider-b/model-b"],
+              },
+            },
+          },
+        }
+      )
+      const sessionID = "test-race-retry-in-flight"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      //#when - first error starts retry (promptAsync hangs, keeping retryInFlight set)
+      const firstErrorPromise = hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      //#when - second error fires while first retry is in flight
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Second rate limit" } },
+        },
+      })
+
+      //#then
+      const skipLog = logCalls.find((call) => call.msg.includes("session.error skipped"))
+      expect(skipLog).toBeDefined()
+      expect(skipLog?.data).toMatchObject({ retryInFlight: true })
+
+      const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
+      expect(fallbackLogs).toHaveLength(1)
+
+      void firstErrorPromise
+    })
+
+    test("consecutive session.errors advance chain normally when retry completes between them", async () => {
+      //#given
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: {
+          categories: {
+            test: {
+              fallback_models: ["provider-a/model-a", "provider-b/model-b"],
+            },
+          },
+        },
+      })
+      const sessionID = "test-race-chain-advance"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      //#when - two errors fire sequentially (retry completes immediately between them)
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit again" } },
+        },
+      })
+
+      //#then - both should advance the chain (no skip)
+      const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
+      expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
+    })
+
+    test("session.stop aborts when sessionAwaitingFallbackResult is set", async () => {
+      const abortCalls: Array<{ path?: { id?: string } }> = []
+
+      //#given
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [{ info: { role: "user" }, parts: [{ type: "text", text: "hello" }] }],
+            }),
+            promptAsync: async () => ({}),
+            abort: async (args: unknown) => {
+              abortCalls.push(args as { path?: { id?: string } })
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: {
+            categories: {
+              test: {
+                fallback_models: ["provider-a/model-a", "provider-b/model-b"],
+              },
+            },
+          },
+        }
+      )
+      const sessionID = "test-race-stop-awaiting"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      //#when
+      await hook.event({
+        event: {
+          type: "session.stop",
+          properties: { sessionID },
+        },
+      })
+
+      //#then
+      expect(abortCalls.some((call) => call.path?.id === sessionID)).toBe(true)
+    })
+
+    test("pendingFallbackModel advances chain on subsequent error even when persisted", async () => {
+      //#given
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({ notify_on_fallback: false }),
+        pluginConfig: {
+          categories: {
+            test: {
+              fallback_models: ["provider-a/model-a", "provider-b/model-b"],
+            },
+          },
+        },
+      })
+      const sessionID = "test-race-pending-persists"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit" } },
+        },
+      })
+
+      const autoRetryLog = logCalls.find((call) => call.msg.includes("No user message found for auto-retry"))
+      expect(autoRetryLog).toBeDefined()
+
+      //#when - second error fires after retry completed (retryInFlight cleared)
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: { sessionID, error: { statusCode: 429, message: "Rate limit again" } },
+        },
+      })
+
+      //#then - chain advances normally (not skipped), consistent with consecutive errors test
+      const fallbackLogs = logCalls.filter((call) => call.msg.includes("Preparing fallback"))
+      expect(fallbackLogs.length).toBeGreaterThanOrEqual(2)
     })
   })
 })

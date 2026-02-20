@@ -177,4 +177,26 @@ describe("scheduleDeferredModelOverride", () => {
       expect.stringContaining("DB not found"),
     )
   })
+
+  test("should not crash when DB file exists but is corrupted", async () => {
+    //#given
+    const { chmodSync, writeFileSync } = await import("node:fs")
+    const corruptedDbPath = join(tempDir, "opencode", "opencode.db")
+    writeFileSync(corruptedDbPath, "this is not a valid sqlite database file")
+    chmodSync(corruptedDbPath, 0o000)
+
+    //#when
+    const { scheduleDeferredModelOverride } = await import("./ultrawork-db-model-override")
+    scheduleDeferredModelOverride(
+      "msg_corrupt",
+      { providerID: "anthropic", modelID: "claude-opus-4-6" },
+    )
+    await flushMicrotasks(5)
+
+    //#then
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to open DB"),
+      expect.objectContaining({ messageId: "msg_corrupt" }),
+    )
+  })
 })

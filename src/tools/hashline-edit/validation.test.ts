@@ -52,3 +52,46 @@ describe("validateLineRef", () => {
     expect(() => validateLineRef(lines, "1#ZZ")).toThrow(/current hash/)
   })
 })
+
+describe("legacy LINE:HEX backward compatibility", () => {
+  it("parses legacy LINE:HEX ref", () => {
+    //#given
+    const ref = "42:ab"
+
+    //#when
+    const result = parseLineRef(ref)
+
+    //#then
+    expect(result).toEqual({ line: 42, hash: "ab" })
+  })
+
+  it("parses legacy LINE:HEX ref with uppercase hex", () => {
+    //#given
+    const ref = "10:FF"
+
+    //#when
+    const result = parseLineRef(ref)
+
+    //#then
+    expect(result).toEqual({ line: 10, hash: "FF" })
+  })
+
+  it("legacy ref fails validation with hash mismatch, not parse error", () => {
+    //#given
+    const lines = ["function hello() {"]
+
+    //#when / #then
+    expect(() => validateLineRef(lines, "1:ab")).toThrow(/Hash mismatch|current hash/)
+  })
+
+  it("extracts legacy ref from content with markers", () => {
+    //#given
+    const ref = ">>> 42:ab|const x = 1"
+
+    //#when
+    const result = parseLineRef(ref)
+
+    //#then
+    expect(result).toEqual({ line: 42, hash: "ab" })
+  })
+})
