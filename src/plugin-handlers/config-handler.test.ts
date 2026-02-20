@@ -1281,7 +1281,7 @@ describe("disable_omo_env pass-through", () => {
     //#given
     ;(agents.createBuiltinAgents as any)?.mockRestore?.()
     ;(shared.fetchAvailableModels as any).mockResolvedValue(
-      new Set(["anthropic/claude-opus-4-6", "google/gemini-3-flash"])
+      new Set(["quotio/claude-opus-4-6-thinking", "quotio/gemini-3-flash"])
     )
 
     const pluginConfig: OhMyOpenCodeConfig = {
@@ -1314,7 +1314,7 @@ describe("disable_omo_env pass-through", () => {
     //#given
     ;(agents.createBuiltinAgents as any)?.mockRestore?.()
     ;(shared.fetchAvailableModels as any).mockResolvedValue(
-      new Set(["anthropic/claude-opus-4-6", "google/gemini-3-flash"])
+      new Set(["quotio/claude-opus-4-6-thinking", "quotio/gemini-3-flash"])
     )
 
     const pluginConfig: OhMyOpenCodeConfig = {}
