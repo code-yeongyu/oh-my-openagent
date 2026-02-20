@@ -1,3 +1,5 @@
+import type { FallbackEntry } from "../../shared/model-requirements"
+
 export type BackgroundTaskStatus =
   | "pending"
   | "running"
@@ -31,6 +33,10 @@ export interface BackgroundTask {
   progress?: TaskProgress
   parentModel?: { providerID: string; modelID: string }
   model?: { providerID: string; modelID: string; variant?: string }
+  /** Fallback chain for runtime retry on model errors */
+  fallbackChain?: FallbackEntry[]
+  /** Number of fallback retry attempts made */
+  attemptCount?: number
   /** Active concurrency slot key */
   concurrencyKey?: string
   /** Persistent key for re-acquiring concurrency on resume */
@@ -60,6 +66,8 @@ export interface LaunchInput {
   parentAgent?: string
   parentTools?: Record<string, boolean>
   model?: { providerID: string; modelID: string; variant?: string }
+  /** Fallback chain for runtime retry on model errors */
+  fallbackChain?: FallbackEntry[]
   isUnstableAgent?: boolean
   skills?: string[]
   skillContent?: string
