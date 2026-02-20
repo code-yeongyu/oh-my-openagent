@@ -109,6 +109,13 @@ const HIGH_VARIANT_MAP: Record<string, string> = {
   "gpt-5-2": "gpt-5-2-high",
   "gpt-5-2-chat-latest": "gpt-5-2-chat-latest-high",
   "gpt-5-2-pro": "gpt-5-2-pro-high",
+  // Antigravity (opencode-antigravity-auth) — proxy models routed through google provider
+  "antigravity-gemini-3-flash": "antigravity-gemini-3-flash-high",
+  "antigravity-gemini-3-pro": "antigravity-gemini-3-pro-high",
+  "antigravity-gemini-3-pro-low": "antigravity-gemini-3-pro-high",
+  "antigravity-gemini-3-1-pro": "antigravity-gemini-3-1-pro-high",
+  "antigravity-gemini-3-1-pro-low": "antigravity-gemini-3-1-pro-high",
+  "antigravity-claude-opus-4-6-thinking": "antigravity-claude-opus-4-6-thinking-high",
 }
 
 const ALREADY_HIGH: Set<string> = new Set(Object.values(HIGH_VARIANT_MAP))
