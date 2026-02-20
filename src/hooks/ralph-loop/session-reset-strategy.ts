@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
+import { isRecord } from "../../shared/record-type-guard"
+import { log } from "../../shared/logger"
 
 export async function createIterationSession(
   ctx: PluginInput,
@@ -47,10 +48,6 @@ export async function selectSessionInTui(
 }
 
 type SelectSessionApi = (args: { body: { sessionID: string } }) => Promise<unknown>
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}
 
 function getSelectSessionApi(client: unknown): SelectSessionApi | null {
   if (!isRecord(client)) {
