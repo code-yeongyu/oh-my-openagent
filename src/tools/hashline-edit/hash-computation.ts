@@ -1,9 +1,9 @@
 import { HASHLINE_DICT } from "./constants"
 
 export function computeLineHash(lineNumber: number, content: string): string {
-  void lineNumber
   const stripped = content.replace(/\s+/g, "")
-  const hash = Bun.hash.xxHash32(stripped)
+  const hashInput = `${lineNumber}:${stripped}`
+  const hash = Bun.hash.xxHash32(hashInput)
   const index = hash % 256
   return HASHLINE_DICT[index]
 }
