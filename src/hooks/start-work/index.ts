@@ -82,7 +82,43 @@ interface StartWorkHookInput {
 }
 
 interface StartWorkHookOutput {
+  message?: unknown
   parts: Array<{ type: string; text?: string }>
+}
+
+function readMessagePathDirectory(message: unknown): { cwd?: string; root?: string } {
+  if (!message || typeof message !== "object") {
+    return {}
+  }
+
+  const maybePath = (message as { path?: unknown }).path
+  if (!maybePath || typeof maybePath !== "object") {
+    return {}
+  }
+
+  const cwd = (maybePath as { cwd?: unknown }).cwd
+  const root = (maybePath as { root?: unknown }).root
+
+  return {
+    cwd: typeof cwd === "string" ? cwd : undefined,
+    root: typeof root === "string" ? root : undefined,
+  }
+}
+
+function resolveWorkingDirectory(
+  defaultDirectory: string,
+  output: StartWorkHookOutput
+): string {
+  const { cwd, root } = readMessagePathDirectory(output.message)
+  if (cwd && existsSync(cwd)) {
+    return cwd
+  }
+
+  if (root && existsSync(root)) {
+    return root
+  }
+
+  return defaultDirectory
 }
 
 function extractUserRequestPlanName(promptText: string): string | null {
@@ -91,8 +127,15 @@ function extractUserRequestPlanName(promptText: string): string | null {
   
   const rawArg = userRequestMatch[1].trim()
   if (!rawArg) return null
+
+  const normalizedArg = rawArg
+    .replace(/\$ARGUMENTS/g, "")
+    .replace(/\$\{user_message\}/g, "")
+    .trim()
+
+  if (!normalizedArg) return null
   
-  const cleanedArg = rawArg.replace(KEYWORD_PATTERN, "").trim()
+  const cleanedArg = normalizedArg.replace(KEYWORD_PATTERN, "").trim()
   return cleanedArg || null
 }
 
@@ -133,7 +176,9 @@ export function createStartWorkHook(ctx: PluginInput) {
 
       updateSessionAgent(input.sessionID, "atlas") // Always switch: fixes #1298
 
-      const existingState = readBoulderState(ctx.directory)
+      const workingDirectory = resolveWorkingDirectory(ctx.directory, output)
+
+      const existingState = readBoulderState(workingDirectory)
       const sessionId = input.sessionID
       const timestamp = new Date().toISOString()
 
@@ -146,7 +191,7 @@ export function createStartWorkHook(ctx: PluginInput) {
           sessionID: input.sessionID,
         })
         
-        const allPlans = findPrometheusPlans(ctx.directory)
+        const allPlans = findPrometheusPlans(workingDirectory)
         const matchedPlan = findPlanByName(allPlans, explicitPlanName)
         
         if (matchedPlan) {
@@ -160,10 +205,10 @@ The requested plan "${getPlanName(matchedPlan)}" has been completed.
 All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
           } else {
             if (existingState) {
-              clearBoulderState(ctx.directory)
+              clearBoulderState(workingDirectory)
             }
             const newState = createBoulderState(matchedPlan, sessionId, "atlas")
-            writeBoulderState(ctx.directory, newState)
+            writeBoulderState(workingDirectory, newState)
             
             contextInfo = `
 ## Auto-Selected Plan
@@ -206,7 +251,7 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
         const progress = getPlanProgress(existingState.active_plan)
         
         if (!progress.isComplete) {
-          appendSessionId(ctx.directory, sessionId)
+          appendSessionId(workingDirectory, sessionId)
           const remainingTasks = progress.total - progress.completed
           contextInfo = `
 ## Active Work Session Found
@@ -230,7 +275,7 @@ Looking for new plans...`
       }
 
       if ((!existingState && !explicitPlanName) || (existingState && !explicitPlanName && getPlanProgress(existingState.active_plan).isComplete)) {
-        const plans = findPrometheusPlans(ctx.directory)
+        const plans = findPrometheusPlans(workingDirectory)
         const incompletePlans = plans.filter(p => !getPlanProgress(p).isComplete)
         
         if (plans.length === 0) {
@@ -250,7 +295,7 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
           const planPath = incompletePlans[0]
           const progress = getPlanProgress(planPath)
           const newState = createBoulderState(planPath, sessionId, "atlas")
-          writeBoulderState(ctx.directory, newState)
+          writeBoulderState(workingDirectory, newState)
 
           contextInfo += `
 
@@ -289,9 +334,12 @@ Ask the user which plan to work on. Present the options above and wait for their
 
       const idx = output.parts.findIndex((p) => p.type === "text" && p.text)
       if (idx >= 0 && output.parts[idx].text) {
+        const resolvedRequest = explicitPlanName ?? ""
         output.parts[idx].text = output.parts[idx].text
           .replace(/\$SESSION_ID/g, sessionId)
           .replace(/\$TIMESTAMP/g, timestamp)
+          .replace(/\$\{user_message\}/g, resolvedRequest)
+          .replace(/\$ARGUMENTS/g, resolvedRequest)
         
         output.parts[idx].text += `\n\n---\n${contextInfo}`
       }
@@ -299,6 +347,8 @@ Ask the user which plan to work on. Present the options above and wait for their
       log(`[${HOOK_NAME}] Context injected`, {
         sessionID: input.sessionID,
         hasExistingState: !!existingState,
+        workingDirectory,
+        pluginDirectory: ctx.directory,
       })
     },
   }
