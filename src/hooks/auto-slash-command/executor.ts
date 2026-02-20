@@ -120,7 +120,7 @@ async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandIn
   const opencodeGlobalCommands = discoverCommandsFromDir(opencodeGlobalDir, "opencode")
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
   const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
-  const builtinCommandsMap = loadBuiltinCommands()
+  const builtinCommandsMap = loadBuiltinCommands(undefined, { runtimeTemplates: true })
   const builtinCommands: CommandInfo[] = Object.values(builtinCommandsMap).map(cmd => ({
     name: cmd.name,
     metadata: {
