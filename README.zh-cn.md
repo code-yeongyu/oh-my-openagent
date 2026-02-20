@@ -135,7 +135,6 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 - [Kimi Code 订阅 ($0.99) (*仅限本月*)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
 - [GLM Coding 套餐 ($10)](https://z.ai/subscribe)
 - 如果你能使用按 token 计费的方式，用 kimi 和 gemini 模型花不了多少钱。
-- 还有一些像 [quotio](https://github.com/nguyenphutrong/quotio) 和 [cliproxyapi](https://github.com/router-for-me/CLIProxyAPI) 的项目。它们可能违反了某些 API 提供商的协议，但社区里有很多人用得挺香的。
 
 |       | 特性                      | 功能说明                                                                                                                        |
 | :---: | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |

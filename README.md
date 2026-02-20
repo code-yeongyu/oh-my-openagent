@@ -135,7 +135,6 @@ Even only with following subscriptions, ultrawork will work well (this project i
 - [Kimi Code Subscription ($0.99) (*only this month)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
 - [GLM Coding Plan ($10)](https://z.ai/subscribe)
 - If you are eligible for pay-per-token, using kimi and gemini models won't cost you that much.
-- There are some projects like [quotio](https://github.com/nguyenphutrong/quotio), [cliproxyapi](https://github.com/router-for-me/CLIProxyAPI) too. These might violate some provider's ToS (or not) but some of our community users are using it.
 
 |       | Feature                      | What it does                                                                                                                        |
 | :---: | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |

@@ -134,7 +134,6 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 - [Kimi Code サブスクリプション ($0.99) (*今月限定)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
 - [GLM Coding プラン ($10)](https://z.ai/subscribe)
 - 従量課金（pay-per-token）の対象であれば、kimiやgeminiモデルを使っても費用はほとんどかかりません。
-- [quotio](https://github.com/nguyenphutrong/quotio)や[cliproxyapi](https://github.com/router-for-me/CLIProxyAPI)のようなプロジェクトもあります。プロバイダーの規約違反になる可能性もありますが、コミュニティのユーザーの一部はよく使用しています。
 
 |       | 機能                      | 何をするのか                                                                                                                        |
 | :---: | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
