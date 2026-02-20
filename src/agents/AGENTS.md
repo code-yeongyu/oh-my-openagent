@@ -51,11 +51,10 @@ agents/
 ├── momus.ts               # Plan review
 ├── atlas/agent.ts         # Todo orchestrator
 ├── athena/                # Multi-model council orchestrator
-│   ├── agent.ts           # Athena agent factory
+│   ├── agent.ts           # Athena agent factory + system prompt
 │   ├── council-member-agent.ts  # Council member agent factory
-│   ├── model-parser.ts    # Model string parser
-│   ├── types.ts           # Council types
-│   └── index.ts           # Barrel exports
+│   ├── model-thinking-config.ts  # Per-provider thinking/reasoning config
+│   └── model-thinking-config.test.ts  # Tests for thinking config
 ├── types.ts               # AgentFactory, AgentMode
 ├── agent-builder.ts       # buildAgent() composition
 ├── utils.ts               # Agent utilities

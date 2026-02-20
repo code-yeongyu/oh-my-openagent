@@ -27,7 +27,7 @@ export function createToolExecuteBeforeHandler(args: {
 
     const tasks = backgroundManager.getTasksByParentSession(sessionID)
     return tasks.some((task) =>
-      (task.agent === "council-member" || task.agent.startsWith(COUNCIL_MEMBER_KEY_PREFIX)) &&
+      task.agent.startsWith(COUNCIL_MEMBER_KEY_PREFIX) &&
       (task.status === "pending" || task.status === "running")
     )
   }

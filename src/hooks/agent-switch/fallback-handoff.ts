@@ -51,17 +51,34 @@ export function extractTextPartsFromMessageResponse(response: unknown): string {
     .join("\n")
 }
 
-export function detectFallbackHandoffTarget(messageText: string): "atlas" | "prometheus" | undefined {
+const HANDOFF_TARGETS = ["prometheus", "atlas"] as const
+type HandoffTarget = (typeof HANDOFF_TARGETS)[number]
+
+const HANDOFF_VERBS = [
+  "switching",
+  "handing\\s+off",
+  "delegating",
+  "routing",
+  "transferring",
+  "passing",
+]
+
+function buildHandoffPattern(target: string): RegExp {
+  const verbGroup = HANDOFF_VERBS.join("|")
+  return new RegExp(
+    `(?<!\\bnot\\s+)(?<!\\bdon'?t\\s+)(?<!\\bnever\\s+)(?:${verbGroup})\\s+(?:(?:control|this|it|work)\\s+)?to\\s+\\*{0,2}\\s*${target}\\b`
+  )
+}
+
+export function detectFallbackHandoffTarget(messageText: string): HandoffTarget | undefined {
   if (!messageText) return undefined
 
   const normalized = messageText.toLowerCase()
 
-  if (/switching\s+to\s+\*{0,2}\s*prometheus\b/.test(normalized) || /handing\s+off\s+to\s+\*{0,2}\s*prometheus\b/.test(normalized)) {
-    return "prometheus"
-  }
-
-  if (/switching\s+to\s+\*{0,2}\s*atlas\b/.test(normalized) || /handing\s+off\s+to\s+\*{0,2}\s*atlas\b/.test(normalized)) {
-    return "atlas"
+  for (const target of HANDOFF_TARGETS) {
+    if (buildHandoffPattern(target).test(normalized)) {
+      return target
+    }
   }
 
   return undefined

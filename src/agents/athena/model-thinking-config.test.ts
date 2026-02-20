@@ -52,4 +52,30 @@ describe("applyModelThinkingConfig", () => {
       expect(result).toBe(BASE_CONFIG)
     })
   })
+
+  describe("given a Claude model through a non-Anthropic provider", () => {
+    it("returns thinking config for github-copilot/claude-opus-4-6", () => {
+      const result = applyModelThinkingConfig(BASE_CONFIG, "github-copilot/claude-opus-4-6")
+      expect(result).toEqual({
+        ...BASE_CONFIG,
+        thinking: { type: "enabled", budgetTokens: 32000 },
+      })
+    })
+
+    it("returns thinking config for opencode/claude-opus-4-6", () => {
+      const result = applyModelThinkingConfig(BASE_CONFIG, "opencode/claude-opus-4-6")
+      expect(result).toEqual({
+        ...BASE_CONFIG,
+        thinking: { type: "enabled", budgetTokens: 32000 },
+      })
+    })
+
+    it("returns thinking config for opencode/claude-sonnet-4-6", () => {
+      const result = applyModelThinkingConfig(BASE_CONFIG, "opencode/claude-sonnet-4-6")
+      expect(result).toEqual({
+        ...BASE_CONFIG,
+        thinking: { type: "enabled", budgetTokens: 32000 },
+      })
+    })
+  })
 })

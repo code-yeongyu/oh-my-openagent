@@ -27,6 +27,7 @@ export function registerCouncilMemberAgents(
   const agents: Record<string, AgentConfig> = {}
   const registeredKeys: string[] = []
   const skippedMembers: SkippedMember[] = []
+  const registeredNamesLower = new Set<string>()
 
   for (const member of councilConfig.members) {
     const parsed = parseModelString(member.model)
@@ -40,16 +41,16 @@ export function registerCouncilMemberAgents(
     }
 
     const key = getCouncilMemberAgentKey(member)
+    const nameLower = member.name.toLowerCase()
 
-    if (agents[key]) {
+    if (registeredNamesLower.has(nameLower)) {
       skippedMembers.push({
         name: member.name,
-        reason: `Duplicate name: '${member.name}' already registered`,
+        reason: `Duplicate name: '${member.name}' already registered (case-insensitive match)`,
       })
       log("[council-member-agents] Skipping duplicate council member name", {
         name: member.name,
         model: member.model,
-        existingModel: agents[key].model ?? "unknown",
       })
       continue
     }
@@ -66,6 +67,7 @@ export function registerCouncilMemberAgents(
     }
 
     registeredKeys.push(key)
+    registeredNamesLower.add(nameLower)
 
     log("[council-member-agents] Registered council member agent", {
       key,

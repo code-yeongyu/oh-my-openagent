@@ -13,7 +13,6 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import { createAthenaAgent, ATHENA_PROMPT_METADATA } from "./athena/agent"
-import { createCouncilMemberAgent } from "./athena/council-member-agent"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -45,7 +44,6 @@ const agentSources: Partial<Record<BuiltinAgentName, AgentSource>> = {
   metis: createMetisAgent,
   momus: createMomusAgent,
   athena: createAthenaAgent,
-  "council-member": createCouncilMemberAgent,
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
@@ -211,7 +209,14 @@ export async function createBuiltinAgents(
 
     if (registeredKeys.length > 0) {
       const memberList = registeredKeys.map((key) => `- "${key}"`).join("\n")
-      const councilTaskInstructions = `\n\n## Registered Council Members\n\nUse these as subagent_type in task calls:\n\n${memberList}`
+      let councilTaskInstructions = `\n\n## Registered Council Members\n\nUse these as subagent_type in task calls:\n\n${memberList}`
+
+      if (skippedMembers.length > 0) {
+        const skipDetails = skippedMembers.map((m) => `- **${m.name}**: ${m.reason}`).join("\n")
+        councilTaskInstructions += `\n\n> **Note**: Some configured council members were skipped:\n${skipDetails}`
+        log("[builtin-agents] Some council members were skipped during registration", { skippedMembers })
+      }
+
       result["athena"] = {
         ...result["athena"],
         prompt: (result["athena"].prompt ?? "") + councilTaskInstructions,

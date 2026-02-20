@@ -16,7 +16,7 @@ describe("createToolExecuteBeforeHandler", () => {
 
     const backgroundManager = {
       getTasksByParentSession: () => [
-        { agent: "council-member", status: "running" },
+        { agent: "Council: Claude Opus 4.6", status: "running" },
       ],
     }
 
@@ -50,7 +50,7 @@ describe("createToolExecuteBeforeHandler", () => {
 
     const backgroundManager = {
       getTasksByParentSession: () => [
-        { agent: "council-member", status: "pending" },
+        { agent: "Council: GPT 5.2", status: "pending" },
       ],
     }
 
@@ -84,8 +84,8 @@ describe("createToolExecuteBeforeHandler", () => {
 
     const backgroundManager = {
       getTasksByParentSession: () => [
-        { agent: "council-member", status: "completed" },
-        { agent: "council-member", status: "cancelled" },
+        { agent: "Council: Claude Opus 4.6", status: "completed" },
+        { agent: "Council: GPT 5.2", status: "cancelled" },
       ],
     }
 

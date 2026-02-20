@@ -1,4 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
+import { parseModelString } from "../../tools/delegate-task/model-string-parser"
 import { isGptModel } from "../types"
 
 export function applyModelThinkingConfig(base: AgentConfig, model: string): AgentConfig {
@@ -6,10 +7,12 @@ export function applyModelThinkingConfig(base: AgentConfig, model: string): Agen
     return { ...base, reasoningEffort: "medium" }
   }
 
-  const slashIndex = model.indexOf("/")
-  const provider = slashIndex > 0 ? model.substring(0, slashIndex).toLowerCase() : ""
+  const parsed = parseModelString(model)
+  if (!parsed) {
+    return base
+  }
 
-  if (provider === "anthropic") {
+  if (parsed.providerID.toLowerCase() === "anthropic" || parsed.modelID.startsWith("claude")) {
     return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
   }
 

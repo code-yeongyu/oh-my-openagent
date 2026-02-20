@@ -43,7 +43,7 @@ describe("CouncilMemberSchema", () => {
 
   test("rejects model string without provider/model separator", () => {
     //#given
-    const config = { model: "invalid-model" }
+    const config = { model: "invalid-model", name: "test-member" }
 
     //#when
     const result = CouncilMemberSchema.safeParse(config)
@@ -54,7 +54,7 @@ describe("CouncilMemberSchema", () => {
 
   test("rejects model string with empty provider", () => {
     //#given
-    const config = { model: "/gpt-5.3-codex" }
+    const config = { model: "/gpt-5.3-codex", name: "test-member" }
 
     //#when
     const result = CouncilMemberSchema.safeParse(config)
@@ -65,7 +65,7 @@ describe("CouncilMemberSchema", () => {
 
   test("rejects model string with empty model ID", () => {
     //#given
-    const config = { model: "openai/" }
+    const config = { model: "openai/", name: "test-member" }
 
     //#when
     const result = CouncilMemberSchema.safeParse(config)
@@ -151,7 +151,7 @@ describe("CouncilMemberSchema", () => {
 
   test("rejects temperature below 0", () => {
     //#given
-    const config = { model: "openai/gpt-5.3-codex", temperature: -0.1 }
+    const config = { model: "openai/gpt-5.3-codex", name: "test-member", temperature: -0.1 }
 
     //#when
     const result = CouncilMemberSchema.safeParse(config)
@@ -162,7 +162,7 @@ describe("CouncilMemberSchema", () => {
 
   test("rejects temperature above 2", () => {
     //#given
-    const config = { model: "openai/gpt-5.3-codex", temperature: 2.1 }
+    const config = { model: "openai/gpt-5.3-codex", name: "test-member", temperature: 2.1 }
 
     //#when
     const result = CouncilMemberSchema.safeParse(config)
@@ -173,7 +173,7 @@ describe("CouncilMemberSchema", () => {
 
   test("rejects member config with unknown fields", () => {
     //#given
-    const config = { model: "openai/gpt-5.3-codex", unknownField: true }
+    const config = { model: "openai/gpt-5.3-codex", name: "test-member", unknownField: true }
 
     //#when
     const result = CouncilMemberSchema.safeParse(config)

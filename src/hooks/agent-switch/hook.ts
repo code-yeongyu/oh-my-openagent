@@ -14,6 +14,15 @@ import {
 const processedFallbackMessages = new Set<string>()
 const MAX_PROCESSED_FALLBACK_MARKERS = 500
 
+function clearFallbackMarkersForSession(sessionID: string): void {
+  clearPendingSwitchRuntime(sessionID)
+  for (const key of Array.from(processedFallbackMessages)) {
+    if (key.startsWith(`${sessionID}:`)) {
+      processedFallbackMessages.delete(key)
+    }
+  }
+}
+
 function getSessionIDFromStatusEvent(input: { event: { properties?: Record<string, unknown> } }): string | undefined {
   const props = input.event.properties as Record<string, unknown> | undefined
   const fromProps = typeof props?.sessionID === "string" ? props.sessionID : undefined
@@ -46,12 +55,7 @@ export function createAgentSwitchHook(ctx: PluginInput) {
         const info = props?.info as Record<string, unknown> | undefined
         const deletedSessionID = info?.id
         if (typeof deletedSessionID === "string") {
-          clearPendingSwitchRuntime(deletedSessionID)
-          for (const key of Array.from(processedFallbackMessages)) {
-            if (key.startsWith(`${deletedSessionID}:`)) {
-              processedFallbackMessages.delete(key)
-            }
-          }
+          clearFallbackMarkersForSession(deletedSessionID)
         }
         return
       }
@@ -61,12 +65,7 @@ export function createAgentSwitchHook(ctx: PluginInput) {
         const info = props?.info as Record<string, unknown> | undefined
         const erroredSessionID = info?.id ?? props?.sessionID
         if (typeof erroredSessionID === "string") {
-          clearPendingSwitchRuntime(erroredSessionID)
-          for (const key of Array.from(processedFallbackMessages)) {
-            if (key.startsWith(`${erroredSessionID}:`)) {
-              processedFallbackMessages.delete(key)
-            }
-          }
+          clearFallbackMarkersForSession(erroredSessionID)
         }
         return
       }
