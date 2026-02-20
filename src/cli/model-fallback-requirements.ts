@@ -2,7 +2,7 @@ import type { ModelRequirement } from "../shared/model-requirements"
 
 // NOTE: These requirements are used by the CLI config generator (`generateModelConfig`).
 // They intentionally use "install-time" provider IDs (anthropic/openai/google/opencode/etc),
-// not runtime providers like `quotio`/`nvidia`.
+// not runtime-only providers like `nvidia`.
 
 export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   sisyphus: {
@@ -150,4 +150,3 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
     ],
   },
 }
-

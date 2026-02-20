@@ -2921,8 +2921,8 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
 
 describe("BackgroundManager.handleEvent - session.error", () => {
   const defaultRetryFallbackChain = [
-    { providers: ["quotio"], model: "claude-opus-4-6", variant: "max" },
-    { providers: ["quotio"], model: "gpt-5.3-codex", variant: "high" },
+    { providers: ["anthropic"], model: "claude-opus-4-6", variant: "max" },
+    { providers: ["anthropic"], model: "gpt-5.3-codex", variant: "high" },
   ]
 
   const stubProcessKey = (manager: BackgroundManager) => {
@@ -2945,7 +2945,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       agent: "sisyphus",
       status: "running",
       concurrencyKey: input.concurrencyKey,
-      model: { providerID: "quotio", modelID: "claude-opus-4-6-thinking" },
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6-thinking" },
       fallbackChain: input.fallbackChain ?? defaultRetryFallbackChain,
       attemptCount: 0,
     })
@@ -3084,7 +3084,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     //#given
     const manager = createBackgroundManager()
     const concurrencyManager = getConcurrencyManager(manager)
-    const concurrencyKey = "quotio/claude-opus-4-6-thinking"
+    const concurrencyKey = "anthropic/claude-opus-4-6-thinking"
     await concurrencyManager.acquire(concurrencyKey)
 
     stubProcessKey(manager)
@@ -3096,8 +3096,8 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       description: "task that should retry",
       concurrencyKey,
       fallbackChain: [
-        { providers: ["quotio"], model: "claude-opus-4-6", variant: "max" },
-        { providers: ["quotio"], model: "claude-opus-4-5" },
+        { providers: ["anthropic"], model: "claude-opus-4-6", variant: "max" },
+        { providers: ["anthropic"], model: "claude-opus-4-5" },
       ],
     })
 
@@ -3120,7 +3120,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(task.status).toBe("pending")
     expect(task.attemptCount).toBe(1)
     expect(task.model).toEqual({
-      providerID: "quotio",
+      providerID: "anthropic",
       modelID: "claude-opus-4-6",
       variant: "max",
     })
@@ -3158,7 +3158,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(task.status).toBe("pending")
     expect(task.attemptCount).toBe(1)
     expect(task.model).toEqual({
-      providerID: "quotio",
+      providerID: "anthropic",
       modelID: "claude-opus-4-6",
       variant: "max",
     })
@@ -3201,7 +3201,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     expect(task.status).toBe("pending")
     expect(task.attemptCount).toBe(1)
     expect(task.model).toEqual({
-      providerID: "quotio",
+      providerID: "anthropic",
       modelID: "claude-opus-4-6",
       variant: "max",
     })

@@ -75,7 +75,7 @@ describe("createEventHandler - model fallback", () => {
             },
             parentID: "msg_user_1",
             modelID: "claude-opus-4-6-thinking",
-            providerID: "quotio",
+            providerID: "anthropic",
             mode: "Sisyphus (Ultraworker)",
             agent: "Sisyphus (Ultraworker)",
             path: { cwd: "/tmp", root: "/tmp" },
@@ -166,7 +166,7 @@ describe("createEventHandler - model fallback", () => {
             time: { created: 1 },
             content: [],
             modelID: "claude-opus-4-6-thinking",
-            providerID: "quotio",
+            providerID: "anthropic",
             agent: "Sisyphus (Ultraworker)",
             path: { cwd: "/tmp", root: "/tmp" },
           },
@@ -196,7 +196,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "quotio", modelID: "claude-opus-4-6-thinking" },
+        model: { providerID: "anthropic", modelID: "claude-opus-4-6-thinking" },
       },
       output,
     )
@@ -205,7 +205,7 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toEqual({
-      providerID: "quotio",
+      providerID: "anthropic",
       modelID: "claude-opus-4-6",
     })
     expect(output.message["variant"]).toBe("max")
@@ -290,7 +290,7 @@ describe("createEventHandler - model fallback", () => {
           type: "session.error",
           properties: {
             sessionID,
-            providerID: "quotio",
+            providerID: "anthropic",
             modelID: "claude-opus-4-6-thinking",
             error: {
               name: "UnknownError",
@@ -310,7 +310,7 @@ describe("createEventHandler - model fallback", () => {
         {
           sessionID,
           agent: "sisyphus",
-          model: { providerID: "quotio", modelID: "claude-opus-4-6-thinking" },
+          model: { providerID: "anthropic", modelID: "claude-opus-4-6-thinking" },
         },
         output,
       )
@@ -322,7 +322,7 @@ describe("createEventHandler - model fallback", () => {
 
     //#then - first fallback entry applied (prefers current provider when available)
     expect(first.message["model"]).toEqual({
-      providerID: "quotio",
+      providerID: "anthropic",
       modelID: "claude-opus-4-6",
     })
     expect(first.message["variant"]).toBe("max")
@@ -332,7 +332,7 @@ describe("createEventHandler - model fallback", () => {
 
     //#then - second fallback entry applied (chain advanced)
     expect(second.message["model"]).toEqual({
-      providerID: "quotio",
+      providerID: "anthropic",
       modelID: "gpt-5.3-codex",
     })
     expect(second.message["variant"]).toBe("high")
