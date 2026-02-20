@@ -1,8 +1,9 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test'
+import { describe, test, expect, mock, beforeEach, spyOn } from 'bun:test'
 import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
 import type { TmuxUtilDeps } from './manager'
+import * as sharedModule from '../../shared'
 
 type ExecuteActionsResult = {
   success: boolean
@@ -655,6 +656,135 @@ describe('TmuxSessionManager', () => {
       // then
       expect((manager as any).deferredQueue).toEqual([])
       expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+    })
+
+    describe('spawn failure recovery', () => {
+      test('#given queryWindowState returns null #when onSessionCreated fires #then session is enqueued in deferred queue', async () => {
+        // given
+        mockIsInsideTmux.mockReturnValue(true)
+        mockQueryWindowState.mockImplementation(async () => null)
+        const logSpy = spyOn(sharedModule, 'log').mockImplementation(() => {})
+
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = createMockContext()
+        const config: TmuxConfig = {
+          enabled: true,
+          layout: 'main-vertical',
+          main_pane_size: 60,
+          main_pane_min_width: 80,
+          agent_pane_min_width: 40,
+        }
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        // when
+        await manager.onSessionCreated(
+          createSessionCreatedEvent('ses_null_state', 'ses_parent', 'Null State Task')
+        )
+
+        // then
+        expect(
+          logSpy.mock.calls.some(([message]) =>
+            String(message).includes('failed to query window state, deferring session')
+          )
+        ).toBe(true)
+        expect((manager as any).deferredQueue).toEqual(['ses_null_state'])
+
+        logSpy.mockRestore()
+      })
+
+      test('#given spawn fails without close action #when onSessionCreated fires #then session is enqueued in deferred queue', async () => {
+        // given
+        mockIsInsideTmux.mockReturnValue(true)
+        mockQueryWindowState.mockImplementation(async () => createWindowState())
+        mockExecuteActions.mockImplementation(async (actions) => ({
+          success: false,
+          spawnedPaneId: undefined,
+          results: actions.map((action) => ({
+            action,
+            result: { success: false, error: 'spawn failed' },
+          })),
+        }))
+        const logSpy = spyOn(sharedModule, 'log').mockImplementation(() => {})
+
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = createMockContext()
+        const config: TmuxConfig = {
+          enabled: true,
+          layout: 'main-vertical',
+          main_pane_size: 60,
+          main_pane_min_width: 80,
+          agent_pane_min_width: 40,
+        }
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        // when
+        await manager.onSessionCreated(
+          createSessionCreatedEvent('ses_fail_no_close', 'ses_parent', 'Spawn Fail No Close')
+        )
+
+        // then
+        expect(
+          logSpy.mock.calls.some(([message]) =>
+            String(message).includes('re-queueing deferred session after spawn failure')
+          )
+        ).toBe(true)
+        expect((manager as any).deferredQueue).toEqual(['ses_fail_no_close'])
+
+        logSpy.mockRestore()
+      })
+
+      test('#given spawn fails with close action that succeeded #when onSessionCreated fires #then session is still enqueued in deferred queue', async () => {
+        // given
+        mockIsInsideTmux.mockReturnValue(true)
+        mockQueryWindowState.mockImplementation(async () => createWindowState())
+        mockExecuteActions.mockImplementation(async () => ({
+          success: false,
+          spawnedPaneId: undefined,
+          results: [
+            {
+              action: { type: 'close', paneId: '%1', sessionId: 'ses_old' },
+              result: { success: true },
+            },
+            {
+              action: {
+                type: 'spawn',
+                sessionId: 'ses_fail_with_close',
+                description: 'Spawn Fail With Close',
+                targetPaneId: '%0',
+                splitDirection: '-h',
+              },
+              result: { success: false, error: 'spawn failed after close' },
+            },
+          ],
+        }))
+        const logSpy = spyOn(sharedModule, 'log').mockImplementation(() => {})
+
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = createMockContext()
+        const config: TmuxConfig = {
+          enabled: true,
+          layout: 'main-vertical',
+          main_pane_size: 60,
+          main_pane_min_width: 80,
+          agent_pane_min_width: 40,
+        }
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        // when
+        await manager.onSessionCreated(
+          createSessionCreatedEvent('ses_fail_with_close', 'ses_parent', 'Spawn Fail With Close')
+        )
+
+        // then
+        expect(
+          logSpy.mock.calls.some(([message]) =>
+            String(message).includes('re-queueing deferred session after spawn failure')
+          )
+        ).toBe(true)
+        expect((manager as any).deferredQueue).toEqual(['ses_fail_with_close'])
+
+        logSpy.mockRestore()
+      })
     })
   })
 
