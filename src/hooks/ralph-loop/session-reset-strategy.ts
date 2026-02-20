@@ -68,5 +68,5 @@ function getSelectSessionApi(client: unknown): SelectSessionApi | null {
     return null
   }
 
-  return selectSessionValue as SelectSessionApi
+  return (selectSessionValue as Function).bind(tuiValue) as SelectSessionApi
 }

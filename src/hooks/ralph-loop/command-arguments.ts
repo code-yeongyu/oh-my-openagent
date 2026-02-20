@@ -11,7 +11,8 @@ const DEFAULT_PROMPT = "Complete the task as instructed"
 
 export function parseRalphLoopArguments(rawArguments: string): ParsedRalphLoopArguments {
   const taskMatch = rawArguments.match(/^["'](.+?)["']/)
-  const prompt = taskMatch?.[1] || rawArguments.split(/\s+--/)[0]?.trim() || DEFAULT_PROMPT
+  const promptCandidate = taskMatch?.[1] ?? (rawArguments.startsWith("--") ? "" : rawArguments.split(/\s+--/)[0]?.trim() ?? "")
+  const prompt = promptCandidate || DEFAULT_PROMPT
 
   const maxIterationMatch = rawArguments.match(/--max-iterations=(\d+)/i)
   const completionPromiseMatch = rawArguments.match(/--completion-promise=["']?([^"'\s]+)["']?/i)
