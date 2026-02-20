@@ -3941,3 +3941,96 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     manager.shutdown()
   })
 })
+
+describe("BackgroundManager - tool permission spread order", () => {
+  test("startTask respects explore agent restrictions", async () => {
+    //#given
+    let capturedTools: Record<string, unknown> | undefined
+    const client = {
+      session: {
+        get: async () => ({ data: { directory: "/test/dir" } }),
+        create: async () => ({ data: { id: "session-1" } }),
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          capturedTools = args.body.tools as Record<string, unknown>
+          return {}
+        },
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-1",
+      status: "pending",
+      queuedAt: new Date(),
+      description: "test task",
+      prompt: "test prompt",
+      agent: "explore",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+    }
+    const input: import("./types").LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionID: task.parentSessionID,
+      parentMessageID: task.parentMessageID,
+    }
+
+    //#when
+    await (manager as unknown as { startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> })
+      .startTask({ task, input })
+
+    //#then
+    expect(capturedTools).toBeDefined()
+    expect(capturedTools?.call_omo_agent).toBe(false)
+    expect(capturedTools?.task).toBe(false)
+    expect(capturedTools?.write).toBe(false)
+    expect(capturedTools?.edit).toBe(false)
+
+    manager.shutdown()
+  })
+
+  test("resume respects explore agent restrictions", async () => {
+    //#given
+    let capturedTools: Record<string, unknown> | undefined
+    const client = {
+      session: {
+        promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+          capturedTools = args.body.tools as Record<string, unknown>
+          return {}
+        },
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-2",
+      sessionID: "session-2",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+      description: "resume task",
+      prompt: "resume prompt",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    await manager.resume({
+      sessionId: "session-2",
+      prompt: "continue",
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+    })
+
+    //#then
+    expect(capturedTools).toBeDefined()
+    expect(capturedTools?.call_omo_agent).toBe(false)
+    expect(capturedTools?.task).toBe(false)
+    expect(capturedTools?.write).toBe(false)
+    expect(capturedTools?.edit).toBe(false)
+
+    manager.shutdown()
+  })
+})
