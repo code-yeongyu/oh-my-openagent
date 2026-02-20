@@ -1,7 +1,5 @@
 import { z } from "zod"
 
-export const FallbackModelsSchema = z.union([z.string(), z.array(z.string())])
-
 export const RuntimeFallbackConfigSchema = z.object({
   /** Enable runtime fallback (default: true) */
   enabled: z.boolean().optional(),
@@ -18,4 +16,3 @@ export const RuntimeFallbackConfigSchema = z.object({
 })
 
 export type RuntimeFallbackConfig = z.infer<typeof RuntimeFallbackConfigSchema>
-export type FallbackModels = z.infer<typeof FallbackModelsSchema>

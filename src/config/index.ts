@@ -11,6 +11,8 @@ export {
   RalphLoopConfigSchema,
   TmuxConfigSchema,
   TmuxLayoutSchema,
+  RuntimeFallbackConfigSchema,
+  FallbackModelsSchema,
 } from "./schema"
 
 export type {

@@ -43,7 +43,7 @@ const testConfig: InstallConfig = {
 
 describe("addAuthPlugins", () => {
   describe("Test 1: JSONC with commented plugin line", () => {
-    it("preserves comment, updates actual plugin array", async () => {
+    it("preserves comment, does NOT add antigravity plugin", async () => {
       const content = `{
   // "plugin": ["old-plugin"]
   "plugin": ["existing-plugin"],
@@ -59,17 +59,18 @@ describe("addAuthPlugins", () => {
       const newContent = readFileSync(result.configPath, "utf-8")
       expect(newContent).toContain('// "plugin": ["old-plugin"]')
       expect(newContent).toContain('existing-plugin')
-      expect(newContent).toContain('opencode-antigravity-auth')
+      // antigravity plugin should NOT be auto-added anymore
+      expect(newContent).not.toContain('opencode-antigravity-auth')
 
       const parsed = parseJsonc<Record<string, unknown>>(newContent)
       const plugins = parsed.plugin as string[]
       expect(plugins).toContain('existing-plugin')
-      expect(plugins.some((p) => p.startsWith('opencode-antigravity-auth'))).toBe(true)
+      expect(plugins.some((p) => p.startsWith('opencode-antigravity-auth'))).toBe(false)
     })
   })
 
   describe("Test 2: Plugin array already contains antigravity", () => {
-    it("does not add duplicate", async () => {
+    it("preserves existing antigravity, does not add another", async () => {
       const content = `{
   "plugin": ["existing-plugin", "opencode-antigravity-auth"],
   "provider": {}
@@ -87,6 +88,7 @@ describe("addAuthPlugins", () => {
 
       const antigravityCount = plugins.filter((p) => p.startsWith('opencode-antigravity-auth')).length
       expect(antigravityCount).toBe(1)
+      expect(plugins).toContain('existing-plugin')
     })
   })
 
@@ -156,7 +158,7 @@ describe("addAuthPlugins", () => {
   })
 
   describe("Test 6: No existing plugin array", () => {
-    it("creates plugin array when none exists", async () => {
+    it("creates empty plugin array when none exists, does NOT add antigravity", async () => {
       const content = `{
   "provider": {}
 }`
@@ -172,7 +174,9 @@ describe("addAuthPlugins", () => {
       const parsed = parseJsonc<Record<string, unknown>>(newContent)
       expect(parsed).toHaveProperty('plugin')
       const plugins = parsed.plugin as string[]
-      expect(plugins.some((p) => p.startsWith('opencode-antigravity-auth'))).toBe(true)
+      // antigravity plugin should NOT be auto-added anymore
+      expect(plugins.some((p) => p.startsWith('opencode-antigravity-auth'))).toBe(false)
+      expect(plugins.length).toBe(0)
     })
   })
 
@@ -199,7 +203,7 @@ describe("addAuthPlugins", () => {
   })
 
   describe("Test 8: Multiple plugins in array", () => {
-    it("appends to existing plugins", async () => {
+    it("preserves existing plugins, does NOT add antigravity", async () => {
       const content = `{
   "plugin": ["plugin-1", "plugin-2", "plugin-3"],
   "provider": {}
@@ -218,7 +222,9 @@ describe("addAuthPlugins", () => {
       expect(plugins).toContain('plugin-1')
       expect(plugins).toContain('plugin-2')
       expect(plugins).toContain('plugin-3')
-      expect(plugins.some((p) => p.startsWith('opencode-antigravity-auth'))).toBe(true)
+      // antigravity plugin should NOT be auto-added anymore
+      expect(plugins.some((p) => p.startsWith('opencode-antigravity-auth'))).toBe(false)
+      expect(plugins.length).toBe(3)
     })
   })
 })

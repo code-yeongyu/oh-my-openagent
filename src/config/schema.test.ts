@@ -644,6 +644,55 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
   })
 })
 
+describe("OhMyOpenCodeConfigSchema - hashline_edit", () => {
+  test("accepts hashline_edit as true", () => {
+    //#given
+    const input = { hashline_edit: true }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBe(true)
+  })
+
+  test("accepts hashline_edit as false", () => {
+    //#given
+    const input = { hashline_edit: false }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBe(false)
+  })
+
+  test("hashline_edit is optional", () => {
+    //#given
+    const input = { auto_update: true }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBeUndefined()
+  })
+
+  test("rejects non-boolean hashline_edit", () => {
+    //#given
+    const input = { hashline_edit: "true" }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("ExperimentalConfigSchema feature flags", () => {
   test("accepts plugin_load_timeout_ms as number", () => {
     //#given
@@ -696,48 +745,6 @@ describe("ExperimentalConfigSchema feature flags", () => {
     if (result.success) {
       expect(result.data.plugin_load_timeout_ms).toBeUndefined()
       expect(result.data.safe_hook_creation).toBeUndefined()
-    }
-  })
-
-  test("accepts hashline_edit as true", () => {
-    //#given
-    const config = { hashline_edit: true }
-
-    //#when
-    const result = ExperimentalConfigSchema.safeParse(config)
-
-    //#then
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.hashline_edit).toBe(true)
-    }
-  })
-
-  test("accepts hashline_edit as false", () => {
-    //#given
-    const config = { hashline_edit: false }
-
-    //#when
-    const result = ExperimentalConfigSchema.safeParse(config)
-
-    //#then
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.hashline_edit).toBe(false)
-    }
-  })
-
-  test("hashline_edit is optional", () => {
-    //#given
-    const config = { safe_hook_creation: true }
-
-    //#when
-    const result = ExperimentalConfigSchema.safeParse(config)
-
-    //#then
-    expect(result.success).toBe(true)
-    if (result.success) {
-      expect(result.data.hashline_edit).toBeUndefined()
     }
   })
 
@@ -794,16 +801,6 @@ describe("ExperimentalConfigSchema feature flags", () => {
     expect(result.success).toBe(false)
   })
 
-  test("rejects non-boolean hashline_edit", () => {
-    //#given
-    const config = { hashline_edit: "true" }
-
-    //#when
-    const result = ExperimentalConfigSchema.safeParse(config)
-
-    //#then
-    expect(result.success).toBe(false)
-  })
 })
 
 describe("GitMasterConfigSchema", () => {

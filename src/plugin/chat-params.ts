@@ -1,4 +1,4 @@
-type ChatParamsInput = {
+export type ChatParamsInput = {
   sessionID: string
   agent: { name?: string }
   model: { providerID: string; modelID: string }
@@ -6,7 +6,7 @@ type ChatParamsInput = {
   message: { variant?: string }
 }
 
-type ChatParamsOutput = {
+export type ChatParamsOutput = {
   temperature?: number
   topP?: number
   topK?: number
@@ -27,10 +27,20 @@ function buildChatParamsInput(raw: unknown): ChatParamsInput | null {
   const message = raw.message
 
   if (typeof sessionID !== "string") return null
-  if (typeof agent !== "string") return null
   if (!isRecord(model)) return null
   if (!isRecord(provider)) return null
   if (!isRecord(message)) return null
+
+  let agentName: string | undefined
+  if (typeof agent === "string") {
+    agentName = agent
+  } else if (isRecord(agent)) {
+    const name = agent.name
+    if (typeof name === "string") {
+      agentName = name
+    }
+  }
+  if (!agentName) return null
 
   const providerID = model.providerID
   const modelID = model.modelID
@@ -43,7 +53,7 @@ function buildChatParamsInput(raw: unknown): ChatParamsInput | null {
 
   return {
     sessionID,
-    agent: { name: agent },
+    agent: { name: agentName },
     model: { providerID, modelID },
     provider: { id: providerId },
     message: typeof variant === "string" ? { variant } : {},

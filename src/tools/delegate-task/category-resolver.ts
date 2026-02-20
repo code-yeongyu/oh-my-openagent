@@ -1,6 +1,7 @@
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
+import type { FallbackEntry } from "../../shared/model-requirements"
 import { mergeCategories } from "../../shared/merge-categories"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
@@ -16,6 +17,7 @@ export interface CategoryResolutionResult {
   modelInfo: ModelFallbackInfo | undefined
   actualModel: string | undefined
   isUnstableAgent: boolean
+  fallbackChain?: FallbackEntry[]  // For runtime retry on model errors
   error?: string
 }
 
@@ -168,7 +170,8 @@ Available categories: ${categoryNames.join(", ")}`,
   }
 
   const unstableModel = actualModel?.toLowerCase()
-  const isUnstableAgent = resolved.config.is_unstable_agent === true || (unstableModel ? unstableModel.includes("gemini") || unstableModel.includes("minimax") : false)
+  const categoryConfigModel = resolved.config.model?.toLowerCase()
+  const isUnstableAgent = resolved.config.is_unstable_agent === true || [unstableModel, categoryConfigModel].some(m => m ? m.includes("gemini") || m.includes("minimax") || m.includes("kimi") : false)
 
   return {
     agentToUse: SISYPHUS_JUNIOR_AGENT,
@@ -177,5 +180,6 @@ Available categories: ${categoryNames.join(", ")}`,
     modelInfo,
     actualModel,
     isUnstableAgent,
+    fallbackChain: requirement?.fallbackChain,
   }
 }

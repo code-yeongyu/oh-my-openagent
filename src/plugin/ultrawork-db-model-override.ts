@@ -43,23 +43,61 @@ function retryViaMicrotask(
       attempt,
     })
     setTimeout(() => {
-      if (tryUpdateMessageModel(db, messageId, targetModel, variant)) {
-        log(`[ultrawork-db-override] setTimeout fallback succeeded: ${targetModel.providerID}/${targetModel.modelID}`, { messageId })
-      } else {
-        log("[ultrawork-db-override] setTimeout fallback failed - message not found", { messageId })
+      try {
+        if (tryUpdateMessageModel(db, messageId, targetModel, variant)) {
+          log(`[ultrawork-db-override] setTimeout fallback succeeded: ${targetModel.providerID}/${targetModel.modelID}`, { messageId })
+        } else {
+          log("[ultrawork-db-override] setTimeout fallback failed - message not found", { messageId })
+        }
+      } catch (error) {
+        log("[ultrawork-db-override] setTimeout fallback failed with error", {
+          messageId,
+          error: String(error),
+        })
+      } finally {
+        try {
+          db.close()
+        } catch (error) {
+          log("[ultrawork-db-override] Failed to close DB after setTimeout fallback", {
+            messageId,
+            error: String(error),
+          })
+        }
       }
-      db.close()
     }, 0)
     return
   }
 
   queueMicrotask(() => {
-    if (tryUpdateMessageModel(db, messageId, targetModel, variant)) {
-      log(`[ultrawork-db-override] Deferred DB update (attempt ${attempt}): ${targetModel.providerID}/${targetModel.modelID}`, { messageId })
-      db.close()
-      return
+    let shouldCloseDb = true
+
+    try {
+      if (tryUpdateMessageModel(db, messageId, targetModel, variant)) {
+        log(`[ultrawork-db-override] Deferred DB update (attempt ${attempt}): ${targetModel.providerID}/${targetModel.modelID}`, { messageId })
+        return
+      }
+
+      shouldCloseDb = false
+      retryViaMicrotask(db, messageId, targetModel, variant, attempt + 1)
+    } catch (error) {
+      log("[ultrawork-db-override] Deferred DB update failed with error", {
+        messageId,
+        attempt,
+        error: String(error),
+      })
+    } finally {
+      if (shouldCloseDb) {
+        try {
+          db.close()
+        } catch (error) {
+          log("[ultrawork-db-override] Failed to close DB after deferred DB update", {
+            messageId,
+            attempt,
+            error: String(error),
+          })
+        }
+      }
     }
-    retryViaMicrotask(db, messageId, targetModel, variant, attempt + 1)
   })
 }
 

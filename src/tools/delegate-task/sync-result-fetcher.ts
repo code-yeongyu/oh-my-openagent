@@ -44,8 +44,17 @@ export async function fetchSyncResult(
     return { ok: false, error: `No assistant response found.\n\nSession ID: ${sessionID}` }
   }
 
-  const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-  const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+  // Search assistant messages (newest first) for one with text/reasoning content.
+  // The last assistant message may only contain tool calls with no text.
+  let textContent = ""
+  for (const msg of assistantMessages) {
+    const textParts = msg.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
+    const content = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+    if (content) {
+      textContent = content
+      break
+    }
+  }
 
   return { ok: true, textContent }
 }

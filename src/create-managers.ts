@@ -4,7 +4,6 @@ import type { PluginContext, TmuxConfig } from "./plugin/types"
 
 import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
-import { createStaleFallbackHandler } from "./features/background-agent/stale-fallback-handler"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { initTaskToastManager } from "./features/task-toast-manager"
 import { TmuxSessionManager } from "./features/tmux-subagent"
@@ -61,11 +60,6 @@ export function createManagers(args: {
       },
       enableParentSessionNotifications: backgroundNotificationHookEnabled,
     },
-  )
-
-  backgroundManager.onStaleFallback = createStaleFallbackHandler(
-    pluginConfig,
-    (input) => backgroundManager.launch(input),
   )
 
   initTaskToastManager(ctx.client)

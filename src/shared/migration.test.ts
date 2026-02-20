@@ -306,6 +306,52 @@ describe("migrateHookNames", () => {
 describe("migrateConfigFile", () => {
   const testConfigPath = "/tmp/nonexistent-path-for-test.json"
 
+  test("migrates experimental.hashline_edit to top-level hashline_edit", () => {
+    // given: Config with legacy experimental.hashline_edit
+    const rawConfig: Record<string, unknown> = {
+      experimental: { hashline_edit: false, safe_hook_creation: true },
+    }
+
+    // when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: hashline_edit should move to top-level and be removed from experimental
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.hashline_edit).toBe(false)
+    expect(rawConfig.experimental).toEqual({ safe_hook_creation: true })
+  })
+
+  test("migrates and removes empty experimental object", () => {
+    // given: Config with only experimental.hashline_edit
+    const rawConfig: Record<string, unknown> = {
+      experimental: { hashline_edit: true },
+    }
+
+    // when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: hashline_edit moves top-level and empty experimental is removed
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.hashline_edit).toBe(true)
+    expect(rawConfig.experimental).toBeUndefined()
+  })
+
+  test("does not overwrite top-level hashline_edit when already set", () => {
+    // given: Config with both top-level and legacy location
+    const rawConfig: Record<string, unknown> = {
+      hashline_edit: false,
+      experimental: { hashline_edit: true },
+    }
+
+    // when: Migrate config file
+    const needsWrite = migrateConfigFile(testConfigPath, rawConfig)
+
+    // then: top-level value wins, legacy key removed
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.hashline_edit).toBe(false)
+    expect(rawConfig.experimental).toBeUndefined()
+  })
+
   test("migrates omo_agent to sisyphus_agent", () => {
     // given: Config with legacy omo_agent key
     const rawConfig: Record<string, unknown> = {

@@ -1,16 +1,9 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { PluginContext } from "./types"
 
-import {
-  applyAgentVariant,
-  resolveAgentVariant,
-  resolveVariantForModel,
-} from "../shared/agent-variant"
 import { hasConnectedProvidersCache } from "../shared"
-
-import {
-  setSessionAgent,
-} from "../features/claude-code-session-state"
+import { setSessionModel } from "../shared/session-model-state"
+import { setSessionAgent } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 
 import type { CreatedHooks } from "../create-hooks"
@@ -21,7 +14,12 @@ type FirstMessageVariantGate = {
 }
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
-type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
+export type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
+export type ChatMessageInput = {
+  sessionID: string
+  agent?: string
+  model?: { providerID: string; modelID: string }
+}
 type StartWorkHookOutput = { parts: Array<{ type: string; text?: string }> }
 
 function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
@@ -42,13 +40,13 @@ export function createChatMessageHandler(args: {
   firstMessageVariantGate: FirstMessageVariantGate
   hooks: CreatedHooks
 }): (
-  input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } },
+  input: ChatMessageInput,
   output: ChatMessageHandlerOutput
 ) => Promise<void> {
   const { ctx, pluginConfig, firstMessageVariantGate, hooks } = args
 
   return async (
-    input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } },
+    input: ChatMessageInput,
     output: ChatMessageHandlerOutput
   ): Promise<void> => {
     if (input.agent) {
@@ -58,34 +56,32 @@ export function createChatMessageHandler(args: {
     const message = output.message
 
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-      if (message["variant"] === undefined) {
-        const variant =
-          input.model && input.agent
-            ? resolveVariantForModel(pluginConfig, input.agent, input.model)
-            : resolveAgentVariant(pluginConfig, input.agent)
-        if (variant !== undefined) {
-          message["variant"] = variant
-        }
-      }
       firstMessageVariantGate.markApplied(input.sessionID)
-    } else {
-      if (input.model && input.agent && message["variant"] === undefined) {
-        const variant = resolveVariantForModel(pluginConfig, input.agent, input.model)
-        if (variant !== undefined) {
-          message["variant"] = variant
-        }
-      } else {
-        applyAgentVariant(pluginConfig, input.agent, message)
-      }
     }
 
+    await hooks.modelFallback?.["chat.message"]?.(input, output)
+    const modelOverride = output.message["model"]
+    if (
+      modelOverride &&
+      typeof modelOverride === "object" &&
+      "providerID" in modelOverride &&
+      "modelID" in modelOverride
+    ) {
+      const providerID = (modelOverride as { providerID?: string }).providerID
+      const modelID = (modelOverride as { modelID?: string }).modelID
+      if (typeof providerID === "string" && typeof modelID === "string") {
+        setSessionModel(input.sessionID, { providerID, modelID })
+      }
+    } else if (input.model) {
+      setSessionModel(input.sessionID, input.model)
+    }
     await hooks.stopContinuationGuard?.["chat.message"]?.(input)
     await hooks.runtimeFallback?.["chat.message"]?.(input, output)
     await hooks.keywordDetector?.["chat.message"]?.(input, output)
     await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
     await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
-
+    await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }

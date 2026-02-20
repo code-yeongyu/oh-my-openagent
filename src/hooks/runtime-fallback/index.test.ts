@@ -1080,7 +1080,7 @@ describe("runtime-fallback", () => {
       void sessionErrorPromise
     })
 
-    test("should not advance fallback after session.deleted cancels timeout-driven retry", async () => {
+    test("should not advance fallback after session.stop cancels timeout-driven retry", async () => {
       const retriedModels: string[] = []
 
       const hook = createRuntimeFallbackHook(
@@ -1109,13 +1109,13 @@ describe("runtime-fallback", () => {
         }
       )
 
-      const sessionID = "test-session-deleted-cancels-timeout-fallback"
+      const sessionID = "test-session-stop-cancels-timeout-fallback"
       SessionCategoryRegistry.register(sessionID, "test")
 
       await hook.event({
         event: {
           type: "session.created",
-          properties: { info: { id: sessionID } },
+          properties: { info: { id: sessionID, model: "google/gemini-2.5-pro" } },
         },
       })
 
@@ -1140,8 +1140,8 @@ describe("runtime-fallback", () => {
 
       await hook.event({
         event: {
-          type: "session.deleted",
-          properties: { info: { id: sessionID } },
+          type: "session.stop",
+          properties: { sessionID },
         },
       })
 
@@ -2014,6 +2014,7 @@ describe("runtime-fallback", () => {
 
       expect(promptCalls.length).toBe(1)
       const callBody = promptCalls[0]?.body as Record<string, unknown>
+      expect(callBody?.agent).toBe("Prometheus (Plan Builder)")
       expect(callBody?.model).toEqual({ providerID: "github-copilot", modelID: "claude-opus-4.6" })
     })
   })
@@ -2087,7 +2088,6 @@ describe("runtime-fallback", () => {
       expect(maxLog).toBeDefined()
     })
   })
-
   describe("manual model change cleanup", () => {
     test("should clear fallback timeout and abort in-flight request on manual model change", async () => {
       const abortCalls: Array<{ path?: { id?: string } }> = []

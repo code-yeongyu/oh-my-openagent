@@ -35,6 +35,26 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
   }
 
+  const handleSessionStop = async (props: Record<string, unknown> | undefined) => {
+    const sessionID = props?.sessionID as string | undefined
+    if (!sessionID) return
+
+    helpers.clearSessionFallbackTimeout(sessionID)
+
+    if (sessionRetryInFlight.has(sessionID)) {
+      await helpers.abortSessionRequest(sessionID, "session.stop")
+    }
+
+    sessionRetryInFlight.delete(sessionID)
+    sessionAwaitingFallbackResult.delete(sessionID)
+
+    const state = sessionStates.get(sessionID)
+    if (state?.pendingFallbackModel) {
+      state.pendingFallbackModel = undefined
+    }
+
+    log(`[${HOOK_NAME}] Cleared fallback retry state on session.stop`, { sessionID })
+  }
   const handleSessionIdle = (props: Record<string, unknown> | undefined) => {
     const sessionID = props?.sessionID as string | undefined
     if (!sessionID) return
@@ -124,7 +144,6 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       }
     }
   }
-
   const handleSessionError = async (props: Record<string, unknown> | undefined) => {
     const sessionID = props?.sessionID as string | undefined
     const error = props?.error
@@ -234,6 +253,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     if (event.type === "session.created") { handleSessionCreated(props); return }
     if (event.type === "session.deleted") { handleSessionDeleted(props); return }
+    if (event.type === "session.stop") { await handleSessionStop(props); return }
     if (event.type === "session.idle") { handleSessionIdle(props); return }
     if (event.type === "session.error") { await handleSessionError(props); return }
     if (event.type === "session.status") { await handleSessionStatus(props); return }

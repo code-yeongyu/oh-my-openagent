@@ -7,10 +7,8 @@ The principles and philosophy behind Oh My OpenCode.
 ## Human Intervention is a Failure Signal
 
 **HUMAN IN THE LOOP = BOTTLENECK**
-**HUMAN IN THE LOOP = BOTTLENECK**
-**HUMAN IN THE LOOP = BOTTLENECK**
 
-Think about autonomous driving. When a human has to take over the wheel, that's not a feature - it's a failure of the system. The car couldn't handle the situation on its own.
+Think about autonomous driving. When a human has to take over the wheel, that's not a feature. It's a failure of the system. The car couldn't handle the situation on its own.
 
 **Why is coding any different?**
 
@@ -20,7 +18,7 @@ When you find yourself:
 - Guiding the agent step-by-step through a task
 - Repeatedly clarifying the same requirements
 
-...that's not "human-AI collaboration." That's the AI failing to do its job.
+That's not "human-AI collaboration." That's the AI failing to do its job.
 
 **Oh My OpenCode is built on this premise**: Human intervention during agentic work is fundamentally a wrong signal. If the system is designed correctly, the agent should complete the work without requiring you to babysit it.
 
@@ -43,7 +41,7 @@ If you can tell whether a commit was made by a human or an agent, the agent has 
 
 ---
 
-## Token Cost vs. Productivity
+## Token Cost vs Productivity
 
 **Higher token usage is acceptable if it significantly increases productivity.**
 
@@ -53,7 +51,7 @@ Using more tokens to:
 - Verify work thoroughly before completion
 - Accumulate knowledge across tasks
 
-...is a worthwhile investment when it means 10x, 20x, or 100x productivity gains.
+That's a worthwhile investment when it means 10x, 20x, or 100x productivity gains.
 
 **However:**
 
@@ -71,7 +69,7 @@ Token efficiency matters. But not at the cost of work quality or human cognitive
 
 **The human should only need to say what they want. Everything else is the agent's job.**
 
-Two approaches to achieve this:
+Two approaches achieve this:
 
 ### Approach 1: Prometheus (Interview Mode)
 
@@ -114,7 +112,7 @@ Given the same inputs:
 - Same requirements
 - Same constraints
 
-...the output should be consistent. Not random, not surprising, not "creative" in ways you didn't ask for.
+The output should be consistent. Not random, not surprising, not "creative" in ways you didn't ask for.
 
 ### Continuous
 
@@ -183,7 +181,7 @@ A world where:
 - Complex projects are as easy as simple ones (just take longer)
 - "Prompt engineering" becomes as obsolete as "compiler debugging"
 
-**The agent should be invisible.** Not in the sense that it's hidden, but in the sense that it just works - like electricity, like running water, like the internet.
+**The agent should be invisible.** Not in the sense that it's hidden, but in the sense that it just works. Like electricity, like running water, like the internet.
 
 You flip the switch. The light turns on. You don't think about the power grid.
 
@@ -193,5 +191,5 @@ That's the goal.
 
 ## Further Reading
 
-- [Overview](./guide/overview.md) - Getting started with Oh My OpenCode
-- [Understanding the Orchestration System](./guide/understanding-orchestration-system.md) - How the agent coordination works
+- [Overview](./guide/overview.md)
+- [Orchestration Guide](./guide/orchestration.md)

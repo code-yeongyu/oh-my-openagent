@@ -6,10 +6,9 @@ import { getAgentConfigKey, getAgentDisplayName } from "../../shared/agent-displ
 
 const TOAST_TITLE = "NEVER Use Sisyphus with GPT"
 const TOAST_MESSAGE = [
-  "Sisyphus is NOT designed for GPT models.",
-  "Sisyphus + GPT performs worse than vanilla Codex.",
-  "You are literally burning money.",
-  "Use Hephaestus for GPT models instead.",
+  "Sisyphus works best with Claude Opus, and works fine with Kimi/GLM models.",
+  "Do NOT use Sisyphus with GPT.",
+  "For GPT models, always use Hephaestus.",
 ].join("\n")
 const HEPHAESTUS_DISPLAY = getAgentDisplayName("hephaestus")
 

@@ -88,8 +88,8 @@ describe("hashline-edit-diff-enhancer", () => {
 			expect(filediff).toBeDefined()
 			expect(filediff.file).toBe(tmpFile)
 			expect(filediff.path).toBe(tmpFile)
-			expect(filediff.before).toMatch(/^\d+:[a-f0-9]{2}\|/)
-			expect(filediff.after).toMatch(/^\d+:[a-f0-9]{2}\|/)
+			expect(filediff.before).toBe(oldContent)
+			expect(filediff.after).toBe(newContent)
 			expect(filediff.additions).toBeGreaterThan(0)
 			expect(filediff.deletions).toBeGreaterThan(0)
 
@@ -163,7 +163,7 @@ describe("hashline-edit-diff-enhancer", () => {
 			const filediff = afterOutput.metadata.filediff as FileDiffMetadata
 			expect(filediff).toBeDefined()
 			expect(filediff.before).toBe("")
-			expect(filediff.after).toMatch(/^1:[a-f0-9]{2}\|new content/)
+			expect(filediff.after).toBe("new content\n")
 			expect(filediff.additions).toBeGreaterThan(0)
 			expect(filediff.deletions).toBe(0)
 
@@ -246,8 +246,8 @@ describe("hashline-edit-diff-enhancer", () => {
 		})
 	})
 
-	describe("hashline format in filediff", () => {
-		test("filediff.before and filediff.after are in hashline format", async () => {
+	describe("raw content in filediff", () => {
+		test("filediff.before and filediff.after are raw file content", async () => {
 			//#given - a temp file
 			const tmpDir = (await import("os")).tmpdir()
 			const tmpFile = `${tmpDir}/hashline-diff-format-${Date.now()}.ts`
@@ -264,17 +264,10 @@ describe("hashline-edit-diff-enhancer", () => {
 			const afterOutput = makeAfterOutput()
 			await hook["tool.execute.after"](input, afterOutput)
 
-			//#then - before and after should be in LINE:HASH|content format
+			//#then - before and after should be raw file content
 			const filediff = afterOutput.metadata.filediff as { before: string; after: string }
-			const beforeLines = filediff.before.split("\n").filter(Boolean)
-			const afterLines = filediff.after.split("\n").filter(Boolean)
-
-			for (const line of beforeLines) {
-				expect(line).toMatch(/^\d+:[a-f0-9]{2}\|/)
-			}
-			for (const line of afterLines) {
-				expect(line).toMatch(/^\d+:[a-f0-9]{2}\|/)
-			}
+			expect(filediff.before).toBe(oldContent)
+			expect(filediff.after).toBe(newContent)
 
 			await (await import("fs/promises")).unlink(tmpFile).catch(() => {})
 		})

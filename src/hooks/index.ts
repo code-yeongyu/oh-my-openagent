@@ -14,6 +14,7 @@ export { createEmptyTaskResponseDetectorHook } from "./empty-task-response-detec
 export { createAnthropicContextWindowLimitRecoveryHook, type AnthropicContextWindowLimitRecoveryOptions } from "./anthropic-context-window-limit-recovery";
 
 export { createThinkModeHook } from "./think-mode";
+export { createModelFallbackHook, setPendingModelFallback, clearPendingModelFallback, type ModelFallbackState } from "./model-fallback/hook";
 export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
 export { createBackgroundNotificationHook } from "./background-notification"
@@ -28,9 +29,9 @@ export { createThinkingBlockValidatorHook } from "./thinking-block-validator";
 export { createCategorySkillReminderHook } from "./category-skill-reminder";
 export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
 export { createNoSisyphusGptHook } from "./no-sisyphus-gpt";
+export { createNoHephaestusNonGptHook } from "./no-hephaestus-non-gpt";
 export { createAutoSlashCommandHook } from "./auto-slash-command";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
-export { createJsonErrorRecoveryHook } from "./json-error-recovery";
 export { createPrometheusMdOnlyHook } from "./prometheus-md-only";
 export { createSisyphusJuniorNotepadHook } from "./sisyphus-junior-notepad";
 export { createTaskResumeInfoHook } from "./task-resume-info";
@@ -44,8 +45,9 @@ export { createCompactionTodoPreserverHook } from "./compaction-todo-preserver";
 export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
 export { createPreemptiveCompactionHook } from "./preemptive-compaction";
 export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
-export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createRuntimeFallbackHook, type RuntimeFallbackHook, type RuntimeFallbackOptions } from "./runtime-fallback";
+export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
-export { createHashlineEditDiffEnhancerHook } from "./hashline-edit-diff-enhancer";
-
+export { createBeastModeSystemHook, BEAST_MODE_SYSTEM_PROMPT } from "./beast-mode-system";
+export { createHashlineEditDiffEnhancerHook } from "./hashline-edit-diff-enhancer"
+export { createJsonErrorRecoveryHook, JSON_ERROR_TOOL_EXCLUDE_LIST, JSON_ERROR_PATTERNS, JSON_ERROR_REMINDER } from "./json-error-recovery";

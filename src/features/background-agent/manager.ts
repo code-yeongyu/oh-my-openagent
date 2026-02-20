@@ -5,6 +5,7 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
+import type { FallbackEntry } from "../../shared/model-requirements"
 import { TaskHistory } from "./task-history"
 import {
   log,
@@ -12,13 +13,22 @@ import {
   normalizePromptTools,
   normalizeSDKResponse,
   promptWithModelSuggestionRetry,
+  readConnectedProvidersCache,
+  readProviderModelsCache,
   resolveInheritedPromptTools,
-  SessionCategoryRegistry,
+  createInternalAgentTextPart,
 } from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
+import {
+  shouldRetryError,
+  getNextFallback,
+  hasMoreFallbacks,
+  selectFallbackProvider,
+} from "../../shared/model-error-classifier"
 import {
   DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
@@ -95,7 +105,6 @@ export class BackgroundManager {
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
   private onShutdown?: () => void
-  public onStaleFallback?: (task: BackgroundTask) => Promise<void>
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
@@ -157,8 +166,9 @@ export class BackgroundManager {
       parentAgent: input.parentAgent,
       parentTools: input.parentTools,
       model: input.model,
+      fallbackChain: input.fallbackChain,
+      attemptCount: 0,
       category: input.category,
-      fallbackModels: input.fallbackModels,
     }
 
     this.tasks.set(task.id, task)
@@ -346,10 +356,10 @@ export class BackgroundManager {
         system: input.skillContent,
         tools: (() => {
           const tools = {
-            ...getAgentToolRestrictions(input.agent),
             task: false,
             call_omo_agent: true,
             question: false,
+            ...getAgentToolRestrictions(input.agent),
           }
           setSessionTools(sessionID, tools)
           return tools
@@ -619,10 +629,10 @@ export class BackgroundManager {
         ...(resumeVariant ? { variant: resumeVariant } : {}),
         tools: (() => {
           const tools = {
-            ...getAgentToolRestrictions(existingTask.agent),
             task: false,
             call_omo_agent: true,
             question: false,
+            ...getAgentToolRestrictions(existingTask.agent),
           }
           setSessionTools(existingTask.sessionID!, tools)
           return tools
@@ -678,6 +688,27 @@ export class BackgroundManager {
 
   handleEvent(event: Event): void {
     const props = event.properties
+
+    if (event.type === "message.updated") {
+      const info = props?.info
+      if (!info || typeof info !== "object") return
+
+      const sessionID = (info as Record<string, unknown>)["sessionID"]
+      const role = (info as Record<string, unknown>)["role"]
+      if (typeof sessionID !== "string" || role !== "assistant") return
+
+      const task = this.findBySession(sessionID)
+      if (!task || task.status !== "running") return
+
+      const assistantError = (info as Record<string, unknown>)["error"]
+      if (!assistantError) return
+
+      const errorInfo = {
+        name: this.extractErrorName(assistantError),
+        message: this.extractErrorMessage(assistantError),
+      }
+      this.tryFallbackRetry(task, errorInfo, "message.updated")
+    }
 
     if (event.type === "message.part.updated" || event.type === "message.part.delta") {
       if (!props || typeof props !== "object" || !("sessionID" in props)) return
@@ -775,10 +806,29 @@ export class BackgroundManager {
       const task = this.findBySession(sessionID)
       if (!task || task.status !== "running") return
 
+      const errorObj = props?.error as { name?: string; message?: string } | undefined
+      const errorName = errorObj?.name
       const errorMessage = props ? this.getSessionErrorMessage(props) : undefined
 
+      const errorInfo = { name: errorName, message: errorMessage }
+      if (this.tryFallbackRetry(task, errorInfo, "session.error")) return
+
+      // Original error handling (no retry)
+      const errorMsg = errorMessage ?? "Session error"
+      const canRetry =
+        shouldRetryError(errorInfo) &&
+        !!task.fallbackChain &&
+        hasMoreFallbacks(task.fallbackChain, task.attemptCount ?? 0)
+      log("[background-agent] Session error - no retry:", {
+        taskId: task.id,
+        errorName,
+        errorMessage: errorMsg?.slice(0, 100),
+        hasFallbackChain: !!task.fallbackChain,
+        canRetry,
+      })
+
       task.status = "error"
-      task.error = errorMessage ?? "Session error"
+      task.error = errorMsg
       task.completedAt = new Date()
       this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
@@ -859,10 +909,133 @@ export class BackgroundManager {
         }
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
-          SessionCategoryRegistry.remove(task.sessionID)
         }
       }
+      SessionCategoryRegistry.remove(sessionID)
     }
+
+    if (event.type === "session.status") {
+      const sessionID = props?.sessionID as string | undefined
+      const status = props?.status as { type?: string; message?: string } | undefined
+      if (!sessionID || status?.type !== "retry") return
+
+      const task = this.findBySession(sessionID)
+      if (!task || task.status !== "running") return
+
+      const errorMessage = typeof status.message === "string" ? status.message : undefined
+      const errorInfo = { name: "SessionRetry", message: errorMessage }
+      this.tryFallbackRetry(task, errorInfo, "session.status")
+    }
+  }
+
+  private tryFallbackRetry(
+    task: BackgroundTask,
+    errorInfo: { name?: string; message?: string },
+    source: string,
+  ): boolean {
+    const fallbackChain = task.fallbackChain
+    const canRetry =
+      shouldRetryError(errorInfo) &&
+      fallbackChain &&
+      fallbackChain.length > 0 &&
+      hasMoreFallbacks(fallbackChain, task.attemptCount ?? 0)
+
+    if (!canRetry) return false
+
+    const attemptCount = task.attemptCount ?? 0
+    const providerModelsCache = readProviderModelsCache()
+    const connectedProviders = providerModelsCache?.connected ?? readConnectedProvidersCache()
+    const connectedSet = connectedProviders ? new Set(connectedProviders.map(p => p.toLowerCase())) : null
+
+    const isReachable = (entry: FallbackEntry): boolean => {
+      if (!connectedSet) return true
+
+      // Gate only on provider connectivity. Provider model lists can be stale/incomplete,
+      // especially after users manually add models to opencode.json.
+      return entry.providers.some((p) => connectedSet.has(p.toLowerCase()))
+    }
+
+    let selectedAttemptCount = attemptCount
+    let nextFallback: FallbackEntry | undefined
+    while (fallbackChain && selectedAttemptCount < fallbackChain.length) {
+      const candidate = getNextFallback(fallbackChain, selectedAttemptCount)
+      if (!candidate) break
+      selectedAttemptCount++
+      if (!isReachable(candidate)) {
+        log("[background-agent] Skipping unreachable fallback:", {
+          taskId: task.id,
+          source,
+          model: candidate.model,
+          providers: candidate.providers,
+        })
+        continue
+      }
+      nextFallback = candidate
+      break
+    }
+    if (!nextFallback) return false
+
+    const providerID = selectFallbackProvider(
+      nextFallback.providers,
+      task.model?.providerID,
+    )
+
+    log("[background-agent] Retryable error, attempting fallback:", {
+      taskId: task.id,
+      source,
+      errorName: errorInfo.name,
+      errorMessage: errorInfo.message?.slice(0, 100),
+      attemptCount: selectedAttemptCount,
+      nextModel: `${providerID}/${nextFallback.model}`,
+    })
+
+    if (task.concurrencyKey) {
+      this.concurrencyManager.release(task.concurrencyKey)
+      task.concurrencyKey = undefined
+    }
+
+    if (task.sessionID) {
+      this.client.session.abort({ path: { id: task.sessionID } }).catch(() => {})
+      subagentSessions.delete(task.sessionID)
+    }
+
+    const idleTimer = this.idleDeferralTimers.get(task.id)
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+      this.idleDeferralTimers.delete(task.id)
+    }
+
+    task.attemptCount = selectedAttemptCount
+    task.model = {
+      providerID,
+      modelID: nextFallback.model,
+      variant: nextFallback.variant,
+    }
+    task.status = "pending"
+    task.sessionID = undefined
+    task.startedAt = undefined
+    task.queuedAt = new Date()
+    task.error = undefined
+
+    const key = task.model ? `${task.model.providerID}/${task.model.modelID}` : task.agent
+    const queue = this.queuesByKey.get(key) ?? []
+    const retryInput: LaunchInput = {
+      description: task.description,
+      prompt: task.prompt,
+      agent: task.agent,
+      parentSessionID: task.parentSessionID,
+      parentMessageID: task.parentMessageID,
+      parentModel: task.parentModel,
+      parentAgent: task.parentAgent,
+      parentTools: task.parentTools,
+      model: task.model,
+      fallbackChain: task.fallbackChain,
+      category: task.category,
+    }
+    queue.push({ task, input: retryInput })
+    this.queuesByKey.set(key, queue)
+    this.processKey(key)
+    return true
   }
 
   markForNotification(task: BackgroundTask): void {
@@ -1280,10 +1453,13 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             if (isCompactionAgent(info?.agent)) {
               continue
             }
-            if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
-              agent = info.agent ?? task.parentAgent
-              model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
-              tools = normalizePromptTools(info.tools) ?? tools
+            const normalizedTools = this.isRecord(info?.tools)
+              ? normalizePromptTools(info.tools as Record<string, boolean | "allow" | "deny" | "ask">)
+              : undefined
+            if (info?.agent || info?.model || (info?.modelID && info?.providerID) || normalizedTools) {
+              agent = info?.agent ?? task.parentAgent
+              model = info?.model ?? (info?.providerID && info?.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+              tools = normalizedTools ?? tools
               break
             }
           }
@@ -1303,7 +1479,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           tools = normalizePromptTools(currentMessage?.tools) ?? tools
         }
 
-        tools = resolveInheritedPromptTools(task.parentSessionID, tools)
+        const resolvedTools = resolveInheritedPromptTools(task.parentSessionID, tools)
 
         log("[background-agent] notifyParentSession context:", {
           taskId: task.id,
@@ -1318,8 +1494,8 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               noReply: !allComplete,
               ...(agent !== undefined ? { agent } : {}),
               ...(model !== undefined ? { model } : {}),
-              ...(tools ? { tools } : {}),
-              parts: [{ type: "text", text: notification }],
+              ...(resolvedTools ? { tools: resolvedTools } : {}),
+              parts: [createInternalAgentTextPart(notification)],
             },
           })
           log("[background-agent] Sent notification to parent session:", {
@@ -1399,6 +1575,46 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       }
     }
     return ""
+  }
+
+  private extractErrorName(error: unknown): string | undefined {
+    if (this.isRecord(error) && typeof error["name"] === "string") return error["name"]
+    if (error instanceof Error) return error.name
+    return undefined
+  }
+
+  private extractErrorMessage(error: unknown): string | undefined {
+    if (!error) return undefined
+    if (typeof error === "string") return error
+    if (error instanceof Error) return error.message
+
+    if (this.isRecord(error)) {
+      const dataRaw = error["data"]
+      const candidates: unknown[] = [
+        error,
+        dataRaw,
+        error["error"],
+        this.isRecord(dataRaw) ? (dataRaw as Record<string, unknown>)["error"] : undefined,
+        error["cause"],
+      ]
+
+      for (const candidate of candidates) {
+        if (typeof candidate === "string" && candidate.length > 0) return candidate
+        if (
+          this.isRecord(candidate) &&
+          typeof candidate["message"] === "string" &&
+          candidate["message"].length > 0
+        ) {
+          return candidate["message"]
+        }
+      }
+    }
+
+    try {
+      return JSON.stringify(error)
+    } catch {
+      return String(error)
+    }
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
@@ -1520,13 +1736,12 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       const runtime = now - startedAt.getTime()
 
       if (!task.progress?.lastUpdate) {
+        if (sessionIsRunning) continue
         if (runtime <= messageStalenessMs) continue
 
         const staleMinutes = Math.round(runtime / 60000)
         task.status = "cancelled"
-        task.error = sessionIsRunning
-          ? `Stale timeout (no activity for ${staleMinutes}min since start — possible API hang)`
-          : `Stale timeout (no activity for ${staleMinutes}min since start)`
+        task.error = `Stale timeout (no activity for ${staleMinutes}min since start)`
         task.completedAt = new Date()
 
         if (task.concurrencyKey) {
@@ -1536,10 +1751,6 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
         this.client.session.abort({ path: { id: sessionID } }).catch(() => {})
         log(`[background-agent] Task ${task.id} interrupted: no progress since start`)
-
-        this.onStaleFallback?.(task).catch((err) => {
-          log("[background-agent] Error in onStaleFallback for stale task:", { taskId: task.id, error: err })
-        })
 
         try {
           await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
@@ -1569,10 +1780,6 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
       this.client.session.abort({ path: { id: sessionID } }).catch(() => {})
       log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
-
-      this.onStaleFallback?.(task).catch((err) => {
-        log("[background-agent] Error in onStaleFallback for stale task:", { taskId: task.id, error: err })
-      })
 
       try {
         await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
@@ -1627,6 +1834,16 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         // Progress is already tracked via handleEvent(message.part.updated),
         // so we skip the expensive session.messages() fetch here.
         // Completion will be detected when session transitions to idle.
+        if (sessionStatus?.type === "retry") {
+          const retryMessage = typeof (sessionStatus as { message?: string }).message === "string"
+            ? (sessionStatus as { message?: string }).message
+            : undefined
+          const errorInfo = { name: "SessionRetry", message: retryMessage }
+          if (this.tryFallbackRetry(task, errorInfo, "polling:session.status")) {
+            continue
+          }
+        }
+
         log("[background-agent] Session still running, relying on event-based progress:", {
           taskId: task.id,
           sessionID,

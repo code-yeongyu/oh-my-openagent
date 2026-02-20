@@ -1,10 +1,10 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-02-19 | **Commit:** 29ebd8c4 | **Branch:** dev
+**Generated:** 2026-02-21 | **Commit:** 86e3c7d1 | **Branch:** dev
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 44 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1161 TypeScript files, 133k LOC.
+OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 44 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1208 TypeScript files, 143k LOC.
 
 ## STRUCTURE
 
@@ -17,13 +17,13 @@ oh-my-opencode/
 │   ├── hooks/                # 44 hooks across 39 directories + 6 standalone files
 │   ├── tools/                # 26 tools across 15 directories
 │   ├── features/             # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
-│   ├── shared/               # 101 utility files in 13 categories
-│   ├── config/               # Zod v4 schema system (22 files)
+│   ├── shared/               # 100+ utility files in 13 categories
+│   ├── config/               # Zod v4 schema system (22+ files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth (Commander.js)
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
 │   ├── plugin/               # 8 OpenCode hook handlers + 44 hook composition
 │   └── plugin-handlers/      # 6-phase config loading pipeline
-├── packages/                 # Monorepo: comment-checker, opencode-sdk
+├── packages/                 # Monorepo: comment-checker, opencode-sdk, 10 platform binaries
 └── local-ignore/             # Dev-only test fixtures
 ```
 
@@ -65,6 +65,7 @@ OhMyOpenCodePlugin(ctx)
 | Add new CLI command | `src/cli/cli-program.ts` | Commander.js subcommand |
 | Add new doctor check | `src/cli/doctor/checks/` | Register in checks/index.ts |
 | Modify config schema | `src/config/schema/` + update root schema | Zod v4, add to OhMyOpenCodeConfigSchema |
+| Add new category | `src/tools/delegate-task/constants.ts` | DEFAULT_CATEGORIES + CATEGORY_MODEL_REQUIREMENTS |
 
 ## MULTI-LEVEL CONFIG
 
@@ -72,7 +73,7 @@ OhMyOpenCodePlugin(ctx)
 Project (.opencode/oh-my-opencode.jsonc)  →  User (~/.config/opencode/oh-my-opencode.jsonc)  →  Defaults
 ```
 
-Fields: agents (14 overridable), categories (8 built-in + custom), disabled_* arrays, 19 feature-specific configs.
+Fields: agents (14 overridable, 21 fields each), categories (8 built-in + custom), disabled_* arrays (agents, hooks, mcps, skills, commands, tools), 19 feature-specific configs.
 
 ## THREE-TIER MCP SYSTEM
 
@@ -84,12 +85,15 @@ Fields: agents (14 overridable), categories (8 built-in + custom), disabled_* ar
 
 ## CONVENTIONS
 
-- **Test pattern**: Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style
+- **Test pattern**: Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style (nested describe with `#given`/`#when`/`#then` prefixes)
 - **Factory pattern**: `createXXX()` for all tools, hooks, agents
-- **Hook tiers**: Session (21) → Tool-Guard (10) → Transform (4) → Continuation (7) → Skill (2)
+- **Hook tiers**: Session (22) → Tool-Guard (10) → Transform (4) → Continuation (7) → Skill (2)
 - **Agent modes**: `primary` (respects UI model) vs `subagent` (own fallback chain) vs `all`
 - **Model resolution**: 3-step: override → category-default → provider-fallback → system-default
 - **Config format**: JSONC with comments, Zod v4 validation, snake_case keys
+- **File naming**: kebab-case for all files/directories
+- **Module structure**: index.ts barrel exports, no catch-all files (utils.ts, helpers.ts banned), 200 LOC soft limit
+- **Imports**: relative within module, barrel imports across modules (`import { log } from "./shared"`)
 
 ## ANTI-PATTERNS
 
@@ -99,16 +103,28 @@ Fields: agents (14 overridable), categories (8 built-in + custom), disabled_* ar
 - Never commit unless explicitly requested
 - Test: given/when/then — never use Arrange-Act-Assert comments
 - Comments: avoid AI-generated comment patterns (enforced by comment-checker hook)
+- Never create catch-all files (`utils.ts`, `helpers.ts`, `service.ts`)
+- Empty catch blocks `catch(e) {}` — always handle errors
 
 ## COMMANDS
 
 ```bash
 bun test                    # Bun test suite
-bun run build              # Build plugin
+bun run build              # Build plugin (ESM + declarations + schema)
+bun run typecheck           # tsc --noEmit
 bunx oh-my-opencode install # Interactive setup
 bunx oh-my-opencode doctor  # Health diagnostics
 bunx oh-my-opencode run     # Non-interactive session
 ```
+
+## CI/CD
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| ci.yml | push/PR | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
+| publish.yml | manual | Version bump, npm publish, platform binaries, GitHub release, merge to master |
+| publish-platform.yml | called | 11 platform binaries via bun compile (darwin/linux/windows) |
+| sisyphus-agent.yml | @mention | AI agent handles issues/PRs |
 
 ## NOTES
 
@@ -117,3 +133,5 @@ bunx oh-my-opencode run     # Non-interactive session
 - Plugin load timeout: 10s for Claude Code plugins
 - Model fallback priority: Claude > OpenAI > Gemini > Copilot > OpenCode Zen > Z.ai > Kimi
 - Config migration runs automatically on legacy keys (agent names, hook names, model versions)
+- Build: bun build (ESM) + tsc --emitDeclarationOnly, externals: @ast-grep/napi
+- Test setup: `test-setup.ts` preloaded via bunfig.toml, mock-heavy tests run in isolation in CI
