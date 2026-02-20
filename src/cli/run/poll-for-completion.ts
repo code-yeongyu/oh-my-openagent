@@ -40,6 +40,7 @@ export async function pollForCompletion(
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
   let firstWorkTimestamp: number | null = null
+  let secondaryTimeoutChecked = false
   const pollStartTimestamp = Date.now()
 
   while (!abortController.signal.aborted) {
@@ -69,6 +70,7 @@ export async function pollForCompletion(
     }
 
     // Watchdog: if no events received for N seconds, verify session status via API
+    let mainSessionStatus: "idle" | "busy" | "retry" | null = null
     if (eventState.lastEventTimestamp !== null) {
       const timeSinceLastEvent = Date.now() - eventState.lastEventTimestamp
       if (timeSinceLastEvent > eventWatchdogMs) {
@@ -82,10 +84,10 @@ export async function pollForCompletion(
         )
 
         // Force check session status directly
-        const directStatus = await getMainSessionStatus(ctx)
-        if (directStatus === "idle") {
+        mainSessionStatus = await getMainSessionStatus(ctx)
+        if (mainSessionStatus === "idle") {
           eventState.mainSessionIdle = true
-        } else if (directStatus === "busy" || directStatus === "retry") {
+        } else if (mainSessionStatus === "busy" || mainSessionStatus === "retry") {
           eventState.mainSessionIdle = false
         }
 
@@ -94,7 +96,10 @@ export async function pollForCompletion(
       }
     }
 
-    const mainSessionStatus = await getMainSessionStatus(ctx)
+    // Only call getMainSessionStatus if watchdog didn't already check
+    if (mainSessionStatus === null) {
+      mainSessionStatus = await getMainSessionStatus(ctx)
+    }
     if (mainSessionStatus === "busy" || mainSessionStatus === "retry") {
       eventState.mainSessionIdle = false
     } else if (mainSessionStatus === "idle") {
@@ -119,7 +124,12 @@ export async function pollForCompletion(
 
       // Secondary timeout: if we've been polling for reasonable time but haven't
       // received meaningful work via events, check if there's active work via API
-      if (Date.now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs) {
+      // Only check once to avoid unnecessary API calls every poll cycle
+      if (
+        Date.now() - pollStartTimestamp > secondaryMeaningfulWorkTimeoutMs &&
+        !secondaryTimeoutChecked
+      ) {
+        secondaryTimeoutChecked = true
         // Check if session actually has pending work (children, todos, etc.)
         const childrenRes = await ctx.client.session.children({
           path: { id: ctx.sessionID },
@@ -132,18 +142,16 @@ export async function pollForCompletion(
         })
         const todos = normalizeSDKResponse(todosRes, [] as unknown[])
 
-        const hasActiveWork =
-          Array.isArray(children)
-            ? children.length > 0
-            : false || Array.isArray(todos)
-            ? todos.some(
-                (
-                  t: unknown
-                ) =>
-                  (t as { status?: string })?.status !== "completed" &&
-                  (t as { status?: string })?.status !== "cancelled"
-              )
-            : false
+        const hasActiveChildren =
+          Array.isArray(children) && children.length > 0
+        const hasActiveTodos =
+          Array.isArray(todos) &&
+          todos.some(
+            (t: unknown) =>
+              (t as { status?: string })?.status !== "completed" &&
+              (t as { status?: string })?.status !== "cancelled"
+          )
+        const hasActiveWork = hasActiveChildren || hasActiveTodos
 
         if (hasActiveWork) {
           // Assume meaningful work is happening even without events
