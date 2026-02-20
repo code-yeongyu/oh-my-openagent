@@ -127,4 +127,15 @@ describe("hashline edit operations", () => {
     //#then
     expect(result).toEqual(["before", "new 1", "new 2", "after"])
   })
+
+  it("does not restore indentation for replace_lines", () => {
+    //#given
+    const lines = ["if (x) {", "  return 1", "  return 2", "}"]
+
+    //#when
+    const result = applyReplaceLines(lines, anchorFor(lines, 2), anchorFor(lines, 3), ["return 3", "return 4"])
+
+    //#then
+    expect(result).toEqual(["if (x) {", "return 3", "return 4", "}"])
+  })
 })
