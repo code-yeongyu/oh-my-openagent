@@ -123,9 +123,9 @@ export function selectFallbackProvider(
 ): string {
   const connectedProviders = readConnectedProvidersCache()
   if (connectedProviders) {
-    const connectedSet = new Set(connectedProviders)
+    const connectedSet = new Set(connectedProviders.map(p => p.toLowerCase()))
     for (const provider of providers) {
-      if (connectedSet.has(provider)) {
+      if (connectedSet.has(provider.toLowerCase())) {
         return provider
       }
     }
