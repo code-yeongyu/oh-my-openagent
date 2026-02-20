@@ -3208,6 +3208,9 @@
         "disable_omo_env": {
           "type": "boolean"
         },
+        "hashline_edit": {
+          "type": "boolean"
+        },
         "model_fallback_title": {
           "type": "boolean"
         }
