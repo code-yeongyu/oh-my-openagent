@@ -410,7 +410,6 @@ export class TmuxSessionManager {
         const closeActionSucceeded = result.results.some(
           ({ action, result: actionResult }) => action.type === "close" && actionResult.success,
         )
-        const spawnFailed = !result.success || !result.spawnedPaneId
 
         if (result.success && result.spawnedPaneId) {
           const sessionReady = await this.waitForSessionReady(sessionId)
