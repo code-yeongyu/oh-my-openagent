@@ -187,6 +187,7 @@ Hey please read this readme and tell me why it is different from other agent har
   - Librarian: 공식 문서, 오픈 소스 구현, 코드베이스 탐색 (GLM-4.7)
    - Explore: 엄청나게 빠른 코드베이스 탐색 (Contextual Grep) (Grok Code Fast 1)
 - 완전한 LSP / AstGrep 지원: 결정적으로 리팩토링합니다.
+- 해시 앵커드 편집 도구: `LINE#ID` 형식으로 변경 전마다 콘텐츠 해시를 검증합니다. 오래된 줄 편집은 이제 없습니다.
 - TODO 연속 강제: 에이전트가 중간에 멈추면 계속하도록 강제합니다. **이것이 Sisyphus가 그 바위를 굴리게 하는 것입니다.**
 - 주석 검사기: AI가 과도한 주석을 추가하는 것을 방지합니다. Sisyphus가 생성한 코드는 인간이 작성한 것과 구별할 수 없어야 합니다.
 - Claude Code 호환성: 명령, 에이전트, 스킬, MCP, 훅(PreToolUse, PostToolUse, UserPromptSubmit, Stop)
@@ -303,6 +304,7 @@ oh-my-opencode를 제거하려면:
 - **에이전트**: Sisyphus(주요 에이전트), Prometheus(플래너), Oracle(아키텍처/디버깅), Librarian(문서/코드 검색), Explore(빠른 코드베이스 grep), Multimodal Looker
 - **백그라운드 에이전트**: 실제 개발 팀처럼 여러 에이전트를 병렬로 실행
 - **LSP 및 AST 도구**: 리팩토링, 이름 변경, 진단, AST 인식 코드 검색
+- **해시 앵커드 편집 도구**: `LINE#ID` 참조로 변경 전마다 콘텐츠를 검증 — 정밀한 편집, 오래된 줄 오류 없음
 - **컨텍스트 주입**: AGENTS.md, README.md, 조건부 규칙 자동 주입
 - **Claude Code 호환성**: 완전한 훅 시스템, 명령, 스킬, 에이전트, MCP
 - **내장 MCP**: websearch(Exa), context7(문서), grep_app(GitHub 검색)
