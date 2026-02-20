@@ -33,9 +33,10 @@
 
 </div>
 
+> Anthropic. They want to lock you in.
 > So how long are you going to keep using Claude Code?
-> They want to lock you in.
-> Join us. We don't lock you in. We promise better results — even without their expensive models.
+> Let's ulw together. We don't lock you in.
+> We promise better results — **even without their expensive models.**
 
 <div align="center">
 
@@ -130,6 +131,13 @@ Hey please read this readme and tell me why it is different from other agent har
 I still can't believe a human — not an agent — is reading this.
 Just install it. Type `ultrawork` (or `ulw`). That's it.
 Every feature below — this entire bible-length list of highlights — you don't need to know any of it. Sorry we have too many good features. It just works.
+
+Even only with following subscriptions, ultrawork will work well (this project is not affiliated, this is just personal recommendation):
+- [ChatGPT Subscription ($20)](https://chatgpt.com/)
+- [Kimi Code Subscription ($0.99) (*only this month)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
+- [GLM Coding Plan ($10)](https://z.ai/subscribe)
+- If you are eligible for pay-per-token, using kimi and gemini models won't cost you that much.
+- There are some projects like [quotio](https://github.com/nguyenphutrong/quotio), [cliproxyapi](https://github.com/router-for-me/CLIProxyAPI) too. These might violate ToS- but some of our community users are using it.
 
 |       | Feature                      | What it does                                                                                                                        |
 | :---: | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
@@ -366,14 +374,6 @@ If this sounds arrogant and you have a better answer, please contribute. You're 
 I have no affiliation with any project or model mentioned here. This is purely personal experimentation and preference.
 
 99% of this project was built using OpenCode. I tested for functionality—I don't really know how to write proper TypeScript. **But I personally reviewed and largely rewrote this doc, so read with confidence.**
-
-## Warnings
-
-- Productivity might spike too hard. Don't let your coworker notice.
-  - Actually, I'll spread the word. Let's see who wins.
-- If you're on [1.0.132](https://github.com/sst/opencode/releases/tag/v1.0.132) or older, an OpenCode bug may break config.
-  - [The fix](https://github.com/sst/opencode/pull/5040) was merged after 1.0.132—use a newer version.
-    - Fun fact: That PR was discovered and fixed thanks to OhMyOpenCode's Librarian, Explore, and Oracle setup.
 
 ## Loved by professionals at
 
