@@ -102,6 +102,7 @@ export function createToolRegistry(args: {
     mcpManager: managers.skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,
+    directory: ctx.directory,
   })
 
   const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false

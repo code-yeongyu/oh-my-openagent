@@ -21,7 +21,9 @@ export function createBackgroundWait(manager: BackgroundOutputManager, client: B
       task_ids: tool.schema.array(tool.schema.string()).describe("Task IDs to monitor — returns when ANY one reaches a terminal state"),
       timeout: tool.schema.number().optional().describe("Max wait in ms. Default: 120000 (2 min). The tool returns immediately when any task finishes, so large values are fine."),
     },
-    async execute(args: { task_ids: string[]; timeout?: number }) {
+    async execute(args: { task_ids: string[]; timeout?: number }, toolContext?: unknown) {
+      const abort = (toolContext as { abort?: AbortSignal } | undefined)?.abort
+
       const taskIds = args.task_ids
       if (!taskIds || taskIds.length === 0) {
         return "Error: task_ids array is required and must not be empty."
@@ -36,6 +38,10 @@ export function createBackgroundWait(manager: BackgroundOutputManager, client: B
 
       const startTime = Date.now()
       while (Date.now() - startTime < timeoutMs) {
+        if (abort?.aborted) {
+          return buildProgressSummary(manager, taskIds, true)
+        }
+
         await delay(1000)
 
         const found = findFirstTerminal(manager, taskIds)

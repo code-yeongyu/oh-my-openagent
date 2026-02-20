@@ -89,8 +89,13 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         }
 
         if (shouldBlock) {
+          const abort = (toolContext as { abort?: AbortSignal } | undefined)?.abort
           const startTime = Date.now()
           while (Date.now() - startTime < timeoutMs) {
+            if (abort?.aborted) {
+              return formatTaskStatus(task)
+            }
+
             await delay(1000)
 
             const currentTask = manager.getTask(args.task_id)

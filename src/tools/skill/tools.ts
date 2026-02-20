@@ -249,7 +249,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
           body = injectGitMasterConfig(body, options.gitMasterConfig)
         }
 
-        const dir = matchedSkill.path ? dirname(matchedSkill.path) : matchedSkill.resolvedPath || process.cwd()
+        const dir = matchedSkill.path ? dirname(matchedSkill.path) : matchedSkill.resolvedPath || options.directory || process.cwd()
 
         const output = [
           `## Skill: ${matchedSkill.name}`,
