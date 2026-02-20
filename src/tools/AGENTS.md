@@ -67,13 +67,12 @@
 | `session_search` | `createSessionManagerTools` | query, session_id, case_sensitive, limit |
 | `session_info` | `createSessionManagerTools` | session_id |
 
-### Skill/Command (3)
+### Skill/Command (2)
 
 | Tool | Factory | Parameters |
 |------|---------|------------|
-| `skill` | `createSkillTool` | name |
+| `skill` | `createSkillTool` | name, user_message |
 | `skill_mcp` | `createSkillMcpTool` | mcp_name, tool_name/resource_name/prompt_name, arguments, grep |
-| `slashcommand` | `createSlashcommandTool` | command, user_message |
 
 ### System (2)
 
