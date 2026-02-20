@@ -94,10 +94,10 @@ describe("createChatHeadersHandler", () => {
 
     await handler(
       {
-        sessionID: "ses_1",
+        sessionID: "ses_3",
         provider: { id: "github-copilot" },
         message: {
-          id: "msg_1",
+          id: "msg_3",
           role: "user",
         },
       },
