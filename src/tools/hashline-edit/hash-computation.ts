@@ -1,16 +1,16 @@
-import { HASH_DICT } from "./constants"
+import { HASHLINE_DICT } from "./constants"
 
 export function computeLineHash(lineNumber: number, content: string): string {
+  void lineNumber
   const stripped = content.replace(/\s+/g, "")
-  const hashInput = `${lineNumber}:${stripped}`
-  const hash = Bun.hash.xxHash32(hashInput)
+  const hash = Bun.hash.xxHash32(stripped)
   const index = hash % 256
-  return HASH_DICT[index]
+  return HASHLINE_DICT[index]
 }
 
 export function formatHashLine(lineNumber: number, content: string): string {
   const hash = computeLineHash(lineNumber, content)
-  return `${lineNumber}:${hash}|${content}`
+  return `${lineNumber}#${hash}:${content}`
 }
 
 export function formatHashLines(content: string): string {
