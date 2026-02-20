@@ -120,7 +120,17 @@ export function scheduleDeferredModelOverride(
       return
     }
 
-    const db = new Database(dbPath)
+    let db: InstanceType<typeof Database>
+    try {
+      db = new Database(dbPath)
+    } catch (error) {
+      log("[ultrawork-db-override] Failed to open DB, skipping deferred override", {
+        messageId,
+        error: String(error),
+      })
+      return
+    }
+
     try {
       retryViaMicrotask(db, messageId, targetModel, variant, 0)
     } catch (error) {

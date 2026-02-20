@@ -43,7 +43,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
 
     helpers.clearSessionFallbackTimeout(sessionID)
 
-    if (sessionRetryInFlight.has(sessionID)) {
+    if (sessionRetryInFlight.has(sessionID) || sessionAwaitingFallbackResult.has(sessionID)) {
       await helpers.abortSessionRequest(sessionID, "session.stop")
     }
 
@@ -92,6 +92,15 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
+
+    if (sessionRetryInFlight.has(sessionID)) {
+      log(`[${HOOK_NAME}] session.error skipped — retry in flight`, {
+        sessionID,
+        retryInFlight: true,
+      })
+      return
+    }
+
     sessionAwaitingFallbackResult.delete(sessionID)
     helpers.clearSessionFallbackTimeout(sessionID)
 

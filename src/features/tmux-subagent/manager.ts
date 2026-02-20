@@ -345,7 +345,8 @@ export class TmuxSessionManager {
       try {
         const state = await queryWindowState(sourcePaneId)
         if (!state) {
-          log("[tmux-session-manager] failed to query window state")
+          log("[tmux-session-manager] failed to query window state, deferring session")
+          this.enqueueDeferredSession(sessionId, title)
           return
         }
 
@@ -407,10 +408,6 @@ export class TmuxSessionManager {
           }
         }
 
-        const closeActionSucceeded = result.results.some(
-          ({ action, result: actionResult }) => action.type === "close" && actionResult.success,
-        )
-
         if (result.success && result.spawnedPaneId) {
           const sessionReady = await this.waitForSessionReady(sessionId)
 
@@ -445,12 +442,10 @@ export class TmuxSessionManager {
             })),
           })
 
-          if (closeActionSucceeded) {
-            log("[tmux-session-manager] re-queueing deferred session after close+spawn failure", {
-              sessionId,
-            })
-            this.enqueueDeferredSession(sessionId, title)
-          }
+          log("[tmux-session-manager] re-queueing deferred session after spawn failure", {
+            sessionId,
+          })
+          this.enqueueDeferredSession(sessionId, title)
 
           if (result.spawnedPaneId) {
             await executeAction(
