@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { executeCompact } from "./executor"
 import type { AutoCompactState } from "./types"
 import * as storage from "./storage"
@@ -78,6 +78,7 @@ function createFakeTimeouts(): FakeTimeouts {
 describe("executeCompact lock management", () => {
   let autoCompactState: AutoCompactState
   let mockClient: any
+  let fakeTimeouts: FakeTimeouts
   const sessionID = "test-session-123"
   const directory = "/test/dir"
   const msg = { providerID: "anthropic", modelID: "claude-opus-4-6" }
@@ -105,6 +106,11 @@ describe("executeCompact lock management", () => {
       },
     }
 
+    fakeTimeouts = createFakeTimeouts()
+  })
+
+  afterEach(() => {
+    fakeTimeouts.restore()
   })
 
   test("clears lock on successful summarize completion", async () => {
@@ -288,16 +294,11 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const fakeTimeouts = createFakeTimeouts()
-    try {
-      // when: Execute compaction
-      await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
+    // when: Execute compaction
+    await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-      // Wait for setTimeout callback
-      await fakeTimeouts.advanceBy(600)
-    } finally {
-      fakeTimeouts.restore()
-    }
+    // Wait for setTimeout callback
+    await fakeTimeouts.advanceBy(600)
 
     // then: Lock should be cleared
     // The continuation happens in setTimeout, but lock is cleared in finally before that
@@ -365,16 +366,11 @@ describe("executeCompact lock management", () => {
       ],
     })
 
-    const fakeTimeouts = createFakeTimeouts()
-    try {
-      // when: Execute compaction
-      await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
+    // when: Execute compaction
+    await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-      // Wait for setTimeout callback
-      await fakeTimeouts.advanceBy(600)
-    } finally {
-      fakeTimeouts.restore()
-    }
+    // Wait for setTimeout callback
+    await fakeTimeouts.advanceBy(600)
 
     // then: Truncation was attempted
     expect(truncateSpy).toHaveBeenCalled()
