@@ -187,7 +187,12 @@ async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<st
   const commandDir = cmd.path ? dirname(cmd.path) : process.cwd()
   const withFileRefs = await resolveFileReferencesInText(content, commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
-  sections.push(resolvedContent.trim())
+  const commandArgs = args || ""
+  const finalContent = resolvedContent
+    .trim()
+    .replace(/\$\{user_message\}/g, commandArgs)
+    .replace(/\$ARGUMENTS/g, commandArgs)
+  sections.push(finalContent)
 
   if (args) {
     sections.push("\n\n---\n")

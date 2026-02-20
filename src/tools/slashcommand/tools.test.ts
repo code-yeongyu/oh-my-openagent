@@ -124,4 +124,23 @@ describe("slashcommand tool - synchronous description", () => {
     // then
     expect(output).toContain("run plan-alpha")
   })
+
+  it("clears placeholder tokens when user_message is missing", async () => {
+    // given
+    const commands = [
+      createMockCommand(
+        "start-work",
+        "Start work",
+        "<command-instruction>args=$ARGUMENTS user=${user_message}</command-instruction>"
+      ),
+    ]
+    const tool = createSlashcommandTool({ commands, skills: [] })
+
+    // when
+    const output = await tool.execute({ command: "start-work" }, mockContext)
+
+    // then
+    expect(output).not.toContain("$ARGUMENTS")
+    expect(output).not.toContain("${user_message}")
+  })
 })

@@ -152,13 +152,11 @@ async function formatLoadedCommand(cmd: CommandInfo, userMessage?: string): Prom
   const commandDir = cmd.path ? dirname(cmd.path) : process.cwd()
   const withFileRefs = await resolveFileReferencesInText(content, commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
-  
-  // Substitute user_message into content if provided
-  let finalContent = resolvedContent.trim()
-  if (userMessage) {
-    finalContent = finalContent.replace(/\$\{user_message\}/g, userMessage)
-    finalContent = finalContent.replace(/\$ARGUMENTS/g, userMessage)
-  }
+  const resolvedUserMessage = userMessage ?? ""
+  const finalContent = resolvedContent
+    .trim()
+    .replace(/\$\{user_message\}/g, resolvedUserMessage)
+    .replace(/\$ARGUMENTS/g, resolvedUserMessage)
   
   sections.push(finalContent)
 

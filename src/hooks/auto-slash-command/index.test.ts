@@ -322,6 +322,23 @@ describe("createAutoSlashCommandHook", () => {
       //#then
       expect(output.parts[0].text).toContain("<auto-slash-command>")
       expect(output.parts[0].text).toContain("/start-work Command")
+      expect(output.parts[0].text).not.toContain("$ARGUMENTS")
+      expect(output.parts[0].text).toContain("<user-request>")
+    })
+
+    it("should clear unresolved placeholders for start-work command without args", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("start-work")
+      const output = createCommandOutput("original")
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.parts[0].text).toContain("/start-work Command")
+      expect(output.parts[0].text).not.toContain("$ARGUMENTS")
+      expect(output.parts[0].text).not.toContain("${user_message}")
     })
 
     it("should pass command arguments correctly", async () => {
