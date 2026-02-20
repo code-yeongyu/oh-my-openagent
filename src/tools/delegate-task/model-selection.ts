@@ -1,5 +1,6 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { fuzzyMatchModel } from "../../shared/model-availability"
+import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 
 function normalizeModel(model?: string): string | undefined {
   const trimmed = model?.trim()
@@ -38,7 +39,8 @@ export function resolveModelForDelegateTask(input: {
       const first = fallbackChain[0]
       const provider = first?.providers?.[0]
       if (provider) {
-        return { model: `${provider}/${first.model}`, variant: first.variant }
+        const transformedModelId = transformModelForProvider(provider, first.model)
+        return { model: `${provider}/${transformedModelId}`, variant: first.variant }
       }
     } else {
       for (const entry of fallbackChain) {
