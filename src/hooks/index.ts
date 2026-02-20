@@ -49,4 +49,5 @@ export { createRuntimeFallbackHook, type RuntimeFallbackHook, type RuntimeFallba
 export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 export { createBeastModeSystemHook, BEAST_MODE_SYSTEM_PROMPT } from "./beast-mode-system";
-export { createHashlineEditDiffEnhancerHook } from "./hashline-edit-diff-enhancer";
+export { createHashlineEditDiffEnhancerHook } from "./hashline-edit-diff-enhancer"
+export { createJsonErrorRecoveryHook, JSON_ERROR_TOOL_EXCLUDE_LIST, JSON_ERROR_PATTERNS, JSON_ERROR_REMINDER } from "./json-error-recovery";
