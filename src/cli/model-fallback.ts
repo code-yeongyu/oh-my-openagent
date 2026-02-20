@@ -1,7 +1,7 @@
 import {
-	AGENT_MODEL_REQUIREMENTS,
-	CATEGORY_MODEL_REQUIREMENTS,
-} from "../shared/model-requirements"
+  CLI_AGENT_MODEL_REQUIREMENTS,
+  CLI_CATEGORY_MODEL_REQUIREMENTS,
+} from "./model-fallback-requirements"
 import type { InstallConfig } from "./types"
 
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
@@ -16,9 +16,9 @@ import {
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
-const LIBRARIAN_MODEL = "opencode/minimax-m2.5-free"
+const ZAI_MODEL = "zai-coding-plan/glm-4.7"
 
-const ULTIMATE_FALLBACK = "opencode/big-pickle"
+const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
 
 
@@ -38,12 +38,12 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     return {
       $schema: SCHEMA_URL,
       agents: Object.fromEntries(
-        Object.entries(AGENT_MODEL_REQUIREMENTS)
+        Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)
           .filter(([role, req]) => !(role === "sisyphus" && req.requiresAnyModel))
           .map(([role]) => [role, { model: ULTIMATE_FALLBACK }])
       ),
       categories: Object.fromEntries(
-        Object.keys(CATEGORY_MODEL_REQUIREMENTS).map((cat) => [cat, { model: ULTIMATE_FALLBACK }])
+        Object.keys(CLI_CATEGORY_MODEL_REQUIREMENTS).map((cat) => [cat, { model: ULTIMATE_FALLBACK }])
       ),
     }
   }
@@ -51,9 +51,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const agents: Record<string, AgentConfig> = {}
   const categories: Record<string, CategoryConfig> = {}
 
-  for (const [role, req] of Object.entries(AGENT_MODEL_REQUIREMENTS)) {
-    if (role === "librarian") {
-      agents[role] = { model: LIBRARIAN_MODEL }
+  for (const [role, req] of Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)) {
+    if (role === "librarian" && avail.zai) {
+      agents[role] = { model: ZAI_MODEL }
       continue
     }
 
@@ -75,7 +75,6 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       if (req.requiresAnyModel && !isAnyFallbackEntryAvailable(fallbackChain, avail)) {
         continue
       }
-
       const resolved = resolveModelFromChain(fallbackChain, avail)
       if (resolved) {
         const variant = resolved.variant ?? req.variant
@@ -100,11 +99,11 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     }
   }
 
-  for (const [cat, req] of Object.entries(CATEGORY_MODEL_REQUIREMENTS)) {
+  for (const [cat, req] of Object.entries(CLI_CATEGORY_MODEL_REQUIREMENTS)) {
     // Special case: unspecified-high downgrades to unspecified-low when not isMaxPlan
     const fallbackChain =
       cat === "unspecified-high" && !avail.isMaxPlan
-        ? CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain
+        ? CLI_CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain
         : req.fallbackChain
 
     if (req.requiresModel && !isRequiredModelAvailable(req.requiresModel, req.fallbackChain, avail)) {

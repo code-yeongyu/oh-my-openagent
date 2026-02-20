@@ -1,8 +1,6 @@
-import {
-	AGENT_MODEL_REQUIREMENTS,
-	type FallbackEntry,
-} from "../shared/model-requirements"
+import type { FallbackEntry } from "../shared/model-requirements"
 import type { ProviderAvailability } from "./model-fallback-types"
+import { CLI_AGENT_MODEL_REQUIREMENTS } from "./model-fallback-requirements"
 import { isProviderAvailable } from "./provider-availability"
 import { transformModelForProvider } from "./provider-model-id-transform"
 
@@ -25,7 +23,7 @@ export function resolveModelFromChain(
 }
 
 export function getSisyphusFallbackChain(): FallbackEntry[] {
-	return AGENT_MODEL_REQUIREMENTS.sisyphus.fallbackChain
+	return CLI_AGENT_MODEL_REQUIREMENTS.sisyphus.fallbackChain
 }
 
 export function isAnyFallbackEntryAvailable(

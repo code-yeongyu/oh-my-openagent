@@ -2920,6 +2920,39 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
 })
 
 describe("BackgroundManager.handleEvent - session.error", () => {
+  const defaultRetryFallbackChain = [
+    { providers: ["quotio"], model: "claude-opus-4-6", variant: "max" },
+    { providers: ["quotio"], model: "gpt-5.3-codex", variant: "high" },
+  ]
+
+  const stubProcessKey = (manager: BackgroundManager) => {
+    ;(manager as unknown as { processKey: (key: string) => Promise<void> }).processKey = async () => {}
+  }
+
+  const createRetryTask = (manager: BackgroundManager, input: {
+    id: string
+    sessionID: string
+    description: string
+    concurrencyKey?: string
+    fallbackChain?: typeof defaultRetryFallbackChain
+  }) => {
+    const task = createMockTask({
+      id: input.id,
+      sessionID: input.sessionID,
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-retry",
+      description: input.description,
+      agent: "sisyphus",
+      status: "running",
+      concurrencyKey: input.concurrencyKey,
+      model: { providerID: "quotio", modelID: "claude-opus-4-6-thinking" },
+      fallbackChain: input.fallbackChain ?? defaultRetryFallbackChain,
+      attemptCount: 0,
+    })
+    getTaskMap(manager).set(task.id, task)
+    return task
+  }
+
   test("sets task to error, releases concurrency, and cleans up", async () => {
     //#given
     const manager = createBackgroundManager()
@@ -3043,6 +3076,135 @@ describe("BackgroundManager.handleEvent - session.error", () => {
 
     //#then
     expect(handler).not.toThrow()
+
+    manager.shutdown()
+  })
+
+  test("retry path releases current concurrency slot and prefers current provider in fallback entry", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const concurrencyManager = getConcurrencyManager(manager)
+    const concurrencyKey = "quotio/claude-opus-4-6-thinking"
+    await concurrencyManager.acquire(concurrencyKey)
+
+    stubProcessKey(manager)
+
+    const sessionID = "ses_error_retry"
+    const task = createRetryTask(manager, {
+      id: "task-session-error-retry",
+      sessionID,
+      description: "task that should retry",
+      concurrencyKey,
+      fallbackChain: [
+        { providers: ["quotio"], model: "claude-opus-4-6", variant: "max" },
+        { providers: ["quotio"], model: "claude-opus-4-5" },
+      ],
+    })
+
+    //#when
+    manager.handleEvent({
+      type: "session.error",
+      properties: {
+        sessionID,
+        error: {
+          name: "UnknownError",
+          data: {
+            message:
+              "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-6-thinking\"}}",
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(task.status).toBe("pending")
+    expect(task.attemptCount).toBe(1)
+    expect(task.model).toEqual({
+      providerID: "quotio",
+      modelID: "claude-opus-4-6",
+      variant: "max",
+    })
+    expect(task.concurrencyKey).toBeUndefined()
+    expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
+
+    manager.shutdown()
+  })
+
+  test("retry path triggers on session.status retry events", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    stubProcessKey(manager)
+
+    const sessionID = "ses_status_retry"
+    const task = createRetryTask(manager, {
+      id: "task-status-retry",
+      sessionID,
+      description: "task that should retry on status",
+    })
+
+    //#when
+    manager.handleEvent({
+      type: "session.status",
+      properties: {
+        sessionID,
+        status: {
+          type: "retry",
+          message: "Provider is overloaded",
+        },
+      },
+    })
+
+    //#then
+    expect(task.status).toBe("pending")
+    expect(task.attemptCount).toBe(1)
+    expect(task.model).toEqual({
+      providerID: "quotio",
+      modelID: "claude-opus-4-6",
+      variant: "max",
+    })
+
+    manager.shutdown()
+  })
+
+  test("retry path triggers on message.updated assistant error events", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    stubProcessKey(manager)
+
+    const sessionID = "ses_message_updated_retry"
+    const task = createRetryTask(manager, {
+      id: "task-message-updated-retry",
+      sessionID,
+      description: "task that should retry on message.updated",
+    })
+
+    //#when
+    manager.handleEvent({
+      type: "message.updated",
+      properties: {
+        info: {
+          id: "msg_errored",
+          sessionID,
+          role: "assistant",
+          error: {
+            name: "UnknownError",
+            data: {
+              message:
+                "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-6-thinking\"}}",
+            },
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(task.status).toBe("pending")
+    expect(task.attemptCount).toBe(1)
+    expect(task.model).toEqual({
+      providerID: "quotio",
+      modelID: "claude-opus-4-6",
+      variant: "max",
+    })
 
     manager.shutdown()
   })

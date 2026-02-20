@@ -69,6 +69,7 @@
           "directory-readme-injector",
           "empty-task-response-detector",
           "think-mode",
+          "model-fallback",
           "anthropic-context-window-limit-recovery",
           "preemptive-compaction",
           "rules-injector",
@@ -80,6 +81,7 @@
           "non-interactive-env",
           "interactive-bash-session",
           "thinking-block-validator",
+          "beast-mode-system",
           "ralph-loop",
           "category-skill-reminder",
           "compaction-context-injector",
@@ -3008,6 +3010,9 @@
           "type": "boolean"
         },
         "disable_omo_env": {
+          "type": "boolean"
+        },
+        "model_fallback_title": {
           "type": "boolean"
         }
       },

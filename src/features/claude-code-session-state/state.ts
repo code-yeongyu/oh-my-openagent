@@ -1,4 +1,5 @@
 export const subagentSessions = new Set<string>()
+export const syncSubagentSessions = new Set<string>()
 
 let _mainSessionID: string | undefined
 
@@ -14,6 +15,7 @@ export function getMainSessionID(): string | undefined {
 export function _resetForTesting(): void {
   _mainSessionID = undefined
   subagentSessions.clear()
+  syncSubagentSessions.clear()
   sessionAgentMap.clear()
 }
 

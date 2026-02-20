@@ -1,5 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
+import type { FallbackEntry } from "../../shared/model-requirements"
 import { getTimingConfig } from "./timing"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
@@ -12,7 +13,8 @@ export async function executeBackgroundTask(
   parentContext: ParentContext,
   agentToUse: string,
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
-  systemContent: string | undefined
+  systemContent: string | undefined,
+  fallbackChain?: FallbackEntry[],
 ): Promise<string> {
   const { manager } = executorCtx
 
@@ -27,6 +29,7 @@ export async function executeBackgroundTask(
       parentAgent: parentContext.agent,
       parentTools: getSessionTools(parentContext.sessionID),
       model: categoryModel,
+      fallbackChain,
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
       category: args.category,
