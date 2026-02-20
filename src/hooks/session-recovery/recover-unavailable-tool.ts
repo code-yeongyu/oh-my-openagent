@@ -51,7 +51,7 @@ async function readPartsFromSDKFallback(
     return target.parts.map((part) => ({
       type: part.type === "tool" ? "tool_use" : part.type,
       id: "callID" in part ? (part as { callID?: string }).callID : part.id,
-      name: "name" in part && typeof part.name === "string" ? part.name : undefined,
+      name: "name" in part && typeof part.name === "string" ? part.name : ("tool" in part && typeof (part as { tool?: unknown }).tool === "string" ? (part as { tool: string }).tool : undefined),
     }))
   } catch {
     return []

@@ -89,7 +89,6 @@ export function detectErrorType(error: unknown): RecoveryErrorType {
       message.includes("dummy_tool") ||
       message.includes("unavailable tool") ||
       message.includes("model tried to call unavailable") ||
-      message.includes("nosuchtoolarror") ||
       message.includes("nosuchtoolerror") ||
       message.includes("no such tool")
     ) {
