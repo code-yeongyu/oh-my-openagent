@@ -7,7 +7,6 @@ import {
   getOpenCodeConfigDir,
   addConfigLoadError,
   detectConfigFile,
-  type ConfigFormat,
   parseConfigContent,
   migrateConfigFile,
   type ConfigFileFormat,
@@ -15,15 +14,15 @@ import {
 
 export function loadConfigFromPath(
   configPath: string,
-  format: ConfigFormat,
+  format: ConfigFileFormat,
   ctx: unknown
 ): OhMyOpenCodeConfig | null {
   try {
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, "utf-8");
-      const rawConfig = parseConfigContent(content, format as Exclude<ConfigFormat, "none">);
+      const rawConfig = parseConfigContent(content, format);
 
-      migrateConfigFile(configPath, rawConfig, format as ConfigFileFormat);
+      migrateConfigFile(configPath, rawConfig, format);
 
       const result = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
 

@@ -15,6 +15,8 @@ export function migrateConfigFile(
   let needsWrite = false
 
   // Load previously applied migrations
+  // NOTE: For TOML configs, _migrations is never written back to disk (TOML is read-only).
+  // This means migrations re-apply on every load. All migrations MUST be idempotent.
   const existingMigrations = Array.isArray(copy._migrations)
     ? new Set(copy._migrations as string[])
     : new Set<string>()
@@ -100,41 +102,33 @@ export function migrateConfigFile(
   }
 
   if (needsWrite) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-    const backupPath = `${configPath}.bak.${timestamp}`
-    let backupSucceeded = false
-    try {
-      fs.copyFileSync(configPath, backupPath)
-      backupSucceeded = true
-    } catch {
-      // Original file may not exist yet — skip backup
-    }
-
-    let writeSucceeded = false
-
-    if (format === "toml") {
-      log(`Skipping file write for TOML config (migrations applied in-memory): ${configPath}`)
-      writeSucceeded = false
-    } else {
-      try {
-        fs.writeFileSync(configPath, JSON.stringify(copy, null, 2) + "\n", "utf-8")
-        writeSucceeded = true
-      } catch (err) {
-        log(`Failed to write migrated config to ${configPath}:`, err)
-      }
-    }
-
+    // Apply migrations to the in-memory config object regardless of format
     for (const key of Object.keys(rawConfig)) {
       delete rawConfig[key]
     }
     Object.assign(rawConfig, copy)
 
-    if (writeSucceeded) {
-      const backupMessage = backupSucceeded ? ` (backup: ${backupPath})` : ""
-      log(`Migrated config file: ${configPath}${backupMessage}`)
+    if (format === "toml") {
+      // TOML configs are read-only — skip backup and file write, apply in-memory only
+      log(`Skipping file write for TOML config (migrations applied in-memory): ${configPath}`)
     } else {
-      const backupMessage = backupSucceeded ? ` (backup: ${backupPath})` : ""
-      log(`Applied migrated config in-memory for: ${configPath}${backupMessage}`)
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
+      const backupPath = `${configPath}.bak.${timestamp}`
+      let backupSucceeded = false
+      try {
+        fs.copyFileSync(configPath, backupPath)
+        backupSucceeded = true
+      } catch {
+        // Original file may not exist yet — skip backup
+      }
+
+      try {
+        fs.writeFileSync(configPath, JSON.stringify(copy, null, 2) + "\n", "utf-8")
+        const backupMessage = backupSucceeded ? ` (backup: ${backupPath})` : ""
+        log(`Migrated config file: ${configPath}${backupMessage}`)
+      } catch (err) {
+        log(`Failed to write migrated config to ${configPath}:`, err)
+      }
     }
   }
 
