@@ -128,6 +128,9 @@
         "type": "string"
       }
     },
+    "hashline_edit": {
+      "type": "boolean"
+    },
     "agents": {
       "type": "object",
       "properties": {
@@ -3140,9 +3143,6 @@
           "type": "boolean"
         },
         "disable_omo_env": {
-          "type": "boolean"
-        },
-        "hashline_edit": {
           "type": "boolean"
         }
       },
