@@ -76,7 +76,7 @@ export function getPluginInfo(): PluginInfo {
       registered: true,
       configPath,
       entry: pluginEntry.entry,
-      isPinned: pinnedVersion !== null,
+      isPinned: pinnedVersion !== null && /^\d+\.\d+\.\d+/.test(pinnedVersion),
       pinnedVersion,
       isLocalDev: pluginEntry.isLocalDev,
     }
