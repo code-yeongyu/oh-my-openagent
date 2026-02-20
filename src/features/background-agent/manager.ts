@@ -945,14 +945,14 @@ export class BackgroundManager {
     const attemptCount = task.attemptCount ?? 0
     const providerModelsCache = readProviderModelsCache()
     const connectedProviders = providerModelsCache?.connected ?? readConnectedProvidersCache()
-    const connectedSet = connectedProviders ? new Set(connectedProviders) : null
+    const connectedSet = connectedProviders ? new Set(connectedProviders.map(p => p.toLowerCase())) : null
 
     const isReachable = (entry: FallbackEntry): boolean => {
       if (!connectedSet) return true
 
       // Gate only on provider connectivity. Provider model lists can be stale/incomplete,
       // especially after users manually add models to opencode.json.
-      return entry.providers.some((p) => connectedSet.has(p))
+      return entry.providers.some((p) => connectedSet.has(p.toLowerCase()))
     }
 
     let selectedAttemptCount = attemptCount
