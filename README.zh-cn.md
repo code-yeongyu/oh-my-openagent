@@ -137,8 +137,8 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 | :---: | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
 |   🤖   | **自律军团 (Discipline Agents)** | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                       |
 |   ⚡   | **`ultrawork` / `ulw`**      | 一键触发，所有智能体出动。任务完成前绝不罢休。                                                                           |
-|   🚪   | **IntentGate 意图门**                 | 真正行动前，先分析用户的真实意图。彻底告别被字面意思误导的 AI 废话。                                         |
-|   🔗   | **基于哈希的编辑工具**  | 每次修改都通过 `LINE#ID` 内容哈希验证。0% 错误修改。                                                              |
+|   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)**                 | 真正行动前，先分析用户的真实意图。彻底告别被字面意思误导的 AI 废话。                                         |
+|   🔗   | **基于哈希的编辑工具**  | 每次修改都通过 `LINE#ID` 内容哈希验证、0% 错误修改。灵感来自 [oh-my-pi](https://github.com/can1357/oh-my-pi)。[马具问题 →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
 |   🛠️   | **LSP + AST-Grep**           | 工作区级别的重命名、构建前诊断、基于 AST 的重写。为 Agent 提供 IDE 级别的精度。                                              |
 |   🧠   | **后台智能体**        | 同时发射 5+ 个专家并行工作。保持上下文干净，随时获取成果。                                                            |
 |   📚   | **内置 MCP**            | Exa (网络搜索)、Context7 (官方文档)、Grep.app (GitHub 源码搜索)。默认开启。                                                    |
