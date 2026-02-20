@@ -80,14 +80,16 @@ describe("runBackgroundUpdateCheck", () => {
       expect(mockUpdatePinnedVersion).not.toHaveBeenCalled()
     })
 
-    it("#then should show update-available toast instead", async () => {
+    it("#then should show manual-update toast message", async () => {
       await runBackgroundUpdateCheck(mockCtx, true, mockGetToastMessage)
 
-      expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(
-        mockCtx,
-        "3.5.0",
-        mockGetToastMessage
-      )
+      expect(mockShowUpdateAvailableToast).toHaveBeenCalledTimes(1)
+
+      const [toastContext, latestVersion, getToastMessage] = mockShowUpdateAvailableToast.mock.calls[0] ?? []
+      expect(toastContext).toBe(mockCtx)
+      expect(latestVersion).toBe("3.5.0")
+      expect(typeof getToastMessage).toBe("function")
+      expect(getToastMessage(true, "3.5.0")).toBe("Update available: 3.5.0 (version pinned, update manually)")
     })
 
     it("#then should NOT run bun install", async () => {
