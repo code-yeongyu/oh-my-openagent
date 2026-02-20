@@ -2,14 +2,33 @@ import { describe, it, expect } from "bun:test"
 import { createSlashcommandTool } from "./tools"
 import type { CommandInfo } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
 
-function createMockCommand(name: string, description = ""): CommandInfo {
+const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
+
+const mockContext: ToolContext = {
+  sessionID: "test-session",
+  messageID: "test-message",
+  agent: "test-agent",
+  directory: projectDir,
+  worktree: projectDir,
+  abort: new AbortController().signal,
+  metadata: () => {},
+  ask: async () => {},
+}
+
+function createMockCommand(
+  name: string,
+  description = "",
+  content?: CommandInfo["content"]
+): CommandInfo {
   return {
     name,
     metadata: {
       name,
       description: description || `Test command ${name}`,
     },
+    content,
     scope: "builtin",
   }
 }
@@ -85,5 +104,24 @@ describe("slashcommand tool - synchronous description", () => {
     // then
     expect(tool.description).toContain("user_message")
     expect(tool.description).toContain("command='publish' user_message='patch'")
+  })
+
+  it("executes function templates without trim errors", async () => {
+    // given
+    const commands = [
+      createMockCommand("start-work", "Start work", ({ user_message }) => {
+        return `<command-instruction>run $ARGUMENTS (${user_message || ""})</command-instruction>`
+      }),
+    ]
+    const tool = createSlashcommandTool({ commands, skills: [] })
+
+    // when
+    const output = await tool.execute(
+      { command: "start-work", user_message: "plan-alpha" },
+      mockContext
+    )
+
+    // then
+    expect(output).toContain("run plan-alpha")
   })
 })

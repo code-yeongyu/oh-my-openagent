@@ -310,6 +310,20 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("/ralph-loop Command")
     })
 
+    it("should inject template for start-work command without runtime error", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("start-work", "50-enhancements-verify-fix")
+      const output = createCommandOutput("original")
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).toContain("/start-work Command")
+    })
+
     it("should pass command arguments correctly", async () => {
       //#given
       const hook = createAutoSlashCommandHook()

@@ -31,9 +31,17 @@ interface CommandInfo {
   name: string
   path?: string
   metadata: CommandMetadata
-  content?: string
+  content?: string | ((args: { user_message?: string }) => string)
   scope: CommandScope["type"]
   lazyContentLoader?: LazyContentLoader
+}
+
+function resolveCommandContent(content: CommandInfo["content"], args: string): string {
+  if (typeof content === "function") {
+    return content({ user_message: args })
+  }
+
+  return content ?? ""
 }
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope["type"]): CommandInfo[] {
@@ -171,7 +179,7 @@ async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<st
   sections.push("---\n")
   sections.push("## Command Instructions\n")
 
-  let content = cmd.content || ""
+  let content = resolveCommandContent(cmd.content, args)
   if (!content && cmd.lazyContentLoader) {
     content = await cmd.lazyContentLoader.load()
   }

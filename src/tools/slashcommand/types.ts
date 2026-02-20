@@ -15,7 +15,7 @@ export interface CommandInfo {
   name: string
   path?: string
   metadata: CommandMetadata
-  content?: string
+  content?: string | ((args: { user_message?: string }) => string)
   scope: CommandScope
   lazyContentLoader?: LazyContentLoader
 }

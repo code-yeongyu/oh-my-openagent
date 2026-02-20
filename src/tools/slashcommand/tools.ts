@@ -100,6 +100,17 @@ function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
   }
 }
 
+function resolveCommandContent(
+  content: CommandInfo["content"],
+  userMessage?: string
+): string {
+  if (typeof content === "function") {
+    return content({ user_message: userMessage })
+  }
+
+  return content ?? ""
+}
+
 async function formatLoadedCommand(cmd: CommandInfo, userMessage?: string): Promise<string> {
   const sections: string[] = []
 
@@ -133,7 +144,7 @@ async function formatLoadedCommand(cmd: CommandInfo, userMessage?: string): Prom
   sections.push("---\n")
   sections.push("## Command Instructions\n")
 
-  let content = cmd.content || ""
+  let content = resolveCommandContent(cmd.content, userMessage)
   if (!content && cmd.lazyContentLoader) {
     content = await cmd.lazyContentLoader.load()
   }
