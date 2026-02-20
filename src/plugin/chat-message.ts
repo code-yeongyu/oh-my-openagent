@@ -83,6 +83,7 @@ export function createChatMessageHandler(args: {
     await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
     await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
+    await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }
