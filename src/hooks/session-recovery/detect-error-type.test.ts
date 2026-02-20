@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from "bun:test"
-import { detectErrorType, extractMessageIndex } from "./detect-error-type"
+import { detectErrorType, extractMessageIndex, extractUnavailableToolName } from "./detect-error-type"
 
 describe("detectErrorType", () => {
   it("#given a tool_use/tool_result error #when detecting #then returns tool_result_missing", () => {
@@ -101,6 +101,45 @@ describe("detectErrorType", () => {
     //#then
     expect(result).toBe("tool_result_missing")
   })
+
+  it("#given a dummy_tool unavailable tool error #when detecting #then returns unavailable_tool", () => {
+    //#given
+    const error = { message: "model tried to call unavailable tool 'invalid'" }
+
+    //#when
+    const result = detectErrorType(error)
+
+    //#then
+    expect(result).toBe("unavailable_tool")
+  })
+
+  it("#given a no such tool error #when detecting #then returns unavailable_tool", () => {
+    //#given
+    const error = { message: "No such tool: grepppp" }
+
+    //#when
+    const result = detectErrorType(error)
+
+    //#then
+    expect(result).toBe("unavailable_tool")
+  })
+
+  it("#given a dummy_tool token in nested error #when detecting #then returns unavailable_tool", () => {
+    //#given
+    const error = {
+      data: {
+        error: {
+          message: "dummy_tool Model tried to call unavailable tool 'invalid'",
+        },
+      },
+    }
+
+    //#when
+    const result = detectErrorType(error)
+
+    //#then
+    expect(result).toBe("unavailable_tool")
+  })
 })
 
 describe("extractMessageIndex", () => {
@@ -122,6 +161,30 @@ describe("extractMessageIndex", () => {
 
     //#when
     const result = extractMessageIndex(circular)
+
+    //#then
+    expect(result).toBeNull()
+  })
+})
+
+describe("extractUnavailableToolName", () => {
+  it("#given unavailable tool error with quoted tool name #when extracting #then returns tool name", () => {
+    //#given
+    const error = { message: "model tried to call unavailable tool 'invalid'" }
+
+    //#when
+    const result = extractUnavailableToolName(error)
+
+    //#then
+    expect(result).toBe("invalid")
+  })
+
+  it("#given error without unavailable tool name #when extracting #then returns null", () => {
+    //#given
+    const error = { message: "dummy_tool appeared without tool name" }
+
+    //#when
+    const result = extractUnavailableToolName(error)
 
     //#then
     expect(result).toBeNull()
