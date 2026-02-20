@@ -5,6 +5,7 @@ import { detectErrorType } from "./detect-error-type"
 import type { RecoveryErrorType } from "./detect-error-type"
 import type { MessageData } from "./types"
 import { recoverToolResultMissing } from "./recover-tool-result-missing"
+import { recoverUnavailableTool } from "./recover-unavailable-tool"
 import { recoverThinkingBlockOrder } from "./recover-thinking-block-order"
 import { recoverThinkingDisabledViolation } from "./recover-thinking-disabled-violation"
 import { extractResumeConfig, findLastUserMessage, resumeSession } from "./resume"
@@ -79,12 +80,14 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
 
       const toastTitles: Record<RecoveryErrorType & string, string> = {
         tool_result_missing: "Tool Crash Recovery",
+        unavailable_tool: "Tool Recovery",
         thinking_block_order: "Thinking Block Recovery",
         thinking_disabled_violation: "Thinking Strip Recovery",
         "assistant_prefill_unsupported": "Prefill Unsupported",
       }
       const toastMessages: Record<RecoveryErrorType & string, string> = {
         tool_result_missing: "Injecting cancelled tool results...",
+        unavailable_tool: "Recovering from unavailable tool call...",
         thinking_block_order: "Fixing message structure...",
         thinking_disabled_violation: "Stripping thinking blocks...",
         "assistant_prefill_unsupported": "Prefill not supported; continuing without recovery.",
@@ -105,6 +108,13 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
 
       if (errorType === "tool_result_missing") {
         success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg)
+      } else if (errorType === "unavailable_tool") {
+        success = await recoverUnavailableTool(ctx.client, sessionID, failedMsg)
+        if (success && experimental?.auto_resume) {
+          const lastUser = findLastUserMessage(msgs ?? [])
+          const resumeConfig = extractResumeConfig(lastUser, sessionID)
+          await resumeSession(ctx.client, resumeConfig)
+        }
       } else if (errorType === "thinking_block_order") {
         success = await recoverThinkingBlockOrder(ctx.client, sessionID, failedMsg, ctx.directory, info.error)
         if (success && experimental?.auto_resume) {
