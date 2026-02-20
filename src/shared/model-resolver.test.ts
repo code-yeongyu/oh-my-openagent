@@ -550,21 +550,21 @@ describe("resolveModelWithFallback", () => {
     })
 
     test("falls through to system default when no provider in fallback is connected", () => {
-      // given - user only has quotio connected, but fallback chain has anthropic/opencode
-      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["quotio"])
+      // given - user only has anthropic connected, but fallback chain has openai/opencode
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
-          { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+          { providers: ["openai", "opencode"], model: "claude-haiku-4-5" },
         ],
         availableModels: new Set(),
-        systemDefaultModel: "quotio/claude-opus-4-6-20251101",
+        systemDefaultModel: "anthropic/claude-opus-4-6-20251101",
       }
 
       // when
       const result = resolveModelWithFallback(input)
 
       // then - no provider in fallback is connected, fall through to system default
-      expect(result!.model).toBe("quotio/claude-opus-4-6-20251101")
+      expect(result!.model).toBe("anthropic/claude-opus-4-6-20251101")
       expect(result!.source).toBe("system-default")
       cacheSpy.mockRestore()
     })
