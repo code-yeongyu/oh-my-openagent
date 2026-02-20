@@ -330,8 +330,9 @@ describe("CouncilConfigSchema", () => {
     expect(result.success).toBe(false)
   })
 
-  test("rejects council with duplicate member names", () => {
-    //#given
+  test("accepts council with duplicate member names for graceful runtime handling", () => {
+    //#given - duplicate detection is handled at runtime by registerCouncilMemberAgents,
+    // not at schema level, to allow graceful fallback instead of hard parse failure
     const config = {
       members: [
         { model: "anthropic/claude-opus-4-6", name: "analyst" },
@@ -343,11 +344,11 @@ describe("CouncilConfigSchema", () => {
     const result = CouncilConfigSchema.safeParse(config)
 
     //#then
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
-  test("rejects council with case-insensitive duplicate names", () => {
-    //#given
+  test("accepts council with case-insensitive duplicate names for graceful runtime handling", () => {
+    //#given - case-insensitive dedup is handled at runtime by registerCouncilMemberAgents
     const config = {
       members: [
         { model: "anthropic/claude-opus-4-6", name: "Claude" },
@@ -359,7 +360,7 @@ describe("CouncilConfigSchema", () => {
     const result = CouncilConfigSchema.safeParse(config)
 
     //#then
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
   })
 
   test("accepts council with unique member names", () => {

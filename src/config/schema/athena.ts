@@ -20,13 +20,7 @@ export const CouncilMemberSchema = z.object({
 }).strict()
 
 export const CouncilConfigSchema = z.object({
-  members: z.array(CouncilMemberSchema).min(2).refine(
-    (members) => {
-      const names = members.map(m => m.name.toLowerCase())
-      return new Set(names).size === names.length
-    },
-    { message: "Council member names must be unique (case-insensitive)" },
-  ),
+  members: z.array(CouncilMemberSchema).min(2),
 }).strict()
 
 export type CouncilMemberConfig = z.infer<typeof CouncilMemberSchema>

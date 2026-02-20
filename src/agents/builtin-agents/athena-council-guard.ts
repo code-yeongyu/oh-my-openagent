@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 
-const MISSING_COUNCIL_PROMPT = `
+const MISSING_COUNCIL_PROMPT_HEADER = `
 
 ## CRITICAL: No Council Members Configured
 
@@ -32,7 +32,9 @@ You have no council members registered. This means the Athena council config is 
 }
 \`\`\`
 
-Each member requires \`model\` (\`"provider/model-id"\` format) and \`name\` (display name). Minimum 2 members required. Optional fields: \`variant\`, \`temperature\`.
+Each member requires \`model\` (\`"provider/model-id"\` format) and \`name\` (display name). Minimum 2 members required. Optional fields: \`variant\`, \`temperature\`.`
+
+const MISSING_COUNCIL_PROMPT_FOOTER = `
 
 ---
 
@@ -47,12 +49,14 @@ export function appendMissingCouncilPrompt(
   athenaConfig: AgentConfig,
   skippedMembers?: Array<{ name: string; reason: string }>,
 ): AgentConfig {
-  let prompt = MISSING_COUNCIL_PROMPT
+  let prompt = MISSING_COUNCIL_PROMPT_HEADER
 
   if (skippedMembers && skippedMembers.length > 0) {
     const skipDetails = skippedMembers.map((m) => `- **${m.name}**: ${m.reason}`).join("\n")
     prompt += `\n\n### Why Council Failed\n\nThe following members were skipped:\n${skipDetails}`
   }
+
+  prompt += MISSING_COUNCIL_PROMPT_FOOTER
 
   return { ...athenaConfig, prompt }
 }

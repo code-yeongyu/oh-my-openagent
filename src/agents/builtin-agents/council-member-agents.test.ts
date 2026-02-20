@@ -2,12 +2,12 @@ import { describe, expect, test } from "bun:test"
 import { registerCouncilMemberAgents } from "./council-member-agents"
 
 describe("council-member-agents", () => {
-  test("skips duplicate names and disables council when below minimum", () => {
+  test("skips case-insensitive duplicate names and disables council when below minimum", () => {
     //#given
     const config = {
       members: [
         { model: "openai/gpt-5.3-codex", name: "GPT" },
-        { model: "anthropic/claude-opus-4-6", name: "GPT" },
+        { model: "anthropic/claude-opus-4-6", name: "gpt" },
       ],
     }
     //#when
