@@ -11,16 +11,16 @@ interface FakeTimeouts {
   restore: () => void
 }
 
+// Capture the real implementations at module load time, before any test can patch them.
+// This ensures restore() always returns to the true originals regardless of test execution order.
+const TRUE_ORIGINAL_SET_TIMEOUT = globalThis.setTimeout
+const TRUE_ORIGINAL_CLEAR_TIMEOUT = globalThis.clearTimeout
+
 function createFakeTimeouts(): FakeTimeouts {
   let now = 0
   let nextId = 1
   const timers = new Map<number, { id: number; time: number; callback: TimerCallback; args: any[] }>()
   const cleared = new Set<number>()
-
-  const original = {
-    setTimeout: globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout,
-  }
 
   const normalizeDelay = (delay?: number) => {
     if (typeof delay !== "number" || !Number.isFinite(delay)) return 0
@@ -68,8 +68,8 @@ function createFakeTimeouts(): FakeTimeouts {
   }
 
   const restore = () => {
-    globalThis.setTimeout = original.setTimeout
-    globalThis.clearTimeout = original.clearTimeout
+    globalThis.setTimeout = TRUE_ORIGINAL_SET_TIMEOUT
+    globalThis.clearTimeout = TRUE_ORIGINAL_CLEAR_TIMEOUT
   }
 
   return { advanceBy, restore }
