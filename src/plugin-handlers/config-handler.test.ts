@@ -1310,7 +1310,7 @@ describe("disable_omo_env pass-through", () => {
     const lastCall =
       createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
-    expect(lastCall?.[12]).toBe(true)
+    expect(lastCall?.[13]).toBe(true)
   })
 
   test("passes disable_omo_env=false to createBuiltinAgents when omitted", async () => {
@@ -1344,6 +1344,6 @@ describe("disable_omo_env pass-through", () => {
     const lastCall =
       createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
     expect(lastCall).toBeDefined()
-    expect(lastCall?.[12]).toBe(false)
+    expect(lastCall?.[13]).toBe(false)
   })
 })

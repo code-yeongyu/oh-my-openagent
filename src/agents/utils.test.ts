@@ -753,6 +753,7 @@ describe("Hephaestus environment context toggle", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       disableFlag
     )
   }
@@ -807,6 +808,7 @@ describe("Sisyphus and Librarian environment context toggle", () => {
       undefined,
       undefined,
       [],
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -871,6 +873,7 @@ describe("Atlas is unaffected by environment context toggle", () => {
       undefined,
       undefined,
       undefined,
+      undefined,
       false
     )
 
@@ -882,6 +885,7 @@ describe("Atlas is unaffected by environment context toggle", () => {
       undefined,
       undefined,
       [],
+      undefined,
       undefined,
       undefined,
       undefined,
