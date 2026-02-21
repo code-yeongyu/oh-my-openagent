@@ -76,8 +76,8 @@ export function discoverCommandsSync(directory?: string): CommandInfo[] {
   }))
 
   return [
-    ...userCommands,
     ...projectCommands,
+    ...userCommands,
     ...opencodeProjectCommands,
     ...opencodeGlobalCommands,
     ...builtinCommands,

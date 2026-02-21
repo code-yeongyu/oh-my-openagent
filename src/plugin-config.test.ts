@@ -180,7 +180,7 @@ describe("parseConfigPartially", () => {
 
       expect(result).not.toBeNull();
       expect(result!.agents?.oracle?.model).toBe("openai/gpt-5.2");
-      expect(result!.disabled_hooks).toBeUndefined();
+      expect(result!.disabled_hooks).toEqual(["not-a-real-hook"]);
     });
   });
 
@@ -199,7 +199,7 @@ describe("parseConfigPartially", () => {
 
       expect(result).not.toBeNull();
       expect(result!.agents).toBeUndefined();
-      expect(result!.disabled_hooks).toBeUndefined();
+      expect(result!.disabled_hooks).toEqual(["not-a-real-hook"]);
     });
   });
 

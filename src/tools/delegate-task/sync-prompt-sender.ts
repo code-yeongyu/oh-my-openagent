@@ -7,6 +7,7 @@ import {
 import { formatDetailedError } from "./error-formatting"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 
 type SendSyncPromptDeps = {
   promptWithModelSuggestionRetry: typeof promptWithModelSuggestionRetry
@@ -56,7 +57,7 @@ export async function sendSyncPrompt(
       agent: input.agentToUse,
       system: input.systemContent,
       tools,
-      parts: [{ type: "text", text: input.args.prompt }],
+      parts: [createInternalAgentTextPart(input.args.prompt)],
       ...(input.categoryModel
         ? { model: { providerID: input.categoryModel.providerID, modelID: input.categoryModel.modelID } }
         : {}),

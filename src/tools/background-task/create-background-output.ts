@@ -78,7 +78,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         }
 
         const isActive = task.status === "pending" || task.status === "running"
-        const fullSession = args.full_session ?? false
+        const fullSession = args.full_session ?? true
         const includeThinking = isActive || (args.include_thinking ?? false)
         const includeToolResults = isActive || (args.include_tool_results ?? false)
 

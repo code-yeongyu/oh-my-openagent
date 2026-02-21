@@ -88,7 +88,7 @@ export function createRalphLoopEventHandler(
 
 				const title = state.ultrawork ? "ULTRAWORK LOOP COMPLETE!" : "Ralph Loop Complete!"
 				const message = state.ultrawork ? `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)` : `Task completed after ${state.iteration} iteration(s)`
-				await ctx.client.tui.showToast({ body: { title, message, variant: "success", duration: 5000 } }).catch(() => {})
+				await ctx.client.tui?.showToast?.({ body: { title, message, variant: "success", duration: 5000 } }).catch(() => {})
 				return
 			}
 
@@ -100,11 +100,9 @@ export function createRalphLoopEventHandler(
 				})
 				options.loopState.clear()
 
-				await ctx.client.tui
-					.showToast({
-						body: { title: "Ralph Loop Stopped", message: `Max iterations (${state.max_iterations}) reached without completion`, variant: "warning", duration: 5000 },
-					})
-					.catch(() => {})
+				await ctx.client.tui?.showToast?.({
+					body: { title: "Ralph Loop Stopped", message: `Max iterations (${state.max_iterations}) reached without completion`, variant: "warning", duration: 5000 },
+					}).catch(() => {})
 				return
 			}
 
@@ -120,16 +118,14 @@ export function createRalphLoopEventHandler(
 				max: newState.max_iterations,
 			})
 
-			await ctx.client.tui
-				.showToast({
-					body: {
-						title: "Ralph Loop",
-						message: `Iteration ${newState.iteration}/${newState.max_iterations}`,
-						variant: "info",
-						duration: 2000,
-					},
-				})
-				.catch(() => {})
+			await ctx.client.tui?.showToast?.({
+				body: {
+					title: "Ralph Loop",
+					message: `Iteration ${newState.iteration}/${newState.max_iterations}`,
+					variant: "info",
+					duration: 2000,
+				},
+				}).catch(() => {})
 
 			try {
 				await continueIteration(ctx, newState, {
