@@ -3447,35 +3447,42 @@
       "additionalProperties": false
     },
     "runtime_fallback": {
-      "type": "object",
-      "properties": {
-        "enabled": {
+      "anyOf": [
+        {
           "type": "boolean"
         },
-        "retry_on_errors": {
-          "type": "array",
-          "items": {
-            "type": "number"
-          }
-        },
-        "max_fallback_attempts": {
-          "type": "number",
-          "minimum": 1,
-          "maximum": 20
-        },
-        "cooldown_seconds": {
-          "type": "number",
-          "minimum": 0
-        },
-        "timeout_seconds": {
-          "type": "number",
-          "minimum": 0
-        },
-        "notify_on_fallback": {
-          "type": "boolean"
+        {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "retry_on_errors": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "max_fallback_attempts": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "cooldown_seconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "timeout_seconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "notify_on_fallback": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
-      },
-      "additionalProperties": false
+      ]
     },
     "background_task": {
       "type": "object",
