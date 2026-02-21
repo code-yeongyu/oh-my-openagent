@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs"
-import { parseJsonc } from "../../shared"
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
+import { dirname } from "node:path"
+import { getProjectOmoConfigPath, parseJsonc } from "../../shared"
 import type { ConfigMergeResult, InstallConfig } from "../types"
 import { getConfigDir, getOmoConfigPath } from "./config-context"
 import { deepMergeRecord } from "./deep-merge-record"
@@ -11,18 +12,32 @@ function isEmptyOrWhitespace(content: string): boolean {
   return content.trim().length === 0
 }
 
-export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult {
+export interface WriteOmoConfigOptions {
+  project?: boolean
+}
+
+function getTargetPath(installConfig: InstallConfig, options?: WriteOmoConfigOptions): string {
+  const shouldWriteProject = options?.project ?? installConfig.project ?? false
+  return shouldWriteProject ? getProjectOmoConfigPath() : getOmoConfigPath()
+}
+
+export function writeOmoConfig(installConfig: InstallConfig, options?: WriteOmoConfigOptions): ConfigMergeResult {
+  const omoConfigPath = getTargetPath(installConfig, options)
+  const shouldWriteProject = options?.project ?? installConfig.project ?? false
+
   try {
-    ensureConfigDirectoryExists()
+    if (shouldWriteProject) {
+      mkdirSync(dirname(omoConfigPath), { recursive: true })
+    } else {
+      ensureConfigDirectoryExists()
+    }
   } catch (err) {
     return {
       success: false,
-      configPath: getConfigDir(),
+      configPath: shouldWriteProject ? dirname(omoConfigPath) : getConfigDir(),
       error: formatErrorWithSuggestion(err, "create config directory"),
     }
   }
-
-  const omoConfigPath = getOmoConfigPath()
 
   try {
     const newConfig = generateOmoConfig(installConfig)

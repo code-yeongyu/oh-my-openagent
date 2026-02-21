@@ -152,6 +152,7 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
 
 export function argsToConfig(args: InstallArgs): InstallConfig {
   return {
+    project: args.project ?? false,
     hasClaude: args.claude !== "no",
     isMax20: args.claude === "max20",
     hasOpenAI: args.openai === "yes",

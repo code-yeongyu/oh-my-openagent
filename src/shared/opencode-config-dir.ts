@@ -136,3 +136,7 @@ export function detectExistingConfigDir(binary: OpenCodeBinaryType, version?: st
 
   return null
 }
+
+export function getProjectOmoConfigPath(directory: string = process.cwd()): string {
+  return join(directory, ".opencode", "oh-my-opencode.json")
+}
