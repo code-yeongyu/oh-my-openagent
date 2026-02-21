@@ -1157,13 +1157,15 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 })
 
 describe("per-agent todowrite/todoread deny when task_system enabled", () => {
-  const PRIMARY_AGENTS = [
+  const AGENTS_WITH_TODO_DENY = new Set([
     getAgentDisplayName("sisyphus"),
     getAgentDisplayName("hephaestus"),
     getAgentDisplayName("atlas"),
+  ])
+  const AGENTS_WITHOUT_TODO_DENY = new Set([
     getAgentDisplayName("prometheus"),
     getAgentDisplayName("sisyphus-junior"),
-  ]
+  ])
 
   test("denies todowrite and todoread for primary agents when task_system is enabled", async () => {
     //#given
@@ -1200,9 +1202,13 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 
     //#then
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    for (const agentName of PRIMARY_AGENTS) {
+    for (const agentName of AGENTS_WITH_TODO_DENY) {
       expect(agentResult[agentName]?.permission?.todowrite).toBe("deny")
       expect(agentResult[agentName]?.permission?.todoread).toBe("deny")
+    }
+    for (const agentName of AGENTS_WITHOUT_TODO_DENY) {
+      expect(agentResult[agentName]?.permission?.todowrite).toBeUndefined()
+      expect(agentResult[agentName]?.permission?.todoread).toBeUndefined()
     }
   })
 
@@ -1277,12 +1283,15 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 })
 
 describe("disable_omo_env pass-through", () => {
-  test("omits <omo-env> in generated sisyphus prompt when disable_omo_env is true", async () => {
+  test("passes disable_omo_env=true to createBuiltinAgents", async () => {
     //#given
-    ;(agents.createBuiltinAgents as any)?.mockRestore?.()
-    ;(shared.fetchAvailableModels as any).mockResolvedValue(
-      new Set(["anthropic/claude-opus-4-6", "google/gemini-3-flash"])
-    )
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+      mock: { calls: unknown[][] }
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "without-env", mode: "primary" },
+    })
 
     const pluginConfig: OhMyOpenCodeConfig = {
       experimental: { disable_omo_env: true },
@@ -1304,18 +1313,21 @@ describe("disable_omo_env pass-through", () => {
     await handler(config)
 
     //#then
-    const agentResult = config.agent as Record<string, { prompt?: string }>
-    const sisyphusPrompt = agentResult[getAgentDisplayName("sisyphus")]?.prompt
-    expect(sisyphusPrompt).toBeDefined()
-    expect(sisyphusPrompt).not.toContain("<omo-env>")
+    const lastCall =
+      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
+    expect(lastCall).toBeDefined()
+    expect(lastCall?.[12]).toBe(true)
   })
 
-  test("keeps <omo-env> in generated sisyphus prompt when disable_omo_env is omitted", async () => {
+  test("passes disable_omo_env=false to createBuiltinAgents when omitted", async () => {
     //#given
-    ;(agents.createBuiltinAgents as any)?.mockRestore?.()
-    ;(shared.fetchAvailableModels as any).mockResolvedValue(
-      new Set(["anthropic/claude-opus-4-6", "google/gemini-3-flash"])
-    )
+    const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
+      mockResolvedValue: (value: Record<string, unknown>) => void
+      mock: { calls: unknown[][] }
+    }
+    createBuiltinAgentsMock.mockResolvedValue({
+      sisyphus: { name: "sisyphus", prompt: "with-env", mode: "primary" },
+    })
 
     const pluginConfig: OhMyOpenCodeConfig = {}
     const config: Record<string, unknown> = {
@@ -1335,9 +1347,9 @@ describe("disable_omo_env pass-through", () => {
     await handler(config)
 
     //#then
-    const agentResult = config.agent as Record<string, { prompt?: string }>
-    const sisyphusPrompt = agentResult[getAgentDisplayName("sisyphus")]?.prompt
-    expect(sisyphusPrompt).toBeDefined()
-    expect(sisyphusPrompt).toContain("<omo-env>")
+    const lastCall =
+      createBuiltinAgentsMock.mock.calls[createBuiltinAgentsMock.mock.calls.length - 1]
+    expect(lastCall).toBeDefined()
+    expect(lastCall?.[12]).toBe(false)
   })
 })

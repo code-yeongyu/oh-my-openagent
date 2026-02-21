@@ -116,8 +116,10 @@ export function resolveModelPipeline(
           if (parts.length >= 2) {
             const provider = parts[0]
             if (connectedSet.has(provider)) {
-              log("Model resolved via user fallback_models (connected provider)", { model })
-              return { model, provenance: "provider-fallback", attempted }
+              const modelName = parts.slice(1).join("/")
+              const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
+              log("Model resolved via user fallback_models (connected provider)", { model: transformedModel, original: model })
+              return { model: transformedModel, provenance: "provider-fallback", attempted }
             }
           }
         }

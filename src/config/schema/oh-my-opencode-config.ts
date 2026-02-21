@@ -11,7 +11,6 @@ import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
 import { ExperimentalConfigSchema } from "./experimental"
 import { GitMasterConfigSchema } from "./git-master"
-import { HookNameSchema } from "./hooks"
 import { NotificationConfigSchema } from "./notification"
 import { RalphLoopConfigSchema } from "./ralph-loop"
 import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
@@ -30,7 +29,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_mcps: z.array(AnyMcpNameSchema).optional(),
   disabled_agents: z.array(BuiltinAgentNameSchema).optional(),
   disabled_skills: z.array(BuiltinSkillNameSchema).optional(),
-  disabled_hooks: z.array(HookNameSchema).optional(),
+  disabled_hooks: z.array(z.string()).optional(),
   disabled_commands: z.array(BuiltinCommandNameSchema).optional(),
   /** Disable specific tools by name (e.g., ["todowrite", "todoread"]) */
   disabled_tools: z.array(z.string()).optional(),
@@ -45,7 +44,12 @@ export const OhMyOpenCodeConfigSchema = z.object({
   auto_update: z.boolean().optional(),
   skills: SkillsConfigSchema.optional(),
   ralph_loop: RalphLoopConfigSchema.optional(),
-  runtime_fallback: RuntimeFallbackConfigSchema.optional(),
+  /**
+   * Enable runtime fallback (default: false)
+   * Set to false to disable, or use object for advanced config:
+   * { "enabled": true, "retry_on_errors": [400, 429], "timeout_seconds": 30 }
+   */
+  runtime_fallback: z.union([z.boolean(), RuntimeFallbackConfigSchema]).optional(),
   background_task: BackgroundTaskConfigSchema.optional(),
   notification: NotificationConfigSchema.optional(),
   babysitting: BabysittingConfigSchema.optional(),

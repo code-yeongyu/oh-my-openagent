@@ -66,7 +66,7 @@ describe("createChatHeadersHandler", () => {
         sessionID: "ses_1",
         provider: { id: "openai" },
         message: {
-          id: "msg_1",
+          id: "msg_2",
           role: "user",
         },
       },

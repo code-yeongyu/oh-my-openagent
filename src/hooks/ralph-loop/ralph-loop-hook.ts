@@ -10,7 +10,12 @@ export interface RalphLoopHook {
   startLoop: (
     sessionID: string,
     prompt: string,
-    options?: { maxIterations?: number; completionPromise?: string; ultrawork?: boolean }
+    options?: {
+      maxIterations?: number
+      completionPromise?: string
+      ultrawork?: boolean
+      strategy?: "reset" | "continue"
+    }
   ) => boolean
   cancelLoop: (sessionID: string) => boolean
   getState: () => RalphLoopState | null

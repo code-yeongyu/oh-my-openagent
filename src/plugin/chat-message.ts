@@ -5,6 +5,7 @@ import { hasConnectedProvidersCache } from "../shared"
 import { setSessionModel } from "../shared/session-model-state"
 import { setSessionAgent } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
+import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -44,6 +45,26 @@ export function createChatMessageHandler(args: {
   output: ChatMessageHandlerOutput
 ) => Promise<void> {
   const { ctx, pluginConfig, firstMessageVariantGate, hooks } = args
+  const pluginContext = ctx as {
+    client: {
+      tui: {
+        showToast: (input: {
+          body: {
+            title: string
+            message: string
+            variant: "warning"
+            duration: number
+          }
+        }) => Promise<unknown>
+      }
+    }
+  }
+  const isRuntimeFallbackEnabled =
+    hooks.runtimeFallback !== null &&
+    hooks.runtimeFallback !== undefined &&
+    (typeof pluginConfig.runtime_fallback === "boolean"
+      ? pluginConfig.runtime_fallback
+      : (pluginConfig.runtime_fallback?.enabled ?? false))
 
   return async (
     input: ChatMessageInput,
@@ -53,13 +74,13 @@ export function createChatMessageHandler(args: {
       setSessionAgent(input.sessionID, input.agent)
     }
 
-    const message = output.message
-
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
       firstMessageVariantGate.markApplied(input.sessionID)
     }
 
-    await hooks.modelFallback?.["chat.message"]?.(input, output)
+    if (!isRuntimeFallbackEnabled) {
+      await hooks.modelFallback?.["chat.message"]?.(input, output)
+    }
     const modelOverride = output.message["model"]
     if (
       modelOverride &&
@@ -87,7 +108,7 @@ export function createChatMessageHandler(args: {
     }
 
     if (!hasConnectedProvidersCache()) {
-      ctx.client.tui
+      pluginContext.client.tui
         .showToast({
           body: {
             title: "⚠️ Provider Cache Missing",
@@ -119,26 +140,18 @@ export function createChatMessageHandler(args: {
       if (isRalphLoopTemplate) {
         const taskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i)
         const rawTask = taskMatch?.[1]?.trim() || ""
-        const quotedMatch = rawTask.match(/^["'](.+?)["']/)
-        const prompt =
-          quotedMatch?.[1] ||
-          rawTask.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
+        const parsedArguments = parseRalphLoopArguments(rawTask)
 
-        const maxIterMatch = rawTask.match(/--max-iterations=(\d+)/i)
-        const promiseMatch = rawTask.match(
-          /--completion-promise=["']?([^"'\s]+)["']?/i,
-        )
-
-        hooks.ralphLoop.startLoop(input.sessionID, prompt, {
-          maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
-          completionPromise: promiseMatch?.[1],
+        hooks.ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
+          maxIterations: parsedArguments.maxIterations,
+          completionPromise: parsedArguments.completionPromise,
+          strategy: parsedArguments.strategy,
         })
       } else if (isCancelRalphTemplate) {
         hooks.ralphLoop.cancelLoop(input.sessionID)
       }
     }
 
-    applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, ctx.client.tui, input.sessionID)
+    applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, pluginContext.client.tui, input.sessionID)
   }
 }

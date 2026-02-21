@@ -43,7 +43,7 @@ function deduplicateSchema(schema: Record<string, unknown>): Record<string, unkn
 
 export function createOhMyOpenCodeJsonSchema(): Record<string, unknown> {
   const jsonSchema = z.toJSONSchema(OhMyOpenCodeConfigSchema, {
-    target: "draft-07",
+    target: "draft-7",
     unrepresentable: "any",
   })
 

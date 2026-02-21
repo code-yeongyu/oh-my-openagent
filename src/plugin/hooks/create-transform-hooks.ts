@@ -5,7 +5,6 @@ import {
   createClaudeCodeHooksHook,
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
-  createBeastModeSystemHook,
 } from "../../hooks"
 import {
   contextCollector,
@@ -14,11 +13,10 @@ import {
 import { safeCreateHook } from "../../shared/safe-create-hook"
 
 export type TransformHooks = {
-  claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook>
+  claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
-  beastModeSystem: ReturnType<typeof createBeastModeSystemHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -30,14 +28,21 @@ export function createTransformHooks(args: {
   const { ctx, pluginConfig, isHookEnabled } = args
   const safeHookEnabled = args.safeHookEnabled ?? true
 
-  const claudeCodeHooks = createClaudeCodeHooksHook(
-    ctx,
-    {
-      disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
-      keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
-    },
-    contextCollector,
-  )
+  const claudeCodeHooks = isHookEnabled("claude-code-hooks")
+    ? safeCreateHook(
+        "claude-code-hooks",
+        () =>
+          createClaudeCodeHooksHook(
+            ctx,
+            {
+              disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
+              keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
+            },
+            contextCollector,
+          ),
+        { enabled: safeHookEnabled },
+      )
+    : null
 
   const keywordDetector = isHookEnabled("keyword-detector")
     ? safeCreateHook(
@@ -58,19 +63,10 @@ export function createTransformHooks(args: {
       )
     : null
 
-  const beastModeSystem = isHookEnabled("beast-mode-system")
-    ? safeCreateHook(
-        "beast-mode-system",
-        () => createBeastModeSystemHook(),
-        { enabled: safeHookEnabled },
-      )
-    : null
-
   return {
     claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
-    beastModeSystem,
   }
 }

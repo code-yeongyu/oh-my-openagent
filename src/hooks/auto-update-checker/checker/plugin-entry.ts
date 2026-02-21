@@ -11,6 +11,10 @@ export interface PluginEntryInfo {
   configPath: string
 }
 
+function isExplicitVersionPin(pinnedVersion: string): boolean {
+  return /^\d+\.\d+\.\d+/.test(pinnedVersion)
+}
+
 export function findPluginEntry(directory: string): PluginEntryInfo | null {
   for (const configPath of getConfigPaths(directory)) {
     try {
@@ -25,8 +29,8 @@ export function findPluginEntry(directory: string): PluginEntryInfo | null {
         }
         if (entry.startsWith(`${PACKAGE_NAME}@`)) {
           const pinnedVersion = entry.slice(PACKAGE_NAME.length + 1)
-          const isPinned = pinnedVersion !== "latest"
-          return { entry, isPinned, pinnedVersion: isPinned ? pinnedVersion : null, configPath }
+          const isPinned = isExplicitVersionPin(pinnedVersion)
+          return { entry, isPinned, pinnedVersion, configPath }
         }
       }
     } catch {

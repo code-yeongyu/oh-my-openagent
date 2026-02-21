@@ -10,6 +10,9 @@ import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
+declare function setTimeout(callback: () => void | Promise<void>, delay?: number): ReturnType<typeof globalThis.setTimeout>
+declare function clearTimeout(timeout: ReturnType<typeof globalThis.setTimeout>): void
+
 export function createAutoRetryHelpers(deps: HookDeps) {
   const { ctx, config, options, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, pluginConfig } = deps
 
@@ -88,6 +91,10 @@ export function createAutoRetryHelpers(deps: HookDeps) {
     const modelParts = newModel.split("/")
     if (modelParts.length < 2) {
       log(`[${HOOK_NAME}] Invalid model format (missing provider prefix): ${newModel}`)
+      const state = sessionStates.get(sessionID)
+      if (state?.pendingFallbackModel) {
+        state.pendingFallbackModel = undefined
+      }
       return
     }
 
@@ -103,6 +110,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
     await abortSessionRequest(sessionID, `pre-fallback.${source}`)
 
     sessionRetryInFlight.add(sessionID)
+    let retryDispatched = false
     try {
       const messagesResp = await ctx.client.session.messages({
         path: { id: sessionID },
@@ -148,6 +156,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
             },
             query: { directory: ctx.directory },
           })
+          retryDispatched = true
         }
       } else {
         log(`[${HOOK_NAME}] No user message found for auto-retry (${source})`, { sessionID })
@@ -157,11 +166,15 @@ export function createAutoRetryHelpers(deps: HookDeps) {
       sessionAwaitingFallbackResult.delete(sessionID)
       clearSessionFallbackTimeout(sessionID)
     } finally {
-      const state = sessionStates.get(sessionID)
-      if (state?.pendingFallbackModel === newModel) {
-        state.pendingFallbackModel = undefined
-      }
       sessionRetryInFlight.delete(sessionID)
+      if (!retryDispatched) {
+        sessionAwaitingFallbackResult.delete(sessionID)
+        clearSessionFallbackTimeout(sessionID)
+        const state = sessionStates.get(sessionID)
+        if (state?.pendingFallbackModel) {
+          state.pendingFallbackModel = undefined
+        }
+      }
     }
   }
 

@@ -19,16 +19,23 @@ type MessageInfo = {
 
 export async function injectContinuationPrompt(
 	ctx: PluginInput,
-	options: { sessionID: string; prompt: string; directory: string; apiTimeoutMs: number },
+	options: {
+		sessionID: string
+		prompt: string
+		directory: string
+		apiTimeoutMs: number
+		inheritFromSessionID?: string
+	},
 ): Promise<void> {
 	let agent: string | undefined
 	let model: { providerID: string; modelID: string } | undefined
 	let tools: Record<string, boolean | "allow" | "deny" | "ask"> | undefined
+	const sourceSessionID = options.inheritFromSessionID ?? options.sessionID
 
 	try {
 		const messagesResp = await withTimeout(
 			ctx.client.session.messages({
-				path: { id: options.sessionID },
+				path: { id: sourceSessionID },
 			}),
 			options.apiTimeoutMs,
 		)
@@ -47,7 +54,7 @@ export async function injectContinuationPrompt(
 			}
 		}
 	} catch {
-		const messageDir = getMessageDir(options.sessionID)
+		const messageDir = getMessageDir(sourceSessionID)
 		const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
 		agent = currentMessage?.agent
 		model =
@@ -60,7 +67,7 @@ export async function injectContinuationPrompt(
 		tools = currentMessage?.tools
 	}
 
-	const inheritedTools = resolveInheritedPromptTools(options.sessionID, tools)
+	const inheritedTools = resolveInheritedPromptTools(sourceSessionID, tools)
 
 	await ctx.client.session.promptAsync({
 		path: { id: options.sessionID },

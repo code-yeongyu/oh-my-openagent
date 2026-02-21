@@ -7,6 +7,10 @@ import { extractChannel } from "../version-channel"
 import { findPluginEntry, getCachedVersion, getLatestVersion, revertPinnedVersion } from "../checker"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
+function getPinnedVersionToastMessage(latestVersion: string): string {
+  return `Update available: ${latestVersion} (version pinned, update manually)`
+}
+
 async function runBunInstallSafe(): Promise<boolean> {
   try {
     return await runBunInstall()
@@ -56,7 +60,7 @@ export async function runBackgroundUpdateCheck(
   }
 
   if (pluginInfo.isPinned) {
-    await showUpdateAvailableToast(ctx, latestVersion, getToastMessage)
+    await showUpdateAvailableToast(ctx, latestVersion, () => getPinnedVersionToastMessage(latestVersion))
     log(`[auto-update-checker] User-pinned version detected (${pluginInfo.entry}), skipping auto-update. Notification only.`)
     return
   }
