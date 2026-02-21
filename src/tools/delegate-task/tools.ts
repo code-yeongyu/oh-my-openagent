@@ -128,6 +128,7 @@ Prompts MUST be in English.`
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
         disabledSkills: options.disabledSkills,
+        directory: options.directory,
       })
       if (skillError) {
         return skillError
