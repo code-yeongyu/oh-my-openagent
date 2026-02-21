@@ -1,7 +1,7 @@
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
 import { TMUX_CALLBACK_DELAY_MS } from "./constants"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, createInternalAgentTextPart } from "../../shared"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { isInsideTmux } from "../../shared/tmux"
@@ -146,7 +146,7 @@ export async function startTask(
         question: false,
         ...getAgentToolRestrictions(input.agent),
       },
-      parts: [{ type: "text", text: input.prompt }],
+      parts: [createInternalAgentTextPart(input.prompt)],
     },
   }).catch((error) => {
     log("[background-agent] promptAsync error:", error)
@@ -230,7 +230,7 @@ export async function resumeTask(
         question: false,
         ...getAgentToolRestrictions(task.agent),
       },
-      parts: [{ type: "text", text: input.prompt }],
+      parts: [createInternalAgentTextPart(input.prompt)],
     },
   }).catch((error) => {
     log("[background-agent] resume prompt error:", error)

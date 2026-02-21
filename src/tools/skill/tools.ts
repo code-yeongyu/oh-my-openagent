@@ -10,6 +10,15 @@ import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
 import { discoverCommandsSync } from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
 import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
+// Priority: project > user > opencode/opencode-project > builtin/config
+const scopePriority: Record<string, number> = {
+  project: 4,
+  user: 3,
+  opencode: 2,
+  "opencode-project": 2,
+  config: 1,
+  builtin: 1,
+}
 
 function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
   return {
@@ -31,15 +40,7 @@ function formatCombinedDescription(skills: SkillInfo[], commands: CommandInfo[])
     return TOOL_DESCRIPTION_NO_SKILLS
   }
 
-  // Priority: project > user > opencode/opencode-project > builtin/config
-  const scopePriority: Record<string, number> = {
-    project: 4,
-    user: 3,
-    opencode: 2,
-    "opencode-project": 2,
-    config: 1,
-    builtin: 1,
-  }
+  // Uses module-level scopePriority for consistent priority ordering
 
   const allItems: string[] = []
 
@@ -273,8 +274,13 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         return output.join("\n")
       }
 
-      // Check commands (exact match, case-insensitive)
-      const matchedCommand = commands.find(c => c.name.toLowerCase() === requestedName.toLowerCase())
+      // Check commands (exact match, case-insensitive) - sort by priority first
+      const sortedCommands = [...commands].sort((a, b) => {
+        const priorityA = scopePriority[a.scope] || 0
+        const priorityB = scopePriority[b.scope] || 0
+        return priorityB - priorityA // Higher priority first
+      })
+      const matchedCommand = sortedCommands.find(c => c.name.toLowerCase() === requestedName.toLowerCase())
 
       if (matchedCommand) {
         return await formatLoadedCommand(matchedCommand, args.user_message)

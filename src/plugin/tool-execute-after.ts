@@ -44,5 +44,6 @@ export function createToolExecuteAfterHandler(args: {
     await hooks.atlasHook?.["tool.execute.after"]?.(input, output)
     await hooks.taskResumeInfo?.["tool.execute.after"]?.(input, output)
     await hooks.hashlineReadEnhancer?.["tool.execute.after"]?.(input, output)
+    await hooks.jsonErrorRecovery?.["tool.execute.after"]?.(input, output)
   }
 }

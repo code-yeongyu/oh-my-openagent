@@ -45,6 +45,24 @@ export function createChatMessageHandler(args: {
   output: ChatMessageHandlerOutput
 ) => Promise<void> {
   const { ctx, pluginConfig, firstMessageVariantGate, hooks } = args
+  const pluginContext = ctx as {
+    client: {
+      tui: {
+        showToast: (input: {
+          body: {
+            title: string
+            message: string
+            variant: "warning"
+            duration: number
+          }
+        }) => Promise<unknown>
+      }
+    }
+  }
+  const isRuntimeFallbackEnabled =
+    hooks.runtimeFallback !== null &&
+    hooks.runtimeFallback !== undefined &&
+    (pluginConfig.runtime_fallback?.enabled ?? true)
 
   return async (
     input: ChatMessageInput,
@@ -58,7 +76,9 @@ export function createChatMessageHandler(args: {
       firstMessageVariantGate.markApplied(input.sessionID)
     }
 
-    await hooks.modelFallback?.["chat.message"]?.(input, output)
+    if (!isRuntimeFallbackEnabled) {
+      await hooks.modelFallback?.["chat.message"]?.(input, output)
+    }
     const modelOverride = output.message["model"]
     if (
       modelOverride &&
@@ -86,7 +106,7 @@ export function createChatMessageHandler(args: {
     }
 
     if (!hasConnectedProvidersCache()) {
-      ctx.client.tui
+      pluginContext.client.tui
         .showToast({
           body: {
             title: "⚠️ Provider Cache Missing",
@@ -130,6 +150,6 @@ export function createChatMessageHandler(args: {
       }
     }
 
-    applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, ctx.client.tui, input.sessionID)
+    applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, pluginContext.client.tui, input.sessionID)
   }
 }
