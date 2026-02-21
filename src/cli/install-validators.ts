@@ -1,4 +1,5 @@
 import color from "picocolors"
+import { createEmptyLocalProviderModels } from "./local-model-capabilities"
 import type {
   BooleanArg,
   ClaudeSubscription,
@@ -38,6 +39,9 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
+  lines.push(formatProvider("LMStudio", config.hasLmstudio, config.lmstudioUrl))
+  lines.push(formatProvider("Ollama", config.hasOllama, config.ollamaUrl))
+  lines.push(formatProvider("vLLM", config.hasVllm, config.vllmUrl))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -46,7 +50,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(color.bold(color.white("Model Assignment")))
   lines.push("")
   lines.push(`  ${SYMBOLS.info} Models auto-configured based on provider priority`)
-  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai`)
+  lines.push(`  ${SYMBOLS.bullet} Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Local`)
 
   return lines.join("\n")
 }
@@ -119,15 +123,11 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --claude value: ${args.claude} (expected: no, yes, max20)`)
   }
 
-  if (args.gemini === undefined) {
-    errors.push("--gemini is required (values: no, yes)")
-  } else if (!["no", "yes"].includes(args.gemini)) {
+  if (args.gemini !== undefined && !["no", "yes"].includes(args.gemini)) {
     errors.push(`Invalid --gemini value: ${args.gemini} (expected: no, yes)`)
   }
 
-  if (args.copilot === undefined) {
-    errors.push("--copilot is required (values: no, yes)")
-  } else if (!["no", "yes"].includes(args.copilot)) {
+  if (args.copilot !== undefined && !["no", "yes"].includes(args.copilot)) {
     errors.push(`Invalid --copilot value: ${args.copilot} (expected: no, yes)`)
   }
 
@@ -147,10 +147,35 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
   }
 
+  const localProviderUrls = [
+    { flag: "--lmstudio", value: args.lmstudio },
+    { flag: "--ollama", value: args.ollama },
+    { flag: "--vllm", value: args.vllm },
+  ]
+
+  for (const localProvider of localProviderUrls) {
+    if (localProvider.value !== undefined && !isValidHttpUrl(localProvider.value)) {
+      errors.push(`Invalid ${localProvider.flag} value: ${localProvider.value} (expected: http://... or https://...)`)
+    }
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 export function argsToConfig(args: InstallArgs): InstallConfig {
+  const lmstudioUrl = args.lmstudio?.trim() || undefined
+  const ollamaUrl = args.ollama?.trim() || undefined
+  const vllmUrl = args.vllm?.trim() || undefined
+
   return {
     hasClaude: args.claude !== "no",
     isMax20: args.claude === "max20",
@@ -160,6 +185,13 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
     hasKimiForCoding: args.kimiForCoding === "yes",
+    hasLmstudio: lmstudioUrl !== undefined,
+    lmstudioUrl,
+    hasOllama: ollamaUrl !== undefined,
+    ollamaUrl,
+    hasVllm: vllmUrl !== undefined,
+    vllmUrl,
+    localProviderModels: createEmptyLocalProviderModels(),
   }
 }
 

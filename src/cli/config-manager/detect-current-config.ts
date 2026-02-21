@@ -35,6 +35,46 @@ function detectProvidersFromOmoConfig(): {
   }
 }
 
+function detectLocalProvidersFromOpenCodeConfig(openCodeConfig: Record<string, unknown>): {
+  hasLmstudio: boolean
+  lmstudioUrl?: string
+  hasOllama: boolean
+  ollamaUrl?: string
+  hasVllm: boolean
+  vllmUrl?: string
+} {
+  const providers = openCodeConfig.provider
+  if (!providers || typeof providers !== "object" || Array.isArray(providers)) {
+    return {
+      hasLmstudio: false,
+      hasOllama: false,
+      hasVllm: false,
+    }
+  }
+
+  const readUrl = (providerName: string): string | undefined => {
+    const providerValue = (providers as Record<string, unknown>)[providerName]
+    if (!providerValue || typeof providerValue !== "object" || Array.isArray(providerValue)) {
+      return undefined
+    }
+    const url = (providerValue as Record<string, unknown>).url
+    return typeof url === "string" && url.length > 0 ? url : undefined
+  }
+
+  const lmstudioUrl = readUrl("lmstudio")
+  const ollamaUrl = readUrl("ollama")
+  const vllmUrl = readUrl("vllm")
+
+  return {
+    hasLmstudio: lmstudioUrl !== undefined,
+    lmstudioUrl,
+    hasOllama: ollamaUrl !== undefined,
+    ollamaUrl,
+    hasVllm: vllmUrl !== undefined,
+    vllmUrl,
+  }
+}
+
 export function detectCurrentConfig(): DetectedConfig {
   const result: DetectedConfig = {
     isInstalled: false,
@@ -46,6 +86,9 @@ export function detectCurrentConfig(): DetectedConfig {
     hasOpencodeZen: true,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
+    hasLmstudio: false,
+    hasOllama: false,
+    hasVllm: false,
   }
 
   const { format, path } = detectConfigFormat()
@@ -73,6 +116,14 @@ export function detectCurrentConfig(): DetectedConfig {
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
+
+  const localProviders = detectLocalProvidersFromOpenCodeConfig(openCodeConfig as Record<string, unknown>)
+  result.hasLmstudio = localProviders.hasLmstudio
+  result.lmstudioUrl = localProviders.lmstudioUrl
+  result.hasOllama = localProviders.hasOllama
+  result.ollamaUrl = localProviders.ollamaUrl
+  result.hasVllm = localProviders.hasVllm
+  result.vllmUrl = localProviders.vllmUrl
 
   return result
 }

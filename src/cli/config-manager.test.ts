@@ -2,6 +2,7 @@ import { describe, expect, test, mock, afterEach } from "bun:test"
 
 import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateOmoConfig } from "./config-manager"
 import type { InstallConfig } from "./types"
+import { createEmptyLocalProviderModels } from "./local-model-capabilities"
 
 describe("getPluginNameWithVersion", () => {
   const originalFetch = globalThis.fetch
@@ -251,6 +252,10 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasLmstudio: false,
+      hasOllama: false,
+      hasVllm: false,
+      localProviderModels: createEmptyLocalProviderModels(),
     }
 
     // #when generating config
@@ -271,6 +276,10 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasLmstudio: false,
+      hasOllama: false,
+      hasVllm: false,
+      localProviderModels: createEmptyLocalProviderModels(),
     }
 
     // #when generating config
@@ -292,6 +301,10 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: true,
       hasKimiForCoding: false,
+      hasLmstudio: false,
+      hasOllama: false,
+      hasVllm: false,
+      localProviderModels: createEmptyLocalProviderModels(),
     }
 
     // #when generating config
@@ -314,6 +327,10 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasLmstudio: false,
+      hasOllama: false,
+      hasVllm: false,
+      localProviderModels: createEmptyLocalProviderModels(),
     }
 
     // #when generating config
@@ -338,6 +355,10 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasLmstudio: false,
+      hasOllama: false,
+      hasVllm: false,
+      localProviderModels: createEmptyLocalProviderModels(),
     }
 
     // #when generating config
@@ -358,6 +379,10 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasLmstudio: false,
+      hasOllama: false,
+      hasVllm: false,
+      localProviderModels: createEmptyLocalProviderModels(),
     }
 
     // #when generating config

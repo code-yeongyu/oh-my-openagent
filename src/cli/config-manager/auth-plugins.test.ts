@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { writeFileSync, readFileSync, existsSync, rmSync, mkdirSync } from "node:fs"
 import { parseJsonc } from "../../shared/jsonc-parser"
 import type { InstallConfig } from "../types"
+import { createEmptyLocalProviderModels } from "../local-model-capabilities"
 import { resetConfigContext } from "./config-context"
 
 let testConfigPath: string
@@ -39,6 +40,10 @@ const testConfig: InstallConfig = {
   hasOpencodeZen: false,
   hasZaiCodingPlan: false,
   hasKimiForCoding: false,
+  hasLmstudio: false,
+  hasOllama: false,
+  hasVllm: false,
+  localProviderModels: createEmptyLocalProviderModels(),
 }
 
 describe("addAuthPlugins", () => {

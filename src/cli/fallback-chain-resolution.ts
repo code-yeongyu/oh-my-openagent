@@ -1,8 +1,20 @@
 import type { FallbackEntry } from "../shared/model-requirements"
+import { resolveLocalModelForSelector } from "./local-model-capabilities"
 import type { ProviderAvailability } from "./model-fallback-types"
 import { CLI_AGENT_MODEL_REQUIREMENTS } from "./model-fallback-requirements"
 import { isProviderAvailable } from "./provider-availability"
 import { transformModelForProvider } from "./provider-model-id-transform"
+
+function resolveEntryModelForProvider(
+	provider: string,
+	model: string,
+	availability: ProviderAvailability
+): string | null {
+	if (provider === "lmstudio" || provider === "ollama" || provider === "vllm") {
+		return resolveLocalModelForSelector(provider, model, availability.localProviderModels)
+	}
+	return model
+}
 
 export function resolveModelFromChain(
 	fallbackChain: FallbackEntry[],
@@ -11,7 +23,11 @@ export function resolveModelFromChain(
 	for (const entry of fallbackChain) {
 		for (const provider of entry.providers) {
 			if (isProviderAvailable(provider, availability)) {
-				const transformedModel = transformModelForProvider(provider, entry.model)
+				const resolvedModel = resolveEntryModelForProvider(provider, entry.model, availability)
+				if (!resolvedModel) {
+					continue
+				}
+				const transformedModel = transformModelForProvider(provider, resolvedModel)
 				return {
 					model: `${provider}/${transformedModel}`,
 					variant: entry.variant,

@@ -1,6 +1,33 @@
 export type ClaudeSubscription = "no" | "yes" | "max20"
 export type BooleanArg = "no" | "yes"
 
+export type LocalProvider = "lmstudio" | "ollama" | "vllm"
+
+export type LocalModelCapability = "multimodal" | "coding" | "general"
+
+export type LocalModelTarget =
+  | "explore"
+  | "librarian"
+  | "atlas"
+  | "multimodal-looker"
+  | "quick"
+  | "unspecified-low"
+
+export interface LocalModelConfig {
+  id: string
+  name: string
+  contextLength?: number
+  outputLength?: number
+  capabilities: LocalModelCapability[]
+  targets: LocalModelTarget[]
+}
+
+export interface LocalProviderModels {
+  lmstudio: LocalModelConfig[]
+  ollama: LocalModelConfig[]
+  vllm: LocalModelConfig[]
+}
+
 export interface InstallArgs {
   tui: boolean
   claude?: ClaudeSubscription
@@ -10,6 +37,9 @@ export interface InstallArgs {
   opencodeZen?: BooleanArg
   zaiCodingPlan?: BooleanArg
   kimiForCoding?: BooleanArg
+  lmstudio?: string
+  ollama?: string
+  vllm?: string
   skipAuth?: boolean
 }
 
@@ -22,6 +52,13 @@ export interface InstallConfig {
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
+  hasLmstudio: boolean
+  lmstudioUrl?: string
+  hasOllama: boolean
+  ollamaUrl?: string
+  hasVllm: boolean
+  vllmUrl?: string
+  localProviderModels: LocalProviderModels
 }
 
 export interface ConfigMergeResult {
@@ -40,4 +77,10 @@ export interface DetectedConfig {
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
+  hasLmstudio?: boolean
+  lmstudioUrl?: string
+  hasOllama?: boolean
+  ollamaUrl?: string
+  hasVllm?: boolean
+  vllmUrl?: string
 }

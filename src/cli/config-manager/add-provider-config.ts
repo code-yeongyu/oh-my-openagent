@@ -9,6 +9,42 @@ import { ANTIGRAVITY_PROVIDER_CONFIG } from "./antigravity-provider-configuratio
 import { modifyProviderInJsonc } from "./jsonc-provider-editor"
 import { parseJsonc } from "../../shared/jsonc-parser"
 
+const DEFAULT_LOCAL_CONTEXT_LIMIT = 32768
+const DEFAULT_LOCAL_OUTPUT_LIMIT = 4096
+
+function toLocalProviderModels(config: InstallConfig["localProviderModels"][keyof InstallConfig["localProviderModels"]]): Record<string, unknown> {
+  return Object.fromEntries(
+    config.map((model) => [
+      model.id,
+      {
+        name: model.name,
+        limit: {
+          context: model.contextLength ?? DEFAULT_LOCAL_CONTEXT_LIMIT,
+          output: model.outputLength ?? DEFAULT_LOCAL_OUTPUT_LIMIT,
+        },
+      },
+    ])
+  )
+}
+
+function buildOpenAiCompatibleLocalProvider(name: string, url: string, models: InstallConfig["localProviderModels"]["lmstudio"]): Record<string, unknown> {
+  return {
+    type: "openai",
+    url,
+    name,
+    models: toLocalProviderModels(models),
+  }
+}
+
+function buildOllamaProvider(url: string, models: InstallConfig["localProviderModels"]["ollama"]): Record<string, unknown> {
+  return {
+    type: "ollama",
+    url,
+    name: "Ollama Local",
+    models: toLocalProviderModels(models),
+  }
+}
+
 export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
   try {
     ensureConfigDirectoryExists()
@@ -41,6 +77,26 @@ export function addProviderConfig(config: InstallConfig): ConfigMergeResult {
 
     if (config.hasGemini) {
       providers.google = ANTIGRAVITY_PROVIDER_CONFIG.google
+    }
+
+    if (config.hasLmstudio && config.lmstudioUrl) {
+      providers.lmstudio = buildOpenAiCompatibleLocalProvider(
+        "LMStudio Local",
+        config.lmstudioUrl,
+        config.localProviderModels.lmstudio
+      )
+    }
+
+    if (config.hasOllama && config.ollamaUrl) {
+      providers.ollama = buildOllamaProvider(config.ollamaUrl, config.localProviderModels.ollama)
+    }
+
+    if (config.hasVllm && config.vllmUrl) {
+      providers.vllm = buildOpenAiCompatibleLocalProvider(
+        "vLLM Local",
+        config.vllmUrl,
+        config.localProviderModels.vllm
+      )
     }
 
     if (Object.keys(providers).length > 0) {

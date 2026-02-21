@@ -33,12 +33,14 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["zai-coding-plan"], model: "glm-4.7" },
       { providers: ["opencode"], model: "glm-4.7-free" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
+      { providers: ["lmstudio", "ollama", "vllm"], model: "local:librarian" },
     ],
   },
   explore: {
     fallbackChain: [
       { providers: ["github-copilot"], model: "grok-code-fast-1" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+      { providers: ["lmstudio", "ollama", "vllm"], model: "local:explore" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -50,6 +52,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["opencode"], model: "kimi-k2.5-free" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-haiku-4-5" },
+      { providers: ["lmstudio", "ollama", "vllm"], model: "local:multimodal-looker" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -85,6 +88,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
+      { providers: ["lmstudio", "ollama", "vllm"], model: "local:atlas" },
     ],
   },
 }
@@ -125,6 +129,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-haiku-4-5" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },
+      { providers: ["lmstudio", "ollama", "vllm"], model: "local:quick" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -133,6 +138,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },
+      { providers: ["lmstudio", "ollama", "vllm"], model: "local:unspecified-low" },
     ],
   },
   "unspecified-high": {
