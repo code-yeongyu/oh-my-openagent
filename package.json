@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
-    "oh-my-opencode": "./bin/oh-my-opencode.js"
+    "oh-my-opencode": "bin/oh-my-opencode.js"
   },
   "files": [
     "dist",
@@ -55,10 +55,9 @@
     "@ast-grep/napi": "^0.40.0",
     "@clack/prompts": "^0.11.0",
     "@code-yeongyu/comment-checker": "^0.6.1",
-    "@modelcontextprotocol/sdk": "^1.25.1",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "@opencode-ai/plugin": "^1.1.19",
     "@opencode-ai/sdk": "^1.1.19",
-    "codex": "^0.2.3",
     "commander": "^14.0.2",
     "detect-libc": "^2.0.0",
     "js-yaml": "^4.1.1",
