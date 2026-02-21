@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test"
 import { computeLineHash } from "./hash-computation"
-import { parseLineRef, validateLineRef } from "./validation"
+import { parseLineRef, validateLineRef, validateLineRefs } from "./validation"
 
 describe("parseLineRef", () => {
   it("parses valid LINE#ID reference", () => {
@@ -49,7 +49,16 @@ describe("validateLineRef", () => {
     const lines = ["function hello() {"]
 
     //#when / #then
-    expect(() => validateLineRef(lines, "1#ZZ")).toThrow(/current hash/)
+    expect(() => validateLineRef(lines, "1#ZZ")).toThrow(/>>>\s+1#[ZPMQVRWSNKTXJBYH]{2}:/)
+  })
+
+  it("shows >>> mismatch context in batched validation", () => {
+    //#given
+    const lines = ["one", "two", "three", "four"]
+
+    //#when / #then
+    expect(() => validateLineRefs(lines, ["2#ZZ"]))
+      .toThrow(/>>>\s+2#[ZPMQVRWSNKTXJBYH]{2}:two/)
   })
 })
 
@@ -81,7 +90,7 @@ describe("legacy LINE:HEX backward compatibility", () => {
     const lines = ["function hello() {"]
 
     //#when / #then
-    expect(() => validateLineRef(lines, "1:ab")).toThrow(/Hash mismatch|current hash/)
+    expect(() => validateLineRef(lines, "1:ab")).toThrow(/>>>\s+1#[ZPMQVRWSNKTXJBYH]{2}:/)
   })
 
   it("extracts legacy ref from content with markers", () => {

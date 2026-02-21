@@ -18,3 +18,196 @@ export function formatHashLines(content: string): string {
   const lines = content.split("\n")
   return lines.map((line, index) => formatHashLine(index + 1, line)).join("\n")
 }
+
+export interface HashlineStreamOptions {
+  startLine?: number
+  maxChunkLines?: number
+  maxChunkBytes?: number
+}
+
+function isReadableStream(value: unknown): value is ReadableStream<Uint8Array> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "getReader" in value &&
+    typeof (value as { getReader?: unknown }).getReader === "function"
+  )
+}
+
+async function* bytesFromReadableStream(stream: ReadableStream<Uint8Array>): AsyncGenerator<Uint8Array> {
+  const reader = stream.getReader()
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) return
+      if (value) yield value
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+export async function* streamHashLinesFromUtf8(
+  source: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>,
+  options: HashlineStreamOptions = {}
+): AsyncGenerator<string> {
+  const startLine = options.startLine ?? 1
+  const maxChunkLines = options.maxChunkLines ?? 200
+  const maxChunkBytes = options.maxChunkBytes ?? 64 * 1024
+  const decoder = new TextDecoder("utf-8")
+  const chunks = isReadableStream(source) ? bytesFromReadableStream(source) : source
+
+  let lineNumber = startLine
+  let pending = ""
+  let sawAnyText = false
+  let endedWithNewline = false
+  let outputLines: string[] = []
+  let outputBytes = 0
+
+  const flush = (): string | undefined => {
+    if (outputLines.length === 0) return undefined
+    const chunk = outputLines.join("\n")
+    outputLines = []
+    outputBytes = 0
+    return chunk
+  }
+
+  const pushLine = (line: string): string[] => {
+    const formatted = `${lineNumber}#${computeLineHash(lineNumber, line)}:${line}`
+    lineNumber += 1
+
+    const chunksToYield: string[] = []
+    const separatorBytes = outputLines.length === 0 ? 0 : 1
+    const lineBytes = Buffer.byteLength(formatted, "utf-8")
+
+    if (
+      outputLines.length > 0 &&
+      (outputLines.length >= maxChunkLines || outputBytes + separatorBytes + lineBytes > maxChunkBytes)
+    ) {
+      const flushed = flush()
+      if (flushed) chunksToYield.push(flushed)
+    }
+
+    outputLines.push(formatted)
+    outputBytes += (outputLines.length === 1 ? 0 : 1) + lineBytes
+
+    if (outputLines.length >= maxChunkLines || outputBytes >= maxChunkBytes) {
+      const flushed = flush()
+      if (flushed) chunksToYield.push(flushed)
+    }
+
+    return chunksToYield
+  }
+
+  const consumeText = (text: string): string[] => {
+    if (text.length === 0) return []
+    sawAnyText = true
+    pending += text
+    const chunksToYield: string[] = []
+
+    while (true) {
+      const idx = pending.indexOf("\n")
+      if (idx === -1) break
+      const line = pending.slice(0, idx)
+      pending = pending.slice(idx + 1)
+      endedWithNewline = true
+      chunksToYield.push(...pushLine(line))
+    }
+
+    if (pending.length > 0) endedWithNewline = false
+    return chunksToYield
+  }
+
+  for await (const chunk of chunks) {
+    for (const out of consumeText(decoder.decode(chunk, { stream: true }))) {
+      yield out
+    }
+  }
+
+  for (const out of consumeText(decoder.decode())) {
+    yield out
+  }
+
+  if (!sawAnyText) {
+    for (const out of pushLine("")) {
+      yield out
+    }
+  } else if (pending.length > 0 || endedWithNewline) {
+    for (const out of pushLine(pending)) {
+      yield out
+    }
+  }
+
+  const finalChunk = flush()
+  if (finalChunk) yield finalChunk
+}
+
+export async function* streamHashLinesFromLines(
+  lines: Iterable<string> | AsyncIterable<string>,
+  options: HashlineStreamOptions = {}
+): AsyncGenerator<string> {
+  const startLine = options.startLine ?? 1
+  const maxChunkLines = options.maxChunkLines ?? 200
+  const maxChunkBytes = options.maxChunkBytes ?? 64 * 1024
+
+  let lineNumber = startLine
+  let outputLines: string[] = []
+  let outputBytes = 0
+  let sawAnyLine = false
+
+  const flush = (): string | undefined => {
+    if (outputLines.length === 0) return undefined
+    const chunk = outputLines.join("\n")
+    outputLines = []
+    outputBytes = 0
+    return chunk
+  }
+
+  const pushLine = (line: string): string[] => {
+    sawAnyLine = true
+    const formatted = `${lineNumber}#${computeLineHash(lineNumber, line)}:${line}`
+    lineNumber += 1
+
+    const chunksToYield: string[] = []
+    const separatorBytes = outputLines.length === 0 ? 0 : 1
+    const lineBytes = Buffer.byteLength(formatted, "utf-8")
+
+    if (
+      outputLines.length > 0 &&
+      (outputLines.length >= maxChunkLines || outputBytes + separatorBytes + lineBytes > maxChunkBytes)
+    ) {
+      const flushed = flush()
+      if (flushed) chunksToYield.push(flushed)
+    }
+
+    outputLines.push(formatted)
+    outputBytes += (outputLines.length === 1 ? 0 : 1) + lineBytes
+
+    if (outputLines.length >= maxChunkLines || outputBytes >= maxChunkBytes) {
+      const flushed = flush()
+      if (flushed) chunksToYield.push(flushed)
+    }
+
+    return chunksToYield
+  }
+
+  const asyncIterator = (lines as AsyncIterable<string>)[Symbol.asyncIterator]
+  if (typeof asyncIterator === "function") {
+    for await (const line of lines as AsyncIterable<string>) {
+      for (const out of pushLine(line)) yield out
+    }
+  } else {
+    for (const line of lines as Iterable<string>) {
+      for (const out of pushLine(line)) yield out
+    }
+  }
+
+  if (!sawAnyLine) {
+    for (const out of pushLine("")) {
+      yield out
+    }
+  }
+
+  const finalChunk = flush()
+  if (finalChunk) yield finalChunk
+}

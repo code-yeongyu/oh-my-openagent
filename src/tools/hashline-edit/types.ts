@@ -17,10 +17,23 @@ export interface InsertAfter {
   text: string | string[]
 }
 
+export interface InsertBefore {
+  type: "insert_before"
+  line: string
+  text: string | string[]
+}
+
+export interface InsertBetween {
+  type: "insert_between"
+  after_line: string
+  before_line: string
+  text: string | string[]
+}
+
 export interface Replace {
   type: "replace"
   old_text: string
   new_text: string | string[]
 }
 
-export type HashlineEdit = SetLine | ReplaceLines | InsertAfter | Replace
+export type HashlineEdit = SetLine | ReplaceLines | InsertAfter | InsertBefore | InsertBetween | Replace
