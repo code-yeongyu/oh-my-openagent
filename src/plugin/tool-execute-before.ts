@@ -30,6 +30,25 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.prometheusMdOnly?.["tool.execute.before"]?.(input, output)
     await hooks.sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
+
+    const normalizedToolName = input.tool.toLowerCase()
+    if (
+      normalizedToolName === "question"
+      || normalizedToolName === "ask_user_question"
+      || normalizedToolName === "askuserquestion"
+    ) {
+      await hooks.sessionNotification?.({
+        event: {
+          type: "tool.execute.before",
+          properties: {
+            sessionID: input.sessionID,
+            tool: input.tool,
+            args: output.args,
+          },
+        },
+      })
+    }
+
     if (input.tool === "task") {
       const argsObject = output.args
       const category = typeof argsObject.category === "string" ? argsObject.category : undefined

@@ -31,6 +31,60 @@ describe("createToolExecuteBeforeHandler", () => {
     await expect(run).resolves.toBeUndefined()
   })
 
+  test("triggers session notification hook for question tools", async () => {
+    let called = false
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
+    }
+
+    const hooks = {
+      sessionNotification: async (input: { event: { type: string; properties?: Record<string, unknown> } }) => {
+        called = true
+        expect(input.event.type).toBe("tool.execute.before")
+        expect(input.event.properties?.sessionID).toBe("ses_q")
+        expect(input.event.properties?.tool).toBe("question")
+      },
+    }
+
+    const handler = createToolExecuteBeforeHandler({ ctx, hooks })
+    const input = { tool: "question", sessionID: "ses_q", callID: "call_q" }
+    const output = { args: { questions: [{ question: "Proceed?", options: [{ label: "Yes" }] }] } as Record<string, unknown> }
+
+    await handler(input, output)
+
+    expect(called).toBe(true)
+  })
+
+  test("does not trigger session notification hook for non-question tools", async () => {
+    let called = false
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
+    }
+
+    const hooks = {
+      sessionNotification: async () => {
+        called = true
+      },
+    }
+
+    const handler = createToolExecuteBeforeHandler({ ctx, hooks })
+
+    await handler(
+      { tool: "bash", sessionID: "ses_b", callID: "call_b" },
+      { args: { command: "pwd" } as Record<string, unknown> },
+    )
+
+    expect(called).toBe(false)
+  })
+
   describe("task tool subagent_type normalization", () => {
     const emptyHooks = {}
 
