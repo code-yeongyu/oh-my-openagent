@@ -186,6 +186,14 @@ describe("hashline edit operations", () => {
     expect(result).toEqual(["line 1", "inserted", "line 2"])
   })
 
+  it("throws when insert_after payload only repeats anchor line", () => {
+    //#given
+    const lines = ["line 1", "line 2"]
+
+    //#when / #then
+    expect(() => applyInsertAfter(lines, anchorFor(lines, 1), ["line 1"])).toThrow(/non-empty/i)
+  })
+
   it("restores indentation for paired single-line replacement", () => {
     //#given
     const lines = ["if (x) {", "  return 1", "}"]
@@ -211,6 +219,23 @@ describe("hashline edit operations", () => {
 
     //#then
     expect(result).toEqual(["before", "new 1", "new 2", "after"])
+  })
+
+  it("throws when insert_between payload contains only boundary echoes", () => {
+    //#given
+    const lines = ["line 1", "line 2", "line 3"]
+
+    //#when / #then
+    expect(() =>
+      applyHashlineEdits(lines.join("\n"), [
+        {
+          type: "insert_between",
+          after_line: anchorFor(lines, 1),
+          before_line: anchorFor(lines, 2),
+          text: ["line 1", "line 2"],
+        },
+      ])
+    ).toThrow(/non-empty/i)
   })
 
   it("restores indentation for first replace_lines entry", () => {

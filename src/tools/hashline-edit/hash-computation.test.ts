@@ -116,4 +116,26 @@ describe("streamHashLinesFrom*", () => {
     //#then
     expect(result).toBe(formatHashLines(content))
   })
+
+  it("matches formatHashLines for empty utf8 stream input", async () => {
+    //#given
+    const content = ""
+
+    //#when
+    const result = await collectStream(streamHashLinesFromUtf8(utf8Chunks(content, 1), { maxChunkLines: 1 }))
+
+    //#then
+    expect(result).toBe(formatHashLines(content))
+  })
+
+  it("matches formatHashLines for empty line iterable input", async () => {
+    //#given
+    const content = ""
+
+    //#when
+    const result = await collectStream(streamHashLinesFromLines([], { maxChunkLines: 1 }))
+
+    //#then
+    expect(result).toBe(formatHashLines(content))
+  })
 })
