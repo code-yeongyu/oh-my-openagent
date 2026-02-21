@@ -12,10 +12,15 @@ import { loadBuiltinCommands } from "../../features/builtin-commands"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { discoverAllSkills, type LoadedSkill, type LazyContentLoader } from "../../features/opencode-skill-loader"
+import {
+  discoverInstalledPlugins,
+  loadPluginCommands,
+  loadPluginSkillsAsCommands,
+} from "../../features/claude-code-plugin-loader"
 import type { ParsedSlashCommand } from "./types"
 
 interface CommandScope {
-  type: "user" | "project" | "opencode" | "opencode-project" | "skill" | "builtin"
+  type: "user" | "project" | "opencode" | "opencode-project" | "skill" | "builtin" | "plugin"
 }
 
 interface CommandMetadata {
@@ -99,6 +104,36 @@ function skillToCommandInfo(skill: LoadedSkill): CommandInfo {
 
 export interface ExecutorOptions {
   skills?: LoadedSkill[]
+  pluginsEnabled?: boolean
+  enabledPluginsOverride?: Record<string, boolean>
+}
+
+function discoverPluginCommands(options?: ExecutorOptions): CommandInfo[] {
+  if (options?.pluginsEnabled === false) {
+    return []
+  }
+
+  const { plugins } = discoverInstalledPlugins({
+    enabledPluginsOverride: options?.enabledPluginsOverride,
+  })
+
+  const pluginDefinitions = {
+    ...loadPluginCommands(plugins),
+    ...loadPluginSkillsAsCommands(plugins),
+  }
+
+  return Object.entries(pluginDefinitions).map(([name, definition]) => ({
+    name,
+    metadata: {
+      name,
+      description: definition.description || "",
+      model: definition.model,
+      agent: definition.agent,
+      subtask: definition.subtask,
+    },
+    content: definition.template,
+    scope: "plugin",
+  }))
 }
 
 async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandInfo[]> {
@@ -128,6 +163,7 @@ async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandIn
 
   const skills = options?.skills ?? await discoverAllSkills()
   const skillCommands = skills.map(skillToCommandInfo)
+  const pluginCommands = discoverPluginCommands(options)
 
   return [
     ...builtinCommands,
@@ -136,6 +172,7 @@ async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandIn
     ...opencodeGlobalCommands,
     ...userCommands,
     ...skillCommands,
+    ...pluginCommands,
   ]
 }
 
@@ -202,9 +239,7 @@ export async function executeSlashCommand(parsed: ParsedSlashCommand, options?: 
   if (!command) {
     return {
       success: false,
-      error: parsed.command.includes(":")
-        ? `Marketplace plugin commands like "/${parsed.command}" are not supported. Use .claude/commands/ for custom commands.`
-        : `Command "/${parsed.command}" not found. Use the skill tool to list available skills and commands.`,
+      error: `Command "/${parsed.command}" not found. Use the skill tool to list available skills and commands.`,
     }
   }
 
