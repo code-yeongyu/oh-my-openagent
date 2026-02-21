@@ -52,9 +52,11 @@ export async function executeHookCommand(
     let settled = false;
     let killTimer: ReturnType<typeof setTimeout> | null = null;
 
+    const isWin32 = process.platform === "win32";
     const proc = spawn(finalCommand, {
       cwd,
       shell: true,
+      detached: !isWin32,
       env: { ...process.env, HOME: home, CLAUDE_PROJECT_DIR: cwd },
     });
 
@@ -69,6 +71,7 @@ export async function executeHookCommand(
       stderr += data.toString();
     });
 
+    proc.stdin?.on("error", () => {});
     proc.stdin?.write(stdin);
     proc.stdin?.end();
 
@@ -92,17 +95,23 @@ export async function executeHookCommand(
       settle({ exitCode: 1, stderr: err.message });
     });
 
+    const killProcessGroup = (signal: NodeJS.Signals) => {
+      try {
+        if (!isWin32 && proc.pid) {
+          process.kill(-proc.pid, signal);
+        } else {
+          proc.kill(signal);
+        }
+      } catch {}
+    };
+
     const timeoutTimer = setTimeout(() => {
       if (settled) return;
-      // Try graceful shutdown first
-      try {
-        proc.kill("SIGTERM");
-      } catch {}
+      // Kill entire process group to avoid orphaned children
+      killProcessGroup("SIGTERM");
       killTimer = setTimeout(() => {
         if (settled) return;
-        try {
-          proc.kill("SIGKILL");
-        } catch {}
+        killProcessGroup("SIGKILL");
       }, SIGKILL_GRACE_MS);
       // Append timeout notice to stderr
       stderr += `\nHook command timed out after ${timeoutMs}ms`;
