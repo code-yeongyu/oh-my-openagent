@@ -1,5 +1,11 @@
 import { describe, it, expect } from "bun:test"
-import { computeLineHash, formatHashLine, formatHashLines } from "./hash-computation"
+import {
+  computeLineHash,
+  formatHashLine,
+  formatHashLines,
+  streamHashLinesFromLines,
+  streamHashLinesFromUtf8,
+} from "./hash-computation"
 
 describe("computeLineHash", () => {
   it("returns deterministic 2-char CID hash per line", () => {
@@ -69,5 +75,45 @@ describe("formatHashLines", () => {
     expect(lines[0]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}:a$/)
     expect(lines[1]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}:b$/)
     expect(lines[2]).toMatch(/^3#[ZPMQVRWSNKTXJBYH]{2}:c$/)
+  })
+})
+
+describe("streamHashLinesFrom*", () => {
+  async function collectStream(stream: AsyncIterable<string>): Promise<string> {
+    const chunks: string[] = []
+    for await (const chunk of stream) {
+      chunks.push(chunk)
+    }
+    return chunks.join("\n")
+  }
+
+  async function* utf8Chunks(text: string, chunkSize: number): AsyncGenerator<Uint8Array> {
+    const encoded = new TextEncoder().encode(text)
+    for (let i = 0; i < encoded.length; i += chunkSize) {
+      yield encoded.slice(i, i + chunkSize)
+    }
+  }
+
+  it("matches formatHashLines for utf8 stream input", async () => {
+    //#given
+    const content = "a\nb\nc"
+
+    //#when
+    const result = await collectStream(streamHashLinesFromUtf8(utf8Chunks(content, 1), { maxChunkLines: 1 }))
+
+    //#then
+    expect(result).toBe(formatHashLines(content))
+  })
+
+  it("matches formatHashLines for line iterable input", async () => {
+    //#given
+    const content = "x\ny\n"
+    const lines = ["x", "y", ""]
+
+    //#when
+    const result = await collectStream(streamHashLinesFromLines(lines, { maxChunkLines: 2 }))
+
+    //#then
+    expect(result).toBe(formatHashLines(content))
   })
 })
