@@ -37,11 +37,12 @@ export function createToolExecuteBeforeHandler(args: {
       || normalizedToolName === "ask_user_question"
       || normalizedToolName === "askuserquestion"
     ) {
+      const sessionID = input.sessionID || getMainSessionID()
       await hooks.sessionNotification?.({
         event: {
           type: "tool.execute.before",
           properties: {
-            sessionID: input.sessionID,
+            sessionID,
             tool: input.tool,
             args: output.args,
           },
