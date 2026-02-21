@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 export const RuntimeFallbackConfigSchema = z.object({
-  /** Enable runtime fallback (default: true) */
+  /** Enable runtime fallback (default: false) */
   enabled: z.boolean().optional(),
   /** HTTP status codes that trigger fallback (default: [400, 429, 503, 529]) */
   retry_on_errors: z.array(z.number()).optional(),

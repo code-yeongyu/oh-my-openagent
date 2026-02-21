@@ -123,7 +123,7 @@ export function createEventHandler(args: {
     hooks.runtimeFallback !== undefined &&
     (typeof args.pluginConfig.runtime_fallback === "boolean"
       ? args.pluginConfig.runtime_fallback
-      : (args.pluginConfig.runtime_fallback?.enabled ?? true))
+      : (args.pluginConfig.runtime_fallback?.enabled ?? false))
 
   // Avoid triggering multiple abort+continue cycles for the same failing assistant message.
   const lastHandledModelErrorMessageID = new Map<string, string>()
