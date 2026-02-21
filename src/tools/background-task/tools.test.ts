@@ -243,8 +243,7 @@ describe("background_output full_session", () => {
     const output = await tool.execute({ task_id: "task-1" }, mockContext)
 
     // #then
-    expect(output).toContain("# Task Status")
-    expect(output).not.toContain("# Full Session Output")
+    expect(output).toContain("# Full Session Output")
   })
 
   test("returns full session when explicitly requested for running task", async () => {
