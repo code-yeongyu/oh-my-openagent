@@ -54,8 +54,6 @@ export function createChatMessageHandler(args: {
       setSessionAgent(input.sessionID, input.agent)
     }
 
-    const message = output.message
-
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
       firstMessageVariantGate.markApplied(input.sessionID)
     }
