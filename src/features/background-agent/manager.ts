@@ -30,6 +30,7 @@ import {
   hasMoreFallbacks,
   selectFallbackProvider,
 } from "../../shared/model-error-classifier"
+import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import {
   DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
@@ -365,7 +366,7 @@ export class BackgroundManager {
           setSessionTools(sessionID, tools)
           return tools
         })(),
-        parts: [{ type: "text", text: input.prompt }],
+        parts: [createInternalAgentTextPart(input.prompt)],
       },
     }).catch((error) => {
       log("[background-agent] promptAsync error:", error)
@@ -638,7 +639,7 @@ export class BackgroundManager {
           setSessionTools(existingTask.sessionID!, tools)
           return tools
         })(),
-        parts: [{ type: "text", text: input.prompt }],
+        parts: [createInternalAgentTextPart(input.prompt)],
       },
     }).catch((error) => {
       log("[background-agent] resume prompt error:", error)
@@ -1007,9 +1008,10 @@ export class BackgroundManager {
     }
 
     task.attemptCount = selectedAttemptCount
+    const transformedModelId = transformModelForProvider(providerID, nextFallback.model)
     task.model = {
       providerID,
-      modelID: nextFallback.model,
+      modelID: transformedModelId,
       variant: nextFallback.variant,
     }
     task.status = "pending"

@@ -6,7 +6,6 @@ export const HookNameSchema = z.enum([
   "session-recovery",
   "session-notification",
   "comment-checker",
-  "grep-output-truncator",
   "tool-output-truncator",
   "question-label-truncator",
   "directory-agents-injector",
@@ -44,7 +43,6 @@ export const HookNameSchema = z.enum([
   "start-work",
   "atlas",
   "unstable-agent-babysitter",
-  "task-reminder",
   "task-resume-info",
   "stop-continuation-guard",
   "tasks-todowrite-disabler",
@@ -54,6 +52,7 @@ export const HookNameSchema = z.enum([
   "hashline-read-enhancer",
   "hashline-edit-diff-enhancer",
   "agent-switch",
+  "task-reminder",
 ])
 
 export type HookName = z.infer<typeof HookNameSchema>

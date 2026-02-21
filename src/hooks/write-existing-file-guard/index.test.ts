@@ -532,12 +532,15 @@ describe("createWriteExistingFileGuardHook", () => {
       })
     ).resolves.toBeDefined()
 
-    // delete the session to trigger cleanup of any stored permissions/state
+    // read the file again to re-establish permission after first write consumed it
     await invoke({
-      tool: "session.deleted",
+      tool: "read",
       sessionID,
-      outputArgs: {},
+      outputArgs: { filePath: existingFile },
     })
+
+    // delete the session to trigger cleanup of any stored permissions/state
+    await emitSessionDeleted(sessionID)
 
     // after session deletion, the previous permissions must no longer apply
     await expect(
