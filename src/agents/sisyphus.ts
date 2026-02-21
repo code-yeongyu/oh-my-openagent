@@ -25,6 +25,7 @@ import {
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
+  buildDeepParallelSection,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder";
 
@@ -139,6 +140,7 @@ Should I proceed with [recommendation], or would you prefer differently?
 }
 
 function buildDynamicSisyphusPrompt(
+  model: string,
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
   availableSkills: AvailableSkill[] = [],
@@ -161,6 +163,7 @@ function buildDynamicSisyphusPrompt(
   const oracleSection = buildOracleSection(availableAgents);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
+  const deepParallelSection = buildDeepParallelSection(model, availableCategories);
   const taskManagementSection = buildTaskManagementSection(useTaskSystem);
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
@@ -356,6 +359,8 @@ STOP searching when:
 
 ${categorySkillsGuide}
 
+${deepParallelSection}
+
 ${delegationTable}
 
 ### Delegation Prompt Structure (MANDATORY - ALL 6 sections):
@@ -545,13 +550,14 @@ export function createSisyphusAgent(
   const categories = availableCategories ?? [];
   const prompt = availableAgents
     ? buildDynamicSisyphusPrompt(
+        model,
         availableAgents,
         tools,
         skills,
         categories,
         useTaskSystem,
       )
-    : buildDynamicSisyphusPrompt([], tools, skills, categories, useTaskSystem);
+    : buildDynamicSisyphusPrompt(model, [], tools, skills, categories, useTaskSystem);
 
   const permission = {
     question: "allow",
