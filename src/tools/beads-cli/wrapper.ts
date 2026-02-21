@@ -5,7 +5,8 @@ import type {
   BdUpdateOptions,
   BdCloseOptions,
   BdDependencyType,
-} from "../../features/beads-integration/types"
+  BdResult,
+} from "./types"
 import { log } from "../../shared"
 
 export interface BeadsWrapperOptions {
@@ -19,20 +20,17 @@ export class BeadsWrapper {
     this.config = options.config
   }
 
-  private buildCommand(command: string, args: string[] = []): string {
+  private buildCommand(command: string, args: string[] = []): string[] {
     const baseCommand = this.config.beads_command ?? "bd"
-    const fullArgs = args.join(" ")
-    return `${baseCommand} ${command} ${fullArgs}`.trim()
+    return [baseCommand, command, ...args]
   }
 
-  private async exec(cmd: string): Promise<string> {
+  private async exec(cmdParts: string[]): Promise<string> {
     const { spawn } = await import("bun")
+    const cmd = cmdParts.join(" ")
     log(`[BeadsWrapper] Executing: ${cmd}`)
 
-    const parts = cmd.split(" ")
-    const [cli, ...args] = parts
-
-    const proc = spawn([cli, ...args], {
+    const proc = spawn(cmdParts, {
       stdout: "pipe",
       stderr: "pipe",
     })
@@ -42,30 +40,44 @@ export class BeadsWrapper {
     const exitCode = await proc.exited
 
     if (exitCode !== 0) {
-      throw new Error(`Beads command failed (exit ${exitCode}): ${stderr || stdout}`)
+      const errorMsg = stderr.trim() || stdout.trim() || `exit code ${exitCode}`
+      throw new Error(`Beads command failed: ${errorMsg}`)
     }
 
     return stdout
   }
 
-  private async execJson<T>(cmd: string): Promise<T | null> {
+  private async execJson<T>(cmdParts: string[]): Promise<BdResult<T>> {
     try {
-      const output = await this.exec(cmd + " --json")
-      return JSON.parse(output) as T
+      const output = await this.exec([...cmdParts, "--json"])
+      const data = JSON.parse(output) as T
+      return { success: true, data }
     } catch (e) {
-      log(`[BeadsWrapper] JSON parse error`, { error: e instanceof Error ? e.message : String(e) })
-      return null
+      const error = e instanceof Error ? e.message : String(e)
+      log(`[BeadsWrapper] Command failed`, { error })
+      return { success: false, error }
     }
   }
 
-  async ready(): Promise<BdIssue[]> {
-    const cmd = this.buildCommand("ready")
-    const result = await this.execJson<BdIssue[]>(cmd)
-    return result ?? []
+  private async execBoolean(cmdParts: string[]): Promise<BdResult<void>> {
+    try {
+      await this.exec(cmdParts)
+      return { success: true }
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e)
+      log(`[BeadsWrapper] Command failed`, { error })
+      return { success: false, error }
+    }
   }
 
-  async create(title: string, options: BdCreateOptions = {}): Promise<BdIssue | null> {
-    const args: string[] = [`"${title.replace(/"/g, '\\"')}"`]
+  async ready(): Promise<BdResult<BdIssue[]>> {
+    const cmd = this.buildCommand("ready")
+    const result = await this.execJson<BdIssue[]>(cmd)
+    return result.success ? { success: true, data: result.data ?? [] } : result
+  }
+
+  async create(title: string, options: BdCreateOptions = {}): Promise<BdResult<BdIssue>> {
+    const args: string[] = [title]
 
     if (options.priority !== undefined) {
       args.push(`--priority=${options.priority}`)
@@ -74,14 +86,14 @@ export class BeadsWrapper {
       args.push(`--type=${options.issue_type}`)
     }
     if (options.assignee) {
-      args.push(`--assignee="${options.assignee.replace(/"/g, '\\"')}"`)
+      args.push(`--assignee=${options.assignee}`)
     }
 
     const cmd = this.buildCommand("create", args)
     return this.execJson<BdIssue>(cmd)
   }
 
-  async update(id: string, options: BdUpdateOptions = {}): Promise<BdIssue | null> {
+  async update(id: string, options: BdUpdateOptions = {}): Promise<BdResult<BdIssue>> {
     const args: string[] = [id]
 
     if (options.status) {
@@ -91,7 +103,7 @@ export class BeadsWrapper {
       args.push(`--priority=${options.priority}`)
     }
     if (options.assignee) {
-      args.push(`--assignee="${options.assignee.replace(/"/g, '\\"')}"`)
+      args.push(`--assignee=${options.assignee}`)
     }
     if (options.claim) {
       args.push("--claim")
@@ -101,69 +113,48 @@ export class BeadsWrapper {
     return this.execJson<BdIssue>(cmd)
   }
 
-  async close(id: string, options: BdCloseOptions = {}): Promise<BdIssue | null> {
+  async close(id: string, options: BdCloseOptions = {}): Promise<BdResult<BdIssue>> {
     const args: string[] = [id]
 
     if (options.reason) {
-      args.push(`--reason="${options.reason.replace(/"/g, '\\"')}"`)
+      args.push(`--reason=${options.reason}`)
     }
 
     const cmd = this.buildCommand("close", args)
     return this.execJson<BdIssue>(cmd)
   }
 
-  async sync(): Promise<boolean> {
-    try {
-      const cmd = this.buildCommand("sync")
-      await this.exec(cmd)
-      return true
-    } catch {
-      return false
-    }
+  async sync(): Promise<BdResult<void>> {
+    const cmd = this.buildCommand("sync")
+    return this.execBoolean(cmd)
   }
 
-  async depAdd(id: string, depId: string, type: BdDependencyType): Promise<boolean> {
-    try {
-      const args = [id, depId, `--type=${type}`]
-      const cmd = this.buildCommand("dep add", args)
-      await this.exec(cmd)
-      return true
-    } catch {
-      return false
-    }
+  async depAdd(id: string, depId: string, type: BdDependencyType): Promise<BdResult<void>> {
+    const args = [id, depId, `--type=${type}`]
+    const cmd = this.buildCommand("dep", ["add", ...args])
+    return this.execBoolean(cmd)
   }
 
-  async depRemove(id: string, depId: string): Promise<boolean> {
-    try {
-      const args = [id, depId]
-      const cmd = this.buildCommand("dep remove", args)
-      await this.exec(cmd)
-      return true
-    } catch {
-      return false
-    }
+  async depRemove(id: string, depId: string): Promise<BdResult<void>> {
+    const args = [id, depId]
+    const cmd = this.buildCommand("dep", ["remove", ...args])
+    return this.execBoolean(cmd)
   }
 
-  async init(): Promise<boolean> {
-    try {
-      const args = ["--quiet"]
-      const cmd = this.buildCommand("init", args)
-      await this.exec(cmd)
-      return true
-    } catch {
-      return false
-    }
+  async init(): Promise<BdResult<void>> {
+    const cmd = this.buildCommand("init", ["--quiet"])
+    return this.execBoolean(cmd)
   }
 
-  async claim(id: string, assignee?: string): Promise<BdIssue | null> {
+  async claim(id: string, assignee?: string): Promise<BdResult<BdIssue>> {
     return this.update(id, { claim: true, assignee })
   }
 
-  async block(id: string): Promise<BdIssue | null> {
+  async block(id: string): Promise<BdResult<BdIssue>> {
     return this.update(id, { status: "blocked" })
   }
 
-  async reopen(id: string): Promise<BdIssue | null> {
+  async reopen(id: string): Promise<BdResult<BdIssue>> {
     return this.update(id, { status: "open" })
   }
 }

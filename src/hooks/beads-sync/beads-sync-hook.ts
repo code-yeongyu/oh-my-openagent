@@ -14,10 +14,9 @@ export interface BeadsSyncHookOptions {
 async function initBeads(ctx: PluginInput, config: BeadsConfig): Promise<void> {
   const { spawn } = await import("bun")
   const baseCommand = config.beads_command ?? "bd"
-  const cmd = `${baseCommand} init --quiet`
+  const cmdParts = [baseCommand, "init", "--quiet"]
 
-  const [cli, ...args] = cmd.split(" ")
-  const proc = spawn([cli, ...args], {
+  const proc = spawn(cmdParts, {
     cwd: ctx.directory,
     stdout: "pipe",
     stderr: "pipe",
@@ -34,10 +33,9 @@ async function initBeads(ctx: PluginInput, config: BeadsConfig): Promise<void> {
 async function syncBeads(ctx: PluginInput, config: BeadsConfig): Promise<void> {
   const { spawn } = await import("bun")
   const baseCommand = config.beads_command ?? "bd"
-  const cmd = `${baseCommand} sync`
+  const cmdParts = [baseCommand, "sync"]
 
-  const [cli, ...args] = cmd.split(" ")
-  const proc = spawn([cli, ...args], {
+  const proc = spawn(cmdParts, {
     cwd: ctx.directory,
     stdout: "pipe",
     stderr: "pipe",
@@ -49,6 +47,16 @@ async function syncBeads(ctx: PluginInput, config: BeadsConfig): Promise<void> {
   if (exitCode !== 0) {
     throw new Error(`Beads sync failed (exit code ${exitCode}): ${stderr}`)
   }
+}
+
+function showToast(ctx: PluginInput, title: string, message: string, variant: "success" | "warning" | "error" = "warning"): void {
+  ctx.client.tui
+    .showToast({
+      body: { title, message, variant, duration: 5000 },
+    })
+    .catch((e) => {
+      log(`[${HOOK_NAME}] Failed to show toast`, { error: e instanceof Error ? e.message : String(e) })
+    })
 }
 
 export function createBeadsSyncHook(options: BeadsSyncHookOptions) {
@@ -80,8 +88,11 @@ export function createBeadsSyncHook(options: BeadsSyncHookOptions) {
           log(`[${HOOK_NAME}] Initializing beads...`)
           await initBeads(ctx, config)
           log(`[${HOOK_NAME}] Beads initialized successfully`)
+          showToast(ctx, "Beads Initialized", "Beads task management has been initialized", "success")
         } catch (e) {
-          log(`[${HOOK_NAME}] Failed to initialize beads`, { error: e instanceof Error ? e.message : String(e) })
+          const errorMsg = e instanceof Error ? e.message : String(e)
+          log(`[${HOOK_NAME}] Failed to initialize beads`, { error: errorMsg })
+          showToast(ctx, "Beads Init Failed", errorMsg, "error")
         }
       }
 
@@ -101,7 +112,9 @@ export function createBeadsSyncHook(options: BeadsSyncHookOptions) {
           await syncBeads(ctx, config)
           log(`[${HOOK_NAME}] Beads synced successfully`)
         } catch (e) {
-          log(`[${HOOK_NAME}] Failed to sync beads`, { error: e instanceof Error ? e.message : String(e) })
+          const errorMsg = e instanceof Error ? e.message : String(e)
+          log(`[${HOOK_NAME}] Failed to sync beads`, { error: errorMsg })
+          showToast(ctx, "Beads Sync Failed", errorMsg, "warning")
         }
       }
     },
