@@ -1157,13 +1157,15 @@ describe("config-handler plugin loading error boundary (#1559)", () => {
 })
 
 describe("per-agent todowrite/todoread deny when task_system enabled", () => {
-  const PRIMARY_AGENTS = [
+  const AGENTS_WITH_TODO_DENY = new Set([
     getAgentDisplayName("sisyphus"),
     getAgentDisplayName("hephaestus"),
     getAgentDisplayName("atlas"),
+  ])
+  const AGENTS_WITHOUT_TODO_DENY = new Set([
     getAgentDisplayName("prometheus"),
     getAgentDisplayName("sisyphus-junior"),
-  ]
+  ])
 
   test("denies todowrite and todoread for primary agents when task_system is enabled", async () => {
     //#given
@@ -1200,9 +1202,13 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
 
     //#then
     const agentResult = config.agent as Record<string, { permission?: Record<string, unknown> }>
-    for (const agentName of PRIMARY_AGENTS) {
+    for (const agentName of AGENTS_WITH_TODO_DENY) {
       expect(agentResult[agentName]?.permission?.todowrite).toBe("deny")
       expect(agentResult[agentName]?.permission?.todoread).toBe("deny")
+    }
+    for (const agentName of AGENTS_WITHOUT_TODO_DENY) {
+      expect(agentResult[agentName]?.permission?.todowrite).toBeUndefined()
+      expect(agentResult[agentName]?.permission?.todoread).toBeUndefined()
     }
   })
 

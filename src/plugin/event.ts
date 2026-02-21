@@ -105,6 +105,23 @@ export function createEventHandler(args: {
   hooks: CreatedHooks
 }): (input: EventInput) => Promise<void> {
   const { ctx, firstMessageVariantGate, managers, hooks } = args
+  const pluginContext = ctx as {
+    directory: string
+    client: {
+      session: {
+        abort: (input: { path: { id: string } }) => Promise<unknown>
+        prompt: (input: {
+          path: { id: string }
+          body: { parts: Array<{ type: "text"; text: string }> }
+          query: { directory: string }
+        }) => Promise<unknown>
+      }
+    }
+  }
+  const isRuntimeFallbackEnabled =
+    hooks.runtimeFallback !== null &&
+    hooks.runtimeFallback !== undefined &&
+    (args.pluginConfig.runtime_fallback?.enabled ?? true)
 
   // Avoid triggering multiple abort+continue cycles for the same failing assistant message.
   const lastHandledModelErrorMessageID = new Map<string, string>()
@@ -250,7 +267,7 @@ export function createEventHandler(args: {
 
       // Model fallback: in practice, API/model failures often surface as assistant message errors.
       // session.error events are not guaranteed for all providers, so we also observe message.updated.
-      if (sessionID && role === "assistant") {
+      if (sessionID && role === "assistant" && !isRuntimeFallbackEnabled) {
         try {
           const assistantMessageID = info?.id as string | undefined
           const assistantError = info?.error
@@ -292,12 +309,12 @@ export function createEventHandler(args: {
                 if (setFallback && shouldAutoRetrySession(sessionID) && !hooks.stopContinuationGuard?.isStopped(sessionID)) {
                   lastHandledModelErrorMessageID.set(sessionID, assistantMessageID)
 
-                  await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
-                  await ctx.client.session
+                  await pluginContext.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+                  await pluginContext.client.session
                     .prompt({
                       path: { id: sessionID },
                       body: { parts: [{ type: "text", text: "continue" }] },
-                      query: { directory: ctx.directory },
+                      query: { directory: pluginContext.directory },
                     })
                     .catch(() => {})
                 }
@@ -353,12 +370,12 @@ export function createEventHandler(args: {
               )
 
               if (setFallback && shouldAutoRetrySession(sessionID) && !hooks.stopContinuationGuard?.isStopped(sessionID)) {
-                await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
-                await ctx.client.session
+                await pluginContext.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+                await pluginContext.client.session
                   .prompt({
                     path: { id: sessionID },
                     body: { parts: [{ type: "text", text: "continue" }] },
-                    query: { directory: ctx.directory },
+                    query: { directory: pluginContext.directory },
                   })
                   .catch(() => {})
               }
@@ -395,17 +412,17 @@ export function createEventHandler(args: {
             sessionID === getMainSessionID() &&
             !hooks.stopContinuationGuard?.isStopped(sessionID)
           ) {
-            await ctx.client.session
+            await pluginContext.client.session
               .prompt({
                 path: { id: sessionID },
                 body: { parts: [{ type: "text", text: "continue" }] },
-                query: { directory: ctx.directory },
+                query: { directory: pluginContext.directory },
               })
               .catch(() => {})
           }
         } 
         // Second, try model fallback for model errors (rate limit, quota, provider issues, etc.)
-        else if (sessionID && shouldRetryError(errorInfo)) {
+        else if (sessionID && shouldRetryError(errorInfo) && !isRuntimeFallbackEnabled) {
           let agentName = getSessionAgent(sessionID)
           
           if (!agentName && sessionID === getMainSessionID()) {
@@ -432,15 +449,15 @@ export function createEventHandler(args: {
             )
             
             if (setFallback && shouldAutoRetrySession(sessionID) && !hooks.stopContinuationGuard?.isStopped(sessionID)) {
-              await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
-              
-              await ctx.client.session
-                .prompt({
-                  path: { id: sessionID },
-                  body: { parts: [{ type: "text", text: "continue" }] },
-                  query: { directory: ctx.directory },
-                })
-                .catch(() => {})
+                await pluginContext.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+                
+                await pluginContext.client.session
+                  .prompt({
+                    path: { id: sessionID },
+                    body: { parts: [{ type: "text", text: "continue" }] },
+                    query: { directory: pluginContext.directory },
+                  })
+                  .catch(() => {})
             }
           }
         }
