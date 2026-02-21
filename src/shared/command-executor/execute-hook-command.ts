@@ -8,9 +8,14 @@ export interface CommandResult {
 	stderr?: string
 }
 
+const DEFAULT_HOOK_TIMEOUT_MS = 30_000
+const SIGKILL_GRACE_MS = 5_000
+
 export interface ExecuteHookOptions {
 	forceZsh?: boolean
 	zshPath?: string
+	/** Timeout in milliseconds. Process is killed after this. Default: 30000 */
+	timeoutMs?: number
 }
 
 export async function executeHookCommand(
@@ -20,6 +25,7 @@ export async function executeHookCommand(
 	options?: ExecuteHookOptions,
 ): Promise<CommandResult> {
 	const home = getHomeDirectory()
+	const timeoutMs = options?.timeoutMs ?? DEFAULT_HOOK_TIMEOUT_MS
 
 	const expandedCommand = command
 		.replace(/^~(?=\/|$)/g, home)
@@ -43,6 +49,9 @@ export async function executeHookCommand(
 	}
 
 	return new Promise((resolve) => {
+		let settled = false
+		let killTimer: ReturnType<typeof setTimeout> | null = null
+
 		const proc = spawn(finalCommand, {
 			cwd,
 			shell: true,
@@ -52,19 +61,27 @@ export async function executeHookCommand(
 		let stdout = ""
 		let stderr = ""
 
-		proc.stdout?.on("data", (data) => {
+		proc.stdout?.on("data", (data: Buffer) => {
 			stdout += data.toString()
 		})
 
-		proc.stderr?.on("data", (data) => {
+		proc.stderr?.on("data", (data: Buffer) => {
 			stderr += data.toString()
 		})
 
 		proc.stdin?.write(stdin)
 		proc.stdin?.end()
 
+		const settle = (result: CommandResult) => {
+			if (settled) return
+			settled = true
+			if (killTimer) clearTimeout(killTimer)
+			if (timeoutTimer) clearTimeout(timeoutTimer)
+			resolve(result)
+		}
+
 		proc.on("close", (code) => {
-			resolve({
+			settle({
 				exitCode: code ?? 0,
 				stdout: stdout.trim(),
 				stderr: stderr.trim(),
@@ -72,7 +89,26 @@ export async function executeHookCommand(
 		})
 
 		proc.on("error", (err) => {
-			resolve({ exitCode: 1, stderr: err.message })
+			settle({ exitCode: 1, stderr: err.message })
 		})
+
+		const timeoutTimer = setTimeout(() => {
+			if (settled) return
+			// Try graceful shutdown first
+			proc.kill("SIGTERM")
+			killTimer = setTimeout(() => {
+				if (settled) return
+				try {
+					proc.kill("SIGKILL")
+				} catch {}
+			}, SIGKILL_GRACE_MS)
+			// Append timeout notice to stderr
+			stderr += `\nHook command timed out after ${timeoutMs}ms`
+		}, timeoutMs)
+
+		// Don't let the timeout timer keep the process alive
+		if (timeoutTimer && typeof timeoutTimer === "object" && "unref" in timeoutTimer) {
+			timeoutTimer.unref()
+		}
 	})
 }
