@@ -45,7 +45,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   skills: SkillsConfigSchema.optional(),
   ralph_loop: RalphLoopConfigSchema.optional(),
   /**
-   * Enable runtime fallback (default: true)
+   * Enable runtime fallback (default: false)
    * Set to false to disable, or use object for advanced config:
    * { "enabled": true, "retry_on_errors": [400, 429], "timeout_seconds": 30 }
    */
