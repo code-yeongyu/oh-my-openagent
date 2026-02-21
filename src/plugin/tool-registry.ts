@@ -94,7 +94,10 @@ export function createToolRegistry(args: {
     getSessionID: getSessionIDForMcp,
   })
 
-  const commands = discoverCommandsSync(ctx.directory)
+  const commands = discoverCommandsSync(ctx.directory, {
+    pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
+    enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+  })
   const skillTool = createSkillTool({
     commands,
     skills: skillContext.mergedSkills,

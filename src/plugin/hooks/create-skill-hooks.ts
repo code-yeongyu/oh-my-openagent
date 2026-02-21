@@ -1,5 +1,5 @@
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
-import type { HookName } from "../../config"
+import type { HookName, OhMyOpenCodeConfig } from "../../config"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { PluginContext } from "../types"
 
@@ -13,12 +13,20 @@ export type SkillHooks = {
 
 export function createSkillHooks(args: {
   ctx: PluginContext
+  pluginConfig: OhMyOpenCodeConfig
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
   mergedSkills: LoadedSkill[]
   availableSkills: AvailableSkill[]
 }): SkillHooks {
-  const { ctx, isHookEnabled, safeHookEnabled, mergedSkills, availableSkills } = args
+  const {
+    ctx,
+    pluginConfig,
+    isHookEnabled,
+    safeHookEnabled,
+    mergedSkills,
+    availableSkills,
+  } = args
 
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
     safeCreateHook(hookName, factory, { enabled: safeHookEnabled })
@@ -30,7 +38,11 @@ export function createSkillHooks(args: {
 
   const autoSlashCommand = isHookEnabled("auto-slash-command")
     ? safeHook("auto-slash-command", () =>
-        createAutoSlashCommandHook({ skills: mergedSkills }))
+        createAutoSlashCommandHook({
+          skills: mergedSkills,
+          pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
+          enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+        }))
     : null
 
   return { categorySkillReminder, autoSlashCommand }

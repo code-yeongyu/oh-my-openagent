@@ -33,4 +33,8 @@ export interface SkillLoadOptions {
   /** Git master configuration for watermark/co-author settings */
   gitMasterConfig?: GitMasterConfig
   disabledSkills?: Set<string>
+  /** Include Claude marketplace plugin commands in discovery (default: true) */
+  pluginsEnabled?: boolean
+  /** Override plugin enablement from Claude settings by plugin key */
+  enabledPluginsOverride?: Record<string, boolean>
 }
