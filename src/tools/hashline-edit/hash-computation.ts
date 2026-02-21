@@ -1,4 +1,5 @@
 import { HASHLINE_DICT } from "./constants"
+import { createHashlineChunkFormatter } from "./hashline-chunk-formatter"
 
 export function computeLineHash(lineNumber: number, content: string): string {
   const stripped = content.replace(/\s+/g, "")
@@ -61,42 +62,12 @@ export async function* streamHashLinesFromUtf8(
   let pending = ""
   let sawAnyText = false
   let endedWithNewline = false
-  let outputLines: string[] = []
-  let outputBytes = 0
-
-  const flush = (): string | undefined => {
-    if (outputLines.length === 0) return undefined
-    const chunk = outputLines.join("\n")
-    outputLines = []
-    outputBytes = 0
-    return chunk
-  }
+  const chunkFormatter = createHashlineChunkFormatter({ maxChunkLines, maxChunkBytes })
 
   const pushLine = (line: string): string[] => {
-    const formatted = `${lineNumber}#${computeLineHash(lineNumber, line)}:${line}`
+    const formatted = formatHashLine(lineNumber, line)
     lineNumber += 1
-
-    const chunksToYield: string[] = []
-    const separatorBytes = outputLines.length === 0 ? 0 : 1
-    const lineBytes = Buffer.byteLength(formatted, "utf-8")
-
-    if (
-      outputLines.length > 0 &&
-      (outputLines.length >= maxChunkLines || outputBytes + separatorBytes + lineBytes > maxChunkBytes)
-    ) {
-      const flushed = flush()
-      if (flushed) chunksToYield.push(flushed)
-    }
-
-    outputLines.push(formatted)
-    outputBytes += (outputLines.length === 1 ? 0 : 1) + lineBytes
-
-    if (outputLines.length >= maxChunkLines || outputBytes >= maxChunkBytes) {
-      const flushed = flush()
-      if (flushed) chunksToYield.push(flushed)
-    }
-
-    return chunksToYield
+    return chunkFormatter.push(formatted)
   }
 
   const consumeText = (text: string): string[] => {
@@ -128,17 +99,13 @@ export async function* streamHashLinesFromUtf8(
     yield out
   }
 
-  if (!sawAnyText) {
-    for (const out of pushLine("")) {
-      yield out
-    }
-  } else if (pending.length > 0 || endedWithNewline) {
+  if (sawAnyText && (pending.length > 0 || endedWithNewline)) {
     for (const out of pushLine(pending)) {
       yield out
     }
   }
 
-  const finalChunk = flush()
+  const finalChunk = chunkFormatter.flush()
   if (finalChunk) yield finalChunk
 }
 
@@ -151,44 +118,12 @@ export async function* streamHashLinesFromLines(
   const maxChunkBytes = options.maxChunkBytes ?? 64 * 1024
 
   let lineNumber = startLine
-  let outputLines: string[] = []
-  let outputBytes = 0
-  let sawAnyLine = false
-
-  const flush = (): string | undefined => {
-    if (outputLines.length === 0) return undefined
-    const chunk = outputLines.join("\n")
-    outputLines = []
-    outputBytes = 0
-    return chunk
-  }
+  const chunkFormatter = createHashlineChunkFormatter({ maxChunkLines, maxChunkBytes })
 
   const pushLine = (line: string): string[] => {
-    sawAnyLine = true
-    const formatted = `${lineNumber}#${computeLineHash(lineNumber, line)}:${line}`
+    const formatted = formatHashLine(lineNumber, line)
     lineNumber += 1
-
-    const chunksToYield: string[] = []
-    const separatorBytes = outputLines.length === 0 ? 0 : 1
-    const lineBytes = Buffer.byteLength(formatted, "utf-8")
-
-    if (
-      outputLines.length > 0 &&
-      (outputLines.length >= maxChunkLines || outputBytes + separatorBytes + lineBytes > maxChunkBytes)
-    ) {
-      const flushed = flush()
-      if (flushed) chunksToYield.push(flushed)
-    }
-
-    outputLines.push(formatted)
-    outputBytes += (outputLines.length === 1 ? 0 : 1) + lineBytes
-
-    if (outputLines.length >= maxChunkLines || outputBytes >= maxChunkBytes) {
-      const flushed = flush()
-      if (flushed) chunksToYield.push(flushed)
-    }
-
-    return chunksToYield
+    return chunkFormatter.push(formatted)
   }
 
   const asyncIterator = (lines as AsyncIterable<string>)[Symbol.asyncIterator]
@@ -202,12 +137,6 @@ export async function* streamHashLinesFromLines(
     }
   }
 
-  if (!sawAnyLine) {
-    for (const out of pushLine("")) {
-      yield out
-    }
-  }
-
-  const finalChunk = flush()
+  const finalChunk = chunkFormatter.flush()
   if (finalChunk) yield finalChunk
 }
