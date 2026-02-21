@@ -13,6 +13,7 @@ export {
   TmuxLayoutSchema,
   RuntimeFallbackConfigSchema,
   FallbackModelsSchema,
+  BeadsConfigSchema,
 } from "./schema"
 
 export type {
@@ -33,4 +34,5 @@ export type {
   SisyphusTasksConfig,
   RuntimeFallbackConfig,
   FallbackModels,
+  BeadsConfig,
 } from "./schema"

@@ -52,3 +52,4 @@ export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 export { createHashlineEditDiffEnhancerHook } from "./hashline-edit-diff-enhancer";
 export { createBeastModeSystemHook, BEAST_MODE_SYSTEM_PROMPT } from "./beast-mode-system";
 export { createJsonErrorRecoveryHook, JSON_ERROR_TOOL_EXCLUDE_LIST, JSON_ERROR_PATTERNS, JSON_ERROR_REMINDER } from "./json-error-recovery";
+export { createBeadsSyncHook, HOOK_NAME as BEADS_SYNC_HOOK_NAME, type BeadsSyncHookOptions } from "./beads-sync";

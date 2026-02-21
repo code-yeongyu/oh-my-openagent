@@ -4,6 +4,7 @@ import { BuiltinAgentNameSchema, BuiltinSkillNameSchema } from "./agent-names"
 import { AgentOverridesSchema } from "./agent-overrides"
 import { BabysittingConfigSchema } from "./babysitting"
 import { BackgroundTaskConfigSchema } from "./background-task"
+import { BeadsConfigSchema } from "./beads"
 import { BrowserAutomationConfigSchema } from "./browser-automation"
 import { CategoriesConfigSchema } from "./categories"
 import { ClaudeCodeConfigSchema } from "./claude-code"
@@ -54,6 +55,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
+  beads: BeadsConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })

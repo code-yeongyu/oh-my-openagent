@@ -25,6 +25,7 @@ import {
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
+  createBeadsSyncHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
@@ -60,6 +61,7 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook>
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
+  beadsSync: ReturnType<typeof createBeadsSyncHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -248,6 +250,15 @@ export function createSessionHooks(args: {
           pluginConfig,
         }))
     : null
+
+  const beadsSync = isHookEnabled("beads-sync") && pluginConfig.beads?.enabled
+    ? safeHook("beads-sync", () =>
+        createBeadsSyncHook({
+          config: pluginConfig.beads!,
+          ctx,
+        }))
+    : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -272,5 +283,6 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     anthropicEffort,
     runtimeFallback,
+    beadsSync,
   }
 }
