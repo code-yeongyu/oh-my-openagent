@@ -33,9 +33,11 @@
 
 </div>
 
-> Anthropic wants you locked in. Claude Code's a nice prison, but it's still a prison.
+> Anthropic [**blocked OpenCode because of us.**](https://x.com/thdxr/status/2010149530486911014) **Yes this is true.**
+> They want you locked in. Claude Code's a nice prison, but it's still a prison.
 >
-> We don't do lock-in here. We ride every model. Claude for orchestration. GPT for reasoning. Kimi for speed. Gemini for vision. The future isn't picking one winner—it's orchestrating them all. Models get cheaper every month. Smarter every month. No single provider will dominate. We're building for that open market, not their walled gardens.
+> We don't do lock-in here. We ride every model. Claude / Kimi / GLM for orchestration. GPT for reasoning. Minimax for speed. Gemini for creativity.
+> The future isn't picking one winner—it's orchestrating them all. Models get cheaper every month. Smarter every month. No single provider will dominate. We're building for that open market, not their walled gardens.
 
 <div align="center">
 
@@ -136,23 +138,23 @@ Even only with following subscriptions, ultrawork will work well (this project i
 - [GLM Coding Plan ($10)](https://z.ai/subscribe)
 - If you are eligible for pay-per-token, using kimi and gemini models won't cost you that much.
 
-|       | Feature                      | What it does                                                                                                                        |
-| :---: | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
-|   🤖   | **Discipline Agents**        | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                       |
-|   ⚡   | **`ultrawork` / `ulw`**      | One word. Every agent activates. Doesn't stop until done.                                                                           |
-|   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)**                 | Analyzes true user intent before classifying or acting. No more literal misinterpretations.                                         |
-|   🔗   | **Hash-Anchored Edit Tool**  | `LINE#ID` content hash validates every change. Zero stale-line errors. Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
-|   🛠️   | **LSP + AST-Grep**           | Workspace rename, pre-build diagnostics, AST-aware rewrites. IDE precision for agents.                                              |
-|   🧠   | **Background Agents**        | Fire 5+ specialists in parallel. Context stays lean. Results when ready.                                                            |
-|   📚   | **Built-in MCPs**            | Exa (web search), Context7 (official docs), Grep.app (GitHub search). Always on.                                                    |
-|   🔁   | **Ralph Loop / `/ulw-loop`** | Self-referential loop. Doesn't stop until 100% done.                                                                                |
-|   ✅   | **Todo Enforcer**            | Agent goes idle? System yanks it back. Your task gets done, period.                                                                 |
-|   💬   | **Comment Checker**          | No AI slop in comments. Code reads like a senior wrote it.                                                                          |
-|   🖥️   | **Tmux Integration**         | Full interactive terminal. REPLs, debuggers, TUIs. All live.                                                                        |
-|   🔌   | **Claude Code Compatible**   | Your hooks, commands, skills, MCPs, and plugins? All work here.                                                                     |
-|   🎯   | **Skill-Embedded MCPs**      | Skills carry their own MCP servers. No context bloat.                                                                               |
-|   📋   | **Prometheus Planner**       | Interview-mode strategic planning before any execution.                                                                             |
-|   🔍   | **`/init-deep`**             | Auto-generates hierarchical `AGENTS.md` files throughout your project. Great for both token efficiency and your agent's performance |
+|       | Feature                                                  | What it does                                                                                                                                                                                                     |
+| :---: | :------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   🤖   | **Discipline Agents**                                    | Sisyphus orchestrates Hephaestus, Oracle, Librarian, Explore. A full AI dev team in parallel.                                                                                                                    |
+|   ⚡   | **`ultrawork` / `ulw`**                                  | One word. Every agent activates. Doesn't stop until done.                                                                                                                                                        |
+|   🚪   | **[IntentGate](https://factory.ai/news/terminal-bench)** | Analyzes true user intent before classifying or acting. No more literal misinterpretations.                                                                                                                      |
+|   🔗   | **Hash-Anchored Edit Tool**                              | `LINE#ID` content hash validates every change. Zero stale-line errors. Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi). [The Harness Problem →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
+|   🛠️   | **LSP + AST-Grep**                                       | Workspace rename, pre-build diagnostics, AST-aware rewrites. IDE precision for agents.                                                                                                                           |
+|   🧠   | **Background Agents**                                    | Fire 5+ specialists in parallel. Context stays lean. Results when ready.                                                                                                                                         |
+|   📚   | **Built-in MCPs**                                        | Exa (web search), Context7 (official docs), Grep.app (GitHub search). Always on.                                                                                                                                 |
+|   🔁   | **Ralph Loop / `/ulw-loop`**                             | Self-referential loop. Doesn't stop until 100% done.                                                                                                                                                             |
+|   ✅   | **Todo Enforcer**                                        | Agent goes idle? System yanks it back. Your task gets done, period.                                                                                                                                              |
+|   💬   | **Comment Checker**                                      | No AI slop in comments. Code reads like a senior wrote it.                                                                                                                                                       |
+|   🖥️   | **Tmux Integration**                                     | Full interactive terminal. REPLs, debuggers, TUIs. All live.                                                                                                                                                     |
+|   🔌   | **Claude Code Compatible**                               | Your hooks, commands, skills, MCPs, and plugins? All work here.                                                                                                                                                  |
+|   🎯   | **Skill-Embedded MCPs**                                  | Skills carry their own MCP servers. No context bloat.                                                                                                                                                            |
+|   📋   | **Prometheus Planner**                                   | Interview-mode strategic planning before any execution.                                                                                                                                                          |
+|   🔍   | **`/init-deep`**                                         | Auto-generates hierarchical `AGENTS.md` files throughout your project. Great for both token efficiency and your agent's performance                                                                              |
 
 ### Discipline Agents
 
