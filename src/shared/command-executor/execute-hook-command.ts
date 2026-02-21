@@ -98,7 +98,11 @@ export async function executeHookCommand(
     const killProcessGroup = (signal: NodeJS.Signals) => {
       try {
         if (!isWin32 && proc.pid) {
-          process.kill(-proc.pid, signal);
+          try {
+            process.kill(-proc.pid, signal);
+          } catch {
+            proc.kill(signal);
+          }
         } else {
           proc.kill(signal);
         }
