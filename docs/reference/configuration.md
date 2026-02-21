@@ -529,6 +529,13 @@ Configure Language Server Protocol integration:
 
 Auto-switches to backup models on API errors.
 
+**Simple configuration** (enable/disable with defaults):
+```json
+{ "runtime_fallback": true }
+{ "runtime_fallback": false }
+```
+
+**Advanced configuration** (full control):
 ```json
 {
   "runtime_fallback": {
