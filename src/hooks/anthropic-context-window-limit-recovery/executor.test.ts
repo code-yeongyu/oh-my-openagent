@@ -1,8 +1,10 @@
+/// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
-import { executeCompact } from "./executor"
 import type { AutoCompactState } from "./types"
-import * as storage from "./storage"
-import * as messagesReader from "../session-recovery/storage/messages-reader"
+
+type ExecuteCompact = typeof import("./executor").executeCompact
+type StorageModule = typeof import("./storage")
+type MessagesReaderModule = typeof import("../session-recovery/storage/messages-reader")
 
 type TimerCallback = (...args: any[]) => void
 
@@ -76,6 +78,9 @@ function createFakeTimeouts(): FakeTimeouts {
 }
 
 describe("executeCompact lock management", () => {
+  let executeCompact: ExecuteCompact
+  let storageModule: StorageModule
+  let messagesReaderModule: MessagesReaderModule
   let autoCompactState: AutoCompactState
   let mockClient: any
   let fakeTimeouts: FakeTimeouts
@@ -83,7 +88,13 @@ describe("executeCompact lock management", () => {
   const directory = "/test/dir"
   const msg = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    mock.restore()
+    const executorModule = await import("./executor")
+    executeCompact = executorModule.executeCompact
+    storageModule = await import("./storage")
+    messagesReaderModule = await import("../session-recovery/storage/messages-reader")
+
     // given: Fresh state for each test
     autoCompactState = {
       pendingCompact: new Set<string>(),
@@ -110,6 +121,7 @@ describe("executeCompact lock management", () => {
   })
 
   afterEach(() => {
+    mock.restore()
     fakeTimeouts.restore()
   })
 
@@ -170,7 +182,7 @@ describe("executeCompact lock management", () => {
 
   test("clears lock when fixEmptyMessages path executes", async () => {
     //#given - Empty content error scenario with no messages in storage
-    const readMessagesSpy = spyOn(messagesReader, "readMessages").mockReturnValue([])
+    const readMessagesSpy = spyOn(messagesReaderModule, "readMessages").mockReturnValue([])
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "non-empty content required",
       messageIndex: 0,
@@ -188,7 +200,7 @@ describe("executeCompact lock management", () => {
 
   test("clears lock when truncation is sufficient", async () => {
     //#given - Aggressive truncation scenario with no messages in storage
-    const readMessagesSpy = spyOn(messagesReader, "readMessages").mockReturnValue([])
+    const readMessagesSpy = spyOn(messagesReaderModule, "readMessages").mockReturnValue([])
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 250000,
@@ -313,7 +325,7 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockResolvedValue({
+    const truncateSpy = spyOn(storageModule, "truncateUntilTargetTokens").mockResolvedValue({
       success: true,
       sufficient: false,
       truncatedCount: 3,
@@ -354,7 +366,7 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockResolvedValue({
+    const truncateSpy = spyOn(storageModule, "truncateUntilTargetTokens").mockResolvedValue({
       success: true,
       sufficient: true,
       truncatedCount: 5,
