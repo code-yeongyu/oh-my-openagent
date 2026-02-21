@@ -333,7 +333,7 @@ export function createEventHandler(args: {
         | { type?: string; attempt?: number; message?: string; next?: number }
         | undefined
 
-      if (sessionID && status?.type === "retry" && !isRuntimeFallbackEnabled) {
+      if (sessionID && status?.type === "retry") {
         try {
           const retryMessage = typeof status.message === "string" ? status.message : ""
           const retryKey = `${status.attempt ?? "?"}:${status.next ?? "?"}:${retryMessage}`
