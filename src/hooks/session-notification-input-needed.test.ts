@@ -78,7 +78,7 @@ describe("session-notification input-needed events", () => {
 
     await hook({
       event: {
-        type: "permission.ask",
+        type: "permission.asked",
         properties: {
           sessionID,
         },
