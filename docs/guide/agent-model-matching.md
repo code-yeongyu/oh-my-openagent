@@ -2,9 +2,58 @@
 
 > **For agents and users**: How to pick the right model for each agent. Read this before customizing model settings.
 
-Run `opencode models` to see all available models on your system, and `opencode auth login` to authenticate with providers.
+## Example Configuration
 
----
+Here's a practical example configuration showing agent-model assignments:
+
+```jsonc
+{
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+
+  "agents": {
+    // Main orchestrator: Claude Opus or Kimi K2.5 work best
+    "sisyphus": {
+      "model": "kimi-for-coding/k2p5",
+      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" }
+    },
+
+    // Research agents: cheaper models are fine
+    "librarian": { "model": "zai-coding-plan/glm-4.7" },
+    "explore":   { "model": "github-copilot/grok-code-fast-1" },
+
+    // Architecture consultation: GPT or Claude Opus
+    "oracle": { "model": "openai/gpt-5.2", "variant": "high" },
+
+    // Prometheus inherits sisyphus model; just add prompt guidance
+    "prometheus": { "prompt_append": "Leverage deep & quick agents heavily, always in parallel." }
+  },
+
+  "categories": {
+    // quick — trivial tasks
+    "quick": { "model": "opencode/gpt-5-nano" },
+
+    // unspecified-low — moderate tasks
+    "unspecified-low": { "model": "kimi-for-coding/k2p5" },
+
+    // unspecified-high — complex work
+    "unspecified-high": { "model": "anthropic/claude-sonnet-4-6", "variant": "max" },
+
+    // visual-engineering — Gemini dominates visual tasks
+    "visual-engineering": { "model": "google/gemini-3-pro", "variant": "high" },
+
+    // writing — docs/prose
+    "writing": { "model": "kimi-for-coding/k2p5" }
+  },
+
+  // Limit expensive providers; let cheap ones run freely
+  "background_task": {
+    "providerConcurrency": { "anthropic": 3, "openai": 3, "opencode": 10, "zai-coding-plan": 10 },
+    "modelConcurrency": { "anthropic/claude-opus-4-6": 2, "opencode/gpt-5-nano": 20 }
+  }
+}
+```
+
+Run `opencode models` to see all available models on your system, and `opencode auth login` to authenticate with providers.
 
 ## Model Families: Know Your Options
 
