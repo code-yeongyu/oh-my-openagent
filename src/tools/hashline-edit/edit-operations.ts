@@ -1,95 +1,18 @@
 import { parseLineRef, validateLineRef, validateLineRefs } from "./validation"
 import type { HashlineEdit } from "./types"
+import {
+  restoreLeadingIndent,
+  stripInsertAnchorEcho,
+  stripInsertBeforeEcho,
+  stripInsertBoundaryEcho,
+  stripRangeBoundaryEcho,
+  toNewLines,
+} from "./edit-text-normalization"
 
-const HASHLINE_PREFIX_RE = /^\s*(?:>>>|>>)?\s*\d+#[A-Z]{2}:/
-const DIFF_PLUS_RE = /^[+-](?![+-])/
-
-function stripLinePrefixes(lines: string[]): string[] {
-  let hashPrefixCount = 0
-  let diffPlusCount = 0
-  let nonEmpty = 0
-
-  for (const line of lines) {
-    if (line.length === 0) continue
-    nonEmpty += 1
-    if (HASHLINE_PREFIX_RE.test(line)) hashPrefixCount += 1
-    if (DIFF_PLUS_RE.test(line)) diffPlusCount += 1
-  }
-
-  if (nonEmpty === 0) {
-    return lines
-  }
-
-  const stripHash = hashPrefixCount > 0 && hashPrefixCount >= nonEmpty * 0.5
-  const stripPlus = !stripHash && diffPlusCount > 0 && diffPlusCount >= nonEmpty * 0.5
-
-  if (!stripHash && !stripPlus) {
-    return lines
-  }
-
-  return lines.map((line) => {
-    if (stripHash) return line.replace(HASHLINE_PREFIX_RE, "")
-    if (stripPlus) return line.replace(DIFF_PLUS_RE, "")
-    return line
-  })
-}
-
-function equalsIgnoringWhitespace(a: string, b: string): boolean {
-  if (a === b) return true
-  return a.replace(/\s+/g, "") === b.replace(/\s+/g, "")
-}
-
-function leadingWhitespace(text: string): string {
-  const match = text.match(/^\s*/)
-  return match ? match[0] : ""
-}
-
-function restoreLeadingIndent(templateLine: string, line: string): string {
-  if (line.length === 0) return line
-  const templateIndent = leadingWhitespace(templateLine)
-  if (templateIndent.length === 0) return line
-  if (leadingWhitespace(line).length > 0) return line
-  return `${templateIndent}${line}`
-}
-
-function stripInsertAnchorEcho(anchorLine: string, newLines: string[]): string[] {
-  if (newLines.length <= 1) return newLines
-  if (equalsIgnoringWhitespace(newLines[0], anchorLine)) {
-    return newLines.slice(1)
-  }
-  return newLines
-}
-
-function stripRangeBoundaryEcho(
-  lines: string[],
-  startLine: number,
-  endLine: number,
-  newLines: string[]
-): string[] {
-  const replacedCount = endLine - startLine + 1
-  if (newLines.length <= 1 || newLines.length <= replacedCount) {
-    return newLines
-  }
-
-  let out = newLines
-  const beforeIdx = startLine - 2
-  if (beforeIdx >= 0 && equalsIgnoringWhitespace(out[0], lines[beforeIdx])) {
-    out = out.slice(1)
-  }
-
-  const afterIdx = endLine
-  if (afterIdx < lines.length && out.length > 0 && equalsIgnoringWhitespace(out[out.length - 1], lines[afterIdx])) {
-    out = out.slice(0, -1)
-  }
-
-  return out
-}
-
-function toNewLines(input: string | string[]): string[] {
-  if (Array.isArray(input)) {
-    return stripLinePrefixes(input)
-  }
-  return stripLinePrefixes(input.split("\n"))
+export interface HashlineApplyReport {
+  content: string
+  noopEdits: number
+  deduplicatedEdits: number
 }
 
 export function applySetLine(lines: string[], anchor: string, newText: string | string[]): string[] {
@@ -137,7 +60,45 @@ export function applyInsertAfter(lines: string[], anchor: string, text: string |
   const { line } = parseLineRef(anchor)
   const result = [...lines]
   const newLines = stripInsertAnchorEcho(lines[line - 1], toNewLines(text))
+  if (newLines.length === 0) {
+    throw new Error(`insert_after requires non-empty text for ${anchor}`)
+  }
   result.splice(line, 0, ...newLines)
+  return result
+}
+
+export function applyInsertBefore(lines: string[], anchor: string, text: string | string[]): string[] {
+  validateLineRef(lines, anchor)
+  const { line } = parseLineRef(anchor)
+  const result = [...lines]
+  const newLines = stripInsertBeforeEcho(lines[line - 1], toNewLines(text))
+  if (newLines.length === 0) {
+    throw new Error(`insert_before requires non-empty text for ${anchor}`)
+  }
+  result.splice(line - 1, 0, ...newLines)
+  return result
+}
+
+export function applyInsertBetween(
+  lines: string[],
+  afterAnchor: string,
+  beforeAnchor: string,
+  text: string | string[]
+): string[] {
+  validateLineRef(lines, afterAnchor)
+  validateLineRef(lines, beforeAnchor)
+  const { line: afterLine } = parseLineRef(afterAnchor)
+  const { line: beforeLine } = parseLineRef(beforeAnchor)
+  if (beforeLine <= afterLine) {
+    throw new Error(`insert_between requires after_line (${afterLine}) < before_line (${beforeLine})`)
+  }
+
+  const result = [...lines]
+  const newLines = stripInsertBoundaryEcho(lines[afterLine - 1], lines[beforeLine - 1], toNewLines(text))
+  if (newLines.length === 0) {
+    throw new Error(`insert_between requires non-empty text for ${afterAnchor}..${beforeAnchor}`)
+  }
+  result.splice(beforeLine - 1, 0, ...newLines)
   return result
 }
 
@@ -157,6 +118,10 @@ function getEditLineNumber(edit: HashlineEdit): number {
       return parseLineRef(edit.end_line).line
     case "insert_after":
       return parseLineRef(edit.line).line
+    case "insert_before":
+      return parseLineRef(edit.line).line
+    case "insert_between":
+      return parseLineRef(edit.before_line).line
     case "replace":
       return Number.NEGATIVE_INFINITY
     default:
@@ -164,12 +129,57 @@ function getEditLineNumber(edit: HashlineEdit): number {
   }
 }
 
-export function applyHashlineEdits(content: string, edits: HashlineEdit[]): string {
-  if (edits.length === 0) {
-    return content
+function normalizeEditPayload(payload: string | string[]): string {
+  return toNewLines(payload).join("\n")
+}
+
+function dedupeEdits(edits: HashlineEdit[]): { edits: HashlineEdit[]; deduplicatedEdits: number } {
+  const seen = new Set<string>()
+  const deduped: HashlineEdit[] = []
+  let deduplicatedEdits = 0
+
+  for (const edit of edits) {
+    const key = (() => {
+      switch (edit.type) {
+        case "set_line":
+          return `set_line|${edit.line}|${normalizeEditPayload(edit.text)}`
+        case "replace_lines":
+          return `replace_lines|${edit.start_line}|${edit.end_line}|${normalizeEditPayload(edit.text)}`
+        case "insert_after":
+          return `insert_after|${edit.line}|${normalizeEditPayload(edit.text)}`
+        case "insert_before":
+          return `insert_before|${edit.line}|${normalizeEditPayload(edit.text)}`
+        case "insert_between":
+          return `insert_between|${edit.after_line}|${edit.before_line}|${normalizeEditPayload(edit.text)}`
+        case "replace":
+          return `replace|${edit.old_text}|${normalizeEditPayload(edit.new_text)}`
+      }
+    })()
+
+    if (seen.has(key)) {
+      deduplicatedEdits += 1
+      continue
+    }
+    seen.add(key)
+    deduped.push(edit)
   }
 
-  const sortedEdits = [...edits].sort((a, b) => getEditLineNumber(b) - getEditLineNumber(a))
+  return { edits: deduped, deduplicatedEdits }
+}
+
+export function applyHashlineEditsWithReport(content: string, edits: HashlineEdit[]): HashlineApplyReport {
+  if (edits.length === 0) {
+    return {
+      content,
+      noopEdits: 0,
+      deduplicatedEdits: 0,
+    }
+  }
+
+  const dedupeResult = dedupeEdits(edits)
+  const sortedEdits = [...dedupeResult.edits].sort((a, b) => getEditLineNumber(b) - getEditLineNumber(a))
+
+  let noopEdits = 0
 
   let result = content
   let lines = result.split("\n")
@@ -182,6 +192,10 @@ export function applyHashlineEdits(content: string, edits: HashlineEdit[]): stri
         return [edit.start_line, edit.end_line]
       case "insert_after":
         return [edit.line]
+      case "insert_before":
+        return [edit.line]
+      case "insert_between":
+        return [edit.after_line, edit.before_line]
       case "replace":
         return []
       default:
@@ -201,7 +215,30 @@ export function applyHashlineEdits(content: string, edits: HashlineEdit[]): stri
         break
       }
       case "insert_after": {
-        lines = applyInsertAfter(lines, edit.line, edit.text)
+        const next = applyInsertAfter(lines, edit.line, edit.text)
+        if (next.join("\n") === lines.join("\n")) {
+          noopEdits += 1
+          break
+        }
+        lines = next
+        break
+      }
+      case "insert_before": {
+        const next = applyInsertBefore(lines, edit.line, edit.text)
+        if (next.join("\n") === lines.join("\n")) {
+          noopEdits += 1
+          break
+        }
+        lines = next
+        break
+      }
+      case "insert_between": {
+        const next = applyInsertBetween(lines, edit.after_line, edit.before_line, edit.text)
+        if (next.join("\n") === lines.join("\n")) {
+          noopEdits += 1
+          break
+        }
+        lines = next
         break
       }
       case "replace": {
@@ -210,12 +247,25 @@ export function applyHashlineEdits(content: string, edits: HashlineEdit[]): stri
           throw new Error(`Text not found: "${edit.old_text}"`)
         }
         const replacement = Array.isArray(edit.new_text) ? edit.new_text.join("\n") : edit.new_text
-        result = result.replaceAll(edit.old_text, replacement)
+        const replaced = result.replaceAll(edit.old_text, replacement)
+        if (replaced === result) {
+          noopEdits += 1
+          break
+        }
+        result = replaced
         lines = result.split("\n")
         break
       }
     }
   }
 
-  return lines.join("\n")
+  return {
+    content: lines.join("\n"),
+    noopEdits,
+    deduplicatedEdits: dedupeResult.deduplicatedEdits,
+  }
+}
+
+export function applyHashlineEdits(content: string, edits: HashlineEdit[]): string {
+  return applyHashlineEditsWithReport(content, edits).content
 }
