@@ -41,6 +41,75 @@ describe("hashline edit operations", () => {
     expect(result).toEqual(["line 1", "line 2", "inserted", "line 3"])
   })
 
+  it("applies insert_before with LINE#ID anchor", () => {
+    //#given
+    const lines = ["line 1", "line 2", "line 3"]
+
+    //#when
+    const result = applyHashlineEdits(
+      lines.join("\n"),
+      [{ type: "insert_before", line: anchorFor(lines, 2), text: "before 2" }]
+    )
+
+    //#then
+    expect(result).toEqual("line 1\nbefore 2\nline 2\nline 3")
+  })
+
+  it("applies insert_between with dual anchors", () => {
+    //#given
+    const lines = ["line 1", "line 2", "line 3"]
+
+    //#when
+    const result = applyHashlineEdits(
+      lines.join("\n"),
+      [{
+        type: "insert_between",
+        after_line: anchorFor(lines, 1),
+        before_line: anchorFor(lines, 2),
+        text: ["between"],
+      }]
+    )
+
+    //#then
+    expect(result).toEqual("line 1\nbetween\nline 2\nline 3")
+  })
+
+  it("throws when insert_after receives empty text array", () => {
+    //#given
+    const lines = ["line 1", "line 2"]
+
+    //#when / #then
+    expect(() => applyInsertAfter(lines, anchorFor(lines, 1), [])).toThrow(/non-empty/i)
+  })
+
+  it("throws when insert_before receives empty text array", () => {
+    //#given
+    const lines = ["line 1", "line 2"]
+
+    //#when / #then
+    expect(() =>
+      applyHashlineEdits(lines.join("\n"), [{ type: "insert_before", line: anchorFor(lines, 1), text: [] }])
+    ).toThrow(/non-empty/i)
+  })
+
+  it("throws when insert_between receives empty text array", () => {
+    //#given
+    const lines = ["line 1", "line 2"]
+
+    //#when / #then
+    expect(() =>
+      applyHashlineEdits(
+        lines.join("\n"),
+        [{
+          type: "insert_between",
+          after_line: anchorFor(lines, 1),
+          before_line: anchorFor(lines, 2),
+          text: [],
+        }]
+      )
+    ).toThrow(/non-empty/i)
+  })
+
   it("applies replace operation", () => {
     //#given
     const content = "hello world foo"
@@ -66,6 +135,22 @@ describe("hashline edit operations", () => {
 
     //#then
     expect(result).toEqual("line 1\ninserted\nline 2\nmodified")
+  })
+
+  it("deduplicates identical insert edits in one pass", () => {
+    //#given
+    const content = "line 1\nline 2"
+    const lines = content.split("\n")
+    const edits: HashlineEdit[] = [
+      { type: "insert_after", line: anchorFor(lines, 1), text: "inserted" },
+      { type: "insert_after", line: anchorFor(lines, 1), text: "inserted" },
+    ]
+
+    //#when
+    const result = applyHashlineEdits(content, edits)
+
+    //#then
+    expect(result).toEqual("line 1\ninserted\nline 2")
   })
 
   it("keeps literal backslash-n in plain string text", () => {
@@ -101,6 +186,14 @@ describe("hashline edit operations", () => {
     expect(result).toEqual(["line 1", "inserted", "line 2"])
   })
 
+  it("throws when insert_after payload only repeats anchor line", () => {
+    //#given
+    const lines = ["line 1", "line 2"]
+
+    //#when / #then
+    expect(() => applyInsertAfter(lines, anchorFor(lines, 1), ["line 1"])).toThrow(/non-empty/i)
+  })
+
   it("restores indentation for paired single-line replacement", () => {
     //#given
     const lines = ["if (x) {", "  return 1", "}"]
@@ -126,6 +219,23 @@ describe("hashline edit operations", () => {
 
     //#then
     expect(result).toEqual(["before", "new 1", "new 2", "after"])
+  })
+
+  it("throws when insert_between payload contains only boundary echoes", () => {
+    //#given
+    const lines = ["line 1", "line 2", "line 3"]
+
+    //#when / #then
+    expect(() =>
+      applyHashlineEdits(lines.join("\n"), [
+        {
+          type: "insert_between",
+          after_line: anchorFor(lines, 1),
+          before_line: anchorFor(lines, 2),
+          text: ["line 1", "line 2"],
+        },
+      ])
+    ).toThrow(/non-empty/i)
   })
 
   it("restores indentation for first replace_lines entry", () => {
