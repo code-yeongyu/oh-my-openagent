@@ -62,7 +62,9 @@ export function createChatMessageHandler(args: {
   const isRuntimeFallbackEnabled =
     hooks.runtimeFallback !== null &&
     hooks.runtimeFallback !== undefined &&
-    (pluginConfig.runtime_fallback?.enabled ?? true)
+    (typeof pluginConfig.runtime_fallback === "boolean"
+      ? pluginConfig.runtime_fallback
+      : (pluginConfig.runtime_fallback?.enabled ?? true))
 
   return async (
     input: ChatMessageInput,

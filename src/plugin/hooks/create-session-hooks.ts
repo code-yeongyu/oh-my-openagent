@@ -245,10 +245,15 @@ export function createSessionHooks(args: {
     ? safeHook("anthropic-effort", () => createAnthropicEffortHook())
     : null
 
+  const runtimeFallbackConfig =
+    typeof pluginConfig.runtime_fallback === "boolean"
+      ? { enabled: pluginConfig.runtime_fallback }
+      : pluginConfig.runtime_fallback
+
   const runtimeFallback = isHookEnabled("runtime-fallback")
     ? safeHook("runtime-fallback", () =>
         createRuntimeFallbackHook(ctx, {
-          config: pluginConfig.runtime_fallback,
+          config: runtimeFallbackConfig,
           pluginConfig,
         }))
     : null
