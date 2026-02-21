@@ -57,7 +57,7 @@ export function restoreLeadingIndent(templateLine: string, line: string): string
 }
 
 export function stripInsertAnchorEcho(anchorLine: string, newLines: string[]): string[] {
-  if (newLines.length <= 1) return newLines
+  if (newLines.length === 0) return newLines
   if (equalsIgnoringWhitespace(newLines[0], anchorLine)) {
     return newLines.slice(1)
   }
@@ -74,10 +74,10 @@ export function stripInsertBeforeEcho(anchorLine: string, newLines: string[]): s
 
 export function stripInsertBoundaryEcho(afterLine: string, beforeLine: string, newLines: string[]): string[] {
   let out = newLines
-  if (out.length > 1 && equalsIgnoringWhitespace(out[0], afterLine)) {
+  if (out.length > 0 && equalsIgnoringWhitespace(out[0], afterLine)) {
     out = out.slice(1)
   }
-  if (out.length > 1 && equalsIgnoringWhitespace(out[out.length - 1], beforeLine)) {
+  if (out.length > 0 && equalsIgnoringWhitespace(out[out.length - 1], beforeLine)) {
     out = out.slice(0, -1)
   }
   return out
