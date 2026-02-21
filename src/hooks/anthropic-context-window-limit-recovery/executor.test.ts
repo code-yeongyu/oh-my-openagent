@@ -1,7 +1,8 @@
+/// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { executeCompact } from "./executor"
 import type { AutoCompactState } from "./types"
-import * as storage from "./storage"
+import * as recoveryStrategy from "./recovery-strategy"
 import * as messagesReader from "../session-recovery/storage/messages-reader"
 
 type TimerCallback = (...args: any[]) => void
@@ -313,18 +314,13 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockResolvedValue({
-      success: true,
-      sufficient: false,
-      truncatedCount: 3,
-      totalBytesRemoved: 10000,
-      targetBytesToRemove: 50000,
-      truncatedTools: [
-        { toolName: "Grep", originalSize: 5000 },
-        { toolName: "Read", originalSize: 3000 },
-        { toolName: "Bash", originalSize: 2000 },
-      ],
-    })
+    const truncateSpy = spyOn(
+      recoveryStrategy,
+      "runAggressiveTruncationStrategy",
+    ).mockImplementation(async (params) => ({
+      handled: false,
+      nextTruncateAttempt: params.truncateAttempt + 1,
+    }))
 
     // when: Execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
@@ -354,16 +350,24 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockResolvedValue({
-      success: true,
-      sufficient: true,
-      truncatedCount: 5,
-      totalBytesRemoved: 60000,
-      targetBytesToRemove: 50000,
-      truncatedTools: [
-        { toolName: "Grep", originalSize: 30000 },
-        { toolName: "Read", originalSize: 30000 },
-      ],
+    const truncateSpy = spyOn(
+      recoveryStrategy,
+      "runAggressiveTruncationStrategy",
+    ).mockImplementation(async (params) => {
+      setTimeout(() => {
+        void params.client.session
+          .promptAsync({
+            path: { id: params.sessionID },
+            body: { auto: true } as never,
+            query: { directory: params.directory },
+          })
+          .catch(() => {})
+      }, 500)
+
+      return {
+        handled: true,
+        nextTruncateAttempt: params.truncateAttempt + 1,
+      }
     })
 
     // when: Execute compaction

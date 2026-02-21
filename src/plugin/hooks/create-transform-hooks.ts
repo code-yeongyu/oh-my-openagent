@@ -5,7 +5,6 @@ import {
   createClaudeCodeHooksHook,
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
-  createBeastModeSystemHook,
 } from "../../hooks"
 import {
   contextCollector,
@@ -18,7 +17,6 @@ export type TransformHooks = {
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
-  beastModeSystem: ReturnType<typeof createBeastModeSystemHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -65,19 +63,10 @@ export function createTransformHooks(args: {
       )
     : null
 
-  const beastModeSystem = isHookEnabled("beast-mode-system")
-    ? safeCreateHook(
-        "beast-mode-system",
-        () => createBeastModeSystemHook(),
-        { enabled: safeHookEnabled },
-      )
-    : null
-
   return {
     claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
-    beastModeSystem,
   }
 }

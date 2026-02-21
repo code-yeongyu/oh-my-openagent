@@ -41,6 +41,12 @@ function createFakeTimers(): FakeTimers {
     return delay < 0 ? 0 : delay
   }
 
+  const flushMicrotasks = async (iterations: number = 5) => {
+    for (let index = 0; index < iterations; index++) {
+      await Promise.resolve()
+    }
+  }
+
   const schedule = (callback: TimerCallback, delay: number | undefined, interval: number | null, args: any[]) => {
     const id = nextId++
     timers.set(id, {
@@ -130,16 +136,16 @@ function createFakeTimers(): FakeTimers {
         cleared.delete(next.id)
       }
 
-      await Promise.resolve()
+      await flushMicrotasks()
     }
     timerNow = target
-    await Promise.resolve()
+    await flushMicrotasks()
   }
 
   const advanceClockBy = async (ms: number) => {
     const clamped = Math.max(0, ms)
     clockNow += clamped
-    await Promise.resolve()
+    await flushMicrotasks()
   }
 
   const restore = () => {
