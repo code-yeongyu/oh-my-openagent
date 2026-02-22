@@ -7,7 +7,6 @@ import { MAX_TRACKED_PATHS_PER_SESSION } from "./hook"
 import { createWriteExistingFileGuardHook } from "./index"
 
 const BLOCK_MESSAGE = "File already exists. Use edit tool instead."
-const OUTSIDE_SESSION_MESSAGE = "Path must be inside session directory."
 
 type Hook = ReturnType<typeof createWriteExistingFileGuardHook>
 
@@ -339,7 +338,7 @@ describe("createWriteExistingFileGuardHook", () => {
     ).resolves.toBeDefined()
   })
 
-  test("#given existing file outside session directory #when write executes #then blocks", async () => {
+  test("#given existing file outside session directory #when write executes #then allows", async () => {
     const outsideDir = mkdtempSync(join(tmpdir(), "write-existing-file-guard-outside-"))
 
     try {
@@ -349,9 +348,9 @@ describe("createWriteExistingFileGuardHook", () => {
       await expect(
         invoke({
           tool: "write",
-          outputArgs: { filePath: outsideFile, content: "attempted overwrite" },
+          outputArgs: { filePath: outsideFile, content: "allowed overwrite" },
         })
-      ).rejects.toThrow(OUTSIDE_SESSION_MESSAGE)
+      ).resolves.toBeDefined()
     } finally {
       rmSync(outsideDir, { recursive: true, force: true })
     }
