@@ -13,6 +13,8 @@ import {
   loadProjectSkills,
   loadOpencodeGlobalSkills,
   loadOpencodeProjectSkills,
+  loadGlobalAgentsSkills,
+  loadProjectAgentsSkills,
   skillsToCommandDefinitionRecord,
 } from "../features/opencode-skill-loader";
 import type { PluginComponents } from "./plugin-components-loader";
@@ -39,6 +41,8 @@ export async function applyCommandConfig(params: {
     projectSkills,
     opencodeGlobalSkills,
     opencodeProjectSkills,
+    agentsGlobalSkills,
+    agentsProjectSkills,
   ] = await Promise.all([
     discoverConfigSourceSkills({
       config: params.pluginConfig.skills,
@@ -52,16 +56,20 @@ export async function applyCommandConfig(params: {
     includeClaudeSkills ? loadProjectSkills(params.ctx.directory) : Promise.resolve({}),
     loadOpencodeGlobalSkills(),
     loadOpencodeProjectSkills(params.ctx.directory),
+    loadGlobalAgentsSkills(),
+    loadProjectAgentsSkills(params.ctx.directory),
   ]);
 
   params.config.command = {
     ...builtinCommands,
     ...skillsToCommandDefinitionRecord(configSourceSkills),
+    ...agentsGlobalSkills,
     ...userCommands,
     ...userSkills,
     ...opencodeGlobalCommands,
     ...opencodeGlobalSkills,
     ...systemCommands,
+    ...agentsProjectSkills,
     ...projectCommands,
     ...projectSkills,
     ...opencodeProjectCommands,
