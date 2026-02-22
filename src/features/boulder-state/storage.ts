@@ -55,15 +55,16 @@ export function writeBoulderState(directory: string, state: BoulderState, planNa
 }
 
 export function appendSessionId(directory: string, sessionId: string, planName?: string): BoulderState | null {
-  const state = readBoulderState(directory, planName)
+  // If planName given but per-plan file doesn't exist, fall back to legacy path
+  const resolvedPlanName = planName && existsSync(getBoulderFilePath(directory, planName)) ? planName : undefined
+  const state = readBoulderState(directory, resolvedPlanName)
   if (!state) return null
-
   if (!state.session_ids?.includes(sessionId)) {
     if (!Array.isArray(state.session_ids)) {
       state.session_ids = []
     }
     state.session_ids.push(sessionId)
-    if (writeBoulderState(directory, state, planName)) {
+    if (writeBoulderState(directory, state, resolvedPlanName)) {
       return state
     }
   }
@@ -87,30 +88,38 @@ export function clearBoulderState(directory: string, planName?: string): boolean
 
 export function findBoulderForSession(directory: string, sessionID: string): BoulderState | null {
   const bouldersDirectory = join(directory, BOULDER_DIR, BOULDERS_DIR)
-  if (!existsSync(bouldersDirectory)) return null
 
-  try {
-    const files = readdirSync(bouldersDirectory)
-    for (const file of files) {
-      if (!file.endsWith(".json")) continue
-      try {
-        const content = readFileSync(join(bouldersDirectory, file), "utf-8")
-        const parsed = JSON.parse(content)
-        if (
-          parsed &&
-          typeof parsed === "object" &&
-          !Array.isArray(parsed) &&
-          Array.isArray(parsed.session_ids) &&
-          parsed.session_ids.includes(sessionID)
-        ) {
-          return parsed as BoulderState
+  // Check per-plan boulders first
+  if (existsSync(bouldersDirectory)) {
+    try {
+      const files = readdirSync(bouldersDirectory)
+      for (const file of files) {
+        if (!file.endsWith(".json")) continue
+        try {
+          const content = readFileSync(join(bouldersDirectory, file), "utf-8")
+          const parsed = JSON.parse(content)
+          if (
+            parsed &&
+            typeof parsed === "object" &&
+            !Array.isArray(parsed) &&
+            Array.isArray(parsed.session_ids) &&
+            parsed.session_ids.includes(sessionID)
+          ) {
+            return parsed as BoulderState
+          }
+        } catch {
+          continue
         }
-      } catch {
-        continue
       }
+    } catch {
+      // Fall through to legacy check
     }
-  } catch {
-    return null
+  }
+
+  // Fall back to legacy boulder.json
+  const legacyState = readBoulderState(directory)
+  if (legacyState?.session_ids?.includes(sessionID)) {
+    return legacyState
   }
   return null
 }

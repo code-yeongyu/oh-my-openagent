@@ -1,4 +1,4 @@
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { findBoulderForSession, getPlanProgress } from "../../features/boulder-state"
 import {
   getActiveContinuationMarkerReason,
   isContinuationMarkerActive,
@@ -29,10 +29,8 @@ export function getContinuationState(directory: string, sessionID: string): Cont
 }
 
 function hasActiveBoulderContinuation(directory: string, sessionID: string): boolean {
-  const boulder = readBoulderState(directory)
+  const boulder = findBoulderForSession(directory, sessionID)
   if (!boulder) return false
-  if (!boulder.session_ids.includes(sessionID)) return false
-
   const progress = getPlanProgress(boulder.active_plan)
   return !progress.isComplete
 }
