@@ -25,7 +25,6 @@ import {
   hasMoreFallbacks,
 } from "../../shared/model-error-classifier"
 import {
-  MIN_IDLE_TIME_MS,
   POLLING_INTERVAL_MS,
   TASK_CLEANUP_DELAY_MS,
 } from "./constants"
@@ -43,6 +42,7 @@ import {
 import { tryFallbackRetry } from "./fallback-retry-handler"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { isCompactionAgent, findNearestMessageExcludingCompaction } from "./compaction-aware-message-resolver"
+import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
@@ -740,61 +740,15 @@ export class BackgroundManager {
     }
 
     if (event.type === "session.idle") {
-      const sessionID = props?.sessionID as string | undefined
-      if (!sessionID) return
-
-      const task = this.findBySession(sessionID)
-      if (!task || task.status !== "running") return
-      
-      const startedAt = task.startedAt
-      if (!startedAt) return
-
-      // Edge guard: Require minimum elapsed time (5 seconds) before accepting idle
-      const elapsedMs = Date.now() - startedAt.getTime()
-      if (elapsedMs < MIN_IDLE_TIME_MS) {
-        const remainingMs = MIN_IDLE_TIME_MS - elapsedMs
-        if (!this.idleDeferralTimers.has(task.id)) {
-          log("[background-agent] Deferring early session.idle:", { elapsedMs, remainingMs, taskId: task.id })
-          const timer = setTimeout(() => {
-            this.idleDeferralTimers.delete(task.id)
-            this.handleEvent({ type: "session.idle", properties: { sessionID } })
-          }, remainingMs)
-          this.idleDeferralTimers.set(task.id, timer)
-        } else {
-          log("[background-agent] session.idle already deferred:", { elapsedMs, taskId: task.id })
-        }
-        return
-      }
-
-      // Edge guard: Verify session has actual assistant output before completing
-      this.validateSessionHasOutput(sessionID).then(async (hasValidOutput) => {
-        // Re-check status after async operation (could have been completed by polling)
-        if (task.status !== "running") {
-          log("[background-agent] Task status changed during validation, skipping:", { taskId: task.id, status: task.status })
-          return
-        }
-
-        if (!hasValidOutput) {
-          log("[background-agent] Session.idle but no valid output yet, waiting:", task.id)
-          return
-        }
-
-        const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-
-        // Re-check status after async operation again
-        if (task.status !== "running") {
-          log("[background-agent] Task status changed during todo check, skipping:", { taskId: task.id, status: task.status })
-          return
-        }
-
-        if (hasIncompleteTodos) {
-          log("[background-agent] Task has incomplete todos, waiting for todo-continuation:", task.id)
-          return
-        }
-
-        await this.tryCompleteTask(task, "session.idle event")
-      }).catch(err => {
-        log("[background-agent] Error in session.idle handler:", err)
+      if (!props || typeof props !== "object") return
+      handleSessionIdleBackgroundEvent({
+        properties: props as Record<string, unknown>,
+        findBySession: (id) => this.findBySession(id),
+        idleDeferralTimers: this.idleDeferralTimers,
+        validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
+        checkSessionTodos: (id) => this.checkSessionTodos(id),
+        tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
+        emitIdleEvent: (sessionID) => this.handleEvent({ type: "session.idle", properties: { sessionID } }),
       })
     }
 
