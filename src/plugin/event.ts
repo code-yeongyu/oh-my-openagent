@@ -126,6 +126,9 @@ export function createEventHandler(args: {
       ? args.pluginConfig.runtime_fallback
       : (args.pluginConfig.runtime_fallback?.enabled ?? false));
 
+  const isModelFallbackEnabled =
+    hooks.modelFallback !== null && hooks.modelFallback !== undefined;
+
   // Avoid triggering multiple abort+continue cycles for the same failing assistant message.
   const lastHandledModelErrorMessageID = new Map<string, string>();
   const lastHandledRetryStatusKey = new Map<string, string>();
@@ -271,7 +274,7 @@ export function createEventHandler(args: {
 
       // Model fallback: in practice, API/model failures often surface as assistant message errors.
       // session.error events are not guaranteed for all providers, so we also observe message.updated.
-      if (sessionID && role === "assistant" && !isRuntimeFallbackEnabled) {
+      if (sessionID && role === "assistant" && !isRuntimeFallbackEnabled && isModelFallbackEnabled) {
         try {
           const assistantMessageID = info?.id as string | undefined;
           const assistantError = info?.error;
@@ -334,7 +337,7 @@ export function createEventHandler(args: {
       const sessionID = props?.sessionID as string | undefined;
       const status = props?.status as { type?: string; attempt?: number; message?: string; next?: number } | undefined;
 
-      if (sessionID && status?.type === "retry") {
+      if (sessionID && status?.type === "retry" && isModelFallbackEnabled) {
         try {
           const retryMessage = typeof status.message === "string" ? status.message : "";
           const retryKey = `${status.attempt ?? "?"}:${status.next ?? "?"}:${retryMessage}`;
@@ -422,7 +425,7 @@ export function createEventHandler(args: {
           }
         }
         // Second, try model fallback for model errors (rate limit, quota, provider issues, etc.)
-        else if (sessionID && shouldRetryError(errorInfo) && !isRuntimeFallbackEnabled) {
+        else if (sessionID && shouldRetryError(errorInfo) && !isRuntimeFallbackEnabled && isModelFallbackEnabled) {
           let agentName = getSessionAgent(sessionID);
 
           if (!agentName && sessionID === getMainSessionID()) {
