@@ -1,6 +1,7 @@
 import { createBuiltinAgents } from "../agents";
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
+import { isClaudeCodeEnabled } from "../config/schema/claude-code";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { getAgentDisplayName } from "../shared/agent-display-names";
@@ -11,7 +12,10 @@ import {
   discoverProjectClaudeSkills,
   discoverUserClaudeSkills,
 } from "../features/opencode-skill-loader";
-import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent-loader";
+import {
+  loadProjectAgents,
+  loadUserAgents,
+} from "../features/claude-code-agent-loader";
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
@@ -23,7 +27,9 @@ type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   plan?: Record<string, unknown>;
 };
 
-function getConfiguredDefaultAgent(config: Record<string, unknown>): string | undefined {
+function getConfiguredDefaultAgent(
+  config: Record<string, unknown>,
+): string | undefined {
   const defaultAgent = config.default_agent;
   if (typeof defaultAgent !== "string") return undefined;
 
@@ -37,13 +43,18 @@ export async function applyAgentConfig(params: {
   ctx: { directory: string; client?: any };
   pluginComponents: PluginComponents;
 }): Promise<Record<string, unknown>> {
-  const migratedDisabledAgents = (params.pluginConfig.disabled_agents ?? []).map(
-    (agent) => {
-      return AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent;
-    },
-  ) as typeof params.pluginConfig.disabled_agents;
+  const migratedDisabledAgents = (
+    params.pluginConfig.disabled_agents ?? []
+  ).map((agent) => {
+    return (
+      AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent
+    );
+  }) as typeof params.pluginConfig.disabled_agents;
 
-  const includeClaudeSkillsForAwareness = params.pluginConfig.claude_code?.skills ?? true;
+  const includeClaudeSkillsForAwareness = isClaudeCodeEnabled(
+    params.pluginConfig.claude_code,
+    "skills",
+  );
   const [
     discoveredConfigSourceSkills,
     discoveredUserSkills,
@@ -55,10 +66,12 @@ export async function applyAgentConfig(params: {
       config: params.pluginConfig.skills,
       configDir: params.ctx.directory,
     }),
-    includeClaudeSkillsForAwareness ? discoverUserClaudeSkills() : Promise.resolve([]),
     includeClaudeSkillsForAwareness
-       ? discoverProjectClaudeSkills(params.ctx.directory)
-       : Promise.resolve([]),
+      ? discoverUserClaudeSkills()
+      : Promise.resolve([]),
+    includeClaudeSkillsForAwareness
+      ? discoverProjectClaudeSkills(params.ctx.directory)
+      : Promise.resolve([]),
     discoverOpencodeGlobalSkills(),
     discoverOpencodeProjectSkills(params.ctx.directory),
   ]);
@@ -74,9 +87,12 @@ export async function applyAgentConfig(params: {
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const currentModel = params.config.model as string | undefined;
-  const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
+  const disabledSkills = new Set<string>(
+    params.pluginConfig.disabled_skills ?? [],
+  );
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
-  const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
+  const disableOmoEnv =
+    params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
@@ -94,9 +110,14 @@ export async function applyAgentConfig(params: {
     disableOmoEnv,
   );
 
-  const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
+  const includeClaudeAgents = isClaudeCodeEnabled(
+    params.pluginConfig.claude_code,
+    "agents",
+  );
   const userAgents = includeClaudeAgents ? loadUserAgents() : {};
-  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
+  const projectAgents = includeClaudeAgents
+    ? loadProjectAgents(params.ctx.directory)
+    : {};
 
   const rawPluginAgents = params.pluginComponents.agents;
   const pluginAgents = Object.fromEntries(
@@ -106,10 +127,12 @@ export async function applyAgentConfig(params: {
     ]),
   );
 
-  const isSisyphusEnabled = params.pluginConfig.sisyphus_agent?.disabled !== true;
+  const isSisyphusEnabled =
+    params.pluginConfig.sisyphus_agent?.disabled !== true;
   const builderEnabled =
     params.pluginConfig.sisyphus_agent?.default_builder_enabled ?? false;
-  const plannerEnabled = params.pluginConfig.sisyphus_agent?.planner_enabled ?? true;
+  const plannerEnabled =
+    params.pluginConfig.sisyphus_agent?.planner_enabled ?? true;
   const replacePlan = params.pluginConfig.sisyphus_agent?.replace_plan ?? true;
   const shouldDemotePlan = plannerEnabled && replacePlan;
   const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
@@ -146,7 +169,9 @@ export async function applyAgentConfig(params: {
         ...migratedBuildConfig,
         description: `${(configAgent?.build?.description as string) ?? "Build agent"} (OpenCode default)`,
       };
-      agentConfig["OpenCode-Builder"] = override ? { ...base, ...override } : base;
+      agentConfig["OpenCode-Builder"] = override
+        ? { ...base, ...override }
+        : base;
     }
 
     if (plannerEnabled) {
@@ -173,7 +198,9 @@ export async function applyAgentConfig(params: {
             })
             .map(([key, value]) => [
               key,
-              value ? migrateAgentConfig(value as Record<string, unknown>) : value,
+              value
+                ? migrateAgentConfig(value as Record<string, unknown>)
+                : value,
             ]),
         )
       : {};
@@ -185,7 +212,9 @@ export async function applyAgentConfig(params: {
     const planDemoteConfig = shouldDemotePlan
       ? buildPlanDemoteConfig(
           agentConfig["prometheus"] as Record<string, unknown> | undefined,
-          params.pluginConfig.agents?.plan as Record<string, unknown> | undefined,
+          params.pluginConfig.agents?.plan as
+            | Record<string, unknown>
+            | undefined,
         )
       : undefined;
 
@@ -221,6 +250,8 @@ export async function applyAgentConfig(params: {
   }
 
   const agentResult = params.config.agent as Record<string, unknown>;
-  log("[config-handler] agents loaded", { agentKeys: Object.keys(agentResult) });
+  log("[config-handler] agents loaded", {
+    agentKeys: Object.keys(agentResult),
+  });
   return agentResult;
 }

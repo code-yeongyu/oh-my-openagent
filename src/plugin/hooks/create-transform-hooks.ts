@@ -1,32 +1,37 @@
-import type { OhMyOpenCodeConfig } from "../../config"
-import type { PluginContext } from "../types"
+import type { OhMyOpenCodeConfig } from "../../config";
+import { isClaudeCodeEnabled } from "../../config/schema/claude-code";
+import type { PluginContext } from "../types";
 
 import {
   createClaudeCodeHooksHook,
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
-} from "../../hooks"
+} from "../../hooks";
 import {
   contextCollector,
   createContextInjectorMessagesTransformHook,
-} from "../../features/context-injector"
-import { safeCreateHook } from "../../shared/safe-create-hook"
+} from "../../features/context-injector";
+import { safeCreateHook } from "../../shared/safe-create-hook";
 
 export type TransformHooks = {
-  claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null
-  keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
-  contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
-  thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
-}
+  claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null;
+  keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null;
+  contextInjectorMessagesTransform: ReturnType<
+    typeof createContextInjectorMessagesTransformHook
+  >;
+  thinkingBlockValidator: ReturnType<
+    typeof createThinkingBlockValidatorHook
+  > | null;
+};
 
 export function createTransformHooks(args: {
-  ctx: PluginContext
-  pluginConfig: OhMyOpenCodeConfig
-  isHookEnabled: (hookName: string) => boolean
-  safeHookEnabled?: boolean
+  ctx: PluginContext;
+  pluginConfig: OhMyOpenCodeConfig;
+  isHookEnabled: (hookName: string) => boolean;
+  safeHookEnabled?: boolean;
 }): TransformHooks {
-  const { ctx, pluginConfig, isHookEnabled } = args
-  const safeHookEnabled = args.safeHookEnabled ?? true
+  const { ctx, pluginConfig, isHookEnabled } = args;
+  const safeHookEnabled = args.safeHookEnabled ?? true;
 
   const claudeCodeHooks = isHookEnabled("claude-code-hooks")
     ? safeCreateHook(
@@ -35,14 +40,19 @@ export function createTransformHooks(args: {
           createClaudeCodeHooksHook(
             ctx,
             {
-              disabledHooks: (pluginConfig.claude_code?.hooks ?? true) ? undefined : true,
+              disabledHooks: isClaudeCodeEnabled(
+                pluginConfig.claude_code,
+                "hooks",
+              )
+                ? undefined
+                : true,
               keywordDetectorDisabled: !isHookEnabled("keyword-detector"),
             },
             contextCollector,
           ),
         { enabled: safeHookEnabled },
       )
-    : null
+    : null;
 
   const keywordDetector = isHookEnabled("keyword-detector")
     ? safeCreateHook(
@@ -50,10 +60,10 @@ export function createTransformHooks(args: {
         () => createKeywordDetectorHook(ctx, contextCollector),
         { enabled: safeHookEnabled },
       )
-    : null
+    : null;
 
   const contextInjectorMessagesTransform =
-    createContextInjectorMessagesTransformHook(contextCollector)
+    createContextInjectorMessagesTransformHook(contextCollector);
 
   const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
     ? safeCreateHook(
@@ -61,12 +71,12 @@ export function createTransformHooks(args: {
         () => createThinkingBlockValidatorHook(),
         { enabled: safeHookEnabled },
       )
-    : null
+    : null;
 
   return {
     claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
-  }
+  };
 }

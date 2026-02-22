@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config";
+import { isClaudeCodeEnabled } from "../config/schema/claude-code";
 import { getAgentDisplayName } from "../shared/agent-display-names";
 import {
   loadUserCommands,
@@ -23,11 +24,20 @@ export async function applyCommandConfig(params: {
   ctx: { directory: string };
   pluginComponents: PluginComponents;
 }): Promise<void> {
-  const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands);
-  const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
+  const builtinCommands = loadBuiltinCommands(
+    params.pluginConfig.disabled_commands,
+  );
+  const systemCommands =
+    (params.config.command as Record<string, unknown>) ?? {};
 
-  const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
-  const includeClaudeSkills = params.pluginConfig.claude_code?.skills ?? true;
+  const includeClaudeCommands = isClaudeCodeEnabled(
+    params.pluginConfig.claude_code,
+    "commands",
+  );
+  const includeClaudeSkills = isClaudeCodeEnabled(
+    params.pluginConfig.claude_code,
+    "skills",
+  );
 
   const [
     configSourceSkills,
@@ -45,11 +55,15 @@ export async function applyCommandConfig(params: {
       configDir: params.ctx.directory,
     }),
     includeClaudeCommands ? loadUserCommands() : Promise.resolve({}),
-    includeClaudeCommands ? loadProjectCommands(params.ctx.directory) : Promise.resolve({}),
+    includeClaudeCommands
+      ? loadProjectCommands(params.ctx.directory)
+      : Promise.resolve({}),
     loadOpencodeGlobalCommands(),
     loadOpencodeProjectCommands(params.ctx.directory),
     includeClaudeSkills ? loadUserSkills() : Promise.resolve({}),
-    includeClaudeSkills ? loadProjectSkills(params.ctx.directory) : Promise.resolve({}),
+    includeClaudeSkills
+      ? loadProjectSkills(params.ctx.directory)
+      : Promise.resolve({}),
     loadOpencodeGlobalSkills(),
     loadOpencodeProjectSkills(params.ctx.directory),
   ]);
@@ -70,10 +84,14 @@ export async function applyCommandConfig(params: {
     ...params.pluginComponents.skills,
   };
 
-  remapCommandAgentFields(params.config.command as Record<string, Record<string, unknown>>);
+  remapCommandAgentFields(
+    params.config.command as Record<string, Record<string, unknown>>,
+  );
 }
 
-function remapCommandAgentFields(commands: Record<string, Record<string, unknown>>): void {
+function remapCommandAgentFields(
+  commands: Record<string, Record<string, unknown>>,
+): void {
   for (const cmd of Object.values(commands)) {
     if (cmd?.agent && typeof cmd.agent === "string") {
       cmd.agent = getAgentDisplayName(cmd.agent);

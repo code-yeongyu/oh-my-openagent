@@ -11,8 +11,63 @@ import {
   migrateConfigFile,
 } from "./shared";
 
+const DISABLE_ALL_CLAUDE_CODE = {
+  enabled: false,
+  plugins: false,
+  commands: false,
+  skills: false,
+  agents: false,
+  mcp: false,
+  hooks: false,
+} as const;
+
+/**
+ * Checks whether an env var holds a truthy disable flag.
+ * Matches OpenCode core convention: "1" or "true" (case-insensitive).
+ */
+function isTruthy(env: NodeJS.ProcessEnv, key: string): boolean {
+  const raw = env[key]?.toLowerCase();
+  return raw === "1" || raw === "true";
+}
+
+/**
+ * Applies hard overrides from OpenCode env vars onto the resolved config.
+ * Accepts an optional `env` parameter so the function is testable without
+ * global mocks.
+ *
+ * Supported env vars (mirrors OpenCode core flag.ts):
+ *   OPENCODE_DISABLE_CLAUDE_CODE        — master kill switch
+ *   OPENCODE_DISABLE_CLAUDE_CODE_SKILLS — disables skills only
+ */
+export function applyEnvVarOverrides(
+  config: OhMyOpenCodeConfig,
+  env: NodeJS.ProcessEnv = process.env,
+): OhMyOpenCodeConfig {
+  if (isTruthy(env, "OPENCODE_DISABLE_CLAUDE_CODE")) {
+    return {
+      ...config,
+      claude_code: {
+        ...config.claude_code,
+        ...DISABLE_ALL_CLAUDE_CODE,
+      },
+    };
+  }
+
+  // Per-component overrides (mirrors OpenCode core flag.ts)
+  const skillsDisabled = isTruthy(env, "OPENCODE_DISABLE_CLAUDE_CODE_SKILLS");
+  if (!skillsDisabled) return config;
+
+  return {
+    ...config,
+    claude_code: {
+      ...config.claude_code,
+      skills: false,
+    },
+  };
+}
+
 export function parseConfigPartially(
-  rawConfig: Record<string, unknown>
+  rawConfig: Record<string, unknown>,
 ): OhMyOpenCodeConfig | null {
   const fullResult = OhMyOpenCodeConfigSchema.safeParse(rawConfig);
   if (fullResult.success) {
@@ -23,7 +78,9 @@ export function parseConfigPartially(
   const invalidSections: string[] = [];
 
   for (const key of Object.keys(rawConfig)) {
-    const sectionResult = OhMyOpenCodeConfigSchema.safeParse({ [key]: rawConfig[key] });
+    const sectionResult = OhMyOpenCodeConfigSchema.safeParse({
+      [key]: rawConfig[key],
+    });
     if (sectionResult.success) {
       const parsed = sectionResult.data as Record<string, unknown>;
       if (parsed[key] !== undefined) {
@@ -49,7 +106,7 @@ export function parseConfigPartially(
 
 export function loadConfigFromPath(
   configPath: string,
-  _ctx: unknown
+  _ctx: unknown,
 ): OhMyOpenCodeConfig | null {
   try {
     if (fs.existsSync(configPath)) {
@@ -76,7 +133,9 @@ export function loadConfigFromPath(
 
       const partialResult = parseConfigPartially(rawConfig);
       if (partialResult) {
-        log(`Partial config loaded from ${configPath}`, { agents: partialResult.agents });
+        log(`Partial config loaded from ${configPath}`, {
+          agents: partialResult.agents,
+        });
         return partialResult;
       }
 
@@ -92,7 +151,7 @@ export function loadConfigFromPath(
 
 export function mergeConfigs(
   base: OhMyOpenCodeConfig,
-  override: OhMyOpenCodeConfig
+  override: OhMyOpenCodeConfig,
 ): OhMyOpenCodeConfig {
   return {
     ...base,
@@ -135,16 +194,14 @@ export function mergeConfigs(
 
 export function loadPluginConfig(
   directory: string,
-  ctx: unknown
+  ctx: unknown,
 ): OhMyOpenCodeConfig {
   // User-level config path - prefer .jsonc over .json
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
   const userBasePath = path.join(configDir, "oh-my-opencode");
   const userDetected = detectConfigFile(userBasePath);
   const userConfigPath =
-    userDetected.format !== "none"
-      ? userDetected.path
-      : userBasePath + ".json";
+    userDetected.format !== "none" ? userDetected.path : userBasePath + ".json";
 
   // Project-level config path - prefer .jsonc over .json
   const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
@@ -164,9 +221,7 @@ export function loadPluginConfig(
     config = mergeConfigs(config, projectConfig);
   }
 
-  config = {
-    ...config,
-  };
+  config = applyEnvVarOverrides(config);
 
   log("Final merged config", {
     agents: config.agents,

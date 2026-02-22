@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config";
+import { isClaudeCodeEnabled } from "../config/schema/claude-code";
 import { loadAllPluginComponents } from "../features/claude-code-plugin-loader";
 import { addConfigLoadError, log } from "../shared";
 
@@ -25,25 +26,31 @@ const EMPTY_PLUGIN_COMPONENTS: PluginComponents = {
 export async function loadPluginComponents(params: {
   pluginConfig: OhMyOpenCodeConfig;
 }): Promise<PluginComponents> {
-  const pluginsEnabled = params.pluginConfig.claude_code?.plugins ?? true;
+  const pluginsEnabled = isClaudeCodeEnabled(
+    params.pluginConfig.claude_code,
+    "plugins",
+  );
   if (!pluginsEnabled) {
     return EMPTY_PLUGIN_COMPONENTS;
   }
 
-  const timeoutMs = params.pluginConfig.experimental?.plugin_load_timeout_ms ?? 10000;
+  const timeoutMs =
+    params.pluginConfig.experimental?.plugin_load_timeout_ms ?? 10000;
 
   try {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(
-        () => reject(new Error(`Plugin loading timed out after ${timeoutMs}ms`)),
+        () =>
+          reject(new Error(`Plugin loading timed out after ${timeoutMs}ms`)),
         timeoutMs,
       );
     });
 
     const pluginComponents = (await Promise.race([
       loadAllPluginComponents({
-        enabledPluginsOverride: params.pluginConfig.claude_code?.plugins_override,
+        enabledPluginsOverride:
+          params.pluginConfig.claude_code?.plugins_override,
       }),
       timeoutPromise,
     ]).finally(() => {

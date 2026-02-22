@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config";
+import { isClaudeCodeEnabled } from "../config/schema/claude-code";
 import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
 import { createBuiltinMcps } from "../mcp";
 import type { PluginComponents } from "./plugin-components-loader";
@@ -6,7 +7,7 @@ import type { PluginComponents } from "./plugin-components-loader";
 type McpEntry = Record<string, unknown>;
 
 function captureUserDisabledMcps(
-  userMcp: Record<string, unknown> | undefined
+  userMcp: Record<string, unknown> | undefined,
 ): Set<string> {
   const disabled = new Set<string>();
   if (!userMcp) return disabled;
@@ -34,7 +35,7 @@ export async function applyMcpConfig(params: {
   const userMcp = params.config.mcp as Record<string, unknown> | undefined;
   const userDisabledMcps = captureUserDisabledMcps(userMcp);
 
-  const mcpResult = params.pluginConfig.claude_code?.mcp ?? true
+  const mcpResult = isClaudeCodeEnabled(params.pluginConfig.claude_code, "mcp")
     ? await loadMcpConfigs(disabledMcps)
     : { servers: {} };
 
