@@ -35,6 +35,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   disabled_tools: z.array(z.string()).optional(),
   /** Enable hashline_edit tool/hook integrations (default: true at call site) */
   hashline_edit: z.boolean().optional(),
+  /** Enable model fallback on API errors (default: false). Set to true to enable automatic model switching when model errors occur. */
+  model_fallback: z.boolean().optional(),
   agents: AgentOverridesSchema.optional(),
   categories: CategoriesConfigSchema.optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),

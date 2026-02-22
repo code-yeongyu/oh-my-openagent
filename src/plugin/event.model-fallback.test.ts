@@ -53,7 +53,8 @@ describe("createEventHandler - model fallback", () => {
   test("triggers retry prompt for assistant message.updated APIError payloads (headless resume)", async () => {
     //#given
     const sessionID = "ses_message_updated_fallback"
-    const { handler, abortCalls, promptCalls } = createHandler()
+    const modelFallback = createModelFallbackHook()
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
 
     //#when
     await handler({
@@ -95,7 +96,8 @@ describe("createEventHandler - model fallback", () => {
     //#given
     const sessionID = "ses_main_fallback_nested"
     setMainSession(sessionID)
-    const { handler, abortCalls, promptCalls } = createHandler()
+    const modelFallback = createModelFallbackHook()
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
 
     //#when
     await handler({
@@ -339,5 +341,65 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID, sessionID])
     expect(promptCalls).toEqual([sessionID, sessionID])
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)
+  })
+
+  test("does not trigger model-fallback retry when modelFallback hook is not provided (disabled by default)", async () => {
+    //#given
+    const sessionID = "ses_disabled_by_default"
+    setMainSession(sessionID)
+    const { handler, abortCalls, promptCalls } = createHandler()
+
+    //#when - message.updated with assistant error
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_err_disabled_1",
+            sessionID,
+            role: "assistant",
+            time: { created: 1, completed: 2 },
+            error: {
+              name: "APIError",
+              data: {
+                message:
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-6-thinking\"}}",
+                isRetryable: true,
+              },
+            },
+            parentID: "msg_user_disabled_1",
+            modelID: "claude-opus-4-6-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus (Ultraworker)",
+            path: { cwd: "/tmp", root: "/tmp" },
+            cost: 0,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          },
+        },
+      },
+    })
+
+    //#when - session.error with retryable error
+    await handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: {
+            name: "UnknownError",
+            data: {
+              error: {
+                message:
+                  "Bad Gateway: {\"error\":{\"message\":\"unknown provider for model claude-opus-4-6-thinking\"}}",
+              },
+            },
+          },
+        },
+      },
+    })
+
+    //#then - no abort or prompt calls should have been made
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
   })
 })

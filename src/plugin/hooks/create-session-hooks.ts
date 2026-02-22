@@ -151,9 +151,10 @@ export function createSessionHooks(args: {
     }
   }
 
-  // Model fallback hook (configurable via disabled_hooks)
+  // Model fallback hook (configurable via model_fallback config + disabled_hooks)
   // This handles automatic model switching when model errors occur
-  const modelFallback = isHookEnabled("model-fallback")
+  const isModelFallbackConfigEnabled = pluginConfig.model_fallback ?? false
+  const modelFallback = isModelFallbackConfigEnabled && isHookEnabled("model-fallback")
     ? safeHook("model-fallback", () =>
       createModelFallbackHook({
         toast: async ({ title, message, variant, duration }) => {
