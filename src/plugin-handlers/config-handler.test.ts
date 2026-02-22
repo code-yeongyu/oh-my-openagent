@@ -1168,6 +1168,7 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     getAgentDisplayName("oracle"),
   ])
 
+
   test("denies todowrite and todoread for primary agents when task_system is enabled", async () => {
     //#given
     const createBuiltinAgentsMock = agents.createBuiltinAgents as unknown as {
@@ -1360,6 +1361,7 @@ describe("Agent display name re-keying", () => {
     expect(agentConfig[getAgentDisplayName("sisyphus")]).toBeDefined()
   })
 })
+
 
 describe("disable_omo_env pass-through", () => {
   test("passes disable_omo_env=true to createBuiltinAgents", async () => {
