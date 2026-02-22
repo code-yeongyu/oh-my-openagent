@@ -3,14 +3,14 @@ import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 export function resolveCompactionModel(
-  pluginConfig: OhMyOpenCodeConfig,
+  pluginConfig: OhMyOpenCodeConfig | undefined,
   sessionID: string,
   originalProviderID: string,
   originalModelID: string
 ): { providerID: string; modelID: string } {
   const sessionAgentName = getSessionAgent(sessionID)
   
-  if (!sessionAgentName || !pluginConfig.agents) {
+  if (!sessionAgentName || !pluginConfig?.agents) {
     return { providerID: originalProviderID, modelID: originalModelID }
   }
 

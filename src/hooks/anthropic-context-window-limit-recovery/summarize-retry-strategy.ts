@@ -13,7 +13,7 @@ export async function runSummarizeRetryStrategy(params: {
   autoCompactState: AutoCompactState
   client: Client
   directory: string
-  pluginConfig: OhMyOpenCodeConfig
+  pluginConfig?: OhMyOpenCodeConfig
   errorType?: string
   messageIndex?: number
 }): Promise<void> {

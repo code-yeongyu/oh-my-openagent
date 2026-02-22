@@ -18,7 +18,7 @@ export async function executeCompact(
   autoCompactState: AutoCompactState,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // @ts-ignore
-  pluginConfig: OhMyOpenCodeConfig,
+  pluginConfig: OhMyOpenCodeConfig | undefined,
   // @ts-ignore
   client: any,
   // @ts-ignore
