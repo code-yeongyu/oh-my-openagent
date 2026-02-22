@@ -134,6 +134,9 @@ export function applyAppend(lines: string[], text: string | string[]): string[] 
   if (normalized.length === 0) {
     throw new Error("append requires non-empty text")
   }
+  if (lines.length === 1 && lines[0] === "") {
+    return [...normalized]
+  }
   return [...lines, ...normalized]
 }
 
@@ -141,6 +144,9 @@ export function applyPrepend(lines: string[], text: string | string[]): string[]
   const normalized = toNewLines(text)
   if (normalized.length === 0) {
     throw new Error("prepend requires non-empty text")
+  }
+  if (lines.length === 1 && lines[0] === "") {
+    return [...normalized]
   }
   return [...normalized, ...lines]
 }

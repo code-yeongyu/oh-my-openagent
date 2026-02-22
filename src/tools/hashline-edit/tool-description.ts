@@ -1,28 +1,22 @@
 export const HASHLINE_EDIT_DESCRIPTION = `Edit files using LINE#ID format for precise, safe modifications.
 
 WORKFLOW:
-1. Read the file and copy exact LINE#ID anchors.
-2. Submit one edit call with all related operations for that file.
-3. If more edits are needed after success, use the latest anchors from read/edit output.
-4. Use anchors as "LINE#ID" only (never include trailing ":content").
+1. Read target file/range and copy exact LINE#ID tags.
+2. Pick the smallest operation per logical mutation site.
+3. Submit one edit call per file with all related operations.
+4. If same file needs another call, re-read first.
+5. Use anchors as "LINE#ID" only (never include trailing ":content").
 
 VALIDATION:
  Payload shape: { "filePath": string, "edits": [...], "delete"?: boolean, "rename"?: string }
  Each edit must be one of: set_line, replace_lines, insert_after, insert_before, insert_between, replace, append, prepend
  text/new_text must contain plain replacement text only (no LINE#ID prefixes, no diff + markers)
+ CRITICAL: all operations validate against the same pre-edit file snapshot and apply bottom-up.
 
-LINE#ID FORMAT (CRITICAL - READ CAREFULLY):
-Each line reference must be in "LINE#ID" format where:
+LINE#ID FORMAT (CRITICAL):
+ Each line reference must be in "LINE#ID" format where:
  LINE: 1-based line number
  ID: Two CID letters from the set ZPMQVRWSNKTXJBYH
-
-OPERATION TYPES:
-1. set_line
-2. replace_lines
-3. insert_after
-4. insert_before
-5. insert_between
-6. replace
 
 FILE MODES:
  delete=true deletes file and requires edits=[] with no rename
@@ -36,17 +30,34 @@ CONTENT FORMAT:
 FILE CREATION:
  append: adds content at EOF. If file does not exist, creates it.
  prepend: adds content at BOF. If file does not exist, creates it.
- CRITICAL: append/prepend are the ONLY operations that work without an existing file.
+ CRITICAL: append/prepend are the only operations that work without an existing file.
 
 OPERATION CHOICE:
- One line wrong \u2192 set_line
- Block rewrite \u2192 replace_lines
- New content between known anchors \u2192 insert_between (safest \u2014 dual-anchor pinning)
- New content at boundary \u2192 insert_after or insert_before
- New file or EOF/BOF addition \u2192 append or prepend
- No LINE#ID available \u2192 replace (last resort)
+ One line wrong -> set_line
+ Adjacent block rewrite or swap/move -> replace_lines (prefer one range op over many single-line ops)
+ Both boundaries known -> insert_between (ALWAYS prefer over insert_after/insert_before)
+ One boundary known -> insert_after or insert_before
+ New file or EOF/BOF addition -> append or prepend
+ No LINE#ID available -> replace (last resort)
 
-AUTOCORRECT (built-in \u2014 you do NOT need to handle these):
+RULES (CRITICAL):
+ 1. Minimize scope: one logical mutation site per operation.
+ 2. Preserve formatting: keep indentation, punctuation, line breaks, trailing commas, brace style.
+ 3. Prefer insertion over neighbor rewrites: anchor to structural boundaries (}, ], },), not interior property lines.
+ 4. No no-ops: replacement content must differ from current content.
+ 5. Touch only requested code: avoid incidental edits.
+ 6. Use exact current tokens: NEVER rewrite approximately.
+ 7. For swaps/moves: prefer one range operation over multiple single-line operations.
+
+TAG CHOICE (ALWAYS):
+ - Copy tags exactly from read output or >>> mismatch output.
+ - NEVER guess tags.
+ - Prefer insert_between over insert_after/insert_before when both boundaries are known.
+ - Anchor to structural lines (function/class/brace), NEVER blank lines.
+ - Anti-pattern warning: blank/whitespace anchors are fragile.
+ - Re-read after each successful edit call before issuing another on the same file.
+
+AUTOCORRECT (built-in - you do NOT need to handle these):
  Merged lines are auto-expanded back to original line count.
  Indentation is auto-restored from original lines.
  BOM and CRLF line endings are preserved automatically.

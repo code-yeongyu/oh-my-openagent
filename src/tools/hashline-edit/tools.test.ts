@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { createHashlineEditTool } from "./tools"
 import { computeLineHash } from "./hash-computation"
+import { canonicalizeFileText } from "./file-text-canonicalization"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
@@ -261,5 +262,27 @@ describe("createHashlineEditTool", () => {
     expect(bytes[1]).toBe(0xbb)
     expect(bytes[2]).toBe(0xbf)
     expect(bytes.toString("utf-8")).toBe("\uFEFFline1\r\nline2-updated\r\n")
+  })
+
+  it("detects LF as line ending when LF appears before CRLF", () => {
+    //#given
+    const content = "line1\nline2\r\nline3"
+
+    //#when
+    const envelope = canonicalizeFileText(content)
+
+    //#then
+    expect(envelope.lineEnding).toBe("\n")
+  })
+
+  it("detects CRLF as line ending when CRLF appears before LF", () => {
+    //#given
+    const content = "line1\r\nline2\nline3"
+
+    //#when
+    const envelope = canonicalizeFileText(content)
+
+    //#then
+    expect(envelope.lineEnding).toBe("\r\n")
   })
 })
