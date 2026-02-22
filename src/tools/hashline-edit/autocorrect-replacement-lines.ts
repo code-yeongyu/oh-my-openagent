@@ -78,18 +78,28 @@ export function maybeExpandSingleLineMerge(
   let orderedMatch = true
   for (const part of parts) {
     let idx = merged.indexOf(part, offset)
+    let matchedLen = part.length
     if (idx === -1) {
       const stripped = stripTrailingContinuationTokens(part)
       if (stripped !== part) {
         idx = merged.indexOf(stripped, offset)
+        if (idx !== -1) matchedLen = stripped.length
       }
     }
     if (idx === -1) {
-      const mergeStripped = stripMergeOperatorChars(merged.slice(offset))
+      const segment = merged.slice(offset)
+      const segmentStripped = stripMergeOperatorChars(segment)
       const partStripped = stripMergeOperatorChars(part)
-      const fuzzyIdx = mergeStripped.indexOf(partStripped)
+      const fuzzyIdx = segmentStripped.indexOf(partStripped)
       if (fuzzyIdx !== -1) {
-        idx = offset + fuzzyIdx
+        let strippedPos = 0
+        let originalPos = 0
+        while (strippedPos < fuzzyIdx && originalPos < segment.length) {
+          if (!/[|&?]/.test(segment[originalPos])) strippedPos += 1
+          originalPos += 1
+        }
+        idx = offset + originalPos
+        matchedLen = part.length
       }
     }
     if (idx === -1) {
@@ -97,7 +107,7 @@ export function maybeExpandSingleLineMerge(
       break
     }
     indices.push(idx)
-    offset = idx + part.length
+    offset = idx + matchedLen
   }
 
   const expanded: string[] = []
