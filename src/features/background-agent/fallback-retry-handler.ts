@@ -117,6 +117,7 @@ export function tryFallbackRetry(args: {
     model: task.model,
     fallbackChain: task.fallbackChain,
     category: task.category,
+    isUnstableAgent: task.isUnstableAgent,
   }
   queue.push({ task, input: retryInput })
   queuesByKey.set(key, queue)

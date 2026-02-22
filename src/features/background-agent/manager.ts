@@ -9,7 +9,6 @@ import { TaskHistory } from "./task-history"
 import {
   log,
   getAgentToolRestrictions,
-  getMessageDir,
   normalizePromptTools,
   normalizeSDKResponse,
   promptWithModelSuggestionRetry,
@@ -44,6 +43,8 @@ import {
 import { tryFallbackRetry } from "./fallback-retry-handler"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { isCompactionAgent, findNearestMessageExcludingCompaction } from "./compaction-aware-message-resolver"
+import { MESSAGE_STORAGE } from "../hook-message-injector"
+import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 
@@ -931,6 +932,7 @@ export class BackgroundManager {
     errorInfo: { name?: string; message?: string },
     source: string,
   ): boolean {
+    const previousSessionID = task.sessionID
     const result = tryFallbackRetry({
       task,
       errorInfo,
@@ -941,8 +943,8 @@ export class BackgroundManager {
       queuesByKey: this.queuesByKey,
       processKey: (key: string) => this.processKey(key),
     })
-    if (result && task.sessionID) {
-      subagentSessions.delete(task.sessionID)
+    if (result && previousSessionID) {
+      subagentSessions.delete(previousSessionID)
     }
     return result
   }
@@ -1345,7 +1347,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               parentSessionID: task.parentSessionID,
             })
           }
-          const messageDir = getMessageDir(task.parentSessionID)
+          const messageDir = join(MESSAGE_STORAGE, task.parentSessionID)
           const currentMessage = messageDir ? findNearestMessageExcludingCompaction(messageDir) : null
           agent = currentMessage?.agent ?? task.parentAgent
           model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
