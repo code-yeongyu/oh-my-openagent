@@ -1,9 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { HOOK_NAME, PROMETHEUS_AGENT, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
+import { HOOK_NAME, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
 import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { getAgentFromSession } from "./agent-resolution"
+import { isPrometheusAgent } from "./agent-matcher"
 import { isAllowedFile } from "./path-policy"
 
 const TASK_TOOLS = ["task", "call_omo_agent"]
@@ -14,9 +15,9 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
       input: { tool: string; sessionID: string; callID: string },
       output: { args: Record<string, unknown>; message?: string }
     ): Promise<void> => {
-      const agentName = getAgentFromSession(input.sessionID, ctx.directory)
+      const agentName = await getAgentFromSession(input.sessionID, ctx.directory, ctx.client)
 
-      if (agentName !== PROMETHEUS_AGENT) {
+      if (!isPrometheusAgent(agentName)) {
         return
       }
 

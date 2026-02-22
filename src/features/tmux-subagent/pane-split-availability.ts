@@ -4,8 +4,13 @@ import {
 	MAX_COLS,
 	MAX_ROWS,
 	MIN_SPLIT_HEIGHT,
-	MIN_SPLIT_WIDTH,
 } from "./tmux-grid-constants"
+import { MIN_PANE_WIDTH } from "./types"
+
+function getMinSplitWidth(minPaneWidth?: number): number {
+	const width = Math.max(1, minPaneWidth ?? MIN_PANE_WIDTH)
+	return 2 * width + DIVIDER_SIZE
+}
 
 export function getColumnCount(paneCount: number): number {
 	if (paneCount <= 0) return 1
@@ -21,36 +26,48 @@ export function getColumnWidth(agentAreaWidth: number, paneCount: number): numbe
 export function isSplittableAtCount(
 	agentAreaWidth: number,
 	paneCount: number,
+	minPaneWidth?: number,
 ): boolean {
 	const columnWidth = getColumnWidth(agentAreaWidth, paneCount)
-	return columnWidth >= MIN_SPLIT_WIDTH
+	return columnWidth >= getMinSplitWidth(minPaneWidth)
 }
 
 export function findMinimalEvictions(
 	agentAreaWidth: number,
 	currentCount: number,
+	minPaneWidth?: number,
 ): number | null {
 	for (let k = 1; k <= currentCount; k++) {
-		if (isSplittableAtCount(agentAreaWidth, currentCount - k)) {
+		if (isSplittableAtCount(agentAreaWidth, currentCount - k, minPaneWidth)) {
 			return k
 		}
 	}
 	return null
 }
 
-export function canSplitPane(pane: TmuxPaneInfo, direction: SplitDirection): boolean {
+export function canSplitPane(
+	pane: TmuxPaneInfo,
+	direction: SplitDirection,
+	minPaneWidth?: number,
+): boolean {
 	if (direction === "-h") {
-		return pane.width >= MIN_SPLIT_WIDTH
+		return pane.width >= getMinSplitWidth(minPaneWidth)
 	}
 	return pane.height >= MIN_SPLIT_HEIGHT
 }
 
-export function canSplitPaneAnyDirection(pane: TmuxPaneInfo): boolean {
-	return pane.width >= MIN_SPLIT_WIDTH || pane.height >= MIN_SPLIT_HEIGHT
+export function canSplitPaneAnyDirection(
+	pane: TmuxPaneInfo,
+	minPaneWidth?: number,
+): boolean {
+	return pane.width >= getMinSplitWidth(minPaneWidth) || pane.height >= MIN_SPLIT_HEIGHT
 }
 
-export function getBestSplitDirection(pane: TmuxPaneInfo): SplitDirection | null {
-	const canH = pane.width >= MIN_SPLIT_WIDTH
+export function getBestSplitDirection(
+	pane: TmuxPaneInfo,
+	minPaneWidth?: number,
+): SplitDirection | null {
+	const canH = pane.width >= getMinSplitWidth(minPaneWidth)
 	const canV = pane.height >= MIN_SPLIT_HEIGHT
 
 	if (!canH && !canV) return null

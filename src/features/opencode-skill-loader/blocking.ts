@@ -25,13 +25,13 @@ export function discoverAllSkillsBlocking(dirs: string[], scopes: SkillScope[]):
   const { port1, port2 } = new MessageChannel()
   
   const worker = new Worker(new URL("./discover-worker.ts", import.meta.url), {
-    workerData: { signal }
+    // workerData is structured-cloned; pass the SharedArrayBuffer and recreate the view in the worker.
+    workerData: { signalBuffer: signal.buffer },
   })
 
-  worker.postMessage({ port: port2 }, [port2])
-  
   const input: WorkerInput = { dirs, scopes }
-  port1.postMessage(input)
+  // Avoid a race where the worker hasn't attached listeners to the MessagePort yet.
+  worker.postMessage({ port: port2, input }, [port2])
 
   const waitResult = Atomics.wait(signal, 0, 0, TIMEOUT_MS)
 

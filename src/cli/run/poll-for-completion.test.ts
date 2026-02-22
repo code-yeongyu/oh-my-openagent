@@ -45,12 +45,37 @@ describe("pollForCompletion", () => {
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
+      minStabilizationMs: 10,
     })
 
     //#then - exits with 0 but only after 3 consecutive checks
     expect(result).toBe(0)
     const todoCallCount = (ctx.client.session.todo as ReturnType<typeof mock>).mock.calls.length
     expect(todoCallCount).toBeGreaterThanOrEqual(3)
+  })
+
+  it("does not check completion during stabilization period after first meaningful work", async () => {
+    //#given - session idle, meaningful work done, but stabilization period not elapsed
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+
+    //#when - abort after 50ms (within the 60ms stabilization period)
+    setTimeout(() => abortController.abort(), 50)
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 3,
+      minStabilizationMs: 60,
+    })
+
+    //#then - should be aborted, not completed (stabilization blocked completion check)
+    expect(result).toBe(130)
+    const todoCallCount = (ctx.client.session.todo as ReturnType<typeof mock>).mock.calls.length
+    expect(todoCallCount).toBe(0)
   })
 
   it("does not exit when currentTool is set - resets consecutive counter", async () => {
@@ -69,6 +94,7 @@ describe("pollForCompletion", () => {
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
+      minStabilizationMs: 500,
     })
 
     //#then - should be aborted, not completed (tool blocked exit)
@@ -110,6 +136,7 @@ describe("pollForCompletion", () => {
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
+      minStabilizationMs: 10,
     })
     const elapsedMs = Date.now() - startMs
 
@@ -133,6 +160,7 @@ describe("pollForCompletion", () => {
     const result = await pollForCompletion(ctx, eventState, abortController, {
       pollIntervalMs: 10,
       requiredConsecutive: 3,
+      minStabilizationMs: 500,
     })
 
     //#then
@@ -179,6 +207,94 @@ describe("pollForCompletion", () => {
     expect(result).toBe(130)
     const todoCallCount = (ctx.client.session.todo as ReturnType<typeof mock>).mock.calls.length
     expect(todoCallCount).toBe(0)
+  })
+
+  it("falls back to session.status API when idle event is missing", async () => {
+    //#given - mainSessionIdle not set by events, but status API says idle
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext({
+      statuses: {
+        "test-session": { type: "idle" },
+      },
+    })
+    const eventState = createEventState()
+    eventState.mainSessionIdle = false
+    eventState.hasReceivedMeaningfulWork = true
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 2,
+      minStabilizationMs: 10,
+    })
+
+    //#then - completion succeeds without idle event
+    expect(result).toBe(0)
+  })
+
+  it("allows silent completion after stabilization when no meaningful work is received", async () => {
+    //#given - session is idle and stable but no assistant message/tool event arrived
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.hasReceivedMeaningfulWork = false
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+      minStabilizationMs: 30,
+    })
+
+    //#then - completion succeeds after stabilization window
+    expect(result).toBe(0)
+  })
+
+  it("uses default stabilization to avoid indefinite wait when no meaningful work arrives", async () => {
+    //#given - idle with no meaningful work and no explicit minStabilization override
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.hasReceivedMeaningfulWork = false
+    const abortController = new AbortController()
+
+    //#when
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+    })
+
+    //#then - command exits without manual Ctrl+C
+    expect(result).toBe(0)
+  })
+
+  it("coerces non-positive stabilization values to default stabilization", async () => {
+    //#given - explicit zero stabilization should still wait for default window
+    spyOn(console, "log").mockImplementation(() => {})
+    spyOn(console, "error").mockImplementation(() => {})
+    const ctx = createMockContext()
+    const eventState = createEventState()
+    eventState.mainSessionIdle = true
+    eventState.hasReceivedMeaningfulWork = false
+    const abortController = new AbortController()
+
+    //#when - abort before default 1s window elapses
+    setTimeout(() => abortController.abort(), 100)
+    const result = await pollForCompletion(ctx, eventState, abortController, {
+      pollIntervalMs: 10,
+      requiredConsecutive: 1,
+      minStabilizationMs: 0,
+    })
+
+    //#then - should not complete early
+    expect(result).toBe(130)
   })
 
   it("simulates race condition: brief idle with 0 todos does not cause immediate exit", async () => {
@@ -238,7 +354,7 @@ describe("pollForCompletion", () => {
     //#then - returns 1 (not 130/timeout), error message printed
     expect(result).toBe(1)
     const errorCalls = (console.error as ReturnType<typeof mock>).mock.calls
-    expect(errorCalls.some((call) => call[0]?.includes("Session ended with error"))).toBe(true)
+    expect(errorCalls.some((call: unknown[]) => String(call[0] ?? "").includes("Session ended with error"))).toBe(true)
   })
 
   it("returns 1 when session errors while tool is active (error not masked by tool gate)", async () => {
@@ -263,4 +379,5 @@ describe("pollForCompletion", () => {
     //#then - returns 1
     expect(result).toBe(1)
   })
+
 })

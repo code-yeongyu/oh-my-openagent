@@ -206,11 +206,9 @@ After EVERY delegation, complete ALL of these steps — no shortcuts:
 **If you cannot explain what the changed code does, you have not reviewed it.**
 
 #### C. Hands-On QA (if applicable)
-| Deliverable | Method | Tool |
-|-------------|--------|------|
-| Frontend/UI | Browser | \`/playwright\` |
-| TUI/CLI | Interactive | \`interactive_bash\` |
-| API/Backend | Real requests | curl |
+- **Frontend/UI**: Browser — \`/playwright\`
+- **TUI/CLI**: Interactive — \`interactive_bash\`
+- **API/Backend**: Real requests — curl
 
 #### D. Check Boulder State Directly
 
@@ -313,7 +311,8 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="Task 4..
 
 **Background management**:
 - Collect results: \`background_output(task_id="...")\`
-- Before final answer: \`background_cancel(all=true)\`
+- Before final answer, cancel DISPOSABLE tasks individually: \`background_cancel(taskId="bg_explore_xxx")\`, \`background_cancel(taskId="bg_librarian_xxx")\`
+- **NEVER use \`background_cancel(all=true)\`** — it kills tasks whose results you haven't collected yet
 </parallel_execution>
 
 <notepad_protocol>
@@ -355,13 +354,11 @@ You are the QA gate. Subagents lie. Verify EVERYTHING.
 6. **Check boulder state**: Read the plan file directly, count remaining tasks
 
 **Evidence required**:
-| Action | Evidence |
-|--------|----------|
-| Code change | lsp_diagnostics clean + manual Read of every changed file |
-| Build | Exit code 0 |
-| Tests | All pass |
-| Logic correct | You read the code and can explain what it does |
-| Boulder state | Read plan file, confirmed progress |
+- **Code change**: lsp_diagnostics clean + manual Read of every changed file
+- **Build**: Exit code 0
+- **Tests**: All pass
+- **Logic correct**: You read the code and can explain what it does
+- **Boulder state**: Read plan file, confirmed progress
 
 **No evidence = not complete. Skipping manual review = rubber-stamping broken work.**
 </verification_rules>

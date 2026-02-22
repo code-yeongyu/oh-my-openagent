@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
+import { normalizeSDKResponse } from "../../shared"
 
 export async function waitForCompletion(
   sessionID: string,
@@ -33,7 +34,7 @@ export async function waitForCompletion(
 
     // Check session status
     const statusResult = await ctx.client.session.status()
-    const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+    const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
     const sessionStatus = allStatuses[sessionID]
 
     // If session is actively running, reset stability counter
@@ -45,7 +46,9 @@ export async function waitForCompletion(
 
     // Session is idle - check message stability
     const messagesCheck = await ctx.client.session.messages({ path: { id: sessionID } })
-    const msgs = ((messagesCheck as { data?: unknown }).data ?? messagesCheck) as Array<unknown>
+    const msgs = normalizeSDKResponse(messagesCheck, [] as Array<unknown>, {
+      preferResponseOnMissingData: true,
+    })
     const currentMsgCount = msgs.length
 
     if (currentMsgCount > 0 && currentMsgCount === lastMsgCount) {

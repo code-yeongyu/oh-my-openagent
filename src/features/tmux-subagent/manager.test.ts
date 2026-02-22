@@ -1,8 +1,9 @@
-import { describe, test, expect, mock, beforeEach } from 'bun:test'
+import { describe, test, expect, mock, beforeEach, spyOn } from 'bun:test'
 import type { TmuxConfig } from '../../config/schema'
 import type { WindowState, PaneAction } from './types'
 import type { ActionResult, ExecuteContext } from './action-executor'
 import type { TmuxUtilDeps } from './manager'
+import * as sharedModule from '../../shared'
 
 type ExecuteActionsResult = {
   success: boolean
@@ -55,6 +56,7 @@ mock.module('./pane-state-querier', () => ({
 mock.module('./action-executor', () => ({
   executeActions: mockExecuteActions,
   executeAction: mockExecuteAction,
+  executeActionWithDeps: mockExecuteAction,
 }))
 
 mock.module('../../shared/tmux', () => {
@@ -155,7 +157,15 @@ describe('TmuxSessionManager', () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import('./manager')
-      const ctx = createMockContext()
+      const ctx = createMockContext({
+        sessionStatusResult: {
+          data: {
+            ses_1: { type: 'running' },
+            ses_2: { type: 'running' },
+            ses_3: { type: 'running' },
+          },
+        },
+      })
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -175,7 +185,13 @@ describe('TmuxSessionManager', () => {
       // given
       mockIsInsideTmux.mockReturnValue(false)
       const { TmuxSessionManager } = await import('./manager')
-      const ctx = createMockContext()
+      const ctx = createMockContext({
+        sessionStatusResult: {
+          data: {
+            ses_once: { type: 'running' },
+          },
+        },
+      })
       const config: TmuxConfig = {
         enabled: true,
         layout: 'main-vertical',
@@ -385,7 +401,7 @@ describe('TmuxSessionManager', () => {
       expect(mockExecuteActions).toHaveBeenCalledTimes(0)
     })
 
-    test('replaces oldest agent when unsplittable (small window)', async () => {
+    test('defers attach when unsplittable (small window)', async () => {
       // given - small window where split is not possible
       mockIsInsideTmux.mockReturnValue(true)
       mockQueryWindowState.mockImplementation(async () =>
@@ -422,17 +438,404 @@ describe('TmuxSessionManager', () => {
         createSessionCreatedEvent('ses_new', 'ses_parent', 'New Task')
       )
 
-      // then - with small window, replace action is used instead of close+spawn
-      expect(mockExecuteActions).toHaveBeenCalledTimes(1)
-      const call = mockExecuteActions.mock.calls[0]
-      expect(call).toBeDefined()
-      const actionsArg = call![0]
-      expect(actionsArg).toHaveLength(1)
-      expect(actionsArg[0].type).toBe('replace')
+      // then - with small window, manager defers instead of replacing
+      expect(mockExecuteActions).toHaveBeenCalledTimes(0)
+      expect((manager as any).deferredQueue).toEqual(['ses_new'])
+    })
+
+    test('keeps deferred queue idempotent for duplicate session.created events', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () =>
+        createWindowState({
+          windowWidth: 160,
+          windowHeight: 11,
+          agentPanes: [
+            {
+              paneId: '%1',
+              width: 80,
+              height: 11,
+              left: 80,
+              top: 0,
+              title: 'old',
+              isActive: false,
+            },
+          ],
+        })
+      )
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 120,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // when
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_dup', 'ses_parent', 'Duplicate Task')
+      )
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_dup', 'ses_parent', 'Duplicate Task')
+      )
+
+      // then
+      expect((manager as any).deferredQueue).toEqual(['ses_dup'])
+    })
+
+    test('auto-attaches deferred sessions in FIFO order', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () =>
+        createWindowState({
+          windowWidth: 160,
+          windowHeight: 11,
+          agentPanes: [
+            {
+              paneId: '%1',
+              width: 80,
+              height: 11,
+              left: 80,
+              top: 0,
+              title: 'old',
+              isActive: false,
+            },
+          ],
+        })
+      )
+
+      const attachOrder: string[] = []
+      mockExecuteActions.mockImplementation(async (actions) => {
+        for (const action of actions) {
+          if (action.type === 'spawn') {
+            attachOrder.push(action.sessionId)
+            trackedSessions.add(action.sessionId)
+            return {
+              success: true,
+              spawnedPaneId: `%${action.sessionId}`,
+              results: [{ action, result: { success: true, paneId: `%${action.sessionId}` } }],
+            }
+          }
+        }
+        return { success: true, results: [] }
+      })
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 120,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_1', 'ses_parent', 'Task 1'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_2', 'ses_parent', 'Task 2'))
+      await manager.onSessionCreated(createSessionCreatedEvent('ses_3', 'ses_parent', 'Task 3'))
+      expect((manager as any).deferredQueue).toEqual(['ses_1', 'ses_2', 'ses_3'])
+
+      // when
+      mockQueryWindowState.mockImplementation(async () => createWindowState())
+      await (manager as any).tryAttachDeferredSession()
+      await (manager as any).tryAttachDeferredSession()
+      await (manager as any).tryAttachDeferredSession()
+
+      // then
+      expect(attachOrder).toEqual(['ses_1', 'ses_2', 'ses_3'])
+      expect((manager as any).deferredQueue).toEqual([])
+    })
+
+    test('does not attach deferred session more than once across repeated retries', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () =>
+        createWindowState({
+          windowWidth: 160,
+          windowHeight: 11,
+          agentPanes: [
+            {
+              paneId: '%1',
+              width: 80,
+              height: 11,
+              left: 80,
+              top: 0,
+              title: 'old',
+              isActive: false,
+            },
+          ],
+        })
+      )
+
+      let attachCount = 0
+      mockExecuteActions.mockImplementation(async (actions) => {
+        for (const action of actions) {
+          if (action.type === 'spawn') {
+            attachCount += 1
+            trackedSessions.add(action.sessionId)
+            return {
+              success: true,
+              spawnedPaneId: `%${action.sessionId}`,
+              results: [{ action, result: { success: true, paneId: `%${action.sessionId}` } }],
+            }
+          }
+        }
+        return { success: true, results: [] }
+      })
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 120,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_once', 'ses_parent', 'Task Once')
+      )
+
+      // when
+      mockQueryWindowState.mockImplementation(async () => createWindowState())
+      await (manager as any).tryAttachDeferredSession()
+      await (manager as any).tryAttachDeferredSession()
+
+      // then
+      expect(attachCount).toBe(1)
+      expect((manager as any).deferredQueue).toEqual([])
+    })
+
+    test('removes deferred session when session is deleted before attach', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      mockQueryWindowState.mockImplementation(async () =>
+        createWindowState({
+          windowWidth: 160,
+          windowHeight: 11,
+          agentPanes: [
+            {
+              paneId: '%1',
+              width: 80,
+              height: 11,
+              left: 80,
+              top: 0,
+              title: 'old',
+              isActive: false,
+            },
+          ],
+        })
+      )
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext()
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 120,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_pending', 'ses_parent', 'Pending Task')
+      )
+      expect((manager as any).deferredQueue).toEqual(['ses_pending'])
+
+      // when
+      await manager.onSessionDeleted({ sessionID: 'ses_pending' })
+
+      // then
+      expect((manager as any).deferredQueue).toEqual([])
+      expect(mockExecuteAction).toHaveBeenCalledTimes(0)
+    })
+
+    describe('spawn failure recovery', () => {
+      test('#given queryWindowState returns null #when onSessionCreated fires #then session is enqueued in deferred queue', async () => {
+        // given
+        mockIsInsideTmux.mockReturnValue(true)
+        mockQueryWindowState.mockImplementation(async () => null)
+        const logSpy = spyOn(sharedModule, 'log').mockImplementation(() => {})
+
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = createMockContext()
+        const config: TmuxConfig = {
+          enabled: true,
+          layout: 'main-vertical',
+          main_pane_size: 60,
+          main_pane_min_width: 80,
+          agent_pane_min_width: 40,
+        }
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        // when
+        await manager.onSessionCreated(
+          createSessionCreatedEvent('ses_null_state', 'ses_parent', 'Null State Task')
+        )
+
+        // then
+        expect(
+          logSpy.mock.calls.some(([message]) =>
+            String(message).includes('failed to query window state, deferring session')
+          )
+        ).toBe(true)
+        expect((manager as any).deferredQueue).toEqual(['ses_null_state'])
+
+        logSpy.mockRestore()
+      })
+
+      test('#given spawn fails without close action #when onSessionCreated fires #then session is enqueued in deferred queue', async () => {
+        // given
+        mockIsInsideTmux.mockReturnValue(true)
+        mockQueryWindowState.mockImplementation(async () => createWindowState())
+        mockExecuteActions.mockImplementation(async (actions) => ({
+          success: false,
+          spawnedPaneId: undefined,
+          results: actions.map((action) => ({
+            action,
+            result: { success: false, error: 'spawn failed' },
+          })),
+        }))
+        const logSpy = spyOn(sharedModule, 'log').mockImplementation(() => {})
+
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = createMockContext()
+        const config: TmuxConfig = {
+          enabled: true,
+          layout: 'main-vertical',
+          main_pane_size: 60,
+          main_pane_min_width: 80,
+          agent_pane_min_width: 40,
+        }
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        // when
+        await manager.onSessionCreated(
+          createSessionCreatedEvent('ses_fail_no_close', 'ses_parent', 'Spawn Fail No Close')
+        )
+
+        // then
+        expect(
+          logSpy.mock.calls.some(([message]) =>
+            String(message).includes('re-queueing deferred session after spawn failure')
+          )
+        ).toBe(true)
+        expect((manager as any).deferredQueue).toEqual(['ses_fail_no_close'])
+
+        logSpy.mockRestore()
+      })
+
+      test('#given spawn fails with close action that succeeded #when onSessionCreated fires #then session is still enqueued in deferred queue', async () => {
+        // given
+        mockIsInsideTmux.mockReturnValue(true)
+        mockQueryWindowState.mockImplementation(async () => createWindowState())
+        mockExecuteActions.mockImplementation(async () => ({
+          success: false,
+          spawnedPaneId: undefined,
+          results: [
+            {
+              action: { type: 'close', paneId: '%1', sessionId: 'ses_old' },
+              result: { success: true },
+            },
+            {
+              action: {
+                type: 'spawn',
+                sessionId: 'ses_fail_with_close',
+                description: 'Spawn Fail With Close',
+                targetPaneId: '%0',
+                splitDirection: '-h',
+              },
+              result: { success: false, error: 'spawn failed after close' },
+            },
+          ],
+        }))
+        const logSpy = spyOn(sharedModule, 'log').mockImplementation(() => {})
+
+        const { TmuxSessionManager } = await import('./manager')
+        const ctx = createMockContext()
+        const config: TmuxConfig = {
+          enabled: true,
+          layout: 'main-vertical',
+          main_pane_size: 60,
+          main_pane_min_width: 80,
+          agent_pane_min_width: 40,
+        }
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        // when
+        await manager.onSessionCreated(
+          createSessionCreatedEvent('ses_fail_with_close', 'ses_parent', 'Spawn Fail With Close')
+        )
+
+        // then
+        expect(
+          logSpy.mock.calls.some(([message]) =>
+            String(message).includes('re-queueing deferred session after spawn failure')
+          )
+        ).toBe(true)
+        expect((manager as any).deferredQueue).toEqual(['ses_fail_with_close'])
+
+        logSpy.mockRestore()
+      })
     })
   })
 
   describe('onSessionDeleted', () => {
+    test('does not track session when readiness timed out', async () => {
+      // given
+      mockIsInsideTmux.mockReturnValue(true)
+      let stateCallCount = 0
+      mockQueryWindowState.mockImplementation(async () => {
+        stateCallCount++
+        if (stateCallCount === 1) {
+          return createWindowState()
+        }
+        return createWindowState({
+          agentPanes: [
+            {
+              paneId: '%mock',
+              width: 40,
+              height: 44,
+              left: 100,
+              top: 0,
+              title: 'omo-subagent-Timeout Task',
+              isActive: false,
+            },
+          ],
+        })
+      })
+
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext({ sessionStatusResult: { data: {} } })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      await manager.onSessionCreated(
+        createSessionCreatedEvent('ses_timeout', 'ses_parent', 'Timeout Task')
+      )
+      mockExecuteAction.mockClear()
+
+      // when
+      await manager.onSessionDeleted({ sessionID: 'ses_timeout' })
+
+      // then
+      expect(mockExecuteAction).toHaveBeenCalledTimes(1)
+    })
+
     test('closes pane when tracked session is deleted', async () => {
       // given
       mockIsInsideTmux.mockReturnValue(true)
@@ -520,8 +923,13 @@ describe('TmuxSessionManager', () => {
       mockIsInsideTmux.mockReturnValue(true)
 
       let callCount = 0
-      mockExecuteActions.mockImplementation(async () => {
+      mockExecuteActions.mockImplementation(async (actions) => {
         callCount++
+        for (const action of actions) {
+          if (action.type === 'spawn') {
+            trackedSessions.add(action.sessionId)
+          }
+        }
         return {
           success: true,
           spawnedPaneId: `%${callCount}`,
@@ -557,221 +965,6 @@ describe('TmuxSessionManager', () => {
     })
   })
 
-  describe('Stability Detection (Issue #1330)', () => {
-    test('does NOT close session immediately when idle - requires 4 polls (1 baseline + 3 stable)', async () => {
-      //#given - session that is old enough (>10s) and idle
-      mockIsInsideTmux.mockReturnValue(true)
-      
-      const { TmuxSessionManager } = await import('./manager')
-      
-      const statusMock = mock(async () => ({
-        data: { 'ses_child': { type: 'idle' } }
-      }))
-      const messagesMock = mock(async () => ({
-        data: [{ id: 'msg1' }]  // Same message count each time
-      }))
-      
-      const ctx = {
-        serverUrl: new URL('http://localhost:4096'),
-        client: {
-          session: {
-            status: statusMock,
-            messages: messagesMock,
-          },
-        },
-      } as any
-      
-      const config: TmuxConfig = {
-        enabled: true,
-        layout: 'main-vertical',
-        main_pane_size: 60,
-        main_pane_min_width: 80,
-        agent_pane_min_width: 40,
-      }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
-
-      // Spawn a session first
-      await manager.onSessionCreated(
-        createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
-      )
-      
-      // Make session old enough for stability detection (>10s)
-      const sessions = (manager as any).sessions as Map<string, any>
-      const tracked = sessions.get('ses_child')
-      tracked.createdAt = new Date(Date.now() - 15000)  // 15 seconds ago
-      
-      mockExecuteAction.mockClear()
-
-      //#when - poll only 3 times (need 4: 1 baseline + 3 stable)
-      await (manager as any).pollSessions()  // sets lastMessageCount = 1
-      await (manager as any).pollSessions()  // stableIdlePolls = 1
-      await (manager as any).pollSessions()  // stableIdlePolls = 2
-
-      //#then - should NOT have closed yet (need one more poll)
-      expect(mockExecuteAction).not.toHaveBeenCalled()
-    })
-
-    test('closes session after 3 consecutive stable idle polls', async () => {
-      //#given
-      mockIsInsideTmux.mockReturnValue(true)
-      
-      const { TmuxSessionManager } = await import('./manager')
-      
-      const statusMock = mock(async () => ({
-        data: { 'ses_child': { type: 'idle' } }
-      }))
-      const messagesMock = mock(async () => ({
-        data: [{ id: 'msg1' }]  // Same message count each time
-      }))
-      
-      const ctx = {
-        serverUrl: new URL('http://localhost:4096'),
-        client: {
-          session: {
-            status: statusMock,
-            messages: messagesMock,
-          },
-        },
-      } as any
-      
-      const config: TmuxConfig = {
-        enabled: true,
-        layout: 'main-vertical',
-        main_pane_size: 60,
-        main_pane_min_width: 80,
-        agent_pane_min_width: 40,
-      }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
-
-      await manager.onSessionCreated(
-        createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
-      )
-      
-      // Simulate session being old enough (>10s) by manipulating createdAt
-      const sessions = (manager as any).sessions as Map<string, any>
-      const tracked = sessions.get('ses_child')
-      tracked.createdAt = new Date(Date.now() - 15000)  // 15 seconds ago
-      
-      mockExecuteAction.mockClear()
-
-      //#when - poll 4 times (1st sets lastMessageCount, then 3 stable polls)
-      await (manager as any).pollSessions()  // sets lastMessageCount = 1
-      await (manager as any).pollSessions()  // stableIdlePolls = 1
-      await (manager as any).pollSessions()  // stableIdlePolls = 2
-      await (manager as any).pollSessions()  // stableIdlePolls = 3 -> close
-
-      //#then - should have closed the session
-      expect(mockExecuteAction).toHaveBeenCalled()
-      const call = mockExecuteAction.mock.calls[0]
-      expect(call![0].type).toBe('close')
-    })
-
-    test('resets stability counter when new messages arrive', async () => {
-      //#given
-      mockIsInsideTmux.mockReturnValue(true)
-      
-      const { TmuxSessionManager } = await import('./manager')
-      
-      let messageCount = 1
-      const statusMock = mock(async () => ({
-        data: { 'ses_child': { type: 'idle' } }
-      }))
-      const messagesMock = mock(async () => {
-        // Simulate new messages arriving each poll
-        messageCount++
-        return { data: Array(messageCount).fill({ id: 'msg' }) }
-      })
-      
-      const ctx = {
-        serverUrl: new URL('http://localhost:4096'),
-        client: {
-          session: {
-            status: statusMock,
-            messages: messagesMock,
-          },
-        },
-      } as any
-      
-      const config: TmuxConfig = {
-        enabled: true,
-        layout: 'main-vertical',
-        main_pane_size: 60,
-        main_pane_min_width: 80,
-        agent_pane_min_width: 40,
-      }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
-
-      await manager.onSessionCreated(
-        createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
-      )
-      
-      const sessions = (manager as any).sessions as Map<string, any>
-      const tracked = sessions.get('ses_child')
-      tracked.createdAt = new Date(Date.now() - 15000)
-      
-      mockExecuteAction.mockClear()
-
-      //#when - poll multiple times (message count keeps changing)
-      await (manager as any).pollSessions()
-      await (manager as any).pollSessions()
-      await (manager as any).pollSessions()
-      await (manager as any).pollSessions()
-
-      //#then - should NOT have closed (stability never reached due to changing messages)
-      expect(mockExecuteAction).not.toHaveBeenCalled()
-    })
-
-    test('does NOT apply stability detection for sessions younger than 10s', async () => {
-      //#given - freshly created session (age < 10s)
-      mockIsInsideTmux.mockReturnValue(true)
-      
-      const { TmuxSessionManager } = await import('./manager')
-      
-      const statusMock = mock(async () => ({
-        data: { 'ses_child': { type: 'idle' } }
-      }))
-      const messagesMock = mock(async () => ({
-        data: [{ id: 'msg1' }]  // Same message count - would trigger close if age check wasn't there
-      }))
-      
-      const ctx = {
-        serverUrl: new URL('http://localhost:4096'),
-        client: {
-          session: {
-            status: statusMock,
-            messages: messagesMock,
-          },
-        },
-      } as any
-      
-      const config: TmuxConfig = {
-        enabled: true,
-        layout: 'main-vertical',
-        main_pane_size: 60,
-        main_pane_min_width: 80,
-        agent_pane_min_width: 40,
-      }
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
-
-      await manager.onSessionCreated(
-        createSessionCreatedEvent('ses_child', 'ses_parent', 'Task')
-      )
-      
-      // Session is fresh (createdAt is now) - don't manipulate it
-      // This tests the 10s age gate - stability detection should NOT activate
-      mockExecuteAction.mockClear()
-
-      //#when - poll 5 times (more than enough to close if age check wasn't there)
-      await (manager as any).pollSessions()  // Would set lastMessageCount if age check passed
-      await (manager as any).pollSessions()  // Would be stableIdlePolls = 1
-      await (manager as any).pollSessions()  // Would be stableIdlePolls = 2
-      await (manager as any).pollSessions()  // Would be stableIdlePolls = 3 -> would close
-      await (manager as any).pollSessions()  // Extra poll to be sure
-
-      //#then - should NOT have closed (session too young for stability detection)
-      expect(mockExecuteAction).not.toHaveBeenCalled()
-    })
-  })
 })
 
 describe('DecisionEngine', () => {
@@ -842,7 +1035,7 @@ describe('DecisionEngine', () => {
       }
     })
 
-    test('returns replace when split not possible', async () => {
+    test('returns canSpawn=false when split not possible', async () => {
       // given - small window where split is never possible
       const { decideSpawnActions } = await import('./decision-engine')
       const state: WindowState = {
@@ -882,10 +1075,10 @@ describe('DecisionEngine', () => {
         sessionMappings
       )
 
-      // then - agent area (80) < MIN_SPLIT_WIDTH (105), so replace is used
-      expect(decision.canSpawn).toBe(true)
-      expect(decision.actions).toHaveLength(1)
-      expect(decision.actions[0].type).toBe('replace')
+      // then - agent area (80) < MIN_SPLIT_WIDTH (105), so attach is deferred
+      expect(decision.canSpawn).toBe(false)
+      expect(decision.actions).toHaveLength(0)
+      expect(decision.reason).toContain('defer')
     })
 
     test('returns canSpawn=false when window too small', async () => {

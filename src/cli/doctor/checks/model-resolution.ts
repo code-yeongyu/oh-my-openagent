@@ -1,24 +1,19 @@
-import type { CheckResult, CheckDefinition } from "../types"
+import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "../../../shared/model-requirements"
 import { CHECK_IDS, CHECK_NAMES } from "../constants"
-import {
-  AGENT_MODEL_REQUIREMENTS,
-  CATEGORY_MODEL_REQUIREMENTS,
-} from "../../../shared/model-requirements"
-import type { OmoConfig, ModelResolutionInfo, AgentResolutionInfo, CategoryResolutionInfo } from "./model-resolution-types"
+import type { CheckResult, DoctorIssue } from "../types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { loadOmoConfig } from "./model-resolution-config"
-import { buildEffectiveResolution, getEffectiveModel } from "./model-resolution-effective-model"
 import { buildModelResolutionDetails } from "./model-resolution-details"
+import { buildEffectiveResolution, getEffectiveModel } from "./model-resolution-effective-model"
+import type { AgentResolutionInfo, CategoryResolutionInfo, ModelResolutionInfo, OmoConfig } from "./model-resolution-types"
 
 export function getModelResolutionInfo(): ModelResolutionInfo {
-  const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(
-    ([name, requirement]) => ({
-      name,
-      requirement,
-      effectiveModel: getEffectiveModel(requirement),
-      effectiveResolution: buildEffectiveResolution(requirement),
-    }),
-  )
+  const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(([name, requirement]) => ({
+    name,
+    requirement,
+    effectiveModel: getEffectiveModel(requirement),
+    effectiveResolution: buildEffectiveResolution(requirement),
+  }))
 
   const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => ({
@@ -26,27 +21,25 @@ export function getModelResolutionInfo(): ModelResolutionInfo {
       requirement,
       effectiveModel: getEffectiveModel(requirement),
       effectiveResolution: buildEffectiveResolution(requirement),
-    }),
+    })
   )
 
   return { agents, categories }
 }
 
 export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelResolutionInfo {
-  const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(
-    ([name, requirement]) => {
-      const userOverride = config.agents?.[name]?.model
-      const userVariant = config.agents?.[name]?.variant
-      return {
-        name,
-        requirement,
-        userOverride,
-        userVariant,
-        effectiveModel: getEffectiveModel(requirement, userOverride),
-        effectiveResolution: buildEffectiveResolution(requirement, userOverride),
-      }
-    },
-  )
+  const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(([name, requirement]) => {
+    const userOverride = config.agents?.[name]?.model
+    const userVariant = config.agents?.[name]?.variant
+    return {
+      name,
+      requirement,
+      userOverride,
+      userVariant,
+      effectiveModel: getEffectiveModel(requirement, userOverride),
+      effectiveResolution: buildEffectiveResolution(requirement, userOverride),
+    }
+  })
 
   const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
@@ -60,40 +53,39 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
         effectiveModel: getEffectiveModel(requirement, userOverride),
         effectiveResolution: buildEffectiveResolution(requirement, userOverride),
       }
-    },
+    }
   )
 
   return { agents, categories }
 }
 
-export async function checkModelResolution(): Promise<CheckResult> {
+export async function checkModels(): Promise<CheckResult> {
   const config = loadOmoConfig() ?? {}
   const info = getModelResolutionInfoWithOverrides(config)
   const available = loadAvailableModelsFromCache()
+  const issues: DoctorIssue[] = []
 
-  const agentCount = info.agents.length
-  const categoryCount = info.categories.length
-  const agentOverrides = info.agents.filter((a) => a.userOverride).length
-  const categoryOverrides = info.categories.filter((c) => c.userOverride).length
-  const totalOverrides = agentOverrides + categoryOverrides
+  if (!available.cacheExists) {
+    issues.push({
+      title: "Model cache not found",
+      description: "OpenCode model cache is missing, so model availability cannot be validated.",
+      fix: "Run: opencode models --refresh",
+      severity: "warning",
+      affects: ["model resolution"],
+    })
+  }
 
-  const overrideNote = totalOverrides > 0 ? ` (${totalOverrides} override${totalOverrides > 1 ? "s" : ""})` : ""
-  const cacheNote = available.cacheExists ? `, ${available.modelCount} available` : ", cache not found"
+  const overrideCount =
+    info.agents.filter((agent) => Boolean(agent.userOverride)).length +
+    info.categories.filter((category) => Boolean(category.userOverride)).length
 
   return {
-    name: CHECK_NAMES[CHECK_IDS.MODEL_RESOLUTION],
-    status: available.cacheExists ? "pass" : "warn",
-    message: `${agentCount} agents, ${categoryCount} categories${overrideNote}${cacheNote}`,
+    name: CHECK_NAMES[CHECK_IDS.MODELS],
+    status: issues.length > 0 ? "warn" : "pass",
+    message: `${info.agents.length} agents, ${info.categories.length} categories, ${overrideCount} override${overrideCount === 1 ? "" : "s"}`,
     details: buildModelResolutionDetails({ info, available, config }),
+    issues,
   }
 }
 
-export function getModelResolutionCheckDefinition(): CheckDefinition {
-  return {
-    id: CHECK_IDS.MODEL_RESOLUTION,
-    name: CHECK_NAMES[CHECK_IDS.MODEL_RESOLUTION],
-    category: "configuration",
-    check: checkModelResolution,
-    critical: false,
-  }
-}
+export const checkModelResolution = checkModels

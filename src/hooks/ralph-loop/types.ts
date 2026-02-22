@@ -9,6 +9,7 @@ export interface RalphLoopState {
   prompt: string
   session_id?: string
   ultrawork?: boolean
+  strategy?: "reset" | "continue"
 }
 
 export interface RalphLoopOptions {

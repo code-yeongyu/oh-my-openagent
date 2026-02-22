@@ -4,8 +4,11 @@
  * Routing logic:
  * 1. Planner agents (prometheus, plan) → planner.ts
  * 2. GPT 5.2 models → gpt5.2.ts
- * 3. Everything else (Claude, etc.) → default.ts
+ * 3. Gemini models → gemini.ts
+ * 4. Everything else (Claude, etc.) → default.ts
  */
+
+import { isGptModel, isGeminiModel } from "../../../agents/types"
 
 /**
  * Checks if agent is a planner-type agent.
@@ -20,18 +23,10 @@ export function isPlannerAgent(agentName?: string): boolean {
   return /\bplan\b/.test(normalized)
 }
 
-/**
- * Checks if model is GPT 5.2 series.
- * GPT models benefit from specific prompting patterns.
- */
-export function isGptModel(modelID?: string): boolean {
-  if (!modelID) return false
-  const lowerModel = modelID.toLowerCase()
-  return lowerModel.includes("gpt")
-}
+export { isGptModel, isGeminiModel }
 
 /** Ultrawork message source type */
-export type UltraworkSource = "planner" | "gpt" | "default"
+export type UltraworkSource = "planner" | "gpt" | "gemini" | "default"
 
 /**
  * Determines which ultrawork message source to use.
@@ -45,11 +40,16 @@ export function getUltraworkSource(
     return "planner"
   }
 
-  // Priority 2: GPT 5.2 models
-  if (isGptModel(modelID)) {
+  // Priority 2: GPT models
+  if (modelID && isGptModel(modelID)) {
     return "gpt"
   }
 
+
+  // Priority 3: Gemini models
+  if (modelID && isGeminiModel(modelID)) {
+    return "gemini"
+  }
   // Default: Claude and other models
   return "default"
 }

@@ -74,6 +74,14 @@ function isTokenLimitError(text: string): boolean {
 }
 
 export function parseAnthropicTokenLimitError(err: unknown): ParsedTokenLimitError | null {
+  try {
+    return parseAnthropicTokenLimitErrorUnsafe(err)
+  } catch {
+    return null
+  }
+}
+
+function parseAnthropicTokenLimitErrorUnsafe(err: unknown): ParsedTokenLimitError | null {
   if (typeof err === "string") {
     if (err.toLowerCase().includes("non-empty content")) {
       return {

@@ -95,4 +95,5 @@ export interface ResumeConfig {
     providerID: string
     modelID: string
   }
+  tools?: Record<string, boolean>
 }

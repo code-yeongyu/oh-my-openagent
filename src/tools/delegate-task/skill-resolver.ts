@@ -4,7 +4,7 @@ import { discoverSkills } from "../../features/opencode-skill-loader"
 
 export async function resolveSkillContent(
   skills: string[],
-  options: { gitMasterConfig?: GitMasterConfig; browserProvider?: BrowserAutomationProvider, disabledSkills?: Set<string> }
+  options: { gitMasterConfig?: GitMasterConfig; browserProvider?: BrowserAutomationProvider, disabledSkills?: Set<string>, directory?: string }
 ): Promise<{ content: string | undefined; error: string | null }> {
   if (skills.length === 0) {
     return { content: undefined, error: null }
@@ -12,7 +12,7 @@ export async function resolveSkillContent(
 
   const { resolved, notFound } = await resolveMultipleSkillsAsync(skills, options)
   if (notFound.length > 0) {
-    const allSkills = await discoverSkills({ includeClaudeCodePaths: true })
+    const allSkills = await discoverSkills({ includeClaudeCodePaths: true, directory: options?.directory })
     const available = allSkills.map(s => s.name).join(", ")
     return { content: undefined, error: `Skills not found: ${notFound.join(", ")}. Available: ${available}` }
   }

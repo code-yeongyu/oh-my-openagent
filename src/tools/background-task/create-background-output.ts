@@ -9,7 +9,9 @@ import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
 
-const SISYPHUS_JUNIOR_AGENT = "sisyphus-junior"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
+
+const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
 
 type ToolContextWithMetadata = {
   sessionID: string
@@ -43,7 +45,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           "Wait for completion (default: false). System notifies when done, so blocking is rarely needed."
         ),
       timeout: tool.schema.number().optional().describe("Max wait time in ms (default: 60000, max: 600000)"),
-      full_session: tool.schema.boolean().optional().describe("Return full session messages with filters (default: false)"),
+      full_session: tool.schema.boolean().optional().describe("Return full session messages with filters (default: true)"),
       include_thinking: tool.schema.boolean().optional().describe("Include thinking/reasoning parts in full_session output (default: false)"),
       message_limit: tool.schema.number().optional().describe("Max messages to return (capped at 100)"),
       since_message_id: tool.schema.string().optional().describe("Return messages after this message ID (exclusive)"),
@@ -75,12 +77,17 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           storeToolMetadata(ctx.sessionID, callID, meta)
         }
 
-        if (args.full_session === true) {
+        const isActive = task.status === "pending" || task.status === "running"
+        const fullSession = args.full_session ?? true
+        const includeThinking = isActive || (args.include_thinking ?? false)
+        const includeToolResults = isActive || (args.include_tool_results ?? false)
+
+        if (fullSession) {
           return await formatFullSession(task, client, {
-            includeThinking: args.include_thinking === true,
+            includeThinking,
             messageLimit: args.message_limit,
             sinceMessageId: args.since_message_id,
-            includeToolResults: args.include_tool_results === true,
+            includeToolResults,
             thinkingMaxChars: args.thinking_max_chars,
           })
         }

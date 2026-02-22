@@ -23,7 +23,7 @@ export function createToolExecuteAfterHandler(input: {
       return
     }
 
-    if (!isCallerOrchestrator(toolInput.sessionID)) {
+    if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
       return
     }
 

@@ -1,10 +1,10 @@
-import type { TmuxPaneInfo } from "./types"
+import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH } from "./types"
+import type { CapacityConfig, TmuxPaneInfo } from "./types"
 import {
 	DIVIDER_SIZE,
-	MAIN_PANE_RATIO,
 	MAX_GRID_SIZE,
+	computeAgentAreaWidth,
 } from "./tmux-grid-constants"
-import { MIN_PANE_HEIGHT, MIN_PANE_WIDTH } from "./types"
 
 export interface GridCapacity {
 	cols: number
@@ -24,17 +24,42 @@ export interface GridPlan {
 	slotHeight: number
 }
 
+type CapacityOptions = CapacityConfig | number | undefined
+
+function resolveMinPaneWidth(options?: CapacityOptions): number {
+	if (typeof options === "number") {
+		return Math.max(1, options)
+	}
+	if (options && typeof options.agentPaneWidth === "number") {
+		return Math.max(1, options.agentPaneWidth)
+	}
+	return MIN_PANE_WIDTH
+}
+
+function resolveAgentAreaWidth(windowWidth: number, options?: CapacityOptions): number {
+	if (typeof options === "number") {
+		return computeAgentAreaWidth(windowWidth)
+	}
+	return computeAgentAreaWidth(windowWidth, options)
+}
+
 export function calculateCapacity(
 	windowWidth: number,
 	windowHeight: number,
+	options?: CapacityOptions,
+	mainPaneWidth?: number,
 ): GridCapacity {
-	const availableWidth = Math.floor(windowWidth * (1 - MAIN_PANE_RATIO))
+	const availableWidth =
+		typeof mainPaneWidth === "number"
+			? Math.max(0, windowWidth - mainPaneWidth - DIVIDER_SIZE)
+			: resolveAgentAreaWidth(windowWidth, options)
+	const minPaneWidth = resolveMinPaneWidth(options)
 	const cols = Math.min(
 		MAX_GRID_SIZE,
 		Math.max(
 			0,
 			Math.floor(
-				(availableWidth + DIVIDER_SIZE) / (MIN_PANE_WIDTH + DIVIDER_SIZE),
+				(availableWidth + DIVIDER_SIZE) / (minPaneWidth + DIVIDER_SIZE),
 			),
 		),
 	)
@@ -54,8 +79,10 @@ export function computeGridPlan(
 	windowWidth: number,
 	windowHeight: number,
 	paneCount: number,
+	options?: CapacityOptions,
+	mainPaneWidth?: number,
 ): GridPlan {
-	const capacity = calculateCapacity(windowWidth, windowHeight)
+	const capacity = calculateCapacity(windowWidth, windowHeight, options, mainPaneWidth)
 	const { cols: maxCols, rows: maxRows } = capacity
 
 	if (maxCols === 0 || maxRows === 0 || paneCount === 0) {
@@ -78,7 +105,10 @@ export function computeGridPlan(
 		}
 	}
 
-	const availableWidth = Math.floor(windowWidth * (1 - MAIN_PANE_RATIO))
+	const availableWidth =
+		typeof mainPaneWidth === "number"
+			? Math.max(0, windowWidth - mainPaneWidth - DIVIDER_SIZE)
+			: resolveAgentAreaWidth(windowWidth, options)
 	const slotWidth = Math.floor(availableWidth / bestCols)
 	const slotHeight = Math.floor(windowHeight / bestRows)
 

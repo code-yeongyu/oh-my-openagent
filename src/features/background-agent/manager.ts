@@ -5,27 +5,48 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import { TaskHistory } from "./task-history"
+import {
+  log,
+  getAgentToolRestrictions,
+  normalizePromptTools,
+  normalizeSDKResponse,
+  promptWithModelSuggestionRetry,
+  resolveInheritedPromptTools,
+  createInternalAgentTextPart,
+} from "../../shared"
+import { setSessionTools } from "../../shared/session-tools-store"
+import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
 import {
-  DEFAULT_STALE_TIMEOUT_MS,
-  MIN_IDLE_TIME_MS,
-  MIN_RUNTIME_BEFORE_STALE_MS,
-  MIN_STABILITY_TIME_MS,
+  shouldRetryError,
+  hasMoreFallbacks,
+} from "../../shared/model-error-classifier"
+import {
   POLLING_INTERVAL_MS,
   TASK_CLEANUP_DELAY_MS,
-  TASK_TTL_MS,
 } from "./constants"
 
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
-import { findNearestMessageWithFields, MESSAGE_STORAGE } from "../hook-message-injector"
-import { existsSync, readdirSync } from "node:fs"
+import { formatDuration } from "./duration-formatter"
+import {
+  isAbortedSessionError,
+  extractErrorName,
+  extractErrorMessage,
+  getSessionErrorMessage,
+  isRecord,
+} from "./error-classifier"
+import { tryFallbackRetry } from "./fallback-retry-handler"
+import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
+import { isCompactionAgent, findNearestMessageExcludingCompaction } from "./compaction-aware-message-resolver"
+import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
+import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
-
-type ProcessCleanupEvent = NodeJS.Signals | "beforeExit" | "exit"
+import { pruneStaleTasksAndNotifications } from "./task-poller"
+import { checkAndInterruptStaleTasks } from "./task-poller"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -68,9 +89,7 @@ export interface SubagentSessionCreatedEvent {
 export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>
 
 export class BackgroundManager {
-  private static cleanupManagers = new Set<BackgroundManager>()
-  private static cleanupRegistered = false
-  private static cleanupHandlers = new Map<ProcessCleanupEvent, () => void>()
+
 
   private tasks: Map<string, BackgroundTask>
   private notifications: Map<string, BackgroundTask[]>
@@ -78,6 +97,7 @@ export class BackgroundManager {
   private client: OpencodeClient
   private directory: string
   private pollingInterval?: ReturnType<typeof setInterval>
+  private pollingInFlight = false
   private concurrencyManager: ConcurrencyManager
   private shutdownTriggered = false
   private config?: BackgroundTaskConfig
@@ -90,6 +110,8 @@ export class BackgroundManager {
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
+  private enableParentSessionNotifications: boolean
+  readonly taskHistory = new TaskHistory()
 
   constructor(
     ctx: PluginInput,
@@ -98,6 +120,7 @@ export class BackgroundManager {
       tmuxConfig?: TmuxConfig
       onSubagentSessionCreated?: OnSubagentSessionCreated
       onShutdown?: () => void
+      enableParentSessionNotifications?: boolean
     }
   ) {
     this.tasks = new Map()
@@ -110,6 +133,7 @@ export class BackgroundManager {
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.onShutdown = options?.onShutdown
+    this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.registerProcessCleanup()
   }
 
@@ -139,11 +163,15 @@ export class BackgroundManager {
       parentMessageID: input.parentMessageID,
       parentModel: input.parentModel,
       parentAgent: input.parentAgent,
+      parentTools: input.parentTools,
       model: input.model,
+      fallbackChain: input.fallbackChain,
+      attemptCount: 0,
       category: input.category,
     }
 
     this.tasks.set(task.id, task)
+    this.taskHistory.record(input.parentSessionID, { id: task.id, agent: input.agent, description: input.description, status: "pending", category: input.category })
 
     // Track for batched notifications immediately (pending state)
     if (input.parentSessionID) {
@@ -192,7 +220,7 @@ export class BackgroundManager {
 
         await this.concurrencyManager.acquire(key)
 
-        if (item.task.status === "cancelled") {
+        if (item.task.status === "cancelled" || item.task.status === "error") {
           this.concurrencyManager.release(key)
           queue.shift()
           continue
@@ -291,6 +319,7 @@ export class BackgroundManager {
     task.concurrencyKey = concurrencyKey
     task.concurrencyGroup = concurrencyKey
 
+    this.taskHistory.record(input.parentSessionID, { id: task.id, sessionID, agent: input.agent, description: input.description, status: "running", category: input.category, startedAt: task.startedAt })
     this.startPolling()
 
     log("[background-agent] Launching task:", { taskId: task.id, sessionID, agent: input.agent })
@@ -324,13 +353,17 @@ export class BackgroundManager {
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         system: input.skillContent,
-        tools: {
-          ...getAgentToolRestrictions(input.agent),
-          task: false,
-          call_omo_agent: true,
-          question: false,
-        },
-        parts: [{ type: "text", text: input.prompt }],
+        tools: (() => {
+          const tools = {
+            task: false,
+            call_omo_agent: true,
+            question: false,
+            ...getAgentToolRestrictions(input.agent),
+          }
+          setSessionTools(sessionID, tools)
+          return tools
+        })(),
+        parts: [createInternalAgentTextPart(input.prompt)],
       },
     }).catch((error) => {
       log("[background-agent] promptAsync error:", error)
@@ -486,6 +519,7 @@ export class BackgroundManager {
     this.tasks.set(task.id, task)
     subagentSessions.add(input.sessionID)
     this.startPolling()
+    this.taskHistory.record(input.parentSessionID, { id: task.id, sessionID: input.sessionID, agent: input.agent || "task", description: input.description, status: "running", startedAt: task.startedAt })
 
     if (input.parentSessionID) {
       const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
@@ -516,6 +550,12 @@ export class BackgroundManager {
       return existingTask
     }
 
+    const completionTimer = this.completionTimers.get(existingTask.id)
+    if (completionTimer) {
+      clearTimeout(completionTimer)
+      this.completionTimers.delete(existingTask.id)
+    }
+
     // Re-acquire concurrency using the persisted concurrency group
     const concurrencyKey = existingTask.concurrencyGroup ?? existingTask.agent
     await this.concurrencyManager.acquire(concurrencyKey)
@@ -530,6 +570,9 @@ export class BackgroundManager {
     existingTask.parentMessageID = input.parentMessageID
     existingTask.parentModel = input.parentModel
     existingTask.parentAgent = input.parentAgent
+    if (input.parentTools) {
+      existingTask.parentTools = input.parentTools
+    }
     // Reset startedAt on resume to prevent immediate completion
     // The MIN_IDLE_TIME_MS check uses startedAt, so resumed tasks need fresh timing
     existingTask.startedAt = new Date()
@@ -583,13 +626,17 @@ export class BackgroundManager {
         agent: existingTask.agent,
         ...(resumeModel ? { model: resumeModel } : {}),
         ...(resumeVariant ? { variant: resumeVariant } : {}),
-        tools: {
-          ...getAgentToolRestrictions(existingTask.agent),
-          task: false,
-          call_omo_agent: true,
-          question: false,
-        },
-        parts: [{ type: "text", text: input.prompt }],
+        tools: (() => {
+          const tools = {
+            task: false,
+            call_omo_agent: true,
+            question: false,
+            ...getAgentToolRestrictions(existingTask.agent),
+          }
+          setSessionTools(existingTask.sessionID!, tools)
+          return tools
+        })(),
+        parts: [createInternalAgentTextPart(input.prompt)],
       },
     }).catch((error) => {
       log("[background-agent] resume prompt error:", error)
@@ -626,7 +673,7 @@ export class BackgroundManager {
       const response = await this.client.session.todo({
         path: { id: sessionID },
       })
-      const todos = (response.data ?? response) as Todo[]
+      const todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
       if (!todos || todos.length === 0) return false
 
       const incomplete = todos.filter(
@@ -641,7 +688,28 @@ export class BackgroundManager {
   handleEvent(event: Event): void {
     const props = event.properties
 
-    if (event.type === "message.part.updated") {
+    if (event.type === "message.updated") {
+      const info = props?.info
+      if (!info || typeof info !== "object") return
+
+      const sessionID = (info as Record<string, unknown>)["sessionID"]
+      const role = (info as Record<string, unknown>)["role"]
+      if (typeof sessionID !== "string" || role !== "assistant") return
+
+      const task = this.findBySession(sessionID)
+      if (!task || task.status !== "running") return
+
+      const assistantError = (info as Record<string, unknown>)["error"]
+      if (!assistantError) return
+
+      const errorInfo = {
+        name: extractErrorName(assistantError),
+        message: extractErrorMessage(assistantError),
+      }
+      this.tryFallbackRetry(task, errorInfo, "message.updated")
+    }
+
+    if (event.type === "message.part.updated" || event.type === "message.part.delta") {
       if (!props || typeof props !== "object" || !("sessionID" in props)) return
       const partInfo = props as unknown as MessagePartInfo
       const sessionID = partInfo?.sessionID
@@ -657,76 +725,93 @@ export class BackgroundManager {
         this.idleDeferralTimers.delete(task.id)
       }
 
-      if (partInfo?.type === "tool" || partInfo?.tool) {
-        if (!task.progress) {
-          task.progress = {
-            toolCalls: 0,
-            lastUpdate: new Date(),
-          }
+      if (!task.progress) {
+        task.progress = {
+          toolCalls: 0,
+          lastUpdate: new Date(),
         }
+      }
+      task.progress.lastUpdate = new Date()
+
+      if (partInfo?.type === "tool" || partInfo?.tool) {
         task.progress.toolCalls += 1
         task.progress.lastTool = partInfo.tool
-        task.progress.lastUpdate = new Date()
       }
     }
 
     if (event.type === "session.idle") {
-      const sessionID = props?.sessionID as string | undefined
+      if (!props || typeof props !== "object") return
+      handleSessionIdleBackgroundEvent({
+        properties: props as Record<string, unknown>,
+        findBySession: (id) => this.findBySession(id),
+        idleDeferralTimers: this.idleDeferralTimers,
+        validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
+        checkSessionTodos: (id) => this.checkSessionTodos(id),
+        tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
+        emitIdleEvent: (sessionID) => this.handleEvent({ type: "session.idle", properties: { sessionID } }),
+      })
+    }
+
+    if (event.type === "session.error") {
+      const sessionID = typeof props?.sessionID === "string" ? props.sessionID : undefined
       if (!sessionID) return
 
       const task = this.findBySession(sessionID)
       if (!task || task.status !== "running") return
-      
-      const startedAt = task.startedAt
-      if (!startedAt) return
 
-      // Edge guard: Require minimum elapsed time (5 seconds) before accepting idle
-      const elapsedMs = Date.now() - startedAt.getTime()
-      if (elapsedMs < MIN_IDLE_TIME_MS) {
-        const remainingMs = MIN_IDLE_TIME_MS - elapsedMs
-        if (!this.idleDeferralTimers.has(task.id)) {
-          log("[background-agent] Deferring early session.idle:", { elapsedMs, remainingMs, taskId: task.id })
-          const timer = setTimeout(() => {
-            this.idleDeferralTimers.delete(task.id)
-            this.handleEvent({ type: "session.idle", properties: { sessionID } })
-          }, remainingMs)
-          this.idleDeferralTimers.set(task.id, timer)
-        } else {
-          log("[background-agent] session.idle already deferred:", { elapsedMs, taskId: task.id })
-        }
-        return
+      const errorObj = props?.error as { name?: string; message?: string } | undefined
+      const errorName = errorObj?.name
+      const errorMessage = props ? getSessionErrorMessage(props) : undefined
+
+      const errorInfo = { name: errorName, message: errorMessage }
+      if (this.tryFallbackRetry(task, errorInfo, "session.error")) return
+
+      // Original error handling (no retry)
+      const errorMsg = errorMessage ?? "Session error"
+      const canRetry =
+        shouldRetryError(errorInfo) &&
+        !!task.fallbackChain &&
+        hasMoreFallbacks(task.fallbackChain, task.attemptCount ?? 0)
+      log("[background-agent] Session error - no retry:", {
+        taskId: task.id,
+        errorName,
+        errorMessage: errorMsg?.slice(0, 100),
+        hasFallbackChain: !!task.fallbackChain,
+        canRetry,
+      })
+
+      task.status = "error"
+      task.error = errorMsg
+      task.completedAt = new Date()
+      this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+
+      if (task.concurrencyKey) {
+        this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined
       }
 
-      // Edge guard: Verify session has actual assistant output before completing
-      this.validateSessionHasOutput(sessionID).then(async (hasValidOutput) => {
-        // Re-check status after async operation (could have been completed by polling)
-        if (task.status !== "running") {
-          log("[background-agent] Task status changed during validation, skipping:", { taskId: task.id, status: task.status })
-          return
-        }
+      const completionTimer = this.completionTimers.get(task.id)
+      if (completionTimer) {
+        clearTimeout(completionTimer)
+        this.completionTimers.delete(task.id)
+      }
 
-        if (!hasValidOutput) {
-          log("[background-agent] Session.idle but no valid output yet, waiting:", task.id)
-          return
-        }
+      const idleTimer = this.idleDeferralTimers.get(task.id)
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+        this.idleDeferralTimers.delete(task.id)
+      }
 
-        const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-
-        // Re-check status after async operation again
-        if (task.status !== "running") {
-          log("[background-agent] Task status changed during todo check, skipping:", { taskId: task.id, status: task.status })
-          return
-        }
-
-        if (hasIncompleteTodos) {
-          log("[background-agent] Task has incomplete todos, waiting for todo-continuation:", task.id)
-          return
-        }
-
-        await this.tryCompleteTask(task, "session.idle event")
-      }).catch(err => {
-        log("[background-agent] Error in session.idle handler:", err)
-      })
+      this.cleanupPendingByParent(task)
+      this.tasks.delete(task.id)
+      this.clearNotificationsForTask(task.id)
+      const toastManager = getTaskToastManager()
+      if (toastManager) {
+        toastManager.removeTask(task.id)
+      }
+      if (task.sessionID) {
+        subagentSessions.delete(task.sessionID)
+      }
     }
 
     if (event.type === "session.deleted") {
@@ -771,11 +856,51 @@ export class BackgroundManager {
         this.cleanupPendingByParent(task)
         this.tasks.delete(task.id)
         this.clearNotificationsForTask(task.id)
+        const toastManager = getTaskToastManager()
+        if (toastManager) {
+          toastManager.removeTask(task.id)
+        }
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
         }
       }
+      SessionCategoryRegistry.remove(sessionID)
     }
+
+    if (event.type === "session.status") {
+      const sessionID = props?.sessionID as string | undefined
+      const status = props?.status as { type?: string; message?: string } | undefined
+      if (!sessionID || status?.type !== "retry") return
+
+      const task = this.findBySession(sessionID)
+      if (!task || task.status !== "running") return
+
+      const errorMessage = typeof status.message === "string" ? status.message : undefined
+      const errorInfo = { name: "SessionRetry", message: errorMessage }
+      this.tryFallbackRetry(task, errorInfo, "session.status")
+    }
+  }
+
+  private tryFallbackRetry(
+    task: BackgroundTask,
+    errorInfo: { name?: string; message?: string },
+    source: string,
+  ): boolean {
+    const previousSessionID = task.sessionID
+    const result = tryFallbackRetry({
+      task,
+      errorInfo,
+      source,
+      concurrencyManager: this.concurrencyManager,
+      client: this.client,
+      idleDeferralTimers: this.idleDeferralTimers,
+      queuesByKey: this.queuesByKey,
+      processKey: (key: string) => this.processKey(key),
+    })
+    if (result && previousSessionID) {
+      subagentSessions.delete(previousSessionID)
+    }
+    return result
   }
 
   markForNotification(task: BackgroundTask): void {
@@ -802,7 +927,7 @@ export class BackgroundManager {
         path: { id: sessionID },
       })
 
-      const messages = response.data ?? []
+      const messages = normalizeSDKResponse(response, [] as Array<{ info?: { role?: string } }>, { preferResponseOnMissingData: true })
       
       // Check for at least one assistant or tool message
       const hasAssistantOrToolMessage = messages.some(
@@ -913,6 +1038,7 @@ export class BackgroundManager {
     if (reason) {
       task.error = reason
     }
+    this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "cancelled", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
     if (task.concurrencyKey) {
       this.concurrencyManager.release(task.concurrencyKey)
@@ -937,9 +1063,15 @@ export class BackgroundManager {
       this.client.session.abort({
         path: { id: task.sessionID },
       }).catch(() => {})
+
+      SessionCategoryRegistry.remove(task.sessionID)
     }
 
     if (options?.skipNotification) {
+      const toastManager = getTaskToastManager()
+      if (toastManager) {
+        toastManager.removeTask(task.id)
+      }
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
       return true
     }
@@ -987,45 +1119,11 @@ export class BackgroundManager {
   }
 
   private registerProcessCleanup(): void {
-    BackgroundManager.cleanupManagers.add(this)
-
-    if (BackgroundManager.cleanupRegistered) return
-    BackgroundManager.cleanupRegistered = true
-
-    const cleanupAll = () => {
-      for (const manager of BackgroundManager.cleanupManagers) {
-        try {
-          manager.shutdown()
-        } catch (error) {
-          log("[background-agent] Error during shutdown cleanup:", error)
-        }
-      }
-    }
-
-    const registerSignal = (signal: ProcessCleanupEvent, exitAfter: boolean): void => {
-      const listener = registerProcessSignal(signal, cleanupAll, exitAfter)
-      BackgroundManager.cleanupHandlers.set(signal, listener)
-    }
-
-    registerSignal("SIGINT", true)
-    registerSignal("SIGTERM", true)
-    if (process.platform === "win32") {
-      registerSignal("SIGBREAK", true)
-    }
-    registerSignal("beforeExit", false)
-    registerSignal("exit", false)
+    registerManagerForCleanup(this)
   }
 
   private unregisterProcessCleanup(): void {
-    BackgroundManager.cleanupManagers.delete(this)
-
-    if (BackgroundManager.cleanupManagers.size > 0) return
-
-    for (const [signal, listener] of BackgroundManager.cleanupHandlers.entries()) {
-      process.off(signal, listener)
-    }
-    BackgroundManager.cleanupHandlers.clear()
-    BackgroundManager.cleanupRegistered = false
+    unregisterManagerForCleanup(this)
   }
 
 
@@ -1057,6 +1155,7 @@ export class BackgroundManager {
     // Atomically mark as completed to prevent race conditions
     task.status = "completed"
     task.completedAt = new Date()
+    this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
     // Release concurrency BEFORE any async operations to prevent slot leaks
     if (task.concurrencyKey) {
@@ -1079,6 +1178,8 @@ export class BackgroundManager {
       this.client.session.abort({
         path: { id: task.sessionID },
       }).catch(() => {})
+
+      SessionCategoryRegistry.remove(task.sessionID)
     }
 
     try {
@@ -1096,7 +1197,7 @@ export class BackgroundManager {
     // Note: Callers must release concurrency before calling this method
     // to ensure slots are freed even if notification fails
 
-    const duration = this.formatDuration(task.startedAt ?? new Date(), task.completedAt)
+    const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
 
     log("[background-agent] notifyParentSession called for task:", task.id)
 
@@ -1125,19 +1226,21 @@ export class BackgroundManager {
       allComplete = true
     }
 
+    const completedTasks = allComplete
+      ? Array.from(this.tasks.values())
+        .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
+      : []
+
     const statusText = task.status === "completed" ? "COMPLETED" : task.status === "interrupt" ? "INTERRUPTED" : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
-    
-    let notification: string
-    let completedTasks: BackgroundTask[] = []
-    if (allComplete) {
-      completedTasks = Array.from(this.tasks.values())
-        .filter(t => t.parentSessionID === task.parentSessionID && t.status !== "running" && t.status !== "pending")
-      const completedTasksText = completedTasks
-        .map(t => `- \`${t.id}\`: ${t.description}`)
-        .join("\n")
 
-      notification = `<system-reminder>
+    let notification: string
+    if (allComplete) {
+        const completedTasksText = completedTasks
+          .map(t => `- \`${t.id}\`: ${t.description}`)
+          .join("\n")
+
+        notification = `<system-reminder>
 [ALL BACKGROUND TASKS COMPLETE]
 
 **Completed:**
@@ -1160,69 +1263,93 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 </system-reminder>`
     }
 
-    let agent: string | undefined = task.parentAgent
-    let model: { providerID: string; modelID: string } | undefined
+      let agent: string | undefined = task.parentAgent
+      let model: { providerID: string; modelID: string } | undefined
+      let tools: Record<string, boolean> | undefined = task.parentTools
 
-    try {
-      const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
-      const messages = (messagesResp.data ?? []) as Array<{
-        info?: { agent?: string; model?: { providerID: string; modelID: string }; modelID?: string; providerID?: string }
-      }>
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const info = messages[i].info
-        if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
-          agent = info.agent ?? task.parentAgent
-          model = info.model ?? (info.providerID && info.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
-          break
+      if (this.enableParentSessionNotifications) {
+        try {
+          const messagesResp = await this.client.session.messages({ path: { id: task.parentSessionID } })
+          const messages = normalizeSDKResponse(messagesResp, [] as Array<{
+            info?: {
+              agent?: string
+              model?: { providerID: string; modelID: string }
+              modelID?: string
+              providerID?: string
+              tools?: Record<string, boolean | "allow" | "deny" | "ask">
+            }
+          }>)
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const info = messages[i].info
+            if (isCompactionAgent(info?.agent)) {
+              continue
+            }
+            const normalizedTools = isRecord(info?.tools)
+              ? normalizePromptTools(info.tools as Record<string, boolean | "allow" | "deny" | "ask">)
+              : undefined
+            if (info?.agent || info?.model || (info?.modelID && info?.providerID) || normalizedTools) {
+              agent = info?.agent ?? task.parentAgent
+              model = info?.model ?? (info?.providerID && info?.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
+              tools = normalizedTools ?? tools
+              break
+            }
+          }
+        } catch (error) {
+          if (isAbortedSessionError(error)) {
+            log("[background-agent] Parent session aborted while loading messages; using messageDir fallback:", {
+              taskId: task.id,
+              parentSessionID: task.parentSessionID,
+            })
+          }
+          const messageDir = join(MESSAGE_STORAGE, task.parentSessionID)
+          const currentMessage = messageDir ? findNearestMessageExcludingCompaction(messageDir) : null
+          agent = currentMessage?.agent ?? task.parentAgent
+          model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
+            ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
+            : undefined
+          tools = normalizePromptTools(currentMessage?.tools) ?? tools
         }
-      }
-    } catch (error) {
-      if (this.isAbortedSessionError(error)) {
-        log("[background-agent] Parent session aborted, skipping notification:", {
+
+        const resolvedTools = resolveInheritedPromptTools(task.parentSessionID, tools)
+
+        log("[background-agent] notifyParentSession context:", {
+          taskId: task.id,
+          resolvedAgent: agent,
+          resolvedModel: model,
+        })
+
+        try {
+          await this.client.session.promptAsync({
+            path: { id: task.parentSessionID },
+            body: {
+              noReply: !allComplete,
+              ...(agent !== undefined ? { agent } : {}),
+              ...(model !== undefined ? { model } : {}),
+              ...(resolvedTools ? { tools: resolvedTools } : {}),
+              parts: [createInternalAgentTextPart(notification)],
+            },
+          })
+          log("[background-agent] Sent notification to parent session:", {
+            taskId: task.id,
+            allComplete,
+            noReply: !allComplete,
+          })
+        } catch (error) {
+          if (isAbortedSessionError(error)) {
+            log("[background-agent] Parent session aborted while sending notification; continuing cleanup:", {
+              taskId: task.id,
+              parentSessionID: task.parentSessionID,
+            })
+          } else {
+            log("[background-agent] Failed to send notification:", error)
+          }
+        }
+      } else {
+        log("[background-agent] Parent session notifications disabled, skipping prompt injection:", {
           taskId: task.id,
           parentSessionID: task.parentSessionID,
         })
-        return
       }
-      const messageDir = getMessageDir(task.parentSessionID)
-      const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-      agent = currentMessage?.agent ?? task.parentAgent
-      model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
-        ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
-        : undefined
-    }
-
-    log("[background-agent] notifyParentSession context:", {
-      taskId: task.id,
-      resolvedAgent: agent,
-      resolvedModel: model,
-    })
-
-    try {
-      await this.client.session.promptAsync({
-        path: { id: task.parentSessionID },
-        body: {
-          noReply: !allComplete,
-          ...(agent !== undefined ? { agent } : {}),
-          ...(model !== undefined ? { model } : {}),
-          parts: [{ type: "text", text: notification }],
-        },
-      })
-      log("[background-agent] Sent notification to parent session:", {
-        taskId: task.id,
-        allComplete,
-        noReply: !allComplete,
-      })
-    } catch (error) {
-      if (this.isAbortedSessionError(error)) {
-        log("[background-agent] Parent session aborted, skipping notification:", {
-          taskId: task.id,
-          parentSessionID: task.parentSessionID,
-        })
-        return
-      }
-      log("[background-agent] Failed to send notification:", error)
-    }
 
     if (allComplete) {
       for (const completedTask of completedTasks) {
@@ -1246,39 +1373,11 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
   }
 
   private formatDuration(start: Date, end?: Date): string {
-    const duration = (end ?? new Date()).getTime() - start.getTime()
-    const seconds = Math.floor(duration / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
-
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m ${seconds % 60}s`
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds % 60}s`
-    }
-    return `${seconds}s`
+    return formatDuration(start, end)
   }
 
   private isAbortedSessionError(error: unknown): boolean {
-    const message = this.getErrorText(error)
-    return message.toLowerCase().includes("aborted")
-  }
-
-  private getErrorText(error: unknown): string {
-    if (!error) return ""
-    if (typeof error === "string") return error
-    if (error instanceof Error) {
-      return `${error.name}: ${error.message}`
-    }
-    if (typeof error === "object" && error !== null) {
-      if ("message" in error && typeof error.message === "string") {
-        return error.message
-      }
-      if ("name" in error && typeof error.name === "string") {
-        return error.name
-      }
-    }
-    return ""
+    return isAbortedSessionError(error)
   }
 
   private hasRunningTasks(): boolean {
@@ -1289,24 +1388,12 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
   }
 
   private pruneStaleTasksAndNotifications(): void {
-    const now = Date.now()
-
-    for (const [taskId, task] of this.tasks.entries()) {
-      const timestamp = task.status === "pending" 
-        ? task.queuedAt?.getTime() 
-        : task.startedAt?.getTime()
-      
-      if (!timestamp) {
-        continue
-      }
-      
-      const age = now - timestamp
-      if (age > TASK_TTL_MS) {
-        const errorMessage = task.status === "pending"
-          ? "Task timed out while queued (30 minutes)"
-          : "Task timed out after 30 minutes"
-        
-        log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(age / 1000) + "s" })
+    pruneStaleTasksAndNotifications({
+      tasks: this.tasks,
+      notifications: this.notifications,
+      onTaskPruned: (taskId, task, errorMessage) => {
+        const wasPending = task.status === "pending"
+        log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(((wasPending ? task.queuedAt?.getTime() : task.startedAt?.getTime()) ? (Date.now() - (wasPending ? task.queuedAt!.getTime() : task.startedAt!.getTime())) : 0) / 1000) + "s" })
         task.status = "error"
         task.error = errorMessage
         task.completedAt = new Date()
@@ -1314,84 +1401,59 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           this.concurrencyManager.release(task.concurrencyKey)
           task.concurrencyKey = undefined
         }
-        // Clean up pendingByParent to prevent stale entries
         this.cleanupPendingByParent(task)
+        if (wasPending) {
+          const key = task.model
+            ? `${task.model.providerID}/${task.model.modelID}`
+            : task.agent
+          const queue = this.queuesByKey.get(key)
+          if (queue) {
+            const index = queue.findIndex((item) => item.task.id === taskId)
+            if (index !== -1) {
+              queue.splice(index, 1)
+              if (queue.length === 0) {
+                this.queuesByKey.delete(key)
+              }
+            }
+          }
+        }
         this.clearNotificationsForTask(taskId)
+        const toastManager = getTaskToastManager()
+        if (toastManager) {
+          toastManager.removeTask(taskId)
+        }
         this.tasks.delete(taskId)
         if (task.sessionID) {
           subagentSessions.delete(task.sessionID)
+          SessionCategoryRegistry.remove(task.sessionID)
         }
-      }
-    }
-
-    for (const [sessionID, notifications] of this.notifications.entries()) {
-      if (notifications.length === 0) {
-        this.notifications.delete(sessionID)
-        continue
-      }
-      const validNotifications = notifications.filter((task) => {
-        if (!task.startedAt) return false
-        const age = now - task.startedAt.getTime()
-        return age <= TASK_TTL_MS
-      })
-      if (validNotifications.length === 0) {
-        this.notifications.delete(sessionID)
-      } else if (validNotifications.length !== notifications.length) {
-        this.notifications.set(sessionID, validNotifications)
-      }
-    }
+      },
+    })
   }
 
-  private async checkAndInterruptStaleTasks(): Promise<void> {
-    const staleTimeoutMs = this.config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
-    const now = Date.now()
-
-    for (const task of this.tasks.values()) {
-      if (task.status !== "running") continue
-      if (!task.progress?.lastUpdate) continue
-      
-      const startedAt = task.startedAt
-      const sessionID = task.sessionID
-      if (!startedAt || !sessionID) continue
-
-      const runtime = now - startedAt.getTime()
-      if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
-
-      const timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
-      if (timeSinceLastUpdate <= staleTimeoutMs) continue
-
-      if (task.status !== "running") continue
-
-      const staleMinutes = Math.round(timeSinceLastUpdate / 60000)
-      task.status = "cancelled"
-      task.error = `Stale timeout (no activity for ${staleMinutes}min)`
-      task.completedAt = new Date()
-
-      if (task.concurrencyKey) {
-        this.concurrencyManager.release(task.concurrencyKey)
-        task.concurrencyKey = undefined
-      }
-
-      this.client.session.abort({
-        path: { id: sessionID },
-      }).catch(() => {})
-
-      log(`[background-agent] Task ${task.id} interrupted: stale timeout`)
-
-      try {
-        await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
-      } catch (err) {
-        log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
-      }
-    }
+  private async checkAndInterruptStaleTasks(
+    allStatuses: Record<string, { type: string }> = {},
+  ): Promise<void> {
+    await checkAndInterruptStaleTasks({
+      tasks: this.tasks.values(),
+      client: this.client,
+      config: this.config,
+      concurrencyManager: this.concurrencyManager,
+      notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task)),
+      sessionStatuses: allStatuses,
+    })
   }
 
   private async pollRunningTasks(): Promise<void> {
+    if (this.pollingInFlight) return
+    this.pollingInFlight = true
+    try {
     this.pruneStaleTasksAndNotifications()
-    await this.checkAndInterruptStaleTasks()
 
     const statusResult = await this.client.session.status()
-    const allStatuses = (statusResult.data ?? {}) as Record<string, { type: string }>
+    const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
+
+    await this.checkAndInterruptStaleTasks(allStatuses)
 
     for (const task of this.tasks.values()) {
       if (task.status !== "running") continue
@@ -1402,7 +1464,6 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       try {
         const sessionStatus = allStatuses[sessionID]
         
-        // Don't skip if session not in status - fall through to message-based detection
         if (sessionStatus?.type === "idle") {
           // Edge guard: Validate session has actual output before completing
           const hasValidOutput = await this.validateSessionHasOutput(sessionID)
@@ -1424,94 +1485,26 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           continue
         }
 
-        const messagesResult = await this.client.session.messages({
-          path: { id: sessionID },
-        })
-
-        if (!messagesResult.error && messagesResult.data) {
-          const messages = messagesResult.data as Array<{
-            info?: { role?: string }
-            parts?: Array<{ type?: string; tool?: string; name?: string; text?: string }>
-          }>
-          const assistantMsgs = messages.filter(
-            (m) => m.info?.role === "assistant"
-          )
-
-          let toolCalls = 0
-          let lastTool: string | undefined
-          let lastMessage: string | undefined
-
-          for (const msg of assistantMsgs) {
-            const parts = msg.parts ?? []
-            for (const part of parts) {
-              if (part.type === "tool_use" || part.tool) {
-                toolCalls++
-                lastTool = part.tool || part.name || "unknown"
-              }
-              if (part.type === "text" && part.text) {
-                lastMessage = part.text
-              }
-            }
+        // Session is still actively running (not idle).
+        // Progress is already tracked via handleEvent(message.part.updated),
+        // so we skip the expensive session.messages() fetch here.
+        // Completion will be detected when session transitions to idle.
+        if (sessionStatus?.type === "retry") {
+          const retryMessage = typeof (sessionStatus as { message?: string }).message === "string"
+            ? (sessionStatus as { message?: string }).message
+            : undefined
+          const errorInfo = { name: "SessionRetry", message: retryMessage }
+          if (this.tryFallbackRetry(task, errorInfo, "polling:session.status")) {
+            continue
           }
-
-          if (!task.progress) {
-            task.progress = { toolCalls: 0, lastUpdate: new Date() }
-          }
-          task.progress.toolCalls = toolCalls
-          task.progress.lastTool = lastTool
-          task.progress.lastUpdate = new Date()
-          if (lastMessage) {
-            task.progress.lastMessage = lastMessage
-            task.progress.lastMessageAt = new Date()
-          }
-
-          // Stability detection: complete when message count unchanged for 3 polls
-          const currentMsgCount = messages.length
-          const startedAt = task.startedAt
-          if (!startedAt) continue
-          
-          const elapsedMs = Date.now() - startedAt.getTime()
-
-          if (elapsedMs >= MIN_STABILITY_TIME_MS) {
-            if (task.lastMsgCount === currentMsgCount) {
-              task.stablePolls = (task.stablePolls ?? 0) + 1
-              if (task.stablePolls >= 3) {
-                // Re-fetch session status to confirm agent is truly idle
-                const recheckStatus = await this.client.session.status()
-                const recheckData = (recheckStatus.data ?? {}) as Record<string, { type: string }>
-                const currentStatus = recheckData[sessionID]
-                
-                if (currentStatus?.type !== "idle") {
-                  log("[background-agent] Stability reached but session not idle, resetting:", { 
-                    taskId: task.id, 
-                    sessionStatus: currentStatus?.type ?? "not_in_status" 
-                  })
-                  task.stablePolls = 0
-                  continue
-                }
-
-                // Edge guard: Validate session has actual output before completing
-                const hasValidOutput = await this.validateSessionHasOutput(sessionID)
-                if (!hasValidOutput) {
-                  log("[background-agent] Stability reached but no valid output, waiting:", task.id)
-                  continue
-                }
-
-                // Re-check status after async operation
-                if (task.status !== "running") continue
-
-                const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-                if (!hasIncompleteTodos) {
-                  await this.tryCompleteTask(task, "stability detection")
-                  continue
-                }
-              }
-            } else {
-              task.stablePolls = 0
-            }
-          }
-          task.lastMsgCount = currentMsgCount
         }
+
+        log("[background-agent] Session still running, relying on event-based progress:", {
+          taskId: task.id,
+          sessionID,
+          sessionStatus: sessionStatus?.type ?? "not_in_status",
+          toolCalls: task.progress?.toolCalls ?? 0,
+        })
       } catch (error) {
         log("[background-agent] Poll error for task:", { taskId: task.id, error })
       }
@@ -1519,6 +1512,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     if (!this.hasRunningTasks()) {
       this.stopPolling()
+    }
+    } finally {
+      this.pollingInFlight = false
     }
   }
 
@@ -1604,36 +1600,4 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
     return current
   }
-}
-
-function registerProcessSignal(
-  signal: ProcessCleanupEvent,
-  handler: () => void,
-  exitAfter: boolean
-): () => void {
-  const listener = () => {
-    handler()
-    if (exitAfter) {
-      // Set exitCode and schedule exit after delay to allow other handlers to complete async cleanup
-      // Use 6s delay to accommodate LSP cleanup (5s timeout + 1s SIGKILL wait)
-      process.exitCode = 0
-      setTimeout(() => process.exit(), 6000)
-    }
-  }
-  process.on(signal, listener)
-  return listener
-}
-
-
-function getMessageDir(sessionID: string): string | null {
-  if (!existsSync(MESSAGE_STORAGE)) return null
-
-  const directPath = join(MESSAGE_STORAGE, sessionID)
-  if (existsSync(directPath)) return directPath
-
-  for (const dir of readdirSync(MESSAGE_STORAGE)) {
-    const sessionPath = join(MESSAGE_STORAGE, dir, sessionID)
-    if (existsSync(sessionPath)) return sessionPath
-  }
-  return null
 }

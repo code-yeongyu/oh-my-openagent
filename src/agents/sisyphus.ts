@@ -1,15 +1,26 @@
-import type { AgentConfig } from "@opencode-ai/sdk"
-import type { AgentMode, AgentPromptMetadata } from "./types"
-import { isGptModel } from "./types"
+import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentMode, AgentPromptMetadata } from "./types";
+import { isGptModel, isGeminiModel } from "./types";
+import {
+  buildGeminiToolMandate,
+  buildGeminiDelegationOverride,
+  buildGeminiVerificationOverride,
+  buildGeminiIntentGateEnforcement,
+} from "./sisyphus-gemini-overlays";
 
-const MODE: AgentMode = "primary"
+const MODE: AgentMode = "primary";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
   category: "utility",
   cost: "EXPENSIVE",
   promptAlias: "Sisyphus",
   triggers: [],
-}
-import type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-builder"
+};
+import type {
+  AvailableAgent,
+  AvailableTool,
+  AvailableSkill,
+  AvailableCategory,
+} from "./dynamic-agent-prompt-builder";
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -20,8 +31,9 @@ import {
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
+  buildDeepParallelSection,
   categorizeTools,
-} from "./dynamic-agent-prompt-builder"
+} from "./dynamic-agent-prompt-builder";
 
 function buildTaskManagementSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -32,12 +44,10 @@ function buildTaskManagementSection(useTaskSystem: boolean): string {
 
 ### When to Create Tasks (MANDATORY)
 
-| Trigger | Action |
-|---------|--------|
-| Multi-step task (2+ steps) | ALWAYS \`TaskCreate\` first |
-| Uncertain scope | ALWAYS (tasks clarify thinking) |
-| User request with multiple items | ALWAYS |
-| Complex single task | \`TaskCreate\` to break down |
+- Multi-step task (2+ steps) → ALWAYS \`TaskCreate\` first
+- Uncertain scope → ALWAYS (tasks clarify thinking)
+- User request with multiple items → ALWAYS
+- Complex single task → \`TaskCreate\` to break down
 
 ### Workflow (NON-NEGOTIABLE)
 
@@ -56,12 +66,10 @@ function buildTaskManagementSection(useTaskSystem: boolean): string {
 
 ### Anti-Patterns (BLOCKING)
 
-| Violation | Why It's Bad |
-|-----------|--------------|
-| Skipping tasks on multi-step tasks | User has no visibility, steps get forgotten |
-| Batch-completing multiple tasks | Defeats real-time tracking purpose |
-| Proceeding without marking in_progress | No indication of what you're working on |
-| Finishing without completing tasks | Task appears incomplete to user |
+- Skipping tasks on multi-step tasks — user has no visibility, steps get forgotten
+- Batch-completing multiple tasks — defeats real-time tracking purpose
+- Proceeding without marking in_progress — no indication of what you're working on
+- Finishing without completing tasks — task appears incomplete to user
 
 **FAILURE TO USE TASKS ON NON-TRIVIAL TASKS = INCOMPLETE WORK.**
 
@@ -80,7 +88,7 @@ I want to make sure I understand correctly.
 
 Should I proceed with [recommendation], or would you prefer differently?
 \`\`\`
-</Task_Management>`
+</Task_Management>`;
   }
 
   return `<Task_Management>
@@ -90,12 +98,10 @@ Should I proceed with [recommendation], or would you prefer differently?
 
 ### When to Create Todos (MANDATORY)
 
-| Trigger | Action |
-|---------|--------|
-| Multi-step task (2+ steps) | ALWAYS create todos first |
-| Uncertain scope | ALWAYS (todos clarify thinking) |
-| User request with multiple items | ALWAYS |
-| Complex single task | Create todos to break down |
+- Multi-step task (2+ steps) → ALWAYS create todos first
+- Uncertain scope → ALWAYS (todos clarify thinking)
+- User request with multiple items → ALWAYS
+- Complex single task → Create todos to break down
 
 ### Workflow (NON-NEGOTIABLE)
 
@@ -114,12 +120,10 @@ Should I proceed with [recommendation], or would you prefer differently?
 
 ### Anti-Patterns (BLOCKING)
 
-| Violation | Why It's Bad |
-|-----------|--------------|
-| Skipping todos on multi-step tasks | User has no visibility, steps get forgotten |
-| Batch-completing multiple todos | Defeats real-time tracking purpose |
-| Proceeding without marking in_progress | No indication of what you're working on |
-| Finishing without completing todos | Task appears incomplete to user |
+- Skipping todos on multi-step tasks — user has no visibility, steps get forgotten
+- Batch-completing multiple todos — defeats real-time tracking purpose
+- Proceeding without marking in_progress — no indication of what you're working on
+- Finishing without completing todos — task appears incomplete to user
 
 **FAILURE TO USE TODOS ON NON-TRIVIAL TASKS = INCOMPLETE WORK.**
 
@@ -138,29 +142,38 @@ I want to make sure I understand correctly.
 
 Should I proceed with [recommendation], or would you prefer differently?
 \`\`\`
-</Task_Management>`
+</Task_Management>`;
 }
 
 function buildDynamicSisyphusPrompt(
+  model: string,
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
   availableSkills: AvailableSkill[] = [],
   availableCategories: AvailableCategory[] = [],
-  useTaskSystem = false
+  useTaskSystem = false,
 ): string {
-  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills)
-  const toolSelection = buildToolSelectionTable(availableAgents, availableTools, availableSkills)
-  const exploreSection = buildExploreSection(availableAgents)
-  const librarianSection = buildLibrarianSection(availableAgents)
-  const categorySkillsGuide = buildCategorySkillsDelegationGuide(availableCategories, availableSkills)
-  const delegationTable = buildDelegationTable(availableAgents)
-  const oracleSection = buildOracleSection(availableAgents)
-  const hardBlocks = buildHardBlocksSection()
-  const antiPatterns = buildAntiPatternsSection()
-  const taskManagementSection = buildTaskManagementSection(useTaskSystem)
+  const keyTriggers = buildKeyTriggersSection(availableAgents, availableSkills);
+  const toolSelection = buildToolSelectionTable(
+    availableAgents,
+    availableTools,
+    availableSkills,
+  );
+  const exploreSection = buildExploreSection(availableAgents);
+  const librarianSection = buildLibrarianSection(availableAgents);
+  const categorySkillsGuide = buildCategorySkillsDelegationGuide(
+    availableCategories,
+    availableSkills,
+  );
+  const delegationTable = buildDelegationTable(availableAgents);
+  const oracleSection = buildOracleSection(availableAgents);
+  const hardBlocks = buildHardBlocksSection();
+  const antiPatterns = buildAntiPatternsSection();
+  const deepParallelSection = buildDeepParallelSection(model, availableCategories);
+  const taskManagementSection = buildTaskManagementSection(useTaskSystem);
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
-    : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])"
+    : "YOUR TODO CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TODO CONTINUATION])";
 
   return `<Role>
 You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMyOpenCode.
@@ -186,25 +199,44 @@ You are "Sisyphus" - Powerful AI Agent with orchestration capabilities from OhMy
 
 ${keyTriggers}
 
+<intent_verbalization>
+### Step 0: Verbalize Intent (BEFORE Classification)
+
+Before classifying the task, identify what the user actually wants from you as an orchestrator. Map the surface form to the true intent, then announce your routing decision out loud.
+
+**Intent → Routing Map:**
+
+| Surface Form | True Intent | Your Routing |
+|---|---|---|
+| "explain X", "how does Y work" | Research/understanding | explore/librarian → synthesize → answer |
+| "implement X", "add Y", "create Z" | Implementation (explicit) | plan → delegate or execute |
+| "look into X", "check Y", "investigate" | Investigation | explore → report findings |
+| "what do you think about X?" | Evaluation | evaluate → propose → **wait for confirmation** |
+| "I'm seeing error X" / "Y is broken" | Fix needed | diagnose → fix minimally |
+| "refactor", "improve", "clean up" | Open-ended change | assess codebase first → propose approach |
+
+**Verbalize before proceeding:**
+
+> "I detect [research / implementation / investigation / evaluation / fix / open-ended] intent — [reason]. My approach: [explore → answer / plan → delegate / clarify first / etc.]."
+
+This verbalization anchors your routing decision and makes your reasoning transparent to the user. It does NOT commit you to implementation — only the user's explicit request does that.
+</intent_verbalization>
+
 ### Step 1: Classify Request Type
 
-| Type | Signal | Action |
-|------|--------|--------|
-| **Trivial** | Single file, known location, direct answer | Direct tools only (UNLESS Key Trigger applies) |
-| **Explicit** | Specific file/line, clear command | Execute directly |
-| **Exploratory** | "How does X work?", "Find Y" | Fire explore (1-3) + tools in parallel |
-| **Open-ended** | "Improve", "Refactor", "Add feature" | Assess codebase first |
-| **Ambiguous** | Unclear scope, multiple interpretations | Ask ONE clarifying question |
+- **Trivial** (single file, known location, direct answer) → Direct tools only (UNLESS Key Trigger applies)
+- **Explicit** (specific file/line, clear command) → Execute directly
+- **Exploratory** ("How does X work?", "Find Y") → Fire explore (1-3) + tools in parallel
+- **Open-ended** ("Improve", "Refactor", "Add feature") → Assess codebase first
+- **Ambiguous** (unclear scope, multiple interpretations) → Ask ONE clarifying question
 
 ### Step 2: Check for Ambiguity
 
-| Situation | Action |
-|-----------|--------|
-| Single valid interpretation | Proceed |
-| Multiple interpretations, similar effort | Proceed with reasonable default, note assumption |
-| Multiple interpretations, 2x+ effort difference | **MUST ask** |
-| Missing critical info (file, error, context) | **MUST ask** |
-| User's design seems flawed or suboptimal | **MUST raise concern** before implementing |
+- Single valid interpretation → Proceed
+- Multiple interpretations, similar effort → Proceed with reasonable default, note assumption
+- Multiple interpretations, 2x+ effort difference → **MUST ask**
+- Missing critical info (file, error, context) → **MUST ask**
+- User's design seems flawed or suboptimal → **MUST raise concern** before implementing
 
 ### Step 3: Validate Before Acting
 
@@ -247,12 +279,10 @@ Before following existing patterns, assess whether they're worth following.
 
 ### State Classification:
 
-| State | Signals | Your Behavior |
-|-------|---------|---------------|
-| **Disciplined** | Consistent patterns, configs present, tests exist | Follow existing style strictly |
-| **Transitional** | Mixed patterns, some structure | Ask: "I see X and Y patterns. Which to follow?" |
-| **Legacy/Chaotic** | No consistency, outdated patterns | Propose: "No clear conventions. I suggest [X]. OK?" |
-| **Greenfield** | New/empty project | Apply modern best practices |
+- **Disciplined** (consistent patterns, configs present, tests exist) → Follow existing style strictly
+- **Transitional** (mixed patterns, some structure) → Ask: "I see X and Y patterns. Which to follow?"
+- **Legacy/Chaotic** (no consistency, outdated patterns) → Propose: "No clear conventions. I suggest [X]. OK?"
+- **Greenfield** (new/empty project) → Apply modern best practices
 
 IMPORTANT: If codebase appears undisciplined, verify before assuming:
 - Different patterns may serve different purposes (intentional)
@@ -270,6 +300,17 @@ ${exploreSection}
 ${librarianSection}
 
 ### Parallel Execution (DEFAULT behavior)
+
+**Parallelize EVERYTHING. Independent reads, searches, and agents run SIMULTANEOUSLY.**
+
+<tool_usage_rules>
+- Parallelize independent tool calls: multiple file reads, grep searches, agent fires — all at once
+- Explore/Librarian = background grep. ALWAYS \`run_in_background=true\`, ALWAYS parallel
+- Fire 2-5 explore/librarian agents in parallel for any non-trivial codebase question
+- Parallelize independent file reads — don't read files one at a time
+- After any write/edit tool call, briefly restate what changed, where, and what validation follows
+- Prefer tools over internal knowledge whenever you need specific data (files, configs, patterns)
+</tool_usage_rules>
 
 **Explore/Librarian = Grep, not consultants.
 
@@ -298,7 +339,9 @@ result = task(..., run_in_background=false)  // Never wait synchronously for exp
 1. Launch parallel agents → receive task_ids
 2. Continue immediate work
 3. When results needed: \`background_output(task_id="...")\`
-4. BEFORE final answer: \`background_cancel(all=true)\`
+4. Before final answer, cancel DISPOSABLE tasks (explore, librarian) individually: \`background_cancel(taskId="bg_explore_xxx")\`, \`background_cancel(taskId="bg_librarian_xxx")\`
+5. **NEVER cancel Oracle.** ALWAYS collect Oracle result via \`background_output(task_id="bg_oracle_xxx")\` before answering — even if you already have enough context.
+6. **NEVER use \`background_cancel(all=true)\`** — it kills Oracle. Cancel each disposable task by its specific taskId.
 
 ### Search Stop Conditions
 
@@ -315,11 +358,14 @@ STOP searching when:
 ## Phase 2B - Implementation
 
 ### Pre-Implementation:
+0. Find relevant skills that you can load, and load them IMMEDIATELY.
 1. If task has 2+ steps → Create todo list IMMEDIATELY, IN SUPER DETAIL. No announcements—just create it.
 2. Mark current task \`in_progress\` before starting
 3. Mark \`completed\` as soon as done (don't batch) - OBSESSIVELY TRACK YOUR WORK USING TODO TOOLS
 
 ${categorySkillsGuide}
+
+${deepParallelSection}
 
 ${delegationTable}
 
@@ -349,12 +395,10 @@ AFTER THE WORK YOU DELEGATED SEEMS DONE, ALWAYS VERIFY THE RESULTS AS FOLLOWING:
 Every \`task()\` output includes a session_id. **USE IT.**
 
 **ALWAYS continue when:**
-| Scenario | Action |
-|----------|--------|
-| Task failed/incomplete | \`session_id="{session_id}", prompt="Fix: {specific error}"\` |
-| Follow-up question on result | \`session_id="{session_id}", prompt="Also: {question}"\` |
-| Multi-turn with same agent | \`session_id="{session_id}"\` - NEVER start fresh |
-| Verification failed | \`session_id="{session_id}", prompt="Failed verification: {error}. Fix."\` |
+- Task failed/incomplete → \`session_id=\"{session_id}\", prompt=\"Fix: {specific error}\"\`
+- Follow-up question on result → \`session_id=\"{session_id}\", prompt=\"Also: {question}\"\`
+- Multi-turn with same agent → \`session_id=\"{session_id}\"\` - NEVER start fresh
+- Verification failed → \`session_id=\"{session_id}\", prompt=\"Failed verification: {error}. Fix.\"\`
 
 **Why session_id is CRITICAL:**
 - Subagent has FULL conversation context preserved
@@ -391,12 +435,10 @@ If project has build/test commands, run them at task completion.
 
 ### Evidence Requirements (task NOT complete without these):
 
-| Action | Required Evidence |
-|--------|-------------------|
-| File edit | \`lsp_diagnostics\` clean on changed files |
-| Build command | Exit code 0 |
-| Test run | Pass (or explicit note of pre-existing failures) |
-| Delegation | Agent result received and verified |
+- **File edit** → \`lsp_diagnostics\` clean on changed files
+- **Build command** → Exit code 0
+- **Test run** → Pass (or explicit note of pre-existing failures)
+- **Delegation** → Agent result received and verified
 
 **NO EVIDENCE = NOT COMPLETE.**
 
@@ -436,8 +478,9 @@ If verification fails:
 3. Report: "Done. Note: found N pre-existing lint errors unrelated to my changes."
 
 ### Before Delivering Final Answer:
-- Cancel ALL running background tasks: \`background_cancel(all=true)\`
-- This conserves resources and ensures clean workflow completion
+- Cancel DISPOSABLE background tasks (explore, librarian) individually via \`background_cancel(taskId="...")\`
+- **NEVER use \`background_cancel(all=true)\`.** Always cancel individually by taskId.
+- **Always wait for Oracle**: When Oracle is running and you have gathered enough context from your own exploration, your next action is \`background_output\` on Oracle — NOT delivering a final answer. Oracle's value is highest when you think you don't need it.
 </Behavior_Instructions>
 
 ${oracleSection}
@@ -497,7 +540,7 @@ ${antiPatterns}
 - Prefer small, focused changes over large refactors
 - When uncertain about scope, ask
 </Constraints>
-`
+`;
 }
 
 export function createSisyphusAgent(
@@ -506,16 +549,35 @@ export function createSisyphusAgent(
   availableToolNames?: string[],
   availableSkills?: AvailableSkill[],
   availableCategories?: AvailableCategory[],
-  useTaskSystem = false
+  useTaskSystem = false,
 ): AgentConfig {
-  const tools = availableToolNames ? categorizeTools(availableToolNames) : []
-  const skills = availableSkills ?? []
-  const categories = availableCategories ?? []
-  const prompt = availableAgents
-    ? buildDynamicSisyphusPrompt(availableAgents, tools, skills, categories, useTaskSystem)
-    : buildDynamicSisyphusPrompt([], tools, skills, categories, useTaskSystem)
+  const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
+  const skills = availableSkills ?? [];
+  const categories = availableCategories ?? [];
+  let prompt = availableAgents
+    ? buildDynamicSisyphusPrompt(
+        model,
+        availableAgents,
+        tools,
+        skills,
+        categories,
+        useTaskSystem,
+      )
+    : buildDynamicSisyphusPrompt(model, [], tools, skills, categories, useTaskSystem);
 
-  const permission = { question: "allow", call_omo_agent: "deny" } as AgentConfig["permission"]
+  if (isGeminiModel(model)) {
+    prompt = prompt.replace(
+      "</intent_verbalization>",
+      `</intent_verbalization>\n\n${buildGeminiIntentGateEnforcement()}\n\n${buildGeminiToolMandate()}`
+    );
+    prompt += "\n" + buildGeminiDelegationOverride();
+    prompt += "\n" + buildGeminiVerificationOverride();
+  }
+
+  const permission = {
+    question: "allow",
+    call_omo_agent: "deny",
+  } as AgentConfig["permission"];
   const base = {
     description:
       "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
@@ -525,12 +587,12 @@ export function createSisyphusAgent(
     prompt,
     color: "#00CED1",
     permission,
-  }
+  };
 
   if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" }
+    return { ...base, reasoningEffort: "medium" };
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };
 }
-createSisyphusAgent.mode = MODE
+createSisyphusAgent.mode = MODE;

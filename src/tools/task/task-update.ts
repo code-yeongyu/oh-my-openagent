@@ -2,7 +2,6 @@ import type { PluginInput } from "@opencode-ai/plugin";
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool";
 import { join } from "path";
 import type { OhMyOpenCodeConfig } from "../../config/schema";
-import type { TaskObject, TaskUpdateInput } from "./types";
 import { TaskObjectSchema, TaskUpdateInputSchema } from "./types";
 import {
   getTaskDir,

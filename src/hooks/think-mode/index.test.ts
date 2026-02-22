@@ -83,7 +83,7 @@ describe("createThinkModeHook integration", () => {
         const hook = createThinkModeHook()
         const input = createMockInput(
           "github-copilot",
-          "claude-sonnet-4-5",
+          "claude-sonnet-4-6",
           "think about this"
         )
 
@@ -92,7 +92,7 @@ describe("createThinkModeHook integration", () => {
 
         // then should upgrade to high variant
         const message = input.message as MessageWithInjectedProps
-        expect(input.message.model?.modelID).toBe("claude-sonnet-4-5-high")
+        expect(input.message.model?.modelID).toBe("claude-sonnet-4-6-high")
         expect(message.thinking).toBeDefined()
       })
     })
@@ -201,7 +201,7 @@ describe("createThinkModeHook integration", () => {
       const hook = createThinkModeHook()
       const input = createMockInput(
         "anthropic",
-        "claude-sonnet-4-5",
+        "claude-sonnet-4-6",
         "think about this"
       )
 
@@ -210,8 +210,29 @@ describe("createThinkModeHook integration", () => {
 
       // then should work as before
       const message = input.message as MessageWithInjectedProps
-      expect(input.message.model?.modelID).toBe("claude-sonnet-4-5-high")
+      expect(input.message.model?.modelID).toBe("claude-sonnet-4-6-high")
       expect(message.thinking).toBeDefined()
+    })
+
+    it("should work for direct google-vertex-anthropic provider", async () => {
+      //#given direct google-vertex-anthropic provider
+      const hook = createThinkModeHook()
+      const input = createMockInput(
+        "google-vertex-anthropic",
+        "claude-opus-4-6",
+        "think deeply"
+      )
+
+      //#when the chat.params hook is called
+      await hook["chat.params"](input, sessionID)
+
+      //#then should upgrade model and inject Claude thinking config
+      const message = input.message as MessageWithInjectedProps
+      expect(input.message.model?.modelID).toBe("claude-opus-4-6-high")
+      expect(message.thinking).toBeDefined()
+      expect((message.thinking as Record<string, unknown>)?.budgetTokens).toBe(
+        64000
+      )
     })
 
     it("should still work for direct google provider", async () => {
@@ -251,7 +272,7 @@ describe("createThinkModeHook integration", () => {
       const hook = createThinkModeHook()
       const input = createMockInput(
         "amazon-bedrock",
-        "claude-sonnet-4-5",
+        "claude-sonnet-4-6",
         "think"
       )
 
@@ -260,7 +281,7 @@ describe("createThinkModeHook integration", () => {
 
       // then should inject bedrock thinking config
       const message = input.message as MessageWithInjectedProps
-      expect(input.message.model?.modelID).toBe("claude-sonnet-4-5-high")
+      expect(input.message.model?.modelID).toBe("claude-sonnet-4-6-high")
       expect(message.reasoningConfig).toBeDefined()
     })
   })
@@ -352,6 +373,25 @@ describe("createThinkModeHook integration", () => {
   })
 
   describe("Agent-level thinking configuration respect", () => {
+    it("should omit Z.ai GLM disabled thinking config", async () => {
+      //#given a Z.ai GLM model with think prompt
+      const hook = createThinkModeHook()
+      const input = createMockInput(
+        "zai-coding-plan",
+        "glm-5",
+        "ultrathink mode"
+      )
+
+      //#when think mode resolves Z.ai thinking configuration
+      await hook["chat.params"](input, sessionID)
+
+      //#then thinking config should be omitted from request
+      const message = input.message as MessageWithInjectedProps
+      expect(input.message.model?.modelID).toBe("glm-5")
+      expect(message.thinking).toBeUndefined()
+      expect(message.providerOptions).toBeUndefined()
+    })
+
     it("should NOT inject thinking config when agent has thinking disabled", async () => {
       // given agent with thinking explicitly disabled
       const hook = createThinkModeHook()

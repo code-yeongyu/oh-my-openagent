@@ -75,6 +75,14 @@ function findVariantInChain(
       return entry.variant
     }
   }
+
+  // Some providers expose identical model IDs (e.g. OpenAI models via different providers).
+  // If we didn't find an exact provider+model match, fall back to model-only matching.
+  for (const entry of fallbackChain) {
+    if (entry.model === currentModel.modelID) {
+      return entry.variant
+    }
+  }
   return undefined
 }
 

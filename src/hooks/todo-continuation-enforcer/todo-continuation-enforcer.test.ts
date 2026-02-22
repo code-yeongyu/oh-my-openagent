@@ -1,19 +1,26 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+/// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 
 import type { BackgroundManager } from "../../features/background-agent"
 import { setMainSession, subagentSessions, _resetForTesting } from "../../features/claude-code-session-state"
 import { createTodoContinuationEnforcer } from "."
+import {
+  CONTINUATION_COOLDOWN_MS,
+  FAILURE_RESET_WINDOW_MS,
+  MAX_CONSECUTIVE_FAILURES,
+} from "./constants"
 
 type TimerCallback = (...args: any[]) => void
 
 interface FakeTimers {
   advanceBy: (ms: number, advanceClock?: boolean) => Promise<void>
+  advanceClockBy: (ms: number) => Promise<void>
   restore: () => void
 }
 
 function createFakeTimers(): FakeTimers {
+  const FAKE_MIN_DELAY_MS = 500
+  const REAL_MAX_DELAY_MS = 5000
   const originalNow = Date.now()
   let clockNow = originalNow
   let timerNow = 0
@@ -32,6 +39,12 @@ function createFakeTimers(): FakeTimers {
   const normalizeDelay = (delay?: number) => {
     if (typeof delay !== "number" || !Number.isFinite(delay)) return 0
     return delay < 0 ? 0 : delay
+  }
+
+  const flushMicrotasks = async (iterations: number = 5) => {
+    for (let index = 0; index < iterations; index++) {
+      await Promise.resolve()
+    }
   }
 
   const schedule = (callback: TimerCallback, delay: number | undefined, interval: number | null, args: any[]) => {
@@ -53,20 +66,41 @@ function createFakeTimers(): FakeTimers {
   }
 
   globalThis.setTimeout = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
-    return schedule(callback, delay, null, args) as unknown as ReturnType<typeof setTimeout>
+    const normalized = normalizeDelay(delay)
+    if (normalized < FAKE_MIN_DELAY_MS) {
+      return original.setTimeout(callback, delay, ...args)
+    }
+    if (normalized >= REAL_MAX_DELAY_MS) {
+      return original.setTimeout(callback, delay, ...args)
+    }
+    return schedule(callback, normalized, null, args) as unknown as ReturnType<typeof setTimeout>
   }) as typeof setTimeout
 
   globalThis.setInterval = ((callback: TimerCallback, delay?: number, ...args: any[]) => {
     const interval = normalizeDelay(delay)
-    return schedule(callback, delay, interval, args) as unknown as ReturnType<typeof setInterval>
+    if (interval < FAKE_MIN_DELAY_MS) {
+      return original.setInterval(callback, delay, ...args)
+    }
+    if (interval >= REAL_MAX_DELAY_MS) {
+      return original.setInterval(callback, delay, ...args)
+    }
+    return schedule(callback, interval, interval, args) as unknown as ReturnType<typeof setInterval>
   }) as typeof setInterval
 
-  globalThis.clearTimeout = ((id?: number) => {
-    clear(id)
+  globalThis.clearTimeout = ((id?: Parameters<typeof clearTimeout>[0]) => {
+    if (typeof id === "number" && timers.has(id)) {
+      clear(id)
+      return
+    }
+    original.clearTimeout(id)
   }) as typeof clearTimeout
 
-  globalThis.clearInterval = ((id?: number) => {
-    clear(id)
+  globalThis.clearInterval = ((id?: Parameters<typeof clearInterval>[0]) => {
+    if (typeof id === "number" && timers.has(id)) {
+      clear(id)
+      return
+    }
+    original.clearInterval(id)
   }) as typeof clearInterval
 
   Date.now = () => clockNow
@@ -102,10 +136,16 @@ function createFakeTimers(): FakeTimers {
         cleared.delete(next.id)
       }
 
-      await Promise.resolve()
+      await flushMicrotasks()
     }
     timerNow = target
-    await Promise.resolve()
+    await flushMicrotasks()
+  }
+
+  const advanceClockBy = async (ms: number) => {
+    const clamped = Math.max(0, ms)
+    clockNow += clamped
+    await flushMicrotasks()
   }
 
   const restore = () => {
@@ -116,36 +156,10 @@ function createFakeTimers(): FakeTimers {
     Date.now = original.dateNow
   }
 
-  return { advanceBy, restore }
+  return { advanceBy, advanceClockBy, restore }
 }
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
-
-const TEST_BOULDER_DIR = join("/tmp/test", ".sisyphus")
-const TEST_BOULDER_FILE = join(TEST_BOULDER_DIR, "boulder.json")
-
-function writeBoulderJsonForSession(sessionIds: string[]): void {
-  if (!existsSync(TEST_BOULDER_DIR)) {
-    mkdirSync(TEST_BOULDER_DIR, { recursive: true })
-  }
-  writeFileSync(TEST_BOULDER_FILE, JSON.stringify({
-    active_plan: "/tmp/test/.sisyphus/plans/test-plan.md",
-    started_at: new Date().toISOString(),
-    session_ids: sessionIds,
-    plan_name: "test-plan",
-  }), "utf-8")
-}
-
-function cleanupBoulderFile(): void {
-  if (existsSync(TEST_BOULDER_FILE)) {
-    rmSync(TEST_BOULDER_FILE)
-  }
-}
-
-function setupMainSessionWithBoulder(sessionID: string): void {
-  setMainSession(sessionID)
-  writeBoulderJsonForSession([sessionID])
-}
 
 describe("todo-continuation-enforcer", () => {
   let promptCalls: Array<{ sessionID: string; agent?: string; model?: { providerID?: string; modelID?: string }; text: string }>
@@ -157,6 +171,15 @@ describe("todo-continuation-enforcer", () => {
       id: string
       role: "user" | "assistant"
       error?: { name: string; data?: { message: string } }
+    }
+  }
+
+  interface PromptRequestOptions {
+    path: { id: string }
+    body: {
+      agent?: string
+      model?: { providerID?: string; modelID?: string }
+      parts: Array<{ text: string }>
     }
   }
 
@@ -223,14 +246,13 @@ describe("todo-continuation-enforcer", () => {
   afterEach(() => {
     fakeTimers.restore()
     _resetForTesting()
-    cleanupBoulderFile()
   })
 
   test("should inject continuation when idle with incomplete todos", async () => {
     fakeTimers.restore()
     // given - main session with incomplete todos
     const sessionID = "main-123"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
       backgroundManager: createMockBackgroundManager(false),
@@ -255,7 +277,7 @@ describe("todo-continuation-enforcer", () => {
   test("should not inject when all todos are complete", async () => {
     // given - session with all todos complete
     const sessionID = "main-456"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const mockInput = createMockPluginInput()
     mockInput.client.session.todo = async () => ({ data: [
@@ -278,7 +300,7 @@ describe("todo-continuation-enforcer", () => {
   test("should not inject when background tasks are running", async () => {
     // given - session with running background tasks
     const sessionID = "main-789"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
       backgroundManager: createMockBackgroundManager(true),
@@ -295,23 +317,23 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
-  test("should not inject for non-main session", async () => {
-    // given - main session set, different session goes idle
-    setMainSession("main-session")
+  test("should inject for any session with incomplete todos", async () => {
+    fakeTimers.restore()
+    //#given — any session, not necessarily main session
     const otherSession = "other-session"
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
-    // when - non-main session goes idle
+    //#when — session goes idle
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID: otherSession } },
     })
 
-    await fakeTimers.advanceBy(3000)
-
-    // then - no continuation injected
-    expect(promptCalls).toHaveLength(0)
-  })
+    //#then — continuation injected regardless of session type
+    await wait(2500)
+    expect(promptCalls.length).toBe(1)
+    expect(promptCalls[0].sessionID).toBe(otherSession)
+  }, { timeout: 15000 })
 
   test("should inject for background task session (subagent)", async () => {
     fakeTimers.restore()
@@ -338,7 +360,7 @@ describe("todo-continuation-enforcer", () => {
   test("should cancel countdown on user message after grace period", async () => {
     // given - session starting countdown
     const sessionID = "main-cancel"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -365,7 +387,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session starting countdown
     const sessionID = "main-grace"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -391,7 +413,7 @@ describe("todo-continuation-enforcer", () => {
   test("should cancel countdown on assistant activity", async () => {
     // given - session starting countdown
     const sessionID = "main-assistant"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -418,7 +440,7 @@ describe("todo-continuation-enforcer", () => {
   test("should cancel countdown on tool execution", async () => {
     // given - session starting countdown
     const sessionID = "main-tool"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -442,7 +464,7 @@ describe("todo-continuation-enforcer", () => {
   test("should skip injection during recovery mode", async () => {
     // given - session in recovery mode
     const sessionID = "main-recovery"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -464,7 +486,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session was in recovery, now complete
     const sessionID = "main-recovery-done"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -486,7 +508,7 @@ describe("todo-continuation-enforcer", () => {
   test("should cleanup on session deleted", async () => {
     // given - session starting countdown
     const sessionID = "main-delete"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -507,10 +529,304 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should not inject again when cooldown is active", async () => {
+    //#given
+    const sessionID = "main-cooldown-active"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+  })
+
+  test("should inject again when cooldown expires", async () => {
+    //#given
+    const sessionID = "main-cooldown-expired"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+  }, { timeout: 15000 })
+
+  test("should apply cooldown even after injection failure", async () => {
+    //#given
+    const sessionID = "main-failure-cooldown"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+  })
+
+  test("should stop retries after max consecutive failures", async () => {
+    //#given
+    const sessionID = "main-max-consecutive-failures"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      if (index < MAX_CONSECUTIVE_FAILURES - 1) {
+        await fakeTimers.advanceClockBy(1_000_000)
+      }
+    }
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES)
+  }, { timeout: 30000 })
+
+  test("should resume retries after reset window when max failures reached", async () => {
+    //#given
+    const sessionID = "main-recovery-after-max-failures"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      if (index < MAX_CONSECUTIVE_FAILURES - 1) {
+        await fakeTimers.advanceClockBy(1_000_000)
+      }
+    }
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    await fakeTimers.advanceClockBy(FAILURE_RESET_WINDOW_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES + 1)
+  }, { timeout: 30000 })
+
+  test("should increase cooldown exponentially after consecutive failures", async () => {
+    //#given
+    const sessionID = "main-exponential-backoff"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+  }, { timeout: 30000 })
+
+  test("should reset consecutive failure count after successful injection", async () => {
+    //#given
+    const sessionID = "main-reset-consecutive-failures"
+    setMainSession(sessionID)
+    let shouldFail = true
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      if (shouldFail) {
+        shouldFail = false
+        throw new Error("simulated auth failure")
+      }
+      return {}
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS * 2)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(3)
+  }, { timeout: 30000 })
+
+  test("should keep injecting even when todos remain unchanged across cycles", async () => {
+    //#given
+    const sessionID = "main-no-stagnation-cap"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "completed", priority: "medium" },
+    ]})
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when — 5 consecutive idle cycles with unchanged todos
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then — all 5 injections should fire (no stagnation cap)
+    expect(promptCalls).toHaveLength(5)
+  }, { timeout: 60000 })
+
+  test("should skip idle handling while injection is in flight", async () => {
+    //#given
+    const sessionID = "main-in-flight"
+    setMainSession(sessionID)
+    let resolvePrompt: (() => void) | undefined
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.promptAsync = async (opts: any) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      await new Promise<void>((resolve) => {
+        resolvePrompt = resolve
+      })
+      return {}
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2100, true)
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(3000, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(1)
+
+    resolvePrompt?.()
+    await Promise.resolve()
+  })
+
+  test("should clear cooldown state on session deleted", async () => {
+    //#given
+    const sessionID = "main-delete-state-reset"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+    await hook.handler({
+      event: { type: "session.deleted", properties: { info: { id: sessionID } } },
+    })
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(2)
+  }, { timeout: 15000 })
+
   test("should accept skipAgents option without error", async () => {
     // given - session with skipAgents configured for Prometheus
     const sessionID = "main-prometheus-option"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     // when - create hook with skipAgents option (should not throw)
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
@@ -530,7 +846,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session with incomplete todos
     const sessionID = "main-toast"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -548,7 +864,7 @@ describe("todo-continuation-enforcer", () => {
   test("should not have 10s throttle between injections", async () => {
     // given - new hook instance (no prior state)
     const sessionID = "main-no-throttle"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -556,16 +872,16 @@ describe("todo-continuation-enforcer", () => {
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
-    await fakeTimers.advanceBy(3500)
+    await fakeTimers.advanceBy(3500, true)
 
     // then - first injection happened
     expect(promptCalls.length).toBe(1)
 
-    // when - immediately trigger second idle (no 10s wait needed)
+    await fakeTimers.advanceBy(CONTINUATION_COOLDOWN_MS, true)
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },
     })
-    await fakeTimers.advanceBy(3500)
+    await fakeTimers.advanceBy(3500, true)
 
     // then - second injection also happened (no throttle blocking)
     expect(promptCalls.length).toBe(2)
@@ -581,7 +897,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session with incomplete todos
     const sessionID = "main-noabort-error"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -620,7 +936,7 @@ describe("todo-continuation-enforcer", () => {
   test("should skip injection when last assistant message has MessageAbortedError", async () => {
     // given - session where last assistant message was aborted
     const sessionID = "main-api-abort"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
@@ -644,7 +960,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session where last assistant message completed normally
     const sessionID = "main-api-no-error"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
@@ -668,7 +984,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session where last message is from user
     const sessionID = "main-api-user-last"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     mockMessages = [
       { info: { id: "msg-1", role: "assistant" } },
@@ -691,7 +1007,7 @@ describe("todo-continuation-enforcer", () => {
   test("should skip when last assistant message has any abort-like error", async () => {
     // given - session where last assistant message has AbortError (DOMException style)
     const sessionID = "main-api-abort-dom"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
@@ -714,7 +1030,7 @@ describe("todo-continuation-enforcer", () => {
   test("should skip injection when abort detected via session.error event (event-based, primary)", async () => {
     // given - session with incomplete todos
     const sessionID = "main-event-abort"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
       { info: { id: "msg-2", role: "assistant" } },
@@ -744,7 +1060,7 @@ describe("todo-continuation-enforcer", () => {
   test("should skip injection when AbortError detected via session.error event", async () => {
     // given - session with incomplete todos
     const sessionID = "main-event-abort-dom"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
       { info: { id: "msg-2", role: "assistant" } },
@@ -775,7 +1091,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session with incomplete todos and old abort timestamp
     const sessionID = "main-stale-abort"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
       { info: { id: "msg-2", role: "assistant" } },
@@ -808,7 +1124,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session with abort detected
     const sessionID = "main-clear-on-user"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
       { info: { id: "msg-2", role: "assistant" } },
@@ -848,7 +1164,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session with abort detected
     const sessionID = "main-clear-on-assistant"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
       { info: { id: "msg-2", role: "assistant" } },
@@ -887,7 +1203,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session with abort detected
     const sessionID = "main-clear-on-tool"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
       { info: { id: "msg-2", role: "assistant" } },
@@ -925,7 +1241,7 @@ describe("todo-continuation-enforcer", () => {
   test("should use event-based detection even when API indicates no abort (event wins)", async () => {
     // given - session with abort event but API shows no error
     const sessionID = "main-event-wins"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
       { info: { id: "msg-2", role: "assistant" } },
@@ -955,7 +1271,7 @@ describe("todo-continuation-enforcer", () => {
   test("should use API fallback when event is missed but API shows abort", async () => {
     // given - session where event was missed but API shows abort
     const sessionID = "main-api-fallback"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
     mockMessages = [
       { info: { id: "msg-1", role: "user" } },
       { info: { id: "msg-2", role: "assistant", error: { name: "MessageAbortedError" } } },
@@ -978,7 +1294,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session with incomplete todos, no prior message context available
     const sessionID = "main-model-preserve"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
       backgroundManager: createMockBackgroundManager(false),
@@ -1000,7 +1316,7 @@ describe("todo-continuation-enforcer", () => {
   test("should extract model from assistant message with flat modelID/providerID", async () => {
     // given - session with assistant message that has flat modelID/providerID (OpenCode API format)
     const sessionID = "main-assistant-model"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     // OpenCode returns assistant messages with flat modelID/providerID, not nested model object
     const mockMessagesWithAssistant = [
@@ -1061,12 +1377,12 @@ describe("todo-continuation-enforcer", () => {
   test("should skip compaction agent messages when resolving agent info", async () => {
     // given - session where last message is from compaction agent but previous was Sisyphus
     const sessionID = "main-compaction-filter"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const mockMessagesWithCompaction = [
-      { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } } },
-      { info: { id: "msg-2", role: "assistant", agent: "sisyphus", modelID: "claude-sonnet-4-5", providerID: "anthropic" } },
-      { info: { id: "msg-3", role: "assistant", agent: "compaction", modelID: "claude-sonnet-4-5", providerID: "anthropic" } },
+      { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" } } },
+      { info: { id: "msg-2", role: "assistant", agent: "sisyphus", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
+      { info: { id: "msg-3", role: "assistant", agent: "compaction", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
     ]
 
     const mockInput = {
@@ -1116,7 +1432,7 @@ describe("todo-continuation-enforcer", () => {
   test("should skip injection when only compaction agent messages exist", async () => {
     // given - session with only compaction agent (post-compaction, no prior agent info)
     const sessionID = "main-only-compaction"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const mockMessagesOnlyCompaction = [
       { info: { id: "msg-1", role: "assistant", agent: "compaction" } },
@@ -1169,7 +1485,7 @@ describe("todo-continuation-enforcer", () => {
   test("should skip injection when prometheus agent is after compaction", async () => {
     // given - prometheus session that was compacted
     const sessionID = "main-prometheus-compacted"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const mockMessagesPrometheusCompacted = [
       { info: { id: "msg-1", role: "user", agent: "prometheus" } },
@@ -1225,7 +1541,7 @@ describe("todo-continuation-enforcer", () => {
     fakeTimers.restore()
     // given - session with no agent info but skipAgents is empty
     const sessionID = "main-no-agent-no-skip"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const mockMessagesNoAgent = [
       { info: { id: "msg-1", role: "user" } },
@@ -1281,7 +1597,7 @@ describe("todo-continuation-enforcer", () => {
   test("should not inject when isContinuationStopped returns true", async () => {
     // given - session with continuation stopped
     const sessionID = "main-stopped"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
       isContinuationStopped: (id) => id === sessionID,
@@ -1298,11 +1614,36 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should not inject when isContinuationStopped becomes true during countdown", async () => {
+    // given - session where continuation is not stopped at idle time but stops during countdown
+    const sessionID = "main-race-condition"
+    setMainSession(sessionID)
+    let stopped = false
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+      isContinuationStopped: () => stopped,
+    })
+
+    // when - session goes idle with continuation not yet stopped
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    // when - stop-continuation fires during the 2s countdown window
+    stopped = true
+
+    // when - countdown elapses and injectContinuation fires
+    await fakeTimers.advanceBy(3000)
+
+    // then - no injection because isContinuationStopped became true before injectContinuation ran
+    expect(promptCalls).toHaveLength(0)
+  })
+
   test("should inject when isContinuationStopped returns false", async () => {
     fakeTimers.restore()
     // given - session with continuation not stopped
     const sessionID = "main-not-stopped"
-    setupMainSessionWithBoulder(sessionID)
+    setMainSession(sessionID)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
       isContinuationStopped: () => false,
@@ -1323,7 +1664,7 @@ describe("todo-continuation-enforcer", () => {
     // given - multiple sessions with running countdowns
     const session1 = "main-cancel-all-1"
     const session2 = "main-cancel-all-2"
-    setupMainSessionWithBoulder(session1)
+    setMainSession(session1)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
 
@@ -1343,97 +1684,4 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
-  // ============================================================
-  // BOULDER SESSION GATE TESTS
-  // These tests verify that todo-continuation-enforcer only fires
-  // when the session is registered in boulder.json's session_ids
-  // (i.e., /start-work was executed in the session)
-  // ============================================================
-
-  test("should NOT inject for main session when session is NOT in boulder.json session_ids", async () => {
-    // given - main session that is NOT registered in boulder.json
-    const sessionID = "main-no-boulder-entry"
-    setMainSession(sessionID)
-    writeBoulderJsonForSession(["some-other-session"])
-
-    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
-      backgroundManager: createMockBackgroundManager(false),
-    })
-
-    // when - session goes idle
-    await hook.handler({
-      event: { type: "session.idle", properties: { sessionID } },
-    })
-
-    await fakeTimers.advanceBy(3000)
-
-    // then - no continuation injected (session not in boulder)
-    expect(promptCalls).toHaveLength(0)
-  })
-
-  test("should inject for main session when session IS in boulder.json session_ids", async () => {
-    fakeTimers.restore()
-    // given - main session that IS registered in boulder.json
-    const sessionID = "main-in-boulder"
-    setMainSession(sessionID)
-    writeBoulderJsonForSession([sessionID])
-
-    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
-      backgroundManager: createMockBackgroundManager(false),
-    })
-
-    // when - session goes idle
-    await hook.handler({
-      event: { type: "session.idle", properties: { sessionID } },
-    })
-
-    await wait(2500)
-
-    // then - continuation injected (session is in boulder)
-    expect(promptCalls.length).toBe(1)
-    expect(promptCalls[0].text).toContain("TODO CONTINUATION")
-  }, { timeout: 15000 })
-
-  test("should NOT inject for main session when no boulder.json exists", async () => {
-    // given - main session with no boulder.json at all
-    const sessionID = "main-no-boulder-file"
-    setMainSession(sessionID)
-    cleanupBoulderFile()
-
-    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
-      backgroundManager: createMockBackgroundManager(false),
-    })
-
-    // when - session goes idle
-    await hook.handler({
-      event: { type: "session.idle", properties: { sessionID } },
-    })
-
-    await fakeTimers.advanceBy(3000)
-
-    // then - no continuation injected (no boulder state)
-    expect(promptCalls).toHaveLength(0)
-  })
-
-  test("should still inject for background task session regardless of boulder state", async () => {
-    fakeTimers.restore()
-    // given - background task session with no boulder entry
-    setMainSession("main-session")
-    const bgTaskSession = "bg-task-boulder-test"
-    subagentSessions.add(bgTaskSession)
-    cleanupBoulderFile()
-
-    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
-
-    // when - background task session goes idle
-    await hook.handler({
-      event: { type: "session.idle", properties: { sessionID: bgTaskSession } },
-    })
-
-    await wait(2500)
-
-    // then - continuation still injected (background tasks bypass boulder check)
-    expect(promptCalls.length).toBe(1)
-    expect(promptCalls[0].sessionID).toBe(bgTaskSession)
-  }, { timeout: 15000 })
 })

@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { AvailableSkill } from "../../agents/dynamic-agent-prompt-builder"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { buildReminderMessage } from "./formatter"
 
 /**
@@ -75,11 +76,11 @@ export function createCategorySkillReminderHook(
   function isTargetAgent(sessionID: string, inputAgent?: string): boolean {
     const agent = getSessionAgent(sessionID) ?? inputAgent
     if (!agent) return false
-    const agentLower = agent.toLowerCase()
+    const agentKey = getAgentConfigKey(agent)
     return (
-      TARGET_AGENTS.has(agentLower) ||
-      agentLower.includes("sisyphus") ||
-      agentLower.includes("atlas")
+      TARGET_AGENTS.has(agentKey) ||
+      agentKey.includes("sisyphus") ||
+      agentKey.includes("atlas")
     )
   }
 

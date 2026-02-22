@@ -7,6 +7,7 @@ import {
   CategoryConfigSchema,
   ExperimentalConfigSchema,
   GitMasterConfigSchema,
+  HookNameSchema,
   OhMyOpenCodeConfigSchema,
 } from "./schema"
 
@@ -393,6 +394,19 @@ describe("BuiltinCategoryNameSchema", () => {
   })
 })
 
+describe("HookNameSchema", () => {
+  test("rejects removed beast-mode-system hook name", () => {
+    //#given
+    const input = "beast-mode-system"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("Sisyphus-Junior agent override", () => {
   test("schema accepts agents['Sisyphus-Junior'] and retains the key after parsing", () => {
     // given
@@ -553,6 +567,18 @@ describe("BrowserAutomationProviderSchema", () => {
     // then
     expect(result.success).toBe(false)
   })
+
+  test("accepts 'playwright-cli' as valid provider", () => {
+    // given
+    const input = "playwright-cli"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("playwright-cli")
+  })
 })
 
 describe("BrowserAutomationConfigSchema", () => {
@@ -576,6 +602,17 @@ describe("BrowserAutomationConfigSchema", () => {
 
     // then
     expect(result.provider).toBe("agent-browser")
+  })
+
+  test("accepts playwright-cli provider in config", () => {
+    // given
+    const input = { provider: "playwright-cli" }
+
+    // when
+    const result = BrowserAutomationConfigSchema.parse(input)
+
+    // then
+    expect(result.provider).toBe("playwright-cli")
   })
 })
 
@@ -606,6 +643,67 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
     // then
     expect(result.success).toBe(true)
     expect(result.data?.browser_automation_engine).toBeUndefined()
+  })
+
+  test("accepts browser_automation_engine with playwright-cli", () => {
+    // given
+    const input = { browser_automation_engine: { provider: "playwright-cli" } }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data?.browser_automation_engine?.provider).toBe("playwright-cli")
+  })
+})
+
+describe("OhMyOpenCodeConfigSchema - hashline_edit", () => {
+  test("accepts hashline_edit as true", () => {
+    //#given
+    const input = { hashline_edit: true }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBe(true)
+  })
+
+  test("accepts hashline_edit as false", () => {
+    //#given
+    const input = { hashline_edit: false }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBe(false)
+  })
+
+  test("hashline_edit is optional", () => {
+    //#given
+    const input = { auto_update: true }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBeUndefined()
+  })
+
+  test("rejects non-boolean hashline_edit", () => {
+    //#given
+    const input = { hashline_edit: "true" }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
   })
 })
 
@@ -663,6 +761,60 @@ describe("ExperimentalConfigSchema feature flags", () => {
       expect(result.data.safe_hook_creation).toBeUndefined()
     }
   })
+
+  test("accepts disable_omo_env as true", () => {
+    //#given
+    const config = { disable_omo_env: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_omo_env).toBe(true)
+    }
+  })
+
+  test("accepts disable_omo_env as false", () => {
+    //#given
+    const config = { disable_omo_env: false }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_omo_env).toBe(false)
+    }
+  })
+
+  test("disable_omo_env is optional", () => {
+    //#given
+    const config = { safe_hook_creation: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_omo_env).toBeUndefined()
+    }
+  })
+
+  test("rejects non-boolean disable_omo_env", () => {
+    //#given
+    const config = { disable_omo_env: "true" }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
 })
 
 describe("GitMasterConfigSchema", () => {
@@ -731,5 +883,22 @@ describe("GitMasterConfigSchema", () => {
 
     //#then
     expect(result.success).toBe(false)
+  })
+})
+
+describe("skills schema", () => {
+  test("accepts skills.sources configuration", () => {
+    //#given
+    const config = {
+      skills: {
+        sources: [{ path: "skill/", recursive: true }],
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
   })
 })

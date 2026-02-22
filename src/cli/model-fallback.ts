@@ -1,7 +1,7 @@
 import {
-	AGENT_MODEL_REQUIREMENTS,
-	CATEGORY_MODEL_REQUIREMENTS,
-} from "../shared/model-requirements"
+  CLI_AGENT_MODEL_REQUIREMENTS,
+  CLI_CATEGORY_MODEL_REQUIREMENTS,
+} from "./model-fallback-requirements"
 import type { InstallConfig } from "./types"
 
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
@@ -38,12 +38,12 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     return {
       $schema: SCHEMA_URL,
       agents: Object.fromEntries(
-        Object.entries(AGENT_MODEL_REQUIREMENTS)
+        Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)
           .filter(([role, req]) => !(role === "sisyphus" && req.requiresAnyModel))
           .map(([role]) => [role, { model: ULTIMATE_FALLBACK }])
       ),
       categories: Object.fromEntries(
-        Object.keys(CATEGORY_MODEL_REQUIREMENTS).map((cat) => [cat, { model: ULTIMATE_FALLBACK }])
+        Object.keys(CLI_CATEGORY_MODEL_REQUIREMENTS).map((cat) => [cat, { model: ULTIMATE_FALLBACK }])
       ),
     }
   }
@@ -51,7 +51,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const agents: Record<string, AgentConfig> = {}
   const categories: Record<string, CategoryConfig> = {}
 
-  for (const [role, req] of Object.entries(AGENT_MODEL_REQUIREMENTS)) {
+  for (const [role, req] of Object.entries(CLI_AGENT_MODEL_REQUIREMENTS)) {
     if (role === "librarian" && avail.zai) {
       agents[role] = { model: ZAI_MODEL }
       continue
@@ -99,11 +99,11 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     }
   }
 
-  for (const [cat, req] of Object.entries(CATEGORY_MODEL_REQUIREMENTS)) {
+  for (const [cat, req] of Object.entries(CLI_CATEGORY_MODEL_REQUIREMENTS)) {
     // Special case: unspecified-high downgrades to unspecified-low when not isMaxPlan
     const fallbackChain =
       cat === "unspecified-high" && !avail.isMaxPlan
-        ? CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain
+        ? CLI_CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain
         : req.fallbackChain
 
     if (req.requiresModel && !isRequiredModelAvailable(req.requiresModel, req.fallbackChain, avail)) {

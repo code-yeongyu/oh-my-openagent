@@ -117,7 +117,7 @@ describe("resolveModelWithFallback", () => {
     test("returns uiSelectedModel with override source when provided", () => {
       // given
       const input: ExtendedModelResolutionInput = {
-        uiSelectedModel: "opencode/glm-4.7-free",
+        uiSelectedModel: "opencode/big-pickle",
         userModel: "anthropic/claude-opus-4-6",
         fallbackChain: [
           { providers: ["anthropic", "github-copilot"], model: "claude-opus-4-6" },
@@ -130,15 +130,15 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("opencode/glm-4.7-free")
+      expect(result!.model).toBe("opencode/big-pickle")
       expect(result!.source).toBe("override")
-      expect(logSpy).toHaveBeenCalledWith("Model resolved via UI selection", { model: "opencode/glm-4.7-free" })
+      expect(logSpy).toHaveBeenCalledWith("Model resolved via UI selection", { model: "opencode/big-pickle" })
     })
 
     test("UI selection takes priority over config override", () => {
       // given
       const input: ExtendedModelResolutionInput = {
-        uiSelectedModel: "opencode/glm-4.7-free",
+        uiSelectedModel: "opencode/big-pickle",
         userModel: "anthropic/claude-opus-4-6",
         availableModels: new Set(["anthropic/claude-opus-4-6"]),
         systemDefaultModel: "google/gemini-3-pro",
@@ -148,7 +148,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then
-      expect(result!.model).toBe("opencode/glm-4.7-free")
+      expect(result!.model).toBe("opencode/big-pickle")
       expect(result!.source).toBe("override")
     })
 
@@ -390,36 +390,36 @@ describe("resolveModelWithFallback", () => {
     })
 
     test("cross-provider fuzzy match when preferred provider unavailable (librarian scenario)", () => {
-      // given - glm-4.7 is defined for zai-coding-plan, but only opencode has it
+      // given - glm-5 is defined for zai-coding-plan, but only opencode has it
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
-          { providers: ["zai-coding-plan"], model: "glm-4.7" },
-          { providers: ["anthropic"], model: "claude-sonnet-4-5" },
+          { providers: ["zai-coding-plan"], model: "glm-5" },
+          { providers: ["anthropic"], model: "claude-sonnet-4-6" },
         ],
-        availableModels: new Set(["opencode/glm-4.7", "anthropic/claude-sonnet-4-5"]),
+        availableModels: new Set(["opencode/glm-5", "anthropic/claude-sonnet-4-6"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
       // when
       const result = resolveModelWithFallback(input)
 
-      // then - should find glm-4.7 from opencode via cross-provider fuzzy match
-      expect(result!.model).toBe("opencode/glm-4.7")
+      // then - should find glm-5 from opencode via cross-provider fuzzy match
+      expect(result!.model).toBe("opencode/glm-5")
       expect(result!.source).toBe("provider-fallback")
       expect(logSpy).toHaveBeenCalledWith("Model resolved via fallback chain (cross-provider fuzzy match)", {
-        model: "glm-4.7",
-        match: "opencode/glm-4.7",
+        model: "glm-5",
+        match: "opencode/glm-5",
         variant: undefined,
       })
     })
 
     test("prefers specified provider over cross-provider match", () => {
-      // given - both zai-coding-plan and opencode have glm-4.7
+      // given - both zai-coding-plan and opencode have glm-5
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
-          { providers: ["zai-coding-plan"], model: "glm-4.7" },
+          { providers: ["zai-coding-plan"], model: "glm-5" },
         ],
-        availableModels: new Set(["zai-coding-plan/glm-4.7", "opencode/glm-4.7"]),
+        availableModels: new Set(["zai-coding-plan/glm-5", "opencode/glm-5"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
@@ -427,7 +427,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should prefer zai-coding-plan (specified provider) over opencode
-      expect(result!.model).toBe("zai-coding-plan/glm-4.7")
+      expect(result!.model).toBe("zai-coding-plan/glm-5")
       expect(result!.source).toBe("provider-fallback")
     })
 
@@ -435,9 +435,9 @@ describe("resolveModelWithFallback", () => {
       // given - entry has variant, model found via cross-provider
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
-          { providers: ["zai-coding-plan"], model: "glm-4.7", variant: "high" },
+          { providers: ["zai-coding-plan"], model: "glm-5", variant: "high" },
         ],
-        availableModels: new Set(["opencode/glm-4.7"]),
+        availableModels: new Set(["opencode/glm-5"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
@@ -445,7 +445,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - variant should be preserved
-      expect(result!.model).toBe("opencode/glm-4.7")
+      expect(result!.model).toBe("opencode/glm-5")
       expect(result!.variant).toBe("high")
     })
 
@@ -454,9 +454,9 @@ describe("resolveModelWithFallback", () => {
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
           { providers: ["zai-coding-plan"], model: "nonexistent-model" },
-          { providers: ["anthropic"], model: "claude-sonnet-4-5" },
+          { providers: ["anthropic"], model: "claude-sonnet-4-6" },
         ],
-        availableModels: new Set(["anthropic/claude-sonnet-4-5"]),
+        availableModels: new Set(["anthropic/claude-sonnet-4-6"]),
         systemDefaultModel: "google/gemini-3-pro",
       }
 
@@ -464,7 +464,7 @@ describe("resolveModelWithFallback", () => {
       const result = resolveModelWithFallback(input)
 
       // then - should fall through to second entry
-      expect(result!.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(result!.model).toBe("anthropic/claude-sonnet-4-6")
       expect(result!.source).toBe("provider-fallback")
     })
   })
@@ -536,34 +536,35 @@ describe("resolveModelWithFallback", () => {
           { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
         ],
         availableModels: new Set(),
-        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+        systemDefaultModel: "anthropic/claude-sonnet-4-6",
       }
 
       // when
       const result = resolveModelWithFallback(input)
 
       // then - should use github-copilot (second provider) since google not connected
-      expect(result!.model).toBe("github-copilot/gemini-3-pro")
+      // model name is transformed to preview variant for github-copilot provider
+      expect(result!.model).toBe("github-copilot/gemini-3-pro-preview")
       expect(result!.source).toBe("provider-fallback")
       cacheSpy.mockRestore()
     })
 
     test("falls through to system default when no provider in fallback is connected", () => {
-      // given - user only has quotio connected, but fallback chain has anthropic/opencode
-      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["quotio"])
+      // given - user only has anthropic connected, but fallback chain has openai/opencode
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic"])
       const input: ExtendedModelResolutionInput = {
         fallbackChain: [
-          { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
+          { providers: ["openai", "opencode"], model: "claude-haiku-4-5" },
         ],
         availableModels: new Set(),
-        systemDefaultModel: "quotio/claude-opus-4-6-20251101",
+        systemDefaultModel: "anthropic/claude-opus-4-6-20251101",
       }
 
       // when
       const result = resolveModelWithFallback(input)
 
       // then - no provider in fallback is connected, fall through to system default
-      expect(result!.model).toBe("quotio/claude-opus-4-6-20251101")
+      expect(result!.model).toBe("anthropic/claude-opus-4-6-20251101")
       expect(result!.source).toBe("system-default")
       cacheSpy.mockRestore()
     })
@@ -714,7 +715,7 @@ describe("resolveModelWithFallback", () => {
           { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
         ],
         availableModels: new Set(["google/gemini-3-pro-preview", "anthropic/claude-opus-4-6"]),
-        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+        systemDefaultModel: "anthropic/claude-sonnet-4-6",
       }
 
       // when
@@ -733,7 +734,7 @@ describe("resolveModelWithFallback", () => {
           { providers: ["google"], model: "gemini-3-pro" },
         ],
         availableModels: new Set(["google/gemini-3-pro", "google/gemini-3-pro-preview"]),
-        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+        systemDefaultModel: "anthropic/claude-sonnet-4-6",
       }
 
       // when
@@ -789,14 +790,88 @@ describe("resolveModelWithFallback", () => {
       const input: ExtendedModelResolutionInput = {
         categoryDefaultModel: "google/gemini-3-pro",
         availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-6",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+
+      // then - should use transformed categoryDefaultModel since google is connected
+      expect(result!.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.source).toBe("category-default")
+      cacheSpy.mockRestore()
+    })
+
+    test("transforms gemini-3-flash in categoryDefaultModel for google connected provider", () => {
+      // given - google connected, category default uses gemini-3-flash
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-flash",
+        availableModels: new Set(),
         systemDefaultModel: "anthropic/claude-sonnet-4-5",
       }
 
       // when
       const result = resolveModelWithFallback(input)
 
-      // then - should use categoryDefaultModel since google is connected
-      expect(result!.model).toBe("google/gemini-3-pro")
+      // then - gemini-3-flash should be transformed to gemini-3-flash-preview
+      expect(result!.model).toBe("google/gemini-3-flash-preview")
+      expect(result!.source).toBe("category-default")
+      cacheSpy.mockRestore()
+    })
+
+    test("does not double-transform categoryDefaultModel already containing -preview", () => {
+      // given - category default already has -preview suffix
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-3-pro-preview",
+        availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+
+      // then - should NOT become gemini-3-pro-preview-preview
+      expect(result!.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.source).toBe("category-default")
+      cacheSpy.mockRestore()
+    })
+
+    test("transforms gemini-3-pro in fallback chain for google connected provider", () => {
+      // given - google connected, fallback chain has gemini-3-pro
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
+      const input: ExtendedModelResolutionInput = {
+        fallbackChain: [
+          { providers: ["google", "github-copilot"], model: "gemini-3-pro" },
+        ],
+        availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+
+      // then - should transform to preview variant for google provider
+      expect(result!.model).toBe("google/gemini-3-pro-preview")
+      expect(result!.source).toBe("provider-fallback")
+      cacheSpy.mockRestore()
+    })
+
+    test("passes through non-gemini-3 models for google connected provider", () => {
+      // given - google connected, category default uses gemini-2.5-flash (no transform needed)
+      const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["google"])
+      const input: ExtendedModelResolutionInput = {
+        categoryDefaultModel: "google/gemini-2.5-flash",
+        availableModels: new Set(),
+        systemDefaultModel: "anthropic/claude-sonnet-4-5",
+      }
+
+      // when
+      const result = resolveModelWithFallback(input)
+
+      // then - should pass through unchanged
+      expect(result!.model).toBe("google/gemini-2.5-flash")
       expect(result!.source).toBe("category-default")
       cacheSpy.mockRestore()
     })

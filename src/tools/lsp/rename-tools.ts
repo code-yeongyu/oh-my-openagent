@@ -12,7 +12,7 @@ export const lsp_prepare_rename: ToolDefinition = tool({
     line: tool.schema.number().min(1).describe("1-based"),
     character: tool.schema.number().min(0).describe("0-based"),
   },
-  execute: async (args, context) => {
+  execute: async (args, _context) => {
     try {
       const result = await withLspClient(args.filePath, async (client) => {
         return (await client.prepareRename(args.filePath, args.line, args.character)) as
@@ -37,7 +37,7 @@ export const lsp_rename: ToolDefinition = tool({
     character: tool.schema.number().min(0).describe("0-based"),
     newName: tool.schema.string().describe("New symbol name"),
   },
-  execute: async (args, context) => {
+  execute: async (args, _context) => {
     try {
       const edit = await withLspClient(args.filePath, async (client) => {
         return (await client.rename(args.filePath, args.line, args.character, args.newName)) as WorkspaceEdit | null

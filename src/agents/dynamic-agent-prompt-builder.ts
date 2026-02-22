@@ -1,5 +1,4 @@
 import type { AgentPromptMetadata } from "./types"
-import { truncateDescription } from "../shared/truncate-description"
 
 export interface AvailableAgent {
   name: string
@@ -35,7 +34,7 @@ export function categorizeTools(toolNames: string[]): AvailableTool[] {
       category = "search"
     } else if (name.startsWith("session_")) {
       category = "session"
-    } else if (name === "slashcommand") {
+    } else if (name === "skill") {
       category = "command"
     }
     return { name, category }
@@ -87,12 +86,9 @@ export function buildToolSelectionTable(
     "",
   ]
 
-  rows.push("| Resource | Cost | When to Use |")
-  rows.push("|----------|------|-------------|")
-
   if (tools.length > 0) {
     const toolsDisplay = formatToolsForPrompt(tools)
-    rows.push(`| ${toolsDisplay} | FREE | Not Complex, Scope Clear, No Implicit Assumptions |`)
+    rows.push(`- ${toolsDisplay} — **FREE** — Not Complex, Scope Clear, No Implicit Assumptions`)
   }
 
   const costOrder = { FREE: 0, CHEAP: 1, EXPENSIVE: 2 }
@@ -102,7 +98,7 @@ export function buildToolSelectionTable(
 
   for (const agent of sortedAgents) {
     const shortDesc = agent.description.split(".")[0] || agent.description
-    rows.push(`| \`${agent.name}\` agent | ${agent.metadata.cost} | ${shortDesc} |`)
+    rows.push(`- \`${agent.name}\` agent — **${agent.metadata.cost}** — ${shortDesc}`)
   }
 
   rows.push("")
@@ -122,10 +118,11 @@ export function buildExploreSection(agents: AvailableAgent[]): string {
 
 Use it as a **peer tool**, not a fallback. Fire liberally.
 
-| Use Direct Tools | Use Explore Agent |
-|------------------|-------------------|
-${avoidWhen.map((w) => `| ${w} |  |`).join("\n")}
-${useWhen.map((w) => `|  | ${w} |`).join("\n")}`
+**Use Direct Tools when:**
+${avoidWhen.map((w) => `- ${w}`).join("\n")}
+
+**Use Explore Agent when:**
+${useWhen.map((w) => `- ${w}`).join("\n")}`
 }
 
 export function buildLibrarianSection(agents: AvailableAgent[]): string {
@@ -138,14 +135,8 @@ export function buildLibrarianSection(agents: AvailableAgent[]): string {
 
 Search **external references** (docs, OSS, web). Fire proactively when unfamiliar libraries are involved.
 
-| Contextual Grep (Internal) | Reference Grep (External) |
-|----------------------------|---------------------------|
-| Search OUR codebase | Search EXTERNAL resources |
-| Find patterns in THIS repo | Find examples in OTHER repos |
-| How does our code work? | How does this library work? |
-| Project-specific logic | Official API documentation |
-| | Library best practices & quirks |
-| | OSS implementation examples |
+**Contextual Grep (Internal)** — search OUR codebase, find patterns in THIS repo, project-specific logic.
+**Reference Grep (External)** — search EXTERNAL resources, official API docs, library best practices, OSS implementation examples.
 
 **Trigger phrases** (fire librarian immediately):
 ${useWhen.map((w) => `- "${w}"`).join("\n")}`
@@ -155,90 +146,60 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
   const rows: string[] = [
     "### Delegation Table:",
     "",
-    "| Domain | Delegate To | Trigger |",
-    "|--------|-------------|---------|",
   ]
 
   for (const agent of agents) {
     for (const trigger of agent.metadata.triggers) {
-      rows.push(`| ${trigger.domain} | \`${agent.name}\` | ${trigger.trigger} |`)
+      rows.push(`- **${trigger.domain}** → \`${agent.name}\` — ${trigger.trigger}`)
     }
   }
 
   return rows.join("\n")
 }
 
-/**
- * Renders the "User-Installed Skills (HIGH PRIORITY)" block used across multiple agent prompts.
- * Extracted to avoid duplication between buildCategorySkillsDelegationGuide, buildSkillsSection, etc.
- */
-export function formatCustomSkillsBlock(
-  customRows: string[],
-  customSkills: AvailableSkill[],
-  headerLevel: "####" | "**" = "####"
-): string {
-  const customSkillNames = customSkills.map((s) => `"${s.name}"`).join(", ")
-  const header = headerLevel === "####"
-    ? `#### User-Installed Skills (HIGH PRIORITY)`
-    : `**User-Installed Skills (HIGH PRIORITY):**`
-
-  return `${header}
-
-**The user has installed these custom skills. They MUST be evaluated for EVERY delegation.**
-Subagents are STATELESS — they lose all custom knowledge unless you pass these skills via \`load_skills\`.
-
-| Skill | Expertise Domain | Source |
-|-------|------------------|--------|
-${customRows.join("\n")}
-
-> **CRITICAL**: Ignoring user-installed skills when they match the task domain is a failure.
-> The user installed ${customSkillNames} for a reason — USE THEM when the task overlaps with their domain.`
-}
 
 export function buildCategorySkillsDelegationGuide(categories: AvailableCategory[], skills: AvailableSkill[]): string {
   if (categories.length === 0 && skills.length === 0) return ""
 
   const categoryRows = categories.map((c) => {
     const desc = c.description || c.name
-    return `| \`${c.name}\` | ${desc} |`
+    return `- \`${c.name}\` — ${desc}`
   })
 
   const builtinSkills = skills.filter((s) => s.location === "plugin")
   const customSkills = skills.filter((s) => s.location !== "plugin")
 
-   const builtinRows = builtinSkills.map((s) => {
-     const desc = truncateDescription(s.description)
-     return `| \`${s.name}\` | ${desc} |`
-   })
-
-   const customRows = customSkills.map((s) => {
-     const desc = truncateDescription(s.description)
-     const source = s.location === "project" ? "project" : "user"
-     return `| \`${s.name}\` | ${desc} | ${source} |`
-   })
-
-  const customSkillBlock = formatCustomSkillsBlock(customRows, customSkills)
+  const builtinNames = builtinSkills.map((s) => s.name).join(", ")
+  const customNames = customSkills.map((s) => {
+    const source = s.location === "project" ? "project" : "user"
+    return `${s.name} (${source})`
+  }).join(", ")
 
   let skillsSection: string
 
   if (customSkills.length > 0 && builtinSkills.length > 0) {
-    skillsSection = `#### Built-in Skills
+    skillsSection = `#### Available Skills (via \`skill\` tool)
 
-| Skill | Expertise Domain |
-|-------|------------------|
-${builtinRows.join("\n")}
+**Built-in**: ${builtinNames}
+**⚡ YOUR SKILLS (PRIORITY)**: ${customNames}
 
-${customSkillBlock}`
+> User-installed skills OVERRIDE built-in defaults. ALWAYS prefer YOUR SKILLS when domain matches.
+> Full skill descriptions → use the \`skill\` tool to check before EVERY delegation.`
   } else if (customSkills.length > 0) {
-    skillsSection = customSkillBlock
+    skillsSection = `#### Available Skills (via \`skill\` tool)
+
+**⚡ YOUR SKILLS (PRIORITY)**: ${customNames}
+
+> User-installed skills OVERRIDE built-in defaults. ALWAYS prefer YOUR SKILLS when domain matches.
+> Full skill descriptions → use the \`skill\` tool to check before EVERY delegation.`
+  } else if (builtinSkills.length > 0) {
+    skillsSection = `#### Available Skills (via \`skill\` tool)
+
+**Built-in**: ${builtinNames}
+
+> Full skill descriptions → use the \`skill\` tool to check before EVERY delegation.`
   } else {
-    skillsSection = `#### Available Skills (Domain Expertise Injection)
-
-Skills inject specialized instructions into the subagent. Read the description to understand when each skill applies.
-
-| Skill | Expertise Domain |
-|-------|------------------|
-${builtinRows.join("\n")}`
+    skillsSection = ""
   }
 
   return `### Category + Skills Delegation System
@@ -249,8 +210,6 @@ ${builtinRows.join("\n")}`
 
 Each category is configured with a model optimized for that domain. Read the description to understand when to use it.
 
-| Category | Domain / Best For |
-|----------|-------------------|
 ${categoryRows.join("\n")}
 
 ${skillsSection}
@@ -264,33 +223,14 @@ ${skillsSection}
 - Match task requirements to category domain
 - Select the category whose domain BEST fits the task
 
-**STEP 2: Evaluate ALL Skills (Built-in AND User-Installed)**
-For EVERY skill listed above, ask yourself:
+**STEP 2: Evaluate ALL Skills**
+Check the \`skill\` tool for available skills and their descriptions. For EVERY skill, ask:
 > "Does this skill's expertise domain overlap with my task?"
 
 - If YES → INCLUDE in \`load_skills=[...]\`
-- If NO → You MUST justify why (see below)
+- If NO → OMIT (no justification needed)
 ${customSkills.length > 0 ? `
-> **User-installed skills get PRIORITY.** The user explicitly installed them for their workflow.
-> When in doubt about a user-installed skill, INCLUDE it rather than omit it.` : ""}
-
-**STEP 3: Justify Omissions**
-
-If you choose NOT to include a skill that MIGHT be relevant, you MUST provide:
-
-\`\`\`
-SKILL EVALUATION for "[skill-name]":
-- Skill domain: [what the skill description says]
-- Task domain: [what your task is about]
-- Decision: OMIT
-- Reason: [specific explanation of why domains don't overlap]
-\`\`\`
-
-**WHY JUSTIFICATION IS MANDATORY:**
-- Forces you to actually READ skill descriptions
-- Prevents lazy omission of potentially useful skills
-- Subagents are STATELESS - they only know what you tell them
-- Missing a relevant skill = suboptimal output
+> **User-installed skills get PRIORITY.** When in doubt, INCLUDE rather than omit.` : ""}
 
 ---
 
@@ -322,11 +262,9 @@ export function buildOracleSection(agents: AvailableAgent[]): string {
 
 Oracle is a read-only, expensive, high-quality reasoning model for debugging and architecture. Consultation only.
 
-### WHEN to Consult:
+### WHEN to Consult (Oracle FIRST, then implement):
 
-| Trigger | Action |
-|---------|--------|
-${useWhen.map((w) => `| ${w} | Oracle FIRST, then implement |`).join("\n")}
+${useWhen.map((w) => `- ${w}`).join("\n")}
 
 ### WHEN NOT to Consult:
 
@@ -336,38 +274,63 @@ ${avoidWhen.map((w) => `- ${w}`).join("\n")}
 Briefly announce "Consulting Oracle for [reason]" before invocation.
 
 **Exception**: This is the ONLY case where you announce before acting. For all other work, start immediately without status updates.
+
+### Oracle Background Task Policy:
+
+**You MUST collect Oracle results before your final answer. No exceptions.**
+
+- Oracle may take several minutes. This is normal and expected.
+- When Oracle is running and you finish your own exploration/analysis, your next action is \`background_output(task_id="...")\` on Oracle — NOT delivering a final answer.
+- Oracle catches blind spots you cannot see — its value is HIGHEST when you think you don't need it.
+- **NEVER** cancel Oracle. **NEVER** use \`background_cancel(all=true)\` when Oracle is running. Cancel disposable tasks (explore, librarian) individually by taskId instead.
 </Oracle_Usage>`
 }
 
 export function buildHardBlocksSection(): string {
   const blocks = [
-    "| Type error suppression (`as any`, `@ts-ignore`) | Never |",
-    "| Commit without explicit request | Never |",
-    "| Speculate about unread code | Never |",
-    "| Leave code in broken state after failures | Never |",
+    "- Type error suppression (`as any`, `@ts-ignore`) — **Never**",
+    "- Commit without explicit request — **Never**",
+    "- Speculate about unread code — **Never**",
+    "- Leave code in broken state after failures — **Never**",
+    "- `background_cancel(all=true)` when Oracle is running — **Never.** Cancel tasks individually by taskId.",
+    "- Delivering final answer before collecting Oracle result — **Never.** Always `background_output` Oracle first.",
   ]
 
   return `## Hard Blocks (NEVER violate)
 
-| Constraint | No Exceptions |
-|------------|---------------|
 ${blocks.join("\n")}`
 }
 
 export function buildAntiPatternsSection(): string {
   const patterns = [
-    "| **Type Safety** | `as any`, `@ts-ignore`, `@ts-expect-error` |",
-    "| **Error Handling** | Empty catch blocks `catch(e) {}` |",
-    "| **Testing** | Deleting failing tests to \"pass\" |",
-    "| **Search** | Firing agents for single-line typos or obvious syntax errors |",
-    "| **Debugging** | Shotgun debugging, random changes |",
+    "- **Type Safety**: `as any`, `@ts-ignore`, `@ts-expect-error`",
+    "- **Error Handling**: Empty catch blocks `catch(e) {}`",
+    "- **Testing**: Deleting failing tests to \"pass\"",
+    "- **Search**: Firing agents for single-line typos or obvious syntax errors",
+    "- **Debugging**: Shotgun debugging, random changes",
+    "- **Background Tasks**: `background_cancel(all=true)` — always cancel individually by taskId",
+    "- **Oracle**: Skipping Oracle results when Oracle was launched — ALWAYS collect via `background_output`",
   ]
 
   return `## Anti-Patterns (BLOCKING violations)
 
-| Category | Forbidden |
-|----------|-----------|
 ${patterns.join("\n")}`
+}
+
+export function buildDeepParallelSection(model: string, categories: AvailableCategory[]): string {
+  const isNonClaude = !model.toLowerCase().includes('claude')
+  const hasDeepCategory = categories.some(c => c.name === 'deep')
+
+  if (!isNonClaude || !hasDeepCategory) return ""
+
+  return `### Deep Parallel Delegation
+
+For implementation tasks, actively decompose and delegate to \`deep\` category agents in parallel.
+
+1. Break the implementation into independent work units
+2. Maximize parallel deep agents — spawn one per independent unit (\`run_in_background=true\`)
+3. Give each agent a GOAL, not step-by-step instructions — deep agents explore and solve autonomously
+4. Collect results, integrate, verify coherence`
 }
 
 export function buildUltraworkSection(

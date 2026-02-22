@@ -1,5 +1,6 @@
 import type { OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
+import { normalizeSDKResponse } from "../../shared"
 
 export async function fetchSyncResult(
   client: OpencodeClient,
@@ -14,7 +15,9 @@ export async function fetchSyncResult(
     return { ok: false, error: `Error fetching result: ${(messagesResult as { error: unknown }).error}\n\nSession ID: ${sessionID}` }
   }
 
-  const messages = ((messagesResult as { data?: unknown }).data ?? messagesResult) as SessionMessage[]
+  const messages = normalizeSDKResponse(messagesResult, [] as SessionMessage[], {
+    preferResponseOnMissingData: true,
+  })
 
   const messagesAfterAnchor = anchorMessageCount !== undefined ? messages.slice(anchorMessageCount) : messages
 
@@ -41,8 +44,17 @@ export async function fetchSyncResult(
     return { ok: false, error: `No assistant response found.\n\nSession ID: ${sessionID}` }
   }
 
-  const textParts = lastMessage?.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
-  const textContent = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+  // Search assistant messages (newest first) for one with text/reasoning content.
+  // The last assistant message may only contain tool calls with no text.
+  let textContent = ""
+  for (const msg of assistantMessages) {
+    const textParts = msg.parts?.filter((p) => p.type === "text" || p.type === "reasoning") ?? []
+    const content = textParts.map((p) => p.text ?? "").filter(Boolean).join("\n")
+    if (content) {
+      textContent = content
+      break
+    }
+  }
 
   return { ok: true, textContent }
 }

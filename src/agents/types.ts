@@ -66,8 +66,31 @@ export interface AgentPromptMetadata {
   keyTrigger?: string
 }
 
+function extractModelName(model: string): string {
+  return model.includes("/") ? model.split("/").pop() ?? model : model
+}
+
+const GPT_MODEL_PREFIXES = ["gpt-", "gpt4", "o1", "o3", "o4"]
+
 export function isGptModel(model: string): boolean {
-  return model.startsWith("openai/") || model.startsWith("github-copilot/gpt-")
+  if (model.startsWith("openai/") || model.startsWith("github-copilot/gpt-"))
+    return true
+
+  const modelName = extractModelName(model).toLowerCase()
+  return GPT_MODEL_PREFIXES.some((prefix) => modelName.startsWith(prefix))
+}
+
+const GEMINI_PROVIDERS = ["google/", "google-vertex/"]
+
+export function isGeminiModel(model: string): boolean {
+  if (GEMINI_PROVIDERS.some((prefix) => model.startsWith(prefix)))
+    return true
+
+  if (model.startsWith("github-copilot/") && extractModelName(model).toLowerCase().startsWith("gemini"))
+    return true
+
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.startsWith("gemini-")
 }
 
 export type BuiltinAgentName =
@@ -90,6 +113,7 @@ export type AgentName = BuiltinAgentName
 export type AgentOverrideConfig = Partial<AgentConfig> & {
   prompt_append?: string
   variant?: string
+  fallback_models?: string | string[]
 }
 
 export type AgentOverrides = Partial<Record<OverridableAgentName, AgentOverrideConfig>>

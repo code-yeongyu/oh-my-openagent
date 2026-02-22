@@ -1,7 +1,7 @@
 import type { BackgroundTask } from "./types"
 import type { ResultHandlerContext } from "./result-handler-context"
 import { TASK_CLEANUP_DELAY_MS } from "./constants"
-import { log } from "../../shared"
+import { createInternalAgentTextPart, log } from "../../shared"
 import { getTaskToastManager } from "../task-toast-manager"
 import { formatDuration } from "./duration-formatter"
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
@@ -56,7 +56,7 @@ export async function notifyParentSession(
     completedTasks,
   })
 
-  const { agent, model } = await resolveParentSessionAgentAndModel({ client, task })
+  const { agent, model, tools } = await resolveParentSessionAgentAndModel({ client, task })
 
   log("[background-agent] notifyParentSession context:", {
     taskId: task.id,
@@ -71,7 +71,8 @@ export async function notifyParentSession(
         noReply: !allComplete,
         ...(agent !== undefined ? { agent } : {}),
         ...(model !== undefined ? { model } : {}),
-        parts: [{ type: "text", text: notification }],
+        ...(tools ? { tools } : {}),
+        parts: [createInternalAgentTextPart(notification)],
       },
     })
 

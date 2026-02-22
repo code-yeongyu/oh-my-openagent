@@ -6,15 +6,19 @@ import {
 	detectCompletionInSessionMessages,
 	detectCompletionInTranscript,
 } from "./completion-promise-detector"
-import { buildContinuationPrompt } from "./continuation-prompt-builder"
-import { injectContinuationPrompt } from "./continuation-prompt-injector"
+import { continueIteration } from "./iteration-continuation"
 
 type SessionRecovery = {
 	isRecovering: (sessionID: string) => boolean
 	markRecovering: (sessionID: string) => void
 	clear: (sessionID: string) => void
 }
-type LoopStateController = { getState: () => RalphLoopState | null; clear: () => boolean; incrementIteration: () => RalphLoopState | null }
+type LoopStateController = {
+	getState: () => RalphLoopState | null
+	clear: () => boolean
+	incrementIteration: () => RalphLoopState | null
+	setSessionID: (sessionID: string) => RalphLoopState | null
+}
 type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; sessionRecovery: SessionRecovery; loopState: LoopStateController }
 
 export function createRalphLoopEventHandler(
@@ -84,7 +88,7 @@ export function createRalphLoopEventHandler(
 
 				const title = state.ultrawork ? "ULTRAWORK LOOP COMPLETE!" : "Ralph Loop Complete!"
 				const message = state.ultrawork ? `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)` : `Task completed after ${state.iteration} iteration(s)`
-				await ctx.client.tui.showToast({ body: { title, message, variant: "success", duration: 5000 } }).catch(() => {})
+				await ctx.client.tui?.showToast?.({ body: { title, message, variant: "success", duration: 5000 } }).catch(() => {})
 				return
 			}
 
@@ -96,11 +100,9 @@ export function createRalphLoopEventHandler(
 				})
 				options.loopState.clear()
 
-				await ctx.client.tui
-					.showToast({
-						body: { title: "Ralph Loop Stopped", message: `Max iterations (${state.max_iterations}) reached without completion`, variant: "warning", duration: 5000 },
-					})
-					.catch(() => {})
+				await ctx.client.tui?.showToast?.({
+					body: { title: "Ralph Loop Stopped", message: `Max iterations (${state.max_iterations}) reached without completion`, variant: "warning", duration: 5000 },
+					}).catch(() => {})
 				return
 			}
 
@@ -116,23 +118,21 @@ export function createRalphLoopEventHandler(
 				max: newState.max_iterations,
 			})
 
-			await ctx.client.tui
-				.showToast({
-					body: {
-						title: "Ralph Loop",
-						message: `Iteration ${newState.iteration}/${newState.max_iterations}`,
-						variant: "info",
-						duration: 2000,
-					},
-				})
-				.catch(() => {})
+			await ctx.client.tui?.showToast?.({
+				body: {
+					title: "Ralph Loop",
+					message: `Iteration ${newState.iteration}/${newState.max_iterations}`,
+					variant: "info",
+					duration: 2000,
+				},
+				}).catch(() => {})
 
 			try {
-				await injectContinuationPrompt(ctx, {
-					sessionID,
-					prompt: buildContinuationPrompt(newState),
+				await continueIteration(ctx, newState, {
+					previousSessionID: sessionID,
 					directory: options.directory,
 					apiTimeoutMs: options.apiTimeoutMs,
+					loopState: options.loopState,
 				})
 			} catch (err) {
 				log(`[${HOOK_NAME}] Failed to inject continuation`, {

@@ -1,38 +1,66 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { findNearestMessageWithFields } from "../../features/hook-message-injector"
-import { getMessageDir } from "../../shared/session-utils"
+import {
+  findNearestMessageWithFields,
+  findNearestMessageWithFieldsFromSDK,
+} from "../../features/hook-message-injector"
+import { getMessageDir, isSqliteBackend, normalizePromptTools, normalizeSDKResponse } from "../../shared"
 import type { ModelInfo } from "./types"
 
-export async function resolveRecentModelForSession(
+type PromptContext = {
+  model?: ModelInfo
+  tools?: Record<string, boolean>
+}
+
+export async function resolveRecentPromptContextForSession(
   ctx: PluginInput,
   sessionID: string
-): Promise<ModelInfo | undefined> {
+): Promise<PromptContext> {
   try {
     const messagesResp = await ctx.client.session.messages({ path: { id: sessionID } })
-    const messages = (messagesResp.data ?? []) as Array<{
-      info?: { model?: ModelInfo; modelID?: string; providerID?: string }
-    }>
+    const messages = normalizeSDKResponse(messagesResp, [] as Array<{
+      info?: {
+        model?: ModelInfo
+        modelID?: string
+        providerID?: string
+        tools?: Record<string, boolean | "allow" | "deny" | "ask">
+      }
+    }>)
 
     for (let i = messages.length - 1; i >= 0; i--) {
       const info = messages[i].info
       const model = info?.model
+      const tools = normalizePromptTools(info?.tools)
       if (model?.providerID && model?.modelID) {
-        return { providerID: model.providerID, modelID: model.modelID }
+        return { model: { providerID: model.providerID, modelID: model.modelID }, tools }
       }
 
       if (info?.providerID && info?.modelID) {
-        return { providerID: info.providerID, modelID: info.modelID }
+        return { model: { providerID: info.providerID, modelID: info.modelID }, tools }
       }
     }
   } catch {
     // ignore - fallback to message storage
   }
 
-  const messageDir = getMessageDir(sessionID)
-  const currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
-  const model = currentMessage?.model
-  if (!model?.providerID || !model?.modelID) {
-    return undefined
+  let currentMessage = null
+  if (isSqliteBackend()) {
+    currentMessage = await findNearestMessageWithFieldsFromSDK(ctx.client, sessionID)
+  } else {
+    const messageDir = getMessageDir(sessionID)
+    currentMessage = messageDir ? findNearestMessageWithFields(messageDir) : null
   }
-  return { providerID: model.providerID, modelID: model.modelID }
+  const model = currentMessage?.model
+  const tools = normalizePromptTools(currentMessage?.tools)
+  if (!model?.providerID || !model?.modelID) {
+    return { tools }
+  }
+  return { model: { providerID: model.providerID, modelID: model.modelID }, tools }
+}
+
+export async function resolveRecentModelForSession(
+  ctx: PluginInput,
+  sessionID: string
+): Promise<ModelInfo | undefined> {
+  const context = await resolveRecentPromptContextForSession(ctx, sessionID)
+  return context.model
 }

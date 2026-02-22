@@ -146,7 +146,7 @@ export function createOracleAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions([
     "write",
     "edit",
-    "task",
+    "apply_patch",
     "task",
   ])
 

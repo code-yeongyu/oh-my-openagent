@@ -2,12 +2,20 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
 const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
-const ANTHROPIC_ACTUAL_LIMIT =
-  process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-  process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
-    ? 1_000_000
-    : 200_000
+const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000
 const CONTEXT_WARNING_THRESHOLD = 0.70
+
+type ModelCacheStateLike = {
+  anthropicContext1MEnabled: boolean
+}
+
+function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
+  return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
+    process.env.ANTHROPIC_1M_CONTEXT === "true" ||
+    process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
+    ? 1_000_000
+    : DEFAULT_ANTHROPIC_ACTUAL_LIMIT
+}
 
 const CONTEXT_REMINDER = `${createSystemDirective(SystemDirectiveTypes.CONTEXT_WINDOW_MONITOR)}
 
@@ -15,23 +23,28 @@ You are using Anthropic Claude with 1M context window.
 You have plenty of context remaining - do NOT rush or skip tasks.
 Complete your work thoroughly and methodically.`
 
-interface AssistantMessageInfo {
-  role: "assistant"
+interface TokenInfo {
+  input: number
+  output: number
+  reasoning: number
+  cache: { read: number; write: number }
+}
+
+interface CachedTokenState {
   providerID: string
-  tokens: {
-    input: number
-    output: number
-    reasoning: number
-    cache: { read: number; write: number }
-  }
+  tokens: TokenInfo
 }
 
-interface MessageWrapper {
-  info: { role: string } & Partial<AssistantMessageInfo>
+function isAnthropicProvider(providerID: string): boolean {
+  return providerID === "anthropic" || providerID === "google-vertex-anthropic"
 }
 
-export function createContextWindowMonitorHook(ctx: PluginInput) {
+export function createContextWindowMonitorHook(
+  _ctx: PluginInput,
+  modelCacheState?: ModelCacheStateLike,
+) {
   const remindedSessions = new Set<string>()
+  const tokenCache = new Map<string, CachedTokenState>()
 
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },
@@ -41,44 +54,29 @@ export function createContextWindowMonitorHook(ctx: PluginInput) {
 
     if (remindedSessions.has(sessionID)) return
 
-    try {
-      const response = await ctx.client.session.messages({
-        path: { id: sessionID },
-      })
+    const cached = tokenCache.get(sessionID)
+    if (!cached) return
 
-      const messages = (response.data ?? response) as MessageWrapper[]
+    if (!isAnthropicProvider(cached.providerID)) return
 
-      const assistantMessages = messages
-        .filter((m) => m.info.role === "assistant")
-        .map((m) => m.info as AssistantMessageInfo)
+    const lastTokens = cached.tokens
+    const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
 
-      if (assistantMessages.length === 0) return
+    const actualUsagePercentage =
+      totalInputTokens / getAnthropicActualLimit(modelCacheState)
 
-      const lastAssistant = assistantMessages[assistantMessages.length - 1]
-      if (lastAssistant.providerID !== "anthropic") return
+    if (actualUsagePercentage < CONTEXT_WARNING_THRESHOLD) return
 
-      // Use only the last assistant message's input tokens
-      // This reflects the ACTUAL current context window usage (post-compaction)
-      const lastTokens = lastAssistant.tokens
-      const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
+    remindedSessions.add(sessionID)
 
-      const actualUsagePercentage = totalInputTokens / ANTHROPIC_ACTUAL_LIMIT
+    const displayUsagePercentage = totalInputTokens / ANTHROPIC_DISPLAY_LIMIT
+    const usedPct = (displayUsagePercentage * 100).toFixed(1)
+    const remainingPct = ((1 - displayUsagePercentage) * 100).toFixed(1)
+    const usedTokens = totalInputTokens.toLocaleString()
+    const limitTokens = ANTHROPIC_DISPLAY_LIMIT.toLocaleString()
 
-      if (actualUsagePercentage < CONTEXT_WARNING_THRESHOLD) return
-
-      remindedSessions.add(sessionID)
-
-      const displayUsagePercentage = totalInputTokens / ANTHROPIC_DISPLAY_LIMIT
-      const usedPct = (displayUsagePercentage * 100).toFixed(1)
-      const remainingPct = ((1 - displayUsagePercentage) * 100).toFixed(1)
-      const usedTokens = totalInputTokens.toLocaleString()
-      const limitTokens = ANTHROPIC_DISPLAY_LIMIT.toLocaleString()
-
-      output.output += `\n\n${CONTEXT_REMINDER}
+    output.output += `\n\n${CONTEXT_REMINDER}
 [Context Status: ${usedPct}% used (${usedTokens}/${limitTokens} tokens), ${remainingPct}% remaining]`
-    } catch {
-      // Graceful degradation - do not disrupt tool execution
-    }
   }
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -88,7 +86,26 @@ export function createContextWindowMonitorHook(ctx: PluginInput) {
       const sessionInfo = props?.info as { id?: string } | undefined
       if (sessionInfo?.id) {
         remindedSessions.delete(sessionInfo.id)
+        tokenCache.delete(sessionInfo.id)
       }
+    }
+
+    if (event.type === "message.updated") {
+      const info = props?.info as {
+        role?: string
+        sessionID?: string
+        providerID?: string
+        finish?: boolean
+        tokens?: TokenInfo
+      } | undefined
+
+      if (!info || info.role !== "assistant" || !info.finish) return
+      if (!info.sessionID || !info.providerID || !info.tokens) return
+
+      tokenCache.set(info.sessionID, {
+        providerID: info.providerID,
+        tokens: info.tokens,
+      })
     }
   }
 

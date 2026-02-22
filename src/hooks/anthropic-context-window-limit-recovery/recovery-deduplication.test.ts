@@ -1,12 +1,17 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test"
+import { describe, test, expect, mock, beforeEach, afterAll } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ExperimentalConfig } from "../../config"
+import * as originalDeduplicationRecovery from "./deduplication-recovery"
 
 const attemptDeduplicationRecoveryMock = mock(async () => {})
 
 mock.module("./deduplication-recovery", () => ({
   attemptDeduplicationRecovery: attemptDeduplicationRecoveryMock,
 }))
+
+afterAll(() => {
+  mock.module("./deduplication-recovery", () => originalDeduplicationRecovery)
+})
 
 function createImmediateTimeouts(): () => void {
   const originalSetTimeout = globalThis.setTimeout
@@ -53,7 +58,7 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
         messages: mock(() => Promise.resolve({ data: [] })),
         summarize: mock(() => summarizePromise),
         revert: mock(() => Promise.resolve()),
-        prompt_async: mock(() => Promise.resolve()),
+        promptAsync: mock(() => Promise.resolve()),
       },
       tui: {
         showToast: mock(() => Promise.resolve()),
@@ -97,7 +102,7 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
         messages: mock(() => Promise.resolve({ data: [] })),
         summarize: mock(() => Promise.resolve()),
         revert: mock(() => Promise.resolve()),
-        prompt_async: mock(() => Promise.resolve()),
+        promptAsync: mock(() => Promise.resolve()),
       },
       tui: {
         showToast: mock(() => Promise.resolve()),

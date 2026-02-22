@@ -5,7 +5,7 @@ import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { log } from "../../shared/logger"
 import { HOOK_NAME, NOTEPAD_DIRECTIVE } from "./constants"
 
-export function createSisyphusJuniorNotepadHook(_ctx: PluginInput) {
+export function createSisyphusJuniorNotepadHook(ctx: PluginInput) {
   return {
     "tool.execute.before": async (
       input: { tool: string; sessionID: string; callID: string },
@@ -17,7 +17,7 @@ export function createSisyphusJuniorNotepadHook(_ctx: PluginInput) {
       }
 
       // 2. Check if caller is Atlas (orchestrator)
-      if (!isCallerOrchestrator(input.sessionID)) {
+      if (!(await isCallerOrchestrator(input.sessionID, ctx.client))) {
         return
       }
 

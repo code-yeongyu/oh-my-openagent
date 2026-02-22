@@ -6,12 +6,14 @@ import { tmpdir } from "node:os"
 import { createRalphLoopHook } from "./index"
 import { readState, writeState, clearState } from "./storage"
 import type { RalphLoopState } from "./types"
+import { parseRalphLoopArguments } from "./command-arguments"
 
 describe("ralph-loop", () => {
   const TEST_DIR = join(tmpdir(), "ralph-loop-test-" + Date.now())
   let promptCalls: Array<{ sessionID: string; text: string }>
   let toastCalls: Array<{ title: string; message: string; variant: string }>
   let messagesCalls: Array<{ sessionID: string }>
+  let createSessionCalls: Array<{ parentID?: string; title?: string; directory?: string }>
   let mockSessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
   let mockMessagesApiResponseShape: "data" | "array"
 
@@ -37,6 +39,17 @@ describe("ralph-loop", () => {
             messagesCalls.push({ sessionID: opts.path.id })
             return mockMessagesApiResponseShape === "array" ? mockSessionMessages : { data: mockSessionMessages }
           },
+          create: async (opts: {
+            body: { parentID?: string; title?: string }
+            query?: { directory?: string }
+          }) => {
+            createSessionCalls.push({
+              parentID: opts.body.parentID,
+              title: opts.body.title,
+              directory: opts.query?.directory,
+            })
+            return { data: { id: `new-session-${createSessionCalls.length}` } }
+          },
         },
         tui: {
           showToast: async (opts: { body: { title: string; message: string; variant: string } }) => {
@@ -57,6 +70,7 @@ describe("ralph-loop", () => {
     promptCalls = []
     toastCalls = []
     messagesCalls = []
+    createSessionCalls = []
     mockSessionMessages = []
     mockMessagesApiResponseShape = "data"
 
@@ -123,6 +137,26 @@ describe("ralph-loop", () => {
       expect(readResult?.ultrawork).toBe(true)
     })
 
+    test("should store and read strategy field", () => {
+      // given - a state object with strategy
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 1,
+        max_iterations: 50,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt: "Build a REST API",
+        strategy: "reset",
+      }
+
+      // when - write and read state
+      writeState(TEST_DIR, state)
+      const readResult = readState(TEST_DIR)
+
+      // then - strategy should be preserved
+      expect(readResult?.strategy).toBe("reset")
+    })
+
     test("should return null for non-existent state", () => {
       // given - no state file exists
       // when - read state
@@ -170,6 +204,32 @@ describe("ralph-loop", () => {
 
       // then - multiline prompt preserved
       expect(readResult?.prompt).toBe("Build a feature\nwith multiple lines\nand requirements")
+    })
+  })
+
+  describe("command arguments", () => {
+    test("should parse --strategy=reset flag", () => {
+      // given - ralph-loop command arguments with reset strategy
+      const rawArguments = '"Build feature X" --strategy=reset --max-iterations=12'
+
+      // when - parse command arguments
+      const parsedArguments = parseRalphLoopArguments(rawArguments)
+
+      // then - strategy should be parsed as reset
+      expect(parsedArguments.strategy).toBe("reset")
+      expect(parsedArguments.prompt).toBe("Build feature X")
+      expect(parsedArguments.maxIterations).toBe(12)
+    })
+
+    test("should parse --strategy=continue flag", () => {
+      // given - ralph-loop command arguments with continue strategy
+      const rawArguments = '"Build feature X" --strategy=continue'
+
+      // when - parse command arguments
+      const parsedArguments = parseRalphLoopArguments(rawArguments)
+
+      // then - strategy should be parsed as continue
+      expect(parsedArguments.strategy).toBe("continue")
     })
   })
 
@@ -443,6 +503,38 @@ describe("ralph-loop", () => {
       // then - should use config defaults
       const state = hook.getState()
       expect(state?.max_iterations).toBe(200)
+    })
+
+    test("should default strategy to continue when not specified", () => {
+      // given - hook with no strategy option
+      const hook = createRalphLoopHook(createMockPluginInput())
+
+      // when - start loop without strategy
+      hook.startLoop("session-123", "Test task")
+
+      // then - strategy should default to continue
+      const state = hook.getState()
+      expect(state?.strategy).toBe("continue")
+    })
+
+    test("should create new session for reset strategy", async () => {
+      // given - hook with reset strategy
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build a feature", { strategy: "reset" })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      // then - new session should be created and continuation injected there
+      expect(createSessionCalls.length).toBe(1)
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].sessionID).toBe("new-session-1")
+      expect(hook.getState()?.session_id).toBe("new-session-1")
     })
 
     test("should not inject when no loop is active", async () => {
