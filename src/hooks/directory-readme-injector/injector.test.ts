@@ -1,161 +1,212 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { randomUUID } from "node:crypto"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-const findReadmeMdUpMock = mock((_: { startDir: string; rootDir: string }) => [] as string[])
-const resolveFilePathMock = mock((_: string, path: string) => path)
-const loadInjectedPathsMock = mock((_: string) => new Set<string>())
-const saveInjectedPathsMock = mock((_: string, __: Set<string>) => {})
+import type { PluginInput } from "@opencode-ai/plugin"
+
+const storageMaps = new Map<string, Set<string>>()
+
+mock.module("./storage", () => ({
+  loadInjectedPaths: (sessionID: string) => storageMaps.get(sessionID) ?? new Set<string>(),
+  saveInjectedPaths: (sessionID: string, paths: Set<string>) => {
+    storageMaps.set(sessionID, paths)
+  },
+}))
+
+function createPluginContext(directory: string): PluginInput {
+  return { directory } as PluginInput
+}
+
+function countReadmeMarkers(output: string): number {
+  return output.split("[Project README:").length - 1
+}
+
+function createTruncator(input?: { truncated?: boolean; result?: string }) {
+  return {
+    truncate: async (_sessionID: string, content: string) => ({
+      result: input?.result ?? content,
+      truncated: input?.truncated ?? false,
+    }),
+    getUsage: async (_sessionID: string) => null,
+    truncateSync: (output: string) => ({ result: output, truncated: false }),
+  }
+}
 
 describe("processFilePathForReadmeInjection", () => {
   let testRoot = ""
 
   beforeEach(() => {
-    findReadmeMdUpMock.mockClear()
-    resolveFilePathMock.mockClear()
-    loadInjectedPathsMock.mockClear()
-    saveInjectedPathsMock.mockClear()
-
-    testRoot = join(
-      tmpdir(),
-      `directory-readme-injector-${Date.now()}-${Math.random().toString(16).slice(2)}`
-    )
+    testRoot = join(tmpdir(), `directory-readme-injector-${randomUUID()}`)
     mkdirSync(testRoot, { recursive: true })
+    storageMaps.clear()
   })
 
   afterEach(() => {
-    mock.restore()
     rmSync(testRoot, { recursive: true, force: true })
+    storageMaps.clear()
   })
 
-  it("does not save when all discovered paths are already cached", async () => {
-    //#given
-    const sessionID = "session-1"
-    const repoRoot = join(testRoot, "repo")
-    const readmePath = join(repoRoot, "src", "README.md")
-    const cachedDirectory = join(repoRoot, "src")
-    mkdirSync(join(repoRoot, "src"), { recursive: true })
-    writeFileSync(readmePath, "# README")
-
-    loadInjectedPathsMock.mockReturnValueOnce(new Set([cachedDirectory]))
-    findReadmeMdUpMock.mockReturnValueOnce([readmePath])
-
-    const truncator = {
-      truncate: mock(async () => ({ result: "trimmed", truncated: false })),
-    }
-
-    mock.module("./finder", () => ({
-      findReadmeMdUp: findReadmeMdUpMock,
-      resolveFilePath: resolveFilePathMock,
-    }))
-    mock.module("./storage", () => ({
-      loadInjectedPaths: loadInjectedPathsMock,
-      saveInjectedPaths: saveInjectedPathsMock,
-    }))
+  it("injects README.md content from file's parent directory into output", async () => {
+    // given
+    const sourceDirectory = join(testRoot, "src")
+    mkdirSync(sourceDirectory, { recursive: true })
+    writeFileSync(join(sourceDirectory, "README.md"), "# Source README\nlocal context")
 
     const { processFilePathForReadmeInjection } = await import("./injector")
+    const output = { title: "Result", output: "base", metadata: {} }
+    const truncator = createTruncator()
 
-    //#when
+    // when
     await processFilePathForReadmeInjection({
-      ctx: { directory: repoRoot } as never,
-      truncator: truncator as never,
-      sessionCaches: new Map(),
-      filePath: join(repoRoot, "src", "file.ts"),
-      sessionID,
-      output: { title: "Result", output: "", metadata: {} },
+      ctx: createPluginContext(testRoot),
+      truncator,
+      sessionCaches: new Map<string, Set<string>>(),
+      filePath: join(sourceDirectory, "file.ts"),
+      sessionID: "session-parent",
+      output,
     })
 
-    //#then
-    expect(saveInjectedPathsMock).not.toHaveBeenCalled()
+    // then
+    expect(output.output).toContain("[Project README:")
+    expect(output.output).toContain("# Source README")
+    expect(output.output).toContain("local context")
   })
 
-  it("saves when a new path is injected", async () => {
-    //#given
-    const sessionID = "session-2"
-    const repoRoot = join(testRoot, "repo")
-    const readmePath = join(repoRoot, "src", "README.md")
-    const injectedDirectory = join(repoRoot, "src")
-    mkdirSync(join(repoRoot, "src"), { recursive: true })
-    writeFileSync(readmePath, "# README")
-
-    loadInjectedPathsMock.mockReturnValueOnce(new Set())
-    findReadmeMdUpMock.mockReturnValueOnce([readmePath])
-
-    const truncator = {
-      truncate: mock(async () => ({ result: "trimmed", truncated: false })),
-    }
-
-    mock.module("./finder", () => ({
-      findReadmeMdUp: findReadmeMdUpMock,
-      resolveFilePath: resolveFilePathMock,
-    }))
-    mock.module("./storage", () => ({
-      loadInjectedPaths: loadInjectedPathsMock,
-      saveInjectedPaths: saveInjectedPathsMock,
-    }))
+  it("includes root-level README.md (unlike agents-injector)", async () => {
+    // given
+    writeFileSync(join(testRoot, "README.md"), "# Root README\nroot context")
 
     const { processFilePathForReadmeInjection } = await import("./injector")
+    const output = { title: "Result", output: "", metadata: {} }
+    const truncator = createTruncator()
 
-    //#when
+    // when
     await processFilePathForReadmeInjection({
-      ctx: { directory: repoRoot } as never,
-      truncator: truncator as never,
-      sessionCaches: new Map(),
-      filePath: join(repoRoot, "src", "file.ts"),
-      sessionID,
-      output: { title: "Result", output: "", metadata: {} },
+      ctx: createPluginContext(testRoot),
+      truncator,
+      sessionCaches: new Map<string, Set<string>>(),
+      filePath: join(testRoot, "file.ts"),
+      sessionID: "session-root",
+      output,
     })
 
-    //#then
-    expect(saveInjectedPathsMock).toHaveBeenCalledTimes(1)
-    const saveCall = saveInjectedPathsMock.mock.calls[0]
-    expect(saveCall[0]).toBe(sessionID)
-    expect((saveCall[1] as Set<string>).has(injectedDirectory)).toBe(true)
+    // then
+    expect(output.output).toContain("[Project README:")
+    expect(output.output).toContain("# Root README")
+    expect(output.output).toContain("root context")
   })
 
-  it("saves once when cached and new paths are mixed", async () => {
-    //#given
-    const sessionID = "session-3"
-    const repoRoot = join(testRoot, "repo")
-    const cachedReadmePath = join(repoRoot, "already-cached", "README.md")
-    const newReadmePath = join(repoRoot, "new-dir", "README.md")
-    mkdirSync(join(repoRoot, "already-cached"), { recursive: true })
-    mkdirSync(join(repoRoot, "new-dir"), { recursive: true })
-    writeFileSync(cachedReadmePath, "# README")
-    writeFileSync(newReadmePath, "# README")
-
-    loadInjectedPathsMock.mockReturnValueOnce(new Set([join(repoRoot, "already-cached")]))
-    findReadmeMdUpMock.mockReturnValueOnce([cachedReadmePath, newReadmePath])
-
-    const truncator = {
-      truncate: mock(async () => ({ result: "trimmed", truncated: false })),
-    }
-
-    mock.module("./finder", () => ({
-      findReadmeMdUp: findReadmeMdUpMock,
-      resolveFilePath: resolveFilePathMock,
-    }))
-    mock.module("./storage", () => ({
-      loadInjectedPaths: loadInjectedPathsMock,
-      saveInjectedPaths: saveInjectedPathsMock,
-    }))
+  it("injects multiple README.md when walking up directory tree", async () => {
+    // given
+    const sourceDirectory = join(testRoot, "src")
+    const componentsDirectory = join(sourceDirectory, "components")
+    mkdirSync(componentsDirectory, { recursive: true })
+    writeFileSync(join(testRoot, "README.md"), "# Root README")
+    writeFileSync(join(sourceDirectory, "README.md"), "# Src README")
+    writeFileSync(join(componentsDirectory, "README.md"), "# Components README")
+    writeFileSync(join(componentsDirectory, "button.ts"), "export const button = true")
 
     const { processFilePathForReadmeInjection } = await import("./injector")
+    const output = { title: "Result", output: "", metadata: {} }
+    const truncator = createTruncator()
 
-    //#when
+    // when
     await processFilePathForReadmeInjection({
-      ctx: { directory: repoRoot } as never,
-      truncator: truncator as never,
-      sessionCaches: new Map(),
-      filePath: join(repoRoot, "new-dir", "file.ts"),
-      sessionID,
-      output: { title: "Result", output: "", metadata: {} },
+      ctx: createPluginContext(testRoot),
+      truncator,
+      sessionCaches: new Map<string, Set<string>>(),
+      filePath: join(componentsDirectory, "button.ts"),
+      sessionID: "session-multi",
+      output,
     })
 
-    //#then
-    expect(saveInjectedPathsMock).toHaveBeenCalledTimes(1)
-    const saveCall = saveInjectedPathsMock.mock.calls[0]
-    expect((saveCall[1] as Set<string>).has(join(repoRoot, "new-dir"))).toBe(true)
+    // then
+    expect(countReadmeMarkers(output.output)).toBe(3)
+    expect(output.output).toContain("# Root README")
+    expect(output.output).toContain("# Src README")
+    expect(output.output).toContain("# Components README")
+  })
+
+  it("does not re-inject already cached directories", async () => {
+    // given
+    const sourceDirectory = join(testRoot, "src")
+    mkdirSync(sourceDirectory, { recursive: true })
+    writeFileSync(join(sourceDirectory, "README.md"), "# Source README")
+
+    const { processFilePathForReadmeInjection } = await import("./injector")
+    const sessionCaches = new Map<string, Set<string>>()
+    const sessionID = "session-cache"
+    const truncator = createTruncator()
+    const firstOutput = { title: "Result", output: "", metadata: {} }
+    const secondOutput = { title: "Result", output: "", metadata: {} }
+
+    // when
+    await processFilePathForReadmeInjection({
+      ctx: createPluginContext(testRoot),
+      truncator,
+      sessionCaches,
+      filePath: join(sourceDirectory, "a.ts"),
+      sessionID,
+      output: firstOutput,
+    })
+    await processFilePathForReadmeInjection({
+      ctx: createPluginContext(testRoot),
+      truncator,
+      sessionCaches,
+      filePath: join(sourceDirectory, "b.ts"),
+      sessionID,
+      output: secondOutput,
+    })
+
+    // then
+    expect(countReadmeMarkers(firstOutput.output)).toBe(1)
+    expect(secondOutput.output).toBe("")
+  })
+
+  it("shows truncation notice when content is truncated", async () => {
+    // given
+    const sourceDirectory = join(testRoot, "src")
+    mkdirSync(sourceDirectory, { recursive: true })
+    writeFileSync(join(sourceDirectory, "README.md"), "# Truncated README")
+
+    const { processFilePathForReadmeInjection } = await import("./injector")
+    const output = { title: "Result", output: "", metadata: {} }
+    const truncator = createTruncator({ result: "trimmed content", truncated: true })
+
+    // when
+    await processFilePathForReadmeInjection({
+      ctx: createPluginContext(testRoot),
+      truncator,
+      sessionCaches: new Map<string, Set<string>>(),
+      filePath: join(sourceDirectory, "file.ts"),
+      sessionID: "session-truncated",
+      output,
+    })
+
+    // then
+    expect(output.output).toContain("trimmed content")
+    expect(output.output).toContain("[Note: Content was truncated")
+  })
+
+  it("does nothing when filePath cannot be resolved", async () => {
+    // given
+    const { processFilePathForReadmeInjection } = await import("./injector")
+    const output = { title: "Result", output: "unchanged", metadata: {} }
+    const truncator = createTruncator()
+
+    // when
+    await processFilePathForReadmeInjection({
+      ctx: createPluginContext(testRoot),
+      truncator,
+      sessionCaches: new Map<string, Set<string>>(),
+      filePath: "",
+      sessionID: "session-empty-path",
+      output,
+    })
+
+    // then
+    expect(output.output).toBe("unchanged")
   })
 })
