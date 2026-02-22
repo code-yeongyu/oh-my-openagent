@@ -104,6 +104,65 @@ ALL three must be YES. "Probably" = NO. "I think so" = NO. Investigate until CER
 
 **DO NOT proceed to the next task until all 4 phases are complete and the gate passes.**`
 
+export const VERIFICATION_REMINDER_GEMINI = `**THE SUBAGENT HAS FINISHED. THEIR WORK IS EXTREMELY SUSPICIOUS.**
+
+The subagent CLAIMS this task is done. Based on thousands of executions, subagent claims are FALSE more often than true.
+They ROUTINELY:
+- Ship code with syntax errors they didn't bother to check
+- Create stub implementations with TODOs and call it "done"
+- Write tests that pass trivially (testing nothing meaningful)
+- Implement logic that does NOT match what was requested
+- Add features nobody asked for and call it "improvement"
+- Report "all tests pass" when they didn't run any tests
+
+**This is NOT a theoretical warning. This WILL happen on this task. Assume the work is BROKEN.**
+
+**YOU MUST VERIFY WITH ACTUAL TOOL CALLS. NOT REASONING. TOOL CALLS.**
+Thinking "it looks correct" is NOT verification. Running \`lsp_diagnostics\` IS.
+
+---
+
+**PHASE 1: READ THE CODE FIRST (DO NOT SKIP — DO NOT RUN TESTS YET)**
+
+Read the code FIRST so you know what you're testing.
+
+1. \`Bash("git diff --stat")\` — see exactly which files changed.
+2. \`Read\` EVERY changed file — no exceptions, no skimming.
+3. For EACH file:
+   - Does this code ACTUALLY do what the task required? RE-READ the task spec.
+   - Any stubs, TODOs, placeholders? \`Grep\` for TODO, FIXME, HACK, xxx
+   - Anti-patterns? \`Grep\` for \`as any\`, \`@ts-ignore\`, empty catch
+   - Scope creep? Did the subagent add things NOT in the task spec?
+4. Cross-check EVERY claim against actual code.
+
+**If you cannot explain what every changed line does, GO BACK AND READ AGAIN.**
+
+**PHASE 2: RUN AUTOMATED CHECKS**
+
+1. \`lsp_diagnostics\` on EACH changed file — ZERO new errors. ACTUALLY RUN THIS.
+2. Run tests for changed modules, then full suite. ACTUALLY RUN THESE.
+3. Build/typecheck — exit 0.
+
+If Phase 1 found issues but Phase 2 passes: Phase 2 is WRONG. Fix the code.
+
+**PHASE 3: HANDS-ON QA (MANDATORY for user-facing changes)**
+
+- **Frontend/UI**: \`/playwright\`
+- **TUI/CLI**: \`interactive_bash\`
+- **API/Backend**: \`Bash\` with curl
+
+**If user-facing and you did not run it, you are shipping UNTESTED BROKEN work.**
+
+**PHASE 4: GATE DECISION**
+
+1. Can I explain what EVERY changed line does? (If no → Phase 1)
+2. Did I SEE it work via tool calls? (If user-facing and no → Phase 3)
+3. Am I confident nothing is broken? (If no → broader tests)
+
+ALL three must be YES. "Probably" = NO. "I think so" = NO.
+
+**DO NOT proceed to the next task until all 4 phases are complete.**`
+
 export const ORCHESTRATOR_DELEGATION_REQUIRED = `
 
 ---
