@@ -1,16 +1,17 @@
-import { existsSync, readFileSync } from "fs"
-import { dirname, join } from "path"
-import { fileURLToPath } from "url"
-import { parseFrontmatter } from "../../shared/frontmatter"
+import { existsSync, readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import type { BuiltinSkill } from "./types"
 import type { BrowserAutomationProvider } from "../../config/schema"
+import { parseSkillTemplate, type ParsedSkillTemplate } from "./skill-parser"
 
 const builtinSkillRoot = dirname(fileURLToPath(import.meta.url))
 const sourceSkillRoot = join(builtinSkillRoot, "..", "..", "..", "src", "features", "builtin-skills")
 const builtinSkillTemplateCache = new Map<string, string>()
+const builtinSkillParsedCache = new Map<string, ParsedSkillTemplate>()
 
-function readBuiltinSkillTemplate(skillDir: string): string {
-  const cached = builtinSkillTemplateCache.get(skillDir)
+function readBuiltinSkillParsed(skillDir: string): ParsedSkillTemplate {
+  const cached = builtinSkillParsedCache.get(skillDir)
   if (cached) return cached
 
   const candidatePaths = [
@@ -21,13 +22,50 @@ function readBuiltinSkillTemplate(skillDir: string): string {
   for (const skillPath of candidatePaths) {
     if (!existsSync(skillPath)) continue
     const content = readFileSync(skillPath, "utf-8")
-    const { body } = parseFrontmatter(content)
-    const template = body.trim()
-    builtinSkillTemplateCache.set(skillDir, template)
-    return template
+    const parsed = parseSkillTemplate(content)
+    builtinSkillParsedCache.set(skillDir, parsed)
+    return parsed
   }
 
-  return ""
+  const fallback: ParsedSkillTemplate = {
+    template: "",
+    hooks: [],
+    triggers: [],
+    priority: "medium",
+    hasFrontmatter: false,
+  }
+  builtinSkillParsedCache.set(skillDir, fallback)
+  return fallback
+}
+
+function readBuiltinSkillTemplate(skillDir: string): string {
+  const cached = builtinSkillTemplateCache.get(skillDir)
+  if (cached) return cached
+
+  const template = readBuiltinSkillParsed(skillDir).template
+  builtinSkillTemplateCache.set(skillDir, template)
+  return template
+}
+
+function applyBuiltinSkillFrontmatter(skill: BuiltinSkill): BuiltinSkill {
+  const parsed = readBuiltinSkillParsed(skill.name)
+  if (!parsed.hasFrontmatter) return skill
+
+  const metadata = {
+    ...(skill.metadata ?? {}),
+    skillFrontmatter: {
+      hooks: parsed.hooks,
+      triggers: parsed.triggers,
+      priority: parsed.priority,
+    },
+  }
+
+  return {
+    ...skill,
+    template: parsed.template || skill.template,
+    description: parsed.description || skill.description,
+    metadata,
+  }
 }
 
 const playwrightSkill: BuiltinSkill = {
@@ -1185,7 +1223,7 @@ IF style == SHORT:
 
 If ANY check fails -> REWRITE message.
 \`\`\`
-\</execution>
+</execution>
 
 ---
 
@@ -2034,9 +2072,9 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     backendPatternPythonSkill,
   ]
 
-  if (!disabledSkills) {
-    return skills
-  }
+  const filteredSkills = disabledSkills
+    ? skills.filter((skill) => !disabledSkills.has(skill.name))
+    : skills
 
-  return skills.filter((skill) => !disabledSkills.has(skill.name))
+  return filteredSkills.map(applyBuiltinSkillFrontmatter)
 }

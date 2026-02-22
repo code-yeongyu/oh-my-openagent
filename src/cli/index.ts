@@ -130,12 +130,14 @@ program
   .description("Check oh-my-opencode installation health and diagnose issues")
   .option("--verbose", "Show detailed diagnostic information")
   .option("--json", "Output results in JSON format")
+  .option("--test", "Run unified test runner after doctor checks")
   .option("--category <category>", "Run only specific category")
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode doctor
   $ bunx oh-my-opencode doctor --verbose
   $ bunx oh-my-opencode doctor --json
+  $ bunx oh-my-opencode doctor --test
   $ bunx oh-my-opencode doctor --category authentication
 
 Categories:
@@ -150,6 +152,7 @@ Categories:
     const doctorOptions: DoctorOptions = {
       verbose: options.verbose ?? false,
       json: options.json ?? false,
+      test: options.test ?? false,
       category: options.category,
     }
     const exitCode = await doctor(doctorOptions)

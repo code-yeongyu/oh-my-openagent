@@ -3,6 +3,9 @@
  */
 
 import { describe, test, expect, beforeEach } from "bun:test"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { createTddGuardHook } from "./index"
 import { determineRiskTier, shouldBlockEdit, matchesIgnorePattern } from "./risk-validator"
 import { isTestFile, detectLanguage, getExpectedTestFilePath } from "./language-adapter"
@@ -420,6 +423,72 @@ describe("TDD Guard Hook", () => {
 
       // #then - should still block (Tier 3 doesn't allow exemption)
       expect(output.blocked).toBe(true)
+    })
+
+    test("should append AST coverage warning after source edit when exports are uncovered", async () => {
+      // #given
+      const tempDir = join(tmpdir(), `tdd-guard-coverage-${Date.now()}`)
+      const sourcePath = join(tempDir, "src", "utils", "math.ts")
+      const testPath = join(tempDir, "src", "utils", "math.test.ts")
+      mkdirSync(join(tempDir, "src", "utils"), { recursive: true })
+      writeFileSync(sourcePath, "export function add(a: number, b: number) { return a + b }\nexport function sub(a: number, b: number) { return a - b }")
+      writeFileSync(testPath, "import { add } from './math'\ntest('add', () => { expect(add(1,2)).toBe(3) })")
+
+      const coverageHook = createTddGuardHook({ cwd: tempDir }, { config: { enabled: true } })
+      const beforeInput = { tool: "edit", sessionID: "test", callID: "coverage-call" }
+      const beforeOutput: {
+        args: Record<string, unknown>
+        blocked?: boolean
+      } = {
+        args: {
+          filePath: "src/utils/math.ts",
+          newString: "// TDD-EXEMPT: reason=\"test fixture\"\nexport function add(a:number,b:number){return a+b}",
+        },
+      }
+
+      // #when
+      await coverageHook["tool.execute.before"](beforeInput, beforeOutput)
+      const afterOutput: { output?: string } = { output: "ok\n" }
+      await coverageHook["tool.execute.after"](beforeInput, afterOutput)
+
+      // #then
+      expect(afterOutput.output).toContain("AST coverage")
+      expect(afterOutput.output).toContain("sub")
+
+      rmSync(tempDir, { recursive: true, force: true })
+    })
+
+    test("should append isolation warning when test uses external network calls", async () => {
+      // #given
+      const tempDir = join(tmpdir(), `tdd-guard-isolation-${Date.now()}`)
+      const sourcePath = join(tempDir, "src", "api", "client.ts")
+      const testPath = join(tempDir, "src", "api", "client.test.ts")
+      mkdirSync(join(tempDir, "src", "api"), { recursive: true })
+      writeFileSync(sourcePath, "export async function load() { return 'ok' }")
+      writeFileSync(testPath, "import { load } from './client'\ntest('load', async () => { await fetch('https://example.com'); expect(await load()).toBe('ok') })")
+
+      const isolationHook = createTddGuardHook({ cwd: tempDir }, { config: { enabled: true } })
+      const input = { tool: "edit", sessionID: "test", callID: "isolation-call" }
+      const beforeOutput: {
+        args: Record<string, unknown>
+        blocked?: boolean
+      } = {
+        args: {
+          filePath: "src/api/client.ts",
+          newString: "export async function load(){return 'ok'}",
+        },
+      }
+
+      // #when
+      await isolationHook["tool.execute.before"](input, beforeOutput)
+      const afterOutput: { output?: string } = { output: "ok\n" }
+      await isolationHook["tool.execute.after"](input, afterOutput)
+
+      // #then
+      expect(afterOutput.output).toContain("Isolation")
+      expect(afterOutput.output).toContain("fetch()")
+
+      rmSync(tempDir, { recursive: true, force: true })
     })
   })
 

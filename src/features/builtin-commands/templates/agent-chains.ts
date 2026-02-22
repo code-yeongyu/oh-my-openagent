@@ -60,7 +60,7 @@ const CHAINS: Record<ChainType, AgentChain> = {
         tools: ["read", "lsp_diagnostics"],
       },
       {
-        agent: "implementer",
+        agent: "hephaestus",
         purpose: "Implement the fix following TDD principles",
         tools: ["write", "edit", "bash"],
       },
@@ -87,7 +87,7 @@ const CHAINS: Record<ChainType, AgentChain> = {
         tools: ["read", "lsp_diagnostics"],
       },
       {
-        agent: "implementer",
+        agent: "hephaestus",
         purpose: "Execute refactoring using LSP tools for safe renames",
         tools: ["lsp", "lsp_rename", "edit", "ast_grep_replace"],
       },

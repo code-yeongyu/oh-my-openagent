@@ -1,4 +1,7 @@
 import { describe, expect, it, mock, beforeEach } from "bun:test"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 
 // Mock dependencies before importing
 const mockInjectHookMessage = mock(() => true)
@@ -97,6 +100,45 @@ describe("createCompactionContextInjector", () => {
       const injectedPrompt = calls[0]?.[1] ?? ""
       expect(injectedPrompt).toContain("Pending Verifications")
       expect(injectedPrompt).toContain("Files already verified")
+    })
+
+    it("injects known failed patterns from anti-pattern tracker storage", async () => {
+      // given
+      const tempDir = join(tmpdir(), `compaction-anti-pattern-${Date.now()}`)
+      const trackerDir = join(tempDir, ".opencode")
+      mkdirSync(trackerDir, { recursive: true })
+      writeFileSync(
+        join(trackerDir, "anti-patterns.json"),
+        JSON.stringify([
+          {
+            pattern: "retry same patch",
+            reason: "causes repeated failure",
+            timestamp: Date.now(),
+            count: 2,
+          },
+        ])
+      )
+
+      const injector = createCompactionContextInjector()
+      const context: SummarizeContext = {
+        sessionID: "test-session",
+        providerID: "anthropic",
+        modelID: "claude-sonnet-4-5",
+        usageRatio: 0.95,
+        directory: tempDir,
+      }
+
+      // when
+      await injector(context)
+
+      // then
+      const calls = mockInjectHookMessage.mock.calls as unknown as [string, string, unknown][]
+      const injectedPrompt = calls[0]?.[1] ?? ""
+      expect(injectedPrompt).toContain("Known Failed Patterns")
+      expect(injectedPrompt).toContain("retry same patch")
+      expect(injectedPrompt).toContain("causes repeated failure")
+
+      rmSync(tempDir, { recursive: true, force: true })
     })
   })
 })

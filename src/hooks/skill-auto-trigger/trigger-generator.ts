@@ -1,7 +1,13 @@
 import { getAllSkills } from "../../features/opencode-skill-loader/skill-content"
-import { extractKeywordsFromDescription } from "./keyword-extractor"
+import { buildTriggerRegex, extractKeywordsFromDescription } from "./keyword-extractor"
 import { SCOPE_PRIORITY, type SkillTrigger } from "./types"
 import type { SkillScope } from "../../features/opencode-skill-loader/types"
+
+const TRIGGER_PRIORITY_BOOST: Record<"high" | "medium" | "low", number> = {
+  high: 30,
+  medium: 0,
+  low: -30,
+}
 
 /**
  * Generates dynamic skill triggers from all available skills.
@@ -19,13 +25,16 @@ export async function generateDynamicTriggers(): Promise<SkillTrigger[]> {
       continue
     }
 
-    const keywords = extractKeywordsFromDescription(description)
+    const explicitTriggerRegex = buildTriggerRegex(skill.triggers ?? [])
+    const keywords = explicitTriggerRegex ?? extractKeywordsFromDescription(description)
     if (!keywords) {
       continue
     }
 
     const scope = skill.scope as SkillScope | "builtin"
-    const priority = SCOPE_PRIORITY[scope] ?? 0
+    const basePriority = SCOPE_PRIORITY[scope] ?? 0
+    const triggerBoost = TRIGGER_PRIORITY_BOOST[skill.triggerPriority ?? "medium"]
+    const priority = basePriority + triggerBoost
 
     triggers.push({
       skillName: skill.name,

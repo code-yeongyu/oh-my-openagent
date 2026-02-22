@@ -1,10 +1,15 @@
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types";
-import { hashDescription } from "./cache-checker";
+import { hashSkillSignature } from "./cache-checker";
 import { mergeFallbackTriggers } from "./trigger-fallbacks";
 import type { CachedSkillTrigger } from "./types";
 import { SCOPE_PRIORITY } from "./types";
 
 const BATCH_SIZE = 15;
+const TRIGGER_PRIORITY_BOOST: Record<"high" | "medium" | "low", number> = {
+	high: 30,
+	medium: 0,
+	low: -30,
+};
 
 export function buildExtractionPrompt(skills: LoadedSkill[]): string {
 	const skillList = skills
@@ -68,9 +73,11 @@ export function buildCachedTriggers(
 			| "project"
 			| "config";
 		result[skill.name] = {
-			hash: hashDescription(description),
+			hash: hashSkillSignature(skill),
 			triggers,
-			priority: SCOPE_PRIORITY[scope] ?? 0,
+			priority:
+				(SCOPE_PRIORITY[scope] ?? 0) +
+				TRIGGER_PRIORITY_BOOST[skill.triggerPriority ?? "medium"],
 			scope,
 		};
 	}

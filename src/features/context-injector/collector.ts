@@ -6,6 +6,11 @@ import type {
   RegisterContextOptions,
 } from "./types"
 import { DEFAULT_SOURCE_ORDER } from "./types"
+import {
+  scoreRelevance,
+  type IntentMode as RelevanceIntentMode,
+  type Resource as RelevanceResource,
+} from "../../shared/relevance-scorer"
 
 const PRIORITY_ORDER: Record<ContextPriority, number> = {
   critical: 0,
@@ -15,6 +20,37 @@ const PRIORITY_ORDER: Record<ContextPriority, number> = {
 }
 
 const CONTEXT_SEPARATOR = "\n\n---\n\n"
+
+function normalizeIntentMode(mode: unknown): RelevanceIntentMode {
+  if (typeof mode !== "string") return "default"
+  const normalized = mode.toLowerCase()
+  if (normalized === "review" || normalized === "research" || normalized === "debug") {
+    return normalized
+  }
+  if (normalized === "implement" || normalized === "implementation" || normalized === "dev") {
+    return "implement"
+  }
+  return "default"
+}
+
+function scoreEntryRelevance(entry: ContextEntry): number {
+  const metadata = entry.metadata ?? {}
+  const resourcePath =
+    (typeof metadata.resourcePath === "string" && metadata.resourcePath) ||
+    (typeof metadata.filePath === "string" && metadata.filePath) ||
+    (typeof metadata.path === "string" && metadata.path)
+
+  if (!resourcePath) {
+    return scoreRelevance({ path: entry.id }, "default")
+  }
+
+  const resource: RelevanceResource = {
+    path: resourcePath,
+    type: typeof metadata.resourceType === "string" ? metadata.resourceType : undefined,
+  }
+  const intent = normalizeIntentMode(metadata.intentMode)
+  return scoreRelevance(resource, intent)
+}
 
 /**
  * Build source order map from array for O(1) lookups
@@ -111,7 +147,11 @@ private sortEntries(entries: ContextEntry[]): ContextEntry[] {
       const priorityDiff = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]
       if (priorityDiff !== 0) return priorityDiff
 
-      // Third: sort by timestamp within same priority
+      // Third: sort by relevance score within same source and priority
+      const relevanceDiff = scoreEntryRelevance(b) - scoreEntryRelevance(a)
+      if (relevanceDiff !== 0) return relevanceDiff
+
+      // Fourth: sort by timestamp within same priority/relevance
       return a.timestamp - b.timestamp
     })
   }

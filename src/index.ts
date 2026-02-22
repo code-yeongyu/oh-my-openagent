@@ -73,6 +73,7 @@ import {
   createWriteExistingFileGuardHook,
   createTasksMdCreationGuardHook,
   createCommitSizeChecker,
+  createFinalAuditHook,
 } from "./hooks";
 import { createSessionScorer } from "./features/session-scorer";
 import {
@@ -141,6 +142,7 @@ import {
 import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
+import { createHookExecutor } from "./shared/hook-executor";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
@@ -371,6 +373,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const sessionScorer = isHookEnabled("session-scorer")
     ? createSessionScorer()
     : null;
+
+  const finalAudit = createFinalAuditHook();
 
   const commitSizeChecker = isHookEnabled("commit-size-checker")
     ? createCommitSizeChecker()
@@ -699,6 +703,28 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       }
     : {};
 
+  const hookExecutor = createHookExecutor();
+  hookExecutor.setLogger((message) => {
+    log(`[hook-executor] ${message}`);
+  });
+
+  const runHook = async (
+    hookName: string,
+    execute: (() => Promise<void> | void | undefined) | undefined,
+  ) => {
+    if (!execute) {
+      return;
+    }
+
+    await hookExecutor.execute({
+      name: hookName,
+      execute: async () => {
+        await execute();
+        return { success: true };
+      },
+    });
+  };
+
   return {
     tool: {
       ...builtinTools,
@@ -746,19 +772,43 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         }
       }
 
-      await stopContinuationGuard?.["chat.message"]?.(input);
-      await keywordDetector?.["chat.message"]?.(input, output);
-      await skillAutoTrigger?.["chat.message"]?.(input, output);
-      await agentSkillReminder?.["chat.message"]?.(input, output);
-      await tddGuard?.["chat.message"]?.(input, output);
-      await claudeCodeHooks["chat.message"]?.(input, output);
-      await autoSlashCommand?.["chat.message"]?.(input, output);
-      await startWork?.["chat.message"]?.(input, output);
+      await runHook("stop-continuation-guard.chat.message", () =>
+        stopContinuationGuard?.["chat.message"]?.(input),
+      );
+      await runHook("keyword-detector.chat.message", () =>
+        keywordDetector?.["chat.message"]?.(input, output),
+      );
+      await runHook("skill-auto-trigger.chat.message", () =>
+        skillAutoTrigger?.["chat.message"]?.(input, output),
+      );
+      await runHook("agent-skill-reminder.chat.message", () =>
+        agentSkillReminder?.["chat.message"]?.(input, output),
+      );
+      await runHook("tdd-guard.chat.message", () =>
+        tddGuard?.["chat.message"]?.(input, output),
+      );
+      await runHook("claude-code-hooks.chat.message", () =>
+        claudeCodeHooks["chat.message"]?.(input, output),
+      );
+      await runHook("auto-slash-command.chat.message", () =>
+        autoSlashCommand?.["chat.message"]?.(input, output),
+      );
+      await runHook("start-work.chat.message", () =>
+        startWork?.["chat.message"]?.(input, output),
+      );
       // Phase 3 hooks - fixed to use createTextPart for proper Part schema
-      await skillAutoInjector?.["chat.message"]?.(input, output);
-      await phaseRulesInjector?.["chat.message"]?.(input, output);
-      await projectContextInjector?.["chat.message"]?.(input, output);
-      await prContextInjector?.["chat.message"]?.(input, output);
+      await runHook("skill-auto-injector.chat.message", () =>
+        skillAutoInjector?.["chat.message"]?.(input, output),
+      );
+      await runHook("phase-rules-injector.chat.message", () =>
+        phaseRulesInjector?.["chat.message"]?.(input, output),
+      );
+      await runHook("project-context-injector.chat.message", () =>
+        projectContextInjector?.["chat.message"]?.(input, output),
+      );
+      await runHook("pr-context-injector.chat.message", () =>
+        prContextInjector?.["chat.message"]?.(input, output),
+      );
 
       if (ralphLoop) {
         const parts = (
@@ -819,46 +869,95 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       output: { messages: Array<{ info: unknown; parts: unknown[] }> },
     ) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await contextInjectorMessagesTransform?.[
-        "experimental.chat.messages.transform"
-      ]?.(input, output as any);
-      await thinkingBlockValidator?.[
-        "experimental.chat.messages.transform"
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ]?.(input, output as any);
+      await runHook("context-injector-messages-transform.experimental", () =>
+        contextInjectorMessagesTransform?.[
+          "experimental.chat.messages.transform"
+        ]?.(input, output as any),
+      );
+      await runHook("thinking-block-validator.experimental", () =>
+        thinkingBlockValidator?.[
+          "experimental.chat.messages.transform"
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ]?.(input, output as any),
+      );
     },
 
     config: configHandler,
 
     event: async (input) => {
-      await autoUpdateChecker?.event(input);
-      await claudeCodeHooks.event(input);
-      await backgroundNotificationHook?.event(input);
-      await sessionNotification?.(input);
-      await todoContinuationEnforcer?.handler(input);
-      await unstableAgentBabysitter?.event(input);
-      await contextWindowMonitor?.event(input);
-      await directoryAgentsInjector?.event(input);
-      await directoryReadmeInjector?.event(input);
-      await rulesInjector?.event(input);
-      await thinkMode?.event(input);
-      await anthropicContextWindowLimitRecovery?.event(input);
-      await agentUsageReminder?.event(input);
-      await agentSkillReminder?.event(input);
-      await categorySkillReminder?.event(input);
-      await interactiveBashSession?.event(input);
-      await ralphLoop?.event(input);
+      await runHook("auto-update-checker.event", () => autoUpdateChecker?.event(input));
+      await runHook("claude-code-hooks.event", () => claudeCodeHooks.event(input));
+      await runHook("background-notification.event", () =>
+        backgroundNotificationHook?.event(input),
+      );
+      await runHook("session-notification.event", () => sessionNotification?.(input));
+      await runHook("todo-continuation-enforcer.event", () =>
+        todoContinuationEnforcer?.handler(input),
+      );
+      await runHook("unstable-agent-babysitter.event", () =>
+        unstableAgentBabysitter?.event(input),
+      );
+      await runHook("context-window-monitor.event", () =>
+        contextWindowMonitor?.event(input),
+      );
+      await runHook("directory-agents-injector.event", () =>
+        directoryAgentsInjector?.event(input),
+      );
+      await runHook("directory-readme-injector.event", () =>
+        directoryReadmeInjector?.event(input),
+      );
+      await runHook("rules-injector.event", () => rulesInjector?.event(input));
+      await runHook("think-mode.event", () => thinkMode?.event(input));
+      await runHook("anthropic-context-window-limit-recovery.event", () =>
+        anthropicContextWindowLimitRecovery?.event(input),
+      );
+      await runHook("agent-usage-reminder.event", () =>
+        agentUsageReminder?.event(input),
+      );
+      await runHook("agent-skill-reminder.event", () =>
+        agentSkillReminder?.event(input),
+      );
+      await runHook("category-skill-reminder.event", () =>
+        categorySkillReminder?.event(input),
+      );
+      await runHook("interactive-bash-session.event", () =>
+        interactiveBashSession?.event(input),
+      );
+      await runHook("ralph-loop.event", () => ralphLoop?.event(input));
       if (sessionScorer && sessionScorer.event) {
-        await sessionScorer.event(input);
+        await runHook("session-scorer.event", () => sessionScorer?.event?.(input));
       }
-      await tddGuard?.event?.(input);
-      await planReorganizer?.handler(input);
-      await stopContinuationGuard?.event(input);
-      await atlasHook?.handler(input);
-      await observerDetector?.event(input as any);
-      await instinctLearner?.event(input as any);
-      await patternExtraction?.event(input as any);
-      await skillAutoInjector?.event(input as any);
+      await runHook("tdd-guard.event", () => tddGuard?.event?.(input));
+      await runHook("plan-reorganizer.event", () => planReorganizer?.handler(input));
+      await runHook("stop-continuation-guard.event", () =>
+        stopContinuationGuard?.event(input),
+      );
+      await runHook("atlas.event", () => atlasHook?.handler(input));
+      await runHook("observer-detector.event", () => observerDetector?.event(input as any));
+      await runHook("instinct-learner.event", () => instinctLearner?.event(input as any));
+      await runHook("pattern-extraction.event", () => patternExtraction?.event(input as any));
+      await runHook("skill-auto-injector.event", () => skillAutoInjector?.event(input as any));
+      await runHook("final-audit.event", () => {
+        const eventType = input.event.type as string;
+        if (eventType !== "session.stop") {
+          return;
+        }
+
+        void finalAudit
+          .runAudit()
+          .then((result) => {
+            const report = finalAudit.generateReport(result);
+            log("[final-audit] Stop-stage final audit completed", {
+              overallSuccess: result.overallSuccess,
+            });
+            log(`[final-audit]\n${report}`);
+          })
+          .catch((error) => {
+            log("[final-audit] Stop-stage final audit failed", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
+      });
 
       const { event } = input;
       const props = event.properties as Record<string, unknown> | undefined;
@@ -942,26 +1041,64 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     },
 
     "tool.execute.before": async (input, output) => {
-      await subagentQuestionBlocker["tool.execute.before"]?.(input, output);
-      await writeExistingFileGuard?.["tool.execute.before"]?.(input, output);
-      await tasksMdCreationGuard?.["tool.execute.before"]?.(input, output);
-      await questionLabelTruncator["tool.execute.before"]?.(input, output);
-      await claudeCodeHooks["tool.execute.before"](input, output);
-      await nonInteractiveEnv?.["tool.execute.before"](input, output);
-      await commentChecker?.["tool.execute.before"]?.(input, output);
-      await directoryAgentsInjector?.["tool.execute.before"]?.(input, output);
-      await directoryReadmeInjector?.["tool.execute.before"]?.(input, output);
-      await rulesInjector?.["tool.execute.before"]?.(input, output);
-      await commitSizeChecker?.["tool.execute.before"]?.(input, output);
+      await runHook("subagent-question-blocker.tool.execute.before", () =>
+        subagentQuestionBlocker["tool.execute.before"]?.(input, output),
+      );
+      await runHook("write-existing-file-guard.tool.execute.before", () =>
+        writeExistingFileGuard?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("tasks-md-creation-guard.tool.execute.before", () =>
+        tasksMdCreationGuard?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("question-label-truncator.tool.execute.before", () =>
+        questionLabelTruncator["tool.execute.before"]?.(input, output),
+      );
+      await runHook("claude-code-hooks.tool.execute.before", () =>
+        claudeCodeHooks["tool.execute.before"](input, output),
+      );
+      await runHook("non-interactive-env.tool.execute.before", () =>
+        nonInteractiveEnv?.["tool.execute.before"](input, output),
+      );
+      await runHook("comment-checker.tool.execute.before", () =>
+        commentChecker?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("directory-agents-injector.tool.execute.before", () =>
+        directoryAgentsInjector?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("directory-readme-injector.tool.execute.before", () =>
+        directoryReadmeInjector?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("rules-injector.tool.execute.before", () =>
+        rulesInjector?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("commit-size-checker.tool.execute.before", () =>
+        commitSizeChecker?.["tool.execute.before"]?.(input, output),
+      );
       // Note: tasksTodowriteDisabler NOT registered to keep TodoWrite available
-      await prometheusMdOnly?.["tool.execute.before"]?.(input, output);
-      await tddGuard?.["tool.execute.before"]?.(input, output);
-      await codebaseAssessment?.["tool.execute.before"]?.(input, output);
-      await mdselReminder?.["tool.execute.before"]?.(input, output);
-      await sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output);
-      await notepadWriteGuard?.["tool.execute.before"]?.(input, output);
-      await observationWriteGuard?.["tool.execute.before"]?.(input, output);
-      await secretScanner?.["tool.execute.before"]?.(input, output);
+      await runHook("prometheus-md-only.tool.execute.before", () =>
+        prometheusMdOnly?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("tdd-guard.tool.execute.before", () =>
+        tddGuard?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("codebase-assessment.tool.execute.before", () =>
+        codebaseAssessment?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("mdsel-reminder.tool.execute.before", () =>
+        mdselReminder?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("sisyphus-junior-notepad.tool.execute.before", () =>
+        sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("notepad-write-guard.tool.execute.before", () =>
+        notepadWriteGuard?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("observation-write-guard.tool.execute.before", () =>
+        observationWriteGuard?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("secret-scanner.tool.execute.before", () =>
+        secretScanner?.["tool.execute.before"]?.(input, output),
+      );
       
       // Check if any hook blocked the operation
       if ((output as { blocked?: boolean }).blocked) {
@@ -969,10 +1106,18 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         throw new Error(blockMessage);
       }
       
-      await instinctTrigger?.["tool.execute.before"]?.(input, output);
-      await planUpdateReminder?.["tool.execute.before"]?.(input, output);
-      await knowledgeInjection?.["tool.execute.before"]?.(input, output);
-      await atlasHook?.["tool.execute.before"]?.(input, output);
+      await runHook("instinct-trigger.tool.execute.before", () =>
+        instinctTrigger?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("plan-update-reminder.tool.execute.before", () =>
+        planUpdateReminder?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("knowledge-injection.tool.execute.before", () =>
+        knowledgeInjection?.["tool.execute.before"]?.(input, output),
+      );
+      await runHook("atlas.tool.execute.before", () =>
+        atlasHook?.["tool.execute.before"]?.(input, output),
+      );
 
       if (input.tool === "task") {
         const args = output.args as Record<string, unknown>;
@@ -1061,48 +1206,108 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       if (!output) {
         return;
       }
-      await claudeCodeHooks["tool.execute.after"](input, output);
-      await tasksMdCreationGuard?.["tool.execute.after"]?.(input, output);
-      await toolOutputTruncator?.["tool.execute.after"](input, output);
-      await preemptiveCompaction?.["tool.execute.after"](input, output);
-      await contextWindowMonitor?.["tool.execute.after"](input, output);
-      await commentChecker?.["tool.execute.after"](input, output);
-      await directoryAgentsInjector?.["tool.execute.after"](input, output);
-      await directoryReadmeInjector?.["tool.execute.after"](input, output);
-      await rulesInjector?.["tool.execute.after"](input, output);
-      await emptyTaskResponseDetector?.["tool.execute.after"](input, output);
-      await agentUsageReminder?.["tool.execute.after"](input, output);
-      await categorySkillReminder?.["tool.execute.after"](input, output);
-      await interactiveBashSession?.["tool.execute.after"](input, output);
-      await editErrorRecovery?.["tool.execute.after"](input, output);
-      await delegateTaskRetry?.["tool.execute.after"](input, output);
-      await atlasHook?.["tool.execute.after"]?.(input, output);
-      await taskResumeInfo["tool.execute.after"](input, output);
-      await planUpdateReminder?.["tool.execute.after"]?.(input, output);
-      await tddGuard?.["tool.execute.after"]?.(input, output);
-      await planningFlowGuide?.["tool.execute.after"]?.(input, output);
-      await subagentVerification?.["tool.execute.after"]?.(input, output);
-      await lspDiagnosticsEnforcer?.["tool.execute.after"]?.(input, output);
-      await phaseFlowEnforcer?.["tool.execute.after"]?.(input, output);
-      await mdselReminder?.["tool.execute.after"]?.(input, output);
-      await observationRecorder?.["tool.execute.after"]?.(input, output);
-      await observerDetector?.["tool.execute.after"]?.(input, output);
-      await instinctLearner?.["tool.execute.after"]?.(input, output);
-      await behaviorAnchor?.["tool.execute.after"]?.(input, output);
-      await verbosityController?.["tool.execute.after"]?.(input, output);
+      await runHook("claude-code-hooks.tool.execute.after", () =>
+        claudeCodeHooks["tool.execute.after"](input, output),
+      );
+      await runHook("tasks-md-creation-guard.tool.execute.after", () =>
+        tasksMdCreationGuard?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("tool-output-truncator.tool.execute.after", () =>
+        toolOutputTruncator?.["tool.execute.after"](input, output),
+      );
+      await runHook("preemptive-compaction.tool.execute.after", () =>
+        preemptiveCompaction?.["tool.execute.after"](input, output),
+      );
+      await runHook("context-window-monitor.tool.execute.after", () =>
+        contextWindowMonitor?.["tool.execute.after"](input, output),
+      );
+      await runHook("comment-checker.tool.execute.after", () =>
+        commentChecker?.["tool.execute.after"](input, output),
+      );
+      await runHook("directory-agents-injector.tool.execute.after", () =>
+        directoryAgentsInjector?.["tool.execute.after"](input, output),
+      );
+      await runHook("directory-readme-injector.tool.execute.after", () =>
+        directoryReadmeInjector?.["tool.execute.after"](input, output),
+      );
+      await runHook("rules-injector.tool.execute.after", () =>
+        rulesInjector?.["tool.execute.after"](input, output),
+      );
+      await runHook("empty-task-response-detector.tool.execute.after", () =>
+        emptyTaskResponseDetector?.["tool.execute.after"](input, output),
+      );
+      await runHook("agent-usage-reminder.tool.execute.after", () =>
+        agentUsageReminder?.["tool.execute.after"](input, output),
+      );
+      await runHook("category-skill-reminder.tool.execute.after", () =>
+        categorySkillReminder?.["tool.execute.after"](input, output),
+      );
+      await runHook("interactive-bash-session.tool.execute.after", () =>
+        interactiveBashSession?.["tool.execute.after"](input, output),
+      );
+      await runHook("edit-error-recovery.tool.execute.after", () =>
+        editErrorRecovery?.["tool.execute.after"](input, output),
+      );
+      await runHook("delegate-task-retry.tool.execute.after", () =>
+        delegateTaskRetry?.["tool.execute.after"](input, output),
+      );
+      await runHook("atlas.tool.execute.after", () =>
+        atlasHook?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("task-resume-info.tool.execute.after", () =>
+        taskResumeInfo["tool.execute.after"](input, output),
+      );
+      await runHook("plan-update-reminder.tool.execute.after", () =>
+        planUpdateReminder?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("tdd-guard.tool.execute.after", () =>
+        tddGuard?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("planning-flow-guide.tool.execute.after", () =>
+        planningFlowGuide?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("subagent-verification.tool.execute.after", () =>
+        subagentVerification?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("lsp-diagnostics-enforcer.tool.execute.after", () =>
+        lspDiagnosticsEnforcer?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("phase-flow-enforcer.tool.execute.after", () =>
+        phaseFlowEnforcer?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("mdsel-reminder.tool.execute.after", () =>
+        mdselReminder?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("observation-recorder.tool.execute.after", () =>
+        observationRecorder?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("observer-detector.tool.execute.after", () =>
+        observerDetector?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("instinct-learner.tool.execute.after", () =>
+        instinctLearner?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("behavior-anchor.tool.execute.after", () =>
+        behaviorAnchor?.["tool.execute.after"]?.(input, output),
+      );
+      await runHook("verbosity-controller.tool.execute.after", () =>
+        verbosityController?.["tool.execute.after"]?.(input, output),
+      );
     },
 
     "experimental.session.compacting": async (input: { sessionID: string }) => {
       if (!compactionContextInjector) {
         return;
       }
-      await compactionContextInjector({
-        sessionID: input.sessionID,
-        providerID: "anthropic",
-        modelID: "claude-opus-4-5",
-        usageRatio: 0.8,
-        directory: ctx.directory,
-      });
+      await runHook("compaction-context-injector.experimental.session.compacting", () =>
+        compactionContextInjector({
+          sessionID: input.sessionID,
+          providerID: "anthropic",
+          modelID: "claude-opus-4-5",
+          usageRatio: 0.8,
+          directory: ctx.directory,
+        }),
+      );
     },
   };
 };

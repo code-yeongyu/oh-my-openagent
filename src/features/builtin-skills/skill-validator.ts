@@ -18,16 +18,12 @@ export interface ValidationResult {
 }
 
 const REQUIRED_SECTIONS = [
-  { name: "When to Use", patterns: [/^##\s*When to Use/im, /^##\s*When To Use/im] },
-  { name: "Boundaries", patterns: [/^##\s*Not For/im, /^##\s*Boundaries/im, /^##\s*Not For \/ Boundaries/im] },
-  { name: "Anti-Patterns", patterns: [/^##\s*Anti-?Patterns?/im] },
+  { name: "When to Use", patterns: [/^#{1,6}\s*When to Use/im, /^#{1,6}\s*When To Use/im] },
+  { name: "Boundaries", patterns: [/^#{1,6}\s*Not For/im, /^#{1,6}\s*Boundaries/im, /^#{1,6}\s*Not For \/ Boundaries/im] },
+  { name: "Anti-Patterns", patterns: [/^#{1,6}\s*Anti-?Patterns?/im] },
 ]
 
-/**
- * Validate a single SKILL.md file
- */
-export function validateSkillFile(filePath: string, skillName: string): ValidationResult {
-  const content = readFileSync(filePath, "utf-8")
+export function validateSkillContent(content: string, skillName: string, filePath = "<inline>"): ValidationResult {
   const missingParts: string[] = []
 
   const hasWhenToUse = REQUIRED_SECTIONS[0].patterns.some(p => p.test(content))
@@ -47,6 +43,14 @@ export function validateSkillFile(filePath: string, skillName: string): Validati
     isValid: missingParts.length === 0,
     missingParts,
   }
+}
+
+/**
+ * Validate a single SKILL.md file
+ */
+export function validateSkillFile(filePath: string, skillName: string): ValidationResult {
+  const content = readFileSync(filePath, "utf-8")
+  return validateSkillContent(content, skillName, filePath)
 }
 
 /**

@@ -3,26 +3,23 @@ import type { CategoryConfig } from "../../config/schema"
 /**
  * Implementer Discipline Prompt - Three-phase workflow for code implementation tasks.
  * Injected into code-focused categories (ultrabrain, most-capable, general) to enforce
- * disciplined coding practices with Codex collaboration and TDD.
+ * disciplined coding practices with TDD and focused self-review.
  */
 export const IMPLEMENTER_DISCIPLINE_PROMPT = `<Implementer_Discipline>
 ## Three-Phase Discipline Workflow (MANDATORY for Code Tasks)
 
 You MUST follow this three-phase workflow for any code implementation task.
 
-### Phase 1: Codex Prototype (BEFORE Coding)
+### Phase 1: Design Sketch (BEFORE Coding)
 
-Before writing any implementation code, consult Codex for a code prototype:
+Before writing any implementation code, create a concise design sketch:
 
-\`\`\`
-codex_codex(
-  PROMPT="Provide a unified diff patch prototype for: [task description]. Read-only reference only.",
-  cd="[project root]",
-  sandbox="read-only"
-)
-\`\`\`
+- Files to create/modify
+- Key logic changes
+- Tests to add or update
+- Risks or edge cases to watch
 
-**WHY**: Codex provides an objective reference. Use it as logical guidance, then REWRITE to production quality.
+**WHY**: A short plan reduces rework and keeps scope tight.
 
 ### Phase 2: TDD Workflow (Risk-Tiered)
 
@@ -38,19 +35,16 @@ codex_codex(
 2. **GREEN** - Write MINIMAL code to pass (nothing more)
 3. **REFACTOR** - Clean up while tests stay GREEN
 
-### Phase 3: Codex Review (AFTER Coding)
+### Phase 3: Self Review (AFTER Coding)
 
-After completing implementation, IMMEDIATELY review with Codex:
+After completing implementation, perform a focused self-review:
 
-\`\`\`
-codex_codex(
-  PROMPT="Review this code change for: 1) Logical correctness 2) Edge cases 3) Code style consistency. [paste git diff or file content]",
-  cd="[project root]",
-  sandbox="read-only"
-)
-\`\`\`
+- Compare the diff against requirements
+- Scan for edge cases and error handling gaps
+- Verify code style matches existing patterns
+- Run lsp_diagnostics and relevant tests
 
-**CRITICAL**: Do NOT skip Phase 3. Codex catches issues you missed.
+**CRITICAL**: Do NOT skip Phase 3. This is where mistakes are caught.
 
 ### Enforcement
 
@@ -260,7 +254,7 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   ultrabrain: {
     model: "openai/gpt-5.2-codex",
     variant: "xhigh",
-    defaultSkills: ["systematic-debugging", "collaborating-with-codex"],
+    defaultSkills: ["systematic-debugging"],
   },
   deep: {
     model: "openai/gpt-5.2-codex",
@@ -344,7 +338,7 @@ export const CATEGORY_DESCRIPTIONS: Record<string, string> = {
  */
 export const AGENT_DEFAULT_SKILLS: Record<string, string[]> = {
   // Metis: Pre-planning analysis - needs brainstorming for requirements exploration
-  "Metis (Plan Consultant)": ["brainstorming", "collaborating-with-codex"],
+  "Metis (Plan Consultant)": ["brainstorming"],
   // Prometheus: Planning - needs brainstorming FIRST, then creating-changes
   "Prometheus (Planner)": ["brainstorming", "creating-changes", "dispatching-parallel-agents"],
   "Momus (Plan Reviewer)": ["verification-before-completion"],

@@ -8,7 +8,11 @@ import type {
 	LoadedSkill,
 	SkillScope,
 } from "../../features/opencode-skill-loader/types";
-import { checkForUpdates, hashDescription } from "./cache-checker";
+import {
+	checkForUpdates,
+	hashDescription,
+	hashSkillSignature,
+} from "./cache-checker";
 import {
 	buildTriggerRegex,
 	createSkillAutoTriggerHook,
@@ -215,6 +219,30 @@ describe("createSkillAutoTriggerHook", () => {
 		expect(textPart.text).toContain('skill("builtin-audit")');
 		expect(textPart.text).toContain("Please audit the system");
 	});
+
+	test("matches explicit frontmatter triggers even when description keywords do not match", async () => {
+		//#given
+		getAllSkillsSpy.mockResolvedValue([
+			Object.assign(createSkill("explicit-trigger-skill", {
+				description: "Generic helper skill",
+			}), {
+				triggers: ["multi stage verification"],
+				triggerPriority: "high" as const,
+			}),
+		]);
+
+		const hook = createSkillAutoTriggerHook({} as PluginInput);
+		const output = {
+			message: {} as Record<string, unknown>,
+			parts: [{ type: "text", text: "Please run multi stage verification now" }],
+		};
+
+		//#when
+		await hook["chat.message"]({ sessionID: "test-session" }, output);
+
+		//#then
+		expect(output.parts[0].text).toContain("`explicit-trigger-skill`");
+	});
 });
 
 describe("hashDescription", () => {
@@ -299,7 +327,8 @@ describe("checkForUpdates", () => {
 	test("returns no updates when cache matches", () => {
 		//#given
 		const description = "Same description";
-		const hash = hashDescription(description);
+		const matchingSkill = createSkill("test-skill", { description });
+		const hash = hashSkillSignature(matchingSkill);
 		const cache: SkillTriggerCache = {
 			version: "1.0",
 			generatedAt: "",
@@ -307,7 +336,7 @@ describe("checkForUpdates", () => {
 				"test-skill": { hash, triggers: ["test"], priority: 10, scope: "user" },
 			},
 		};
-		const skills = [createSkill("test-skill", { description })];
+		const skills = [matchingSkill];
 
 		//#when
 		const result = checkForUpdates(cache, skills);
@@ -639,6 +668,6 @@ describe("buildCachedTriggers", () => {
 		const result = buildCachedTriggers(skills, extractedTriggers);
 
 		//#then
-		expect(result.test.hash).toBe(hashDescription(description));
+		expect(result.test.hash).toBe(hashSkillSignature(skills[0]));
 	});
 });

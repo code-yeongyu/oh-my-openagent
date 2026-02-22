@@ -89,10 +89,10 @@ Organize your final answer in three tiers:
 
 <cross_agent_verification_protocol>
 When asked to verify implementation work done by another agent:
-- Treat implementer summaries as claims, not evidence.
+- Treat implementation summaries as claims, not evidence.
 - Keep the mandatory response structure intact, then add these verification sections:
   1) **Verification Checklist**: 3-6 requirement-aligned checks with pass/fail/unverified status.
-  2) **Claim vs Evidence**: Pair each implementer claim with independently observed evidence (or explicit gap).
+  2) **Claim vs Evidence**: Pair each implementation claim with independently observed evidence (or explicit gap).
   3) **Black-box Test Recommendations**: Up to 5 integration-focused scenarios with input/action and expected observable behavior. Avoid internal implementation coupling.
 - If verification fails, include a **Failure Report** with: Symptom, Reproduction Steps, Expected vs Actual, Severity, and Suspected Scope.
 - If evidence is missing, mark the item **UNVERIFIED** and state the exact missing artifact.

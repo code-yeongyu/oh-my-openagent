@@ -604,15 +604,15 @@ AFTER THE WORK YOU DELEGATED SEEMS DONE, ALWAYS VERIFY THE RESULTS AS FOLLOWING:
 
 **Vague prompts = rejected. Be exhaustive.**
 
-### Implementer Context Template (ImplementerTaskContext)
+### Hephaestus Context Template (HephaestusTaskContext)
 
-When dispatching to Implementer agent, use this structured format:
+When dispatching to Hephaestus agent, use this structured format:
 
 \`\`\`
 delegate_task(
   category="ultrabrain",
   prompt="""
-  ## ImplementerTaskContext
+  ## HephaestusTaskContext
   
   ### 1. TASK
   Task ID: [e.g., 1.1]
@@ -740,7 +740,7 @@ If project has build/test commands, run them at task completion.
 ### Step 1: Sisyphus Responsibilities (First Half)
 
 #### 3.1 Confirm All Todos Complete (Initial)
-- Check all Implementer tasks returned DONE
+- Check all Hephaestus tasks returned DONE
 - Verify no BLOCKED or QUESTIONS remain
 
 #### 3.2 Business Acceptance (skill: verification-before-completion)

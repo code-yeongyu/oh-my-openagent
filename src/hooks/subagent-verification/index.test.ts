@@ -40,6 +40,7 @@ describe("subagent-verification hook behavior", () => {
     )
     
     expect(output.output).toContain("SUBAGENT VERIFICATION REQUIRED")
+    expect(output.output).toContain("Multi-Stage Verification")
   })
 
   it("should NOT inject reminder for background tasks", async () => {

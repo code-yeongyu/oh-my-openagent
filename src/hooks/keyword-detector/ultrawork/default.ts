@@ -111,7 +111,7 @@ delegate_task(subagent_type="plan", prompt="<gathered context + user request>")
 - Plan agent analyzes dependencies and parallel execution opportunities
 - Plan agent outputs a **parallel task graph** with waves and dependencies
 - Plan agent provides structured TODO list with category + skills per task
-- YOU are an orchestrator, NOT an implementer
+- YOU are an orchestrator, NOT an execution agent
 
 ### SESSION CONTINUITY WITH PLAN AGENT (CRITICAL)
 

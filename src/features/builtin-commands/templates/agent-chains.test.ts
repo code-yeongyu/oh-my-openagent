@@ -45,7 +45,7 @@ describe("AgentChainManager", () => {
       expect(chain.steps).toHaveLength(4)
       expect(chain.steps[0].agent).toBe("explore")
       expect(chain.steps[1].agent).toBe("oracle")
-      expect(chain.steps[2].agent).toBe("implementer")
+      expect(chain.steps[2].agent).toBe("hephaestus")
       expect(chain.steps[3].agent).toBe("verifier")
     })
 
@@ -83,13 +83,13 @@ describe("AgentChainManager", () => {
       expect(chain.steps).toHaveLength(4)
       expect(chain.steps[0].agent).toBe("explore")
       expect(chain.steps[1].agent).toBe("oracle")
-      expect(chain.steps[2].agent).toBe("implementer")
+      expect(chain.steps[2].agent).toBe("hephaestus")
       expect(chain.steps[3].agent).toBe("verifier")
     })
 
-    it("should include LSP tools usage in implementer step", () => {
+    it("should include LSP tools usage in hephaestus step", () => {
       const chain = manager.getChain(ChainType.REFACTOR)
-      const implStep = chain.steps.find((s: AgentChainStep) => s.agent === "implementer")
+      const implStep = chain.steps.find((s: AgentChainStep) => s.agent === "hephaestus")
 
       expect(implStep?.tools).toContain("lsp")
     })

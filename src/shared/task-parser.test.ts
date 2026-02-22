@@ -76,8 +76,12 @@ describe("task-parser", () => {
   })
 
   describe("parseAgent", () => {
-    test("parses implementer", () => {
-      expect(parseAgent("<!-- agent: implementer -->")).toBe("implementer")
+    test("maps implementer to hephaestus", () => {
+      expect(parseAgent("<!-- agent: implementer -->")).toBe("hephaestus")
+    })
+
+    test("parses hephaestus", () => {
+      expect(parseAgent("<!-- agent: hephaestus -->")).toBe("hephaestus")
     })
 
     test("parses frontend-ui-ux-engineer", () => {
@@ -88,8 +92,8 @@ describe("task-parser", () => {
       expect(parseAgent("<!-- agent: document-writer -->")).toBe("document-writer")
     })
 
-    test("defaults to implementer when not specified", () => {
-      expect(parseAgent("### Task 1.1: Do something")).toBe("implementer")
+    test("defaults to hephaestus when not specified", () => {
+      expect(parseAgent("### Task 1.1: Do something")).toBe("hephaestus")
     })
   })
 
@@ -245,7 +249,7 @@ Body here
       expect(task!.name).toBe("Implement base module")
       expect(task!.riskTier).toBe(2)
       expect(task!.taskType).toBe("code")
-      expect(task!.agent).toBe("implementer")
+      expect(task!.agent).toBe("hephaestus")
       expect(task!.files.create).toEqual(["src/core/base.ts"])
       expect(task!.acceptance.length).toBe(1)
       expect(task!.tddNotes.length).toBe(1)
@@ -265,7 +269,7 @@ Body here
           riskTier: 2,
           dependsOn: [],
           taskType: "code",
-          agent: "implementer",
+          agent: "hephaestus",
           files: { create: [], modify: ["src/index.ts"], test: [] },
           acceptance: [],
           tddNotes: [],
@@ -276,7 +280,7 @@ Body here
           riskTier: 2,
           dependsOn: [],
           taskType: "code",
-          agent: "implementer",
+          agent: "hephaestus",
           files: { create: [], modify: ["src/index.ts"], test: [] },
           acceptance: [],
           tddNotes: [],
@@ -297,7 +301,7 @@ Body here
           riskTier: 2,
           dependsOn: [],
           taskType: "code",
-          agent: "implementer",
+          agent: "hephaestus",
           files: { create: ["src/a.ts"], modify: [], test: [] },
           acceptance: [],
           tddNotes: [],
@@ -308,7 +312,7 @@ Body here
           riskTier: 2,
           dependsOn: [],
           taskType: "code",
-          agent: "implementer",
+          agent: "hephaestus",
           files: { create: ["src/b.ts"], modify: [], test: [] },
           acceptance: [],
           tddNotes: [],

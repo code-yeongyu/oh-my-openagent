@@ -205,6 +205,39 @@ describe("ContextCollector", () => {
       const ids = pending.entries.map((e) => e.id)
       expect(ids).toEqual(["first", "second", "third"])
     })
+
+    it("uses relevance score for ordering within same source and priority", () => {
+      // given
+      const sessionID = "ses_relevance"
+      collector.register(sessionID, {
+        id: "source-file",
+        source: "custom",
+        content: "source context",
+        priority: "normal",
+        metadata: {
+          intentMode: "review",
+          resourcePath: "src/service/auth.ts",
+          resourceType: "source",
+        },
+      })
+      collector.register(sessionID, {
+        id: "test-file",
+        source: "custom",
+        content: "test context",
+        priority: "normal",
+        metadata: {
+          intentMode: "review",
+          resourcePath: "src/service/auth.test.ts",
+          resourceType: "test",
+        },
+      })
+
+      // when
+      const pending = collector.getPending(sessionID)
+
+      // then
+      expect(pending.entries.map((e) => e.id)).toEqual(["test-file", "source-file"])
+    })
   })
 
   describe("consume", () => {

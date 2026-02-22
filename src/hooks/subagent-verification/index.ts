@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { HOOK_NAME, VERIFICATION_REMINDER, DELEGATE_TASK_TOOL } from "./constants"
+import { runVerificationStages } from "../../features/verification"
 
 export * from "./constants"
 
@@ -50,7 +51,11 @@ export function createSubagentVerificationHook(_ctx: PluginInput) {
       }
 
       log(`[${HOOK_NAME}] Injecting verification reminder`, { sessionID })
-      output.output += `\n\n${VERIFICATION_REMINDER}`
+      const verificationResult = await runVerificationStages({
+        taskOutput: resultStr,
+        strictness: "medium",
+      })
+      output.output += `\n\n${VERIFICATION_REMINDER}\n\n${verificationResult.report}`
     },
   }
 }

@@ -30,6 +30,7 @@ export interface DoctorOptions {
   verbose?: boolean
   json?: boolean
   category?: CheckCategory
+  test?: boolean
 }
 
 export interface DoctorSummary {

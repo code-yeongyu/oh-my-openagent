@@ -4,6 +4,7 @@ import type { LoadedSkill } from "./types"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { readFileSync } from "node:fs"
 import type { GitMasterConfig, BrowserAutomationProvider } from "../../config/schema"
+import { validateSkillContent } from "../builtin-skills/skill-validator"
 
 export interface SkillResolutionOptions {
 	gitMasterConfig?: GitMasterConfig
@@ -37,7 +38,19 @@ async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSki
 		),
 	])
 
-	const builtinSkillsAsLoaded: LoadedSkill[] = builtinSkillDefs.map((skill) => ({
+	const builtinSkillsAsLoaded: LoadedSkill[] = builtinSkillDefs.map((skill) => {
+		const validation = validateSkillContent(skill.template, skill.name)
+		const metadata = {
+			...(skill.metadata as Record<string, string> | undefined),
+			...(validation.isValid
+				? {}
+				: {
+					skill_validation_status: "invalid",
+					skill_validation_missing_sections: validation.missingParts.join(", "),
+				}),
+		}
+
+		return {
 		name: skill.name,
 		definition: {
 			name: skill.name,
@@ -50,10 +63,11 @@ async function getAllSkills(options?: SkillResolutionOptions): Promise<LoadedSki
 		scope: "builtin" as const,
 		license: skill.license,
 		compatibility: skill.compatibility,
-		metadata: skill.metadata as Record<string, string> | undefined,
+		metadata,
 		allowedTools: skill.allowedTools,
 		mcpConfig: skill.mcpConfig,
-	}))
+		}
+	})
 
 	const discoveredNames = new Set(discoveredSkills.map((s) => s.name))
 	const uniqueBuiltins = builtinSkillsAsLoaded.filter((s) => !discoveredNames.has(s.name))

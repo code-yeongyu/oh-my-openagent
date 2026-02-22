@@ -276,6 +276,39 @@ Skill.
       expect(skill?.mcpConfig?.["from-json"]).toBeDefined()
       expect(skill?.mcpConfig?.["from-yaml"]).toBeUndefined()
     })
+
+    it("parses hooks, triggers, and priority from SKILL.md frontmatter", async () => {
+      // given
+      const skillContent = `---
+name: async-frontmatter
+description: Async frontmatter metadata
+hooks:
+  - tool.execute.after
+triggers:
+  - async verify
+  - quality gate
+priority: low
+---
+Skill body.
+`
+      createTestSkill("async-frontmatter", skillContent)
+
+      // when
+      const { discoverSkillsInDirAsync } = await import("./async-loader")
+      const skills = await discoverSkillsInDirAsync(SKILLS_DIR)
+
+      // then
+      const skill = skills.find((s: LoadedSkill) => s.name === "async-frontmatter")
+      expect(skill).toBeDefined()
+      const raw = skill as unknown as {
+        hooks?: string[]
+        triggers?: string[]
+        triggerPriority?: "high" | "medium" | "low"
+      }
+      expect(raw.hooks).toEqual(["tool.execute.after"])
+      expect(raw.triggers).toEqual(["async verify", "quality gate"])
+      expect(raw.triggerPriority).toBe("low")
+    })
   })
 
   describe("mapWithConcurrency", () => {

@@ -108,3 +108,4 @@ export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";
 export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createTasksMdCreationGuardHook } from "./tasks-md-creation-guard";
 export { createCommitSizeChecker } from "./pre-tool-use/commit-size-checker";
+export { createFinalAuditHook } from "./stop/final-audit-hook";

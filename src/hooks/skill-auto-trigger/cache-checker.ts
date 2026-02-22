@@ -14,6 +14,17 @@ export function hashDescription(description: string): string {
   return Math.abs(hash).toString(16)
 }
 
+export function hashSkillSignature(skill: LoadedSkill): string {
+  const description = skill.definition?.description ?? ""
+  const signature = JSON.stringify({
+    description,
+    hooks: skill.hooks ?? [],
+    triggers: skill.triggers ?? [],
+    triggerPriority: skill.triggerPriority ?? "medium",
+  })
+  return hashDescription(signature)
+}
+
 export interface UpdateCheckResult {
   /** Skills that are new (not in cache) */
   newSkills: LoadedSkill[]
@@ -38,11 +49,10 @@ export function checkForUpdates(
   const currentSkillNames = new Set<string>()
   
   for (const skill of currentSkills) {
-    const description = skill.definition?.description
-    if (!description) continue
+    if (!skill.definition?.description) continue
     
     currentSkillNames.add(skill.name)
-    const currentHash = hashDescription(description)
+    const currentHash = hashSkillSignature(skill)
     const cached = cache.skills[skill.name]
     
     if (!cached) {

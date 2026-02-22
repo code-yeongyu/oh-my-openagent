@@ -11,14 +11,17 @@
  */
 
 import { isAbsolute, join, relative } from "node:path"
+import { existsSync, readFileSync } from "node:fs"
 import type { TddGuardConfig } from "./types"
 import { DEFAULT_TDD_GUARD_CONFIG, EXEMPTION_PATTERNS } from "./constants"
 import { determineRiskTier, shouldBlockEdit, matchesIgnorePattern } from "./risk-validator"
-import { isTestFile } from "./language-adapter"
+import { getExpectedTestFilePath, isTestFile } from "./language-adapter"
 import { FileStorage } from "./storage"
 import { UserPromptHandler, SessionHandler, PostToolLintHandler } from "./handlers"
 import { executeTests } from "./test-executor"
 import { generateTestTemplate } from "./template-generator"
+import { checkAstCoverage } from "../../shared/ast-coverage-checker"
+import { checkIsolation } from "../../shared/isolation-checker"
 
 // Inline TDD skill content (loaded at module init, fallback if external file not found)
 const TDD_SKILL_CONTENT = `# TDD Workflow (Auto-Injected)
@@ -363,6 +366,42 @@ Consider running linting/type-checking to catch issues early:
 - Tests: \`bun test\` (if tests exist for this file)
 `
       output.output = (output.output || "") + lintReminder
+
+      const expectedTestPath = getExpectedTestFilePath(filePath)
+      if (!expectedTestPath) {
+        return
+      }
+
+      const sourceFilePath = isAbsolute(filePath) ? filePath : join(ctx.cwd, filePath)
+      const testFilePath = isAbsolute(expectedTestPath)
+        ? expectedTestPath
+        : join(ctx.cwd, expectedTestPath)
+
+      if (!existsSync(sourceFilePath) || !existsSync(testFilePath)) {
+        return
+      }
+
+      const sourceContent = readFileSync(sourceFilePath, "utf-8")
+      const testContent = readFileSync(testFilePath, "utf-8")
+
+      const coverageReport = checkAstCoverage(sourceContent, testContent)
+      if (coverageReport.uncovered.length > 0) {
+        output.output += `
+[TDD Guard - AST coverage]
+Test file: ${testFilePath}
+Uncovered exports: ${coverageReport.uncovered.join(", ")}
+Coverage: ${coverageReport.coveragePercent.toFixed(0)}%
+`
+      }
+
+      const isolationReport = checkIsolation(testContent)
+      if (!isolationReport.isolated) {
+        output.output += `
+[TDD Guard - Isolation]
+Test file: ${testFilePath}
+Violations: ${isolationReport.violations.join(", ")}
+`
+      }
     },
 
     // Handle session lifecycle events

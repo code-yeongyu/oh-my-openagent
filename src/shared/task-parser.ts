@@ -4,7 +4,7 @@ export type RiskTier = 0 | 1 | 2 | 3
 
 export type TaskType = "code" | "frontend" | "docs"
 
-export type AgentType = "implementer" | "frontend-ui-ux-engineer" | "document-writer"
+export type AgentType = "hephaestus" | "frontend-ui-ux-engineer" | "document-writer"
 
 export interface ParsedTaskFiles {
   create: string[]
@@ -40,7 +40,7 @@ const TASK_HEADER_REGEX = /^###\s+Task\s+([\d.]+):\s*(.+?)(?:\s*<!--.*-->)*\s*$/
 const DEPENDS_ON_REGEX = /<!--\s*depends_on:\s*([^>]+)\s*-->/i
 const RISK_TIER_REGEX = /<!--\s*Risk:\s*Tier-?(\d)\s*-->/i
 const TASK_TYPE_REGEX = /<!--\s*type:\s*(code|frontend|docs)\s*-->/i
-const AGENT_REGEX = /<!--\s*agent:\s*(implementer|frontend-ui-ux-engineer|document-writer)\s*-->/i
+const AGENT_REGEX = /<!--\s*agent:\s*(implementer|hephaestus|frontend-ui-ux-engineer|document-writer)\s*-->/i
 const FEATURE_NAME_REGEX = /^#\s+Tasks:\s*(.+)$/m
 
 export function parseRiskTier(line: string): RiskTier {
@@ -78,9 +78,9 @@ export function parseTaskType(line: string): TaskType {
 export function parseAgent(line: string): AgentType {
   const match = line.match(AGENT_REGEX)
   if (!match) {
-    return "implementer"
+    return "hephaestus"
   }
-  return match[1] as AgentType
+  return match[1] === "implementer" ? "hephaestus" : match[1] as AgentType
 }
 
 export function parseFilesSection(content: string): ParsedTaskFiles {

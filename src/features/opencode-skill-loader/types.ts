@@ -15,6 +15,9 @@ export interface SkillMetadata {
   metadata?: Record<string, string>
   "allowed-tools"?: string | string[]
   mcp?: SkillMcpConfig
+  hooks?: string[]
+  triggers?: string[]
+  priority?: "high" | "medium" | "low"
 }
 
 export interface LazyContentLoader {
@@ -34,5 +37,8 @@ export interface LoadedSkill {
   metadata?: Record<string, string>
   allowedTools?: string[]
   mcpConfig?: SkillMcpConfig
+  hooks?: string[]
+  triggers?: string[]
+  triggerPriority?: "high" | "medium" | "low"
   lazyContent?: LazyContentLoader
 }

@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import { createBuiltinMcps } from "./index"
+import * as fs from "node:fs"
+import { createBuiltinMcps, checkMcpToolCount } from "./index"
+import { getLogFilePath } from "../shared/logger"
+import { OhMyOpenCodeConfigSchema } from "../config/schema"
 
 describe("createBuiltinMcps", () => {
   test("should return all MCPs when disabled_mcps is empty", () => {
@@ -89,7 +92,7 @@ describe("createBuiltinMcps", () => {
     const originalTavilyKey = process.env.TAVILY_API_KEY
     delete process.env.TAVILY_API_KEY
     const disabledMcps = ["websearch"]
-    const config = { websearch: { provider: "tavily" as const } }
+    const config = OhMyOpenCodeConfigSchema.parse({ websearch: { provider: "tavily" } })
 
     try {
       // when
@@ -102,5 +105,56 @@ describe("createBuiltinMcps", () => {
     } finally {
       if (originalTavilyKey) process.env.TAVILY_API_KEY = originalTavilyKey
     }
+  })
+
+  test("should log warning using configured tool count threshold", () => {
+    // given
+    const disabledMcps: string[] = []
+    const config = OhMyOpenCodeConfigSchema.parse({
+      mcp: {
+        tool_count_warning_threshold: 2,
+      },
+    })
+    const logFile = getLogFilePath()
+    const before = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : ""
+
+    // when
+    const result = createBuiltinMcps(disabledMcps, config)
+    const after = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : ""
+
+    // then
+    expect(Object.keys(result)).toHaveLength(3)
+    expect(after.length).toBeGreaterThan(before.length)
+    expect(after).toContain(
+      "[MCP Warning] Tool count (3) exceeds threshold (2). Consider disabling unused MCPs to improve performance and reduce confusion.",
+    )
+  })
+
+})
+
+describe("checkMcpToolCount", () => {
+  test("should return warned false when under threshold", () => {
+    // given
+    const toolCount = 3
+
+    // when
+    const result = checkMcpToolCount(toolCount, { threshold: 3 })
+
+    // then
+    expect(result).toEqual({ warned: false })
+  })
+
+  test("should return warned true with warning message when above threshold", () => {
+    // given
+    const toolCount = 3
+
+    // when
+    const result = checkMcpToolCount(toolCount, { threshold: 2 })
+
+    // then
+    expect(result.warned).toBe(true)
+    expect(result.message).toBe(
+      "[MCP Warning] Tool count (3) exceeds threshold (2). Consider disabling unused MCPs to improve performance and reduce confusion.",
+    )
   })
 })

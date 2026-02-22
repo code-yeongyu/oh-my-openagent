@@ -76,7 +76,6 @@ export type BuiltinAgentName =
   | "oracle"
   | "librarian"
   | "explore"
-  | "implementer"
   | "archiver"
   | "frontend-ui-ux-engineer"
   | "document-writer"

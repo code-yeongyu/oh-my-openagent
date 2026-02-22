@@ -5,7 +5,6 @@ import { createSisyphusAgent } from "./sisyphus"
 import { createOracleAgent, ORACLE_PROMPT_METADATA } from "./oracle"
 import { createLibrarianAgent, LIBRARIAN_PROMPT_METADATA } from "./librarian"
 import { createExploreAgent, EXPLORE_PROMPT_METADATA } from "./explore"
-import { createImplementerAgent, IMPLEMENTER_PROMPT_METADATA } from "./implementer"
 import { createArchiverAgent, ARCHIVER_PROMPT_METADATA } from "./archiver"
 // Note: frontend-ui-ux-engineer and document-writer agents are not yet implemented
 // These will be added in a future update
@@ -34,7 +33,6 @@ const agentSources: Partial<Record<BuiltinAgentName, AgentSource>> = {
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
   explore: createExploreAgent,
-  implementer: createImplementerAgent,
   archiver: createArchiverAgent,
   // Note: frontend-ui-ux-engineer and document-writer are not yet implemented
   "multimodal-looker": createMultimodalLookerAgent,
@@ -55,7 +53,6 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   oracle: ORACLE_PROMPT_METADATA,
   librarian: LIBRARIAN_PROMPT_METADATA,
   explore: EXPLORE_PROMPT_METADATA,
-  implementer: IMPLEMENTER_PROMPT_METADATA,
   archiver: ARCHIVER_PROMPT_METADATA,
   // Note: frontend-ui-ux-engineer and document-writer metadata not available
   "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,

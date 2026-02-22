@@ -5,6 +5,7 @@ import yaml from "js-yaml"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { resolveSymlink, isMarkdownFile } from "../../shared/file-utils"
+import { parseSkillFrontmatter } from "../builtin-skills/frontmatter-parser"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkill } from "./types"
 import type { SkillMcpConfig } from "../skill-mcp-manager/types"
@@ -79,6 +80,7 @@ export async function loadSkillFromPathAsync(
   try {
     const content = await readFile(skillPath, "utf-8")
     const { data, body, parseError } = parseFrontmatter<SkillMetadata>(content)
+    const parsedSkillFrontmatter = parseSkillFrontmatter(content)
     if (parseError) return null
     
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
@@ -122,6 +124,9 @@ $ARGUMENTS
       metadata: data.metadata,
       allowedTools: parseAllowedTools(data["allowed-tools"]),
       mcpConfig,
+      hooks: parsedSkillFrontmatter.hooks,
+      triggers: parsedSkillFrontmatter.triggers,
+      triggerPriority: parsedSkillFrontmatter.priority,
     }
   } catch {
     return null

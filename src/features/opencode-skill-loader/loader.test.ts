@@ -386,6 +386,43 @@ Skill body.
         process.chdir(originalCwd)
       }
     })
+
+    it("parses hooks, triggers, and priority from SKILL.md frontmatter", async () => {
+      // given
+      const skillContent = `---
+name: frontmatter-skill
+description: Skill with trigger metadata
+hooks: [tool.execute.before, chat.message]
+triggers: ["verify flow", "multi stage"]
+priority: high
+---
+Skill body.
+`
+      createTestSkill("frontmatter-skill", skillContent)
+
+      // when
+      const { discoverSkills } = await import("./loader")
+      const originalCwd = process.cwd()
+      process.chdir(TEST_DIR)
+
+      try {
+        const skills = await discoverSkills({ includeClaudeCodePaths: false })
+        const skill = skills.find(s => s.name === "frontmatter-skill")
+
+        // then
+        expect(skill).toBeDefined()
+        const raw = skill as unknown as {
+          hooks?: string[]
+          triggers?: string[]
+          triggerPriority?: "high" | "medium" | "low"
+        }
+        expect(raw.hooks).toEqual(["tool.execute.before", "chat.message"])
+        expect(raw.triggers).toEqual(["verify flow", "multi stage"])
+        expect(raw.triggerPriority).toBe("high")
+      } finally {
+        process.chdir(originalCwd)
+      }
+    })
   })
 
   describe("deduplication", () => {

@@ -1,6 +1,8 @@
 import { injectHookMessage } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { createSystemDirective, SystemDirectiveTypes } from "../../shared/system-directive"
+import { AntiPatternTracker } from "../../shared/anti-pattern-tracker"
+import { join } from "node:path"
 import { markCompaction, isCompactionInProgress, markCompactionInProgress, clearCompactionInProgress } from "../compaction-state"
 
 export interface SummarizeContext {
@@ -66,6 +68,25 @@ This section is CRITICAL for reviewer agents (momus, oracle) to maintain continu
 This context is critical for maintaining continuity after compaction.
 `
 
+function buildFailedPatternsSection(directory: string): string {
+  const storagePath = join(directory, ".opencode", "anti-patterns.json")
+  const tracker = new AntiPatternTracker(storagePath)
+  const patterns = tracker
+    .getFailedPatterns()
+    .sort((a, b) => b.count - a.count || b.timestamp - a.timestamp)
+    .slice(0, 5)
+
+  if (patterns.length === 0) {
+    return "\n## 9. Known Failed Patterns\n- None recorded in anti-pattern tracker."
+  }
+
+  const lines = patterns.map((pattern) => {
+    return `- ${pattern.pattern}: ${pattern.reason} (count: ${pattern.count})`
+  })
+
+  return `\n## 9. Known Failed Patterns\n${lines.join("\n")}`
+}
+
 export function createCompactionContextInjector() {
   return async (ctx: SummarizeContext): Promise<void> => {
     log("[compaction-context-injector] injecting context", { sessionID: ctx.sessionID })
@@ -84,7 +105,9 @@ export function createCompactionContextInjector() {
       markCompaction(ctx.sessionID)
       log("[compaction-context-injector] marked compaction for cooldown", { sessionID: ctx.sessionID })
 
-      const success = injectHookMessage(ctx.sessionID, SUMMARIZE_CONTEXT_PROMPT, {
+      const promptWithFailedPatterns = `${SUMMARIZE_CONTEXT_PROMPT}${buildFailedPatternsSection(ctx.directory)}`
+
+      const success = injectHookMessage(ctx.sessionID, promptWithFailedPatterns, {
         agent: "general",
         model: { providerID: ctx.providerID, modelID: ctx.modelID },
         path: { cwd: ctx.directory },

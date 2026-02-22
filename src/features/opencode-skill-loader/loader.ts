@@ -6,6 +6,7 @@ import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { resolveSymlinkAsync, isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
+import { parseSkillFrontmatter } from "../builtin-skills/frontmatter-parser"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { SkillScope, SkillMetadata, LoadedSkill, LazyContentLoader } from "./types"
 import type { SkillMcpConfig } from "../skill-mcp-manager/types"
@@ -72,6 +73,7 @@ async function loadSkillFromPath(
   try {
     const content = await fs.readFile(skillPath, "utf-8")
     const { data, body } = parseFrontmatter<SkillMetadata>(content)
+    const parsedSkillFrontmatter = parseSkillFrontmatter(content)
     const frontmatterMcp = parseSkillMcpConfigFromFrontmatter(content)
     const mcpJsonMcp = await loadMcpJsonFromDir(resolvedPath)
     const mcpConfig = mcpJsonMcp || frontmatterMcp
@@ -125,6 +127,9 @@ $ARGUMENTS
       metadata: data.metadata,
       allowedTools: parseAllowedTools(data["allowed-tools"]),
       mcpConfig,
+      hooks: parsedSkillFrontmatter.hooks,
+      triggers: parsedSkillFrontmatter.triggers,
+      triggerPriority: parsedSkillFrontmatter.priority,
       lazyContent: eagerLoader,
     }
   } catch {

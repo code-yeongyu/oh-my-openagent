@@ -1,7 +1,6 @@
 import { createWebsearchConfig } from "./websearch"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
-import type { McpName } from "./types"
 import type { OhMyOpenCodeConfig } from "../config/schema"
 import { log } from "../shared/logger"
 import { resolveMcpTemplates } from "./templates"
@@ -73,6 +72,9 @@ export function createBuiltinMcps(disabledMcps: string[] = [], config?: OhMyOpen
       }
     }
   }
+
+  const toolCount = Object.keys(mcps).length
+  checkMcpToolCount(toolCount, { threshold: config?.mcp?.tool_count_warning_threshold })
 
   return mcps
 }

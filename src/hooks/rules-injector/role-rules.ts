@@ -10,7 +10,7 @@ export type AgentRole =
   | "explore"
   | "sisyphus"
   | "prometheus"
-  | "implementer"
+  | "hephaestus"
   | "frontend-ui-ux"
   | "default"
 
@@ -182,7 +182,8 @@ export function normalizeAgentRole(agentName: string): AgentRole {
   if (normalized.includes("explore")) return "explore"
   if (normalized.includes("sisyphus")) return "sisyphus"
   if (normalized.includes("prometheus") || normalized.includes("planner")) return "prometheus"
-  if (normalized.includes("implementer")) return "implementer"
+  if (normalized.includes("hephaestus")) return "hephaestus"
+  if (normalized.includes("implementer")) return "hephaestus"
   if (normalized.includes("frontend") || normalized.includes("ui-ux")) return "frontend-ui-ux"
   
   return "default"
@@ -223,8 +224,8 @@ export function getRulesForRole(
       return PROMETHEUS_RULES
     case "frontend-ui-ux":
       return FRONTEND_RULES
-    case "implementer":
-      return SISYPHUS_RULES // Implementer uses same rules as Sisyphus
+    case "hephaestus":
+      return SISYPHUS_RULES // Hephaestus uses same rules as Sisyphus
     default:
       return DEFAULT_RULES
   }
