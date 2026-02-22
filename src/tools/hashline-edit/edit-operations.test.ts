@@ -246,6 +246,36 @@ describe("hashline edit operations", () => {
     const result = applyReplaceLines(lines, anchorFor(lines, 2), anchorFor(lines, 3), ["return 3", "return 4"])
 
     //#then
-    expect(result).toEqual(["if (x) {", "  return 3", "return 4", "}"])
+    expect(result).toEqual(["if (x) {", "  return 3", "  return 4", "}"])
+  })
+
+  it("applies append and prepend operations", () => {
+    //#given
+    const content = "line 1\nline 2"
+
+    //#when
+    const result = applyHashlineEdits(content, [
+      { type: "append", text: ["line 3"] },
+      { type: "prepend", text: ["line 0"] },
+    ])
+
+    //#then
+    expect(result).toEqual("line 0\nline 1\nline 2\nline 3")
+  })
+
+  it("autocorrects single-line merged replacement into original line count", () => {
+    //#given
+    const lines = ["const a = 1;", "const b = 2;"]
+
+    //#when
+    const result = applyReplaceLines(
+      lines,
+      anchorFor(lines, 1),
+      anchorFor(lines, 2),
+      "const a = 10; const b = 20;"
+    )
+
+    //#then
+    expect(result).toEqual(["const a = 10;", "const b = 20;"])
   })
 })

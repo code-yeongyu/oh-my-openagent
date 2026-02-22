@@ -36,4 +36,22 @@ export interface Replace {
   new_text: string | string[]
 }
 
-export type HashlineEdit = SetLine | ReplaceLines | InsertAfter | InsertBefore | InsertBetween | Replace
+export interface Append {
+  type: "append"
+  text: string | string[]
+}
+
+export interface Prepend {
+  type: "prepend"
+  text: string | string[]
+}
+
+export type HashlineEdit =
+  | SetLine
+  | ReplaceLines
+  | InsertAfter
+  | InsertBefore
+  | InsertBetween
+  | Replace
+  | Append
+  | Prepend

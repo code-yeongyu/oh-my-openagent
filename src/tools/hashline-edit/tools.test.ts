@@ -216,4 +216,50 @@ describe("createHashlineEditTool", () => {
     expect(fs.existsSync(filePath)).toBe(false)
     expect(result).toContain("Successfully deleted")
   })
+
+  it("creates missing file with append and prepend", async () => {
+    //#given
+    const filePath = path.join(tempDir, "created.txt")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [
+          { type: "append", text: ["line2"] },
+          { type: "prepend", text: ["line1"] },
+        ],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.existsSync(filePath)).toBe(true)
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nline2")
+    expect(result).toContain("Successfully applied 2 edit(s)")
+  })
+
+  it("preserves BOM and CRLF through hashline_edit", async () => {
+    //#given
+    const filePath = path.join(tempDir, "crlf-bom.txt")
+    const bomCrLf = "\uFEFFline1\r\nline2\r\n"
+    fs.writeFileSync(filePath, bomCrLf)
+    const line2Hash = computeLineHash(2, "line2")
+
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "set_line", line: `2#${line2Hash}`, text: "line2-updated" }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    const bytes = fs.readFileSync(filePath)
+    expect(bytes[0]).toBe(0xef)
+    expect(bytes[1]).toBe(0xbb)
+    expect(bytes[2]).toBe(0xbf)
+    expect(bytes.toString("utf-8")).toBe("\uFEFFline1\r\nline2-updated\r\n")
+  })
 })
