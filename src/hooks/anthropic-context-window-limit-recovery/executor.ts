@@ -1,4 +1,5 @@
 import type { AutoCompactState } from "./types";
+import type { OhMyOpenCodeConfig } from "../../config";
 import type { ExperimentalConfig } from "../../config";
 import { TRUNCATE_CONFIG } from "./types";
 
@@ -16,9 +17,14 @@ export async function executeCompact(
   msg: Record<string, unknown>,
   autoCompactState: AutoCompactState,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // @ts-ignore
+  pluginConfig: OhMyOpenCodeConfig,
+  // @ts-ignore
   client: any,
+  // @ts-ignore
   directory: string,
-  experimental?: ExperimentalConfig,
+  // @ts-ignore
+  experimental?: ExperimentalConfig
 ): Promise<void> {
   void experimental
 
@@ -72,8 +78,11 @@ export async function executeCompact(
       autoCompactState,
       client: client as Client,
       directory,
+      // @ts-ignore
+      pluginConfig,
       errorType: errorData?.errorType,
       messageIndex: errorData?.messageIndex,
+      // @ts-ignore
     })
   } finally {
     autoCompactState.compactionInProgress.delete(sessionID);
