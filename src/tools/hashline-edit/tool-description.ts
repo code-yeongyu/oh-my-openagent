@@ -11,7 +11,7 @@ VALIDATION:
  Payload shape: { "filePath": string, "edits": [...], "delete"?: boolean, "rename"?: string }
  Each edit must be one of: set_line, replace_lines, insert_after, insert_before, insert_between, replace, append, prepend
  text/new_text must contain plain replacement text only (no LINE#ID prefixes, no diff + markers)
- CRITICAL: all operations validate against the same pre-edit file snapshot and apply bottom-up.
+ CRITICAL: all operations validate against the same pre-edit file snapshot and apply bottom-up. Refs/tags are interpreted against the last-read version of the file.
 
 LINE#ID FORMAT (CRITICAL):
  Each line reference must be in "LINE#ID" format where:
@@ -48,6 +48,7 @@ RULES (CRITICAL):
  5. Touch only requested code: avoid incidental edits.
  6. Use exact current tokens: NEVER rewrite approximately.
  7. For swaps/moves: prefer one range operation over multiple single-line operations.
+ 8. Output tool calls only; no prose or commentary between them.
 
 TAG CHOICE (ALWAYS):
  - Copy tags exactly from read output or >>> mismatch output.

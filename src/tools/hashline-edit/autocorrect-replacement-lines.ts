@@ -77,7 +77,21 @@ export function maybeExpandSingleLineMerge(
   let offset = 0
   let orderedMatch = true
   for (const part of parts) {
-    const idx = merged.indexOf(part, offset)
+    let idx = merged.indexOf(part, offset)
+    if (idx === -1) {
+      const stripped = stripTrailingContinuationTokens(part)
+      if (stripped !== part) {
+        idx = merged.indexOf(stripped, offset)
+      }
+    }
+    if (idx === -1) {
+      const mergeStripped = stripMergeOperatorChars(merged.slice(offset))
+      const partStripped = stripMergeOperatorChars(part)
+      const fuzzyIdx = mergeStripped.indexOf(partStripped)
+      if (fuzzyIdx !== -1) {
+        idx = offset + fuzzyIdx
+      }
+    }
     if (idx === -1) {
       orderedMatch = false
       break
