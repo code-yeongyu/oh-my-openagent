@@ -13,7 +13,7 @@ export async function createSyncSession(
     body: {
       parentID: input.parentSessionID,
       title: `${input.description} (@${input.agentToUse} subagent)`,
-    } as any,
+    } as Record<string, unknown>,
     query: {
       directory: parentDirectory,
     },
