@@ -47,6 +47,24 @@ describe("createToolExecuteAfterHandler surrogate sanitization", () => {
     expect(output.title).toBe("stored\uFFFD")
     expect(output.metadata).toEqual({ fromStore: "value\uFFFD" })
   })
-})
 
+  test("sanitizes MCP content array items", async () => {
+    const handler = createToolExecuteAfterHandler({ hooks: {} })
+
+    const input = { tool: "mcp_tool", sessionID: "ses_3", callID: "call_3" }
+    const output = {
+      content: [
+        { type: "text", text: "hello\uD800world" },
+        { type: "text", text: "ok" },
+        { type: "text", text: "bad\uDC00end" },
+      ],
+    }
+
+    await handler(input, output)
+
+    expect(output.content[0].text).toBe("hello\uFFFDworld")
+    expect(output.content[1].text).toBe("ok")
+    expect(output.content[2].text).toBe("bad\uFFFDend")
+  })
+})
 export {}

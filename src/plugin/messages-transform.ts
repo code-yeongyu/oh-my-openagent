@@ -14,7 +14,8 @@ export function createMessagesTransformHandler(args: {
   hooks: CreatedHooks
 }): (input: Record<string, never>, output: MessagesTransformOutput) => Promise<void> {
   return async (input, output): Promise<void> => {
-    output.messages = deepSanitizeSurrogates(output.messages) as MessageWithParts[]
+    const sanitizedBefore = deepSanitizeSurrogates(output.messages) as MessageWithParts[]
+    output.messages.splice(0, output.messages.length, ...sanitizedBefore)
 
     await args.hooks.contextInjectorMessagesTransform?.[
       "experimental.chat.messages.transform"
@@ -24,6 +25,7 @@ export function createMessagesTransformHandler(args: {
       "experimental.chat.messages.transform"
     ]?.(input, output)
 
-    output.messages = deepSanitizeSurrogates(output.messages) as MessageWithParts[]
+    const sanitizedAfter = deepSanitizeSurrogates(output.messages) as MessageWithParts[]
+    output.messages.splice(0, output.messages.length, ...sanitizedAfter)
   }
 }
