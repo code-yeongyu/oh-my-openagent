@@ -96,8 +96,8 @@ describe("findNearestMessageExcludingCompaction", () => {
         agent: "sisyphus",
         model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
       }
-      writeFileSync(join(tempDir, "001.json"), JSON.stringify(compactionMessage))
-      writeFileSync(join(tempDir, "002.json"), JSON.stringify(validMessage))
+      writeFileSync(join(tempDir, "002.json"), JSON.stringify(compactionMessage))
+      writeFileSync(join(tempDir, "001.json"), JSON.stringify(validMessage))
 
       // when
       const result = findNearestMessageExcludingCompaction(tempDir)
@@ -155,8 +155,8 @@ describe("findNearestMessageExcludingCompaction", () => {
         agent: "oracle",
         model: { providerID: "google", modelID: "gemini-2-flash" },
       }
-      writeFileSync(join(tempDir, "001.json"), invalidJson)
-      writeFileSync(join(tempDir, "002.json"), JSON.stringify(validMessage))
+      writeFileSync(join(tempDir, "002.json"), invalidJson)
+      writeFileSync(join(tempDir, "001.json"), JSON.stringify(validMessage))
 
       // when
       const result = findNearestMessageExcludingCompaction(tempDir)
