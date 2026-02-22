@@ -84,6 +84,7 @@ export function applyToolConfig(params: {
       question: questionPermission,
       "task_*": "allow",
       teammate: "allow",
+      ...denyTodoTools,
     };
   }
   const junior = agentByKey(params.agentResult, "sisyphus-junior");
@@ -93,6 +94,7 @@ export function applyToolConfig(params: {
       task: "allow",
       "task_*": "allow",
       teammate: "allow",
+      ...denyTodoTools,
     };
   }
 
