@@ -64,7 +64,9 @@ describe("process-cleanup", () => {
 
       registerManagerForCleanup(manager)
 
-      const [, listener] = processOnCalls[0]
+      const exitEntry = processOnCalls.find(([signal]) => signal === "exit")
+      expect(exitEntry).toBeDefined()
+      const [, listener] = exitEntry!
       listener()
 
       expect(mockShutdown).toHaveBeenCalled()
@@ -83,7 +85,9 @@ describe("process-cleanup", () => {
       registerManagerForCleanup(manager2)
       registerManagerForCleanup(manager3)
 
-      const [, listener] = processOnCalls[0]
+      const exitEntry = processOnCalls.find(([signal]) => signal === "exit")
+      expect(exitEntry).toBeDefined()
+      const [, listener] = exitEntry!
       listener()
 
       expect(shutdown1).toHaveBeenCalledTimes(1)
@@ -144,7 +148,9 @@ describe("process-cleanup", () => {
       registerManagerForCleanup(manager1)
       registerManagerForCleanup(manager2)
 
-      const [, listener] = processOnCalls[0]
+      const exitEntry = processOnCalls.find(([signal]) => signal === "exit")
+      expect(exitEntry).toBeDefined()
+      const [, listener] = exitEntry!
       unregisterManagerForCleanup(manager2)
 
       listener()

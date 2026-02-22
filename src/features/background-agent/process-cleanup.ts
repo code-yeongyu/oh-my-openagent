@@ -11,7 +11,7 @@ function registerProcessSignal(
     handler()
     if (exitAfter) {
       process.exitCode = 0
-      setTimeout(() => process.exit(), 6000)
+      setTimeout(() => process.exit(), 6000).unref()
     }
   }
   process.on(signal, listener)
