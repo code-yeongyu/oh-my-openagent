@@ -7,9 +7,11 @@ import {
   DEFAULT_MAX_DEPTH,
   DEFAULT_MAX_OUTPUT_BYTES,
   RG_FILES_FLAGS,
+  DEFAULT_RG_THREADS,
 } from "./constants"
 import type { GlobOptions, GlobResult, FileMatch } from "./types"
 import { stat } from "node:fs/promises"
+import { rgSemaphore } from "../shared/semaphore"
 
 export interface ResolvedCli {
   path: string
@@ -19,6 +21,7 @@ export interface ResolvedCli {
 function buildRgArgs(options: GlobOptions): string[] {
   const args: string[] = [
     ...RG_FILES_FLAGS,
+    `--threads=${Math.min(options.threads ?? DEFAULT_RG_THREADS, DEFAULT_RG_THREADS)}`,
     `--max-depth=${Math.min(options.maxDepth ?? DEFAULT_MAX_DEPTH, DEFAULT_MAX_DEPTH)}`,
   ]
 
@@ -89,6 +92,18 @@ async function getFileMtime(filePath: string): Promise<number> {
 export { buildRgArgs, buildFindArgs, buildPowerShellCommand }
 
 export async function runRgFiles(
+  options: GlobOptions,
+  resolvedCli?: ResolvedCli
+): Promise<GlobResult> {
+  await rgSemaphore.acquire()
+  try {
+    return await runRgFilesInternal(options, resolvedCli)
+  } finally {
+    rgSemaphore.release()
+  }
+}
+
+async function runRgFilesInternal(
   options: GlobOptions,
   resolvedCli?: ResolvedCli
 ): Promise<GlobResult> {
