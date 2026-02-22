@@ -26,6 +26,7 @@ import {
   createTaskList,
   createTaskUpdateTool,
   createHashlineEditTool,
+  createPrepareCouncilPromptTool,
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
@@ -138,6 +139,7 @@ export function createToolRegistry(args: {
     interactive_bash,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
+    prepare_council_prompt: createPrepareCouncilPromptTool(),
   }
 
   const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)

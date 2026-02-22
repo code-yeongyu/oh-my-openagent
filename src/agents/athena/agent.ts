@@ -73,14 +73,17 @@ Step 2: Resolve the selected member list:
 - If user selected "All Members", resolve to every member from your available council members listed below.
 - Otherwise resolve to the explicitly selected member labels.
 
-Step 3: Launch each selected member via the task tool with run_in_background=true:
-- For each selected member, call the task tool with:
+Step 3: Save the prompt, then launch members with short references:
+
+Step 3a: Call prepare_council_prompt with the user's original question as the prompt parameter. This saves it to a temp file and returns the file path.
+
+Step 3b: For each selected member, call the task tool with:
   - subagent_type: the exact member name from your available council members listed below (e.g., "Council: Claude Opus 4.6")
   - run_in_background: true
-  - prompt: the user's original question
+  - prompt: "Read <path> for your instructions." (where <path> is the file path from Step 3a)
   - load_skills: []
   - description: the member name (e.g., "Council: Claude Opus 4.6")
-- Launch ALL selected members FIRST (one task call per member, all in parallel) before collecting any results.
+- Launch ALL selected members before collecting any results.
 - Track every returned task_id and member mapping.
 - IMPORTANT: Use EXACTLY the subagent_type names listed in your available council members below — they must match precisely.
 

@@ -1,0 +1,47 @@
+import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { writeFile, unlink } from "node:fs/promises"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
+import { log } from "../../shared/logger"
+
+const CLEANUP_DELAY_MS = 30 * 60 * 1000
+
+export function createPrepareCouncilPromptTool(): ToolDefinition {
+  const description = `Save a council analysis prompt to a temp file so council members can read it.
+
+Athena-only tool. Saves the prompt once, then each council member task() call uses a short
+"Read <path>" instruction instead of repeating the full question. This keeps task() calls
+fast and small.
+
+Returns the file path to reference in subsequent task() calls.`
+
+  return tool({
+    description,
+    args: {
+      prompt: tool.schema.string().describe("The full analysis prompt/question for council members"),
+    },
+    async execute(args: { prompt: string }) {
+      if (!args.prompt?.trim()) {
+        return "Prompt cannot be empty."
+      }
+
+      const filename = `athena-council-${crypto.randomUUID().slice(0, 8)}.md`
+      const filePath = join(tmpdir(), filename)
+
+      await writeFile(filePath, args.prompt, "utf-8")
+
+      setTimeout(() => {
+        unlink(filePath).catch(() => {})
+      }, CLEANUP_DELAY_MS)
+
+      log("[prepare-council-prompt] Saved prompt", { filePath, length: args.prompt.length })
+
+      return `Council prompt saved to: ${filePath}
+
+Use this path in each council member's task() call:
+- prompt: "Read ${filePath} for your instructions."
+
+The file auto-deletes after 30 minutes.`
+    },
+  })
+}

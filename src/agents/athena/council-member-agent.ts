@@ -32,6 +32,7 @@ export function createCouncilMemberAgent(model: string): AgentConfig {
     "call_omo_agent",
     "switch_agent",
     "background_wait",
+    "prepare_council_prompt",
   ])
 
   const base = {
