@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { AutoCompactState, ParsedTokenLimitError } from "./types"
-import type { ExperimentalConfig } from "../../config"
+import type { ExperimentalConfig, OhMyOpenCodeConfig } from "../../config"
 import { parseAnthropicTokenLimitError } from "./parser"
 import { executeCompact, getLastAssistant } from "./executor"
 import { attemptDeduplicationRecovery } from "./deduplication-recovery"
@@ -8,6 +8,7 @@ import { log } from "../../shared/logger"
 
 export interface AnthropicContextWindowLimitRecoveryOptions {
   experimental?: ExperimentalConfig
+  pluginConfig?: OhMyOpenCodeConfig
 }
 
 function createRecoveryState(): AutoCompactState {
@@ -28,6 +29,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
 ) {
   const autoCompactState = createRecoveryState()
   const experimental = options?.experimental
+  const pluginConfig = options?.pluginConfig ?? ({} as OhMyOpenCodeConfig)
   const pendingCompactionTimeoutBySession = new Map<string, ReturnType<typeof setTimeout>>()
 
   const eventHandler = async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -89,6 +91,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
             sessionID,
             { providerID, modelID },
             autoCompactState,
+            pluginConfig,
             // @ts-ignore
             ctx.client,
             ctx.directory,
@@ -157,6 +160,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
         sessionID,
         { providerID, modelID },
         autoCompactState,
+        pluginConfig,
         // @ts-ignore
         ctx.client,
         ctx.directory,

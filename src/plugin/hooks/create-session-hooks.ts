@@ -175,7 +175,7 @@ export function createSessionHooks(args: {
 
   const anthropicContextWindowLimitRecovery = isHookEnabled("anthropic-context-window-limit-recovery")
     ? safeHook("anthropic-context-window-limit-recovery", () =>
-        createAnthropicContextWindowLimitRecoveryHook(ctx, { experimental: pluginConfig.experimental }))
+        createAnthropicContextWindowLimitRecoveryHook(ctx, { experimental: pluginConfig.experimental, pluginConfig }))
     : null
 
   const autoUpdateChecker = isHookEnabled("auto-update-checker")

@@ -17,13 +17,9 @@ export async function executeCompact(
   msg: Record<string, unknown>,
   autoCompactState: AutoCompactState,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  // @ts-ignore
   pluginConfig: OhMyOpenCodeConfig,
-  // @ts-ignore
   client: any,
-  // @ts-ignore
   directory: string,
-  // @ts-ignore
   experimental?: ExperimentalConfig
 ): Promise<void> {
   void experimental
@@ -78,11 +74,9 @@ export async function executeCompact(
       autoCompactState,
       client: client as Client,
       directory,
-      // @ts-ignore
       pluginConfig,
       errorType: errorData?.errorType,
       messageIndex: errorData?.messageIndex,
-      // @ts-ignore
     })
   } finally {
     autoCompactState.compactionInProgress.delete(sessionID);
