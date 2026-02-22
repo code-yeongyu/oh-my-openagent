@@ -191,17 +191,6 @@ describe("runBackgroundUpdateCheck", () => {
       expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockCtx, "3.4.0", "3.5.0")
       expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
     })
-
-    it("does NOT show update-available toast on success", async () => {
-      //#given
-      mockRunBunInstall.mockResolvedValue(true)
-      //#when
-      await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
-      //#then
-      expect(mockShowAutoUpdatedToast).toHaveBeenCalledTimes(1)
-      expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
-      expect(mockRunBunInstall).toHaveBeenCalledTimes(1)
-    })
   })
 
   describe("#given unpinned with auto-update and install fails", () => {
