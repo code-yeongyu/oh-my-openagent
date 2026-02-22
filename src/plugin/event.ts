@@ -10,6 +10,7 @@ import {
   syncSubagentSessions,
   updateSessionAgent,
 } from "../features/claude-code-session-state";
+import { clearSessionPlanName } from "../features/boulder-state";
 import {
   clearPendingModelFallback,
   clearSessionFallbackChain,
@@ -237,6 +238,7 @@ export function createEventHandler(args: {
 
       if (sessionInfo?.id) {
         clearSessionAgent(sessionInfo.id);
+        clearSessionPlanName(sessionInfo.id);
         lastHandledModelErrorMessageID.delete(sessionInfo.id);
         lastHandledRetryStatusKey.delete(sessionInfo.id);
         lastKnownModelBySession.delete(sessionInfo.id);
