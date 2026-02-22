@@ -8,6 +8,9 @@ import {
   createBoulderState,
   getPlanName,
   clearBoulderState,
+  findBoulderForSession,
+  setSessionPlanName,
+  getSessionPlanName,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { updateSessionAgent } from "../../features/claude-code-session-state"
@@ -73,9 +76,12 @@ export function createStartWorkHook(ctx: PluginInput) {
 
       updateSessionAgent(input.sessionID, "atlas") // Always switch: fixes #1298
 
-      const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID
       const timestamp = new Date().toISOString()
+      const existingPlanName = getSessionPlanName(sessionId)
+      let existingState = existingPlanName
+        ? readBoulderState(ctx.directory, existingPlanName)
+        : findBoulderForSession(ctx.directory, sessionId) ?? readBoulderState(ctx.directory)
 
       let contextInfo = ""
       
@@ -100,10 +106,11 @@ The requested plan "${getPlanName(matchedPlan)}" has been completed.
 All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
           } else {
             if (existingState) {
-              clearBoulderState(ctx.directory)
+              clearBoulderState(ctx.directory, existingState.plan_name)
             }
             const newState = createBoulderState(matchedPlan, sessionId, "atlas")
-            writeBoulderState(ctx.directory, newState)
+            writeBoulderState(ctx.directory, newState, getPlanName(matchedPlan))
+            setSessionPlanName(sessionId, getPlanName(matchedPlan))
             
             contextInfo = `
 ## Auto-Selected Plan
@@ -145,7 +152,8 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
         const progress = getPlanProgress(existingState.active_plan)
         
         if (!progress.isComplete) {
-          appendSessionId(ctx.directory, sessionId)
+          appendSessionId(ctx.directory, sessionId, existingState.plan_name)
+          setSessionPlanName(sessionId, existingState.plan_name)
           contextInfo = `
 ## Active Work Session Found
 
@@ -188,7 +196,8 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
           const planPath = incompletePlans[0]
           const progress = getPlanProgress(planPath)
           const newState = createBoulderState(planPath, sessionId, "atlas")
-          writeBoulderState(ctx.directory, newState)
+          writeBoulderState(ctx.directory, newState, getPlanName(planPath))
+          setSessionPlanName(sessionId, getPlanName(planPath))
 
           contextInfo += `
 
