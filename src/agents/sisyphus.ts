@@ -1,6 +1,11 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel } from "./types";
+import { isGptModel, isGeminiModel } from "./types";
+import {
+  buildGeminiToolMandate,
+  buildGeminiDelegationOverride,
+  buildGeminiVerificationOverride,
+} from "./sisyphus-gemini-overlays";
 
 const MODE: AgentMode = "primary";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
@@ -548,7 +553,7 @@ export function createSisyphusAgent(
   const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
   const skills = availableSkills ?? [];
   const categories = availableCategories ?? [];
-  const prompt = availableAgents
+  let prompt = availableAgents
     ? buildDynamicSisyphusPrompt(
         model,
         availableAgents,
@@ -558,6 +563,15 @@ export function createSisyphusAgent(
         useTaskSystem,
       )
     : buildDynamicSisyphusPrompt(model, [], tools, skills, categories, useTaskSystem);
+
+  if (isGeminiModel(model)) {
+    prompt = prompt.replace(
+      "</intent_verbalization>",
+      `</intent_verbalization>\n\n${buildGeminiToolMandate()}`
+    );
+    prompt += "\n" + buildGeminiDelegationOverride();
+    prompt += "\n" + buildGeminiVerificationOverride();
+  }
 
   const permission = {
     question: "allow",
