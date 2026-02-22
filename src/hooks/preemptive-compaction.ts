@@ -1,5 +1,7 @@
 import { log } from "../shared/logger"
+import type { OhMyOpenCodeConfig } from "../config"
 
+import { resolveCompactionModel } from "./shared/compaction-model-resolver"
 const DEFAULT_ACTUAL_LIMIT = 200_000
 
 type ModelCacheStateLike = {
@@ -51,6 +53,7 @@ type PluginInput = {
 
 export function createPreemptiveCompactionHook(
   ctx: PluginInput,
+  pluginConfig: OhMyOpenCodeConfig,
   modelCacheState?: ModelCacheStateLike,
 ) {
   const compactionInProgress = new Set<string>()
@@ -84,9 +87,16 @@ export function createPreemptiveCompactionHook(
     compactionInProgress.add(sessionID)
 
     try {
+      const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
+        pluginConfig,
+        sessionID,
+        cached.providerID,
+        modelID
+      )
+
       await ctx.client.session.summarize({
         path: { id: sessionID },
-        body: { providerID: cached.providerID, modelID, auto: true } as never,
+        body: { providerID: targetProviderID, modelID: targetModelID, auto: true } as never,
         query: { directory: ctx.directory },
       })
 
