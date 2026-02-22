@@ -15,8 +15,7 @@ export function resolveCompactionModel(
   }
 
   const agentConfigKey = getAgentConfigKey(sessionAgentName)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const agentConfig = (pluginConfig.agents as any)[agentConfigKey]
+  const agentConfig = (pluginConfig.agents as Record<string, { compaction?: { model?: string } } | undefined>)[agentConfigKey]
   const compactionConfig = agentConfig?.compaction
 
   if (!compactionConfig?.model) {
