@@ -82,7 +82,7 @@ export function createSessionHooks(args: {
     isHookEnabled("preemptive-compaction") &&
     pluginConfig.experimental?.preemptive_compaction
       ? safeHook("preemptive-compaction", () =>
-          createPreemptiveCompactionHook(ctx, modelCacheState))
+          createPreemptiveCompactionHook(ctx, pluginConfig, modelCacheState as any))
       : null
 
   const sessionRecovery = isHookEnabled("session-recovery")
