@@ -1,14 +1,17 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
+import * as originalExecutor from "./executor"
+import * as originalParser from "./parser"
+import * as originalLogger from "../../shared/logger"
 
 const executeCompactMock = mock(async () => {})
 const getLastAssistantMock = mock(async () => ({
   providerID: "anthropic",
-  modelID: "claude-sonnet-4-5",
+  modelID: "claude-sonnet-4-6",
 }))
 const parseAnthropicTokenLimitErrorMock = mock(() => ({
   providerID: "anthropic",
-  modelID: "claude-sonnet-4-5",
+  modelID: "claude-sonnet-4-6",
 }))
 
 mock.module("./executor", () => ({
@@ -23,6 +26,12 @@ mock.module("./parser", () => ({
 mock.module("../../shared/logger", () => ({
   log: () => {},
 }))
+
+afterAll(() => {
+  mock.module("./executor", () => originalExecutor)
+  mock.module("./parser", () => originalParser)
+  mock.module("../../shared/logger", () => originalLogger)
+})
 
 function createMockContext(): PluginInput {
   return {
@@ -70,6 +79,10 @@ describe("createAnthropicContextWindowLimitRecoveryHook", () => {
     executeCompactMock.mockClear()
     getLastAssistantMock.mockClear()
     parseAnthropicTokenLimitErrorMock.mockClear()
+  })
+
+  afterEach(() => {
+    mock.restore()
   })
 
   test("cancels pending timer when session.idle handles compaction first", async () => {

@@ -51,12 +51,10 @@ When blocked: try a different approach → decompose the problem → challenge a
 
 ## Ambiguity Protocol (EXPLORE FIRST)
 
-| Situation | Action |
-|-----------|--------|
-| Single valid interpretation | Proceed immediately |
-| Missing info that MIGHT exist | **EXPLORE FIRST** — use tools (grep, rg, file reads, explore agents) to find it |
-| Multiple plausible interpretations | State your interpretation, proceed with simplest approach |
-| Truly impossible to proceed | Ask ONE precise question (LAST RESORT) |
+- **Single valid interpretation** — Proceed immediately
+- **Missing info that MIGHT exist** — **EXPLORE FIRST** — use tools (grep, rg, file reads, explore agents) to find it
+- **Multiple plausible interpretations** — State your interpretation, proceed with simplest approach
+- **Truly impossible to proceed** — Ask ONE precise question (LAST RESORT)
 
 <tool_usage_rules>
 - Parallelize independent tool calls: multiple file reads, grep searches, agent fires — all at once
@@ -100,11 +98,9 @@ Style:
 4. **Run build** if applicable — exit code 0 required
 5. **Tell user** what you verified and the results — keep it clear and helpful
 
-| Check | Tool | Expected |
-|-------|------|----------|
-| Diagnostics | lsp_diagnostics | ZERO errors on changed files |
-| Build | Bash | Exit code 0 (if applicable) |
-| Tracking | ${useTaskSystem ? "task_update" : "todowrite"} | ${verificationText} |
+- **Diagnostics**: Use lsp_diagnostics — ZERO errors on changed files
+- **Build**: Use Bash — Exit code 0 (if applicable)
+- **Tracking**: Use ${useTaskSystem ? "task_update" : "todowrite"} — ${verificationText}
 
 **No evidence = not complete.**
 
@@ -136,24 +132,20 @@ function buildGptTaskDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
     return `## Task Discipline (NON-NEGOTIABLE)
 
-| Trigger | Action |
-|---------|--------|
-| 2+ steps | task_create FIRST, atomic breakdown |
-| Starting step | task_update(status="in_progress") — ONE at a time |
-| Completing step | task_update(status="completed") IMMEDIATELY |
-| Batching | NEVER batch completions |
+- **2+ steps** — task_create FIRST, atomic breakdown
+- **Starting step** — task_update(status="in_progress") — ONE at a time
+- **Completing step** — task_update(status="completed") IMMEDIATELY
+- **Batching** — NEVER batch completions
 
 No tasks on multi-step work = INCOMPLETE WORK.`
   }
 
   return `## Todo Discipline (NON-NEGOTIABLE)
 
-| Trigger | Action |
-|---------|--------|
-| 2+ steps | todowrite FIRST, atomic breakdown |
-| Starting step | Mark in_progress — ONE at a time |
-| Completing step | Mark completed IMMEDIATELY |
-| Batching | NEVER batch completions |
+- **2+ steps** — todowrite FIRST, atomic breakdown
+- **Starting step** — Mark in_progress — ONE at a time
+- **Completing step** — Mark completed IMMEDIATELY
+- **Batching** — NEVER batch completions
 
 No todos on multi-step work = INCOMPLETE WORK.`
 }

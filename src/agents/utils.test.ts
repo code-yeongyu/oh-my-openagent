@@ -18,8 +18,8 @@ describe("createBuiltinAgents with model overrides", () => {
         "anthropic/claude-opus-4-6",
         "kimi-for-coding/k2p5",
         "opencode/kimi-k2.5-free",
-        "zai-coding-plan/glm-4.7",
-        "opencode/glm-4.7-free",
+        "zai-coding-plan/glm-5",
+        "opencode/big-pickle",
       ])
     )
 
@@ -51,10 +51,10 @@ describe("createBuiltinAgents with model overrides", () => {
     expect(agents.sisyphus.thinking).toBeUndefined()
   })
 
-  test("Atlas uses uiSelectedModel when provided", async () => {
+  test("Atlas uses uiSelectedModel", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-5"])
+      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-6"])
     )
     const uiSelectedModel = "openai/gpt-5.2"
 
@@ -84,7 +84,7 @@ describe("createBuiltinAgents with model overrides", () => {
   test("user config model takes priority over uiSelectedModel for sisyphus", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-5"])
+      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-6"])
     )
     const uiSelectedModel = "openai/gpt-5.2"
     const overrides = {
@@ -117,7 +117,7 @@ describe("createBuiltinAgents with model overrides", () => {
   test("user config model takes priority over uiSelectedModel for atlas", async () => {
     // #given
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-5"])
+      new Set(["openai/gpt-5.2", "anthropic/claude-sonnet-4-6"])
     )
     const uiSelectedModel = "openai/gpt-5.2"
     const overrides = {
@@ -259,8 +259,8 @@ describe("createBuiltinAgents with model overrides", () => {
         "anthropic/claude-opus-4-6",
         "kimi-for-coding/k2p5",
         "opencode/kimi-k2.5-free",
-        "zai-coding-plan/glm-4.7",
-        "opencode/glm-4.7-free",
+        "zai-coding-plan/glm-5",
+        "opencode/big-pickle",
         "openai/gpt-5.2",
       ])
     )
@@ -505,8 +505,8 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
         "anthropic/claude-opus-4-6",
         "kimi-for-coding/k2p5",
         "opencode/kimi-k2.5-free",
-        "zai-coding-plan/glm-4.7",
-        "opencode/glm-4.7-free",
+        "zai-coding-plan/glm-5",
+        "opencode/big-pickle",
       ])
     )
 
@@ -659,6 +659,178 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
     } finally {
       fetchSpy.mockRestore()
     }
+  })
+})
+
+describe("Hephaestus environment context toggle", () => {
+  let fetchSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["openai/gpt-5.3-codex"])
+    )
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+  })
+
+  async function buildAgents(disableFlag?: boolean) {
+    return createBuiltinAgents(
+      [],
+      {},
+      "/tmp/work",
+      TEST_DEFAULT_MODEL,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      disableFlag
+    )
+  }
+
+  test("includes <omo-env> tag when disable flag is unset", async () => {
+    // #when
+    const agents = await buildAgents(undefined)
+
+    // #then
+    expect(agents.hephaestus).toBeDefined()
+    expect(agents.hephaestus.prompt).toContain("<omo-env>")
+  })
+
+  test("includes <omo-env> tag when disable flag is false", async () => {
+    // #when
+    const agents = await buildAgents(false)
+
+    // #then
+    expect(agents.hephaestus).toBeDefined()
+    expect(agents.hephaestus.prompt).toContain("<omo-env>")
+  })
+
+  test("omits <omo-env> tag when disable flag is true", async () => {
+    // #when
+    const agents = await buildAgents(true)
+
+    // #then
+    expect(agents.hephaestus).toBeDefined()
+    expect(agents.hephaestus.prompt).not.toContain("<omo-env>")
+  })
+})
+
+describe("Sisyphus and Librarian environment context toggle", () => {
+  let fetchSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["anthropic/claude-opus-4-6", "google/gemini-3-flash"])
+    )
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+  })
+
+  async function buildAgents(disableFlag?: boolean) {
+    return createBuiltinAgents(
+      [],
+      {},
+      "/tmp/work",
+      TEST_DEFAULT_MODEL,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      disableFlag
+    )
+  }
+
+  test("includes <omo-env> for sisyphus and librarian when disable flag is unset", async () => {
+    const agents = await buildAgents(undefined)
+
+    expect(agents.sisyphus).toBeDefined()
+    expect(agents.librarian).toBeDefined()
+    expect(agents.sisyphus.prompt).toContain("<omo-env>")
+    expect(agents.librarian.prompt).toContain("<omo-env>")
+  })
+
+  test("includes <omo-env> for sisyphus and librarian when disable flag is false", async () => {
+    const agents = await buildAgents(false)
+
+    expect(agents.sisyphus).toBeDefined()
+    expect(agents.librarian).toBeDefined()
+    expect(agents.sisyphus.prompt).toContain("<omo-env>")
+    expect(agents.librarian.prompt).toContain("<omo-env>")
+  })
+
+  test("omits <omo-env> for sisyphus and librarian when disable flag is true", async () => {
+    const agents = await buildAgents(true)
+
+    expect(agents.sisyphus).toBeDefined()
+    expect(agents.librarian).toBeDefined()
+    expect(agents.sisyphus.prompt).not.toContain("<omo-env>")
+    expect(agents.librarian.prompt).not.toContain("<omo-env>")
+  })
+})
+
+describe("Atlas is unaffected by environment context toggle", () => {
+  let fetchSpy: ReturnType<typeof spyOn>
+
+  beforeEach(() => {
+    fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["anthropic/claude-opus-4-6", "openai/gpt-5.2"])
+    )
+  })
+
+  afterEach(() => {
+    fetchSpy.mockRestore()
+  })
+
+  test("atlas prompt is unchanged and never contains <omo-env>", async () => {
+    const agentsDefault = await createBuiltinAgents(
+      [],
+      {},
+      "/tmp/work",
+      TEST_DEFAULT_MODEL,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      false
+    )
+
+    const agentsDisabled = await createBuiltinAgents(
+      [],
+      {},
+      "/tmp/work",
+      TEST_DEFAULT_MODEL,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      true
+    )
+
+    expect(agentsDefault.atlas).toBeDefined()
+    expect(agentsDisabled.atlas).toBeDefined()
+    expect(agentsDefault.atlas.prompt).not.toContain("<omo-env>")
+    expect(agentsDisabled.atlas.prompt).not.toContain("<omo-env>")
+    expect(agentsDisabled.atlas.prompt).toBe(agentsDefault.atlas.prompt)
   })
 })
 

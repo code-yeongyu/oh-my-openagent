@@ -202,7 +202,9 @@ export async function executeSlashCommand(parsed: ParsedSlashCommand, options?: 
   if (!command) {
     return {
       success: false,
-      error: parsed.command.includes(":") ? `Marketplace plugin commands like "/${parsed.command}" are not supported. Use .claude/commands/ for custom commands.` : `Command "/${parsed.command}" not found. Use the slashcommand tool to list available commands.`,
+      error: parsed.command.includes(":")
+        ? `Marketplace plugin commands like "/${parsed.command}" are not supported. Use .claude/commands/ for custom commands.`
+        : `Command "/${parsed.command}" not found. Use the skill tool to list available skills and commands.`,
     }
   }
 

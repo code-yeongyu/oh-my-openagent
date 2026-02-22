@@ -1,6 +1,6 @@
 # src/cli/ — CLI: install, run, doctor, mcp-oauth
 
-**Generated:** 2026-02-17
+**Generated:** 2026-02-21
 
 ## OVERVIEW
 
@@ -51,7 +51,7 @@ cli/
 
 ## MODEL FALLBACK SYSTEM
 
-Priority: Claude > OpenAI > Gemini > Copilot > OpenCode Zen > Z.ai > Kimi > glm-4.7-free
+Priority: Claude > OpenAI > Gemini > Copilot > OpenCode Zen > Z.ai > Kimi > big-pickle
 
 Agent-specific: librarian→ZAI, explore→Haiku/nano, hephaestus→requires OpenAI/Copilot
 

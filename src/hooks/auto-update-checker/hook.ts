@@ -42,8 +42,8 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
         const displayVersion = localDevVersion ?? cachedVersion
 
         await showConfigErrorsIfAny(ctx)
-        await showModelCacheWarningIfNeeded(ctx)
         await updateAndShowConnectedProvidersCacheStatus(ctx)
+        await showModelCacheWarningIfNeeded(ctx)
 
         if (localDevVersion) {
           if (showStartupToast) {

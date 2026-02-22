@@ -59,7 +59,7 @@ export class TaskHistory {
     if (list.length === 0) return null
 
     const lines = list.map((e) => {
-      const desc = e.description.replace(/[\n\r]+/g, " ").trim()
+      const desc = e.description?.replace(/[\n\r]+/g, " ").trim() ?? ""
       const parts = [
         `- **${e.agent}**`,
         e.category ? `[${e.category}]` : null,

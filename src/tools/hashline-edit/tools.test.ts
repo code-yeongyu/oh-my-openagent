@@ -1,9 +1,22 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
+import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { createHashlineEditTool } from "./tools"
-import * as fs from "node:fs"
-import * as path from "node:path"
-import * as os from "node:os"
 import { computeLineHash } from "./hash-computation"
+import { canonicalizeFileText } from "./file-text-canonicalization"
+import * as fs from "node:fs"
+import * as os from "node:os"
+import * as path from "node:path"
+
+function createMockContext(): ToolContext {
+  return {
+    sessionID: "test",
+    messageID: "test",
+    agent: "test",
+    abort: new AbortController().signal,
+    metadata: mock(() => {}),
+    ask: async () => {},
+  } as unknown as ToolContext
+}
 
 describe("createHashlineEditTool", () => {
   let tempDir: string
@@ -18,222 +31,258 @@ describe("createHashlineEditTool", () => {
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
-  describe("tool definition", () => {
-    it("has correct description", () => {
-      //#given tool is created
-      //#when accessing tool properties
-      //#then description explains LINE:HASH format
-      expect(tool.description).toContain("LINE:HASH")
-      expect(tool.description).toContain("set_line")
-      expect(tool.description).toContain("replace_lines")
-      expect(tool.description).toContain("insert_after")
-      expect(tool.description).toContain("replace")
-    })
+  it("applies set_line with LINE#ID anchor", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2\nline3")
+    const hash = computeLineHash(2, "line2")
 
-    it("has path parameter", () => {
-      //#given tool is created
-      //#when checking parameters
-      //#then path parameter exists as required string
-      expect(tool.args.path).toBeDefined()
-    })
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "set_line", line: `2#${hash}`, text: "modified line2" }],
+      },
+      createMockContext(),
+    )
 
-    it("has edits parameter as array", () => {
-      //#given tool is created
-      //#when checking parameters
-      //#then edits parameter exists as array
-      expect(tool.args.edits).toBeDefined()
-    })
+    //#then
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nmodified line2\nline3")
+    expect(result).toContain("Successfully")
+    expect(result).toContain("Updated file (LINE#ID:content)")
+    expect(result).toMatch(/2#[ZPMQVRWSNKTXJBYH]{2}:modified line2/)
   })
 
-  describe("execute", () => {
-    it("returns error when file does not exist", async () => {
-      //#given non-existent file path
-      const nonExistentPath = path.join(tempDir, "non-existent.txt")
+  it("applies replace_lines and insert_after", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2\nline3\nline4")
+    const line2Hash = computeLineHash(2, "line2")
+    const line3Hash = computeLineHash(3, "line3")
+    const line4Hash = computeLineHash(4, "line4")
 
-      //#when executing tool
-      const result = await tool.execute(
-        {
-          path: nonExistentPath,
-          edits: [{ type: "set_line", line: "1:00", text: "new content" }],
-        },
-        { sessionID: "test", messageID: "test", agent: "test", abort: new AbortController() }
-      )
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        edits: [
+          {
+            type: "replace_lines",
+            start_line: `2#${line2Hash}`,
+            end_line: `3#${line3Hash}`,
+            text: "replaced",
+          },
+          {
+            type: "insert_after",
+            line: `4#${line4Hash}`,
+            text: "inserted",
+          },
+        ],
+      },
+      createMockContext(),
+    )
 
-      //#then error is returned
-      expect(result).toContain("Error")
-      expect(result).toContain("not found")
-    })
+    //#then
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nreplaced\nline4\ninserted")
+  })
 
-    it("applies set_line edit and returns diff", async () => {
-      //#given file with content
-      const filePath = path.join(tempDir, "test.txt")
-      fs.writeFileSync(filePath, "line1\nline2\nline3")
-      const line2Hash = computeLineHash(2, "line2")
+  it("returns mismatch error on stale anchor", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
 
-      //#when executing set_line edit
-      const result = await tool.execute(
-        {
-          path: filePath,
-          edits: [{ type: "set_line", line: `2:${line2Hash}`, text: "modified line2" }],
-        },
-        { sessionID: "test", messageID: "test", agent: "test", abort: new AbortController() }
-      )
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "set_line", line: "1#ZZ", text: "new" }],
+      },
+      createMockContext(),
+    )
 
-      //#then file is modified and diff is returned
-      const content = fs.readFileSync(filePath, "utf-8")
-      expect(content).toBe("line1\nmodified line2\nline3")
-      expect(result).toContain("modified line2")
-    })
+    //#then
+    expect(result).toContain("Error")
+    expect(result).toContain(">>>")
+  })
 
-    it("applies insert_after edit", async () => {
-      //#given file with content
-      const filePath = path.join(tempDir, "test.txt")
-      fs.writeFileSync(filePath, "line1\nline2")
-      const line1Hash = computeLineHash(1, "line1")
+  it("preserves literal backslash-n and supports string[] payload", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+    const line1Hash = computeLineHash(1, "line1")
 
-      //#when executing insert_after edit
-      const result = await tool.execute(
-        {
-          path: filePath,
-          edits: [{ type: "insert_after", line: `1:${line1Hash}`, text: "inserted" }],
-        },
-        { sessionID: "test", messageID: "test", agent: "test", abort: new AbortController() }
-      )
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "set_line", line: `1#${line1Hash}`, text: "join(\\n)" }],
+      },
+      createMockContext(),
+    )
 
-      //#then line is inserted after specified line
-      const content = fs.readFileSync(filePath, "utf-8")
-      expect(content).toBe("line1\ninserted\nline2")
-    })
+    await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "insert_after", line: `1#${computeLineHash(1, "join(\\n)")}`, text: ["a", "b"] }],
+      },
+      createMockContext(),
+    )
 
-    it("applies replace_lines edit", async () => {
-      //#given file with content
-      const filePath = path.join(tempDir, "test.txt")
-      fs.writeFileSync(filePath, "line1\nline2\nline3\nline4")
-      const line2Hash = computeLineHash(2, "line2")
-      const line3Hash = computeLineHash(3, "line3")
+    //#then
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("join(\\n)\na\nb\nline2")
+  })
 
-      //#when executing replace_lines edit
-      const result = await tool.execute(
-        {
-          path: filePath,
-          edits: [
-            {
-              type: "replace_lines",
-              start_line: `2:${line2Hash}`,
-              end_line: `3:${line3Hash}`,
-              text: "replaced",
-            },
-          ],
-        },
-        { sessionID: "test", messageID: "test", agent: "test", abort: new AbortController() }
-      )
+  it("supports insert_before and insert_between", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2\nline3")
+    const line1 = computeLineHash(1, "line1")
+    const line2 = computeLineHash(2, "line2")
+    const line3 = computeLineHash(3, "line3")
 
-      //#then lines are replaced
-      const content = fs.readFileSync(filePath, "utf-8")
-      expect(content).toBe("line1\nreplaced\nline4")
-    })
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        edits: [
+          { type: "insert_before", line: `3#${line3}`, text: ["before3"] },
+          { type: "insert_between", after_line: `1#${line1}`, before_line: `2#${line2}`, text: ["between"] },
+        ],
+      },
+      createMockContext(),
+    )
 
-    it("applies replace edit", async () => {
-      //#given file with content
-      const filePath = path.join(tempDir, "test.txt")
-      fs.writeFileSync(filePath, "hello world\nfoo bar")
+    //#then
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nbetween\nline2\nbefore3\nline3")
+  })
 
-      //#when executing replace edit
-      const result = await tool.execute(
-        {
-          path: filePath,
-          edits: [{ type: "replace", old_text: "world", new_text: "universe" }],
-        },
-        { sessionID: "test", messageID: "test", agent: "test", abort: new AbortController() }
-      )
+  it("returns error when insert text is empty array", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+    const line1 = computeLineHash(1, "line1")
 
-      //#then text is replaced
-      const content = fs.readFileSync(filePath, "utf-8")
-      expect(content).toBe("hello universe\nfoo bar")
-    })
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "insert_after", line: `1#${line1}`, text: [] }],
+      },
+      createMockContext(),
+    )
 
-    it("applies multiple edits in bottom-up order", async () => {
-      //#given file with content
-      const filePath = path.join(tempDir, "test.txt")
-      fs.writeFileSync(filePath, "line1\nline2\nline3")
-      const line1Hash = computeLineHash(1, "line1")
-      const line3Hash = computeLineHash(3, "line3")
+    //#then
+    expect(result).toContain("Error")
+    expect(result).toContain("non-empty")
+  })
 
-      //#when executing multiple edits
-      const result = await tool.execute(
-        {
-          path: filePath,
-          edits: [
-            { type: "set_line", line: `1:${line1Hash}`, text: "new1" },
-            { type: "set_line", line: `3:${line3Hash}`, text: "new3" },
-          ],
-        },
-        { sessionID: "test", messageID: "test", agent: "test", abort: new AbortController() }
-      )
+  it("supports file rename with edits", async () => {
+    //#given
+    const filePath = path.join(tempDir, "source.txt")
+    const renamedPath = path.join(tempDir, "renamed.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+    const line2 = computeLineHash(2, "line2")
 
-      //#then both edits are applied
-      const content = fs.readFileSync(filePath, "utf-8")
-      expect(content).toBe("new1\nline2\nnew3")
-    })
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        rename: renamedPath,
+        edits: [{ type: "set_line", line: `2#${line2}`, text: "line2-updated" }],
+      },
+      createMockContext(),
+    )
 
-    it("returns error on hash mismatch", async () => {
-      //#given file with content
-      const filePath = path.join(tempDir, "test.txt")
-      fs.writeFileSync(filePath, "line1\nline2")
+    //#then
+    expect(fs.existsSync(filePath)).toBe(false)
+    expect(fs.readFileSync(renamedPath, "utf-8")).toBe("line1\nline2-updated")
+  })
 
-      //#when executing with wrong hash (valid format but wrong value)
-      const result = await tool.execute(
-        {
-          path: filePath,
-          edits: [{ type: "set_line", line: "1:ff", text: "new" }],
-        },
-        { sessionID: "test", messageID: "test", agent: "test", abort: new AbortController() }
-      )
+  it("supports file delete mode", async () => {
+    //#given
+    const filePath = path.join(tempDir, "delete-me.txt")
+    fs.writeFileSync(filePath, "line1")
 
-      //#then hash mismatch error is returned
-      expect(result).toContain("Error")
-      expect(result).toContain("hash")
-    })
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        delete: true,
+        edits: [],
+      },
+      createMockContext(),
+    )
 
-    it("handles escaped newlines in text", async () => {
-      //#given file with content
-      const filePath = path.join(tempDir, "test.txt")
-      fs.writeFileSync(filePath, "line1\nline2")
-      const line1Hash = computeLineHash(1, "line1")
+    //#then
+    expect(fs.existsSync(filePath)).toBe(false)
+    expect(result).toContain("Successfully deleted")
+  })
 
-      //#when executing with escaped newline
-      const result = await tool.execute(
-        {
-          path: filePath,
-          edits: [{ type: "set_line", line: `1:${line1Hash}`, text: "new\\nline" }],
-        },
-        { sessionID: "test", messageID: "test", agent: "test", abort: new AbortController() }
-      )
+  it("creates missing file with append and prepend", async () => {
+    //#given
+    const filePath = path.join(tempDir, "created.txt")
 
-      //#then newline is unescaped
-      const content = fs.readFileSync(filePath, "utf-8")
-      expect(content).toBe("new\nline\nline2")
-    })
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [
+          { type: "append", text: ["line2"] },
+          { type: "prepend", text: ["line1"] },
+        ],
+      },
+      createMockContext(),
+    )
 
-    it("returns success result with diff summary", async () => {
-      //#given file with content
-      const filePath = path.join(tempDir, "test.txt")
-      fs.writeFileSync(filePath, "old content")
-      const line1Hash = computeLineHash(1, "old content")
+    //#then
+    expect(fs.existsSync(filePath)).toBe(true)
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nline2")
+    expect(result).toContain("Successfully applied 2 edit(s)")
+  })
 
-      //#when executing edit
-      const result = await tool.execute(
-        {
-          path: filePath,
-          edits: [{ type: "set_line", line: `1:${line1Hash}`, text: "new content" }],
-        },
-        { sessionID: "test", messageID: "test", agent: "test", abort: new AbortController() }
-      )
+  it("preserves BOM and CRLF through hashline_edit", async () => {
+    //#given
+    const filePath = path.join(tempDir, "crlf-bom.txt")
+    const bomCrLf = "\uFEFFline1\r\nline2\r\n"
+    fs.writeFileSync(filePath, bomCrLf)
+    const line2Hash = computeLineHash(2, "line2")
 
-      //#then result contains success indicator and diff
-      expect(result).toContain("Successfully")
-      expect(result).toContain("old content")
-      expect(result).toContain("new content")
-    })
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "set_line", line: `2#${line2Hash}`, text: "line2-updated" }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    const bytes = fs.readFileSync(filePath)
+    expect(bytes[0]).toBe(0xef)
+    expect(bytes[1]).toBe(0xbb)
+    expect(bytes[2]).toBe(0xbf)
+    expect(bytes.toString("utf-8")).toBe("\uFEFFline1\r\nline2-updated\r\n")
+  })
+
+  it("detects LF as line ending when LF appears before CRLF", () => {
+    //#given
+    const content = "line1\nline2\r\nline3"
+
+    //#when
+    const envelope = canonicalizeFileText(content)
+
+    //#then
+    expect(envelope.lineEnding).toBe("\n")
+  })
+
+  it("detects CRLF as line ending when CRLF appears before LF", () => {
+    //#given
+    const content = "line1\r\nline2\nline3"
+
+    //#when
+    const envelope = canonicalizeFileText(content)
+
+    //#then
+    expect(envelope.lineEnding).toBe("\r\n")
   })
 })

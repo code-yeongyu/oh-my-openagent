@@ -75,7 +75,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 50000,
@@ -128,7 +128,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 170000,
@@ -164,7 +164,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "google-vertex-anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 170000,
@@ -202,7 +202,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: { input: 180000, output: 0, reasoning: 0, cache: { read: 10000, write: 0 } },
           },
@@ -241,7 +241,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 170000,
@@ -269,7 +269,7 @@ describe("preemptive-compaction", () => {
 
   it("should use 1M limit when model cache flag is enabled", async () => {
     //#given
-    const hook = createPreemptiveCompactionHook(ctx as never, {
+    const hook = createPreemptiveCompactionHook(ctx as never, {}, {
       anthropicContext1MEnabled: true,
     })
     const sessionID = "ses_1m_flag"
@@ -282,7 +282,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 300000,
@@ -308,7 +308,7 @@ describe("preemptive-compaction", () => {
   it("should keep env var fallback when model cache flag is disabled", async () => {
     //#given
     process.env[ANTHROPIC_CONTEXT_ENV_KEY] = "true"
-    const hook = createPreemptiveCompactionHook(ctx as never, {
+    const hook = createPreemptiveCompactionHook(ctx as never, {}, {
       anthropicContext1MEnabled: false,
     })
     const sessionID = "ses_env_fallback"
@@ -321,7 +321,7 @@ describe("preemptive-compaction", () => {
             role: "assistant",
             sessionID,
             providerID: "anthropic",
-            modelID: "claude-sonnet-4-5",
+            modelID: "claude-sonnet-4-6",
             finish: true,
             tokens: {
               input: 300000,

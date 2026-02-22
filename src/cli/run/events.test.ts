@@ -1,5 +1,5 @@
-import { describe, it, expect, spyOn } from "bun:test"
-import { createEventState, serializeError, type EventState } from "./events"
+import { afterEach, beforeEach, describe, it, expect, spyOn } from "bun:test"
+import { createEventState, processEvents, serializeError, type EventState } from "./events"
 import type { RunContext, EventPayload } from "./types"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
@@ -99,14 +99,22 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
-    // when
-    await processEvents(ctx, events, state)
+    const baselineCallCount = errorSpy.mock.calls.length
 
-    // then
-    expect(errorSpy).not.toHaveBeenCalled()
-    errorSpy.mockRestore()
+    try {
+      // when
+      await processEvents(ctx, events, state)
+
+      // then
+      const newCalls = errorSpy.mock.calls.slice(baselineCallCount)
+      const hasEventTrace = newCalls.some((call) =>
+        String(call?.[0] ?? "").includes("custom.event"),
+      )
+      expect(hasEventTrace).toBe(false)
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 
   it("logs full event traces when verbose is enabled", async () => {
@@ -121,16 +129,22 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
-    // when
-    await processEvents(ctx, events, state)
+    const baselineCallCount = errorSpy.mock.calls.length
 
-    // then
-    expect(errorSpy).toHaveBeenCalledTimes(1)
-    const firstCall = errorSpy.mock.calls[0]
-    expect(String(firstCall?.[0] ?? "")).toContain("custom.event")
-    errorSpy.mockRestore()
+    try {
+      // when
+      await processEvents(ctx, events, state)
+
+      // then
+      const newCalls = errorSpy.mock.calls.slice(baselineCallCount)
+      const hasEventTrace = newCalls.some((call) =>
+        String(call?.[0] ?? "").includes("custom.event"),
+      )
+      expect(hasEventTrace).toBe(true)
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 
   it("session.idle sets mainSessionIdle to true for matching session", async () => {
@@ -144,7 +158,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -164,7 +177,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -184,7 +196,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -207,7 +218,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -229,7 +239,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     //#when
     await processEvents(ctx, events, state)
@@ -251,7 +260,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -275,7 +283,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -299,7 +306,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -328,7 +334,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)

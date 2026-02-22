@@ -1,15 +1,11 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { PluginContext } from "./types"
 
-import {
-  applyAgentVariant,
-  resolveAgentVariant,
-  resolveVariantForModel,
-} from "../shared/agent-variant"
 import { hasConnectedProvidersCache } from "../shared"
-import {
-  setSessionAgent,
-} from "../features/claude-code-session-state"
+import { setSessionModel } from "../shared/session-model-state"
+import { setSessionAgent } from "../features/claude-code-session-state"
+import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
+import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -19,7 +15,12 @@ type FirstMessageVariantGate = {
 }
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
-type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
+export type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
+export type ChatMessageInput = {
+  sessionID: string
+  agent?: string
+  model?: { providerID: string; modelID: string }
+}
 type StartWorkHookOutput = { parts: Array<{ type: string; text?: string }> }
 
 function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
@@ -40,54 +41,74 @@ export function createChatMessageHandler(args: {
   firstMessageVariantGate: FirstMessageVariantGate
   hooks: CreatedHooks
 }): (
-  input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } },
+  input: ChatMessageInput,
   output: ChatMessageHandlerOutput
 ) => Promise<void> {
   const { ctx, pluginConfig, firstMessageVariantGate, hooks } = args
+  const pluginContext = ctx as {
+    client: {
+      tui: {
+        showToast: (input: {
+          body: {
+            title: string
+            message: string
+            variant: "warning"
+            duration: number
+          }
+        }) => Promise<unknown>
+      }
+    }
+  }
+  const isRuntimeFallbackEnabled =
+    hooks.runtimeFallback !== null &&
+    hooks.runtimeFallback !== undefined &&
+    (typeof pluginConfig.runtime_fallback === "boolean"
+      ? pluginConfig.runtime_fallback
+      : (pluginConfig.runtime_fallback?.enabled ?? false))
 
   return async (
-    input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string } },
+    input: ChatMessageInput,
     output: ChatMessageHandlerOutput
   ): Promise<void> => {
     if (input.agent) {
       setSessionAgent(input.sessionID, input.agent)
     }
 
-    const message = output.message
-
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
-      if (message["variant"] === undefined) {
-        const variant =
-          input.model && input.agent
-            ? resolveVariantForModel(pluginConfig, input.agent, input.model)
-            : resolveAgentVariant(pluginConfig, input.agent)
-        if (variant !== undefined) {
-          message["variant"] = variant
-        }
-      }
       firstMessageVariantGate.markApplied(input.sessionID)
-    } else {
-      if (input.model && input.agent && message["variant"] === undefined) {
-        const variant = resolveVariantForModel(pluginConfig, input.agent, input.model)
-        if (variant !== undefined) {
-          message["variant"] = variant
-        }
-      } else {
-        applyAgentVariant(pluginConfig, input.agent, message)
-      }
     }
 
+    if (!isRuntimeFallbackEnabled) {
+      await hooks.modelFallback?.["chat.message"]?.(input, output)
+    }
+    const modelOverride = output.message["model"]
+    if (
+      modelOverride &&
+      typeof modelOverride === "object" &&
+      "providerID" in modelOverride &&
+      "modelID" in modelOverride
+    ) {
+      const providerID = (modelOverride as { providerID?: string }).providerID
+      const modelID = (modelOverride as { modelID?: string }).modelID
+      if (typeof providerID === "string" && typeof modelID === "string") {
+        setSessionModel(input.sessionID, { providerID, modelID })
+      }
+    } else if (input.model) {
+      setSessionModel(input.sessionID, input.model)
+    }
     await hooks.stopContinuationGuard?.["chat.message"]?.(input)
+    await hooks.runtimeFallback?.["chat.message"]?.(input, output)
     await hooks.keywordDetector?.["chat.message"]?.(input, output)
     await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
-    await hooks.sisyphusGptHephaestusReminder?.["chat.message"]?.(input)
+    await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
+    await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }
 
     if (!hasConnectedProvidersCache()) {
-      ctx.client.tui
+      pluginContext.client.tui
         .showToast({
           body: {
             title: "⚠️ Provider Cache Missing",
@@ -119,24 +140,18 @@ export function createChatMessageHandler(args: {
       if (isRalphLoopTemplate) {
         const taskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i)
         const rawTask = taskMatch?.[1]?.trim() || ""
-        const quotedMatch = rawTask.match(/^["'](.+?)["']/)
-        const prompt =
-          quotedMatch?.[1] ||
-          rawTask.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
+        const parsedArguments = parseRalphLoopArguments(rawTask)
 
-        const maxIterMatch = rawTask.match(/--max-iterations=(\d+)/i)
-        const promiseMatch = rawTask.match(
-          /--completion-promise=["']?([^"'\s]+)["']?/i,
-        )
-
-        hooks.ralphLoop.startLoop(input.sessionID, prompt, {
-          maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
-          completionPromise: promiseMatch?.[1],
+        hooks.ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
+          maxIterations: parsedArguments.maxIterations,
+          completionPromise: parsedArguments.completionPromise,
+          strategy: parsedArguments.strategy,
         })
       } else if (isCancelRalphTemplate) {
         hooks.ralphLoop.cancelLoop(input.sessionID)
       }
     }
+
+    applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, pluginContext.client.tui, input.sessionID)
   }
 }

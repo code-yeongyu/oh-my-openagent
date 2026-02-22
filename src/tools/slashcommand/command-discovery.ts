@@ -76,10 +76,10 @@ export function discoverCommandsSync(directory?: string): CommandInfo[] {
   }))
 
   return [
-    ...builtinCommands,
-    ...opencodeProjectCommands,
     ...projectCommands,
-    ...opencodeGlobalCommands,
     ...userCommands,
+    ...opencodeProjectCommands,
+    ...opencodeGlobalCommands,
+    ...builtinCommands,
   ]
 }

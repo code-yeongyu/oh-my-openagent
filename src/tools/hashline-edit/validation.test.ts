@@ -1,105 +1,106 @@
 import { describe, it, expect } from "bun:test"
-import { parseLineRef, validateLineRef } from "./validation"
+import { computeLineHash } from "./hash-computation"
+import { parseLineRef, validateLineRef, validateLineRefs } from "./validation"
 
 describe("parseLineRef", () => {
-  it("parses valid line reference", () => {
+  it("parses valid LINE#ID reference", () => {
     //#given
-    const ref = "42:a3"
+    const ref = "42#VK"
 
     //#when
     const result = parseLineRef(ref)
 
     //#then
-    expect(result).toEqual({ line: 42, hash: "a3" })
+    expect(result).toEqual({ line: 42, hash: "VK" })
   })
 
-  it("parses line reference with different hash", () => {
+  it("throws on invalid format", () => {
     //#given
-    const ref = "1:ff"
+    const ref = "42:VK"
+
+    //#when / #then
+    expect(() => parseLineRef(ref)).toThrow("LINE#ID")
+  })
+
+  it("accepts refs copied with markers and trailing content", () => {
+    //#given
+    const ref = ">>> 42#VK:const value = 1"
 
     //#when
     const result = parseLineRef(ref)
 
     //#then
-    expect(result).toEqual({ line: 1, hash: "ff" })
-  })
-
-  it("throws on invalid format - no colon", () => {
-    //#given
-    const ref = "42a3"
-
-    //#when & #then
-    expect(() => parseLineRef(ref)).toThrow()
-  })
-
-  it("throws on invalid format - non-numeric line", () => {
-    //#given
-    const ref = "abc:a3"
-
-    //#when & #then
-    expect(() => parseLineRef(ref)).toThrow()
-  })
-
-  it("throws on invalid format - invalid hash", () => {
-    //#given
-    const ref = "42:xyz"
-
-    //#when & #then
-    expect(() => parseLineRef(ref)).toThrow()
-  })
-
-  it("throws on empty string", () => {
-    //#given
-    const ref = ""
-
-    //#when & #then
-    expect(() => parseLineRef(ref)).toThrow()
+    expect(result).toEqual({ line: 42, hash: "VK" })
   })
 })
 
 describe("validateLineRef", () => {
-  it("validates matching hash", () => {
+  it("accepts matching reference", () => {
     //#given
     const lines = ["function hello() {", "  return 42", "}"]
-    const ref = "1:42"
+    const hash = computeLineHash(1, lines[0])
 
-    //#when & #then
-    expect(() => validateLineRef(lines, ref)).not.toThrow()
+    //#when / #then
+    expect(() => validateLineRef(lines, `1#${hash}`)).not.toThrow()
   })
 
-  it("throws on hash mismatch", () => {
-    //#given
-    const lines = ["function hello() {", "  return 42", "}"]
-    const ref = "1:00" // Wrong hash
-
-    //#when & #then
-    expect(() => validateLineRef(lines, ref)).toThrow()
-  })
-
-  it("throws on line out of bounds", () => {
-    //#given
-    const lines = ["function hello() {", "  return 42", "}"]
-    const ref = "99:a3"
-
-    //#when & #then
-    expect(() => validateLineRef(lines, ref)).toThrow()
-  })
-
-  it("throws on invalid line number", () => {
+  it("throws on mismatch and includes current hash", () => {
     //#given
     const lines = ["function hello() {"]
-    const ref = "0:a3" // Line numbers start at 1
 
-    //#when & #then
-    expect(() => validateLineRef(lines, ref)).toThrow()
+    //#when / #then
+    expect(() => validateLineRef(lines, "1#ZZ")).toThrow(/>>>\s+1#[ZPMQVRWSNKTXJBYH]{2}:/)
   })
 
-  it("error message includes current hash", () => {
+  it("shows >>> mismatch context in batched validation", () => {
+    //#given
+    const lines = ["one", "two", "three", "four"]
+
+    //#when / #then
+    expect(() => validateLineRefs(lines, ["2#ZZ"]))
+      .toThrow(/>>>\s+2#[ZPMQVRWSNKTXJBYH]{2}:two/)
+  })
+})
+
+describe("legacy LINE:HEX backward compatibility", () => {
+  it("parses legacy LINE:HEX ref", () => {
+    //#given
+    const ref = "42:ab"
+
+    //#when
+    const result = parseLineRef(ref)
+
+    //#then
+    expect(result).toEqual({ line: 42, hash: "ab" })
+  })
+
+  it("parses legacy LINE:HEX ref with uppercase hex", () => {
+    //#given
+    const ref = "10:FF"
+
+    //#when
+    const result = parseLineRef(ref)
+
+    //#then
+    expect(result).toEqual({ line: 10, hash: "FF" })
+  })
+
+  it("legacy ref fails validation with hash mismatch, not parse error", () => {
     //#given
     const lines = ["function hello() {"]
-    const ref = "1:00"
 
-    //#when & #then
-    expect(() => validateLineRef(lines, ref)).toThrow(/current hash/)
+    //#when / #then
+    expect(() => validateLineRef(lines, "1:ab")).toThrow(/>>>\s+1#[ZPMQVRWSNKTXJBYH]{2}:/)
+  })
+
+  it("extracts legacy ref from content with markers", () => {
+    //#given
+    const ref = ">>> 42:ab|const x = 1"
+
+    //#when
+    const result = parseLineRef(ref)
+
+    //#then
+    expect(result).toEqual({ line: 42, hash: "ab" })
   })
 })

@@ -1,7 +1,7 @@
 import { describe, it, expect, spyOn } from "bun:test"
 import type { RunContext } from "./types"
 import { createEventState } from "./events"
-import { handleSessionStatus, handleMessagePartUpdated, handleTuiToast } from "./event-handlers"
+import { handleSessionStatus, handleMessagePartUpdated, handleMessageUpdated, handleTuiToast } from "./event-handlers"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
   sessionID,
@@ -231,6 +231,80 @@ describe("handleMessagePartUpdated", () => {
     expect(state.hasReceivedMeaningfulWork).toBe(true)
     expect(state.lastPartText).toBe("Legacy text")
     stdoutSpy.mockRestore()
+  })
+
+  it("prints completion metadata once when assistant text part is completed", () => {
+    // given
+    const nowSpy = spyOn(Date, "now")
+    nowSpy.mockReturnValueOnce(1000)
+    nowSpy.mockReturnValueOnce(3400)
+
+    const ctx = createMockContext("ses_main")
+    const state = createEventState()
+    const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
+
+    handleMessageUpdated(
+      ctx,
+      {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_1",
+            sessionID: "ses_main",
+            role: "assistant",
+            agent: "Sisyphus",
+            modelID: "claude-sonnet-4-6",
+          },
+        },
+      } as any,
+      state,
+    )
+
+    // when
+    handleMessagePartUpdated(
+      ctx,
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "part_1",
+            sessionID: "ses_main",
+            messageID: "msg_1",
+            type: "text",
+            text: "done",
+            time: { end: 1 },
+          },
+        },
+      } as any,
+      state,
+    )
+
+    handleMessagePartUpdated(
+      ctx,
+      {
+        type: "message.part.updated",
+        properties: {
+          part: {
+            id: "part_1",
+            sessionID: "ses_main",
+            messageID: "msg_1",
+            type: "text",
+            text: "done",
+            time: { end: 2 },
+          },
+        },
+      } as any,
+      state,
+    )
+
+    // then
+    const output = stdoutSpy.mock.calls.map(call => String(call[0])).join("")
+    const metaCount = output.split("Sisyphus · claude-sonnet-4-6 · 2.4s").length - 1
+    expect(metaCount).toBe(1)
+    expect(state.completionMetaPrintedByMessageId["msg_1"]).toBe(true)
+
+    stdoutSpy.mockRestore()
+    nowSpy.mockRestore()
   })
 })
 

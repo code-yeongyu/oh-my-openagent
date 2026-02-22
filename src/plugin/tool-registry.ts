@@ -11,9 +11,8 @@ import {
   createBackgroundTools,
   createCallOmoAgent,
   createLookAt,
-  createSkillTool,
   createSkillMcpTool,
-  createSlashcommandTool,
+  createSkillTool,
   createGrepTools,
   createGlobTools,
   createAstGrepTools,
@@ -61,6 +60,7 @@ export function createToolRegistry(args: {
     client: ctx.client,
     directory: ctx.directory,
     userCategories: pluginConfig.categories,
+    agentOverrides: pluginConfig.agents,
     gitMasterConfig: pluginConfig.git_master,
     sisyphusJuniorModel: pluginConfig.agents?.["sisyphus-junior"]?.model,
     browserProvider: skillContext.browserProvider,
@@ -88,14 +88,6 @@ export function createToolRegistry(args: {
 
   const getSessionIDForMcp = (): string => getMainSessionID() || ""
 
-  const skillTool = createSkillTool({
-    skills: skillContext.mergedSkills,
-    mcpManager: managers.skillMcpManager,
-    getSessionID: getSessionIDForMcp,
-    gitMasterConfig: pluginConfig.git_master,
-    disabledSkills: skillContext.disabledSkills,
-  })
-
   const skillMcpTool = createSkillMcpTool({
     manager: managers.skillMcpManager,
     getLoadedSkills: () => skillContext.mergedSkills,
@@ -103,9 +95,12 @@ export function createToolRegistry(args: {
   })
 
   const commands = discoverCommandsSync(ctx.directory)
-  const slashcommandTool = createSlashcommandTool({
+  const skillTool = createSkillTool({
     commands,
     skills: skillContext.mergedSkills,
+    mcpManager: managers.skillMcpManager,
+    getSessionID: getSessionIDForMcp,
+    gitMasterConfig: pluginConfig.git_master,
   })
 
   const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false
@@ -118,7 +113,7 @@ export function createToolRegistry(args: {
       }
     : {}
 
-  const hashlineEnabled = pluginConfig.experimental?.hashline_edit ?? false
+  const hashlineEnabled = pluginConfig.hashline_edit ?? true
   const hashlineToolsRecord: Record<string, ToolDefinition> = hashlineEnabled
     ? { edit: createHashlineEditTool() }
     : {}
@@ -133,9 +128,8 @@ export function createToolRegistry(args: {
     call_omo_agent: callOmoAgent,
     ...(lookAt ? { look_at: lookAt } : {}),
     task: delegateTask,
-    skill: skillTool,
     skill_mcp: skillMcpTool,
-    slashcommand: slashcommandTool,
+    skill: skillTool,
     interactive_bash,
     ...taskToolsRecord,
     ...hashlineToolsRecord,

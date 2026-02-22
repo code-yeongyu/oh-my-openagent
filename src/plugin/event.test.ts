@@ -383,3 +383,55 @@ type EventInput = { event: { type: string; properties?: Record<string, unknown> 
 		expect(dispatchCalls[1].event.type).toBe("session.idle")
 	})
 })
+
+describe("createEventHandler - event forwarding", () => {
+	it("forwards session.deleted to write-existing-file-guard hook", async () => {
+		//#given
+		const forwardedEvents: EventInput[] = []
+		const disconnectedSessions: string[] = []
+		const deletedSessions: string[] = []
+		const eventHandler = createEventHandler({
+			ctx: {} as never,
+			pluginConfig: {} as never,
+			firstMessageVariantGate: {
+				markSessionCreated: () => {},
+				clear: () => {},
+			},
+			managers: {
+				skillMcpManager: {
+					disconnectSession: async (sessionID: string) => {
+						disconnectedSessions.push(sessionID)
+					},
+				},
+				tmuxSessionManager: {
+					onSessionCreated: async () => {},
+					onSessionDeleted: async ({ sessionID }: { sessionID: string }) => {
+						deletedSessions.push(sessionID)
+					},
+				},
+			} as never,
+			hooks: {
+				writeExistingFileGuard: {
+					event: async (input: EventInput) => {
+						forwardedEvents.push(input)
+					},
+				},
+			} as never,
+		})
+		const sessionID = "ses_forward_delete_event"
+
+		//#when
+		await eventHandler({
+			event: {
+				type: "session.deleted",
+				properties: { info: { id: sessionID } },
+			},
+		})
+
+		//#then
+		expect(forwardedEvents.length).toBe(1)
+		expect(forwardedEvents[0]?.event.type).toBe("session.deleted")
+		expect(disconnectedSessions).toEqual([sessionID])
+		expect(deletedSessions).toEqual([sessionID])
+	})
+})

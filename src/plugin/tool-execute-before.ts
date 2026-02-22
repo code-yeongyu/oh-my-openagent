@@ -4,6 +4,7 @@ import { getMainSessionID } from "../features/claude-code-session-state"
 import { clearBoulderState } from "../features/boulder-state"
 import { log } from "../shared"
 import { resolveSessionAgent } from "./session-agent-resolver"
+import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -29,6 +30,26 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.prometheusMdOnly?.["tool.execute.before"]?.(input, output)
     await hooks.sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
+
+    const normalizedToolName = input.tool.toLowerCase()
+    if (
+      normalizedToolName === "question"
+      || normalizedToolName === "ask_user_question"
+      || normalizedToolName === "askuserquestion"
+    ) {
+      const sessionID = input.sessionID || getMainSessionID()
+      await hooks.sessionNotification?.({
+        event: {
+          type: "tool.execute.before",
+          properties: {
+            sessionID,
+            tool: input.tool,
+            args: output.args,
+          },
+        },
+      })
+    }
+
     if (input.tool === "task") {
       const argsObject = output.args
       const category = typeof argsObject.category === "string" ? argsObject.category : undefined
@@ -43,50 +64,38 @@ export function createToolExecuteBeforeHandler(args: {
       }
     }
 
-    if (hooks.ralphLoop && input.tool === "slashcommand") {
-      const rawCommand = typeof output.args.command === "string" ? output.args.command : undefined
-      const command = rawCommand?.replace(/^\//, "").toLowerCase()
+    if (hooks.ralphLoop && input.tool === "skill") {
+      const rawName = typeof output.args.name === "string" ? output.args.name : undefined
+      const command = rawName?.replace(/^\//, "").toLowerCase()
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "ralph-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(ralph-loop)\s*/i, "") || ""
-        const taskMatch = rawArgs.match(/^["'](.+?)["']/)
-        const prompt =
-          taskMatch?.[1] ||
-          rawArgs.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
+        const rawArgs = rawName?.replace(/^\/?(ralph-loop)\s*/i, "") || ""
+        const parsedArguments = parseRalphLoopArguments(rawArgs)
 
-        const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i)
-        const promiseMatch = rawArgs.match(/--completion-promise=["']?([^"'\s]+)["']?/i)
-
-        hooks.ralphLoop.startLoop(sessionID, prompt, {
-          maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
-          completionPromise: promiseMatch?.[1],
+        hooks.ralphLoop.startLoop(sessionID, parsedArguments.prompt, {
+          maxIterations: parsedArguments.maxIterations,
+          completionPromise: parsedArguments.completionPromise,
+          strategy: parsedArguments.strategy,
         })
       } else if (command === "cancel-ralph" && sessionID) {
         hooks.ralphLoop.cancelLoop(sessionID)
       } else if (command === "ulw-loop" && sessionID) {
-        const rawArgs = rawCommand?.replace(/^\/?(ulw-loop)\s*/i, "") || ""
-        const taskMatch = rawArgs.match(/^["'](.+?)["']/)
-        const prompt =
-          taskMatch?.[1] ||
-          rawArgs.split(/\s+--/)[0]?.trim() ||
-          "Complete the task as instructed"
+        const rawArgs = rawName?.replace(/^\/?(ulw-loop)\s*/i, "") || ""
+        const parsedArguments = parseRalphLoopArguments(rawArgs)
 
-        const maxIterMatch = rawArgs.match(/--max-iterations=(\d+)/i)
-        const promiseMatch = rawArgs.match(/--completion-promise=["']?([^"'\s]+)["']?/i)
-
-        hooks.ralphLoop.startLoop(sessionID, prompt, {
+        hooks.ralphLoop.startLoop(sessionID, parsedArguments.prompt, {
           ultrawork: true,
-          maxIterations: maxIterMatch ? parseInt(maxIterMatch[1], 10) : undefined,
-          completionPromise: promiseMatch?.[1],
+          maxIterations: parsedArguments.maxIterations,
+          completionPromise: parsedArguments.completionPromise,
+          strategy: parsedArguments.strategy,
         })
       }
     }
 
-    if (input.tool === "slashcommand") {
-      const rawCommand = typeof output.args.command === "string" ? output.args.command : undefined
-      const command = rawCommand?.replace(/^\//, "").toLowerCase()
+    if (input.tool === "skill") {
+      const rawName = typeof output.args.name === "string" ? output.args.name : undefined
+      const command = rawName?.replace(/^\//, "").toLowerCase()
       const sessionID = input.sessionID || getMainSessionID()
 
       if (command === "stop-continuation" && sessionID) {

@@ -51,6 +51,19 @@ function getDeltaMessageId(props?: {
   return props?.messageID
 }
 
+function renderCompletionMetaLine(state: EventState, messageID: string): void {
+  if (state.completionMetaPrintedByMessageId[messageID]) return
+
+  const startedAt = state.messageStartedAtById[messageID]
+  const elapsedSec = startedAt ? ((Date.now() - startedAt) / 1000).toFixed(1) : "0.0"
+  const agent = state.currentAgent ?? "assistant"
+  const model = state.currentModel ?? "unknown-model"
+  const variant = state.currentVariant ? ` (${state.currentVariant})` : ""
+
+  process.stdout.write(pc.dim(`\n  ${displayChars.treeEnd} ${agent} · ${model}${variant} · ${elapsedSec}s  \n`))
+  state.completionMetaPrintedByMessageId[messageID] = true
+}
+
 export function handleSessionIdle(ctx: RunContext, payload: EventPayload, state: EventState): void {
   if (payload.type !== "session.idle") return
 
@@ -133,6 +146,13 @@ export function handleMessagePartUpdated(ctx: RunContext, payload: EventPayload,
       state.hasReceivedMeaningfulWork = true
     }
     state.lastPartText = part.text
+
+    if (part.time?.end) {
+      const messageID = part.messageID ?? state.currentMessageId
+      if (messageID) {
+        renderCompletionMetaLine(state, messageID)
+      }
+    }
   }
 
   if (part.type === "tool") {
@@ -238,6 +258,10 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
     state.textAtLineStart = true
     state.thinkingAtLineStart = false
     closeThinkBlockIfNeeded(state)
+    if (messageID) {
+      state.messageStartedAtById[messageID] = Date.now()
+      state.completionMetaPrintedByMessageId[messageID] = false
+    }
   }
 
   const agent = props?.info?.agent ?? null

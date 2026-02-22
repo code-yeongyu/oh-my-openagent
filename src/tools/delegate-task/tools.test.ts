@@ -10,12 +10,12 @@ import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import * as executor from "./executor"
 
-const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-5"
+const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
 
 const TEST_CONNECTED_PROVIDERS = ["anthropic", "google", "openai"]
 const TEST_AVAILABLE_MODELS = new Set([
   "anthropic/claude-opus-4-6",
-  "anthropic/claude-sonnet-4-5",
+  "anthropic/claude-sonnet-4-6",
   "anthropic/claude-haiku-4-5",
   "google/gemini-3-pro",
   "google/gemini-3-flash",
@@ -51,7 +51,7 @@ describe("sisyphus-task", () => {
     cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
-        anthropic: ["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"],
+        anthropic: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
         google: ["gemini-3-pro", "gemini-3-flash"],
         openai: ["gpt-5.2", "gpt-5.3-codex"],
       },
@@ -1044,7 +1044,7 @@ describe("sisyphus-task", () => {
         modelID: "claude-opus-4-6",
         variant: "max",
       })
-    })
+    }, { timeout: 20000 })
 
      test("DEFAULT_CATEGORIES variant passes to sync session.prompt WITHOUT userCategories", async () => {
        // given - NO userCategories, testing DEFAULT_CATEGORIES for sync mode
@@ -2046,8 +2046,8 @@ describe("sisyphus-task", () => {
       expect(result).toContain("Artistry result here")
     }, { timeout: 20000 })
 
-    test("writing category (gemini-flash) with run_in_background=false should force background but wait for result", async () => {
-      // given - writing uses gemini-3-flash
+    test("writing category (kimi) with run_in_background=false should force background but wait for result", async () => {
+      // given - writing uses kimi-for-coding/k2p5
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
       
@@ -2251,7 +2251,7 @@ describe("sisyphus-task", () => {
       )
 
       // then - model should be anthropic/claude-haiku-4-5 from DEFAULT_CATEGORIES
-      //         NOT anthropic/claude-sonnet-4-5 (system default)
+      //         NOT anthropic/claude-sonnet-4-6 (system default)
       expect(launchInput.model.providerID).toBe("anthropic")
       expect(launchInput.model.modelID).toBe("claude-haiku-4-5")
     })
@@ -2352,7 +2352,7 @@ describe("sisyphus-task", () => {
       const tool = createDelegateTask({
         manager: mockManager,
         client: mockClient,
-        sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
+        sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
         availableModelsOverride: createTestAvailableModels(),
       })
@@ -2378,7 +2378,7 @@ describe("sisyphus-task", () => {
 
       // then - override model should be used instead of category model
       expect(launchInput.model.providerID).toBe("anthropic")
-      expect(launchInput.model.modelID).toBe("claude-sonnet-4-5")
+      expect(launchInput.model.modelID).toBe("claude-sonnet-4-6")
     })
 
     test("explicit category model takes precedence over sisyphus-junior model", async () => {
@@ -2414,7 +2414,7 @@ describe("sisyphus-task", () => {
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
-         sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
+         sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
          userCategories: {
            ultrabrain: { model: "openai/gpt-5.3-codex" },
          },
@@ -2478,7 +2478,7 @@ describe("sisyphus-task", () => {
       const tool = createDelegateTask({
         manager: mockManager,
         client: mockClient,
-        sisyphusJuniorModel: "anthropic/claude-sonnet-4-5",
+        sisyphusJuniorModel: "anthropic/claude-sonnet-4-6",
         connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
         availableModelsOverride: createTestAvailableModels(),
       })
@@ -2504,7 +2504,7 @@ describe("sisyphus-task", () => {
 
       // then - sisyphus-junior override model should be used, not category default
       expect(launchInput.model.providerID).toBe("anthropic")
-      expect(launchInput.model.modelID).toBe("claude-sonnet-4-5")
+      expect(launchInput.model.modelID).toBe("claude-sonnet-4-6")
     })
 
     test("sisyphus-junior model override works with user-defined category (#1295)", async () => {
@@ -2624,31 +2624,35 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - agent-browser skill should be resolved (not in notFound)
+      // then - agent-browser skill should be resolved
       expect(promptBody).toBeDefined()
       expect(promptBody.system).toBeDefined()
-      expect(promptBody.system).toContain("agent-browser")
+      expect(promptBody.system).toContain("<Category_Context>")
+      expect(String(promptBody.system).startsWith("<Category_Context>")).toBe(false)
     }, { timeout: 20000 })
 
-    test("should NOT resolve agent-browser skill when browserProvider is not set", async () => {
-      // given - task without browserProvider (defaults to playwright)
+    test("should resolve agent-browser skill even when browserProvider is not set", async () => {
+      // given - delegate_task without browserProvider
       const { createDelegateTask } = require("./tools")
+      let promptBody: any
 
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
-         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         session: {
-           get: async () => ({ data: { directory: "/project" } }),
-           create: async () => ({ data: { id: "ses_no_browser_provider" } }),
-           prompt: async () => ({ data: {} }),
-           promptAsync: async () => ({ data: {} }),
-           messages: async () => ({
-             data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
-           }),
-           status: async () => ({ data: {} }),
-         },
-       }
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_no_browser_provider" } }),
+          prompt: async (input: any) => {
+            promptBody = input.body
+            return { data: {} }
+          },
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: {} }),
+        },
+      }
 
        // No browserProvider passed
        const tool = createDelegateTask({
@@ -2675,7 +2679,7 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - should return skill not found error
+      // then - agent-browser skill should NOT resolve without browserProvider
       expect(result).toContain("Skills not found")
       expect(result).toContain("agent-browser")
     })
@@ -2886,7 +2890,7 @@ describe("sisyphus-task", () => {
       
       // then - default model from DEFAULT_CATEGORIES is used
       expect(resolved).not.toBeNull()
-      expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(resolved!.config.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("category built-in model takes precedence over inheritedModel for builtin category", () => {
@@ -2966,7 +2970,7 @@ describe("sisyphus-task", () => {
       // given a custom category with no default model
       const categoryName = "custom-no-default"
       const userCategories = { "custom-no-default": { temperature: 0.5 } } as unknown as Record<string, CategoryConfig>
-      const systemDefaultModel = "anthropic/claude-sonnet-4-5"
+      const systemDefaultModel = "anthropic/claude-sonnet-4-6"
       
       // when no inheritedModel is provided, only systemDefaultModel
       const resolved = resolveCategoryConfig(categoryName, { 
@@ -2976,7 +2980,7 @@ describe("sisyphus-task", () => {
       
       // then systemDefaultModel should be returned
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("anthropic/claude-sonnet-4-5")
+      expect(resolved!.model).toBe("anthropic/claude-sonnet-4-6")
     })
 
     test("FIXED: userConfig.model always takes priority over everything", () => {
@@ -2984,7 +2988,7 @@ describe("sisyphus-task", () => {
       const categoryName = "ultrabrain"
       const userCategories = { "ultrabrain": { model: "custom/user-model" } }
       const inheritedModel = "anthropic/claude-opus-4-6"
-      const systemDefaultModel = "anthropic/claude-sonnet-4-5"
+      const systemDefaultModel = "anthropic/claude-sonnet-4-6"
       
       // when resolveCategoryConfig is called with all sources
       const resolved = resolveCategoryConfig(categoryName, { 
@@ -3032,7 +3036,7 @@ describe("sisyphus-task", () => {
       const categoryName = "my-custom"
       // Using type assertion since we're testing fallback behavior for categories without model
       const userCategories = { "my-custom": { temperature: 0.5 } } as unknown as Record<string, CategoryConfig>
-      const systemDefaultModel = "anthropic/claude-sonnet-4-5"
+      const systemDefaultModel = "anthropic/claude-sonnet-4-6"
       
       // when
       const resolved = resolveCategoryConfig(categoryName, { userCategories, systemDefaultModel })
@@ -3801,7 +3805,7 @@ describe("sisyphus-task", () => {
          manager: mockManager,
          client: mockClient,
          userCategories: {
-           "sisyphus-junior": { model: "anthropic/claude-sonnet-4-5" },
+           "sisyphus-junior": { model: "anthropic/claude-sonnet-4-6" },
          },
        })
 

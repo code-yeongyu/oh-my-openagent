@@ -130,7 +130,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     !config.hasCopilot &&
     !config.hasOpencodeZen
   ) {
-    printWarning("No model providers configured. Using opencode/glm-4.7-free as fallback.")
+    printWarning("No model providers configured. Using opencode/big-pickle as fallback.")
   }
 
   console.log(`${SYMBOLS.star} ${color.bold(color.green(isUpdate ? "Configuration updated!" : "Installation complete!"))}`)

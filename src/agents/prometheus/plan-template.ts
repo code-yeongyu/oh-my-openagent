@@ -83,12 +83,10 @@ Generate plan to: \`.sisyphus/plans/{name}.md\`
 Every task MUST include agent-executed QA scenarios (see TODO template below).
 Evidence saved to \`.sisyphus/evidence/task-{N}-{scenario-slug}.{ext}\`.
 
-| Deliverable Type | Verification Tool | Method |
-|------------------|-------------------|--------|
-| Frontend/UI | Playwright (playwright skill) | Navigate, interact, assert DOM, screenshot |
-| TUI/CLI | interactive_bash (tmux) | Run command, send keystrokes, validate output |
-| API/Backend | Bash (curl) | Send requests, assert status + response fields |
-| Library/Module | Bash (bun/node REPL) | Import, call functions, compare output |
+- **Frontend/UI**: Use Playwright (playwright skill) — Navigate, interact, assert DOM, screenshot
+- **TUI/CLI**: Use interactive_bash (tmux) — Run command, send keystrokes, validate output
+- **API/Backend**: Use Bash (curl) — Send requests, assert status + response fields
+- **Library/Module**: Use Bash (bun/node REPL) — Import, call functions, compare output
 
 ---
 
@@ -146,26 +144,22 @@ Max Concurrent: 7 (Waves 1 & 2)
 
 ### Dependency Matrix (abbreviated — show ALL tasks in your generated plan)
 
-| Task | Depends On | Blocks | Wave |
-|------|------------|--------|------|
-| 1-7 | — | 8-14 | 1 |
-| 8 | 3, 5, 7 | 11, 15 | 2 |
-| 11 | 8 | 15 | 2 |
-| 14 | 5, 10 | 15 | 2 |
-| 15 | 6, 11, 14 | 17-19, 21 | 3 |
-| 21 | 15 | 23, 24 | 4 |
+- **1-7**: — — 8-14, 1
+- **8**: 3, 5, 7 — 11, 15, 2
+- **11**: 8 — 15, 2
+- **14**: 5, 10 — 15, 2
+- **15**: 6, 11, 14 — 17-19, 21, 3
+- **21**: 15 — 23, 24, 4
 
 > This is abbreviated for reference. YOUR generated plan must include the FULL matrix for ALL tasks.
 
 ### Agent Dispatch Summary
 
-| Wave | # Parallel | Tasks → Agent Category |
-|------|------------|----------------------|
-| 1 | **7** | T1-T4 → \`quick\`, T5 → \`quick\`, T6 → \`quick\`, T7 → \`quick\` |
-| 2 | **7** | T8 → \`deep\`, T9 → \`unspecified-high\`, T10 → \`unspecified-high\`, T11 → \`deep\`, T12 → \`visual-engineering\`, T13 → \`quick\`, T14 → \`unspecified-high\` |
-| 3 | **6** | T15 → \`deep\`, T16 → \`visual-engineering\`, T17-T19 → \`quick\`, T20 → \`visual-engineering\` |
-| 4 | **4** | T21 → \`deep\`, T22 → \`unspecified-high\`, T23 → \`deep\`, T24 → \`git\` |
-| FINAL | **4** | F1 → \`oracle\`, F2 → \`unspecified-high\`, F3 → \`unspecified-high\`, F4 → \`deep\` |
+- **1**: **7** — T1-T4 → \`quick\`, T5 → \`quick\`, T6 → \`quick\`, T7 → \`quick\`
+- **2**: **7** — T8 → \`deep\`, T9 → \`unspecified-high\`, T10 → \`unspecified-high\`, T11 → \`deep\`, T12 → \`visual-engineering\`, T13 → \`quick\`, T14 → \`unspecified-high\`
+- **3**: **6** — T15 → \`deep\`, T16 → \`visual-engineering\`, T17-T19 → \`quick\`, T20 → \`visual-engineering\`
+- **4**: **4** — T21 → \`deep\`, T22 → \`unspecified-high\`, T23 → \`deep\`, T24 → \`git\`
+- **FINAL**: **4** — F1 → \`oracle\`, F2 → \`unspecified-high\`, F3 → \`unspecified-high\`, F4 → \`deep\`
 
 ---
 
@@ -312,9 +306,7 @@ Max Concurrent: 7 (Waves 1 & 2)
 
 ## Commit Strategy
 
-| After Task | Message | Files | Verification |
-|------------|---------|-------|--------------|
-| 1 | \`type(scope): desc\` | file.ts | npm test |
+- **1**: \`type(scope): desc\` — file.ts, npm test
 
 ---
 

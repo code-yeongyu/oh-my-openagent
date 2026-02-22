@@ -47,7 +47,7 @@ describe("updateConnectedProvidersCache", () => {
 								env: [],
 								models: {
 									"claude-opus-4-6": { id: "claude-opus-4-6", name: "Claude Opus 4.6" },
-									"claude-sonnet-4-5": { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5" },
+									"claude-sonnet-4-6": { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
 								},
 							},
 						],
@@ -65,7 +65,7 @@ describe("updateConnectedProvidersCache", () => {
 		expect(cache!.connected).toEqual(["openai", "anthropic"])
 		expect(cache!.models).toEqual({
 			openai: ["gpt-5.3-codex", "gpt-5.2"],
-			anthropic: ["claude-opus-4-6", "claude-sonnet-4-5"],
+			anthropic: ["claude-opus-4-6", "claude-sonnet-4-6"],
 		})
 	})
 

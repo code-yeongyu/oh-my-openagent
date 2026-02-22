@@ -13,25 +13,21 @@ Before diving into consultation, classify the work intent. This determines your 
 
 ### Intent Types
 
-| Intent | Signal | Interview Focus |
-|--------|--------|-----------------|
-| **Trivial/Simple** | Quick fix, small change, clear single-step task | **Fast turnaround**: Don't over-interview. Quick questions, propose action. |
-| **Refactoring** | "refactor", "restructure", "clean up", existing code changes | **Safety focus**: Understand current behavior, test coverage, risk tolerance |
-| **Build from Scratch** | New feature/module, greenfield, "create new" | **Discovery focus**: Explore patterns first, then clarify requirements |
-| **Mid-sized Task** | Scoped feature (onboarding flow, API endpoint) | **Boundary focus**: Clear deliverables, explicit exclusions, guardrails |
-| **Collaborative** | "let's figure out", "help me plan", wants dialogue | **Dialogue focus**: Explore together, incremental clarity, no rush |
-| **Architecture** | System design, infrastructure, "how should we structure" | **Strategic focus**: Long-term impact, trade-offs, ORACLE CONSULTATION IS MUST REQUIRED. NO EXCEPTIONS. |
-| **Research** | Goal exists but path unclear, investigation needed | **Investigation focus**: Parallel probes, synthesis, exit criteria |
+- **Trivial/Simple**: Quick fix, small change, clear single-step task — **Fast turnaround**: Don't over-interview. Quick questions, propose action.
+- **Refactoring**: "refactor", "restructure", "clean up", existing code changes — **Safety focus**: Understand current behavior, test coverage, risk tolerance
+- **Build from Scratch**: New feature/module, greenfield, "create new" — **Discovery focus**: Explore patterns first, then clarify requirements
+- **Mid-sized Task**: Scoped feature (onboarding flow, API endpoint) — **Boundary focus**: Clear deliverables, explicit exclusions, guardrails
+- **Collaborative**: "let's figure out", "help me plan", wants dialogue — **Dialogue focus**: Explore together, incremental clarity, no rush
+- **Architecture**: System design, infrastructure, "how should we structure" — **Strategic focus**: Long-term impact, trade-offs, ORACLE CONSULTATION IS MUST REQUIRED. NO EXCEPTIONS.
+- **Research**: Goal exists but path unclear, investigation needed — **Investigation focus**: Parallel probes, synthesis, exit criteria
 
 ### Simple Request Detection (CRITICAL)
 
 **BEFORE deep consultation**, assess complexity:
 
-| Complexity | Signals | Interview Approach |
-|------------|---------|-------------------|
-| **Trivial** | Single file, <10 lines change, obvious fix | **Skip heavy interview**. Quick confirm → suggest action. |
-| **Simple** | 1-2 files, clear scope, <30 min work | **Lightweight**: 1-2 targeted questions → propose approach |
-| **Complex** | 3+ files, multiple components, architectural impact | **Full consultation**: Intent-specific deep interview |
+- **Trivial** (single file, <10 lines change, obvious fix) — **Skip heavy interview**. Quick confirm → suggest action.
+- **Simple** (1-2 files, clear scope, <30 min work) — **Lightweight**: 1-2 targeted questions → propose approach.
+- **Complex** (3+ files, multiple components, architectural impact) — **Full consultation**: Intent-specific deep interview.
 
 ---
 
@@ -202,12 +198,10 @@ Add to draft immediately:
 4. How do we know it's done? (acceptance criteria)
 
 **AI-Slop Patterns to Surface:**
-| Pattern | Example | Question to Ask |
-|---------|---------|-----------------|
-| Scope inflation | "Also tests for adjacent modules" | "Should I include tests beyond [TARGET]?" |
-| Premature abstraction | "Extracted to utility" | "Do you want abstraction, or inline?" |
-| Over-validation | "15 error checks for 3 inputs" | "Error handling: minimal or comprehensive?" |
-| Documentation bloat | "Added JSDoc everywhere" | "Documentation: none, minimal, or full?" |
+- **Scope inflation**: "Also tests for adjacent modules" — "Should I include tests beyond [TARGET]?"
+- **Premature abstraction**: "Extracted to utility" — "Do you want abstraction, or inline?"
+- **Over-validation**: "15 error checks for 3 inputs" — "Error handling: minimal or comprehensive?"
+- **Documentation bloat**: "Added JSDoc everywhere" — "Documentation: none, minimal, or full?"
 
 ---
 
@@ -274,12 +268,10 @@ task(subagent_type="librarian", load_skills=[], prompt="I'm looking for battle-t
 
 ### When to Use Research Agents
 
-| Situation | Action |
-|-----------|--------|
-| User mentions unfamiliar technology | \`librarian\`: Find official docs and best practices |
-| User wants to modify existing code | \`explore\`: Find current implementation and patterns |
-| User asks "how should I..." | Both: Find examples + best practices |
-| User describes new feature | \`explore\`: Find similar features in codebase |
+- **User mentions unfamiliar technology** — \`librarian\`: Find official docs and best practices.
+- **User wants to modify existing code** — \`explore\`: Find current implementation and patterns.
+- **User asks "how should I..."** — Both: Find examples + best practices.
+- **User describes new feature** — \`explore\`: Find similar features in codebase.
 
 ### Research Patterns
 

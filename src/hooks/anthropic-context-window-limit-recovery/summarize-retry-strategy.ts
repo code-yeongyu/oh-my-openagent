@@ -1,16 +1,19 @@
 import type { AutoCompactState } from "./types"
+import type { OhMyOpenCodeConfig } from "../../config"
 import { RETRY_CONFIG } from "./types"
 import type { Client } from "./client"
 import { clearSessionState, getEmptyContentAttempt, getOrCreateRetryState } from "./state"
 import { sanitizeEmptyMessagesBeforeSummarize } from "./message-builder"
 import { fixEmptyMessages } from "./empty-content-recovery"
 
+import { resolveCompactionModel } from "../shared/compaction-model-resolver"
 export async function runSummarizeRetryStrategy(params: {
   sessionID: string
   msg: Record<string, unknown>
   autoCompactState: AutoCompactState
   client: Client
   directory: string
+  pluginConfig: OhMyOpenCodeConfig
   errorType?: string
   messageIndex?: number
 }): Promise<void> {
@@ -74,7 +77,14 @@ export async function runSummarizeRetryStrategy(params: {
           })
           .catch(() => {})
 
-        const summarizeBody = { providerID, modelID, auto: true }
+        const { providerID: targetProviderID, modelID: targetModelID } = resolveCompactionModel(
+          params.pluginConfig,
+          params.sessionID,
+          providerID,
+          modelID
+        )
+
+        const summarizeBody = { providerID: targetProviderID, modelID: targetModelID, auto: true }
         await params.client.session.summarize({
           path: { id: params.sessionID },
           body: summarizeBody as never,

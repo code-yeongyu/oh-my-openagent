@@ -5,6 +5,7 @@ import {
   canSplitPane, 
   canSplitPaneAnyDirection,
   getBestSplitDirection,
+  findSpawnTarget,
   type SessionMapping 
 } from "./decision-engine"
 import type { WindowState, CapacityConfig, TmuxPaneInfo } from "./types"
@@ -258,7 +259,120 @@ describe("decideSpawnActions", () => {
       expect(result.actions[0].type).toBe("spawn")
     })
 
-    it("replaces oldest pane when existing panes are too small to split", () => {
+    it("respects configured agent min width for split decisions", () => {
+      // given
+      const state = createWindowState(240, 44, [
+        { paneId: "%1", width: 100, height: 44, left: 140, top: 0 },
+      ])
+      const mappings: SessionMapping[] = [
+        { sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") },
+      ]
+      const strictConfig: CapacityConfig = {
+        mainPaneSize: 60,
+        mainPaneMinWidth: 120,
+        agentPaneWidth: 60,
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", strictConfig, mappings)
+
+      // then
+      expect(result.canSpawn).toBe(false)
+      expect(result.actions).toHaveLength(0)
+      expect(result.reason).toContain("defer")
+    })
+
+    it("returns canSpawn=true when 0 agent panes exist and mainPane occupies full window width", () => {
+      // given - tmux reports mainPane.width === windowWidth when no splits exist
+      const windowWidth = 252
+      const windowHeight = 56
+      const state: WindowState = {
+        windowWidth,
+        windowHeight,
+        mainPane: { paneId: "%0", width: windowWidth, height: windowHeight, left: 0, top: 0, title: "main", isActive: true },
+        agentPanes: [],
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
+
+      // then - should NOT be blocked by agentAreaWidth check
+      expect(result.canSpawn).toBe(true)
+      expect(result.actions.length).toBe(1)
+      expect(result.actions[0].type).toBe("spawn")
+    })
+
+    it("returns canSpawn=false when 0 agent panes and window genuinely too narrow to split", () => {
+      // given - window so narrow that even splitting mainPane would fail
+      const windowWidth = 70
+      const windowHeight = 56
+      const state: WindowState = {
+        windowWidth,
+        windowHeight,
+        mainPane: { paneId: "%0", width: windowWidth, height: windowHeight, left: 0, top: 0, title: "main", isActive: true },
+        agentPanes: [],
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
+
+      // then
+      expect(result.canSpawn).toBe(false)
+      expect(result.reason).toContain("too small")
+    })
+
+    it("returns canSpawn=false when agent panes exist but agent area too small", () => {
+      // given - 1 agent pane exists, and agent area is below minPaneWidth
+      const state: WindowState = {
+        windowWidth: 180,
+        windowHeight: 44,
+        mainPane: { paneId: "%0", width: 160, height: 44, left: 0, top: 0, title: "main", isActive: true },
+        agentPanes: [{ paneId: "%1", width: 19, height: 44, left: 161, top: 0, title: "agent-0", isActive: false }],
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
+
+      // then
+      expect(result.canSpawn).toBe(false)
+      expect(result.reason).toContain("defer attach")
+    })
+
+    it("spawns at exact minimum splittable width with 0 agent panes", () => {
+      // given
+      const exactThreshold = 2 * defaultConfig.agentPaneWidth + 1
+      const state: WindowState = {
+        windowWidth: exactThreshold,
+        windowHeight: 56,
+        mainPane: { paneId: "%0", width: exactThreshold, height: 56, left: 0, top: 0, title: "main", isActive: true },
+        agentPanes: [],
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
+
+      // then
+      expect(result.canSpawn).toBe(true)
+    })
+
+    it("rejects spawn 1 pixel below minimum splittable width with 0 agent panes", () => {
+      // given
+      const belowThreshold = 2 * defaultConfig.agentPaneWidth
+      const state: WindowState = {
+        windowWidth: belowThreshold,
+        windowHeight: 56,
+        mainPane: { paneId: "%0", width: belowThreshold, height: 56, left: 0, top: 0, title: "main", isActive: true },
+        agentPanes: [],
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", defaultConfig, [])
+
+      // then
+      expect(result.canSpawn).toBe(false)
+    })
+
+    it("closes oldest pane when existing panes are too small to split", () => {
       // given - existing pane is below minimum splittable size
       const state = createWindowState(220, 30, [
         { paneId: "%1", width: 50, height: 15, left: 110, top: 0 },
@@ -272,8 +386,9 @@ describe("decideSpawnActions", () => {
 
       // then
       expect(result.canSpawn).toBe(true)
-      expect(result.actions.length).toBe(1)
-      expect(result.actions[0].type).toBe("replace")
+      expect(result.actions.length).toBe(2)
+      expect(result.actions[0].type).toBe("close")
+      expect(result.actions[1].type).toBe("spawn")
     })
 
     it("can spawn when existing pane is large enough to split", () => {
@@ -335,6 +450,64 @@ describe("decideSpawnActions", () => {
       expect(result.canSpawn).toBe(false)
       expect(result.reason).toBe("no main pane found")
     })
+
+    it("uses configured main pane size for split/defer decision", () => {
+      // given
+      const state = createWindowState(240, 44, [
+        { paneId: "%1", width: 90, height: 44, left: 150, top: 0 },
+      ])
+      const mappings: SessionMapping[] = [
+        { sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") },
+      ]
+      const wideMainConfig: CapacityConfig = {
+        mainPaneSize: 80,
+        mainPaneMinWidth: 120,
+        agentPaneWidth: 40,
+      }
+
+      // when
+      const result = decideSpawnActions(state, "ses1", "test", wideMainConfig, mappings)
+
+      // then
+      expect(result.canSpawn).toBe(false)
+      expect(result.actions).toHaveLength(0)
+      expect(result.reason).toContain("defer")
+    })
+  })
+})
+
+describe("findSpawnTarget", () => {
+  it("uses deterministic vertical fallback order", () => {
+    // given
+    const state: WindowState = {
+      windowWidth: 320,
+      windowHeight: 44,
+      mainPane: {
+        paneId: "%0",
+        width: 160,
+        height: 44,
+        left: 0,
+        top: 0,
+        title: "main",
+        isActive: true,
+      },
+      agentPanes: [
+        { paneId: "%1", width: 70, height: 20, left: 170, top: 0, title: "a", isActive: false },
+        { paneId: "%2", width: 120, height: 44, left: 240, top: 0, title: "b", isActive: false },
+        { paneId: "%3", width: 120, height: 22, left: 240, top: 22, title: "c", isActive: false },
+      ],
+    }
+    const config: CapacityConfig = {
+      mainPaneSize: 50,
+      mainPaneMinWidth: 120,
+      agentPaneWidth: 40,
+    }
+
+    // when
+    const target = findSpawnTarget(state, config)
+
+    // then
+    expect(target).toEqual({ targetPaneId: "%2", splitDirection: "-v" })
   })
 })
 
@@ -461,7 +634,7 @@ describe("decideSpawnActions with custom agentPaneWidth", () => {
     }
   })
 
-	it("#given wider main pane #when capacity needs two evictions #then replace is chosen", () => {
+	it("#given wider main pane #when capacity needs two evictions #then defer is chosen", () => {
 		//#given
 		const config: CapacityConfig = { mainPaneMinWidth: 120, agentPaneWidth: 40 }
 		const state = createWindowState(220, 44, [
@@ -492,8 +665,8 @@ describe("decideSpawnActions with custom agentPaneWidth", () => {
 		const result = decideSpawnActions(state, "ses-new", "new task", config, mappings)
 
 		//#then
-		expect(result.canSpawn).toBe(true)
-		expect(result.actions).toHaveLength(1)
-		expect(result.actions[0].type).toBe("replace")
+		expect(result.canSpawn).toBe(false)
+		expect(result.actions).toHaveLength(0)
+		expect(result.reason).toContain("defer attach")
 	})
 })

@@ -8,6 +8,7 @@ import { getAgentDisplayName, getAgentConfigKey } from "../../shared/agent-displ
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
+import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
 import { toCanonical } from "../../shared/agent-name-aliases"
 
@@ -16,7 +17,7 @@ export async function resolveSubagentExecution(
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
   categoryExamples: string
-): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; error?: string }> {
+): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
   const { client, agentOverrides } = executorCtx
 
   if (!args.subagent_type?.trim()) {
@@ -47,6 +48,7 @@ Create the work plan directly - that's your job as the planning agent.`,
 
   let agentToUse = agentName
   let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
+  let fallbackChain: FallbackEntry[] | undefined = undefined
 
   try {
     const agentsResult = await client.app.agents()
@@ -93,6 +95,7 @@ Create the work plan directly - that's your job as the planning agent.`,
     const agentOverride = agentOverrides?.[canonicalLower as keyof typeof agentOverrides]
       ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === canonicalLower)?.[1] : undefined)
     const agentRequirement = AGENT_MODEL_REQUIREMENTS[canonicalLower]
+    fallbackChain = agentRequirement?.fallbackChain
 
     if (agentOverride?.model || agentRequirement || matchedAgent.model) {
       const availableModels = await getAvailableModelsForDelegateTask(client)
@@ -136,5 +139,5 @@ Create the work plan directly - that's your job as the planning agent.`,
     }
   }
 
-  return { agentToUse, categoryModel }
+  return { agentToUse, categoryModel, fallbackChain }
 }

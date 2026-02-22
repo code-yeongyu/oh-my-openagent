@@ -7,7 +7,7 @@ import { normalizeSDKResponse } from "../../shared"
 const DEFAULT_POLL_INTERVAL_MS = 500
 const DEFAULT_REQUIRED_CONSECUTIVE = 1
 const ERROR_GRACE_CYCLES = 3
-const MIN_STABILIZATION_MS = 0
+const MIN_STABILIZATION_MS = 1_000
 
 export interface PollOptions {
   pollIntervalMs?: number
@@ -24,8 +24,10 @@ export async function pollForCompletion(
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
   const requiredConsecutive =
     options.requiredConsecutive ?? DEFAULT_REQUIRED_CONSECUTIVE
-  const minStabilizationMs =
+  const rawMinStabilizationMs =
     options.minStabilizationMs ?? MIN_STABILIZATION_MS
+  const minStabilizationMs =
+    rawMinStabilizationMs > 0 ? rawMinStabilizationMs : MIN_STABILIZATION_MS
   let consecutiveCompleteChecks = 0
   let errorCycleCount = 0
   let firstWorkTimestamp: number | null = null
@@ -75,27 +77,21 @@ export async function pollForCompletion(
     }
 
     if (!eventState.hasReceivedMeaningfulWork) {
-      if (minStabilizationMs <= 0) {
-        consecutiveCompleteChecks = 0
-        continue
-      }
-
       if (Date.now() - pollStartTimestamp < minStabilizationMs) {
         consecutiveCompleteChecks = 0
         continue
       }
-      consecutiveCompleteChecks = 0
-    }
+    } else {
+      // Track when first meaningful work was received
+      if (firstWorkTimestamp === null) {
+        firstWorkTimestamp = Date.now()
+      }
 
-    // Track when first meaningful work was received
-    if (firstWorkTimestamp === null) {
-      firstWorkTimestamp = Date.now()
-    }
-
-    // Don't check completion during stabilization period
-    if (Date.now() - firstWorkTimestamp < minStabilizationMs) {
-      consecutiveCompleteChecks = 0
-      continue
+      // Don't check completion during stabilization period
+      if (Date.now() - firstWorkTimestamp < minStabilizationMs) {
+        consecutiveCompleteChecks = 0
+        continue
+      }
     }
 
     const shouldExit = await checkCompletionConditions(ctx)

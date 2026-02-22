@@ -98,7 +98,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   }
 
   if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
-    p.log.warn("No model providers configured. Using opencode/glm-4.7-free as fallback.")
+    p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
   }
 
   p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")

@@ -44,6 +44,12 @@ function createFakeTimers(): FakeTimers {
     return delay < 0 ? 0 : delay
   }
 
+  const flushMicrotasks = async (iterations: number = 5) => {
+    for (let index = 0; index < iterations; index++) {
+      await Promise.resolve()
+    }
+  }
+
   const schedule = (callback: TimerCallback, delay: number | undefined, interval: number | null, args: any[]) => {
     const id = nextId++
     timers.set(id, {
@@ -133,16 +139,16 @@ function createFakeTimers(): FakeTimers {
         cleared.delete(next.id)
       }
 
-      await Promise.resolve()
+      await flushMicrotasks()
     }
     timerNow = target
-    await Promise.resolve()
+    await flushMicrotasks()
   }
 
   const advanceClockBy = async (ms: number) => {
     const clamped = Math.max(0, ms)
     clockNow += clamped
-    await Promise.resolve()
+    await flushMicrotasks()
   }
 
   const restore = () => {
@@ -1406,9 +1412,9 @@ describe("todo-continuation-enforcer", () => {
     setupMainSessionWithBoulder(sessionID)
 
     const mockMessagesWithCompaction = [
-      { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: "anthropic", modelID: "claude-sonnet-4-5" } } },
-      { info: { id: "msg-2", role: "assistant", agent: "sisyphus", modelID: "claude-sonnet-4-5", providerID: "anthropic" } },
-      { info: { id: "msg-3", role: "assistant", agent: "compaction", modelID: "claude-sonnet-4-5", providerID: "anthropic" } },
+      { info: { id: "msg-1", role: "user", agent: "sisyphus", model: { providerID: "anthropic", modelID: "claude-sonnet-4-6" } } },
+      { info: { id: "msg-2", role: "assistant", agent: "sisyphus", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
+      { info: { id: "msg-3", role: "assistant", agent: "compaction", modelID: "claude-sonnet-4-6", providerID: "anthropic" } },
     ]
 
     const mockInput = {
@@ -1637,6 +1643,31 @@ describe("todo-continuation-enforcer", () => {
     await fakeTimers.advanceBy(3000)
 
     // then - no continuation injected (stopped flag is true)
+    expect(promptCalls).toHaveLength(0)
+  })
+
+  test("should not inject when isContinuationStopped becomes true during countdown", async () => {
+    // given - session where continuation is not stopped at idle time but stops during countdown
+    const sessionID = "main-race-condition"
+    setMainSession(sessionID)
+    let stopped = false
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+      isContinuationStopped: () => stopped,
+    })
+
+    // when - session goes idle with continuation not yet stopped
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    // when - stop-continuation fires during the 2s countdown window
+    stopped = true
+
+    // when - countdown elapses and injectContinuation fires
+    await fakeTimers.advanceBy(3000)
+
+    // then - no injection because isContinuationStopped became true before injectContinuation ran
     expect(promptCalls).toHaveLength(0)
   })
 

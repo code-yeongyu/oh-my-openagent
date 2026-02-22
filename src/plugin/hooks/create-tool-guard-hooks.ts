@@ -12,6 +12,7 @@ import {
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
   createHashlineReadEnhancerHook,
+  createJsonErrorRecoveryHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -31,6 +32,7 @@ export type ToolGuardHooks = {
   tasksTodowriteDisabler: ReturnType<typeof createTasksTodowriteDisablerHook> | null
   writeExistingFileGuard: ReturnType<typeof createWriteExistingFileGuardHook> | null
   hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
+  jsonErrorRecovery: ReturnType<typeof createJsonErrorRecoveryHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -96,7 +98,11 @@ export function createToolGuardHooks(args: {
     : null
 
   const hashlineReadEnhancer = isHookEnabled("hashline-read-enhancer")
-    ? safeHook("hashline-read-enhancer", () => createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.experimental?.hashline_edit ?? false } }))
+    ? safeHook("hashline-read-enhancer", () => createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.hashline_edit ?? true } }))
+    : null
+
+  const jsonErrorRecovery = isHookEnabled("json-error-recovery")
+    ? safeHook("json-error-recovery", () => createJsonErrorRecoveryHook(ctx))
     : null
 
   return {
@@ -109,5 +115,6 @@ export function createToolGuardHooks(args: {
     tasksTodowriteDisabler,
     writeExistingFileGuard,
     hashlineReadEnhancer,
+    jsonErrorRecovery,
   }
 }

@@ -54,27 +54,45 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
   }).join("\n")
 
   const description = `Spawn agent task with category-based or direct agent selection.
-
-REQUIRED: You MUST provide EITHER category OR subagent_type (one of them is REQUIRED, but not both).
-- If using a predefined category → provide category
-- If using a specific agent → provide subagent_type
-- Providing NEITHER is INVALID and will fail.
-
-- load_skills: ALWAYS REQUIRED. Pass at least one skill name.
-- category: Use predefined category → Spawns Sisyphus-Junior with category config
-  Available categories:
-${categoryList}
-- subagent_type: Use specific agent directly
-- run_in_background: true=async (returns task_id), false=sync (waits for result). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
-- session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
-- command: The command that triggered this task (optional, for slash command tracking).
-
-**WHEN TO USE session_id:**
-- Task failed/incomplete → session_id with "fix: [specific issue]"
-- Need follow-up on previous result → session_id with additional question
-- Multi-turn conversation with same agent → always session_id instead of new task
-
-Prompts MUST be in English.`
+  
+  ⚠️  CRITICAL: You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL.
+  
+  **COMMON MISTAKE (DO NOT DO THIS):**
+  \`\`\`
+  task(description="...", prompt="...", run_in_background=false)  // ❌ FAILS - missing category AND subagent_type
+  \`\`\`
+  
+  **CORRECT - Using category:**
+  \`\`\`
+  task(category="quick", load_skills=[], description="Fix type error", prompt="...", run_in_background=false)
+  \`\`\`
+  
+  **CORRECT - Using subagent_type:**
+  \`\`\`
+  task(subagent_type="explore", load_skills=[], description="Find patterns", prompt="...", run_in_background=true)
+  \`\`\`
+  
+  REQUIRED: Provide ONE of:
+  - category: For task delegation (uses Sisyphus-Junior with category-optimized model)
+  - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)
+  
+  **DO NOT provide both.** If category is provided, subagent_type is ignored.
+  
+  - load_skills: ALWAYS REQUIRED. Pass [] if no skills needed, or ["skill-1", "skill-2"] for category tasks.
+  - category: Use predefined category → Spawns Sisyphus-Junior with category config
+    Available categories:
+  ${categoryList}
+  - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
+  - run_in_background: true=async (returns task_id), false=sync (waits). Default: false. Use background=true ONLY for parallel exploration with 5+ independent queries.
+  - session_id: Existing Task session to continue (from previous task output). Continues agent with FULL CONTEXT PRESERVED - saves tokens, maintains continuity.
+  - command: The command that triggered this task (optional, for slash command tracking).
+  
+  **WHEN TO USE session_id:**
+  - Task failed/incomplete → session_id with "fix: [specific issue]"
+  - Need follow-up on previous result → session_id with additional question
+  - Multi-turn conversation with same agent → always session_id instead of new task
+  
+  Prompts MUST be in English.`
 
   return tool({
     description,
@@ -128,6 +146,7 @@ Prompts MUST be in English.`
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
         disabledSkills: options.disabledSkills,
+        directory: options.directory,
       })
       if (skillError) {
         return skillError
@@ -164,6 +183,7 @@ Prompts MUST be in English.`
       let modelInfo: import("../../features/task-toast-manager/types").ModelFallbackInfo | undefined
       let actualModel: string | undefined
       let isUnstableAgent = false
+      let fallbackChain: import("../../shared/model-requirements").FallbackEntry[] | undefined
 
       if (args.category) {
         const resolution = await resolveCategoryExecution(args, options, inheritedModel, systemDefaultModel)
@@ -176,6 +196,7 @@ Prompts MUST be in English.`
         modelInfo = resolution.modelInfo
         actualModel = resolution.actualModel
         isUnstableAgent = resolution.isUnstableAgent
+        fallbackChain = resolution.fallbackChain
 
         const isRunInBackgroundExplicitlyFalse = args.run_in_background === false || args.run_in_background === "false" as unknown as boolean
 
@@ -206,6 +227,7 @@ Prompts MUST be in English.`
         }
         agentToUse = resolution.agentToUse
         categoryModel = resolution.categoryModel
+        fallbackChain = resolution.fallbackChain
       }
 
       const systemContent = buildSystemContent({
@@ -217,10 +239,10 @@ Prompts MUST be in English.`
       })
 
       if (runInBackground) {
-        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent)
+        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
       }
 
-      return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo)
+      return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)
     },
   })
 }

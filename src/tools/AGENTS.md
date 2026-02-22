@@ -1,6 +1,6 @@
-# src/tools/ — 26 Tools Across 14 Directories
+# src/tools/ — 26 Tools Across 15 Directories
 
-**Generated:** 2026-02-17
+**Generated:** 2026-02-21
 
 ## OVERVIEW
 
@@ -67,13 +67,12 @@
 | `session_search` | `createSessionManagerTools` | query, session_id, case_sensitive, limit |
 | `session_info` | `createSessionManagerTools` | session_id |
 
-### Skill/Command (3)
+### Skill/Command (2)
 
 | Tool | Factory | Parameters |
 |------|---------|------------|
-| `skill` | `createSkillTool` | name |
+| `skill` | `createSkillTool` | name, user_message |
 | `skill_mcp` | `createSkillMcpTool` | mcp_name, tool_name/resource_name/prompt_name, arguments, grep |
-| `slashcommand` | `createSlashcommandTool` | command, user_message |
 
 ### System (2)
 
@@ -97,7 +96,7 @@
 | deep | gpt-5.3-codex medium | Autonomous problem-solving |
 | artistry | gemini-3-pro high | Creative approaches |
 | quick | claude-haiku-4-5 | Trivial tasks |
-| unspecified-low | claude-sonnet-4-5 | Moderate effort |
+| unspecified-low | claude-sonnet-4-6 | Moderate effort |
 | unspecified-high | claude-opus-4-6 max | High effort |
 | writing | kimi-k2p5 | Documentation |
 
