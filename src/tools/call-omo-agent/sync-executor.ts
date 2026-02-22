@@ -6,6 +6,10 @@ import { createOrGetSession } from "./session-creator"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 
+type SessionWithPromptAsync = {
+  promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
+}
+
 type ExecuteSyncDeps = {
   createOrGetSession: typeof createOrGetSession
   waitForCompletion: typeof waitForCompletion
@@ -41,7 +45,7 @@ export async function executeSync(
   log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
 
   try {
-    await (ctx.client.session as any).promptAsync({
+    await (ctx.client.session as unknown as SessionWithPromptAsync).promptAsync({
       path: { id: sessionID },
       body: {
         agent: args.subagent_type,
