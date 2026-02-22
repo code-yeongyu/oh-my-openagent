@@ -21,6 +21,18 @@ interface MessageWithParts {
   parts: Part[]
 }
 
+interface ThinkingPart {
+  thinking?: string
+  text?: string
+}
+
+interface MessageInfoExtended {
+  id: string
+  role: string
+  sessionID?: string
+  modelID?: string
+}
+
 type MessagesTransformHook = {
   "experimental.chat.messages.transform"?: (
     input: Record<string, never>,
@@ -91,7 +103,7 @@ function findPreviousThinkingContent(
     for (const part of msg.parts) {
       const type = part.type as string
       if (type === "thinking" || type === "reasoning") {
-        const thinking = (part as any).thinking || (part as any).text
+        const thinking = (part as unknown as ThinkingPart).thinking || (part as unknown as ThinkingPart).text
         if (thinking && typeof thinking === "string" && thinking.trim().length > 0) {
           return thinking
         }
@@ -114,7 +126,7 @@ function prependThinkingBlock(message: MessageWithParts, thinkingContent: string
   const thinkingPart = {
     type: "thinking" as const,
     id: `prt_0000000000_synthetic_thinking`,
-    sessionID: (message.info as any).sessionID || "",
+    sessionID: (message.info as unknown as MessageInfoExtended).sessionID || "",
     messageID: message.info.id,
     thinking: thinkingContent,
     synthetic: true,
@@ -138,7 +150,7 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
 
       // Get the model info from the last user message
       const lastUserMessage = messages.findLast(m => m.info.role === "user")
-      const modelID = (lastUserMessage?.info as any)?.modelID || ""
+      const modelID = (lastUserMessage?.info as unknown as MessageInfoExtended)?.modelID || ""
 
       // Only process if extended thinking might be enabled
       if (!isExtendedThinkingModel(modelID)) {

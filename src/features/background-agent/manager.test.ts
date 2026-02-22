@@ -2554,8 +2554,8 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
     expect(task.status).toBe("running")
   })
 
-  test("should NOT interrupt running session with no progress (undefined lastUpdate)", async () => {
-    //#given — no progress at all, but session is running
+  test("should interrupt running session with no progress after messageStalenessTimeout (API hang detection)", async () => {
+    //#given — no progress at all, session is running but exceeded stale timeout
     const client = {
       session: {
         prompt: async () => ({}),
@@ -2580,11 +2580,11 @@ describe("BackgroundManager.checkAndInterruptStaleTasks", () => {
 
     getTaskMap(manager).set(task.id, task)
 
-    //#when — session is running despite no progress
+    //#when — session is running despite no progress for 15min (exceeds 10min timeout)
     await manager["checkAndInterruptStaleTasks"]({ "session-rnp": { type: "running" } })
-
-    //#then — running sessions are NEVER killed
-    expect(task.status).toBe("running")
+    //#then — running sessions with no progress ARE interrupted after stale timeout
+    expect(task.status).toBe("cancelled")
+    expect(task.error).toContain("possible API hang")
   })
 
   test("should interrupt task with no lastUpdate after messageStalenessTimeout", async () => {
