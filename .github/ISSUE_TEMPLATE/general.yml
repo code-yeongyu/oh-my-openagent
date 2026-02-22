@@ -1,0 +1,85 @@
+name: Question or Discussion
+description: Ask a question or start a discussion about oh-my-opencode
+title: "[Question]: "
+labels: ["question", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please write your issue in English.** See our [Language Policy](https://github.com/code-yeongyu/oh-my-opencode/blob/dev/CONTRIBUTING.md#language-policy) for details.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      description: Please confirm the following before submitting
+      options:
+        - label: I will write this issue in English (see our [Language Policy](https://github.com/code-yeongyu/oh-my-opencode/blob/dev/CONTRIBUTING.md#language-policy))
+          required: true
+        - label: I have searched existing issues and discussions
+          required: true
+        - label: I have read the [documentation](https://github.com/code-yeongyu/oh-my-opencode#readme) or asked an AI coding agent with this project's GitHub URL loaded and couldn't find the answer
+          required: true
+        - label: This is a question (not a bug report or feature request)
+          required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know or discuss?
+      placeholder: |
+        Ask your question in detail...
+        
+        Examples:
+        - How do I configure agent X to do Y?
+        - What's the best practice for Z?
+        - Why does feature A work differently than B?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide any relevant context or background
+      placeholder: |
+        What have you tried so far?
+        What's your use case?
+        Any relevant configuration or setup details?
+
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Doctor Output (Optional)
+      description: |
+        If your question is about configuration or setup, run `bunx oh-my-opencode doctor` and paste the output.
+      placeholder: |
+        Paste the output of: bunx oh-my-opencode doctor
+        (Optional for questions)
+      render: shell
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Question Category
+      description: What is your question about?
+      options:
+        - Configuration
+        - Agent Usage
+        - Hook Behavior
+        - Tool Usage
+        - Installation/Setup
+        - Best Practices
+        - Performance
+        - Integration
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Information
+      description: Any other information that might be helpful
+      placeholder: Links, screenshots, examples, etc.

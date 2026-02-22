@@ -1,0 +1,207 @@
+name: CI
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master, dev]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Block PRs targeting master branch
+  block-master-pr:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check PR target branch
+        run: |
+          if [ "${{ github.base_ref }}" = "master" ]; then
+            echo "::error::PRs to master branch are not allowed. Please target the 'dev' branch instead."
+            echo ""
+            echo "PULL REQUESTS TO MASTER ARE BLOCKED"
+            echo ""
+            echo "All PRs must target the 'dev' branch."
+            echo "Please close this PR and create a new one targeting 'dev'."
+            exit 1
+          else
+            echo "PR targets '${{ github.base_ref }}' branch - OK"
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+
+      - name: Run mock-heavy tests (isolated)
+        run: |
+          # These files use mock.module() which pollutes module cache
+          # Run them in separate processes to prevent cross-file contamination
+          bun test src/plugin-handlers
+          bun test src/hooks/atlas
+          bun test src/hooks/compaction-context-injector
+          bun test src/features/tmux-subagent
+          bun test src/cli/doctor/formatter.test.ts
+          bun test src/cli/doctor/format-default.test.ts
+          bun test src/tools/call-omo-agent/sync-executor.test.ts
+          bun test src/tools/call-omo-agent/session-creator.test.ts
+          bun test src/tools/session-manager
+          bun test src/features/opencode-skill-loader/loader.test.ts
+
+      - name: Run remaining tests
+        run: |
+          # Enumerate subdirectories/files explicitly to EXCLUDE mock-heavy files
+          # that were already run in isolation above.
+          # Excluded from src/cli: doctor/formatter.test.ts, doctor/format-default.test.ts
+          # Excluded from src/tools: call-omo-agent/sync-executor.test.ts, call-omo-agent/session-creator.test.ts, session-manager (all)
+          bun test bin script src/config src/mcp src/index.test.ts \
+            src/agents src/shared \
+            src/cli/run src/cli/config-manager src/cli/mcp-oauth \
+            src/cli/index.test.ts src/cli/install.test.ts src/cli/model-fallback.test.ts \
+            src/cli/config-manager.test.ts \
+            src/cli/doctor/runner.test.ts src/cli/doctor/checks \
+            src/tools/ast-grep src/tools/background-task src/tools/delegate-task \
+            src/tools/glob src/tools/grep src/tools/interactive-bash \
+            src/tools/look-at src/tools/lsp \
+            src/tools/skill src/tools/skill-mcp src/tools/slashcommand src/tools/task \
+            src/tools/call-omo-agent/background-agent-executor.test.ts \
+            src/tools/call-omo-agent/background-executor.test.ts \
+            src/tools/call-omo-agent/subagent-session-creator.test.ts \
+            src/hooks/anthropic-context-window-limit-recovery \
+            src/hooks/claude-code-compatibility \
+            src/hooks/context-injection \
+            src/hooks/provider-toast \
+            src/hooks/session-notification \
+            src/hooks/sisyphus \
+            src/hooks/todo-continuation-enforcer \
+            src/features/background-agent \
+            src/features/builtin-commands \
+            src/features/builtin-skills \
+            src/features/claude-code-session-state \
+            src/features/hook-message-injector \
+            src/features/opencode-skill-loader/config-source-discovery.test.ts \
+            src/features/opencode-skill-loader/merger.test.ts \
+            src/features/opencode-skill-loader/skill-content.test.ts \
+            src/features/opencode-skill-loader/blocking.test.ts \
+            src/features/opencode-skill-loader/async-loader.test.ts \
+            src/features/skill-mcp-manager
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+
+      - name: Type check
+        run: bun run typecheck
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test, typecheck]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+        env:
+          BUN_INSTALL_ALLOW_SCRIPTS: "@ast-grep/napi"
+
+      - name: Build
+        run: bun run build
+
+      - name: Verify build output
+        run: |
+          test -f dist/index.js || (echo "ERROR: dist/index.js not found!" && exit 1)
+          test -f dist/index.d.ts || (echo "ERROR: dist/index.d.ts not found!" && exit 1)
+
+      - name: Auto-commit schema changes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          if git diff --quiet assets/oh-my-opencode.schema.json; then
+            echo "No schema changes to commit"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add assets/oh-my-opencode.schema.json
+            git commit -m "chore: auto-update schema.json"
+            git push
+          fi
+
+  draft-release:
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - run: git fetch --force --tags
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          NOTES=$(bun run script/generate-changelog.ts)
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create or update draft release
+        run: |
+          EXISTING_DRAFT=$(gh release list --json tagName,isDraft --jq '.[] | select(.isDraft == true and .tagName == "next") | .tagName')
+          
+          if [ -n "$EXISTING_DRAFT" ]; then
+            echo "Updating existing draft release..."
+            gh release edit next \
+              --title "Upcoming Changes 🍿" \
+              --notes-file - \
+              --draft <<'EOF'
+          ${{ steps.notes.outputs.notes }}
+          EOF
+          else
+            echo "Creating new draft release..."
+            gh release create next \
+              --title "Upcoming Changes 🍿" \
+              --notes-file - \
+              --draft \
+              --target ${{ github.sha }} <<'EOF'
+          ${{ steps.notes.outputs.notes }}
+          EOF
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

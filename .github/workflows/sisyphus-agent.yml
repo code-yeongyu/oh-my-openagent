@@ -1,0 +1,539 @@
+name: Sisyphus Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Custom prompt"
+        required: false
+  # Only issue_comment works for fork PRs (secrets available)
+  # pull_request_review/pull_request_review_comment do NOT get secrets for fork PRs
+  issue_comment:
+    types: [created]
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    # @sisyphus-dev-ai mention only (maintainers, exclude self)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body || '', '@sisyphus-dev-ai') &&
+       (github.event.comment.user.login || '') != 'sisyphus-dev-ai' &&
+       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || ''))
+
+    permissions:
+      contents: read
+
+    steps:
+      # Checkout with sisyphus-dev-ai's PAT
+      - uses: actions/checkout@v5
+        with:
+          token: ${{ secrets.GH_PAT }}
+          fetch-depth: 0
+
+      # Git config - commits as sisyphus-dev-ai
+      - name: Configure Git as sisyphus-dev-ai
+        run: |
+          git config user.name "sisyphus-dev-ai"
+          git config user.email "sisyphus-dev-ai@users.noreply.github.com"
+
+      # gh CLI auth as sisyphus-dev-ai
+      - name: Authenticate gh CLI as sisyphus-dev-ai
+        run: |
+          echo "${{ secrets.GH_PAT }}" | gh auth login --with-token
+          gh auth status
+
+      - name: Ensure tmux is available (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          if ! command -v tmux >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends tmux
+          fi
+          tmux -V
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      # Build local oh-my-opencode
+      - name: Build oh-my-opencode
+        run: |
+          bun install
+          bun run build
+
+      # Install OpenCode + configure local plugin + auth in single step
+      - name: Setup OpenCode with oh-my-opencode
+        env:
+          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+          ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          export PATH="$HOME/.opencode/bin:$PATH"
+
+          # Install OpenCode (skip if cached)
+          if ! command -v opencode &>/dev/null; then
+            echo "Installing OpenCode..."
+            curl -fsSL https://opencode.ai/install -o /tmp/opencode-install.sh
+            
+            # Try default installer first, fallback to re-download if it fails
+            if file /tmp/opencode-install.sh | grep -q "shell script\|text"; then
+              if ! bash /tmp/opencode-install.sh 2>&1; then
+                echo "Default installer failed, trying direct install..."
+                bash <(curl -fsSL https://opencode.ai/install)
+              fi
+            else
+              echo "Download corrupted, trying direct install..."
+              bash <(curl -fsSL https://opencode.ai/install)
+            fi
+          fi
+          opencode --version
+
+          # Run local oh-my-opencode install (uses built dist)
+          bun run dist/cli/index.js install --no-tui --claude=max20 --openai=no --gemini=no --copilot=no
+
+          # Override plugin to use local file reference
+          OPENCODE_JSON=~/.config/opencode/opencode.json
+          REPO_PATH=$(pwd)
+          jq --arg path "file://$REPO_PATH/src/index.ts" '
+            .plugin = [.plugin[] | select(. != "oh-my-opencode")] + [$path]
+          ' "$OPENCODE_JSON" > /tmp/oc.json && mv /tmp/oc.json "$OPENCODE_JSON"
+
+          OPENCODE_JSON=~/.config/opencode/opencode.json
+          jq --arg baseURL "$ANTHROPIC_BASE_URL" --arg apiKey "$ANTHROPIC_API_KEY" '
+            .model = "anthropic/claude-opus-4-5" |
+            .provider.anthropic = {
+              "name": "Anthropic",
+              "npm": "@ai-sdk/anthropic",
+              "options": {
+                "baseURL": $baseURL,
+                "apiKey": $apiKey
+              },
+              "models": {
+                "claude-opus-4-5": {
+                  "id": "claude-opus-4-5-20251101",
+                  "name": "Opus 4.5",
+                  "limit": { "context": 190000, "output": 64000 },
+                  "options": { "effort": "high" }
+                },
+                "claude-opus-4-5-high": {
+                  "id": "claude-opus-4-5-20251101",
+                  "name": "Opus 4.5 High",
+                  "limit": { "context": 190000, "output": 128000 },
+                  "options": { "effort": "high", "thinking": { "type": "enabled", "budgetTokens": 64000 } }
+                },
+                "claude-sonnet-4-5": {
+                  "id": "claude-sonnet-4-5-20250929",
+                  "name": "Sonnet 4.5",
+                  "limit": { "context": 200000, "output": 64000 }
+                },
+                "claude-sonnet-4-5-high": {
+                  "id": "claude-sonnet-4-5-20250929",
+                  "name": "Sonnet 4.5 High",
+                  "limit": { "context": 200000, "output": 128000 },
+                  "options": { "thinking": { "type": "enabled", "budgetTokens": 64000 } }
+                },
+                "claude-haiku-4-5": {
+                  "id": "claude-haiku-4-5-20251001",
+                  "name": "Haiku 4.5",
+                  "limit": { "context": 200000, "output": 64000 }
+                }
+              }
+            } |
+            .provider["zai-coding-plan"] = {
+              "name": "Z.AI Coding Plan",
+              "npm": "@ai-sdk/openai-compatible",
+              "options": {
+                "baseURL": "https://api.z.ai/api/paas/v4"
+              },
+              "models": {
+                "glm-4.7": {
+                  "id": "glm-4.7",
+                  "name": "GLM 4.7",
+                  "limit": { "context": 128000, "output": 16000 }
+                },
+                "glm-4.6v": {
+                  "id": "glm-4.6v",
+                  "name": "GLM 4.6 Vision",
+                  "limit": { "context": 128000, "output": 16000 }
+                }
+              }
+            } |
+            .provider.openai = {
+              "name": "OpenAI",
+              "npm": "@ai-sdk/openai",
+              "models": {
+                "gpt-5.2": {
+                  "id": "gpt-5.2",
+                  "name": "GPT-5.2",
+                  "limit": { "context": 128000, "output": 16000 }
+                },
+                "gpt-5.2-codex": {
+                  "id": "gpt-5.2-codex",
+                  "name": "GPT-5.2 Codex",
+                  "limit": { "context": 128000, "output": 32000 }
+                }
+              }
+            }
+          ' "$OPENCODE_JSON" > /tmp/oc.json && mv /tmp/oc.json "$OPENCODE_JSON"
+
+          OMO_JSON=~/.config/opencode/oh-my-opencode.json
+          PROMPT_APPEND=$(cat << 'PROMPT_EOF'
+          <ultrawork-mode>
+          [CODE RED] Maximum precision required. Ultrathink before acting.
+
+          YOU MUST LEVERAGE ALL AVAILABLE AGENTS TO THEIR FULLEST POTENTIAL.
+          TELL THE USER WHAT AGENTS YOU WILL LEVERAGE NOW TO SATISFY USER'S REQUEST.
+
+          ## AGENT UTILIZATION PRINCIPLES (by capability, not by name)
+          - **Codebase Exploration**: Spawn exploration agents using BACKGROUND TASKS for file patterns, internal implementations, project structure
+          - **Documentation & References**: Use librarian-type agents via BACKGROUND TASKS for API references, examples, external library docs
+          - **Planning & Strategy**: For implementation tasks, spawn a dedicated planning agent for work breakdown (not needed for simple questions/investigations)
+          - **High-IQ Reasoning**: Leverage specialized agents for architecture decisions, code review, strategic planning
+          - **Frontend/UI Tasks**: Delegate to UI-specialized agents for design and implementation
+
+          ## EXECUTION RULES
+          - **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
+          - **PARALLEL**: Fire independent agent calls simultaneously via background_task - NEVER wait sequentially.
+          - **BACKGROUND FIRST**: Use background_task for exploration/research agents (10+ concurrent if needed).
+          - **VERIFY**: Re-read request after completion. Check ALL requirements met before reporting done.
+          - **DELEGATE**: Don't do everything yourself - orchestrate specialized agents for their strengths.
+
+          ## WORKFLOW
+          1. Analyze the request and identify required capabilities
+          2. Spawn exploration/librarian agents via background_task in PARALLEL (10+ if needed)
+          3. Always Use Plan agent with gathered context to create detailed work breakdown
+          4. Execute with continuous verification against original requirements
+
+          ## TDD (if test infrastructure exists)
+
+          1. Write spec (requirements)
+          2. Write tests (failing)
+          3. RED: tests fail
+          4. Implement minimal code
+          5. GREEN: tests pass
+          6. Refactor if needed (must stay green)
+          7. Next feature, repeat
+
+          ## ZERO TOLERANCE FAILURES
+          - **NO Scope Reduction**: Never make "demo", "skeleton", "simplified", "basic" versions - deliver FULL implementation
+          - **NO MockUp Work**: When user asked you to do "port A", you must "port A", fully, 100%. No Extra feature, No reduced feature, no mock data, fully working 100% port.
+          - **NO Partial Completion**: Never stop at 60-80% saying "you can extend this..." - finish 100%
+          - **NO Assumed Shortcuts**: Never skip requirements you deem "optional" or "can be added later"
+          - **NO Premature Stopping**: Never declare done until ALL TODOs are completed and verified
+          - **NO TEST DELETION**: Never delete or skip failing tests to make the build pass. Fix the code, not the tests.
+
+          THE USER ASKED FOR X. DELIVER EXACTLY X. NOT A SUBSET. NOT A DEMO. NOT A STARTING POINT.
+
+          </ultrawork-mode>
+
+          ---
+
+
+          [analyze-mode]
+          ANALYSIS MODE. Gather context before diving deep:
+
+          CONTEXT GATHERING (parallel):
+          - 1-2 explore agents (codebase patterns, implementations)
+          - 1-2 librarian agents (if external library involved)
+          - Direct tools: Grep, AST-grep, LSP for targeted searches
+
+          IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
+          - Consult oracle for strategic guidance
+
+          SYNTHESIZE findings before proceeding.
+
+          ---
+
+          ## GitHub Actions Environment
+
+          You are `sisyphus-dev-ai` in GitHub Actions.
+
+          ### CRITICAL: GitHub Comments = Your ONLY Output
+
+          User CANNOT see console. Post everything via `gh issue comment` or `gh pr comment`.
+
+          ### Comment Formatting (CRITICAL)
+
+          **ALWAYS use heredoc syntax for comments containing code references, backticks, or multiline content:**
+
+          ```bash
+          gh issue comment <number> --body "$(cat <<'EOF'
+          Your comment with `backticks` and code references preserved here.
+          Multiple lines work perfectly.
+          EOF
+          )"
+          ```
+
+          **NEVER use direct quotes with backticks** (shell will interpret them as command substitution):
+          ```bash
+          # WRONG - backticks disappear:
+          gh issue comment 123 --body "text with `code`"
+          
+          # CORRECT - backticks preserved:
+          gh issue comment 123 --body "$(cat <<'EOF'
+          text with `code`
+          EOF
+          )"
+          ```
+
+          ### GitHub Markdown Rules (MUST FOLLOW)
+
+          **Code blocks MUST have EXACTLY 3 backticks and language identifier:**
+          - CORRECT: ` ```bash ` ... ` ``` `
+          - WRONG: ` ``` ` (no language), ` ```` ` (4 backticks), ` `` ` (2 backticks)
+          
+          **Every opening ` ``` ` MUST have a closing ` ``` ` on its own line:**
+          ```
+          ```bash
+          code here
+          ```
+          ```
+          
+          **NO trailing backticks or spaces after closing ` ``` `**
+          
+          **For inline code, use SINGLE backticks:** `code` not ```code```
+          
+          **Lists inside code blocks break rendering - avoid them or use plain text**
+
+          ### Rules
+          - EVERY response = GitHub comment (use heredoc for proper escaping)
+          - Code changes = PR (never push main/master)
+          - Setup: bun install first
+          - Acknowledge immediately, report when done
+
+          ### Git Config
+          - user.name: sisyphus-dev-ai
+          - user.email: sisyphus-dev-ai@users.noreply.github.com
+          PROMPT_EOF
+          )
+          jq --arg append "$PROMPT_APPEND" '.agents.Sisyphus.prompt_append = $append' "$OMO_JSON" > /tmp/omo.json && mv /tmp/omo.json "$OMO_JSON"
+
+          # Add categories configuration for unspecified-low to use GLM 4.7
+          jq '.categories["unspecified-low"] = { "model": "zai-coding-plan/glm-4.7" }' "$OMO_JSON" > /tmp/omo.json && mv /tmp/omo.json "$OMO_JSON"
+
+          mkdir -p ~/.local/share/opencode
+          echo "$OPENCODE_AUTH_JSON" > ~/.local/share/opencode/auth.json
+          chmod 600 ~/.local/share/opencode/auth.json
+
+          cat "$OPENCODE_JSON"
+
+      # Collect context
+      - name: Collect Context
+        id: context
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          EVENT_NAME: ${{ github.event_name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_ID_VAL: ${{ github.event.comment.id }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [[ "$EVENT_NAME" == "issue_comment" ]]; then
+            ISSUE_NUM="$ISSUE_NUMBER"
+            AUTHOR="$COMMENT_AUTHOR"
+            COMMENT_ID="$COMMENT_ID_VAL"
+
+            # Check if PR or Issue and get title
+            ISSUE_DATA=$(gh api "repos/$REPO/issues/${ISSUE_NUM}")
+            TITLE=$(echo "$ISSUE_DATA" | jq -r '.title')
+            if echo "$ISSUE_DATA" | jq -e '.pull_request' > /dev/null; then
+              echo "type=pr" >> $GITHUB_OUTPUT
+              echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            else
+              echo "type=issue" >> $GITHUB_OUTPUT
+              echo "number=${ISSUE_NUM}" >> $GITHUB_OUTPUT
+            fi
+            echo "title=${TITLE}" >> $GITHUB_OUTPUT
+          fi
+
+          echo "comment<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMENT_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+          echo "comment_id=$COMMENT_ID" >> $GITHUB_OUTPUT
+
+      # Add :eyes: reaction (as sisyphus-dev-ai)
+      - name: Add eyes reaction
+        if: steps.context.outputs.comment_id != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+            -X POST -f content="eyes" || true
+
+      - name: Add working label
+        if: steps.context.outputs.number != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh label create "sisyphus: working" \
+            --repo "${{ github.repository }}" \
+            --color "fcf2e1" \
+            --description "Sisyphus is currently working on this" \
+            --force || true
+          
+          if [[ "${{ steps.context.outputs.type }}" == "pr" ]]; then
+            gh pr edit "${{ steps.context.outputs.number }}" \
+              --repo "${{ github.repository }}" \
+              --add-label "sisyphus: working" || true
+          else
+            gh issue edit "${{ steps.context.outputs.number }}" \
+              --repo "${{ github.repository }}" \
+              --add-label "sisyphus: working" || true
+          fi
+
+      - name: Run oh-my-opencode
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          USER_COMMENT: ${{ steps.context.outputs.comment }}
+          COMMENT_AUTHOR: ${{ steps.context.outputs.author }}
+          CONTEXT_TYPE: ${{ steps.context.outputs.type }}
+          CONTEXT_NUMBER: ${{ steps.context.outputs.number }}
+          CONTEXT_TITLE: ${{ steps.context.outputs.title }}
+          REPO_NAME: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          export PATH="$HOME/.opencode/bin:$PATH"
+
+          PROMPT=$(cat <<'PROMPT_EOF'
+          [analyze-mode]
+          ANALYSIS MODE. Gather context before diving deep:
+
+          CONTEXT GATHERING (parallel):
+          - 1-2 explore agents (codebase patterns, implementations)
+          - 1-2 librarian agents (if external library involved)
+          - Direct tools: Grep, AST-grep, LSP for targeted searches
+
+          IF COMPLEX (architecture, multi-system, debugging after 2+ failures):
+          - Consult oracle for strategic guidance
+
+          SYNTHESIZE findings before proceeding.
+
+          ---
+
+          Your username is @sisyphus-dev-ai, mentioned by @AUTHOR_PLACEHOLDER in REPO_PLACEHOLDER.
+
+          ## Context
+          - Title: TITLE_PLACEHOLDER
+          - Type: TYPE_PLACEHOLDER
+          - Number: #NUMBER_PLACEHOLDER
+          - Repository: REPO_PLACEHOLDER
+          - Default Branch: BRANCH_PLACEHOLDER
+
+          ## User's Request
+          COMMENT_PLACEHOLDER
+
+          ---
+
+          ## CRITICAL: First Steps (MUST DO BEFORE ANYTHING ELSE)
+
+          ### [CODE RED] MANDATORY CONTEXT READING - ZERO EXCEPTIONS
+
+          **YOU MUST READ ALL CONTENT. NOT SOME. NOT MOST. ALL.**
+
+          1. **READ FULL CONVERSATION** - Execute ALL commands below before ANY other action:
+             - **Issues**: `gh issue view NUMBER_PLACEHOLDER --comments`
+             - **PRs**: Use ALL THREE commands to get COMPLETE context:
+               ```bash
+               gh pr view NUMBER_PLACEHOLDER --comments
+               gh api repos/REPO_PLACEHOLDER/pulls/NUMBER_PLACEHOLDER/comments
+               gh api repos/REPO_PLACEHOLDER/pulls/NUMBER_PLACEHOLDER/reviews
+               ```
+             
+             **WHAT TO EXTRACT FROM THE CONVERSATION:**
+             - The ORIGINAL issue/PR description (first message) - this is often the TRUE requirement
+             - ALL previous attempts and their outcomes
+             - ALL decisions made and their reasoning
+             - ALL feedback, criticism, and rejection reasons
+             - ANY linked issues, PRs, or external references
+             - The EXACT ask from the user who mentioned you
+             
+             **FAILURE TO READ EVERYTHING = GUARANTEED FAILURE**
+             You WILL make wrong assumptions. You WILL repeat past mistakes. You WILL miss critical context.
+
+          2. **CREATE TODOS IMMEDIATELY**: Right after reading, create your todo list using todo tools.
+             - First todo: "Summarize issue/PR context and requirements"
+             - Break down ALL work into atomic, verifiable steps
+             - **GIT WORKFLOW (MANDATORY for implementation tasks)**: ALWAYS include these final todos:
+               - "Create new branch from origin/BRANCH_PLACEHOLDER (NEVER push directly to BRANCH_PLACEHOLDER)"
+               - "Commit changes"
+               - "Create PR to BRANCH_PLACEHOLDER branch"
+             - Plan everything BEFORE starting any work
+
+          ---
+
+
+          Plan everything using todo tools.
+          Then investigate and satisfy the request. Only if user requested to you to work explicitly, then use plan agent to plan, todo obsessively then create a PR to `BRANCH_PLACEHOLDER` branch.
+          When done, report the result to the issue/PR with `gh issue comment NUMBER_PLACEHOLDER` or `gh pr comment NUMBER_PLACEHOLDER`.
+          PROMPT_EOF
+          )
+
+          PROMPT="${PROMPT//AUTHOR_PLACEHOLDER/$COMMENT_AUTHOR}"
+          PROMPT="${PROMPT//REPO_PLACEHOLDER/$REPO_NAME}"
+          PROMPT="${PROMPT//TYPE_PLACEHOLDER/$CONTEXT_TYPE}"
+          PROMPT="${PROMPT//NUMBER_PLACEHOLDER/$CONTEXT_NUMBER}"
+          PROMPT="${PROMPT//TITLE_PLACEHOLDER/$CONTEXT_TITLE}"
+          PROMPT="${PROMPT//BRANCH_PLACEHOLDER/$DEFAULT_BRANCH}"
+          PROMPT="${PROMPT//COMMENT_PLACEHOLDER/$USER_COMMENT}"
+
+          stdbuf -oL -eL bun run dist/cli/index.js run "$PROMPT"
+
+      # Push changes (as sisyphus-dev-ai)
+      - name: Push changes
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add -A
+            git commit -m "chore: changes by sisyphus-dev-ai" || true
+          fi
+
+          BRANCH=$(git branch --show-current)
+          if [[ "$BRANCH" != "main" && "$BRANCH" != "master" ]]; then
+            git push origin "$BRANCH" || true
+          fi
+
+      - name: Update reaction and remove label
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [[ -n "${{ steps.context.outputs.comment_id }}" ]]; then
+            REACTION_ID=$(gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+              --jq '.[] | select(.content == "eyes" and .user.login == "sisyphus-dev-ai") | .id' | head -1)
+            if [[ -n "$REACTION_ID" ]]; then
+              gh api -X DELETE "/repos/${{ github.repository }}/reactions/${REACTION_ID}" || true
+            fi
+
+            gh api "/repos/${{ github.repository }}/issues/comments/${{ steps.context.outputs.comment_id }}/reactions" \
+              -X POST -f content="+1" || true
+          fi
+
+          if [[ -n "${{ steps.context.outputs.number }}" ]]; then
+            if [[ "${{ steps.context.outputs.type }}" == "pr" ]]; then
+              gh pr edit "${{ steps.context.outputs.number }}" \
+                --repo "${{ github.repository }}" \
+                --remove-label "sisyphus: working" || true
+            else
+              gh issue edit "${{ steps.context.outputs.number }}" \
+                --repo "${{ github.repository }}" \
+                --remove-label "sisyphus: working" || true
+            fi
+          fi
