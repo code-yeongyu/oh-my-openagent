@@ -36,6 +36,7 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "rate_limit",
   "rate limit",
   "quota",
+  "quota protection",
   "not found",
   "unavailable",
   "insufficient",
