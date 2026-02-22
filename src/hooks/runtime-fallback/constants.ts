@@ -27,6 +27,7 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /too.?many.?requests/i,
   /quota.?exceeded/i,
   /quota.?protection/i,
+  /key.?limit.?exceeded/i,
   /usage\s+limit\s+has\s+been\s+reached/i,
   /service.?unavailable/i,
   /overloaded/i,
