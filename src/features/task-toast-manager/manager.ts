@@ -4,6 +4,12 @@ import type { ConcurrencyManager } from "../background-agent/concurrency"
 
 type OpencodeClient = PluginInput["client"]
 
+type ClientWithTui = {
+  tui?: {
+    showToast: (opts: { body: { title: string; message: string; variant: string; duration: number } }) => Promise<unknown>
+  }
+}
+
 export class TaskToastManager {
   private tasks: Map<string, TrackedTask> = new Map()
   private client: OpencodeClient
@@ -170,8 +176,7 @@ export class TaskToastManager {
    * Show consolidated toast with all running/queued tasks
    */
   private showTaskListToast(newTask: TrackedTask): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as ClientWithTui
     if (!tuiClient.tui?.showToast) return
 
     const message = this.buildTaskListMessage(newTask)
@@ -196,8 +201,7 @@ export class TaskToastManager {
    * Show task completion toast
    */
   showCompletionToast(task: { id: string; description: string; duration: string }): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as ClientWithTui
     if (!tuiClient.tui?.showToast) return
 
     this.removeTask(task.id)
