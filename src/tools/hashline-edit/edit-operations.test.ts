@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { applyHashlineEdits, applyInsertAfter, applyReplace, applyReplaceLines, applySetLine } from "./edit-operations"
+import { applyAppend, applyPrepend } from "./edit-operation-primitives"
 import { computeLineHash } from "./hash-computation"
 import type { HashlineEdit } from "./types"
 
@@ -249,6 +250,72 @@ describe("hashline edit operations", () => {
     expect(result).toEqual(["if (x) {", "  return 3", "  return 4", "}"])
   })
 
+  it("collapses wrapped replacement span back to unique original single line", () => {
+    //#given
+    const lines = [
+      "const request = buildRequest({ method: \"GET\", retries: 3 })",
+      "const done = true",
+    ]
+
+    //#when
+    const result = applyReplaceLines(
+      lines,
+      anchorFor(lines, 1),
+      anchorFor(lines, 1),
+      ["const request = buildRequest({", "method: \"GET\", retries: 3 })"]
+    )
+
+    //#then
+    expect(result).toEqual([
+      "const request = buildRequest({ method: \"GET\", retries: 3 })",
+      "const done = true",
+    ])
+  })
+
+  it("keeps wrapped replacement when canonical match is not unique in original lines", () => {
+    //#given
+    const lines = ["const query = a + b", "const query = a+b", "const done = true"]
+
+    //#when
+    const result = applyReplaceLines(lines, anchorFor(lines, 1), anchorFor(lines, 2), ["const query = a +", "b"])
+
+    //#then
+    expect(result).toEqual(["const query = a +", "b", "const done = true"])
+  })
+
+  it("keeps wrapped replacement when same canonical candidate appears multiple times", () => {
+    //#given
+    const lines = ["const expression = alpha + beta + gamma", "const done = true"]
+
+    //#when
+    const result = applyReplaceLines(lines, anchorFor(lines, 1), anchorFor(lines, 1), [
+      "const expression = alpha +",
+      "beta + gamma",
+      "const expression = alpha +",
+      "beta + gamma",
+    ])
+
+    //#then
+    expect(result).toEqual([
+      "const expression = alpha +",
+      "beta + gamma",
+      "const expression = alpha +",
+      "beta + gamma",
+      "const done = true",
+    ])
+  })
+
+  it("keeps wrapped replacement when canonical match is shorter than threshold", () => {
+    //#given
+    const lines = ["a + b", "const done = true"]
+
+    //#when
+    const result = applyReplaceLines(lines, anchorFor(lines, 1), anchorFor(lines, 1), ["a +", "b"])
+
+    //#then
+    expect(result).toEqual(["a +", "b", "const done = true"])
+  })
+
   it("applies append and prepend operations", () => {
     //#given
     const content = "line 1\nline 2"
@@ -261,6 +328,28 @@ describe("hashline edit operations", () => {
 
     //#then
     expect(result).toEqual("line 0\nline 1\nline 2\nline 3")
+  })
+
+  it("appends to empty file without extra blank line", () => {
+    //#given
+    const lines = [""]
+
+    //#when
+    const result = applyAppend(lines, ["line1"])
+
+    //#then
+    expect(result).toEqual(["line1"])
+  })
+
+  it("prepends to empty file without extra blank line", () => {
+    //#given
+    const lines = [""]
+
+    //#when
+    const result = applyPrepend(lines, ["line1"])
+
+    //#then
+    expect(result).toEqual(["line1"])
   })
 
   it("autocorrects single-line merged replacement into original line count", () => {

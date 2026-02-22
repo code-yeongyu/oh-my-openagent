@@ -5,7 +5,11 @@ export interface FileTextEnvelope {
 }
 
 function detectLineEnding(content: string): "\n" | "\r\n" {
-  return content.includes("\r\n") ? "\r\n" : "\n"
+  const crlfIndex = content.indexOf("\r\n")
+  const lfIndex = content.indexOf("\n")
+  if (lfIndex === -1) return "\n"
+  if (crlfIndex === -1) return "\n"
+  return crlfIndex < lfIndex ? "\r\n" : "\n"
 }
 
 function stripBom(content: string): { content: string; hadBom: boolean } {
