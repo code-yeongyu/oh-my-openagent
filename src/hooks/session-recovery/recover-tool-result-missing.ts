@@ -5,6 +5,12 @@ import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
 
 type Client = ReturnType<typeof createOpencodeClient>
+type ClientWithPromptAsync = {
+  session: {
+    promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
+  }
+}
+
 
 interface ToolUsePart {
   type: "tool_use"
@@ -77,8 +83,7 @@ export async function recoverToolResultMissing(
   }
 
   try {
-    // @ts-expect-error - SDK types may not include tool_result parts
-    await client.session.promptAsync(promptInput)
+    await (client as unknown as ClientWithPromptAsync).session.promptAsync(promptInput)
 
     return true
   } catch {
