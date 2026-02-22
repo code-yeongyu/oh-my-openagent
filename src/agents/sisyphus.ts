@@ -5,6 +5,7 @@ import {
   buildGeminiToolMandate,
   buildGeminiDelegationOverride,
   buildGeminiVerificationOverride,
+  buildGeminiIntentGateEnforcement,
 } from "./sisyphus-gemini-overlays";
 
 const MODE: AgentMode = "primary";
@@ -567,7 +568,7 @@ export function createSisyphusAgent(
   if (isGeminiModel(model)) {
     prompt = prompt.replace(
       "</intent_verbalization>",
-      `</intent_verbalization>\n\n${buildGeminiToolMandate()}`
+      `</intent_verbalization>\n\n${buildGeminiIntentGateEnforcement()}\n\n${buildGeminiToolMandate()}`
     );
     prompt += "\n" + buildGeminiDelegationOverride();
     prompt += "\n" + buildGeminiVerificationOverride();

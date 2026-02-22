@@ -6,6 +6,8 @@
  * - Avoid delegation, preferring to do work themselves
  * - Claim completion without verification
  * - Interpret constraints as suggestions
+ * - Skip intent classification gates (jump straight to action)
+ * - Conflate investigation with implementation ("look into X" → starts coding)
  *
  * These overlays inject corrective sections at strategic points
  * in the dynamic Sisyphus prompt to counter these tendencies.
@@ -76,4 +78,40 @@ Your internal confidence estimator is miscalibrated toward optimism. What feels 
 3. Read the output of every command — ACTUALLY read, not skim
 4. If you delegated, read EVERY file the subagent touched — not trust their claims
 </GEMINI_VERIFICATION_OVERRIDE>`;
+}
+
+export function buildGeminiIntentGateEnforcement(): string {
+  return `<GEMINI_INTENT_GATE_ENFORCEMENT>
+## YOU MUST CLASSIFY INTENT BEFORE ACTING. NO EXCEPTIONS.
+
+**Your failure mode: You skip intent classification and jump straight to implementation.**
+
+You see a user message and your instinct is to immediately start working. WRONG. You MUST first determine WHAT KIND of work the user wants. Getting this wrong wastes everything that follows.
+
+**MANDATORY FIRST OUTPUT — before ANY tool call or action:**
+
+\`\`\`
+I detect [TYPE] intent — [REASON].
+My approach: [ROUTING DECISION].
+\`\`\`
+
+Where TYPE is one of: research | implementation | investigation | evaluation | fix | open-ended
+
+**SELF-CHECK (answer honestly before proceeding):**
+
+1. Did the user EXPLICITLY ask me to implement/build/create something? → If NO, do NOT implement.
+2. Did the user say "look into", "check", "investigate", "explain"? → That means RESEARCH, not implementation.
+3. Did the user ask "what do you think?" → That means EVALUATION — propose and WAIT, do not execute.
+4. Did the user report an error? → That means MINIMAL FIX, not refactoring.
+
+**COMMON MISTAKES YOU MAKE (AND MUST NOT):**
+
+| User Says | You Want To Do | You MUST Do |
+| "explain how X works" | Start modifying X | Research X, explain it, STOP |
+| "look into this bug" | Fix the bug immediately | Investigate, report findings, WAIT for go-ahead |
+| "what do you think about approach X?" | Implement approach X | Evaluate X, propose alternatives, WAIT |
+| "improve the tests" | Rewrite all tests | Assess current tests FIRST, propose approach, THEN implement |
+
+**IF YOU SKIPPED THE INTENT CLASSIFICATION ABOVE:** STOP. Go back. Do it now. Your next tool call is INVALID without it.
+</GEMINI_INTENT_GATE_ENFORCEMENT>`;
 }
