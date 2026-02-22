@@ -2,6 +2,11 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { consumeNewMessages } from "../../shared/session-cursor"
 
+interface SDKMessage {
+  info?: { role?: string; time?: { created?: number } }
+  parts?: Array<{ type: string; text?: string; content?: string | Array<{ type: string; text?: string }> }>
+}
+
 export async function processMessages(
   sessionID: string,
   ctx: PluginInput
@@ -20,9 +25,8 @@ export async function processMessages(
 
   // Include both assistant messages AND tool messages
   // Tool results (grep, glob, bash output) come from role "tool"
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const relevantMessages = messages.filter(
-    (m: any) => m.info?.role === "assistant" || m.info?.role === "tool"
+    (m: SDKMessage) => m.info?.role === "assistant" || m.info?.role === "tool"
   )
 
   if (relevantMessages.length === 0) {
@@ -34,8 +38,7 @@ export async function processMessages(
   log(`[call_omo_agent] Found ${relevantMessages.length} relevant messages`)
 
   // Sort by time ascending (oldest first) to process messages in order
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sortedMessages = [...relevantMessages].sort((a: any, b: any) => {
+  const sortedMessages = [...relevantMessages].sort((a: SDKMessage, b: SDKMessage) => {
     const timeA = a.info?.time?.created ?? 0
     const timeB = b.info?.time?.created ?? 0
     return timeA - timeB
@@ -52,12 +55,11 @@ export async function processMessages(
   const extractedContent: string[] = []
 
   for (const message of newMessages) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const part of (message as any).parts ?? []) {
+    for (const part of message.parts ?? []) {
       // Handle both "text" and "reasoning" parts (thinking models use "reasoning")
       if ((part.type === "text" || part.type === "reasoning") && part.text) {
         extractedContent.push(part.text)
-      } else if (part.type === "tool_result") {
+      } else if ((part.type as string) === "tool_result") {
         // Tool results contain the actual output from tool calls
         const toolResult = part as { content?: string | Array<{ type: string; text?: string }> }
         if (typeof toolResult.content === "string" && toolResult.content) {

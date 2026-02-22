@@ -199,7 +199,7 @@ export async function fetchAvailableModels(
 				// Handle both string[] (legacy) and object[] (with metadata) formats
 				const modelId = typeof modelItem === 'string' 
 					? modelItem 
-					: (modelItem as any)?.id
+					: modelItem?.id
 				
 				if (modelId) {
 					modelSet.add(`${providerId}/${modelId}`)

@@ -39,7 +39,7 @@ export async function createOrGetSession(
       body: {
         parentID: toolContext.sessionID,
         title: `${args.description} (@${args.subagent_type} subagent)`,
-      } as any,
+      } as Record<string, unknown>,
       query: {
         directory: parentDirectory,
       },

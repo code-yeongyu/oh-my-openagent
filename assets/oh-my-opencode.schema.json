@@ -84,6 +84,9 @@
     "hashline_edit": {
       "type": "boolean"
     },
+    "model_fallback": {
+      "type": "boolean"
+    },
     "agents": {
       "type": "object",
       "properties": {
