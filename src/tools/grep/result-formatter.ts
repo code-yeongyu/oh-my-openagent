@@ -10,6 +10,7 @@ export function formatGrepResult(result: GrepResult): string {
   }
 
   const lines: string[] = []
+  const isFilesOnlyMode = result.matches.every((match) => match.line === 0 && match.text.trim() === "")
 
   lines.push(`Found ${result.totalMatches} match(es) in ${result.filesSearched} file(s)`)
   if (result.truncated) {
@@ -26,8 +27,14 @@ export function formatGrepResult(result: GrepResult): string {
 
   for (const [file, matches] of byFile) {
     lines.push(file)
-    for (const match of matches) {
-      lines.push(`  ${match.line}: ${match.text.trim()}`)
+    if (!isFilesOnlyMode) {
+      for (const match of matches) {
+        const trimmedText = match.text.trim()
+        if (match.line === 0 && trimmedText === "") {
+          continue
+        }
+        lines.push(`  ${match.line}: ${trimmedText}`)
+      }
     }
     lines.push("")
   }
