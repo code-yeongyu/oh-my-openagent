@@ -317,6 +317,22 @@ export function buildAntiPatternsSection(): string {
 ${patterns.join("\n")}`
 }
 
+export function buildDeepParallelSection(model: string, categories: AvailableCategory[]): string {
+  const isNonClaude = !model.toLowerCase().includes('claude')
+  const hasDeepCategory = categories.some(c => c.name === 'deep')
+
+  if (!isNonClaude || !hasDeepCategory) return ""
+
+  return `### Deep Parallel Delegation
+
+For implementation tasks, actively decompose and delegate to \`deep\` category agents in parallel.
+
+1. Break the implementation into independent work units
+2. Maximize parallel deep agents — spawn one per independent unit (\`run_in_background=true\`)
+3. Give each agent a GOAL, not step-by-step instructions — deep agents explore and solve autonomously
+4. Collect results, integrate, verify coherence`
+}
+
 export function buildUltraworkSection(
   agents: AvailableAgent[],
   categories: AvailableCategory[],

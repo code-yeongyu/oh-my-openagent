@@ -6,6 +6,13 @@ export interface LineRef {
   hash: string
 }
 
+interface HashMismatch {
+  line: number
+  expected: string
+}
+
+const MISMATCH_CONTEXT = 2
+
 const LINE_REF_EXTRACT_PATTERN = /([0-9]+#[ZPMQVRWSNKTXJBYH]{2}|[0-9]+:[0-9a-fA-F]{2,})/
 
 function normalizeLineRef(ref: string): string {
@@ -59,34 +66,85 @@ export function validateLineRef(lines: string[], ref: string): void {
   const currentHash = computeLineHash(line, content)
 
   if (currentHash !== hash) {
-    throw new Error(
-      `Hash mismatch at line ${line}. Expected hash: ${hash}, current hash: ${currentHash}. ` +
-        `Line content may have changed. Current content: "${content}"`
+    throw new HashlineMismatchError([{ line, expected: hash }], lines)
+  }
+}
+
+export class HashlineMismatchError extends Error {
+  readonly remaps: ReadonlyMap<string, string>
+
+  constructor(
+    private readonly mismatches: HashMismatch[],
+    private readonly fileLines: string[]
+  ) {
+    super(HashlineMismatchError.formatMessage(mismatches, fileLines))
+    this.name = "HashlineMismatchError"
+    const remaps = new Map<string, string>()
+    for (const mismatch of mismatches) {
+      const actual = computeLineHash(mismatch.line, fileLines[mismatch.line - 1] ?? "")
+      remaps.set(`${mismatch.line}#${mismatch.expected}`, `${mismatch.line}#${actual}`)
+    }
+    this.remaps = remaps
+  }
+
+  static formatMessage(mismatches: HashMismatch[], fileLines: string[]): string {
+    const mismatchByLine = new Map<number, HashMismatch>()
+    for (const mismatch of mismatches) mismatchByLine.set(mismatch.line, mismatch)
+
+    const displayLines = new Set<number>()
+    for (const mismatch of mismatches) {
+      const low = Math.max(1, mismatch.line - MISMATCH_CONTEXT)
+      const high = Math.min(fileLines.length, mismatch.line + MISMATCH_CONTEXT)
+      for (let line = low; line <= high; line++) displayLines.add(line)
+    }
+
+    const sortedLines = [...displayLines].sort((a, b) => a - b)
+    const output: string[] = []
+    output.push(
+      `${mismatches.length} line${mismatches.length > 1 ? "s have" : " has"} changed since last read. ` +
+        "Use updated LINE#ID references below (>>> marks changed lines)."
     )
+    output.push("")
+
+    let previousLine = -1
+    for (const line of sortedLines) {
+      if (previousLine !== -1 && line > previousLine + 1) {
+        output.push("    ...")
+      }
+      previousLine = line
+
+      const content = fileLines[line - 1] ?? ""
+      const hash = computeLineHash(line, content)
+      const prefix = `${line}#${hash}:${content}`
+      if (mismatchByLine.has(line)) {
+        output.push(`>>> ${prefix}`)
+      } else {
+        output.push(`    ${prefix}`)
+      }
+    }
+
+    return output.join("\n")
   }
 }
 
 export function validateLineRefs(lines: string[], refs: string[]): void {
-  const mismatches: string[] = []
+  const mismatches: HashMismatch[] = []
 
   for (const ref of refs) {
     const { line, hash } = parseLineRef(ref)
 
     if (line < 1 || line > lines.length) {
-      mismatches.push(`Line number ${line} out of bounds (file has ${lines.length} lines)`) 
-      continue
+      throw new Error(`Line number ${line} out of bounds (file has ${lines.length} lines)`)
     }
 
     const content = lines[line - 1]
     const currentHash = computeLineHash(line, content)
     if (currentHash !== hash) {
-      mismatches.push(
-        `line ${line}: expected ${hash}, current ${currentHash} (${line}#${currentHash}) content: "${content}"`
-      )
+      mismatches.push({ line, expected: hash })
     }
   }
 
   if (mismatches.length > 0) {
-    throw new Error(`Hash mismatches:\n- ${mismatches.join("\n- ")}`)
+    throw new HashlineMismatchError(mismatches, lines)
   }
 }

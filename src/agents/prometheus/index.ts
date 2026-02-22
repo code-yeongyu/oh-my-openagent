@@ -6,6 +6,7 @@ export {
 } from "./system-prompt"
 export type { PrometheusPromptSource } from "./system-prompt"
 export { PROMETHEUS_GPT_SYSTEM_PROMPT, getGptPrometheusPrompt } from "./gpt"
+export { PROMETHEUS_GEMINI_SYSTEM_PROMPT, getGeminiPrometheusPrompt } from "./gemini"
 
 // Re-export individual sections for granular access
 export { PROMETHEUS_IDENTITY_CONSTRAINTS } from "./identity-constraints"

@@ -48,6 +48,12 @@ export const AgentOverrideConfigSchema = z.object({
       variant: z.string().optional(),
     })
     .optional(),
+  compaction: z
+    .object({
+      model: z.string().optional(),
+      variant: z.string().optional(),
+    })
+    .optional(),
 })
 
 export const AthenaOverrideConfigSchema = AgentOverrideConfigSchema.extend({

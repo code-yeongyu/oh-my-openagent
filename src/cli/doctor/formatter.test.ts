@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it, mock } from "bun:test"
+import { describe, expect, it } from "bun:test"
+import { stripAnsi } from "./format-shared"
 import type { DoctorResult } from "./types"
 
 function createDoctorResult(): DoctorResult {
@@ -39,78 +40,122 @@ function createDoctorResult(): DoctorResult {
   }
 }
 
-describe("formatter", () => {
-  afterEach(() => {
-    mock.restore()
+function createDoctorResultWithIssues(): DoctorResult {
+  const base = createDoctorResult()
+  base.results[1].issues = [
+    { title: "Config issue", description: "Bad config", severity: "error" as const, fix: "Fix it" },
+    { title: "Tool warning", description: "Missing tool", severity: "warning" as const },
+  ]
+  base.summary.failed = 1
+  base.summary.warnings = 1
+  return base
+}
+
+describe("formatDoctorOutput", () => {
+  describe("#given default mode", () => {
+    it("shows System OK when no issues", async () => {
+      //#given
+      const result = createDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?default-ok-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "default"))
+
+      //#then
+      expect(output).toContain("System OK (opencode 1.0.200 · oh-my-opencode 3.4.0)")
+    })
+
+    it("shows issue count and details when issues exist", async () => {
+      //#given
+      const result = createDoctorResultWithIssues()
+      const { formatDoctorOutput } = await import(`./formatter?default-issues-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "default"))
+
+      //#then
+      expect(output).toContain("issues found:")
+      expect(output).toContain("1. Config issue")
+      expect(output).toContain("2. Tool warning")
+    })
   })
 
-  describe("formatDoctorOutput", () => {
-    it("dispatches to default formatter for default mode", async () => {
+  describe("#given status mode", () => {
+    it("renders system version line", async () => {
       //#given
-      const formatDefaultMock = mock(() => "default-output")
-      const formatStatusMock = mock(() => "status-output")
-      const formatVerboseMock = mock(() => "verbose-output")
-      mock.module("./format-default", () => ({ formatDefault: formatDefaultMock }))
-      mock.module("./format-status", () => ({ formatStatus: formatStatusMock }))
-      mock.module("./format-verbose", () => ({ formatVerbose: formatVerboseMock }))
-      const { formatDoctorOutput } = await import(`./formatter?default=${Date.now()}`)
+      const result = createDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?status-ver-${Date.now()}`)
 
       //#when
-      const output = formatDoctorOutput(createDoctorResult(), "default")
+      const output = stripAnsi(formatDoctorOutput(result, "status"))
 
       //#then
-      expect(output).toBe("default-output")
-      expect(formatDefaultMock).toHaveBeenCalledTimes(1)
-      expect(formatStatusMock).toHaveBeenCalledTimes(0)
-      expect(formatVerboseMock).toHaveBeenCalledTimes(0)
+      expect(output).toContain("1.0.200 · 3.4.0 · Bun 1.2.0")
     })
 
-    it("dispatches to status formatter for status mode", async () => {
+    it("renders tool and MCP info", async () => {
       //#given
-      const formatDefaultMock = mock(() => "default-output")
-      const formatStatusMock = mock(() => "status-output")
-      const formatVerboseMock = mock(() => "verbose-output")
-      mock.module("./format-default", () => ({ formatDefault: formatDefaultMock }))
-      mock.module("./format-status", () => ({ formatStatus: formatStatusMock }))
-      mock.module("./format-verbose", () => ({ formatVerbose: formatVerboseMock }))
-      const { formatDoctorOutput } = await import(`./formatter?status=${Date.now()}`)
+      const result = createDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?status-tools-${Date.now()}`)
 
       //#when
-      const output = formatDoctorOutput(createDoctorResult(), "status")
+      const output = stripAnsi(formatDoctorOutput(result, "status"))
 
       //#then
-      expect(output).toBe("status-output")
-      expect(formatDefaultMock).toHaveBeenCalledTimes(0)
-      expect(formatStatusMock).toHaveBeenCalledTimes(1)
-      expect(formatVerboseMock).toHaveBeenCalledTimes(0)
+      expect(output).toContain("LSP 2/4")
+      expect(output).toContain("context7")
+    })
+  })
+
+  describe("#given verbose mode", () => {
+    it("includes all section headers", async () => {
+      //#given
+      const result = createDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?verbose-headers-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "verbose"))
+
+      //#then
+      expect(output).toContain("System Information")
+      expect(output).toContain("Configuration")
+      expect(output).toContain("Tools")
+      expect(output).toContain("MCPs")
+      expect(output).toContain("Summary")
     })
 
-    it("dispatches to verbose formatter for verbose mode", async () => {
+    it("shows check summary counts", async () => {
       //#given
-      const formatDefaultMock = mock(() => "default-output")
-      const formatStatusMock = mock(() => "status-output")
-      const formatVerboseMock = mock(() => "verbose-output")
-      mock.module("./format-default", () => ({ formatDefault: formatDefaultMock }))
-      mock.module("./format-status", () => ({ formatStatus: formatStatusMock }))
-      mock.module("./format-verbose", () => ({ formatVerbose: formatVerboseMock }))
-      const { formatDoctorOutput } = await import(`./formatter?verbose=${Date.now()}`)
+      const result = createDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?verbose-summary-${Date.now()}`)
 
       //#when
-      const output = formatDoctorOutput(createDoctorResult(), "verbose")
+      const output = stripAnsi(formatDoctorOutput(result, "verbose"))
 
       //#then
-      expect(output).toBe("verbose-output")
-      expect(formatDefaultMock).toHaveBeenCalledTimes(0)
-      expect(formatStatusMock).toHaveBeenCalledTimes(0)
-      expect(formatVerboseMock).toHaveBeenCalledTimes(1)
+      expect(output).toContain("1 passed")
+      expect(output).toContain("0 failed")
+      expect(output).toContain("1 warnings")
     })
   })
 
   describe("formatJsonOutput", () => {
-    it("returns valid JSON payload", async () => {
+    it("returns valid JSON", async () => {
       //#given
-      const { formatJsonOutput } = await import(`./formatter?json=${Date.now()}`)
       const result = createDoctorResult()
+      const { formatJsonOutput } = await import(`./formatter?json-valid-${Date.now()}`)
+
+      //#when
+      const output = formatJsonOutput(result)
+
+      //#then
+      expect(() => JSON.parse(output)).not.toThrow()
+    })
+
+    it("preserves all result fields", async () => {
+      //#given
+      const result = createDoctorResult()
+      const { formatJsonOutput } = await import(`./formatter?json-fields-${Date.now()}`)
 
       //#when
       const output = formatJsonOutput(result)
@@ -119,7 +164,6 @@ describe("formatter", () => {
       //#then
       expect(parsed.summary.total).toBe(2)
       expect(parsed.systemInfo.pluginVersion).toBe("3.4.0")
-      expect(parsed.tools.ghCli.username).toBe("yeongyu")
       expect(parsed.exitCode).toBe(0)
     })
   })

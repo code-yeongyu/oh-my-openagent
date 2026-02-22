@@ -1,14 +1,18 @@
-const store = new Map<string, Record<string, boolean>>()
+const store = new Map<string, Record<string, boolean>>();
 
 export function setSessionTools(sessionID: string, tools: Record<string, boolean>): void {
-  store.set(sessionID, { ...tools })
+  store.set(sessionID, { ...tools });
 }
 
 export function getSessionTools(sessionID: string): Record<string, boolean> | undefined {
-  const tools = store.get(sessionID)
-  return tools ? { ...tools } : undefined
+  const tools = store.get(sessionID);
+  return tools ? { ...tools } : undefined;
+}
+
+export function deleteSessionTools(sessionID: string): void {
+  store.delete(sessionID);
 }
 
 export function clearSessionTools(): void {
-  store.clear()
+  store.clear();
 }
