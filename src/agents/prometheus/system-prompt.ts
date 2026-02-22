@@ -5,7 +5,8 @@ import { PROMETHEUS_HIGH_ACCURACY_MODE } from "./high-accuracy-mode"
 import { PROMETHEUS_PLAN_TEMPLATE } from "./plan-template"
 import { PROMETHEUS_BEHAVIORAL_SUMMARY } from "./behavioral-summary"
 import { getGptPrometheusPrompt } from "./gpt"
-import { isGptModel } from "../types"
+import { getGeminiPrometheusPrompt } from "./gemini"
+import { isGptModel, isGeminiModel } from "../types"
 
 /**
  * Combined Prometheus system prompt (Claude-optimized, default).
@@ -30,7 +31,7 @@ export const PROMETHEUS_PERMISSION = {
   question: "allow" as const,
 }
 
-export type PrometheusPromptSource = "default" | "gpt"
+export type PrometheusPromptSource = "default" | "gpt" | "gemini"
 
 /**
  * Determines which Prometheus prompt to use based on model.
@@ -39,12 +40,16 @@ export function getPrometheusPromptSource(model?: string): PrometheusPromptSourc
   if (model && isGptModel(model)) {
     return "gpt"
   }
+  if (model && isGeminiModel(model)) {
+    return "gemini"
+  }
   return "default"
 }
 
 /**
  * Gets the appropriate Prometheus prompt based on model.
  * GPT models → GPT-5.2 optimized prompt (XML-tagged, principle-driven)
+ * Gemini models → Gemini-optimized prompt (aggressive tool-call enforcement, thinking checkpoints)
  * Default (Claude, etc.) → Claude-optimized prompt (modular sections)
  */
 export function getPrometheusPrompt(model?: string): string {
@@ -53,6 +58,8 @@ export function getPrometheusPrompt(model?: string): string {
   switch (source) {
     case "gpt":
       return getGptPrometheusPrompt()
+    case "gemini":
+      return getGeminiPrometheusPrompt()
     case "default":
     default:
       return PROMETHEUS_SYSTEM_PROMPT

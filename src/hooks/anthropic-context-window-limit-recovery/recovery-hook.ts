@@ -89,6 +89,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
             sessionID,
             { providerID, modelID },
             autoCompactState,
+            // @ts-ignore
             ctx.client,
             ctx.directory,
             experimental,
@@ -156,6 +157,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
         sessionID,
         { providerID, modelID },
         autoCompactState,
+        // @ts-ignore
         ctx.client,
         ctx.directory,
         experimental,

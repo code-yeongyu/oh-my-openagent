@@ -6,12 +6,13 @@
  *
  * Routing:
  * 1. GPT models (openai/*, github-copilot/gpt-*) -> gpt.ts (GPT-5.2 optimized)
- * 2. Default (Claude, etc.) -> default.ts (Claude-optimized)
+ * 2. Gemini models (google/*, google-vertex/*) -> gemini.ts (Gemini-optimized)
+ * 3. Default (Claude, etc.) -> default.ts (Claude-optimized)
  */
 
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { isGptModel } from "../types"
+import { isGptModel, isGeminiModel } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
 import {
   createAgentToolRestrictions,
@@ -20,6 +21,7 @@ import {
 
 import { buildDefaultSisyphusJuniorPrompt } from "./default"
 import { buildGptSisyphusJuniorPrompt } from "./gpt"
+import { buildGeminiSisyphusJuniorPrompt } from "./gemini"
 
 const MODE: AgentMode = "subagent"
 
@@ -32,7 +34,7 @@ export const SISYPHUS_JUNIOR_DEFAULTS = {
   temperature: 0.1,
 } as const
 
-export type SisyphusJuniorPromptSource = "default" | "gpt"
+export type SisyphusJuniorPromptSource = "default" | "gpt" | "gemini"
 
 /**
  * Determines which Sisyphus-Junior prompt to use based on model.
@@ -40,6 +42,9 @@ export type SisyphusJuniorPromptSource = "default" | "gpt"
 export function getSisyphusJuniorPromptSource(model?: string): SisyphusJuniorPromptSource {
   if (model && isGptModel(model)) {
     return "gpt"
+  }
+  if (model && isGeminiModel(model)) {
+    return "gemini"
   }
   return "default"
 }
@@ -57,6 +62,8 @@ export function buildSisyphusJuniorPrompt(
   switch (source) {
     case "gpt":
       return buildGptSisyphusJuniorPrompt(useTaskSystem, promptAppend)
+    case "gemini":
+      return buildGeminiSisyphusJuniorPrompt(useTaskSystem, promptAppend)
     case "default":
     default:
       return buildDefaultSisyphusJuniorPrompt(useTaskSystem, promptAppend)

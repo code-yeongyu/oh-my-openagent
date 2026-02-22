@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { createHashlineEditTool } from "./tools"
 import { computeLineHash } from "./hash-computation"
+import { canonicalizeFileText } from "./file-text-canonicalization"
 import * as fs from "node:fs"
 import * as os from "node:os"
 import * as path from "node:path"
@@ -11,12 +12,10 @@ function createMockContext(): ToolContext {
     sessionID: "test",
     messageID: "test",
     agent: "test",
-    directory: "/tmp",
-    worktree: "/tmp",
     abort: new AbortController().signal,
     metadata: mock(() => {}),
     ask: async () => {},
-  }
+  } as unknown as ToolContext
 }
 
 describe("createHashlineEditTool", () => {
@@ -103,7 +102,7 @@ describe("createHashlineEditTool", () => {
 
     //#then
     expect(result).toContain("Error")
-    expect(result).toContain("hash")
+    expect(result).toContain(">>>")
   })
 
   it("preserves literal backslash-n and supports string[] payload", async () => {
@@ -131,5 +130,159 @@ describe("createHashlineEditTool", () => {
 
     //#then
     expect(fs.readFileSync(filePath, "utf-8")).toBe("join(\\n)\na\nb\nline2")
+  })
+
+  it("supports insert_before and insert_between", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2\nline3")
+    const line1 = computeLineHash(1, "line1")
+    const line2 = computeLineHash(2, "line2")
+    const line3 = computeLineHash(3, "line3")
+
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        edits: [
+          { type: "insert_before", line: `3#${line3}`, text: ["before3"] },
+          { type: "insert_between", after_line: `1#${line1}`, before_line: `2#${line2}`, text: ["between"] },
+        ],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nbetween\nline2\nbefore3\nline3")
+  })
+
+  it("returns error when insert text is empty array", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+    const line1 = computeLineHash(1, "line1")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "insert_after", line: `1#${line1}`, text: [] }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toContain("Error")
+    expect(result).toContain("non-empty")
+  })
+
+  it("supports file rename with edits", async () => {
+    //#given
+    const filePath = path.join(tempDir, "source.txt")
+    const renamedPath = path.join(tempDir, "renamed.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+    const line2 = computeLineHash(2, "line2")
+
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        rename: renamedPath,
+        edits: [{ type: "set_line", line: `2#${line2}`, text: "line2-updated" }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.existsSync(filePath)).toBe(false)
+    expect(fs.readFileSync(renamedPath, "utf-8")).toBe("line1\nline2-updated")
+  })
+
+  it("supports file delete mode", async () => {
+    //#given
+    const filePath = path.join(tempDir, "delete-me.txt")
+    fs.writeFileSync(filePath, "line1")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        delete: true,
+        edits: [],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.existsSync(filePath)).toBe(false)
+    expect(result).toContain("Successfully deleted")
+  })
+
+  it("creates missing file with append and prepend", async () => {
+    //#given
+    const filePath = path.join(tempDir, "created.txt")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [
+          { type: "append", text: ["line2"] },
+          { type: "prepend", text: ["line1"] },
+        ],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.existsSync(filePath)).toBe(true)
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nline2")
+    expect(result).toContain("Successfully applied 2 edit(s)")
+  })
+
+  it("preserves BOM and CRLF through hashline_edit", async () => {
+    //#given
+    const filePath = path.join(tempDir, "crlf-bom.txt")
+    const bomCrLf = "\uFEFFline1\r\nline2\r\n"
+    fs.writeFileSync(filePath, bomCrLf)
+    const line2Hash = computeLineHash(2, "line2")
+
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "set_line", line: `2#${line2Hash}`, text: "line2-updated" }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    const bytes = fs.readFileSync(filePath)
+    expect(bytes[0]).toBe(0xef)
+    expect(bytes[1]).toBe(0xbb)
+    expect(bytes[2]).toBe(0xbf)
+    expect(bytes.toString("utf-8")).toBe("\uFEFFline1\r\nline2-updated\r\n")
+  })
+
+  it("detects LF as line ending when LF appears before CRLF", () => {
+    //#given
+    const content = "line1\nline2\r\nline3"
+
+    //#when
+    const envelope = canonicalizeFileText(content)
+
+    //#then
+    expect(envelope.lineEnding).toBe("\n")
+  })
+
+  it("detects CRLF as line ending when CRLF appears before LF", () => {
+    //#given
+    const content = "line1\r\nline2\nline3"
+
+    //#when
+    const envelope = canonicalizeFileText(content)
+
+    //#then
+    expect(envelope.lineEnding).toBe("\r\n")
   })
 })

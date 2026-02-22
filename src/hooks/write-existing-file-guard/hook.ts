@@ -1,7 +1,7 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 
 import { existsSync, realpathSync } from "fs"
-import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from "path"
+import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "path"
 
 import { log } from "../../shared"
 
@@ -14,7 +14,7 @@ type GuardArgs = {
 
 const MAX_TRACKED_SESSIONS = 256
 export const MAX_TRACKED_PATHS_PER_SESSION = 1024
-const OUTSIDE_SESSION_MESSAGE = "Path must be inside session directory."
+const BLOCK_MESSAGE = "File already exists. Use edit tool instead."
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -36,6 +36,8 @@ function isPathInsideDirectory(pathToCheck: string, directory: string): boolean 
   const relativePath = relative(directory, pathToCheck)
   return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath))
 }
+
+
 
 function toCanonicalPath(absolutePath: string): string {
   let canonicalPath = absolutePath
@@ -73,7 +75,6 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
   const readPermissionsBySession = new Map<string, Set<string>>()
   const sessionLastAccess = new Map<string, number>()
   const canonicalSessionRoot = toCanonicalPath(resolveInputPath(ctx, ctx.directory))
-  const sisyphusRoot = join(canonicalSessionRoot, ".sisyphus") + sep
 
   const touchSession = (sessionID: string): void => {
     sessionLastAccess.set(sessionID, Date.now())
@@ -174,16 +175,7 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
       const isInsideSessionDirectory = isPathInsideDirectory(canonicalPath, canonicalSessionRoot)
 
       if (!isInsideSessionDirectory) {
-        if (toolName === "read") {
-          return
-        }
-
-        log("[write-existing-file-guard] Blocking write outside session directory", {
-          sessionID: input.sessionID,
-          filePath,
-          resolvedPath,
-        })
-        throw new Error(OUTSIDE_SESSION_MESSAGE)
+        return
       }
 
       if (toolName === "read") {
@@ -206,7 +198,7 @@ export function createWriteExistingFileGuardHook(ctx: PluginInput): Hooks {
         return
       }
 
-      const isSisyphusPath = canonicalPath.startsWith(sisyphusRoot)
+      const isSisyphusPath = canonicalPath.includes("/.sisyphus/")
       if (isSisyphusPath) {
         log("[write-existing-file-guard] Allowing .sisyphus/** overwrite", {
           sessionID: input.sessionID,
