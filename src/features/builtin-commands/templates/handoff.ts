@@ -142,36 +142,47 @@ Rules for the summary:
 
 ---
 
-# PHASE 4: PROVIDE INSTRUCTIONS
+# PHASE 4: SAVE TO FILE
 
-After generating the summary, instruct the user:
+After generating the summary, save it to disk using the Write tool:
+
+Write the HANDOFF CONTEXT block (everything from "HANDOFF CONTEXT" through "CONTEXT FOR CONTINUATION" section) to \`.opencode/handoff.md\`.
+
+IMPORTANT:
+- Write ONLY the handoff content — not the format instructions or this command template
+- Overwrite any existing handoff.md from a previous session
+- The file must be self-contained and readable without this session
+
+---
+
+# PHASE 5: CONFIRM AND INSTRUCT
+
+After saving the file, inform the user:
 
 \`\`\`
 ---
 
-TO CONTINUE IN A NEW SESSION:
+Handoff saved to .opencode/handoff.md
 
-1. Press 'n' in OpenCode TUI to open a new session, or run 'opencode' in a new terminal
-2. Paste the HANDOFF CONTEXT above as your first message
-3. Add your request: "Continue from the handoff context above. [Your next task]"
-
-The new session will have all context needed to continue seamlessly.
+To continue in a new session:
+1. Start a new OpenCode session (press 'n' in TUI, or run 'opencode' in a new terminal)
+2. Type /resume-handoff to pick up where you left off
 \`\`\`
 
 ---
 
 # IMPORTANT CONSTRAINTS
-
 - DO NOT attempt to programmatically create new sessions (no API available to agents)
 - DO provide a self-contained summary that works without access to this session
 - DO include workspace-relative file paths
 - DO NOT include sensitive information (API keys, credentials, secrets)
 - DO NOT exceed 10 files in the KEY FILES section
 - DO keep the GOAL section to a single sentence or short paragraph
+- DO save the handoff to .opencode/handoff.md before presenting instructions
 
 ---
 
 # EXECUTE NOW
 
-Begin by gathering programmatic context, then synthesize the handoff summary.
+Begin by gathering programmatic context, then synthesize the handoff summary, save it to file, and confirm.
 `
