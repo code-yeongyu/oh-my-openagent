@@ -1,10 +1,12 @@
 import { HASHLINE_DICT } from "./constants"
 import { createHashlineChunkFormatter } from "./hashline-chunk-formatter"
 
+const RE_SIGNIFICANT = /[\p{L}\p{N}]/u
+
 export function computeLineHash(lineNumber: number, content: string): string {
-  const stripped = content.replace(/\s+/g, "")
-  const hashInput = `${lineNumber}:${stripped}`
-  const hash = Bun.hash.xxHash32(hashInput)
+  const stripped = content.endsWith("\r") ? content.slice(0, -1).replace(/\s+/g, "") : content.replace(/\s+/g, "")
+  const seed = RE_SIGNIFICANT.test(stripped) ? 0 : lineNumber
+  const hash = Bun.hash.xxHash32(stripped, seed)
   const index = hash % 256
   return HASHLINE_DICT[index]
 }

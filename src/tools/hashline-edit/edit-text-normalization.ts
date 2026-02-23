@@ -1,5 +1,5 @@
-const HASHLINE_PREFIX_RE = /^\s*(?:>>>|>>)?\s*\d+#[A-Z]{2}:/
-const DIFF_PLUS_RE = /^[+-](?![+-])/
+const HASHLINE_PREFIX_RE = /^\s*(?:>>>|>>)?\s*\d+\s*#\s*[ZPMQVRWSNKTXJBYH]{2}:/
+const DIFF_PLUS_RE = /^[+](?![+])/
 
 function equalsIgnoringWhitespace(a: string, b: string): boolean {
   if (a === b) return true
