@@ -77,13 +77,40 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           storeToolMetadata(ctx.sessionID, callID, meta)
         }
 
-        const isActive = task.status === "pending" || task.status === "running"
+        const shouldBlock = args.block === true
+        const timeoutMs = Math.min(args.timeout ?? 60000, 600000)
         const fullSession = args.full_session ?? true
+
+        let resolvedTask = task
+
+        if (shouldBlock && (task.status === "pending" || task.status === "running")) {
+          const startTime = Date.now()
+          while (Date.now() - startTime < timeoutMs) {
+            await delay(1000)
+
+            const currentTask = manager.getTask(args.task_id)
+            if (!currentTask) {
+              return `Task was deleted: ${args.task_id}`
+            }
+
+            if (currentTask.status !== "pending" && currentTask.status !== "running") {
+              resolvedTask = currentTask
+              break
+            }
+          }
+
+          const finalCheck = manager.getTask(args.task_id)
+          if (finalCheck) {
+            resolvedTask = finalCheck
+          }
+        }
+
+        const isActive = resolvedTask.status === "pending" || resolvedTask.status === "running"
         const includeThinking = isActive || (args.include_thinking ?? false)
         const includeToolResults = isActive || (args.include_tool_results ?? false)
 
         if (fullSession) {
-          return await formatFullSession(task, client, {
+          return await formatFullSession(resolvedTask, client, {
             includeThinking,
             messageLimit: args.message_limit,
             sinceMessageId: args.since_message_id,
@@ -92,44 +119,15 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           })
         }
 
-        const shouldBlock = args.block === true
-        const timeoutMs = Math.min(args.timeout ?? 60000, 600000)
-
-        if (task.status === "completed") {
-          return await formatTaskResult(task, client)
+        if (resolvedTask.status === "completed") {
+          return await formatTaskResult(resolvedTask, client)
         }
 
-        if (task.status === "error" || task.status === "cancelled" || task.status === "interrupt") {
-          return formatTaskStatus(task)
+        if (resolvedTask.status === "error" || resolvedTask.status === "cancelled" || resolvedTask.status === "interrupt") {
+          return formatTaskStatus(resolvedTask)
         }
 
-        if (!shouldBlock) {
-          return formatTaskStatus(task)
-        }
-
-        const startTime = Date.now()
-        while (Date.now() - startTime < timeoutMs) {
-          await delay(1000)
-
-          const currentTask = manager.getTask(args.task_id)
-          if (!currentTask) {
-            return `Task was deleted: ${args.task_id}`
-          }
-
-          if (currentTask.status === "completed") {
-            return await formatTaskResult(currentTask, client)
-          }
-
-           if (currentTask.status === "error" || currentTask.status === "cancelled" || currentTask.status === "interrupt") {
-             return formatTaskStatus(currentTask)
-           }
-        }
-
-        const finalTask = manager.getTask(args.task_id)
-        if (!finalTask) {
-          return `Task was deleted: ${args.task_id}`
-        }
-        return `Timeout exceeded (${timeoutMs}ms). Task still ${finalTask.status}.\n\n${formatTaskStatus(finalTask)}`
+        return formatTaskStatus(resolvedTask)
       } catch (error) {
         return `Error getting output: ${error instanceof Error ? error.message : String(error)}`
       }
