@@ -3,7 +3,7 @@ import type { PluginContext } from "./types"
 
 import { hasConnectedProvidersCache } from "../shared"
 import { setSessionModel } from "../shared/session-model-state"
-import { setSessionAgent } from "../features/claude-code-session-state"
+import { updateSessionAgent, pinSessionAgent } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 
@@ -71,8 +71,18 @@ export function createChatMessageHandler(args: {
     output: ChatMessageHandlerOutput
   ): Promise<void> => {
     if (input.agent) {
-      setSessionAgent(input.sessionID, input.agent)
+      updateSessionAgent(input.sessionID, input.agent)
     }
+    const promptText = output.parts
+      ?.filter((p) => p.type === "text" && p.text)
+      .map((p) => p.text)
+      .join("\n")
+      .trim() || ""
+    const isStartWorkCommand = promptText.includes("<session-context>")
+    if (isStartWorkCommand) {
+      pinSessionAgent(input.sessionID, "atlas")
+    }
+
 
     if (firstMessageVariantGate.shouldOverride(input.sessionID)) {
       firstMessageVariantGate.markApplied(input.sessionID)
