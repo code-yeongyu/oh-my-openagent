@@ -139,7 +139,7 @@ export function createToolRegistry(args: {
     interactive_bash,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
-    prepare_council_prompt: createPrepareCouncilPromptTool(),
+    prepare_council_prompt: createPrepareCouncilPromptTool(ctx.directory),
   }
 
   const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)

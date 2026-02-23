@@ -1,11 +1,11 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
-import { createAgentToolRestrictions } from "../../shared/permission-compat"
+import { createAgentToolAllowlist } from "../../shared"
 import { applyModelThinkingConfig } from "./model-thinking-config"
 
 const MODE: AgentMode = "subagent"
 
-const COUNCIL_MEMBER_PROMPT = `You are an independent code analyst in a multi-model analysis council. Your role is to provide thorough, evidence-based analysis.
+export const COUNCIL_MEMBER_PROMPT = `You are an independent code analyst in a multi-model analysis council. Your role is to provide thorough, evidence-based analysis.
 
 ## Your Role
 - You are one of several AI models analyzing the same question independently
@@ -25,14 +25,16 @@ const COUNCIL_MEMBER_PROMPT = `You are an independent code analyst in a multi-mo
 5. Be concise but thorough — quality over quantity`
 
 export function createCouncilMemberAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "task",
-    "call_omo_agent",
-    "switch_agent",
-    "background_wait",
-    "prepare_council_prompt",
+  // Allow-list: only read-only analysis tools. Everything else is denied via `*: deny`.
+  const restrictions = createAgentToolAllowlist([
+    "read",
+    "grep",
+    "glob",
+    "lsp_goto_definition",
+    "lsp_find_references",
+    "lsp_symbols",
+    "lsp_diagnostics",
+    "ast_grep_search",
   ])
 
   const base = {

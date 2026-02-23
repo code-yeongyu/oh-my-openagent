@@ -53,17 +53,21 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
 
   // NOTE: Athena/council tool restrictions are also defined in:
   // - src/agents/athena/agent.ts (AgentConfig permission format)
-  // - src/agents/athena/council-member-agent.ts (AgentConfig permission format)
+  // - src/agents/athena/council-member-agent.ts (AgentConfig permission format — allow-list)
   // - src/plugin-handlers/tool-config-handler.ts (allow/deny string format)
   // Keep all three in sync when modifying.
+  // Council members use an allow-list: only read-only analysis tools are permitted.
+  // Prompt file lives in .sisyphus/tmp/ (inside project) so no external_directory needed.
   "council-member": {
-    write: false,
-    edit: false,
-    task: false,
-    call_omo_agent: false,
-    switch_agent: false,
-    background_wait: false,
-    prepare_council_prompt: false,
+    "*": false,
+    read: true,
+    grep: true,
+    glob: true,
+    lsp_goto_definition: true,
+    lsp_find_references: true,
+    lsp_symbols: true,
+    lsp_diagnostics: true,
+    ast_grep_search: true,
   },
 }
 

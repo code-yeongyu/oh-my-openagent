@@ -1,13 +1,14 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { randomUUID } from "node:crypto"
-import { writeFile, unlink } from "node:fs/promises"
+import { writeFile, unlink, mkdir } from "node:fs/promises"
 import { join } from "node:path"
-import { tmpdir } from "node:os"
 import { log } from "../../shared/logger"
+import { COUNCIL_MEMBER_PROMPT } from "../../agents/athena/council-member-agent"
 
 const CLEANUP_DELAY_MS = 30 * 60 * 1000
+const COUNCIL_TMP_DIR = ".sisyphus/tmp"
 
-export function createPrepareCouncilPromptTool(): ToolDefinition {
+export function createPrepareCouncilPromptTool(directory: string): ToolDefinition {
   const description = `Save a council analysis prompt to a temp file so council members can read it.
 
 Athena-only tool. Saves the prompt once, then each council member task() call uses a short
@@ -26,10 +27,19 @@ Returns the file path to reference in subsequent task() calls.`
         return "Prompt cannot be empty."
       }
 
-      const filename = `athena-council-${randomUUID().slice(0, 8)}.md`
-      const filePath = join(tmpdir(), filename)
+      const tmpDir = join(directory, COUNCIL_TMP_DIR)
+      await mkdir(tmpDir, { recursive: true })
 
-      await writeFile(filePath, args.prompt, "utf-8")
+      const filename = `athena-council-${randomUUID().slice(0, 8)}.md`
+      const filePath = join(tmpDir, filename)
+
+      const content = `${COUNCIL_MEMBER_PROMPT}
+
+## Analysis Question
+
+${args.prompt}`
+
+      await writeFile(filePath, content, "utf-8")
 
       setTimeout(() => {
         unlink(filePath).catch(() => {})

@@ -35,7 +35,7 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | Atlas | task, call_omo_agent |
 | Momus | write, edit, task |
 | Athena | write, edit, call_omo_agent |
-| Council-Member | write, edit, task, call_omo_agent, switch_agent, background_wait, prepare_council_prompt |
+| Council-Member | ALL except read, grep, glob, lsp_*, ast_grep_search (allow-list) |
 
 ## STRUCTURE
 
