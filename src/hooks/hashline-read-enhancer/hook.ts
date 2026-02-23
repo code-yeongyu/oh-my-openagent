@@ -6,9 +6,12 @@ interface HashlineReadEnhancerConfig {
   hashline_edit?: { enabled: boolean }
 }
 
-const READ_LINE_PATTERN = /^(\d+): ?(.*)$/
+const COLON_READ_LINE_PATTERN = /^\s*(\d+): ?(.*)$/
+const PIPE_READ_LINE_PATTERN = /^\s*(\d+)\| ?(.*)$/
 const CONTENT_OPEN_TAG = "<content>"
 const CONTENT_CLOSE_TAG = "</content>"
+const FILE_OPEN_TAG = "<file>"
+const FILE_CLOSE_TAG = "</file>"
 
 function isReadTool(toolName: string): boolean {
   return toolName.toLowerCase() === "read"
@@ -24,18 +27,36 @@ function shouldProcess(config: HashlineReadEnhancerConfig): boolean {
 
 function isTextFile(output: string): boolean {
   const firstLine = output.split("\n")[0] ?? ""
-  return READ_LINE_PATTERN.test(firstLine)
+  return COLON_READ_LINE_PATTERN.test(firstLine) || PIPE_READ_LINE_PATTERN.test(firstLine)
+}
+
+function parseReadLine(line: string): { lineNumber: number; content: string } | null {
+  const colonMatch = COLON_READ_LINE_PATTERN.exec(line)
+  if (colonMatch) {
+    return {
+      lineNumber: Number.parseInt(colonMatch[1], 10),
+      content: colonMatch[2],
+    }
+  }
+
+  const pipeMatch = PIPE_READ_LINE_PATTERN.exec(line)
+  if (pipeMatch) {
+    return {
+      lineNumber: Number.parseInt(pipeMatch[1], 10),
+      content: pipeMatch[2],
+    }
+  }
+
+  return null
 }
 
 function transformLine(line: string): string {
-  const match = READ_LINE_PATTERN.exec(line)
-  if (!match) {
+  const parsed = parseReadLine(line)
+  if (!parsed) {
     return line
   }
-  const lineNumber = parseInt(match[1], 10)
-  const content = match[2]
-  const hash = computeLineHash(lineNumber, content)
-  return `${lineNumber}#${hash}:${content}`
+  const hash = computeLineHash(parsed.lineNumber, parsed.content)
+  return `${parsed.lineNumber}#${hash}:${parsed.content}`
 }
 
 function transformOutput(output: string): string {
@@ -44,25 +65,43 @@ function transformOutput(output: string): string {
   }
 
   const lines = output.split("\n")
-  const contentStart = lines.indexOf(CONTENT_OPEN_TAG)
+  const contentStart = lines.findIndex(
+    (line) => line === CONTENT_OPEN_TAG || line.startsWith(CONTENT_OPEN_TAG)
+  )
   const contentEnd = lines.indexOf(CONTENT_CLOSE_TAG)
+  const fileStart = lines.findIndex((line) => line === FILE_OPEN_TAG || line.startsWith(FILE_OPEN_TAG))
+  const fileEnd = lines.indexOf(FILE_CLOSE_TAG)
 
-  if (contentStart !== -1 && contentEnd !== -1 && contentEnd > contentStart + 1) {
-    const fileLines = lines.slice(contentStart + 1, contentEnd)
+  const blockStart = contentStart !== -1 ? contentStart : fileStart
+  const blockEnd = contentStart !== -1 ? contentEnd : fileEnd
+  const openTag = contentStart !== -1 ? CONTENT_OPEN_TAG : FILE_OPEN_TAG
+
+  if (blockStart !== -1 && blockEnd !== -1 && blockEnd > blockStart) {
+    const openLine = lines[blockStart] ?? ""
+    const inlineFirst = openLine.startsWith(openTag) && openLine !== openTag
+      ? openLine.slice(openTag.length)
+      : null
+    const fileLines = inlineFirst !== null
+      ? [inlineFirst, ...lines.slice(blockStart + 1, blockEnd)]
+      : lines.slice(blockStart + 1, blockEnd)
     if (!isTextFile(fileLines[0] ?? "")) {
       return output
     }
 
     const result: string[] = []
     for (const line of fileLines) {
-      if (!READ_LINE_PATTERN.test(line)) {
+      if (!parseReadLine(line)) {
         result.push(...fileLines.slice(result.length))
         break
       }
       result.push(transformLine(line))
     }
 
-    return [...lines.slice(0, contentStart + 1), ...result, ...lines.slice(contentEnd)].join("\n")
+    const prefixLines = inlineFirst !== null
+      ? [...lines.slice(0, blockStart), openTag]
+      : lines.slice(0, blockStart + 1)
+
+    return [...prefixLines, ...result, ...lines.slice(blockEnd)].join("\n")
   }
 
   if (!isTextFile(lines[0] ?? "")) {
@@ -71,7 +110,7 @@ function transformOutput(output: string): string {
 
   const result: string[] = []
   for (const line of lines) {
-    if (!READ_LINE_PATTERN.test(line)) {
+    if (!parseReadLine(line)) {
       result.push(...lines.slice(result.length))
       break
     }
