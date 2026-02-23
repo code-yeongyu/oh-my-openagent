@@ -31,7 +31,7 @@ describe("createHashlineEditTool", () => {
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
-  it("applies set_line with LINE#ID anchor", async () => {
+  it("applies replace with single LINE#ID anchor", async () => {
     //#given
     const filePath = path.join(tempDir, "test.txt")
     fs.writeFileSync(filePath, "line1\nline2\nline3")
@@ -41,7 +41,7 @@ describe("createHashlineEditTool", () => {
     const result = await tool.execute(
       {
         filePath,
-        edits: [{ type: "set_line", line: `2#${hash}`, text: "modified line2" }],
+        edits: [{ op: "replace", pos: `2#${hash}`, lines: "modified line2" }],
       },
       createMockContext(),
     )
@@ -51,7 +51,7 @@ describe("createHashlineEditTool", () => {
     expect(result).toBe(`Updated ${filePath}`)
   })
 
-  it("applies replace_lines and insert_after", async () => {
+  it("applies ranged replace and anchored append", async () => {
     //#given
     const filePath = path.join(tempDir, "test.txt")
     fs.writeFileSync(filePath, "line1\nline2\nline3\nline4")
@@ -65,15 +65,15 @@ describe("createHashlineEditTool", () => {
         filePath,
         edits: [
           {
-            type: "replace_lines",
-            start_line: `2#${line2Hash}`,
-            end_line: `3#${line3Hash}`,
-            text: "replaced",
+            op: "replace",
+            pos: `2#${line2Hash}`,
+            end: `3#${line3Hash}`,
+            lines: "replaced",
           },
           {
-            type: "insert_after",
-            line: `4#${line4Hash}`,
-            text: "inserted",
+            op: "append",
+            pos: `4#${line4Hash}`,
+            lines: "inserted",
           },
         ],
       },
@@ -93,7 +93,7 @@ describe("createHashlineEditTool", () => {
     const result = await tool.execute(
       {
         filePath,
-        edits: [{ type: "set_line", line: "1#ZZ", text: "new" }],
+        edits: [{ op: "replace", pos: "1#ZZ", lines: "new" }],
       },
       createMockContext(),
     )
@@ -113,7 +113,7 @@ describe("createHashlineEditTool", () => {
     await tool.execute(
       {
         filePath,
-        edits: [{ type: "set_line", line: `1#${line1Hash}`, text: "join(\\n)" }],
+        edits: [{ op: "replace", pos: `1#${line1Hash}`, lines: "join(\\n)" }],
       },
       createMockContext(),
     )
@@ -121,7 +121,7 @@ describe("createHashlineEditTool", () => {
     await tool.execute(
       {
         filePath,
-        edits: [{ type: "insert_after", line: `1#${computeLineHash(1, "join(\\n)")}`, text: ["a", "b"] }],
+        edits: [{ op: "append", pos: `1#${computeLineHash(1, "join(\\n)")}`, lines: ["a", "b"] }],
       },
       createMockContext(),
     )
@@ -130,12 +130,11 @@ describe("createHashlineEditTool", () => {
     expect(fs.readFileSync(filePath, "utf-8")).toBe("join(\\n)\na\nb\nline2")
   })
 
-  it("supports insert_before and insert_between", async () => {
+  it("supports anchored prepend and anchored append", async () => {
     //#given
     const filePath = path.join(tempDir, "test.txt")
     fs.writeFileSync(filePath, "line1\nline2\nline3")
     const line1 = computeLineHash(1, "line1")
-    const line2 = computeLineHash(2, "line2")
     const line3 = computeLineHash(3, "line3")
 
     //#when
@@ -143,8 +142,8 @@ describe("createHashlineEditTool", () => {
       {
         filePath,
         edits: [
-          { type: "insert_before", line: `3#${line3}`, text: ["before3"] },
-          { type: "insert_between", after_line: `1#${line1}`, before_line: `2#${line2}`, text: ["between"] },
+          { op: "prepend", pos: `3#${line3}`, lines: ["before3"] },
+          { op: "append", pos: `1#${line1}`, lines: ["between"] },
         ],
       },
       createMockContext(),
@@ -164,7 +163,7 @@ describe("createHashlineEditTool", () => {
     const result = await tool.execute(
       {
         filePath,
-        edits: [{ type: "insert_after", line: `1#${line1}`, text: [] }],
+        edits: [{ op: "append", pos: `1#${line1}`, lines: [] }],
       },
       createMockContext(),
     )
@@ -186,7 +185,7 @@ describe("createHashlineEditTool", () => {
       {
         filePath,
         rename: renamedPath,
-        edits: [{ type: "set_line", line: `2#${line2}`, text: "line2-updated" }],
+        edits: [{ op: "replace", pos: `2#${line2}`, lines: "line2-updated" }],
       },
       createMockContext(),
     )
@@ -226,8 +225,8 @@ describe("createHashlineEditTool", () => {
       {
         filePath,
         edits: [
-          { type: "append", text: ["line2"] },
-          { type: "prepend", text: ["line1"] },
+          { op: "append", lines: ["line2"] },
+          { op: "prepend", lines: ["line1"] },
         ],
       },
       createMockContext(),
@@ -239,7 +238,7 @@ describe("createHashlineEditTool", () => {
     expect(result).toBe(`Updated ${filePath}`)
   })
 
-  it("accepts replace_lines with one anchor and downgrades to set_line", async () => {
+  it("accepts replace with one anchor", async () => {
     //#given
     const filePath = path.join(tempDir, "degrade.txt")
     fs.writeFileSync(filePath, "line1\nline2\nline3")
@@ -249,7 +248,7 @@ describe("createHashlineEditTool", () => {
     const result = await tool.execute(
       {
         filePath,
-        edits: [{ type: "replace_lines", start_line: `2#${line2Hash}`, text: ["line2-updated"] }],
+        edits: [{ op: "replace", pos: `2#${line2Hash}`, lines: ["line2-updated"] }],
       },
       createMockContext(),
     )
@@ -259,7 +258,7 @@ describe("createHashlineEditTool", () => {
     expect(result).toBe(`Updated ${filePath}`)
   })
 
-  it("accepts insert_after using after_line alias", async () => {
+  it("accepts anchored append using end alias", async () => {
     //#given
     const filePath = path.join(tempDir, "alias.txt")
     fs.writeFileSync(filePath, "line1\nline2")
@@ -269,7 +268,7 @@ describe("createHashlineEditTool", () => {
     await tool.execute(
       {
         filePath,
-        edits: [{ type: "insert_after", after_line: `1#${line1Hash}`, text: ["inserted"] }],
+        edits: [{ op: "append", end: `1#${line1Hash}`, lines: ["inserted"] }],
       },
       createMockContext(),
     )
@@ -289,7 +288,7 @@ describe("createHashlineEditTool", () => {
     await tool.execute(
       {
         filePath,
-        edits: [{ type: "set_line", line: `2#${line2Hash}`, text: "line2-updated" }],
+        edits: [{ op: "replace", pos: `2#${line2Hash}`, lines: "line2-updated" }],
       },
       createMockContext(),
     )
