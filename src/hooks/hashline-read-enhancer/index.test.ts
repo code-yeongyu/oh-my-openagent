@@ -47,8 +47,8 @@ describe("hashline-read-enhancer", () => {
 
     //#then
     const lines = output.output.split("\n")
-    expect(lines[3]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}:const x = 1$/)
-    expect(lines[4]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}:const y = 2$/)
+    expect(lines[3]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}\|const x = 1$/)
+    expect(lines[4]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\|const y = 2$/)
     expect(lines[10]).toBe("1: keep this unchanged")
   })
 
@@ -78,8 +78,8 @@ describe("hashline-read-enhancer", () => {
     expect(lines[0]).toBe("<path>/tmp/demo.ts</path>")
     expect(lines[1]).toBe("<type>file</type>")
     expect(lines[2]).toBe("<content>")
-    expect(lines[3]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}:const x = 1$/)
-    expect(lines[4]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}:const y = 2$/)
+    expect(lines[3]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}\|const x = 1$/)
+    expect(lines[4]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\|const y = 2$/)
     expect(lines[6]).toBe("(End of file - total 2 lines)")
     expect(lines[7]).toBe("</content>")
   })
@@ -105,9 +105,9 @@ describe("hashline-read-enhancer", () => {
 
     //#then
     const lines = output.output.split("\n")
-    expect(lines[0]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}:# Oh-My-OpenCode Features$/)
-    expect(lines[1]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}:$/)
-    expect(lines[2]).toMatch(/^3#[ZPMQVRWSNKTXJBYH]{2}:Hashline test$/)
+    expect(lines[0]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}\|# Oh-My-OpenCode Features$/)
+    expect(lines[1]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\|$/)
+    expect(lines[2]).toMatch(/^3#[ZPMQVRWSNKTXJBYH]{2}\|Hashline test$/)
     expect(lines[4]).toBe("(End of file - total 3 lines)")
   })
 
@@ -133,8 +133,8 @@ describe("hashline-read-enhancer", () => {
 
     //#then
     const lines = output.output.split("\n")
-    expect(lines[1]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}:const x = 1$/)
-    expect(lines[2]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}:const y = 2$/)
+    expect(lines[1]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}\|const x = 1$/)
+    expect(lines[2]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\|const y = 2$/)
     expect(lines[5]).toBe("</file>")
   })
 
@@ -160,8 +160,8 @@ describe("hashline-read-enhancer", () => {
 
     //#then
     const lines = output.output.split("\n")
-    expect(lines[1]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}:const x = 1$/)
-    expect(lines[2]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}:const y = 2$/)
+    expect(lines[1]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}\|const x = 1$/)
+    expect(lines[2]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\|const y = 2$/)
   })
 
   it("appends LINE#ID output for write tool using metadata filepath", async () => {
@@ -181,9 +181,9 @@ describe("hashline-read-enhancer", () => {
     await hook["tool.execute.after"](input, output)
 
     //#then
-    expect(output.output).toContain("Updated file (LINE#ID:content):")
-    expect(output.output).toMatch(/1#[ZPMQVRWSNKTXJBYH]{2}:const x = 1/)
-    expect(output.output).toMatch(/2#[ZPMQVRWSNKTXJBYH]{2}:const y = 2/)
+    expect(output.output).toContain("Updated file (LINE#ID|content):")
+    expect(output.output).toMatch(/1#[ZPMQVRWSNKTXJBYH]{2}\|const x = 1/)
+    expect(output.output).toMatch(/2#[ZPMQVRWSNKTXJBYH]{2}\|const y = 2/)
 
     fs.rmSync(tempDir, { recursive: true, force: true })
   })

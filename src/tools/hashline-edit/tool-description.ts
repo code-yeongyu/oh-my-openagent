@@ -5,7 +5,7 @@ WORKFLOW:
 2. Pick the smallest operation per logical mutation site.
 3. Submit one edit call per file with all related operations.
 4. If same file needs another call, re-read first.
-5. Use anchors as "LINE#ID" only (never include trailing ":content").
+5. Use anchors as "LINE#ID" only (never include trailing "|content").
 
 VALIDATION:
   Payload shape: { "filePath": string, "edits": [...], "delete"?: boolean, "rename"?: string }

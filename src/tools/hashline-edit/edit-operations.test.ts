@@ -141,7 +141,7 @@ describe("hashline edit operations", () => {
     const lines = ["line 1", "line 2", "line 3"]
 
     //#when
-    const result = applySetLine(lines, anchorFor(lines, 2), "1#VK:first\n2#NP:second")
+    const result = applySetLine(lines, anchorFor(lines, 2), "1#VK|first\n2#NP|second")
 
     //#then
     expect(result).toEqual(["line 1", "first", "second", "line 3"])

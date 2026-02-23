@@ -24,7 +24,7 @@ describe("parseLineRef", () => {
 
   it("accepts refs copied with markers and trailing content", () => {
     //#given
-    const ref = ">>> 42#VK:const value = 1"
+    const ref = ">>> 42#VK|const value = 1"
 
     //#when
     const result = parseLineRef(ref)
@@ -49,7 +49,7 @@ describe("validateLineRef", () => {
     const lines = ["function hello() {"]
 
     //#when / #then
-    expect(() => validateLineRef(lines, "1#ZZ")).toThrow(/>>>\s+1#[ZPMQVRWSNKTXJBYH]{2}:/)
+    expect(() => validateLineRef(lines, "1#ZZ")).toThrow(/>>>\s+1#[ZPMQVRWSNKTXJBYH]{2}\|/)
   })
 
   it("shows >>> mismatch context in batched validation", () => {
@@ -58,7 +58,7 @@ describe("validateLineRef", () => {
 
     //#when / #then
     expect(() => validateLineRefs(lines, ["2#ZZ"]))
-      .toThrow(/>>>\s+2#[ZPMQVRWSNKTXJBYH]{2}:two/)
+      .toThrow(/>>>\s+2#[ZPMQVRWSNKTXJBYH]{2}\|two/)
   })
 })
 
@@ -90,7 +90,7 @@ describe("legacy LINE:HEX backward compatibility", () => {
     const lines = ["function hello() {"]
 
     //#when / #then
-    expect(() => validateLineRef(lines, "1:ab")).toThrow(/>>>\s+1#[ZPMQVRWSNKTXJBYH]{2}:/)
+    expect(() => validateLineRef(lines, "1:ab")).toThrow(/>>>\s+1#[ZPMQVRWSNKTXJBYH]{2}\|/)
   })
 
   it("extracts legacy ref from content with markers", () => {

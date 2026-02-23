@@ -216,9 +216,9 @@ MCP 서버들이 당신의 컨텍스트 예산을 다 잡아먹죠. 우리가 �
 [oh-my-pi](https://github.com/can1357/oh-my-pi)에서 영감을 받아, **Hashline**을 구현했습니다. 에이전트가 읽는 모든 줄에는 콘텐츠 해시 태그가 붙어 나옵니다:
 
 ```
-11#VK: function hello() {
-22#XJ:   return "world";
-33#MB: }
+11#VK| function hello() {
+22#XJ|   return "world";
+33#MB| }
 ```
 
 에이전트는 이 태그를 참조해서 편집합니다. 마지막으로 읽은 후 파일이 변경되었다면 해시가 일치하지 않아 코드가 망가지기 전에 편집이 거부됩니다. 공백을 똑같이 재현할 필요도 없고, 엉뚱한 줄을 수정하는 에러(stale-line)도 없습니다.
