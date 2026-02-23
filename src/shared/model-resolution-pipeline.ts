@@ -33,6 +33,7 @@ export type ModelResolutionResult = {
   variant?: string
   attempted?: string[]
   reason?: string
+  explicitUserConfig?: boolean
 }
 
 function normalizeModel(model?: string): string | undefined {
@@ -58,7 +59,7 @@ export function resolveModelPipeline(
   const normalizedUserModel = normalizeModel(intent?.userModel)
   if (normalizedUserModel) {
     log("Model resolved via config override", { model: normalizedUserModel })
-    return { model: normalizedUserModel, provenance: "override" }
+    return { model: normalizedUserModel, provenance: "override", explicitUserConfig: true }
   }
 
   const normalizedCategoryDefault = normalizeModel(intent?.categoryDefaultModel)
