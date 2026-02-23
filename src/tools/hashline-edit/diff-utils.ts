@@ -23,9 +23,9 @@ export function generateUnifiedDiff(oldContent: string, newContent: string, file
 		.replace(/^Index: .*\n/, "")
 		.replace(/^===================================================================\n/, "")
 		// Strip trailing tabs from --- and +++ lines
-		.replace(/^(--- |\+\+\+ ).*\t$/gm, "$1" + filePath)
-		// Strip "\ No newline at end of file" markers if present
-		.replace(/\\ No newline at end of file\n?/g, "")
+		.replace(/^(--- |\+\+\+ ).*\t$/gm, (_, p1) => p1 + filePath)
+		// Strip "\ No newline at end of file" markers if present (only at line start)
+		.replace(/^\\ No newline at end of file\n?/gm, "")
 
 	// Handle empty diff (no changes) - return just header
 	if (!result.includes("@@")) {

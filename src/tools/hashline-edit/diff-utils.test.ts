@@ -129,4 +129,53 @@ describe("generateUnifiedDiff", () => {
 			})
 		})
 	})
+
+	describe("#given file content containing marker string", () => {
+		describe("#when added line contains literal \\ No newline at end of file", () => {
+			it("#then preserves the content and does not strip it from diff", () => {
+				const oldContent = "line1\n"
+				const newContent = "line1\n\\ No newline at end of file\n"
+				const filePath = "test.txt"
+
+				const result = generateUnifiedDiff(oldContent, newContent, filePath)
+
+
+				expect(result).toContain("+\\ No newline at end of file")
+			})
+		})
+	})
+	describe("#given filePath with special characters", () => {
+		describe("#when filePath contains $ characters", () => {
+			it("#then handles $ characters without interpreting them as capture groups", () => {
+				const oldContent = "line1\nline2\nline3"
+				const newContent = "line1\nmodified\nline3"
+				const filePath = "Component$1.js"
+
+				const result = generateUnifiedDiff(oldContent, newContent, filePath)
+
+				// Verify the header contains the correct, unmodified filePath
+				expect(result).toContain("--- Component$1.js")
+				expect(result).toContain("+++ Component$1.js")
+				// Verify the $ character is NOT replaced (corrupted)
+				expect(result).not.toContain("--- Component--- .js")
+				expect(result).not.toContain("+++ Component+++ .js")
+			})
+		})
+
+		describe("#when filePath contains multiple $ characters", () => {
+			it("#then preserves all $ characters without corruption", () => {
+				const oldContent = "line1\nline2"
+				const newContent = "line1\nmodified"
+				const filePath = "file$$name$&$'$`$1$2.js"
+
+				const result = generateUnifiedDiff(oldContent, newContent, filePath)
+
+				expect(result).toContain(`--- ${filePath}`)
+				expect(result).toContain(`+++ ${filePath}`)
+				// Verify no corruption occurred
+				expect(result).toContain("--- file$$name$&$'$`$1$2.js")
+			})
+		})
+	})
+
 })
