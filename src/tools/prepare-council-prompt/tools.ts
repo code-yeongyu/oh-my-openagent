@@ -1,4 +1,5 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { randomUUID } from "node:crypto"
 import { writeFile, unlink } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -25,7 +26,7 @@ Returns the file path to reference in subsequent task() calls.`
         return "Prompt cannot be empty."
       }
 
-      const filename = `athena-council-${crypto.randomUUID().slice(0, 8)}.md`
+      const filename = `athena-council-${randomUUID().slice(0, 8)}.md`
       const filePath = join(tmpdir(), filename)
 
       await writeFile(filePath, args.prompt, "utf-8")
