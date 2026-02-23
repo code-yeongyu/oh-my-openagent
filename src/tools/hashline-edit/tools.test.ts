@@ -48,9 +48,7 @@ describe("createHashlineEditTool", () => {
 
     //#then
     expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nmodified line2\nline3")
-    expect(result).toContain("Successfully")
-    expect(result).toContain("Updated file (LINE#ID:content)")
-    expect(result).toMatch(/2#[ZPMQVRWSNKTXJBYH]{2}:modified line2/)
+    expect(result).toBe(`Updated ${filePath}`)
   })
 
   it("applies replace_lines and insert_after", async () => {
@@ -184,7 +182,7 @@ describe("createHashlineEditTool", () => {
     const line2 = computeLineHash(2, "line2")
 
     //#when
-    await tool.execute(
+    const result = await tool.execute(
       {
         filePath,
         rename: renamedPath,
@@ -196,6 +194,7 @@ describe("createHashlineEditTool", () => {
     //#then
     expect(fs.existsSync(filePath)).toBe(false)
     expect(fs.readFileSync(renamedPath, "utf-8")).toBe("line1\nline2-updated")
+    expect(result).toBe(`Moved ${filePath} to ${renamedPath}`)
   })
 
   it("supports file delete mode", async () => {
@@ -237,7 +236,46 @@ describe("createHashlineEditTool", () => {
     //#then
     expect(fs.existsSync(filePath)).toBe(true)
     expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nline2")
-    expect(result).toContain("Successfully applied 2 edit(s)")
+    expect(result).toBe(`Updated ${filePath}`)
+  })
+
+  it("accepts replace_lines with one anchor and downgrades to set_line", async () => {
+    //#given
+    const filePath = path.join(tempDir, "degrade.txt")
+    fs.writeFileSync(filePath, "line1\nline2\nline3")
+    const line2Hash = computeLineHash(2, "line2")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "replace_lines", start_line: `2#${line2Hash}`, text: ["line2-updated"] }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nline2-updated\nline3")
+    expect(result).toBe(`Updated ${filePath}`)
+  })
+
+  it("accepts insert_after using after_line alias", async () => {
+    //#given
+    const filePath = path.join(tempDir, "alias.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+    const line1Hash = computeLineHash(1, "line1")
+
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        edits: [{ type: "insert_after", after_line: `1#${line1Hash}`, text: ["inserted"] }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\ninserted\nline2")
   })
 
   it("preserves BOM and CRLF through hashline_edit", async () => {
