@@ -3,7 +3,7 @@ import type { PluginContext } from "./types"
 
 import { hasConnectedProvidersCache } from "../shared"
 import { setSessionModel } from "../shared/session-model-state"
-import { updateSessionAgent, pinSessionAgent } from "../features/claude-code-session-state"
+import { updateSessionAgent, pinSessionAgent, unpinSessionAgent } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 
@@ -71,6 +71,7 @@ export function createChatMessageHandler(args: {
     output: ChatMessageHandlerOutput
   ): Promise<void> => {
     if (input.agent) {
+      unpinSessionAgent(input.sessionID)
       updateSessionAgent(input.sessionID, input.agent)
     }
     const promptText = output.parts
