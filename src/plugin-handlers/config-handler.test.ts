@@ -1161,10 +1161,11 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
     getAgentDisplayName("sisyphus"),
     getAgentDisplayName("hephaestus"),
     getAgentDisplayName("atlas"),
-  ])
-  const AGENTS_WITHOUT_TODO_DENY = new Set([
     getAgentDisplayName("prometheus"),
     getAgentDisplayName("sisyphus-junior"),
+  ])
+  const AGENTS_WITHOUT_TODO_DENY = new Set([
+    getAgentDisplayName("oracle"),
   ])
 
   test("denies todowrite and todoread for primary agents when task_system is enabled", async () => {
