@@ -1,14 +1,14 @@
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { applyHashlineEditsWithReport } from "./edit-operations"
-import { countLineDiffs, generateUnifiedDiff, toHashlineContent } from "./diff-utils"
+import { countLineDiffs, generateUnifiedDiff } from "./diff-utils"
 import { canonicalizeFileText, restoreFileText } from "./file-text-canonicalization"
-import { generateHashlineDiff } from "./hashline-edit-diff"
+import { normalizeHashlineEdits, type RawHashlineEdit } from "./normalize-edits"
 import type { HashlineEdit } from "./types"
 
 interface HashlineEditArgs {
   filePath: string
-  edits: HashlineEdit[]
+  edits: RawHashlineEdit[]
   delete?: boolean
   rename?: string
 }
@@ -44,6 +44,17 @@ function buildSuccessMeta(
 ) {
   const unifiedDiff = generateUnifiedDiff(beforeContent, afterContent, effectivePath)
   const { additions, deletions } = countLineDiffs(beforeContent, afterContent)
+  const beforeLines = beforeContent.split("\n")
+  const afterLines = afterContent.split("\n")
+  const maxLength = Math.max(beforeLines.length, afterLines.length)
+  let firstChangedLine: number | undefined
+
+  for (let index = 0; index < maxLength; index += 1) {
+    if ((beforeLines[index] ?? "") !== (afterLines[index] ?? "")) {
+      firstChangedLine = index + 1
+      break
+    }
+  }
 
   return {
     title: effectivePath,
@@ -54,6 +65,7 @@ function buildSuccessMeta(
       diff: unifiedDiff,
       noopEdits,
       deduplicatedEdits,
+      firstChangedLine,
       filediff: {
         file: effectivePath,
         path: effectivePath,
@@ -71,13 +83,16 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
   try {
     const metadataContext = context as ToolContextWithMetadata
     const filePath = args.filePath
-    const { edits, delete: deleteMode, rename } = args
+    const { delete: deleteMode, rename } = args
+
+    if (!deleteMode && (!args.edits || !Array.isArray(args.edits) || args.edits.length === 0)) {
+      return "Error: edits parameter must be a non-empty array"
+    }
+
+    const edits = deleteMode ? [] : normalizeHashlineEdits(args.edits)
 
     if (deleteMode && rename) {
       return "Error: delete and rename cannot be used together"
-    }
-    if (!deleteMode && (!edits || !Array.isArray(edits) || edits.length === 0)) {
-      return "Error: edits parameter must be a non-empty array"
     }
     if (deleteMode && edits.length > 0) {
       return "Error: delete mode requires edits to be an empty array"
@@ -100,6 +115,15 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
 
     const applyResult = applyHashlineEditsWithReport(oldEnvelope.content, edits)
     const canonicalNewContent = applyResult.content
+
+    if (canonicalNewContent === oldEnvelope.content && !rename) {
+      let diagnostic = `No changes made to ${filePath}. The edits produced identical content.`
+      if (applyResult.noopEdits > 0) {
+        diagnostic += ` No-op edits: ${applyResult.noopEdits}. Re-read the file and provide content that differs from current lines.`
+      }
+      return `Error: ${diagnostic}`
+    }
+
     const writeContent = restoreFileText(canonicalNewContent, oldEnvelope)
 
     await Bun.write(filePath, writeContent)
@@ -110,8 +134,6 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
     }
 
     const effectivePath = rename && rename !== filePath ? rename : filePath
-    const diff = generateHashlineDiff(oldEnvelope.content, canonicalNewContent, effectivePath)
-    const newHashlined = toHashlineContent(canonicalNewContent)
     const meta = buildSuccessMeta(
       effectivePath,
       oldEnvelope.content,
@@ -129,13 +151,11 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
       storeToolMetadata(context.sessionID, callID, meta)
     }
 
-    return `Successfully applied ${edits.length} edit(s) to ${effectivePath}
-No-op edits: ${applyResult.noopEdits}, deduplicated edits: ${applyResult.deduplicatedEdits}
+    if (rename && rename !== filePath) {
+      return `Moved ${filePath} to ${rename}`
+    }
 
-${diff}
-
-Updated file (LINE#ID:content):
-${newHashlined}`
+    return `Updated ${effectivePath}`
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (message.toLowerCase().includes("hash")) {
