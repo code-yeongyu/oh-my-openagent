@@ -21,13 +21,25 @@ describe("computeLineHash", () => {
     expect(hash1).toMatch(/^[ZPMQVRWSNKTXJBYH]{2}$/)
   })
 
-  it("produces different hashes for same content on different lines", () => {
+  it("produces same hashes for significant content on different lines", () => {
     //#given
     const content = "function hello() {"
 
     //#when
     const hash1 = computeLineHash(1, content)
     const hash2 = computeLineHash(2, content)
+
+    //#then
+    expect(hash1).toBe(hash2)
+  })
+
+  it("mixes line number for non-significant lines", () => {
+    //#given
+    const punctuationOnly = "{}"
+
+    //#when
+    const hash1 = computeLineHash(1, punctuationOnly)
+    const hash2 = computeLineHash(2, punctuationOnly)
 
     //#then
     expect(hash1).not.toBe(hash2)
