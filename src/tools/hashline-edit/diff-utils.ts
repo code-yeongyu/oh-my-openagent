@@ -9,7 +9,7 @@ export function toHashlineContent(content: string): string {
 	const hashlined = contentLines.map((line, i) => {
 		const lineNum = i + 1
 		const hash = computeLineHash(lineNum, line)
-		return `${lineNum}#${hash}:${line}`
+		return `${lineNum}#${hash}|${line}`
 	})
 	return hasTrailingNewline ? hashlined.join("\n") + "\n" : hashlined.join("\n")
 }

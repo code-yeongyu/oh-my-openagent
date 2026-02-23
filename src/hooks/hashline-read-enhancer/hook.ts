@@ -56,7 +56,7 @@ function transformLine(line: string): string {
     return line
   }
   const hash = computeLineHash(parsed.lineNumber, parsed.content)
-  return `${parsed.lineNumber}#${hash}:${parsed.content}`
+  return `${parsed.lineNumber}#${hash}|${parsed.content}`
 }
 
 function transformOutput(output: string): string {
@@ -137,7 +137,7 @@ function extractFilePath(metadata: unknown): string | undefined {
 }
 
 async function appendWriteHashlineOutput(output: { output: string; metadata: unknown }): Promise<void> {
-  if (output.output.includes("Updated file (LINE#ID:content):")) {
+  if (output.output.includes("Updated file (LINE#ID|content):")) {
     return
   }
 
@@ -153,7 +153,7 @@ async function appendWriteHashlineOutput(output: { output: string; metadata: unk
 
   const content = await file.text()
   const hashlined = toHashlineContent(content)
-  output.output = `${output.output}\n\nUpdated file (LINE#ID:content):\n${hashlined}`
+  output.output = `${output.output}\n\nUpdated file (LINE#ID|content):\n${hashlined}`
 }
 
 export function createHashlineReadEnhancerHook(

@@ -60,7 +60,7 @@ describe("computeLineHash", () => {
 })
 
 describe("formatHashLine", () => {
-  it("formats single line as LINE#ID:content", () => {
+  it("formats single line as LINE#ID|content", () => {
     //#given
     const lineNumber = 42
     const content = "const x = 42"
@@ -69,12 +69,12 @@ describe("formatHashLine", () => {
     const result = formatHashLine(lineNumber, content)
 
     //#then
-    expect(result).toMatch(/^42#[ZPMQVRWSNKTXJBYH]{2}:const x = 42$/)
+    expect(result).toMatch(/^42#[ZPMQVRWSNKTXJBYH]{2}\|const x = 42$/)
   })
 })
 
 describe("formatHashLines", () => {
-  it("formats all lines as LINE#ID:content", () => {
+  it("formats all lines as LINE#ID|content", () => {
     //#given
     const content = "a\nb\nc"
 
@@ -84,9 +84,9 @@ describe("formatHashLines", () => {
     //#then
     const lines = result.split("\n")
     expect(lines).toHaveLength(3)
-    expect(lines[0]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}:a$/)
-    expect(lines[1]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}:b$/)
-    expect(lines[2]).toMatch(/^3#[ZPMQVRWSNKTXJBYH]{2}:c$/)
+    expect(lines[0]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}\|a$/)
+    expect(lines[1]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\|b$/)
+    expect(lines[2]).toMatch(/^3#[ZPMQVRWSNKTXJBYH]{2}\|c$/)
   })
 })
 
