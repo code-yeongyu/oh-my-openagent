@@ -1,7 +1,5 @@
-/// <reference types="bun-types" />
-
 import { afterEach, beforeEach, describe, it, expect, spyOn } from "bun:test"
-import { createEventState, processEvents, serializeError } from "./events"
+import { createEventState, processEvents, serializeError, type EventState } from "./events"
 import type { RunContext, EventPayload } from "./types"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
@@ -319,8 +317,16 @@ describe("event handling", () => {
   it("session.status with busy type sets mainSessionIdle to false", async () => {
     // given
     const ctx = createMockContext("my-session")
-    const state = createEventState()
-    state.mainSessionIdle = true
+    const state: EventState = {
+      mainSessionIdle: true,
+      mainSessionError: false,
+      lastError: null,
+      lastOutput: "",
+      lastPartText: "",
+      currentTool: null,
+      hasReceivedMeaningfulWork: false,
+      messageCount: 0,
+    }
 
     const payload: EventPayload = {
       type: "session.status",

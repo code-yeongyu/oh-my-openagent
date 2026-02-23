@@ -48,7 +48,6 @@ export const HookNameSchema = z.enum([
   "runtime-fallback",
   "write-existing-file-guard",
   "anthropic-effort",
-  "runtime-fallback",
   "hashline-read-enhancer",
 ])
 
