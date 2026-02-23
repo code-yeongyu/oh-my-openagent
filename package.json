@@ -69,7 +69,7 @@
     "zod": "^4.1.8"
   },
   "devDependencies": {
-    "@types/diff": "^5.2.3",
+    "@types/diff": "^8.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^3.0.2",
     "bun-types": "1.3.6",
