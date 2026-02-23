@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { normalizeHashlineEdits, type RawHashlineEdit } from "./normalize-edits"
 
 describe("normalizeHashlineEdits", () => {
-  it("maps replace with pos to set_line", () => {
+  it("maps replace with pos to replace", () => {
     //#given
     const input: RawHashlineEdit[] = [{ op: "replace", pos: "2#VK", lines: "updated" }]
 
@@ -10,10 +10,10 @@ describe("normalizeHashlineEdits", () => {
     const result = normalizeHashlineEdits(input)
 
     //#then
-    expect(result).toEqual([{ type: "set_line", line: "2#VK", text: "updated" }])
+    expect(result).toEqual([{ op: "replace", pos: "2#VK", lines: "updated" }])
   })
 
-  it("maps replace with pos and end to replace_lines", () => {
+  it("maps replace with pos and end to replace", () => {
     //#given
     const input: RawHashlineEdit[] = [{ op: "replace", pos: "2#VK", end: "4#MB", lines: ["a", "b"] }]
 
@@ -21,10 +21,10 @@ describe("normalizeHashlineEdits", () => {
     const result = normalizeHashlineEdits(input)
 
     //#then
-    expect(result).toEqual([{ type: "replace_lines", start_line: "2#VK", end_line: "4#MB", text: ["a", "b"] }])
+    expect(result).toEqual([{ op: "replace", pos: "2#VK", end: "4#MB", lines: ["a", "b"] }])
   })
 
-  it("maps anchored append and prepend to insert operations", () => {
+  it("maps anchored append and prepend preserving op", () => {
     //#given
     const input: RawHashlineEdit[] = [
       { op: "append", pos: "2#VK", lines: ["after"] },
@@ -35,10 +35,7 @@ describe("normalizeHashlineEdits", () => {
     const result = normalizeHashlineEdits(input)
 
     //#then
-    expect(result).toEqual([
-      { type: "insert_after", line: "2#VK", text: ["after"] },
-      { type: "insert_before", line: "4#MB", text: ["before"] },
-    ])
+    expect(result).toEqual([{ op: "append", pos: "2#VK", lines: ["after"] }, { op: "prepend", pos: "4#MB", lines: ["before"] }])
   })
 
   it("prefers pos over end for prepend anchors", () => {
@@ -49,7 +46,7 @@ describe("normalizeHashlineEdits", () => {
     const result = normalizeHashlineEdits(input)
 
     //#then
-    expect(result).toEqual([{ type: "insert_before", line: "3#AA", text: ["before"] }])
+    expect(result).toEqual([{ op: "prepend", pos: "3#AA", lines: ["before"] }])
   })
 
   it("rejects legacy payload without op", () => {

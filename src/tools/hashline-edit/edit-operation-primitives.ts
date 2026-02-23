@@ -150,11 +150,3 @@ export function applyPrepend(lines: string[], text: string | string[]): string[]
   }
   return [...normalized, ...lines]
 }
-
-export function applyReplace(content: string, oldText: string, newText: string | string[]): string {
-  if (!content.includes(oldText)) {
-    throw new Error(`Text not found: "${oldText}"`)
-  }
-  const replacement = Array.isArray(newText) ? newText.join("\n") : newText
-  return content.replaceAll(oldText, replacement)
-}
