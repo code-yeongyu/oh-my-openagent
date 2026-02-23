@@ -99,4 +99,47 @@ describe("no-hephaestus-non-gpt hook", () => {
     // then - toast shown once per session (2 total)
     expect(showToast).toHaveBeenCalledTimes(2)
   })
+
+  test("retries toast on failure - session not marked as warned until toast succeeds", async () => {
+    // given - toast that fails on first call, succeeds on second
+    let callCount = 0
+    const showToast = spyOn(
+      {
+        fn: async () => {
+          callCount++
+          if (callCount === 1) {
+            throw new Error("TUI unavailable")
+          }
+          return {}
+        },
+      },
+      "fn",
+    )
+    const hook = createNoHephaestusNonGptHook({
+      client: { tui: { showToast } },
+    } as any)
+
+    // when - chat.message called twice (first fails, second succeeds)
+    await hook["chat.message"]?.({
+      sessionID: "ses_retry",
+      agent: HEPHAESTUS_DISPLAY,
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+    })
+    await hook["chat.message"]?.({
+      sessionID: "ses_retry",
+      agent: HEPHAESTUS_DISPLAY,
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+    })
+
+    // then - toast called twice (retry on failure), session only warned after success
+    expect(showToast).toHaveBeenCalledTimes(2)
+
+    // and - third call does NOT show toast (session now warned)
+    await hook["chat.message"]?.({
+      sessionID: "ses_retry",
+      agent: HEPHAESTUS_DISPLAY,
+      model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+    })
+    expect(showToast).toHaveBeenCalledTimes(2) // still 2, not 3
+  })
 })

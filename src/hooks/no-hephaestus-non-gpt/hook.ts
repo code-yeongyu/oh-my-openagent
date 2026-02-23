@@ -11,20 +11,24 @@ const TOAST_MESSAGE = [
   "For best results with Claude/Kimi/GLM, consider using Sisyphus instead.",
 ].join("\n")
 
-function showToast(ctx: PluginInput, sessionID: string): void {
-  ctx.client.tui.showToast({
-    body: {
-      title: TOAST_TITLE,
-      message: TOAST_MESSAGE,
-      variant: "warning",
-      duration: 8000,
-    },
-  }).catch((error) => {
+async function showToast(ctx: PluginInput, sessionID: string): Promise<boolean> {
+  try {
+    await ctx.client.tui.showToast({
+      body: {
+        title: TOAST_TITLE,
+        message: TOAST_MESSAGE,
+        variant: "warning",
+        duration: 8000,
+      },
+    })
+    return true
+  } catch (error) {
     log("[no-hephaestus-non-gpt] Failed to show toast", {
       sessionID,
       error,
     })
-  })
+    return false
+  }
 }
 
 // Track which sessions have already been warned to avoid spamming
@@ -42,10 +46,13 @@ export function createNoHephaestusNonGptHook(ctx: PluginInput) {
       const modelID = input.model?.modelID
 
       // Show warning once per session when Hephaestus is used with non-GPT
+      // Only add to warnedSessions after successful toast delivery to allow retries on failure
       if (agentKey === "hephaestus" && modelID && !isGptModel(modelID)) {
         if (!warnedSessions.has(input.sessionID)) {
-          showToast(ctx, input.sessionID)
-          warnedSessions.add(input.sessionID)
+          const success = await showToast(ctx, input.sessionID)
+          if (success) {
+            warnedSessions.add(input.sessionID)
+          }
         }
       }
     },
