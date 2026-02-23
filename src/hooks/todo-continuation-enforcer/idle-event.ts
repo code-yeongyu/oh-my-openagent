@@ -6,6 +6,7 @@ import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 
+import { COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents"
 import {
   ABORT_WINDOW_MS,
   CONTINUATION_COOLDOWN_MS,
@@ -164,6 +165,10 @@ export async function handleSessionIdle(args: {
   log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents, hasCompactionMessage })
 
   const resolvedAgentName = resolvedInfo?.agent
+  if (resolvedAgentName && resolvedAgentName.startsWith(COUNCIL_MEMBER_KEY_PREFIX)) {
+    log(`[${HOOK_NAME}] Skipped: council member agent`, { sessionID, agent: resolvedAgentName })
+    return
+  }
   if (resolvedAgentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(resolvedAgentName))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedAgentName })
     return

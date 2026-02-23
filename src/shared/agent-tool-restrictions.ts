@@ -56,7 +56,8 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
   // - src/agents/athena/council-member-agent.ts (AgentConfig permission format — allow-list)
   // - src/plugin-handlers/tool-config-handler.ts (allow/deny string format)
   // Keep all three in sync when modifying.
-  // Council members use an allow-list: only read-only analysis tools are permitted.
+  // Council members use an allow-list: read-only analysis + optional call_omo_agent delegation.
+  // TodoWrite/TodoRead explicitly denied to prevent uncompletable todo loops.
   // Prompt file lives in .sisyphus/tmp/ (inside project) so no external_directory needed.
   "council-member": {
     "*": false,
@@ -68,6 +69,9 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     lsp_symbols: true,
     lsp_diagnostics: true,
     ast_grep_search: true,
+    call_omo_agent: true,
+    todowrite: false,
+    todoread: false,
   },
 }
 

@@ -111,6 +111,7 @@ export class BackgroundManager {
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
+  private recentlyCompactedSessions: Set<string> = new Set()
   private enableParentSessionNotifications: boolean
   readonly taskHistory = new TaskHistory()
 
@@ -740,12 +741,31 @@ export class BackgroundManager {
       }
     }
 
+    if (event.type === "session.compacted") {
+      const sessionID = typeof props?.sessionID === "string"
+        ? props.sessionID
+        : typeof (props?.info as { id?: string } | undefined)?.id === "string"
+          ? (props!.info as { id: string }).id
+          : undefined
+      if (!sessionID) return
+
+      const task = this.findBySession(sessionID)
+      if (!task || task.status !== "running") return
+
+      this.recentlyCompactedSessions.add(sessionID)
+      if (task.progress) {
+        task.progress.lastUpdate = new Date()
+      }
+      log("[background-agent] Session compacted, deferring next idle:", { taskId: task.id, sessionID })
+    }
+
     if (event.type === "session.idle") {
       if (!props || typeof props !== "object") return
       handleSessionIdleBackgroundEvent({
         properties: props as Record<string, unknown>,
         findBySession: (id) => this.findBySession(id),
         idleDeferralTimers: this.idleDeferralTimers,
+        recentlyCompactedSessions: this.recentlyCompactedSessions,
         validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
         checkSessionTodos: (id) => this.checkSessionTodos(id),
         tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
@@ -866,6 +886,7 @@ export class BackgroundManager {
         }
       }
       SessionCategoryRegistry.remove(sessionID)
+      this.recentlyCompactedSessions.delete(sessionID)
     }
 
     if (event.type === "session.status") {
@@ -1467,6 +1488,12 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         const sessionStatus = allStatuses[sessionID]
         
         if (sessionStatus?.type === "idle") {
+          if (this.recentlyCompactedSessions.has(sessionID)) {
+            this.recentlyCompactedSessions.delete(sessionID)
+            log("[background-agent] Polling: skipping post-compaction idle:", task.id)
+            continue
+          }
+
           // Edge guard: Validate session has actual output before completing
           const hasValidOutput = await this.validateSessionHasOutput(sessionID)
           if (!hasValidOutput) {
@@ -1572,6 +1599,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.notifications.clear()
     this.pendingByParent.clear()
     this.notificationQueueByParent.clear()
+    this.recentlyCompactedSessions.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
     this.unregisterProcessCleanup()

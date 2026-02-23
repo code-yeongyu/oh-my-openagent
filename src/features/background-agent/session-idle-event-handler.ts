@@ -11,6 +11,7 @@ export function handleSessionIdleBackgroundEvent(args: {
   properties: Record<string, unknown>
   findBySession: (sessionID: string) => BackgroundTask | undefined
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
+  recentlyCompactedSessions?: Set<string>
   validateSessionHasOutput: (sessionID: string) => Promise<boolean>
   checkSessionTodos: (sessionID: string) => Promise<boolean>
   tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
@@ -20,6 +21,7 @@ export function handleSessionIdleBackgroundEvent(args: {
     properties,
     findBySession,
     idleDeferralTimers,
+    recentlyCompactedSessions,
     validateSessionHasOutput,
     checkSessionTodos,
     tryCompleteTask,
@@ -31,6 +33,12 @@ export function handleSessionIdleBackgroundEvent(args: {
 
   const task = findBySession(sessionID)
   if (!task || task.status !== "running") return
+
+  if (recentlyCompactedSessions?.has(sessionID)) {
+    recentlyCompactedSessions.delete(sessionID)
+    log("[background-agent] Skipping post-compaction session.idle:", { taskId: task.id, sessionID })
+    return
+  }
 
   const startedAt = task.startedAt
   if (!startedAt) return
