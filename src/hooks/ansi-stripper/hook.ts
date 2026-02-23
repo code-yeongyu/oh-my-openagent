@@ -1,20 +1,10 @@
-import type { Message, Part } from "@opencode-ai/sdk"
+import type { Message, Part, ToolPart } from "@opencode-ai/sdk"
 
 import { stripAnsi } from "./strip-ansi"
 
 interface MessageWithParts {
   info: Message
   parts: Part[]
-}
-
-interface SDKToolPart {
-  type: string
-  state?: {
-    output?: string
-    error?: string
-    [key: string]: unknown
-  }
-  [key: string]: unknown
 }
 
 type MessagesTransformHook = {
@@ -24,13 +14,10 @@ type MessagesTransformHook = {
   ) => Promise<void>
 }
 
-function stripToolPartAnsi(part: SDKToolPart): void {
-  if (!part.state) return
-
-  if (typeof part.state.output === "string") {
+function stripToolPartAnsi(part: ToolPart): void {
+  if (part.state.status === "completed") {
     part.state.output = stripAnsi(part.state.output)
-  }
-  if (typeof part.state.error === "string") {
+  } else if (part.state.status === "error") {
     part.state.error = stripAnsi(part.state.error)
   }
 }
@@ -45,9 +32,8 @@ export function createAnsiStripperHook(): MessagesTransformHook {
         if (!msg.parts) continue
 
         for (const part of msg.parts) {
-          const type = part.type as string
-          if (type === "tool" || type === "tool_use") {
-            stripToolPartAnsi(part as unknown as SDKToolPart)
+          if (part.type === "tool") {
+            stripToolPartAnsi(part)
           }
         }
       }
