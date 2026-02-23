@@ -1,4 +1,5 @@
 import { computeLineHash } from "./hash-computation"
+import { createTwoFilesPatch } from "diff"
 
 export function toHashlineContent(content: string): string {
 	if (!content) return content
@@ -15,59 +16,23 @@ export function toHashlineContent(content: string): string {
 }
 
 export function generateUnifiedDiff(oldContent: string, newContent: string, filePath: string): string {
-	const oldLines = oldContent.split("\n")
-	const newLines = newContent.split("\n")
-	const maxLines = Math.max(oldLines.length, newLines.length)
+	const patch = createTwoFilesPatch(filePath, filePath, oldContent, newContent, "", "", { context: 3 })
 
-	let diff = `--- ${filePath}\n+++ ${filePath}\n`
-	let inHunk = false
-	let oldStart = 1
-	let newStart = 1
-	let oldCount = 0
-	let newCount = 0
-	let hunkLines: string[] = []
+	// Strip "Index:" and "===..." header lines added by createTwoFilesPatch
+	let result = patch
+		.replace(/^Index: .*\n/, "")
+		.replace(/^===================================================================\n/, "")
+		// Strip trailing tabs from --- and +++ lines
+		.replace(/^(--- |\+\+\+ ).*\t$/gm, "$1" + filePath)
+		// Strip "\ No newline at end of file" markers if present
+		.replace(/\\ No newline at end of file\n?/g, "")
 
-	for (let i = 0; i < maxLines; i++) {
-		const oldLine = oldLines[i] ?? ""
-		const newLine = newLines[i] ?? ""
-
-		if (oldLine !== newLine) {
-			if (!inHunk) {
-				oldStart = i + 1
-				newStart = i + 1
-				oldCount = 0
-				newCount = 0
-				hunkLines = []
-				inHunk = true
-			}
-
-			if (oldLines[i] !== undefined) {
-				hunkLines.push(`-${oldLine}`)
-				oldCount++
-			}
-			if (newLines[i] !== undefined) {
-				hunkLines.push(`+${newLine}`)
-				newCount++
-			}
-		} else if (inHunk) {
-			hunkLines.push(` ${oldLine}`)
-			oldCount++
-			newCount++
-
-			if (hunkLines.length > 6) {
-				diff += `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@\n`
-				diff += hunkLines.join("\n") + "\n"
-				inHunk = false
-			}
-		}
+	// Handle empty diff (no changes) - return just header
+	if (!result.includes("@@")) {
+		return `--- ${filePath}\n+++ ${filePath}\n`
 	}
 
-	if (inHunk && hunkLines.length > 0) {
-		diff += `@@ -${oldStart},${oldCount} +${newStart},${newCount} @@\n`
-		diff += hunkLines.join("\n") + "\n"
-	}
-
-	return diff || `--- ${filePath}\n+++ ${filePath}\n`
+	return result
 }
 
 export function countLineDiffs(oldContent: string, newContent: string): { additions: number; deletions: number } {
