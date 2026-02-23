@@ -1,4 +1,4 @@
-import type { HashlineEdit } from "./types"
+import type { AppendEdit, HashlineEdit, PrependEdit, ReplaceEdit } from "./types"
 
 type HashlineToolOp = "replace" | "append" | "prepend"
 
@@ -36,62 +36,43 @@ function normalizeReplaceEdit(edit: RawHashlineEdit, index: number): HashlineEdi
   const pos = normalizeAnchor(edit.pos)
   const end = normalizeAnchor(edit.end)
   const anchor = requireLine(pos ?? end, index, "replace")
-  const text = requireLines(edit, index)
+  const lines = requireLines(edit, index)
 
-  if (pos && end) {
-    return {
-      type: "replace_lines",
-      start_line: pos,
-      end_line: end,
-      text,
-    }
+  const normalized: ReplaceEdit = {
+    op: "replace",
+    pos: anchor,
+    lines,
   }
-
-  return {
-    type: "set_line",
-    line: anchor,
-    text,
-  }
+  if (end) normalized.end = end
+  return normalized
 }
 
 function normalizeAppendEdit(edit: RawHashlineEdit, index: number): HashlineEdit {
   const pos = normalizeAnchor(edit.pos)
   const end = normalizeAnchor(edit.end)
   const anchor = pos ?? end
-  const text = requireLines(edit, index)
+  const lines = requireLines(edit, index)
 
-  if (!anchor) {
-    return {
-      type: "append",
-      text,
-    }
+  const normalized: AppendEdit = {
+    op: "append",
+    lines,
   }
-
-  return {
-    type: "insert_after",
-    line: anchor,
-    text,
-  }
+  if (anchor) normalized.pos = anchor
+  return normalized
 }
 
 function normalizePrependEdit(edit: RawHashlineEdit, index: number): HashlineEdit {
   const pos = normalizeAnchor(edit.pos)
   const end = normalizeAnchor(edit.end)
   const anchor = pos ?? end
-  const text = requireLines(edit, index)
+  const lines = requireLines(edit, index)
 
-  if (!anchor) {
-    return {
-      type: "prepend",
-      text,
-    }
+  const normalized: PrependEdit = {
+    op: "prepend",
+    lines,
   }
-
-  return {
-    type: "insert_before",
-    line: anchor,
-    text,
-  }
+  if (anchor) normalized.pos = anchor
+  return normalized
 }
 
 export function normalizeHashlineEdits(rawEdits: RawHashlineEdit[]): HashlineEdit[] {

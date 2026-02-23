@@ -6,23 +6,13 @@ function normalizeEditPayload(payload: string | string[]): string {
 }
 
 function buildDedupeKey(edit: HashlineEdit): string {
-  switch (edit.type) {
-    case "set_line":
-      return `set_line|${edit.line}|${normalizeEditPayload(edit.text)}`
-    case "replace_lines":
-      return `replace_lines|${edit.start_line}|${edit.end_line}|${normalizeEditPayload(edit.text)}`
-    case "insert_after":
-      return `insert_after|${edit.line}|${normalizeEditPayload(edit.text)}`
-    case "insert_before":
-      return `insert_before|${edit.line}|${normalizeEditPayload(edit.text)}`
-    case "insert_between":
-      return `insert_between|${edit.after_line}|${edit.before_line}|${normalizeEditPayload(edit.text)}`
+  switch (edit.op) {
     case "replace":
-      return `replace|${edit.old_text}|${normalizeEditPayload(edit.new_text)}`
+      return `replace|${edit.pos}|${edit.end ?? ""}|${normalizeEditPayload(edit.lines)}`
     case "append":
-      return `append|${normalizeEditPayload(edit.text)}`
+      return `append|${edit.pos ?? ""}|${normalizeEditPayload(edit.lines)}`
     case "prepend":
-      return `prepend|${normalizeEditPayload(edit.text)}`
+      return `prepend|${edit.pos ?? ""}|${normalizeEditPayload(edit.lines)}`
     default:
       return JSON.stringify(edit)
   }

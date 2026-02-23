@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { applyHashlineEdits, applyInsertAfter, applyReplace, applyReplaceLines, applySetLine } from "./edit-operations"
-import { applyAppend, applyPrepend } from "./edit-operation-primitives"
+import { applyHashlineEdits, applyInsertAfter, applyReplaceLines, applySetLine } from "./edit-operations"
+import { applyAppend, applyInsertBetween, applyPrepend } from "./edit-operation-primitives"
 import { computeLineHash } from "./hash-computation"
 import type { HashlineEdit } from "./types"
 
@@ -49,7 +49,7 @@ describe("hashline edit operations", () => {
     //#when
     const result = applyHashlineEdits(
       lines.join("\n"),
-      [{ type: "insert_before", line: anchorFor(lines, 2), text: "before 2" }]
+      [{ op: "prepend", pos: anchorFor(lines, 2), lines: "before 2" }]
     )
 
     //#then
@@ -61,15 +61,7 @@ describe("hashline edit operations", () => {
     const lines = ["line 1", "line 2", "line 3"]
 
     //#when
-    const result = applyHashlineEdits(
-      lines.join("\n"),
-      [{
-        type: "insert_between",
-        after_line: anchorFor(lines, 1),
-        before_line: anchorFor(lines, 2),
-        text: ["between"],
-      }]
-    )
+    const result = applyInsertBetween(lines, anchorFor(lines, 1), anchorFor(lines, 2), ["between"]).join("\n")
 
     //#then
     expect(result).toEqual("line 1\nbetween\nline 2\nline 3")
@@ -89,7 +81,7 @@ describe("hashline edit operations", () => {
 
     //#when / #then
     expect(() =>
-      applyHashlineEdits(lines.join("\n"), [{ type: "insert_before", line: anchorFor(lines, 1), text: [] }])
+      applyHashlineEdits(lines.join("\n"), [{ op: "prepend", pos: anchorFor(lines, 1), lines: [] }])
     ).toThrow(/non-empty/i)
   })
 
@@ -98,28 +90,7 @@ describe("hashline edit operations", () => {
     const lines = ["line 1", "line 2"]
 
     //#when / #then
-    expect(() =>
-      applyHashlineEdits(
-        lines.join("\n"),
-        [{
-          type: "insert_between",
-          after_line: anchorFor(lines, 1),
-          before_line: anchorFor(lines, 2),
-          text: [],
-        }]
-      )
-    ).toThrow(/non-empty/i)
-  })
-
-  it("applies replace operation", () => {
-    //#given
-    const content = "hello world foo"
-
-    //#when
-    const result = applyReplace(content, "world", "universe")
-
-    //#then
-    expect(result).toEqual("hello universe foo")
+    expect(() => applyInsertBetween(lines, anchorFor(lines, 1), anchorFor(lines, 2), [])).toThrow(/non-empty/i)
   })
 
   it("applies mixed edits in one pass", () => {
@@ -127,8 +98,8 @@ describe("hashline edit operations", () => {
     const content = "line 1\nline 2\nline 3"
     const lines = content.split("\n")
     const edits: HashlineEdit[] = [
-      { type: "insert_after", line: anchorFor(lines, 1), text: "inserted" },
-      { type: "set_line", line: anchorFor(lines, 3), text: "modified" },
+      { op: "append", pos: anchorFor(lines, 1), lines: "inserted" },
+      { op: "replace", pos: anchorFor(lines, 3), lines: "modified" },
     ]
 
     //#when
@@ -143,8 +114,8 @@ describe("hashline edit operations", () => {
     const content = "line 1\nline 2"
     const lines = content.split("\n")
     const edits: HashlineEdit[] = [
-      { type: "insert_after", line: anchorFor(lines, 1), text: "inserted" },
-      { type: "insert_after", line: anchorFor(lines, 1), text: "inserted" },
+      { op: "append", pos: anchorFor(lines, 1), lines: "inserted" },
+      { op: "append", pos: anchorFor(lines, 1), lines: "inserted" },
     ]
 
     //#when
@@ -227,16 +198,9 @@ describe("hashline edit operations", () => {
     const lines = ["line 1", "line 2", "line 3"]
 
     //#when / #then
-    expect(() =>
-      applyHashlineEdits(lines.join("\n"), [
-        {
-          type: "insert_between",
-          after_line: anchorFor(lines, 1),
-          before_line: anchorFor(lines, 2),
-          text: ["line 1", "line 2"],
-        },
-      ])
-    ).toThrow(/non-empty/i)
+    expect(() => applyInsertBetween(lines, anchorFor(lines, 1), anchorFor(lines, 2), ["line 1", "line 2"])).toThrow(
+      /non-empty/i
+    )
   })
 
   it("restores indentation for first replace_lines entry", () => {
@@ -322,8 +286,8 @@ describe("hashline edit operations", () => {
 
     //#when
     const result = applyHashlineEdits(content, [
-      { type: "append", text: ["line 3"] },
-      { type: "prepend", text: ["line 0"] },
+      { op: "append", lines: ["line 3"] },
+      { op: "prepend", lines: ["line 0"] },
     ])
 
     //#then
