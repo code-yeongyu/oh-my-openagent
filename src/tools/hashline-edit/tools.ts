@@ -1,11 +1,11 @@
 import { tool, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin/tool"
-import type { HashlineEdit } from "./types"
 import { executeHashlineEditTool } from "./hashline-edit-executor"
 import { HASHLINE_EDIT_DESCRIPTION } from "./tool-description"
+import type { RawHashlineEdit } from "./normalize-edits"
 
 interface HashlineEditArgs {
   filePath: string
-  edits: HashlineEdit[]
+  edits: RawHashlineEdit[]
   delete?: boolean
   rename?: string
 }
@@ -19,64 +19,34 @@ export function createHashlineEditTool(): ToolDefinition {
       rename: tool.schema.string().optional().describe("Rename output file path after edits"),
       edits: tool.schema
         .array(
-          tool.schema.union([
-            tool.schema.object({
-              type: tool.schema.literal("set_line"),
-              line: tool.schema.string().describe("Line reference in LINE#ID format"),
-              text: tool.schema
-                .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
-                .describe("New content for the line (string or string[] for multiline)"),
-            }),
-            tool.schema.object({
-              type: tool.schema.literal("replace_lines"),
-              start_line: tool.schema.string().describe("Start line in LINE#ID format"),
-              end_line: tool.schema.string().describe("End line in LINE#ID format"),
-              text: tool.schema
-                .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
-                .describe("New content to replace the range (string or string[] for multiline)"),
-            }),
-            tool.schema.object({
-              type: tool.schema.literal("insert_after"),
-              line: tool.schema.string().describe("Line reference in LINE#ID format"),
-              text: tool.schema
-                .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
-                .describe("Content to insert after the line (string or string[] for multiline)"),
-            }),
-            tool.schema.object({
-              type: tool.schema.literal("insert_before"),
-              line: tool.schema.string().describe("Line reference in LINE#ID format"),
-              text: tool.schema
-                .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
-                .describe("Content to insert before the line (string or string[] for multiline)"),
-            }),
-            tool.schema.object({
-              type: tool.schema.literal("insert_between"),
-              after_line: tool.schema.string().describe("After line in LINE#ID format"),
-              before_line: tool.schema.string().describe("Before line in LINE#ID format"),
-              text: tool.schema
-                .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
-                .describe("Content to insert between anchor lines (string or string[] for multiline)"),
-            }),
-            tool.schema.object({
-              type: tool.schema.literal("replace"),
-              old_text: tool.schema.string().describe("Text to find"),
-              new_text: tool.schema
-                .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
-                .describe("Replacement text (string or string[] for multiline)"),
-            }),
-            tool.schema.object({
-              type: tool.schema.literal("append"),
-              text: tool.schema
-                .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
-                .describe("Content to append at EOF; also creates missing file"),
-            }),
-            tool.schema.object({
-              type: tool.schema.literal("prepend"),
-              text: tool.schema
-                .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
-                .describe("Content to prepend at BOF; also creates missing file"),
-            }),
-          ])
+          tool.schema.object({
+            type: tool.schema
+              .union([
+                tool.schema.literal("set_line"),
+                tool.schema.literal("replace_lines"),
+                tool.schema.literal("insert_after"),
+                tool.schema.literal("insert_before"),
+                tool.schema.literal("insert_between"),
+                tool.schema.literal("replace"),
+                tool.schema.literal("append"),
+                tool.schema.literal("prepend"),
+              ])
+              .describe("Edit operation type"),
+            line: tool.schema.string().optional().describe("Anchor line in LINE#ID format"),
+            start_line: tool.schema.string().optional().describe("Range start in LINE#ID format"),
+            end_line: tool.schema.string().optional().describe("Range end in LINE#ID format"),
+            after_line: tool.schema.string().optional().describe("Insert boundary (after) in LINE#ID format"),
+            before_line: tool.schema.string().optional().describe("Insert boundary (before) in LINE#ID format"),
+            text: tool.schema
+              .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
+              .optional()
+              .describe("Operation content"),
+            old_text: tool.schema.string().optional().describe("Legacy text replacement source"),
+            new_text: tool.schema
+              .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
+              .optional()
+              .describe("Legacy text replacement target"),
+          })
         )
         .describe("Array of edit operations to apply (empty when delete=true)"),
     },
