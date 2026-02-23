@@ -17,6 +17,9 @@ export function applyToolConfig(params: {
   const denyTodoTools = params.pluginConfig.experimental?.task_system
     ? { todowrite: "deny", todoread: "deny" }
     : {}
+  const allowTodoTools = params.pluginConfig.experimental?.task_system
+    ? { todowrite: "allow", todoread: "allow" }
+    : {}
 
   params.config.tools = {
     ...(params.config.tools as Record<string, unknown>),
@@ -84,6 +87,7 @@ export function applyToolConfig(params: {
       question: questionPermission,
       "task_*": "allow",
       teammate: "allow",
+      ...allowTodoTools,
     };
   }
   const junior = agentByKey(params.agentResult, "sisyphus-junior");
@@ -93,6 +97,7 @@ export function applyToolConfig(params: {
       task: "allow",
       "task_*": "allow",
       teammate: "allow",
+      ...allowTodoTools,
     };
   }
 

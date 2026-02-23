@@ -1207,8 +1207,8 @@ describe("per-agent todowrite/todoread deny when task_system enabled", () => {
       expect(agentResult[agentName]?.permission?.todoread).toBe("deny")
     }
     for (const agentName of AGENTS_WITHOUT_TODO_DENY) {
-      expect(agentResult[agentName]?.permission?.todowrite).toBeUndefined()
-      expect(agentResult[agentName]?.permission?.todoread).toBeUndefined()
+      expect(agentResult[agentName]?.permission?.todowrite).toBe("allow")
+      expect(agentResult[agentName]?.permission?.todoread).toBe("allow")
     }
   })
 

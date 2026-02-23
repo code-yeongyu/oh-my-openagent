@@ -55,7 +55,7 @@ describe("applyToolConfig", () => {
       it.each([
         "prometheus",
         "sisyphus-junior",
-      ])("#then should NOT deny todo tools for %s agent when task_system enabled", (agentName) => {
+      ])("#then should explicitly allow todo tools for %s agent when task_system enabled", (agentName) => {
         const params = createParams({
           taskSystem: true,
           agents: [agentName],
@@ -66,8 +66,8 @@ describe("applyToolConfig", () => {
         const agent = params.agentResult[agentName] as {
           permission: Record<string, unknown>
         }
-        expect(agent.permission.todowrite).toBeUndefined()
-        expect(agent.permission.todoread).toBeUndefined()
+        expect(agent.permission.todowrite).toBe("allow")
+        expect(agent.permission.todoread).toBe("allow")
       })
     })
   })
