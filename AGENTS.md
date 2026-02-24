@@ -1,10 +1,10 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-02-21 | **Commit:** 86e3c7d1 | **Branch:** dev
+**Generated:** 2026-02-24 | **Commit:** fcb90d92 | **Branch:** dev
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 44 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1208 TypeScript files, 143k LOC.
+OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 46 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1208 TypeScript files, 143k LOC.
 
 ## STRUCTURE
 
@@ -14,14 +14,14 @@ oh-my-opencode/
 │   ├── index.ts              # Plugin entry: loadConfig → createManagers → createTools → createHooks → createPluginInterface
 │   ├── plugin-config.ts      # JSONC multi-level config: user → project → defaults (Zod v4)
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
-│   ├── hooks/                # 44 hooks across 39 directories + 6 standalone files
+| `hooks/`                # 46 hooks across 39 directories + 6 standalone files
 │   ├── tools/                # 26 tools across 15 directories
 │   ├── features/             # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
 │   ├── shared/               # 100+ utility files in 13 categories
 │   ├── config/               # Zod v4 schema system (22+ files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth (Commander.js)
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
-│   ├── plugin/               # 8 OpenCode hook handlers + 44 hook composition
+│   ├── plugin/               # 8 OpenCode hook handlers + 46 hook composition
 │   └── plugin-handlers/      # 6-phase config loading pipeline
 ├── packages/                 # Monorepo: comment-checker, opencode-sdk, 10 platform binaries
 └── local-ignore/             # Dev-only test fixtures
@@ -34,7 +34,7 @@ OhMyOpenCodePlugin(ctx)
   ├─→ loadPluginConfig()         # JSONC parse → project/user merge → Zod validate → migrate
   ├─→ createManagers()           # TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler
   ├─→ createTools()              # SkillContext + AvailableCategories + ToolRegistry (26 tools)
-  ├─→ createHooks()              # 3-tier: Core(35) + Continuation(7) + Skill(2) = 44 hooks
+  ├─→ createHooks()              # 3-tier: Core(37) + Continuation(7) + Skill(2) = 46 hooks
   └─→ createPluginInterface()    # 8 OpenCode hook handlers → PluginInterface
 ```
 
@@ -87,7 +87,7 @@ Fields: agents (14 overridable, 21 fields each), categories (8 built-in + custom
 
 - **Test pattern**: Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style (nested describe with `#given`/`#when`/`#then` prefixes)
 - **Factory pattern**: `createXXX()` for all tools, hooks, agents
-- **Hook tiers**: Session (22) → Tool-Guard (10) → Transform (4) → Continuation (7) → Skill (2)
+- **Hook tiers**: Session (23) → Tool-Guard (10) → Transform (4) → Continuation (7) → Skill (2)
 - **Agent modes**: `primary` (respects UI model) vs `subagent` (own fallback chain) vs `all`
 - **Model resolution**: 3-step: override → category-default → provider-fallback → system-default
 - **Config format**: JSONC with comments, Zod v4 validation, snake_case keys

@@ -1,6 +1,6 @@
 # src/plugin-handlers/ — 6-Phase Config Loading Pipeline
 
-**Generated:** 2026-02-21
+**Generated:** 2026-02-24
 
 ## OVERVIEW
 
