@@ -103,32 +103,6 @@ export function applyInsertBefore(
   return result
 }
 
-export function applyInsertBetween(
-  lines: string[],
-  afterAnchor: string,
-  beforeAnchor: string,
-  text: string | string[],
-  options?: EditApplyOptions
-): string[] {
-  if (shouldValidate(options)) {
-    validateLineRef(lines, afterAnchor)
-    validateLineRef(lines, beforeAnchor)
-  }
-  const { line: afterLine } = parseLineRef(afterAnchor)
-  const { line: beforeLine } = parseLineRef(beforeAnchor)
-  if (beforeLine <= afterLine) {
-    throw new Error(`insert_between requires after_line (${afterLine}) < before_line (${beforeLine})`)
-  }
-
-  const result = [...lines]
-  const newLines = stripInsertBoundaryEcho(lines[afterLine - 1], lines[beforeLine - 1], toNewLines(text))
-  if (newLines.length === 0) {
-    throw new Error(`insert_between requires non-empty text for ${afterAnchor}..${beforeAnchor}`)
-  }
-  result.splice(beforeLine - 1, 0, ...newLines)
-  return result
-}
-
 export function applyAppend(lines: string[], text: string | string[]): string[] {
   const normalized = toNewLines(text)
   if (normalized.length === 0) {
