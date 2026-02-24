@@ -1,8 +1,14 @@
 import type { ContextCollector } from "./collector"
 import type { Message, Part } from "@opencode-ai/sdk"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 import { log } from "../../shared"
+import { safeCompress } from "../../shared/toon-compression"
 import { getMainSessionID } from "../claude-code-session-state"
 
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
 interface OutputPart {
   type: string
   text?: string
@@ -80,7 +86,8 @@ type MessagesTransformHook = {
 }
 
 export function createContextInjectorMessagesTransformHook(
-  collector: ContextCollector
+  collector: ContextCollector,
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
 ): MessagesTransformHook {
   return {
     "experimental.chat.messages.transform": async (_input, output) => {
@@ -146,13 +153,16 @@ export function createContextInjectorMessagesTransformHook(
         return
       }
 
+      // Compress context before injection
+      const compressedContent = safeCompress(pending.merged, compressionConfig)
+
       // synthetic part pattern (minimal fields)
       const syntheticPart = {
         id: `synthetic_hook_${Date.now()}`,
         messageID: lastUserMessage.info.id,
         sessionID: (lastUserMessage.info as { sessionID?: string }).sessionID ?? "",
         type: "text" as const,
-        text: pending.merged,
+        text: compressedContent,
         synthetic: true,  // hidden in UI
       }
 

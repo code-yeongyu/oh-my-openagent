@@ -37,12 +37,12 @@ function createMockInput(agent?: string, model?: { providerID: string; modelID: 
   }
 }
 
-function createMockOutput(variant?: string): ChatMessageHandlerOutput {
+function createMockOutput(variant?: string, parts?: ChatMessagePart[]): ChatMessageHandlerOutput {
   const message: Record<string, unknown> = {}
   if (variant !== undefined) {
     message["variant"] = variant
   }
-  return { message, parts: [] }
+  return { message, parts: parts ?? [] }
 }
 
 describe("createChatMessageHandler - TUI variant passthrough", () => {
@@ -112,7 +112,105 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     //#when
     await handler(input, output)
 
-    //#then - gate should still be marked as applied
     expect(args._appliedSessions).toContain("test-session")
+  })
+})
+
+describe("createChatMessageHandler - toon compression", () => {
+  function createLargePartsArray(count: number): ChatMessagePart[] {
+    return Array.from({ length: count }, (_, i) => ({
+      type: "text",
+      text: `Message part ${i} with some content to make it larger`,
+    }))
+  }
+
+  test("does not compress small parts array", async () => {
+    //#given - small parts array, compression enabled
+    const args = createMockHandlerArgs({
+      pluginConfig: { toon_compression: { enabled: true, threshold: 100 } },
+    })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput()
+    const smallParts = [{ type: "text", text: "hello" }]
+    const output = createMockOutput(undefined, smallParts)
+
+    //#when
+    await handler(input, output)
+
+    //#then - no compression applied for small array
+    expect(output.message["_compressedParts"]).toBeUndefined()
+  })
+
+  test("compresses large uniform parts array when enabled", async () => {
+    //#given - large uniform parts array, compression enabled with low threshold
+    const args = createMockHandlerArgs({
+      pluginConfig: { toon_compression: { enabled: true, threshold: 100 } },
+    })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput()
+    const largeParts = createLargePartsArray(10)
+    const output = createMockOutput(undefined, largeParts)
+
+    //#when
+    await handler(input, output)
+
+    //#then - compression should be applied
+    expect(output.message["_compressedParts"]).toBeDefined()
+    expect(typeof output.message["_compressedParts"]).toBe("string")
+  })
+
+  test("does not compress when disabled even with large array", async () => {
+    //#given - large parts array, compression disabled
+    const args = createMockHandlerArgs({
+      pluginConfig: { toon_compression: { enabled: false, threshold: 100 } },
+    })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput()
+    const largeParts = createLargePartsArray(10)
+    const output = createMockOutput(undefined, largeParts)
+
+    //#when
+    await handler(input, output)
+
+    //#then - no compression when disabled
+    expect(output.message["_compressedParts"]).toBeUndefined()
+  })
+
+  test("uses default config when toon_compression not specified", async () => {
+    //#given - no compression config specified (uses defaults: disabled)
+    const args = createMockHandlerArgs({ pluginConfig: {} })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput()
+    const largeParts = createLargePartsArray(10)
+    const output = createMockOutput(undefined, largeParts)
+
+    //#when
+    await handler(input, output)
+
+    //#then - defaults to disabled, no compression
+    expect(output.message["_compressedParts"]).toBeUndefined()
+  })
+
+  test("does not compress non-uniform parts array", async () => {
+    //#given - large but non-uniform parts array
+    const args = createMockHandlerArgs({
+      pluginConfig: { toon_compression: { enabled: true, threshold: 100 } },
+    })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput()
+    const nonUniformParts = [
+      { type: "text", text: "hello" },
+      { type: "image", url: "http://example.com/img.png" },
+      { type: "text", text: "world" },
+      { type: "code", language: "ts", content: "const x = 1" },
+      { type: "text", text: "test" },
+    ]
+    const output = createMockOutput(undefined, nonUniformParts)
+
+    //#when
+    await handler(input, output)
+
+    //#then - non-uniform arrays should not be compressed
+    expect(output.message["_compressedParts"]).toBeUndefined()
   })
 })

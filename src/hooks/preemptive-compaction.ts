@@ -1,8 +1,14 @@
 import { log } from "../shared/logger"
 import type { OhMyOpenCodeConfig } from "../config"
-
+import type { ToonCompressionConfig } from "../config/schema/toon-compression"
+import { safeCompress } from "../shared/toon-compression"
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
+
 const DEFAULT_ACTUAL_LIMIT = 200_000
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
 
 type ModelCacheStateLike = {
   anthropicContext1MEnabled: boolean
@@ -55,10 +61,19 @@ export function createPreemptiveCompactionHook(
   ctx: PluginInput,
   pluginConfig: OhMyOpenCodeConfig,
   modelCacheState?: ModelCacheStateLike,
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
 ) {
   const compactionInProgress = new Set<string>()
   const compactedSessions = new Set<string>()
-  const tokenCache = new Map<string, CachedCompactionState>()
+  const tokenCache = new Map<string, string>()
+
+  function parseCachedState(data: string): CachedCompactionState | null {
+    try {
+      return JSON.parse(data) as CachedCompactionState
+    } catch {
+      return null
+    }
+  }
 
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },
@@ -67,7 +82,10 @@ export function createPreemptiveCompactionHook(
     const { sessionID } = input
     if (compactedSessions.has(sessionID) || compactionInProgress.has(sessionID)) return
 
-    const cached = tokenCache.get(sessionID)
+    const cachedRaw = tokenCache.get(sessionID)
+    if (!cachedRaw) return
+
+    const cached = parseCachedState(cachedRaw)
     if (!cached) return
 
     const actualLimit =
@@ -134,11 +152,13 @@ export function createPreemptiveCompactionHook(
       if (!info || info.role !== "assistant" || !info.finish) return
       if (!info.sessionID || !info.providerID || !info.tokens) return
 
-      tokenCache.set(info.sessionID, {
+      const state: CachedCompactionState = {
         providerID: info.providerID,
         modelID: info.modelID ?? "",
         tokens: info.tokens,
-      })
+      }
+      const compressed = safeCompress(state, compressionConfig)
+      tokenCache.set(info.sessionID, compressed)
     }
   }
 

@@ -3841,6 +3841,25 @@
       },
       "additionalProperties": false
     },
+    "toon_compression": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "threshold": {
+          "default": 5000,
+          "type": "number",
+          "minimum": 100
+        }
+      },
+      "required": [
+        "enabled",
+        "threshold"
+      ],
+      "additionalProperties": false
+    },
     "_migrations": {
       "type": "array",
       "items": {

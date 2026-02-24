@@ -119,4 +119,74 @@ describe("createContextInjectorMessagesTransformHook", () => {
     // then
     expect(collector.hasPending(sessionID)).toBe(false)
   })
+
+  describe("with compression enabled", () => {
+    it("uses compression config when provided", async () => {
+      // given
+      const compressionConfig = { enabled: true, threshold: 100 }
+      const hook = createContextInjectorMessagesTransformHook(collector, compressionConfig)
+      const sessionID = "ses_compression1"
+      collector.register(sessionID, {
+        id: "ctx",
+        source: "keyword-detector",
+        content: "Context content that should be processed",
+      })
+      const messages = [createMockMessage("user", "Message", sessionID)]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const output = { messages } as any
+
+      // when
+      await hook["experimental.chat.messages.transform"]!({}, output)
+
+      // then - compression is applied (for strings it falls back to original)
+      expect(output.messages[0].parts.length).toBe(2)
+      expect(output.messages[0].parts[0].text).toBe("Context content that should be processed")
+      expect(output.messages[0].parts[0].synthetic).toBe(true)
+    })
+
+    it("works with compression disabled", async () => {
+      // given
+      const compressionConfig = { enabled: false, threshold: 5000 }
+      const hook = createContextInjectorMessagesTransformHook(collector, compressionConfig)
+      const sessionID = "ses_compression2"
+      collector.register(sessionID, {
+        id: "ctx",
+        source: "keyword-detector",
+        content: "Context content",
+      })
+      const messages = [createMockMessage("user", "Message", sessionID)]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const output = { messages } as any
+
+      // when
+      await hook["experimental.chat.messages.transform"]!({}, output)
+
+      // then
+      expect(output.messages[0].parts[0].text).toBe("Context content")
+    })
+
+    it("handles large content with compression enabled", async () => {
+      // given
+      const compressionConfig = { enabled: true, threshold: 50 }
+      const hook = createContextInjectorMessagesTransformHook(collector, compressionConfig)
+      const sessionID = "ses_compression3"
+      // Create content larger than threshold
+      const largeContent = "A".repeat(100)
+      collector.register(sessionID, {
+        id: "ctx",
+        source: "keyword-detector",
+        content: largeContent,
+      })
+      const messages = [createMockMessage("user", "Message", sessionID)]
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const output = { messages } as any
+
+      // when
+      await hook["experimental.chat.messages.transform"]!({}, output)
+
+      // then - content is injected (compression falls back for strings)
+      expect(output.messages[0].parts[0].text).toBe(largeContent)
+      expect(output.messages[0].parts[0].synthetic).toBe(true)
+    })
+  })
 })

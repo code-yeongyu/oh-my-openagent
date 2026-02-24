@@ -5,6 +5,7 @@ import {
   createClaudeCodeHooksHook,
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
+  createMessageBatchCompressorHook,
 } from "../../hooks"
 import {
   contextCollector,
@@ -17,6 +18,7 @@ export type TransformHooks = {
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
+  messageBatchCompressor: ReturnType<typeof createMessageBatchCompressorHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -53,7 +55,10 @@ export function createTransformHooks(args: {
     : null
 
   const contextInjectorMessagesTransform =
-    createContextInjectorMessagesTransformHook(contextCollector)
+    createContextInjectorMessagesTransformHook(
+      contextCollector,
+      pluginConfig.toon_compression ?? { enabled: false, threshold: 5000 },
+    )
 
   const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
     ? safeCreateHook(
@@ -63,10 +68,19 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const messageBatchCompressor = isHookEnabled("message-batch-compressor")
+    ? safeCreateHook(
+        "message-batch-compressor",
+        () => createMessageBatchCompressorHook(pluginConfig.toon_compression ?? { enabled: false, threshold: 5000 }),
+        { enabled: safeHookEnabled },
+      )
+    : null
+
   return {
     claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
+    messageBatchCompressor,
   }
 }

@@ -63,7 +63,7 @@ describe("preemptive-compaction", () => {
   // #when tool.execute.after is called
   // #then session.messages() should NOT be called
   it("should use cached token info instead of fetching session.messages()", async () => {
-    const hook = createPreemptiveCompactionHook(ctx as never)
+    const hook = createPreemptiveCompactionHook(ctx as never, {})
     const sessionID = "ses_test1"
 
     // Simulate message.updated with token info below threshold
@@ -101,8 +101,7 @@ describe("preemptive-compaction", () => {
   // #when tool.execute.after is called
   // #then should skip without fetching
   it("should skip gracefully when no cached token info exists", async () => {
-    const hook = createPreemptiveCompactionHook(ctx as never)
-
+    const hook = createPreemptiveCompactionHook(ctx as never, {})
     const output = { title: "", output: "test", metadata: null }
     await hook["tool.execute.after"](
       { tool: "bash", sessionID: "ses_none", callID: "call_1" },
@@ -116,7 +115,7 @@ describe("preemptive-compaction", () => {
   // #when tool.execute.after runs
   // #then should trigger summarize
   it("should trigger compaction when usage exceeds threshold", async () => {
-    const hook = createPreemptiveCompactionHook(ctx as never)
+    const hook = createPreemptiveCompactionHook(ctx as never, {})
     const sessionID = "ses_high"
 
     // 170K input + 10K cache = 180K → 90% of 200K
@@ -153,7 +152,7 @@ describe("preemptive-compaction", () => {
 
   it("should trigger compaction for google-vertex-anthropic provider", async () => {
     //#given google-vertex-anthropic usage above threshold
-    const hook = createPreemptiveCompactionHook(ctx as never)
+    const hook = createPreemptiveCompactionHook(ctx as never, {})
     const sessionID = "ses_vertex_anthropic_high"
 
     await hook.event({
@@ -191,7 +190,7 @@ describe("preemptive-compaction", () => {
   // #given session deleted
   // #then cache should be cleaned up
   it("should clean up cache on session.deleted", async () => {
-    const hook = createPreemptiveCompactionHook(ctx as never)
+    const hook = createPreemptiveCompactionHook(ctx as never, {})
     const sessionID = "ses_del"
 
     await hook.event({
@@ -228,7 +227,7 @@ describe("preemptive-compaction", () => {
 
   it("should log summarize errors instead of swallowing them", async () => {
     //#given
-    const hook = createPreemptiveCompactionHook(ctx as never)
+    const hook = createPreemptiveCompactionHook(ctx as never, {})
     const sessionID = "ses_log_error"
     const summarizeError = new Error("summarize failed")
     ctx.client.session.summarize.mockRejectedValueOnce(summarizeError)
@@ -342,5 +341,140 @@ describe("preemptive-compaction", () => {
 
     //#then
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+  })
+
+  // #given compression config enabled
+  // #when token info is cached
+  // #then hook should still function correctly
+  it("should work with compression enabled", async () => {
+    //#given
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {},
+      undefined,
+      { enabled: true, threshold: 5000 }
+    )
+    const sessionID = "ses_compression_enabled"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    //#when
+    const output = { title: "", output: "test", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    //#then - summarize should still be triggered
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
+
+  // #given compression config disabled
+  // #when token info is cached
+  // #then hook should still function correctly
+  it("should work with compression disabled", async () => {
+    //#given
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {},
+      undefined,
+      { enabled: false, threshold: 5000 }
+    )
+    const sessionID = "ses_compression_disabled"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    //#when
+    const output = { title: "", output: "test", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    //#then - summarize should still be triggered
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
+
+  // #given compression config with custom threshold
+  // #when token info is cached
+  // #then hook should still function correctly
+  it("should work with custom compression threshold", async () => {
+    //#given
+    const hook = createPreemptiveCompactionHook(
+      ctx as never,
+      {},
+      undefined,
+      { enabled: true, threshold: 100 }
+    )
+    const sessionID = "ses_custom_threshold"
+
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 1000,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    //#when
+    const output = { title: "", output: "test", metadata: null }
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      output
+    )
+
+    //#then - summarize should still be triggered
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
   })
 })

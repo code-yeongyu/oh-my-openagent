@@ -69,6 +69,7 @@ export function createPluginInterface(args: {
 
     "tool.execute.after": createToolExecuteAfterHandler({
       hooks,
+      pluginConfig,
     }),
   }
 }

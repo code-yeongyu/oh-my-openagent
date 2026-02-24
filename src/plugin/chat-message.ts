@@ -6,6 +6,7 @@ import { setSessionModel } from "../shared/session-model-state"
 import { setSessionAgent } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
+import { safeCompress, shouldCompress } from "../shared/toon-compression"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -153,5 +154,11 @@ export function createChatMessageHandler(args: {
     }
 
     applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, pluginContext.client.tui, input.sessionID)
+
+    // Compress large parts arrays for efficient storage/transmission
+    const compressionConfig = pluginConfig.toon_compression ?? { enabled: false, threshold: 5000 }
+    if (compressionConfig.enabled && shouldCompress(output.parts, compressionConfig.threshold)) {
+      output.message["_compressedParts"] = safeCompress(output.parts, compressionConfig)
+    }
   }
 }
