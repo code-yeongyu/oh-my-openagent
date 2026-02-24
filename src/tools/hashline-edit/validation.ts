@@ -115,7 +115,7 @@ export class HashlineMismatchError extends Error {
 
       const content = fileLines[line - 1] ?? ""
       const hash = computeLineHash(line, content)
-      const prefix = `${line}#${hash}:${content}`
+      const prefix = `${line}#${hash}|${content}`
       if (mismatchByLine.has(line)) {
         output.push(`>>> ${prefix}`)
       } else {

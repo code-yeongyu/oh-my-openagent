@@ -1,13 +1,11 @@
 import { dedupeEdits } from "./edit-deduplication"
-import { collectLineRefs, getEditLineNumber } from "./edit-ordering"
+import { collectLineRefs, detectOverlappingRanges, getEditLineNumber } from "./edit-ordering"
 import type { HashlineEdit } from "./types"
 import {
   applyAppend,
   applyInsertAfter,
   applyInsertBefore,
-  applyInsertBetween,
   applyPrepend,
-  applyReplace,
   applyReplaceLines,
   applySetLine,
 } from "./edit-operation-primitives"
@@ -33,42 +31,20 @@ export function applyHashlineEditsWithReport(content: string, edits: HashlineEdi
 
   let noopEdits = 0
 
-  let result = content
-  let lines = result.length === 0 ? [] : result.split("\n")
+  let lines = content.length === 0 ? [] : content.split("\n")
 
   const refs = collectLineRefs(sortedEdits)
   validateLineRefs(lines, refs)
 
+  const overlapError = detectOverlappingRanges(sortedEdits)
+  if (overlapError) throw new Error(overlapError)
+
   for (const edit of sortedEdits) {
-    switch (edit.type) {
-      case "set_line": {
-        lines = applySetLine(lines, edit.line, edit.text, { skipValidation: true })
-        break
-      }
-      case "replace_lines": {
-        lines = applyReplaceLines(lines, edit.start_line, edit.end_line, edit.text, { skipValidation: true })
-        break
-      }
-      case "insert_after": {
-        const next = applyInsertAfter(lines, edit.line, edit.text, { skipValidation: true })
-        if (next.join("\n") === lines.join("\n")) {
-          noopEdits += 1
-          break
-        }
-        lines = next
-        break
-      }
-      case "insert_before": {
-        const next = applyInsertBefore(lines, edit.line, edit.text, { skipValidation: true })
-        if (next.join("\n") === lines.join("\n")) {
-          noopEdits += 1
-          break
-        }
-        lines = next
-        break
-      }
-      case "insert_between": {
-        const next = applyInsertBetween(lines, edit.after_line, edit.before_line, edit.text, { skipValidation: true })
+    switch (edit.op) {
+      case "replace": {
+        const next = edit.end
+          ? applyReplaceLines(lines, edit.pos, edit.end, edit.lines, { skipValidation: true })
+          : applySetLine(lines, edit.pos, edit.lines, { skipValidation: true })
         if (next.join("\n") === lines.join("\n")) {
           noopEdits += 1
           break
@@ -77,7 +53,9 @@ export function applyHashlineEditsWithReport(content: string, edits: HashlineEdi
         break
       }
       case "append": {
-        const next = applyAppend(lines, edit.text)
+        const next = edit.pos
+          ? applyInsertAfter(lines, edit.pos, edit.lines, { skipValidation: true })
+          : applyAppend(lines, edit.lines)
         if (next.join("\n") === lines.join("\n")) {
           noopEdits += 1
           break
@@ -86,23 +64,14 @@ export function applyHashlineEditsWithReport(content: string, edits: HashlineEdi
         break
       }
       case "prepend": {
-        const next = applyPrepend(lines, edit.text)
+        const next = edit.pos
+          ? applyInsertBefore(lines, edit.pos, edit.lines, { skipValidation: true })
+          : applyPrepend(lines, edit.lines)
         if (next.join("\n") === lines.join("\n")) {
           noopEdits += 1
           break
         }
         lines = next
-        break
-      }
-      case "replace": {
-        result = lines.join("\n")
-        const replaced = applyReplace(result, edit.old_text, edit.new_text)
-        if (replaced === result) {
-          noopEdits += 1
-          break
-        }
-        result = replaced
-        lines = result.split("\n")
         break
       }
     }
@@ -124,6 +93,4 @@ export {
   applyReplaceLines,
   applyInsertAfter,
   applyInsertBefore,
-  applyInsertBetween,
-  applyReplace,
 } from "./edit-operation-primitives"

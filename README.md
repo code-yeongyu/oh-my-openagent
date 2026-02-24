@@ -220,9 +220,9 @@ The harness problem is real. Most agent failures aren't the model. It's the edit
 Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi), we implemented **Hashline**. Every line the agent reads comes back tagged with a content hash:
 
 ```
-11#VK: function hello() {
-22#XJ:   return "world";
-33#MB: }
+11#VK| function hello() {
+22#XJ|   return "world";
+33#MB| }
 ```
 
 The agent edits by referencing those tags. If the file changed since the last read, the hash won't match and the edit is rejected before corruption. No whitespace reproduction. No stale-line errors.

@@ -20,32 +20,19 @@ export function createHashlineEditTool(): ToolDefinition {
       edits: tool.schema
         .array(
           tool.schema.object({
-            type: tool.schema
+            op: tool.schema
               .union([
-                tool.schema.literal("set_line"),
-                tool.schema.literal("replace_lines"),
-                tool.schema.literal("insert_after"),
-                tool.schema.literal("insert_before"),
-                tool.schema.literal("insert_between"),
                 tool.schema.literal("replace"),
                 tool.schema.literal("append"),
                 tool.schema.literal("prepend"),
               ])
-              .describe("Edit operation type"),
-            line: tool.schema.string().optional().describe("Anchor line in LINE#ID format"),
-            start_line: tool.schema.string().optional().describe("Range start in LINE#ID format"),
-            end_line: tool.schema.string().optional().describe("Range end in LINE#ID format"),
-            after_line: tool.schema.string().optional().describe("Insert boundary (after) in LINE#ID format"),
-            before_line: tool.schema.string().optional().describe("Insert boundary (before) in LINE#ID format"),
-            text: tool.schema
-              .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
+              .describe("Hashline edit operation mode"),
+            pos: tool.schema.string().optional().describe("Primary anchor in LINE#ID format"),
+            end: tool.schema.string().optional().describe("Range end anchor in LINE#ID format"),
+            lines: tool.schema
+              .union([tool.schema.string(), tool.schema.array(tool.schema.string()), tool.schema.null()])
               .optional()
-              .describe("Operation content"),
-            old_text: tool.schema.string().optional().describe("Legacy text replacement source"),
-            new_text: tool.schema
-              .union([tool.schema.string(), tool.schema.array(tool.schema.string())])
-              .optional()
-              .describe("Legacy text replacement target"),
+              .describe("Replacement or inserted lines. null/[] deletes with replace"),
           })
         )
         .describe("Array of edit operations to apply (empty when delete=true)"),

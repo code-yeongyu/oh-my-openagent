@@ -14,16 +14,16 @@ export function generateHashlineDiff(oldContent: string, newContent: string, fil
     const hash = computeLineHash(lineNum, newLine)
 
     if (i >= oldLines.length) {
-      diff += `+ ${lineNum}#${hash}:${newLine}\n`
+      diff += `+ ${lineNum}#${hash}|${newLine}\n`
       continue
     }
     if (i >= newLines.length) {
-      diff += `- ${lineNum}#  :${oldLine}\n`
+      diff += `- ${lineNum}#  |${oldLine}\n`
       continue
     }
     if (oldLine !== newLine) {
-      diff += `- ${lineNum}#  :${oldLine}\n`
-      diff += `+ ${lineNum}#${hash}:${newLine}\n`
+      diff += `- ${lineNum}#  |${oldLine}\n`
+      diff += `+ ${lineNum}#${hash}|${newLine}\n`
     }
   }
 
