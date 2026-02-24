@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
-import { applyHashlineEdits, applyInsertAfter, applyReplace, applyReplaceLines, applySetLine } from "./edit-operations"
-import { applyAppend, applyPrepend } from "./edit-operation-primitives"
+import { applyHashlineEdits, applyInsertAfter, applyReplaceLines, applySetLine } from "./edit-operations"
+import { applyAppend, applyInsertBetween, applyPrepend } from "./edit-operation-primitives"
 import { computeLineHash } from "./hash-computation"
 import type { HashlineEdit } from "./types"
 
@@ -49,7 +49,7 @@ describe("hashline edit operations", () => {
     //#when
     const result = applyHashlineEdits(
       lines.join("\n"),
-      [{ type: "insert_before", line: anchorFor(lines, 2), text: "before 2" }]
+      [{ op: "prepend", pos: anchorFor(lines, 2), lines: "before 2" }]
     )
 
     //#then
@@ -61,15 +61,7 @@ describe("hashline edit operations", () => {
     const lines = ["line 1", "line 2", "line 3"]
 
     //#when
-    const result = applyHashlineEdits(
-      lines.join("\n"),
-      [{
-        type: "insert_between",
-        after_line: anchorFor(lines, 1),
-        before_line: anchorFor(lines, 2),
-        text: ["between"],
-      }]
-    )
+    const result = applyInsertBetween(lines, anchorFor(lines, 1), anchorFor(lines, 2), ["between"]).join("\n")
 
     //#then
     expect(result).toEqual("line 1\nbetween\nline 2\nline 3")
@@ -89,7 +81,7 @@ describe("hashline edit operations", () => {
 
     //#when / #then
     expect(() =>
-      applyHashlineEdits(lines.join("\n"), [{ type: "insert_before", line: anchorFor(lines, 1), text: [] }])
+      applyHashlineEdits(lines.join("\n"), [{ op: "prepend", pos: anchorFor(lines, 1), lines: [] }])
     ).toThrow(/non-empty/i)
   })
 
@@ -98,28 +90,7 @@ describe("hashline edit operations", () => {
     const lines = ["line 1", "line 2"]
 
     //#when / #then
-    expect(() =>
-      applyHashlineEdits(
-        lines.join("\n"),
-        [{
-          type: "insert_between",
-          after_line: anchorFor(lines, 1),
-          before_line: anchorFor(lines, 2),
-          text: [],
-        }]
-      )
-    ).toThrow(/non-empty/i)
-  })
-
-  it("applies replace operation", () => {
-    //#given
-    const content = "hello world foo"
-
-    //#when
-    const result = applyReplace(content, "world", "universe")
-
-    //#then
-    expect(result).toEqual("hello universe foo")
+    expect(() => applyInsertBetween(lines, anchorFor(lines, 1), anchorFor(lines, 2), [])).toThrow(/non-empty/i)
   })
 
   it("applies mixed edits in one pass", () => {
@@ -127,8 +98,8 @@ describe("hashline edit operations", () => {
     const content = "line 1\nline 2\nline 3"
     const lines = content.split("\n")
     const edits: HashlineEdit[] = [
-      { type: "insert_after", line: anchorFor(lines, 1), text: "inserted" },
-      { type: "set_line", line: anchorFor(lines, 3), text: "modified" },
+      { op: "append", pos: anchorFor(lines, 1), lines: "inserted" },
+      { op: "replace", pos: anchorFor(lines, 3), lines: "modified" },
     ]
 
     //#when
@@ -143,8 +114,8 @@ describe("hashline edit operations", () => {
     const content = "line 1\nline 2"
     const lines = content.split("\n")
     const edits: HashlineEdit[] = [
-      { type: "insert_after", line: anchorFor(lines, 1), text: "inserted" },
-      { type: "insert_after", line: anchorFor(lines, 1), text: "inserted" },
+      { op: "append", pos: anchorFor(lines, 1), lines: "inserted" },
+      { op: "append", pos: anchorFor(lines, 1), lines: "inserted" },
     ]
 
     //#when
@@ -170,7 +141,7 @@ describe("hashline edit operations", () => {
     const lines = ["line 1", "line 2", "line 3"]
 
     //#when
-    const result = applySetLine(lines, anchorFor(lines, 2), "1#VK:first\n2#NP:second")
+    const result = applySetLine(lines, anchorFor(lines, 2), "1#VK|first\n2#NP|second")
 
     //#then
     expect(result).toEqual(["line 1", "first", "second", "line 3"])
@@ -206,6 +177,28 @@ describe("hashline edit operations", () => {
     expect(result).toEqual(["if (x) {", "  return 2", "}"])
   })
 
+  it("preserves intentional indentation removal (tab to no-tab)", () => {
+    //#given
+    const lines = ["# Title", "\t1절", "content"]
+
+    //#when
+    const result = applySetLine(lines, anchorFor(lines, 2), "1절")
+
+    //#then
+    expect(result).toEqual(["# Title", "1절", "content"])
+  })
+
+  it("preserves intentional indentation removal (spaces to no-spaces)", () => {
+    //#given
+    const lines = ["function foo() {", "    indented", "}"]
+
+    //#when
+    const result = applySetLine(lines, anchorFor(lines, 2), "indented")
+
+    //#then
+    expect(result).toEqual(["function foo() {", "indented", "}"])
+  })
+
   it("strips boundary echo around replace_lines content", () => {
     //#given
     const lines = ["before", "old 1", "old 2", "after"]
@@ -227,16 +220,9 @@ describe("hashline edit operations", () => {
     const lines = ["line 1", "line 2", "line 3"]
 
     //#when / #then
-    expect(() =>
-      applyHashlineEdits(lines.join("\n"), [
-        {
-          type: "insert_between",
-          after_line: anchorFor(lines, 1),
-          before_line: anchorFor(lines, 2),
-          text: ["line 1", "line 2"],
-        },
-      ])
-    ).toThrow(/non-empty/i)
+    expect(() => applyInsertBetween(lines, anchorFor(lines, 1), anchorFor(lines, 2), ["line 1", "line 2"])).toThrow(
+      /non-empty/i
+    )
   })
 
   it("restores indentation for first replace_lines entry", () => {
@@ -248,6 +234,22 @@ describe("hashline edit operations", () => {
 
     //#then
     expect(result).toEqual(["if (x) {", "  return 3", "  return 4", "}"])
+  })
+
+  it("preserves blank lines and indentation in range replace (no false unwrap)", () => {
+    //#given — reproduces the 애국가 bug where blank+indented lines collapse
+    const lines = ["", "동해물과 백두산이 마르고 닳도록", "하느님이 보우하사 우리나라 만세", "", "무궁화 삼천리 화려강산", "대한사람 대한으로 길이 보전하세", ""]
+
+    //#when — replace the range with indented version (blank lines preserved)
+    const result = applyReplaceLines(
+      lines,
+      anchorFor(lines, 1),
+      anchorFor(lines, 7),
+      ["", "  동해물과 백두산이 마르고 닳도록", "  하느님이 보우하사 우리나라 만세", "", "  무궁화 삼천리 화려강산", "  대한사람 대한으로 길이 보전하세", ""]
+    )
+
+    //#then — all 7 lines preserved with indentation, not collapsed to 3
+    expect(result).toEqual(["", "  동해물과 백두산이 마르고 닳도록", "  하느님이 보우하사 우리나라 만세", "", "  무궁화 삼천리 화려강산", "  대한사람 대한으로 길이 보전하세", ""])
   })
 
   it("collapses wrapped replacement span back to unique original single line", () => {
@@ -322,8 +324,8 @@ describe("hashline edit operations", () => {
 
     //#when
     const result = applyHashlineEdits(content, [
-      { type: "append", text: ["line 3"] },
-      { type: "prepend", text: ["line 0"] },
+      { op: "append", lines: ["line 3"] },
+      { op: "prepend", lines: ["line 0"] },
     ])
 
     //#then
@@ -366,5 +368,34 @@ describe("hashline edit operations", () => {
 
     //#then
     expect(result).toEqual(["const a = 10;", "const b = 20;"])
+  })
+
+  it("throws on overlapping range edits", () => {
+    //#given
+    const content = "line 1\nline 2\nline 3\nline 4\nline 5"
+    const lines = content.split("\n")
+    const edits: HashlineEdit[] = [
+      { op: "replace", pos: anchorFor(lines, 1), end: anchorFor(lines, 3), lines: "replaced A" },
+      { op: "replace", pos: anchorFor(lines, 2), end: anchorFor(lines, 4), lines: "replaced B" },
+    ]
+
+    //#when / #then
+    expect(() => applyHashlineEdits(content, edits)).toThrow(/overlapping/i)
+  })
+
+  it("allows non-overlapping range edits", () => {
+    //#given
+    const content = "line 1\nline 2\nline 3\nline 4\nline 5"
+    const lines = content.split("\n")
+    const edits: HashlineEdit[] = [
+      { op: "replace", pos: anchorFor(lines, 1), end: anchorFor(lines, 2), lines: "replaced A" },
+      { op: "replace", pos: anchorFor(lines, 4), end: anchorFor(lines, 5), lines: "replaced B" },
+    ]
+
+    //#when
+    const result = applyHashlineEdits(content, edits)
+
+    //#then
+    expect(result).toEqual("replaced A\nline 3\nreplaced B")
   })
 })

@@ -63,7 +63,7 @@ export function applyReplaceLines(
   const corrected = autocorrectReplacementLines(originalRange, stripped)
   const restored = corrected.map((entry, idx) => {
     if (idx !== 0) return entry
-    return restoreLeadingIndent(lines[startLine - 1], entry)
+    return restoreLeadingIndent(lines[startLine - 1] ?? "", entry)
   })
   result.splice(startLine - 1, endLine - startLine + 1, ...restored)
   return result
@@ -149,12 +149,4 @@ export function applyPrepend(lines: string[], text: string | string[]): string[]
     return [...normalized]
   }
   return [...normalized, ...lines]
-}
-
-export function applyReplace(content: string, oldText: string, newText: string | string[]): string {
-  if (!content.includes(oldText)) {
-    throw new Error(`Text not found: "${oldText}"`)
-  }
-  const replacement = Array.isArray(newText) ? newText.join("\n") : newText
-  return content.replaceAll(oldText, replacement)
 }

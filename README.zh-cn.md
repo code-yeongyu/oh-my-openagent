@@ -218,9 +218,9 @@ Harness 问题是真的。绝大多数所谓的 Agent 故障，其实并不是�
 受 [oh-my-pi](https://github.com/can1357/oh-my-pi) 的启发，我们实现了 **Hashline** 技术。Agent 读到的每一行代码，末尾都会打上一个强绑定的内容哈希值：
 
 ```
-11#VK: function hello() {
-22#XJ:   return "world";
-33#MB: }
+11#VK| function hello() {
+22#XJ|   return "world";
+33#MB| }
 ```
 
 Agent 发起修改时，必须通过这些标签引用目标行。如果在此期间文件发生过变化，哈希验证就会失败，从而在代码被污染前直接驳回。不再有缩进空格错乱，彻底告别改错行的惨剧。

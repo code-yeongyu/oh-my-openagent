@@ -13,7 +13,7 @@ export function computeLineHash(lineNumber: number, content: string): string {
 
 export function formatHashLine(lineNumber: number, content: string): string {
   const hash = computeLineHash(lineNumber, content)
-  return `${lineNumber}#${hash}:${content}`
+  return `${lineNumber}#${hash}|${content}`
 }
 
 export function formatHashLines(content: string): string {

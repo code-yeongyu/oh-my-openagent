@@ -32,7 +32,7 @@ function resolveToolCallID(ctx: ToolContextWithCallID): string | undefined {
 
 function canCreateFromMissingFile(edits: HashlineEdit[]): boolean {
   if (edits.length === 0) return false
-  return edits.every((edit) => edit.type === "append" || edit.type === "prepend")
+  return edits.every((edit) => edit.op === "append" || edit.op === "prepend")
 }
 
 function buildSuccessMeta(
