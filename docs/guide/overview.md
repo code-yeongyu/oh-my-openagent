@@ -186,7 +186,7 @@ You can override specific agents or categories in your config:
 
   "categories": {
     // Frontend work: Gemini dominates visual tasks
-    "visual-engineering": { "model": "google/gemini-3.1-pro, "variant": "high" },
+    "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
 
     // Quick tasks: use the cheapest models
     "quick": { "model": "anthropic/claude-haiku-4-5" },
