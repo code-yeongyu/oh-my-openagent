@@ -38,6 +38,32 @@ describe("parseLineRef", () => {
     expect(() => parseLineRef(ref)).toThrow(/not a line number/i)
   })
 
+  it("extracts valid line number from mixed prefix like LINE42 without throwing", () => {
+    //#given — normalizeLineRef extracts 42#VK from LINE42#VK
+    const ref = "LINE42#VK"
+
+    //#when / #then — should parse successfully as line 42
+    const result = parseLineRef(ref)
+    expect(result.line).toBe(42)
+    expect(result.hash).toBe("VK")
+  })
+
+  it("gives specific hint when hyphenated prefix like line-ref is used", () => {
+    //#given
+    const ref = "line-ref#VK"
+
+    //#when / #then
+    expect(() => parseLineRef(ref)).toThrow(/not a line number/i)
+  })
+
+  it("gives specific hint when prefix contains a period like line.ref", () => {
+    //#given
+    const ref = "line.ref#VK"
+
+    //#when / #then
+    expect(() => parseLineRef(ref)).toThrow(/not a line number/i)
+  })
+
   it("accepts refs copied with markers and trailing content", () => {
     //#given
     const ref = ">>> 42#VK|const value = 1"
