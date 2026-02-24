@@ -44,6 +44,8 @@ import { tryFallbackRetry } from "./fallback-retry-handler"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { isCompactionAgent, findNearestMessageExcludingCompaction } from "./compaction-aware-message-resolver"
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
+import { sendPostCompactionContinuation } from "./post-compaction-continuation"
+import { COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
@@ -766,6 +768,11 @@ export class BackgroundManager {
         findBySession: (id) => this.findBySession(id),
         idleDeferralTimers: this.idleDeferralTimers,
         recentlyCompactedSessions: this.recentlyCompactedSessions,
+        onPostCompactionIdle: (t, sid) => {
+          if (t.agent?.startsWith(COUNCIL_MEMBER_KEY_PREFIX)) {
+            sendPostCompactionContinuation(this.client, t, sid)
+          }
+        },
         validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
         checkSessionTodos: (id) => this.checkSessionTodos(id),
         tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
@@ -1492,6 +1499,12 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             this.recentlyCompactedSessions.delete(sessionID)
             log("[background-agent] Polling: skipping post-compaction idle:", task.id)
             continue
+          }
+
+          // Refresh lastUpdate so the next poll's stale check doesn't kill
+          // the task while we're awaiting async validation
+          if (task.progress) {
+            task.progress.lastUpdate = new Date()
           }
 
           // Edge guard: Validate session has actual output before completing

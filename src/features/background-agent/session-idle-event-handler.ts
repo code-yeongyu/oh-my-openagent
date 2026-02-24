@@ -12,6 +12,7 @@ export function handleSessionIdleBackgroundEvent(args: {
   findBySession: (sessionID: string) => BackgroundTask | undefined
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   recentlyCompactedSessions?: Set<string>
+  onPostCompactionIdle?: (task: BackgroundTask, sessionID: string) => void
   validateSessionHasOutput: (sessionID: string) => Promise<boolean>
   checkSessionTodos: (sessionID: string) => Promise<boolean>
   tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
@@ -22,6 +23,7 @@ export function handleSessionIdleBackgroundEvent(args: {
     findBySession,
     idleDeferralTimers,
     recentlyCompactedSessions,
+    onPostCompactionIdle,
     validateSessionHasOutput,
     checkSessionTodos,
     tryCompleteTask,
@@ -37,6 +39,7 @@ export function handleSessionIdleBackgroundEvent(args: {
   if (recentlyCompactedSessions?.has(sessionID)) {
     recentlyCompactedSessions.delete(sessionID)
     log("[background-agent] Skipping post-compaction session.idle:", { taskId: task.id, sessionID })
+    onPostCompactionIdle?.(task, sessionID)
     return
   }
 
@@ -61,6 +64,13 @@ export function handleSessionIdleBackgroundEvent(args: {
       log("[background-agent] session.idle already deferred:", { elapsedMs, taskId: task.id })
     }
     return
+  }
+
+  // Refresh lastUpdate to prevent stale timeout from racing with this async validation.
+  // Without this, checkAndInterruptStaleTasks can kill the task synchronously
+  // while validateSessionHasOutput is still awaiting an API response.
+  if (task.progress) {
+    task.progress.lastUpdate = new Date()
   }
 
   validateSessionHasOutput(sessionID)
