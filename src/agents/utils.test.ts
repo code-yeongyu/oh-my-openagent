@@ -242,14 +242,28 @@ describe("createBuiltinAgents with model overrides", () => {
   test("createBuiltinAgents excludes disabled skills from availableSkills", async () => {
     // #given
     const disabledSkills = new Set(["playwright"])
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set([
+        "anthropic/claude-opus-4-6",
+        "opencode/kimi-k2.5-free",
+        "zai-coding-plan/glm-5",
+        "opencode/big-pickle",
+      ])
+    )
 
-    // #when
-    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined, undefined, disabledSkills)
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined, undefined, disabledSkills)
 
-    // #then
-    expect(agents.sisyphus.prompt).not.toContain("playwright")
-    expect(agents.sisyphus.prompt).toContain("frontend-ui-ux")
-    expect(agents.sisyphus.prompt).toContain("git-master")
+      // #then
+      expect(agents.sisyphus.prompt).not.toContain("playwright")
+      expect(agents.sisyphus.prompt).toContain("frontend-ui-ux")
+      expect(agents.sisyphus.prompt).toContain("git-master")
+    } finally {
+      cacheSpy.mockRestore()
+      fetchSpy.mockRestore()
+    }
   })
 
   test("includes custom agents in orchestrator prompts when provided via config", async () => {
@@ -589,20 +603,22 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
     }
   })
 
-  test("hephaestus is created when github-copilot provider is connected", async () => {
+  test("hephaestus is not created when only github-copilot provider is connected", async () => {
     // #given - github-copilot provider has models available
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["github-copilot/gpt-5.3-codex"])
     )
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
 
     try {
       // #when
       const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
 
       // #then
-      expect(agents.hephaestus).toBeDefined()
+      expect(agents.hephaestus).toBeUndefined()
     } finally {
       fetchSpy.mockRestore()
+      cacheSpy.mockRestore()
     }
   })
 
