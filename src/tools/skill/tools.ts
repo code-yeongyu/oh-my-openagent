@@ -10,6 +10,8 @@ import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
 import { discoverCommandsSync } from "../slashcommand/command-discovery"
 import type { CommandInfo } from "../slashcommand/types"
 import { formatLoadedCommand } from "../slashcommand/command-output-formatter"
+import { safeCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../config/schema"
 // Priority: project > user > opencode/opencode-project > builtin/config
 const scopePriority: Record<string, number> = {
   project: 4,
@@ -110,10 +112,13 @@ async function extractSkillBody(skill: LoadedSkill): Promise<string> {
   return templateMatch ? templateMatch[1].trim() : skill.definition.template || ""
 }
 
+const DEFAULT_TOON_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
+
 async function formatMcpCapabilities(
   skill: LoadedSkill,
   manager: SkillMcpManager,
-  sessionID: string
+  sessionID: string,
+  toonConfig: ToonCompressionConfig = DEFAULT_TOON_CONFIG
 ): Promise<string | null> {
   if (!skill.mcpConfig || Object.keys(skill.mcpConfig).length === 0) {
     return null
@@ -153,7 +158,7 @@ async function formatMcpCapabilities(
           sections.push("")
           sections.push("**inputSchema:**")
           sections.push("```json")
-          sections.push(JSON.stringify(t.inputSchema, null, 2))
+          sections.push(safeCompress(t.inputSchema, toonConfig))
           sections.push("```")
           sections.push("")
         }
@@ -264,7 +269,8 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
           const mcpInfo = await formatMcpCapabilities(
             matchedSkill,
             options.mcpManager,
-            options.getSessionID()
+            options.getSessionID(),
+            options.toonCompression ?? DEFAULT_TOON_CONFIG
           )
           if (mcpInfo) {
             output.push(mcpInfo)

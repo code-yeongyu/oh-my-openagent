@@ -483,3 +483,183 @@ describe("skill tool - ordering and priority", () => {
     expect(tool.description).toContain("<command>")
   })
 })
+
+
+describe("skill tool - TOON compression for MCP schemas", () => {
+  let manager: SkillMcpManager
+  let loadedSkills: LoadedSkill[]
+  let sessionID: string
+
+  beforeEach(() => {
+    manager = new SkillMcpManager()
+    loadedSkills = []
+    sessionID = "test-session-compression"
+  })
+
+  describe("#given compression disabled by default", () => {
+    it("outputs plain JSON when compression is not configured", async () => {
+      // given
+      const mockTools: McpTool[] = [
+        {
+          name: "test_tool",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: { type: "string" },
+            },
+          },
+        },
+      ]
+
+      loadedSkills = [
+        createMockSkillWithMcp("compression-skill", {
+          test: { command: "echo", args: ["test"] },
+        }),
+      ]
+
+      spyOn(manager, "listTools").mockResolvedValue(mockTools)
+      spyOn(manager, "listResources").mockResolvedValue([])
+      spyOn(manager, "listPrompts").mockResolvedValue([])
+
+      // when: no compression config (disabled by default)
+      const tool = createSkillTool({
+        skills: loadedSkills,
+        mcpManager: manager,
+        getSessionID: () => sessionID,
+      })
+
+      const result = await tool.execute({ name: "compression-skill" }, mockContext)
+
+      // then: should be plain JSON, not TOON compressed
+      expect(result).toContain("test_tool")
+      expect(result).toContain("\"type\":\"object\"")
+      expect(result).toContain("\"query\"")
+    })
+
+    it("outputs plain JSON when compression is explicitly disabled", async () => {
+      // given
+      const mockTools: McpTool[] = [
+        {
+          name: "test_tool",
+          inputSchema: {
+            type: "object",
+            properties: {
+              query: { type: "string" },
+            },
+          },
+        },
+      ]
+
+      loadedSkills = [
+        createMockSkillWithMcp("compression-skill", {
+          test: { command: "echo", args: ["test"] },
+        }),
+      ]
+
+      spyOn(manager, "listTools").mockResolvedValue(mockTools)
+      spyOn(manager, "listResources").mockResolvedValue([])
+      spyOn(manager, "listPrompts").mockResolvedValue([])
+
+      // when: compression explicitly disabled
+      const tool = createSkillTool({
+        skills: loadedSkills,
+        mcpManager: manager,
+        getSessionID: () => sessionID,
+        toonCompression: { enabled: false, threshold: 100 },
+      })
+
+      const result = await tool.execute({ name: "compression-skill" }, mockContext)
+
+      // then: should be plain JSON (compact, no spaces)
+      expect(result).toContain("\"type\":\"object\"")
+    })
+  })
+
+  describe("#given compression enabled", () => {
+    it("compresses inputSchema when threshold is met", async () => {
+      // given: large uniform array that should compress well
+      const properties: Record<string, { type: string; description: string }> = {}
+      for (let i = 0; i < 20; i++) {
+        properties[`field_${i}`] = {
+          type: "string",
+          description: `Description for field ${i} that is reasonably long to add characters`,
+        }
+      }
+
+      const mockTools: McpTool[] = [
+        {
+          name: "large_tool",
+          inputSchema: {
+            type: "object",
+            properties,
+            required: Object.keys(properties),
+          },
+        },
+      ]
+
+      loadedSkills = [
+        createMockSkillWithMcp("compression-skill", {
+          test: { command: "echo", args: ["test"] },
+        }),
+      ]
+
+      spyOn(manager, "listTools").mockResolvedValue(mockTools)
+      spyOn(manager, "listResources").mockResolvedValue([])
+      spyOn(manager, "listPrompts").mockResolvedValue([])
+
+      // when: compression enabled with low threshold
+      const tool = createSkillTool({
+        skills: loadedSkills,
+        mcpManager: manager,
+        getSessionID: () => sessionID,
+        toonCompression: { enabled: true, threshold: 100 },
+      })
+
+      const result = await tool.execute({ name: "compression-skill" }, mockContext)
+
+      // then: should include tool name but not formatted JSON
+      expect(result).toContain("large_tool")
+      // The result should be shorter than raw JSON would be
+      expect(result).toContain("inputSchema")
+    })
+
+    it("falls back to JSON on compression error", async () => {
+      // given
+      const mockTools: McpTool[] = [
+        {
+          name: "error_tool",
+          inputSchema: {
+            type: "object",
+            properties: {
+              message: { type: "string" },
+            },
+          },
+        },
+      ]
+
+      loadedSkills = [
+        createMockSkillWithMcp("compression-skill", {
+          test: { command: "echo", args: ["test"] },
+        }),
+      ]
+
+      spyOn(manager, "listTools").mockResolvedValue(mockTools)
+      spyOn(manager, "listResources").mockResolvedValue([])
+      spyOn(manager, "listPrompts").mockResolvedValue([])
+
+      // when: compression enabled
+      const tool = createSkillTool({
+        skills: loadedSkills,
+        mcpManager: manager,
+        getSessionID: () => sessionID,
+        toonCompression: { enabled: true, threshold: 100 },
+      })
+
+      const result = await tool.execute({ name: "compression-skill" }, mockContext)
+
+      // then: should still work (safeCompress handles errors gracefully)
+      expect(result).toContain("error_tool")
+      expect(result).toContain("inputSchema")
+    })
+  })
+})

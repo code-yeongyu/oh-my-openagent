@@ -4,9 +4,25 @@ import { extractMessages, getErrorMessage } from "./session-messages"
 import { formatMessageTime } from "./time-format"
 import { truncateText } from "./truncate-text"
 import { formatTaskStatus } from "./task-status-format"
+import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 
 const MAX_MESSAGE_LIMIT = 100
 const THINKING_MAX_CHARS = 2000
+
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
+
+export interface FormatFullSessionOptions {
+  includeThinking: boolean
+  messageLimit?: number
+  sinceMessageId?: string
+  includeToolResults: boolean
+  thinkingMaxChars?: number
+  compressionConfig?: ToonCompressionConfig
+}
 
 function extractToolResultText(part: NonNullable<BackgroundOutputMessage["parts"]>[number]): string[] {
   if (typeof part.content === "string" && part.content.length > 0) {
@@ -33,17 +49,13 @@ function extractToolResultText(part: NonNullable<BackgroundOutputMessage["parts"
 export async function formatFullSession(
   task: BackgroundTask,
   client: BackgroundOutputClient,
-  options: {
-    includeThinking: boolean
-    messageLimit?: number
-    sinceMessageId?: string
-    includeToolResults: boolean
-    thinkingMaxChars?: number
-  }
+  options: FormatFullSessionOptions,
 ): Promise<string> {
   if (!task.sessionID) {
     return formatTaskStatus(task)
   }
+
+  const compressionConfig = options.compressionConfig ?? DEFAULT_COMPRESSION_CONFIG
 
   const messagesResult: BackgroundOutputMessagesResult = await client.session.messages({
     path: { id: task.sessionID },
@@ -144,5 +156,39 @@ export async function formatFullSession(
     }
   }
 
-  return lines.join("\n")
+  const output = lines.join("\n")
+
+  // Check if output should be compressed
+  if (compressionConfig.enabled && output.length > compressionConfig.threshold) {
+    // Prepare structured message data for compression
+    const messageData = visibleMessages.map((m) => ({
+      id: m.id,
+      role: m.info?.role,
+      agent: m.info?.agent,
+      time: m.info?.time,
+      parts: m.parts,
+    }))
+
+    if (shouldCompress(messageData, compressionConfig.threshold)) {
+      const compressed = safeCompress(messageData, compressionConfig)
+      const header: string[] = []
+      header.push("# Full Session Output")
+      header.push("")
+      header.push(`Task ID: ${task.id}`)
+      header.push(`Description: ${task.description}`)
+      header.push(`Status: ${task.status}`)
+      header.push(`Session ID: ${task.sessionID}`)
+      header.push(`Total messages: ${normalizedMessages.length}`)
+      header.push(`Returned: ${visibleMessages.length}`)
+      header.push(`Has more: ${hasMore ? "true" : "false"}`)
+      header.push("")
+      header.push("## Messages")
+      header.push("")
+      header.push("[Compressed output]")
+      header.push(compressed)
+      return header.join("\n")
+    }
+  }
+
+  return output
 }

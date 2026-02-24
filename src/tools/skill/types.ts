@@ -1,6 +1,6 @@
 import type { SkillScope, LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { SkillMcpManager } from "../../features/skill-mcp-manager"
-import type { GitMasterConfig } from "../../config/schema"
+import type { GitMasterConfig, ToonCompressionConfig } from "../../config/schema"
 import type { CommandInfo } from "../slashcommand/types"
 
 export interface SkillArgs {
@@ -33,4 +33,6 @@ export interface SkillLoadOptions {
   /** Git master configuration for watermark/co-author settings */
   gitMasterConfig?: GitMasterConfig
   disabledSkills?: Set<string>
+  /** TOON compression config for MCP tool schemas (default: { enabled: false, threshold: 5000 }) */
+  toonCompression?: ToonCompressionConfig
 }

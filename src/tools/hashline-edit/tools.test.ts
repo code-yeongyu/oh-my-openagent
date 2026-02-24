@@ -342,3 +342,83 @@ describe("createHashlineEditTool", () => {
     expect(envelope.lineEnding).toBe("\r\n")
   })
 })
+
+describe("createHashlineEditTool compression", () => {
+  let tempDir: string
+  let tool: ReturnType<typeof createHashlineEditTool>
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "hashline-edit-compression-test-"))
+    tool = createHashlineEditTool()
+  })
+
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  it("returns output unchanged when compression is disabled (default)", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+    const hash = computeLineHash(1, "line1")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ op: "replace", pos: `1#${hash}`, lines: "modified" }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toBe(`Updated ${filePath}`)
+    expect(typeof result).toBe("string")
+  })
+
+  it("returns error output unchanged (errors should not be compressed)", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ op: "replace", pos: "1#ZZ", lines: "new" }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toContain("Error")
+    expect(result).toContain(">>>")
+  })
+
+  it("preserves existing tool behavior with compression integration", async () => {
+    //#given
+    const filePath = path.join(tempDir, "test.txt")
+    fs.writeFileSync(filePath, "line1\nline2\nline3")
+    const hash1 = computeLineHash(1, "line1")
+    const hash2 = computeLineHash(2, "line2")
+    const hash3 = computeLineHash(3, "line3")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [
+          { op: "replace", pos: `2#${hash2}`, lines: "replaced" },
+          { op: "append", pos: `3#${hash3}`, lines: "appended" },
+          { op: "prepend", pos: `1#${hash1}`, lines: "prepended" },
+        ],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toBe(`Updated ${filePath}`)
+    const content = fs.readFileSync(filePath, "utf-8")
+    expect(content).toBe("prepended\nline1\nreplaced\nline3\nappended")
+  })
+})
