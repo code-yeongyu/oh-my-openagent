@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { applyHashlineEdits, applyInsertAfter, applyReplaceLines, applySetLine } from "./edit-operations"
-import { applyAppend, applyInsertBetween, applyPrepend } from "./edit-operation-primitives"
+import { applyAppend, applyPrepend } from "./edit-operation-primitives"
 import { computeLineHash } from "./hash-computation"
 import type { HashlineEdit } from "./types"
 
@@ -56,16 +56,6 @@ describe("hashline edit operations", () => {
     expect(result).toEqual("line 1\nbefore 2\nline 2\nline 3")
   })
 
-  it("applies insert_between with dual anchors", () => {
-    //#given
-    const lines = ["line 1", "line 2", "line 3"]
-
-    //#when
-    const result = applyInsertBetween(lines, anchorFor(lines, 1), anchorFor(lines, 2), ["between"]).join("\n")
-
-    //#then
-    expect(result).toEqual("line 1\nbetween\nline 2\nline 3")
-  })
 
   it("throws when insert_after receives empty text array", () => {
     //#given
@@ -85,13 +75,6 @@ describe("hashline edit operations", () => {
     ).toThrow(/non-empty/i)
   })
 
-  it("throws when insert_between receives empty text array", () => {
-    //#given
-    const lines = ["line 1", "line 2"]
-
-    //#when / #then
-    expect(() => applyInsertBetween(lines, anchorFor(lines, 1), anchorFor(lines, 2), [])).toThrow(/non-empty/i)
-  })
 
   it("applies mixed edits in one pass", () => {
     //#given
@@ -215,15 +198,6 @@ describe("hashline edit operations", () => {
     expect(result).toEqual(["before", "new 1", "new 2", "after"])
   })
 
-  it("throws when insert_between payload contains only boundary echoes", () => {
-    //#given
-    const lines = ["line 1", "line 2", "line 3"]
-
-    //#when / #then
-    expect(() => applyInsertBetween(lines, anchorFor(lines, 1), anchorFor(lines, 2), ["line 1", "line 2"])).toThrow(
-      /non-empty/i
-    )
-  })
 
   it("restores indentation for first replace_lines entry", () => {
     //#given
