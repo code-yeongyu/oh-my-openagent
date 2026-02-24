@@ -38,6 +38,7 @@ export function parseLineRef(ref: string): LineRef {
       hash: match[2],
     }
   }
+  // normalized equals ref.trim() in all error paths — extraction only succeeds for valid refs
   const hashIdx = normalized.indexOf('#')
   if (hashIdx > 0) {
     const prefix = normalized.slice(0, hashIdx)
@@ -150,7 +151,6 @@ function parseLineRefWithHint(ref: string, lines: string[]): LineRef {
     throw parseError
   }
 }
-
 
 export function validateLineRefs(lines: string[], refs: string[]): void {
   const mismatches: HashMismatch[] = []
