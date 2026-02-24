@@ -6,6 +6,8 @@ import {
 } from "./storage";
 import { TARGET_TOOLS, AGENT_TOOLS, REMINDER_MESSAGE } from "./constants";
 import type { AgentUsageState } from "./types";
+import { getSessionAgent } from "../../features/claude-code-session-state";
+import { COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents";
 
 interface ToolExecuteInput {
   tool: string;
@@ -60,6 +62,12 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
     output: ToolExecuteOutput,
   ) => {
     const { tool, sessionID } = input;
+
+    const agent = getSessionAgent(sessionID);
+    if (agent?.startsWith(COUNCIL_MEMBER_KEY_PREFIX)) {
+      return;
+    }
+
     const toolLower = tool.toLowerCase();
 
     if (AGENT_TOOLS.has(toolLower)) {
