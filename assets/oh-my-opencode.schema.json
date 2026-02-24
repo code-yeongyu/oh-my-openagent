@@ -3254,6 +3254,15 @@
         "additionalProperties": false
       }
     },
+    "agent_display_names": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
     "claude_code": {
       "type": "object",
       "properties": {
