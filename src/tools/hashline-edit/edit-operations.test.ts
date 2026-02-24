@@ -236,6 +236,22 @@ describe("hashline edit operations", () => {
     expect(result).toEqual(["if (x) {", "  return 3", "  return 4", "}"])
   })
 
+  it("preserves blank lines and indentation in range replace (no false unwrap)", () => {
+    //#given — reproduces the 애국가 bug where blank+indented lines collapse
+    const lines = ["", "동해물과 백두산이 마르고 닳도록", "하느님이 보우하사 우리나라 만세", "", "무궁화 삼천리 화려강산", "대한사람 대한으로 길이 보전하세", ""]
+
+    //#when — replace the range with indented version (blank lines preserved)
+    const result = applyReplaceLines(
+      lines,
+      anchorFor(lines, 1),
+      anchorFor(lines, 7),
+      ["", "  동해물과 백두산이 마르고 닳도록", "  하느님이 보우하사 우리나라 만세", "", "  무궁화 삼천리 화려강산", "  대한사람 대한으로 길이 보전하세", ""]
+    )
+
+    //#then — all 7 lines preserved with indentation, not collapsed to 3
+    expect(result).toEqual(["", "  동해물과 백두산이 마르고 닳도록", "  하느님이 보우하사 우리나라 만세", "", "  무궁화 삼천리 화려강산", "  대한사람 대한으로 길이 보전하세", ""])
+  })
+
   it("collapses wrapped replacement span back to unique original single line", () => {
     //#given
     const lines = [
@@ -352,5 +368,34 @@ describe("hashline edit operations", () => {
 
     //#then
     expect(result).toEqual(["const a = 10;", "const b = 20;"])
+  })
+
+  it("throws on overlapping range edits", () => {
+    //#given
+    const content = "line 1\nline 2\nline 3\nline 4\nline 5"
+    const lines = content.split("\n")
+    const edits: HashlineEdit[] = [
+      { op: "replace", pos: anchorFor(lines, 1), end: anchorFor(lines, 3), lines: "replaced A" },
+      { op: "replace", pos: anchorFor(lines, 2), end: anchorFor(lines, 4), lines: "replaced B" },
+    ]
+
+    //#when / #then
+    expect(() => applyHashlineEdits(content, edits)).toThrow(/overlapping/i)
+  })
+
+  it("allows non-overlapping range edits", () => {
+    //#given
+    const content = "line 1\nline 2\nline 3\nline 4\nline 5"
+    const lines = content.split("\n")
+    const edits: HashlineEdit[] = [
+      { op: "replace", pos: anchorFor(lines, 1), end: anchorFor(lines, 2), lines: "replaced A" },
+      { op: "replace", pos: anchorFor(lines, 4), end: anchorFor(lines, 5), lines: "replaced B" },
+    ]
+
+    //#when
+    const result = applyHashlineEdits(content, edits)
+
+    //#then
+    expect(result).toEqual("replaced A\nline 3\nreplaced B")
   })
 })
