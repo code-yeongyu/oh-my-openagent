@@ -168,14 +168,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("opencode")
   })
 
-  test("hephaestus requires openai/github-copilot/opencode provider", () => {
+  test("hephaestus requires openai/opencode provider (not github-copilot since gpt-5.3-codex unavailable there)", () => {
     // #given - hephaestus agent requirement
     const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
 
     // #when - accessing hephaestus requirement
-    // #then - requiresProvider is set to openai, github-copilot, opencode (not requiresModel)
+    // #then - requiresProvider is set to openai and opencode only (github-copilot removed)
     expect(hephaestus).toBeDefined()
-    expect(hephaestus.requiresProvider).toEqual(["openai", "github-copilot", "opencode"])
+    expect(hephaestus.requiresProvider).toEqual(["openai", "opencode"])
     expect(hephaestus.requiresModel).toBeUndefined()
   })
 
@@ -495,5 +495,37 @@ describe("requiresModel field in categories", () => {
 
     // when / #then
     expect(artistry.requiresModel).toBe("gemini-3-pro")
+  })
+})
+
+describe("gpt-5.3-codex provider restrictions", () => {
+  test("no gpt-5.3-codex entry in AGENT_MODEL_REQUIREMENTS includes github-copilot as provider", () => {
+    // given - all agent requirements
+    const allAgentEntries = Object.values(AGENT_MODEL_REQUIREMENTS).flatMap(
+      (req) => req.fallbackChain
+    )
+
+    // when - filtering entries with gpt-5.3-codex model
+    const codexEntries = allAgentEntries.filter((entry) => entry.model === "gpt-5.3-codex")
+
+    // then - none of them include github-copilot as a provider
+    for (const entry of codexEntries) {
+      expect(entry.providers).not.toContain("github-copilot")
+    }
+  })
+
+  test("no gpt-5.3-codex entry in CATEGORY_MODEL_REQUIREMENTS includes github-copilot as provider", () => {
+    // given - all category requirements
+    const allCategoryEntries = Object.values(CATEGORY_MODEL_REQUIREMENTS).flatMap(
+      (req) => req.fallbackChain
+    )
+
+    // when - filtering entries with gpt-5.3-codex model
+    const codexEntries = allCategoryEntries.filter((entry) => entry.model === "gpt-5.3-codex")
+
+    // then - none of them include github-copilot as a provider
+    for (const entry of codexEntries) {
+      expect(entry.providers).not.toContain("github-copilot")
+    }
   })
 })

@@ -750,10 +750,6 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "explore": {
       "model": "github-copilot/gpt-5-mini",
     },
-    "hephaestus": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "medium",
-    },
     "librarian": {
       "model": "github-copilot/claude-sonnet-4.5",
     },
@@ -786,16 +782,12 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/gemini-3-pro-preview",
       "variant": "high",
     },
-    "deep": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "medium",
-    },
     "quick": {
       "model": "github-copilot/claude-haiku-4.5",
     },
     "ultrabrain": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "github-copilot/gemini-3-pro-preview",
+      "variant": "high",
     },
     "unspecified-high": {
       "model": "github-copilot/claude-sonnet-4.5",
@@ -824,10 +816,6 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     "explore": {
       "model": "github-copilot/gpt-5-mini",
     },
-    "hephaestus": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "medium",
-    },
     "librarian": {
       "model": "github-copilot/claude-sonnet-4.5",
     },
@@ -860,16 +848,12 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/gemini-3-pro-preview",
       "variant": "high",
     },
-    "deep": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "medium",
-    },
     "quick": {
       "model": "github-copilot/claude-haiku-4.5",
     },
     "ultrabrain": {
-      "model": "github-copilot/gpt-5.3-codex",
-      "variant": "xhigh",
+      "model": "github-copilot/gemini-3-pro-preview",
+      "variant": "high",
     },
     "unspecified-high": {
       "model": "github-copilot/claude-opus-4.6",
@@ -1285,7 +1269,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "opencode/claude-haiku-4-5",
     },
     "hephaestus": {
-      "model": "github-copilot/gpt-5.3-codex",
+      "model": "opencode/gpt-5.3-codex",
       "variant": "medium",
     },
     "librarian": {
@@ -1321,14 +1305,14 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "variant": "high",
     },
     "deep": {
-      "model": "github-copilot/gpt-5.3-codex",
+      "model": "opencode/gpt-5.3-codex",
       "variant": "medium",
     },
     "quick": {
       "model": "github-copilot/claude-haiku-4.5",
     },
     "ultrabrain": {
-      "model": "github-copilot/gpt-5.3-codex",
+      "model": "opencode/gpt-5.3-codex",
       "variant": "xhigh",
     },
     "unspecified-high": {
