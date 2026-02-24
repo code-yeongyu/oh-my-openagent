@@ -1,12 +1,37 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { randomUUID } from "node:crypto"
-import { writeFile, unlink, mkdir } from "node:fs/promises"
+import { writeFile, unlink, mkdir, readdir, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
-import { COUNCIL_MEMBER_PROMPT, COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM } from "../../agents/athena"
+import { COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM } from "../../agents/athena"
 
 const CLEANUP_DELAY_MS = 30 * 60 * 1000
 const COUNCIL_TMP_DIR = ".sisyphus/tmp"
+
+const COUNCIL_FILE_PREFIX = "athena-council-"
+
+async function cleanupStaleTempFiles(directory: string): Promise<void> {
+  const tmpDir = join(directory, COUNCIL_TMP_DIR)
+  try {
+    const files = await readdir(tmpDir)
+    const now = Date.now()
+    for (const file of files) {
+      if (!file.startsWith(COUNCIL_FILE_PREFIX) || !file.endsWith(".md")) continue
+      const filePath = join(tmpDir, file)
+      try {
+        const fileStat = await stat(filePath)
+        if (now - fileStat.mtimeMs > CLEANUP_DELAY_MS) {
+          await unlink(filePath)
+          log("[prepare-council-prompt] Cleaned up stale temp file", { filePath })
+        }
+      } catch {
+        // File may have been deleted between readdir and stat
+      }
+    }
+  } catch {
+    // Directory may not exist yet — nothing to clean
+  }
+}
 
 export function createPrepareCouncilPromptTool(directory: string): ToolDefinition {
   const description = `Save a council analysis prompt to a temp file so council members can read it.
@@ -20,6 +45,10 @@ The "mode" parameter controls whether council members can delegate exploration t
 - "delegation": Members can delegate to explore/librarian agents. Faster, lighter context.
 
 Returns the file path to reference in subsequent task() calls.`
+
+  cleanupStaleTempFiles(directory).catch((err) => {
+    log("[prepare-council-prompt] Startup cleanup failed", { error: String(err) })
+  })
 
   return tool({
     description,
@@ -40,8 +69,7 @@ Returns the file path to reference in subsequent task() calls.`
       const filePath = join(tmpDir, filename)
 
       const modeAddendum = mode === "delegation" ? COUNCIL_DELEGATION_ADDENDUM : COUNCIL_SOLO_ADDENDUM
-      const content = `${COUNCIL_MEMBER_PROMPT}
-${modeAddendum}
+      const content = `${modeAddendum}
 
 ## Analysis Question
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { applyModelThinkingConfig } from "./model-thinking-config"
 
@@ -10,20 +10,20 @@ const BASE_CONFIG: AgentConfig = {
 }
 
 describe("applyModelThinkingConfig", () => {
-  describe("given a GPT model", () => {
-    it("returns reasoningEffort medium", () => {
+  describe("#given a GPT model", () => {
+    test("#then returns reasoningEffort medium", () => {
       const result = applyModelThinkingConfig(BASE_CONFIG, "gpt-5.2")
       expect(result).toEqual({ ...BASE_CONFIG, reasoningEffort: "medium" })
     })
 
-    it("returns reasoningEffort medium for openai-prefixed model", () => {
+    test("#then returns reasoningEffort medium for openai-prefixed model", () => {
       const result = applyModelThinkingConfig(BASE_CONFIG, "openai/gpt-5.2")
       expect(result).toEqual({ ...BASE_CONFIG, reasoningEffort: "medium" })
     })
   })
 
-  describe("given an Anthropic model", () => {
-    it("returns thinking config with budgetTokens 32000", () => {
+  describe("#given an Anthropic model", () => {
+    test("#then returns thinking config with budgetTokens 32000", () => {
       const result = applyModelThinkingConfig(BASE_CONFIG, "anthropic/claude-opus-4-6")
       expect(result).toEqual({
         ...BASE_CONFIG,
@@ -32,29 +32,29 @@ describe("applyModelThinkingConfig", () => {
     })
   })
 
-  describe("given a Google model", () => {
-    it("returns base config unchanged", () => {
+  describe("#given a Google model", () => {
+    test("#then returns base config unchanged", () => {
       const result = applyModelThinkingConfig(BASE_CONFIG, "google/gemini-3-pro")
       expect(result).toBe(BASE_CONFIG)
     })
   })
 
-  describe("given a Kimi model", () => {
-    it("returns base config unchanged", () => {
+  describe("#given a Kimi model", () => {
+    test("#then returns base config unchanged", () => {
       const result = applyModelThinkingConfig(BASE_CONFIG, "kimi/kimi-k2.5")
       expect(result).toBe(BASE_CONFIG)
     })
   })
 
-  describe("given a model with no provider prefix", () => {
-    it("returns base config unchanged for non-GPT model", () => {
+  describe("#given a model with no provider prefix", () => {
+    test("#then returns base config unchanged for non-GPT model", () => {
       const result = applyModelThinkingConfig(BASE_CONFIG, "gemini-3-pro")
       expect(result).toBe(BASE_CONFIG)
     })
   })
 
-  describe("given a Claude model through a non-Anthropic provider", () => {
-    it("returns thinking config for github-copilot/claude-opus-4-6", () => {
+  describe("#given a Claude model through a non-Anthropic provider", () => {
+    test("#then returns thinking config for github-copilot/claude-opus-4-6", () => {
       const result = applyModelThinkingConfig(BASE_CONFIG, "github-copilot/claude-opus-4-6")
       expect(result).toEqual({
         ...BASE_CONFIG,
@@ -62,7 +62,7 @@ describe("applyModelThinkingConfig", () => {
       })
     })
 
-    it("returns thinking config for opencode/claude-opus-4-6", () => {
+    test("#then returns thinking config for opencode/claude-opus-4-6", () => {
       const result = applyModelThinkingConfig(BASE_CONFIG, "opencode/claude-opus-4-6")
       expect(result).toEqual({
         ...BASE_CONFIG,
@@ -70,7 +70,7 @@ describe("applyModelThinkingConfig", () => {
       })
     })
 
-    it("returns thinking config for opencode/claude-sonnet-4-6", () => {
+    test("#then returns thinking config for opencode/claude-sonnet-4-6", () => {
       const result = applyModelThinkingConfig(BASE_CONFIG, "opencode/claude-sonnet-4-6")
       expect(result).toEqual({
         ...BASE_CONFIG,

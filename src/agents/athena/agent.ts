@@ -236,9 +236,6 @@ export function createAthenaAgent(model: string): AgentConfig {
   const restrictions = createAgentToolRestrictions(["write", "edit", "call_omo_agent"])
 
   // question permission is set by tool-config-handler.ts based on CLI mode (allow/deny)
-  const permission = {
-    ...restrictions.permission,
-  }
 
   const base = {
     description:
@@ -246,7 +243,7 @@ export function createAthenaAgent(model: string): AgentConfig {
     mode: MODE,
     model,
     temperature: 0.1,
-    permission,
+    permission: restrictions.permission,
     prompt: ATHENA_SYSTEM_PROMPT,
     color: "#1F8EFA",
   }
