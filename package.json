@@ -60,6 +60,7 @@
     "@opencode-ai/sdk": "^1.1.19",
     "commander": "^14.0.2",
     "detect-libc": "^2.0.0",
+    "diff": "^8.0.3",
     "js-yaml": "^4.1.1",
     "jsonc-parser": "^3.3.1",
     "picocolors": "^1.1.1",

@@ -1,6 +1,6 @@
 # src/ — Plugin Source
 
-**Generated:** 2026-02-21
+**Generated:** 2026-02-24
 
 ## OVERVIEW
 
@@ -14,7 +14,7 @@ Root source directory. Entry point `index.ts` orchestrates 4-step initialization
 | `plugin-config.ts` | JSONC parse, multi-level merge (user → project → defaults), Zod validation |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
 | `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry |
-| `create-hooks.ts` | 3-tier hook composition: Core(35) + Continuation(7) + Skill(2) |
+| `create-hooks.ts` | 3-tier hook composition: Core(37) + Continuation(7) + Skill(2) |
 | `plugin-interface.ts` | Assembles 8 OpenCode hook handlers into PluginInterface |
 
 ## CONFIG LOADING
@@ -32,9 +32,9 @@ loadPluginConfig(directory, ctx)
 
 ```
 createHooks()
-  ├─→ createCoreHooks()           # 35 hooks
-  │   ├─ createSessionHooks()     # 21: contextWindowMonitor, thinkMode, ralphLoop, sessionRecovery, jsonErrorRecovery, sisyphusGptHephaestusReminder, anthropicEffort...
-  │   ├─ createToolGuardHooks()   # 10: commentChecker, rulesInjector, writeExistingFileGuard, hashlineEditDiffEnhancer...
+  ├─→ createCoreHooks()           # 37 hooks
+  │   ├─ createSessionHooks()     # 23: contextWindowMonitor, thinkMode, ralphLoop, modelFallback, runtimeFallback, noSisyphusGpt, noHephaestusNonGpt, anthropicEffort...
+  │   ├─ createToolGuardHooks()   # 10: commentChecker, rulesInjector, writeExistingFileGuard, jsonErrorRecovery, hashlineReadEnhancer...
   │   └─ createTransformHooks()   # 4: claudeCodeHooks, keywordDetector, contextInjector, thinkingBlockValidator
   ├─→ createContinuationHooks()   # 7: todoContinuationEnforcer, atlas, stopContinuationGuard...
   └─→ createSkillHooks()          # 2: categorySkillReminder, autoSlashCommand

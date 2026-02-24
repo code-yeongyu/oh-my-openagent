@@ -1,6 +1,6 @@
 # src/agents/ — 13 Agent Definitions
 
-**Generated:** 2026-02-21
+**Generated:** 2026-02-24
 
 ## OVERVIEW
 
