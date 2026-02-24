@@ -177,6 +177,28 @@ describe("hashline edit operations", () => {
     expect(result).toEqual(["if (x) {", "  return 2", "}"])
   })
 
+  it("preserves intentional indentation removal (tab to no-tab)", () => {
+    //#given
+    const lines = ["# Title", "\t1절", "content"]
+
+    //#when
+    const result = applySetLine(lines, anchorFor(lines, 2), "1절")
+
+    //#then
+    expect(result).toEqual(["# Title", "1절", "content"])
+  })
+
+  it("preserves intentional indentation removal (spaces to no-spaces)", () => {
+    //#given
+    const lines = ["function foo() {", "    indented", "}"]
+
+    //#when
+    const result = applySetLine(lines, anchorFor(lines, 2), "indented")
+
+    //#then
+    expect(result).toEqual(["function foo() {", "indented", "}"])
+  })
+
   it("strips boundary echo around replace_lines content", () => {
     //#given
     const lines = ["before", "old 1", "old 2", "after"]

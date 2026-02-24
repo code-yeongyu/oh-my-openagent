@@ -159,6 +159,7 @@ export function restoreIndentForPairedReplacement(
     if (leadingWhitespace(line).length > 0) return line
     const indent = leadingWhitespace(originalLines[idx])
     if (indent.length === 0) return line
+    if (originalLines[idx].trim() === line.trim()) return line
     return `${indent}${line}`
   })
 }

@@ -53,6 +53,7 @@ export function restoreLeadingIndent(templateLine: string, line: string): string
   const templateIndent = leadingWhitespace(templateLine)
   if (templateIndent.length === 0) return line
   if (leadingWhitespace(line).length > 0) return line
+  if (templateLine.trim() === line.trim()) return line
   return `${templateIndent}${line}`
 }
 
