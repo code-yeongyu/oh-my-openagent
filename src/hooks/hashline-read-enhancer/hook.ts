@@ -1,6 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { computeLineHash } from "../../tools/hashline-edit/hash-computation"
-import { toHashlineContent } from "../../tools/hashline-edit/diff-utils"
 
 interface HashlineReadEnhancerConfig {
   hashline_edit?: { enabled: boolean }
@@ -137,10 +136,6 @@ function extractFilePath(metadata: unknown): string | undefined {
 }
 
 async function appendWriteHashlineOutput(output: { output: string; metadata: unknown }): Promise<void> {
-  if (output.output.includes("Updated file (LINE#ID|content):")) {
-    return
-  }
-
   const filePath = extractFilePath(output.metadata)
   if (!filePath) {
     return
@@ -152,8 +147,8 @@ async function appendWriteHashlineOutput(output: { output: string; metadata: unk
   }
 
   const content = await file.text()
-  const hashlined = toHashlineContent(content)
-  output.output = `${output.output}\n\nUpdated file (LINE#ID|content):\n${hashlined}`
+  const lineCount = content === "" ? 0 : content.split("\n").length
+  output.output = `File written successfully. ${lineCount} lines written.`
 }
 
 export function createHashlineReadEnhancerHook(
