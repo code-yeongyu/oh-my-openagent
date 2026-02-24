@@ -55,8 +55,8 @@ Question({
       question: "How should council members analyze?",
       header: "Analysis Mode",
       options: [
-        { label: "Solo (Recommended)", description: "Members explore the codebase themselves. More thorough and in-depth, but slower and uses more tokens." },
-        { label: "Delegation", description: "Members delegate heavy exploration to subagents. Faster and lighter on context, but may miss nuance." }
+        { label: "Delegation (Recommended)", description: "Members delegate heavy exploration to subagents. Faster and lighter on context." },
+        { label: "Solo", description: "Members explore the codebase themselves. More thorough but slower, uses more tokens, and may hit context limits." }
       ],
       multiple: false
     }
@@ -64,8 +64,8 @@ Question({
 })
 
 Map the analysis mode answer to the prepare_council_prompt "mode" parameter:
-- "Solo (Recommended)" → mode: "solo"
-- "Delegation" → mode: "delegation"
+- "Delegation (Recommended)" → mode: "delegation"
+- "Solo" → mode: "solo"
 
 **Shortcut — skip the Question tool if:**
 - The user already specified models in their message (e.g., "ask GPT and Claude about X") → launch the specified members directly. Still ask the analysis mode question unless specified.

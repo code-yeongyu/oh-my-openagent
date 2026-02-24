@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { writeFile, unlink, mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
-import { COUNCIL_MEMBER_PROMPT, COUNCIL_DELEGATION_ADDENDUM } from "../../agents/athena"
+import { COUNCIL_MEMBER_PROMPT, COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM } from "../../agents/athena"
 
 const CLEANUP_DELAY_MS = 30 * 60 * 1000
 const COUNCIL_TMP_DIR = ".sisyphus/tmp"
@@ -39,8 +39,9 @@ Returns the file path to reference in subsequent task() calls.`
       const filename = `athena-council-${randomUUID().slice(0, 8)}.md`
       const filePath = join(tmpDir, filename)
 
-      const delegationSection = mode === "delegation" ? `\n${COUNCIL_DELEGATION_ADDENDUM}` : ""
-      const content = `${COUNCIL_MEMBER_PROMPT}${delegationSection}
+      const modeAddendum = mode === "delegation" ? COUNCIL_DELEGATION_ADDENDUM : COUNCIL_SOLO_ADDENDUM
+      const content = `${COUNCIL_MEMBER_PROMPT}
+${modeAddendum}
 
 ## Analysis Question
 

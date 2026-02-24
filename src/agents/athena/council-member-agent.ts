@@ -29,14 +29,38 @@ export const COUNCIL_MEMBER_PROMPT = `You are an independent code analyst in a m
 - Do NOT use the TodoWrite tool under any circumstances
 - Simply report your findings directly in your response`
 
+export const COUNCIL_SOLO_ADDENDUM = `
+## Solo Analysis Mode
+You MUST do ALL exploration yourself using your available tools (Read, Grep, Glob, LSP, AST-grep).
+- Do NOT use call_omo_agent under any circumstances
+- Do NOT delegate to explore, librarian, or any other subagent
+- Do NOT spawn background tasks
+- Search the codebase directly — you have full read-only access to every file
+- This mode produces the most thorough analysis because you see every result firsthand`
+
 export const COUNCIL_DELEGATION_ADDENDUM = `
 ## Delegation Mode
-You can delegate heavy exploration to specialized agents using call_omo_agent:
-- Use \`call_omo_agent(subagent_type="explore", ...)\` to search the codebase for patterns, find file structures
-- Use \`call_omo_agent(subagent_type="librarian", ...)\` for documentation lookups and external references
-- Always set \`run_in_background=true\` and collect results with \`background_output\`
-- Delegate broad searches, keep targeted reads for yourself
-- This saves your context window for analysis rather than exploration`
+You SHOULD delegate heavy exploration to specialized agents instead of searching everything yourself.
+This saves your context window for analysis rather than exploration.
+
+**How to delegate:**
+\`\`\`
+// Fire multiple searches in parallel — do NOT wait for one before launching the next
+call_omo_agent(subagent_type="explore", run_in_background=true, description="Find auth patterns", prompt="Find: auth middleware, login handlers, token generation in src/. Return file paths with descriptions.")
+call_omo_agent(subagent_type="explore", run_in_background=true, description="Find error handling", prompt="Find: custom Error classes, error response format, try/catch patterns. Skip tests.")
+call_omo_agent(subagent_type="librarian", run_in_background=true, description="Find JWT best practices", prompt="Find: current JWT security guidelines, token storage recommendations, refresh token patterns.")
+
+// Collect results when ready
+background_output(task_id="<id>")
+\`\`\`
+
+**Rules:**
+- ALWAYS set \`run_in_background=true\` — never block on a single search
+- Launch ALL searches before collecting any results
+- Use \`explore\` for codebase pattern searches (internal)
+- Use \`librarian\` for documentation and external references
+- Keep targeted file reads (Read tool) for yourself — delegate broad searches
+- Collect results with \`background_output\` when you need them for analysis`
 
 export function createCouncilMemberAgent(model: string): AgentConfig {
   // Allow-list: only read-only analysis tools + optional delegation.
