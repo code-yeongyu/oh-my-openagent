@@ -5,6 +5,7 @@ import { countLineDiffs, generateUnifiedDiff } from "./diff-utils"
 import { canonicalizeFileText, restoreFileText } from "./file-text-canonicalization"
 import { normalizeHashlineEdits, type RawHashlineEdit } from "./normalize-edits"
 import type { HashlineEdit } from "./types"
+import { HashlineMismatchError } from "./validation"
 
 interface HashlineEditArgs {
   filePath: string
@@ -158,7 +159,7 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
     return `Updated ${effectivePath}`
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (message.toLowerCase().includes("hash")) {
+    if (error instanceof HashlineMismatchError) {
       return `Error: hash mismatch - ${message}\nTip: reuse LINE#ID entries from the latest read/edit output, or batch related edits in one call.`
     }
     return `Error: ${message}`

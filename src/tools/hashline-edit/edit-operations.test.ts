@@ -92,6 +92,22 @@ describe("hashline edit operations", () => {
     expect(result).toEqual("line 1\ninserted\nline 2\nmodified")
   })
 
+  it("applies replace before prepend when both target same line", () => {
+    //#given
+    const content = "line 1\nline 2\nline 3"
+    const lines = content.split("\n")
+    const edits: HashlineEdit[] = [
+      { op: "prepend", pos: anchorFor(lines, 2), lines: "before line 2" },
+      { op: "replace", pos: anchorFor(lines, 2), lines: "modified line 2" },
+    ]
+
+    //#when
+    const result = applyHashlineEdits(content, edits)
+
+    //#then
+    expect(result).toEqual("line 1\nbefore line 2\nmodified line 2\nline 3")
+  })
+
   it("deduplicates identical insert edits in one pass", () => {
     //#given
     const content = "line 1\nline 2"

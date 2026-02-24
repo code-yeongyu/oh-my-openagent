@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { computeLineHash } from "../../tools/hashline-edit/hash-computation"
-import { toHashlineContent } from "../../tools/hashline-edit/diff-utils"
+
+const WRITE_SUCCESS_MARKER = "File written successfully."
 
 interface HashlineReadEnhancerConfig {
   hashline_edit?: { enabled: boolean }
@@ -12,6 +13,7 @@ const CONTENT_OPEN_TAG = "<content>"
 const CONTENT_CLOSE_TAG = "</content>"
 const FILE_OPEN_TAG = "<file>"
 const FILE_CLOSE_TAG = "</file>"
+const OPENCODE_LINE_TRUNCATION_SUFFIX = "... (line truncated to 2000 chars)"
 
 function isReadTool(toolName: string): boolean {
   return toolName.toLowerCase() === "read"
@@ -53,6 +55,9 @@ function parseReadLine(line: string): { lineNumber: number; content: string } | 
 function transformLine(line: string): string {
   const parsed = parseReadLine(line)
   if (!parsed) {
+    return line
+  }
+  if (parsed.content.endsWith(OPENCODE_LINE_TRUNCATION_SUFFIX)) {
     return line
   }
   const hash = computeLineHash(parsed.lineNumber, parsed.content)
@@ -137,7 +142,12 @@ function extractFilePath(metadata: unknown): string | undefined {
 }
 
 async function appendWriteHashlineOutput(output: { output: string; metadata: unknown }): Promise<void> {
-  if (output.output.includes("Updated file (LINE#ID|content):")) {
+  if (output.output.startsWith(WRITE_SUCCESS_MARKER)) {
+    return
+  }
+
+  const outputLower = output.output.toLowerCase()
+  if (outputLower.startsWith("error") || outputLower.includes("failed")) {
     return
   }
 
@@ -152,8 +162,8 @@ async function appendWriteHashlineOutput(output: { output: string; metadata: unk
   }
 
   const content = await file.text()
-  const hashlined = toHashlineContent(content)
-  output.output = `${output.output}\n\nUpdated file (LINE#ID|content):\n${hashlined}`
+  const lineCount = content === "" ? 0 : content.split("\n").length
+  output.output = `${WRITE_SUCCESS_MARKER} ${lineCount} lines written.`
 }
 
 export function createHashlineReadEnhancerHook(

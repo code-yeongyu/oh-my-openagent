@@ -27,7 +27,13 @@ export function applyHashlineEditsWithReport(content: string, edits: HashlineEdi
   }
 
   const dedupeResult = dedupeEdits(edits)
-  const sortedEdits = [...dedupeResult.edits].sort((a, b) => getEditLineNumber(b) - getEditLineNumber(a))
+  const EDIT_PRECEDENCE: Record<string, number> = { replace: 0, append: 1, prepend: 2 }
+  const sortedEdits = [...dedupeResult.edits].sort((a, b) => {
+    const lineA = getEditLineNumber(a)
+    const lineB = getEditLineNumber(b)
+    if (lineB !== lineA) return lineB - lineA
+    return (EDIT_PRECEDENCE[a.op] ?? 3) - (EDIT_PRECEDENCE[b.op] ?? 3)
+  })
 
   let noopEdits = 0
 
@@ -87,4 +93,3 @@ export function applyHashlineEditsWithReport(content: string, edits: HashlineEdi
 export function applyHashlineEdits(content: string, edits: HashlineEdit[]): string {
   return applyHashlineEditsWithReport(content, edits).content
 }
-
