@@ -7,5 +7,4 @@ export const HASHLINE_DICT = Array.from({ length: 256 }, (_, i) => {
 })
 
 export const HASHLINE_REF_PATTERN = /^([0-9]+)#([ZPMQVRWSNKTXJBYH]{2})$/
-export const HASHLINE_OUTPUT_PATTERN = /^([0-9]+)#([ZPMQVRWSNKTXJBYH]{2}):(.*)$/
-export const HASHLINE_LEGACY_REF_PATTERN = /^([0-9]+):([0-9a-fA-F]{2,})$/
+export const HASHLINE_OUTPUT_PATTERN = /^([0-9]+)#([ZPMQVRWSNKTXJBYH]{2})\|(.*)$/
