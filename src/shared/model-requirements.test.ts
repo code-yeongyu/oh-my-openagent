@@ -7,19 +7,19 @@ import {
 } from "./model-requirements"
 
 describe("AGENT_MODEL_REQUIREMENTS", () => {
-  test("oracle has valid fallbackChain with gpt-5.2 as primary", () => {
+  test("oracle has valid fallbackChain with gpt-5.3-codex as primary", () => {
     // given - oracle agent requirement
     const oracle = AGENT_MODEL_REQUIREMENTS["oracle"]
 
     // when - accessing oracle requirement
-    // then - fallbackChain exists with gpt-5.2 as first entry
+    // then - fallbackChain exists with gpt-5.3-codex as first entry
     expect(oracle).toBeDefined()
     expect(oracle.fallbackChain).toBeArray()
     expect(oracle.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = oracle.fallbackChain[0]
     expect(primary.providers).toContain("openai")
-    expect(primary.model).toBe("gpt-5.2")
+    expect(primary.model).toBe("gpt-5.3-codex")
     expect(primary.variant).toBe("high")
   })
 
@@ -137,18 +137,18 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("max")
   })
 
-  test("momus has valid fallbackChain with gpt-5.2 as primary", () => {
+  test("momus has valid fallbackChain with gpt-5.3-codex as primary", () => {
     // given - momus agent requirement
     const momus = AGENT_MODEL_REQUIREMENTS["momus"]
 
     // when - accessing Momus requirement
-    // then - fallbackChain exists with gpt-5.2 as first entry, variant medium
+    // then - fallbackChain exists with gpt-5.3-codex as first entry, variant medium
     expect(momus).toBeDefined()
     expect(momus.fallbackChain).toBeArray()
     expect(momus.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = momus.fallbackChain[0]
-    expect(primary.model).toBe("gpt-5.2")
+    expect(primary.model).toBe("gpt-5.3-codex")
     expect(primary.variant).toBe("medium")
     expect(primary.providers[0]).toBe("openai")
   })
