@@ -74,6 +74,28 @@ describe("parseLineRef", () => {
     //#then
     expect(result).toEqual({ line: 42, hash: "VK" })
   })
+
+  it("accepts refs copied with >>> marker only", () => {
+    //#given
+    const ref = ">>> 42#VK"
+
+    //#when
+    const result = parseLineRef(ref)
+
+    //#then
+    expect(result).toEqual({ line: 42, hash: "VK" })
+  })
+
+  it("accepts refs with spaces around hash separator", () => {
+    //#given
+    const ref = "42 # VK"
+
+    //#when
+    const result = parseLineRef(ref)
+
+    //#then
+    expect(result).toEqual({ line: 42, hash: "VK" })
+  })
 })
 
 describe("validateLineRef", () => {
