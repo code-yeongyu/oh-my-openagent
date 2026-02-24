@@ -124,24 +124,62 @@ Step 4: Collect results with progress using background_wait:
 - Do NOT ask the final action question while any launched member is still pending.
 - Do NOT present interim synthesis from partial results. Wait for all members first.
 
-Step 5: Synthesize the findings returned by all collected member outputs:
-- Number each finding sequentially: #1, #2, #3, etc.
-- Group findings by agreement level: unanimous, majority, minority, solo
-- Solo findings are potential false positives — flag the risk explicitly
-- Add your own assessment and rationale to each finding
-- Classify the overall question intent as ACTIONABLE or INFORMATIONAL (see Step 6)
+Step 5: Classify the question intent BEFORE synthesizing.
 
-Step 6: Present synthesized findings grouped by agreement level (unanimous → majority → minority → solo).
+Read the original question and match it to the FIRST fitting synthesis format:
 
-Then determine the question type and follow the matching path:
+- **AUDIT** — Signals: "find issues", "review", "audit", "what's wrong", "bugs", "problems", "security concerns", "code review"
+  → Seeks defects, risks, or improvements that lead to code changes.
 
-**ACTIONABLE** — The original question asks for something that leads to code changes: bug hunting, code review, security audit, performance analysis, finding issues to fix, improvements to implement, etc.
+- **COMPARISON** — Signals: "alternatives", "options", "compare", "what else", "better way", "other approaches"
+  → Seeks evaluation of multiple options or approaches.
 
-**INFORMATIONAL** — The original question asks for substantial research or analysis that the user may want to preserve: architecture deep-dives, multi-approach comparisons, migration strategies, tradeoff analyses, etc.
+- **DECISION** — Signals: "should we", "X or Y", "tradeoffs", "which one", "pros and cons", "recommend"
+  → Seeks help choosing between specific options.
 
-**CONVERSATIONAL** — The original question is a simple or direct question with a straightforward answer: "what does this function do?", "how is auth implemented?", "which pattern does module X use?", etc. The synthesis itself IS the answer — no follow-up action is needed.
+- **ROADMAP** — Signals: "how to migrate", "transition", "upgrade", "move from X to Y", "adoption strategy", "step by step"
+  → Seeks a phased plan for transitioning between states.
 
-If the question has both actionable AND informational aspects, treat it as ACTIONABLE (the informational parts can be included in the handoff context).
+- **ARCHITECTURE** — Signals: "how does X work", "analyze the system", "explain the design", "architecture of", "deep dive"
+  → Seeks deep understanding of a system's structure, patterns, and interactions.
+
+- **RESEARCH** (default) — No clear signal match, or general exploration/learning questions.
+  → Seeks broad understanding, novel insights, or knowledge synthesis.
+
+Then determine the follow-up path:
+- AUDIT → **ACTIONABLE** path (Step 7A)
+- COMPARISON, DECISION, ROADMAP, ARCHITECTURE, RESEARCH → **INFORMATIONAL** path (Step 7B)
+- If the question is simple/direct with a straightforward answer ("what does this function do?", "which pattern does X use?") → **CONVERSATIONAL** path (Step 7C)
+
+If the question has both AUDIT and other aspects, use AUDIT format with ACTIONABLE path.
+
+Step 6: Synthesize the collected council member outputs using the format selected in Step 5.
+
+**Universal requirements (ALL formats):**
+- Track which members agree and disagree on each point — agreement level is your confidence signal
+- When only 1 member raises a point, flag it as lower confidence
+- Add your own assessment where you have relevant context
+- Be concrete and specific — avoid vague summaries
+
+**Format-specific guidance:**
+
+### AUDIT format
+Structure around discrete findings. Number them sequentially. Group by confidence level: unanimous findings first (all members agree), then majority, then minority, then single-member (flag false-positive risk). For each finding, state what's wrong, why it matters, and what the fix looks like.
+
+### COMPARISON format
+Structure around the options members discovered. Present an evaluation showing how each option performs across criteria members analyzed (cost, quality, complexity, etc.). Show where members converge on a winner vs where the best choice depends on context. End with a conditional recommendation ("Use X if [condition], Y if [condition]").
+
+### DECISION format
+Structure around decision dimensions. For each dimension, show which option wins and with what confidence. Provide scenario-based guidance ("If your priority is performance, choose A; if cost matters more, choose B"). Surface key uncertainties that could change the recommendation.
+
+### ROADMAP format
+Structure as current state → target state → migration path. If members proposed different approaches, compare them. Organize into phases with clear sequencing. Highlight risks, dependencies, and prerequisites. Include effort estimates if members provided them.
+
+### ARCHITECTURE format
+Structure around system components and their relationships. Build a unified picture from members' analyses. Highlight architectural patterns and design decisions. Note quality concerns, technical debt, or evolution opportunities.
+
+### RESEARCH format
+Structure around key insights and novel perspectives. Lead with the most important synthesized findings, then unique perspectives individual members contributed. Identify knowledge gaps where members disagreed or expressed uncertainty. Suggest concrete areas for further investigation.
 
 ### Path A: ACTIONABLE findings
 
@@ -209,7 +247,9 @@ Step 7B-2: Execute the chosen action:
 
 ### Path C: CONVERSATIONAL (simple Q&A)
 
-Present the synthesis and end. The answer IS the deliverable — do NOT present any Question tool prompts. Just end your turn after presenting the synthesized findings.
+Present the synthesis as a direct answer — the synthesis IS the deliverable. After presenting, suggest ONE natural follow-up action based on what the synthesis revealed (e.g., "Would you like me to dive deeper into [specific aspect]?" or "Want me to create a document summarizing this?"). Keep the suggestion brief and specific — one sentence, not a menu of options. Do NOT use the Question tool for this — just include the suggestion naturally in your response.
+
+---------------------------
 
 The switch_agent tool switches the active agent. After you call it, end your response — the target agent will take over the session automatically.
 
