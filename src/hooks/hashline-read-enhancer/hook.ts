@@ -142,6 +142,11 @@ async function appendWriteHashlineOutput(output: { output: string; metadata: unk
     return
   }
 
+  const outputLower = output.output.toLowerCase()
+  if (outputLower.startsWith("error") || outputLower.includes("failed")) {
+    return
+  }
+
   const filePath = extractFilePath(output.metadata)
   if (!filePath) {
     return
