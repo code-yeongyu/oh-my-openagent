@@ -1,5 +1,5 @@
 import { dedupeEdits } from "./edit-deduplication"
-import { collectLineRefs, getEditLineNumber } from "./edit-ordering"
+import { collectLineRefs, detectOverlappingRanges, getEditLineNumber } from "./edit-ordering"
 import type { HashlineEdit } from "./types"
 import {
   applyAppend,
@@ -35,6 +35,9 @@ export function applyHashlineEditsWithReport(content: string, edits: HashlineEdi
 
   const refs = collectLineRefs(sortedEdits)
   validateLineRefs(lines, refs)
+
+  const overlapError = detectOverlappingRanges(sortedEdits)
+  if (overlapError) throw new Error(overlapError)
 
   for (const edit of sortedEdits) {
     switch (edit.op) {

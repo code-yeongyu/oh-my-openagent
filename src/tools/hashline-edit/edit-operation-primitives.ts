@@ -63,7 +63,7 @@ export function applyReplaceLines(
   const corrected = autocorrectReplacementLines(originalRange, stripped)
   const restored = corrected.map((entry, idx) => {
     if (idx !== 0) return entry
-    return restoreLeadingIndent(lines[startLine - 1], entry)
+    return restoreLeadingIndent(lines[startLine - 1] ?? "", entry)
   })
   result.splice(startLine - 1, endLine - startLine + 1, ...restored)
   return result
