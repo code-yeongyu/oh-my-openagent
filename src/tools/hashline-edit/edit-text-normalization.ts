@@ -1,4 +1,4 @@
-const HASHLINE_PREFIX_RE = /^\s*(?:>>>|>>)?\s*\d+\s*#\s*[ZPMQVRWSNKTXJBYH]{2}:/
+const HASHLINE_PREFIX_RE = /^\s*(?:>>>|>>)?\s*\d+\s*#\s*[ZPMQVRWSNKTXJBYH]{2}\|/
 const DIFF_PLUS_RE = /^[+](?![+])/
 
 function equalsIgnoringWhitespace(a: string, b: string): boolean {
@@ -7,6 +7,7 @@ function equalsIgnoringWhitespace(a: string, b: string): boolean {
 }
 
 function leadingWhitespace(text: string): string {
+  if (!text) return ""
   const match = text.match(/^\s*/)
   return match ? match[0] : ""
 }
@@ -53,6 +54,7 @@ export function restoreLeadingIndent(templateLine: string, line: string): string
   const templateIndent = leadingWhitespace(templateLine)
   if (templateIndent.length === 0) return line
   if (leadingWhitespace(line).length > 0) return line
+  if (templateLine.trim() === line.trim()) return line
   return `${templateIndent}${line}`
 }
 

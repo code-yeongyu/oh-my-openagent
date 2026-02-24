@@ -5,40 +5,40 @@ WORKFLOW:
 2. Pick the smallest operation per logical mutation site.
 3. Submit one edit call per file with all related operations.
 4. If same file needs another call, re-read first.
-5. Use anchors as "LINE#ID" only (never include trailing ":content").
+5. Use anchors as "LINE#ID" only (never include trailing "|content").
 
 VALIDATION:
- Payload shape: { "filePath": string, "edits": [...], "delete"?: boolean, "rename"?: string }
- Each edit must be one of: set_line, replace_lines, insert_after, insert_before, insert_between, replace, append, prepend
- text/new_text must contain plain replacement text only (no LINE#ID prefixes, no diff + markers)
- CRITICAL: all operations validate against the same pre-edit file snapshot and apply bottom-up. Refs/tags are interpreted against the last-read version of the file.
+  Payload shape: { "filePath": string, "edits": [...], "delete"?: boolean, "rename"?: string }
+  Each edit must be one of: replace, append, prepend
+  Edit shape: { "op": "replace"|"append"|"prepend", "pos"?: "LINE#ID", "end"?: "LINE#ID", "lines"?: string|string[]|null }
+  lines must contain plain replacement text only (no LINE#ID prefixes, no diff + markers)
+  CRITICAL: all operations validate against the same pre-edit file snapshot and apply bottom-up. Refs/tags are interpreted against the last-read version of the file.
 
 LINE#ID FORMAT (CRITICAL):
- Each line reference must be in "LINE#ID" format where:
- LINE: 1-based line number
- ID: Two CID letters from the set ZPMQVRWSNKTXJBYH
+ Each line reference must be in "{line_number}#{hash_id}" format where:
+ {line_number}: 1-based line number
+ {hash_id}: Two CID letters from the set ZPMQVRWSNKTXJBYH
 
 FILE MODES:
  delete=true deletes file and requires edits=[] with no rename
  rename moves final content to a new path and removes old path
 
 CONTENT FORMAT:
- text/new_text can be a string (single line) or string[] (multi-line, preferred).
- If you pass a multi-line string, it is split by real newline characters.
- Literal "\\n" is preserved as text.
+  lines can be a string (single line) or string[] (multi-line, preferred).
+  If you pass a multi-line string, it is split by real newline characters.
+  Literal "\\n" is preserved as text.
 
 FILE CREATION:
- append: adds content at EOF. If file does not exist, creates it.
- prepend: adds content at BOF. If file does not exist, creates it.
- CRITICAL: append/prepend are the only operations that work without an existing file.
+  append without anchors adds content at EOF. If file does not exist, creates it.
+  prepend without anchors adds content at BOF. If file does not exist, creates it.
+  CRITICAL: only unanchored append/prepend can create a missing file.
 
 OPERATION CHOICE:
- One line wrong -> set_line
- Adjacent block rewrite or swap/move -> replace_lines (prefer one range op over many single-line ops)
- Both boundaries known -> insert_between (ALWAYS prefer over insert_after/insert_before)
- One boundary known -> insert_after or insert_before
- New file or EOF/BOF addition -> append or prepend
- No LINE#ID available -> replace (last resort)
+  replace with pos only -> replace one line at pos (MOST COMMON for single-line edits)
+  replace with pos+end -> replace ENTIRE range pos..end as a block (ranges MUST NOT overlap across edits)
+  append with pos/end anchor -> insert after that anchor
+  prepend with pos/end anchor -> insert before that anchor
+  append/prepend without anchors -> EOF/BOF insertion
 
 RULES (CRITICAL):
  1. Minimize scope: one logical mutation site per operation.
@@ -53,10 +53,9 @@ RULES (CRITICAL):
 TAG CHOICE (ALWAYS):
  - Copy tags exactly from read output or >>> mismatch output.
  - NEVER guess tags.
- - Prefer insert_between over insert_after/insert_before when both boundaries are known.
- - Anchor to structural lines (function/class/brace), NEVER blank lines.
- - Anti-pattern warning: blank/whitespace anchors are fragile.
- - Re-read after each successful edit call before issuing another on the same file.
+  - Anchor to structural lines (function/class/brace), NEVER blank lines.
+  - Anti-pattern warning: blank/whitespace anchors are fragile.
+  - Re-read after each successful edit call before issuing another on the same file.
 
 AUTOCORRECT (built-in - you do NOT need to handle these):
  Merged lines are auto-expanded back to original line count.
