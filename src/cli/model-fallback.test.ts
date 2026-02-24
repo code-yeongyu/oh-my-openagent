@@ -421,16 +421,15 @@ describe("generateModelConfig", () => {
       expect(result.agents?.hephaestus?.variant).toBe("medium")
     })
 
-    test("Hephaestus is created when Copilot is available (github-copilot provider connected)", () => {
+    test("Hephaestus is NOT created when only Copilot is available (gpt-5.3-codex unavailable on github-copilot)", () => {
       // #given
       const config = createConfig({ hasCopilot: true })
 
       // #when
       const result = generateModelConfig(config)
 
-      // #then
-      expect(result.agents?.hephaestus?.model).toBe("github-copilot/gpt-5.3-codex")
-      expect(result.agents?.hephaestus?.variant).toBe("medium")
+      // #then - hephaestus is omitted because gpt-5.3-codex is not available on github-copilot
+      expect(result.agents?.hephaestus).toBeUndefined()
     })
 
     test("Hephaestus is created when OpenCode Zen is available (opencode provider connected)", () => {
