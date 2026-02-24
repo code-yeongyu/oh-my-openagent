@@ -189,6 +189,28 @@ describe("hashline-read-enhancer", () => {
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
+  it("does not re-process write output that already contains the success marker", async () => {
+    //#given
+    const hook = createHashlineReadEnhancerHook(mockCtx(), { hashline_edit: { enabled: true } })
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "hashline-idem-"))
+    const filePath = path.join(tempDir, "demo.ts")
+    fs.writeFileSync(filePath, "a\nb\nc\nd\ne")
+    const input = { tool: "write", sessionID: "s", callID: "c" }
+    const output = {
+      title: "write",
+      output: "File written successfully. 99 lines written.",
+      metadata: { filepath: filePath },
+    }
+
+    //#when
+    await hook["tool.execute.after"](input, output)
+
+    //#then — guard should prevent re-reading the file and updating the count
+    expect(output.output).toBe("File written successfully. 99 lines written.")
+
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  })
+
   it("skips when feature is disabled", async () => {
     //#given
     const hook = createHashlineReadEnhancerHook(mockCtx(), { hashline_edit: { enabled: false } })

@@ -136,6 +136,10 @@ function extractFilePath(metadata: unknown): string | undefined {
 }
 
 async function appendWriteHashlineOutput(output: { output: string; metadata: unknown }): Promise<void> {
+  if (output.output.startsWith("File written successfully.")) {
+    return
+  }
+
   const filePath = extractFilePath(output.metadata)
   if (!filePath) {
     return

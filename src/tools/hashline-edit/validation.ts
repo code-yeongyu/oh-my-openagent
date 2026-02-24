@@ -38,12 +38,16 @@ export function parseLineRef(ref: string): LineRef {
       hash: match[2],
     }
   }
-  const nonNumericMatch = ref.trim().match(/^([A-Za-z_]+)#([ZPMQVRWSNKTXJBYH]{2})$/)
-  if (nonNumericMatch) {
-    throw new Error(
-      `Invalid line reference: "${ref}". "${nonNumericMatch[1]}" is not a line number. ` +
-        `Use the actual line number from the read output.`
-    )
+  const hashIdx = normalized.indexOf('#')
+  if (hashIdx > 0) {
+    const prefix = normalized.slice(0, hashIdx)
+    const suffix = normalized.slice(hashIdx + 1)
+    if (!/^\d+$/.test(prefix) && /^[ZPMQVRWSNKTXJBYH]{2}$/.test(suffix)) {
+      throw new Error(
+        `Invalid line reference: "${ref}". "${prefix}" is not a line number. ` +
+          `Use the actual line number from the read output.`
+      )
+    }
   }
   throw new Error(
     `Invalid line reference format: "${ref}". Expected format: "{line_number}#{hash_id}"`
@@ -51,17 +55,7 @@ export function parseLineRef(ref: string): LineRef {
 }
 
 export function validateLineRef(lines: string[], ref: string): void {
-  let parsed: LineRef
-  try {
-    parsed = parseLineRef(ref)
-  } catch (parseError) {
-    const hint = suggestLineForHash(ref, lines)
-    if (hint && parseError instanceof Error) {
-      throw new Error(`${parseError.message} ${hint}`)
-    }
-    throw parseError
-  }
-  const { line, hash } = parsed
+  const { line, hash } = parseLineRefWithHint(ref, lines)
 
   if (line < 1 || line > lines.length) {
     throw new Error(
@@ -145,22 +139,24 @@ function suggestLineForHash(ref: string, lines: string[]): string | null {
   }
   return null
 }
+function parseLineRefWithHint(ref: string, lines: string[]): LineRef {
+  try {
+    return parseLineRef(ref)
+  } catch (parseError) {
+    const hint = suggestLineForHash(ref, lines)
+    if (hint && parseError instanceof Error) {
+      throw new Error(`${parseError.message} ${hint}`)
+    }
+    throw parseError
+  }
+}
+
 
 export function validateLineRefs(lines: string[], refs: string[]): void {
   const mismatches: HashMismatch[] = []
 
   for (const ref of refs) {
-    let parsed: LineRef
-    try {
-      parsed = parseLineRef(ref)
-    } catch (parseError) {
-      const hint = suggestLineForHash(ref, lines)
-      if (hint && parseError instanceof Error) {
-        throw new Error(`${parseError.message} ${hint}`)
-      }
-      throw parseError
-    }
-    const { line, hash } = parsed
+    const { line, hash } = parseLineRefWithHint(ref, lines)
 
     if (line < 1 || line > lines.length) {
       throw new Error(`Line number ${line} out of bounds (file has ${lines.length} lines)`)
