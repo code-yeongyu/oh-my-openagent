@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { writeFile, unlink, mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
-import { COUNCIL_MEMBER_PROMPT, COUNCIL_DELEGATION_ADDENDUM } from "../../agents/athena/council-member-agent"
+import { COUNCIL_MEMBER_PROMPT, COUNCIL_DELEGATION_ADDENDUM } from "../../agents/athena"
 
 const CLEANUP_DELAY_MS = 30 * 60 * 1000
 const COUNCIL_TMP_DIR = ".sisyphus/tmp"
@@ -49,7 +49,9 @@ ${args.prompt}`
       await writeFile(filePath, content, "utf-8")
 
       setTimeout(() => {
-        unlink(filePath).catch(() => {})
+        unlink(filePath).catch((err) => {
+          log("[prepare-council-prompt] Failed to clean up temp file", { filePath, error: String(err) })
+        })
       }, CLEANUP_DELAY_MS)
 
       log("[prepare-council-prompt] Saved prompt", { filePath, length: args.prompt.length, mode })

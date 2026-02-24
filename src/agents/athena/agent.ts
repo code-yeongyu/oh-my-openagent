@@ -238,7 +238,7 @@ export function createAthenaAgent(model: string): AgentConfig {
   // question permission is set by tool-config-handler.ts based on CLI mode (allow/deny)
   const permission = {
     ...restrictions.permission,
-  } as AgentConfig["permission"]
+  }
 
   const base = {
     description:

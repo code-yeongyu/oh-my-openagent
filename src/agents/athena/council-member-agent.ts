@@ -52,6 +52,7 @@ export function createCouncilMemberAgent(model: string): AgentConfig {
     "lsp_diagnostics",
     "ast_grep_search",
     "call_omo_agent",
+    "background_output",
   ])
 
   // Explicitly deny TodoWrite/TodoRead even though `*: deny` should catch them.
