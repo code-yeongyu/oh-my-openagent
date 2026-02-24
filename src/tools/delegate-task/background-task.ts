@@ -1,11 +1,18 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 import { getTimingConfig } from "./timing"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { safeCompress } from "../../shared/toon-compression"
+
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
@@ -16,6 +23,7 @@ export async function executeBackgroundTask(
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
   fallbackChain?: FallbackEntry[],
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
 ): Promise<string> {
   const { manager } = executorCtx
 
@@ -56,36 +64,30 @@ export async function executeBackgroundTask(
       SessionCategoryRegistry.register(sessionId, args.category)
     }
 
+    const metadataPayload = {
+      prompt: args.prompt,
+      agent: task.agent,
+      category: args.category,
+      load_skills: args.load_skills,
+      description: args.description,
+      run_in_background: args.run_in_background,
+      sessionId: sessionId ?? "pending",
+      command: args.command,
+    }
+
+    // Compression is available for inter-agent payload transfers via safeCompress.
+    // The response is human-readable text (not JSON), so compression is not applied to output.
+    // When structured data transfers are implemented, use: safeCompress(metadataPayload, compressionConfig)
     const unstableMeta = {
       title: args.description,
-      metadata: {
-        prompt: args.prompt,
-        agent: task.agent,
-        category: args.category,
-        load_skills: args.load_skills,
-        description: args.description,
-        run_in_background: args.run_in_background,
-        sessionId: sessionId ?? "pending",
-        command: args.command,
-      },
+      metadata: metadataPayload,
     }
     await ctx.metadata?.(unstableMeta)
     if (ctx.callID) {
       storeToolMetadata(ctx.sessionID, ctx.callID, unstableMeta)
     }
 
-    return `Background task launched.
-
-Task ID: ${task.id}
-Description: ${task.description}
-Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
-Status: ${task.status}
-
-System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
-
-<task_metadata>
-session_id: ${sessionId}
-</task_metadata>`
+    return buildLaunchResponse(task, args.category, sessionId)
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch background task",
@@ -94,4 +96,27 @@ session_id: ${sessionId}
       category: args.category,
     })
   }
+}
+
+/**
+ * Build a formatted response string for background task launch.
+ * The response is human-readable text, not JSON, so compression is not applied.
+ */
+function buildLaunchResponse(
+  task: { id: string; description: string; agent: string; status: string },
+  category: string | undefined,
+  sessionId: string | undefined,
+): string {
+  return `Background task launched.
+
+Task ID: ${task.id}
+Description: ${task.description}
+Agent: ${task.agent}${category ? ` (category: ${category})` : ""}
+Status: ${task.status}
+
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+
+<task_metadata>
+session_id: ${sessionId}
+</task_metadata>`
 }

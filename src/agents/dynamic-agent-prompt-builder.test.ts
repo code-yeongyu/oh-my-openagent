@@ -172,4 +172,156 @@ describe("buildUltraworkSection", () => {
   })
 })
 
+describe("buildCategorySkillsDelegationGuide compression", () => {
+  function createLargeCategoryArray(count: number): AvailableCategory[] {
+    return Array.from({ length: count }, (_, i) => ({
+      name: `category-${i}`,
+      description: `Category ${i} description with some content to make it larger`,
+    }))
+  }
 
+  function createLargeSkillArray(count: number): AvailableSkill[] {
+    return Array.from({ length: count }, (_, i) => ({
+      name: `skill-${i}`,
+      description: `Skill ${i} description with some content to make it larger`,
+      location: "plugin" as const,
+    }))
+  }
+
+  it("should return formatted text when compression is disabled", () => {
+    //#given: large arrays with compression disabled
+    const categories = createLargeCategoryArray(10)
+    const skills = createLargeSkillArray(10)
+    const config = { enabled: false, threshold: 100 }
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, skills, config)
+
+    //#then: should return formatted text, not compressed
+    expect(result).toContain("Category + Skills Delegation System")
+    expect(result).not.toContain("[Compressed")
+  })
+
+  it("should compress large arrays when compression is enabled", () => {
+    //#given: large arrays with compression enabled
+    const categories = createLargeCategoryArray(10)
+    const skills = createLargeSkillArray(10)
+    const config = { enabled: true, threshold: 100 }
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, skills, config)
+
+    //#then: should return compressed data
+    expect(result).toContain("[Compressed categories/skills data]")
+  })
+
+  it("should not compress small arrays even when compression is enabled", () => {
+    //#given: small arrays with compression enabled
+    const categories: AvailableCategory[] = [
+      { name: "quick", description: "Quick tasks" },
+    ]
+    const skills: AvailableSkill[] = [
+      { name: "playwright", description: "Browser automation", location: "plugin" },
+    ]
+    const config = { enabled: true, threshold: 5000 }
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, skills, config)
+
+    //#then: should return formatted text (data too small)
+    expect(result).toContain("Category + Skills Delegation System")
+    expect(result).not.toContain("[Compressed")
+  })
+
+  it("should return empty string for empty arrays regardless of compression", () => {
+    //#given: empty arrays with compression enabled
+    const config = { enabled: true, threshold: 100 }
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide([], [], config)
+
+    //#then: should return empty string
+    expect(result).toBe("")
+  })
+})
+
+describe("buildUltraworkSection compression", () => {
+  function createLargeAgentArray(count: number): AvailableAgent[] {
+    return Array.from({ length: count }, (_, i) => ({
+      name: `agent-${i}`,
+      description: `Agent ${i} description with some content to make it larger and more descriptive`,
+      metadata: {
+        category: "utility",
+        cost: "FREE" as const,
+        triggers: [],
+        useWhen: [],
+        avoidWhen: [],
+        keyTrigger: undefined,
+        promptAlias: `Agent${i}`,
+      },
+    }))
+  }
+
+  function createLargeCategoryArray(count: number): AvailableCategory[] {
+    return Array.from({ length: count }, (_, i) => ({
+      name: `category-${i}`,
+      description: `Category ${i} description with some content to make it larger`,
+    }))
+  }
+
+  function createLargeSkillArray(count: number): AvailableSkill[] {
+    return Array.from({ length: count }, (_, i) => ({
+      name: `skill-${i}`,
+      description: `Skill ${i} description with some content to make it larger`,
+      location: "plugin" as const,
+    }))
+  }
+
+  it("should return formatted text when compression is disabled", () => {
+    //#given: large arrays with compression disabled
+    const agents = createLargeAgentArray(10)
+    const categories = createLargeCategoryArray(10)
+    const skills = createLargeSkillArray(10)
+    const config = { enabled: false, threshold: 100 }
+
+    //#when: building ultrawork section
+    const result = buildUltraworkSection(agents, categories, skills, config)
+
+    //#then: should return formatted text, not compressed
+    expect(result).toContain("**Categories**")
+    expect(result).not.toContain("[Compressed")
+  })
+
+  it("should compress large arrays when compression is enabled", () => {
+    //#given: large arrays with compression enabled
+    const agents = createLargeAgentArray(10)
+    const categories = createLargeCategoryArray(10)
+    const skills = createLargeSkillArray(10)
+    const config = { enabled: true, threshold: 100 }
+
+    //#when: building ultrawork section
+    const result = buildUltraworkSection(agents, categories, skills, config)
+
+    //#then: should return compressed data
+    expect(result).toContain("[Compressed ultrawork data]")
+  })
+
+  it("should not compress small arrays even when compression is enabled", () => {
+    //#given: small arrays with compression enabled
+    const agents: AvailableAgent[] = []
+    const categories: AvailableCategory[] = [
+      { name: "quick", description: "Quick tasks" },
+    ]
+    const skills: AvailableSkill[] = [
+      { name: "playwright", description: "Browser automation", location: "plugin" },
+    ]
+    const config = { enabled: true, threshold: 5000 }
+
+    //#when: building ultrawork section
+    const result = buildUltraworkSection(agents, categories, skills, config)
+
+    //#then: should return formatted text (data too small)
+    expect(result).toContain("**Categories**")
+    expect(result).not.toContain("[Compressed")
+  })
+})

@@ -1,12 +1,13 @@
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
+import type { ConcurrencyManager } from "./concurrency"
 import { TMUX_CALLBACK_DELAY_MS } from "./constants"
 import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, createInternalAgentTextPart } from "../../shared"
+import { safeCompress } from "../../shared/toon-compression"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { isInsideTmux } from "../../shared/tmux"
-import type { ConcurrencyManager } from "./concurrency"
-
 export interface SpawnerContext {
   client: OpencodeClient
   directory: string
@@ -14,6 +15,7 @@ export interface SpawnerContext {
   tmuxEnabled: boolean
   onSubagentSessionCreated?: OnSubagentSessionCreated
   onTaskError: (task: BackgroundTask, error: Error) => void
+  toonCompressionConfig?: ToonCompressionConfig
 }
 
 export function createTask(input: LaunchInput): BackgroundTask {
@@ -32,12 +34,61 @@ export function createTask(input: LaunchInput): BackgroundTask {
   }
 }
 
+const DEFAULT_TOON_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
+
+/**
+ * Compresses session prompt data for background agents.
+ * Uses TOON format compression when enabled and data exceeds threshold.
+ * Falls back to original string if compression fails or is not applicable.
+ */
+export function compressSessionPromptData(
+  data: unknown,
+  config?: ToonCompressionConfig
+): string {
+  const effectiveConfig = config ?? DEFAULT_TOON_CONFIG
+  return safeCompress(data, effectiveConfig)
+}
+
+/**
+ * Prepares prompt text with optional compression for structured data.
+ * If the prompt contains parseable JSON that meets compression criteria,
+ * it will be compressed. Otherwise returns the original prompt.
+ */
+export function preparePromptWithCompression(
+  prompt: string,
+  config?: ToonCompressionConfig
+): string {
+  if (!config?.enabled) {
+    return prompt
+  }
+
+  // Try to parse as JSON to see if it's structured data
+  try {
+    const parsed = JSON.parse(prompt)
+    // Only compress if it's an array or object that could benefit
+    if (typeof parsed === "object" && parsed !== null) {
+      const compressed = compressSessionPromptData(parsed, config)
+      // If compression actually compressed it (different from original), use it
+      if (compressed !== prompt) {
+        return compressed
+      }
+    }
+  } catch {
+    // Not valid JSON, return as-is
+  }
+
+  return prompt
+}
+
 export async function startTask(
   item: QueueItem,
   ctx: SpawnerContext
 ): Promise<void> {
   const { task, input } = item
-  const { client, directory, concurrencyManager, tmuxEnabled, onSubagentSessionCreated, onTaskError } = ctx
+  const { client, directory, concurrencyManager, tmuxEnabled, onSubagentSessionCreated, onTaskError, toonCompressionConfig } = ctx
 
   log("[background-agent] Starting task:", {
     taskId: task.id,
@@ -131,6 +182,9 @@ export async function startTask(
     : undefined
   const launchVariant = input.model?.variant
 
+  // Apply compression to prompt if config is provided
+  const compressedPrompt = preparePromptWithCompression(input.prompt, toonCompressionConfig)
+
   promptWithModelSuggestionRetry(client, {
     path: { id: sessionID },
     body: {
@@ -144,7 +198,7 @@ export async function startTask(
         question: false,
         ...getAgentToolRestrictions(input.agent),
       },
-      parts: [createInternalAgentTextPart(input.prompt)],
+      parts: [createInternalAgentTextPart(compressedPrompt)],
     },
   }).catch((error) => {
     log("[background-agent] promptAsync error:", error)
@@ -155,9 +209,9 @@ export async function startTask(
 export async function resumeTask(
   task: BackgroundTask,
   input: ResumeInput,
-  ctx: Pick<SpawnerContext, "client" | "concurrencyManager" | "onTaskError">
+  ctx: Pick<SpawnerContext, "client" | "concurrencyManager" | "onTaskError" | "toonCompressionConfig">
 ): Promise<void> {
-  const { client, concurrencyManager, onTaskError } = ctx
+  const { client, concurrencyManager, onTaskError, toonCompressionConfig } = ctx
 
   if (!task.sessionID) {
     throw new Error(`Task has no sessionID: ${task.id}`)
@@ -216,6 +270,9 @@ export async function resumeTask(
     : undefined
   const resumeVariant = task.model?.variant
 
+  // Apply compression to prompt if config is provided
+  const compressedPrompt = preparePromptWithCompression(input.prompt, toonCompressionConfig)
+
   client.session.promptAsync({
     path: { id: task.sessionID },
     body: {
@@ -228,7 +285,7 @@ export async function resumeTask(
         question: false,
         ...getAgentToolRestrictions(task.agent),
       },
-      parts: [createInternalAgentTextPart(input.prompt)],
+      parts: [createInternalAgentTextPart(compressedPrompt)],
     },
   }).catch((error) => {
     log("[background-agent] resume prompt error:", error)

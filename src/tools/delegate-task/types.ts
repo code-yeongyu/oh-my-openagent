@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides } from "../../config/schema"
 import type {
@@ -76,4 +77,5 @@ export interface BuildSystemContentInput {
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
+  compressionConfig?: ToonCompressionConfig
 }

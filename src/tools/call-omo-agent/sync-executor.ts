@@ -2,9 +2,16 @@ import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { getAgentToolRestrictions } from "../../shared"
+import { safeCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 import { createOrGetSession } from "./session-creator"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
+
+export const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
 
 type SessionWithPromptAsync = {
   promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
@@ -14,12 +21,14 @@ type ExecuteSyncDeps = {
   createOrGetSession: typeof createOrGetSession
   waitForCompletion: typeof waitForCompletion
   processMessages: typeof processMessages
+  safeCompress: typeof safeCompress
 }
 
 const defaultDeps: ExecuteSyncDeps = {
   createOrGetSession,
   waitForCompletion,
   processMessages,
+  safeCompress,
 }
 
 export async function executeSync(
@@ -32,7 +41,8 @@ export async function executeSync(
     metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   },
   ctx: PluginInput,
-  deps: ExecuteSyncDeps = defaultDeps
+  deps: ExecuteSyncDeps = defaultDeps,
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG
 ): Promise<string> {
   const { sessionID } = await deps.createOrGetSession(args, toolContext, ctx)
 
@@ -69,9 +79,12 @@ export async function executeSync(
   await deps.waitForCompletion(sessionID, toolContext, ctx)
 
   const responseText = await deps.processMessages(sessionID, ctx)
+  const compressedResponse = deps.safeCompress(responseText, compressionConfig)
 
   const output =
-    responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
+    compressedResponse +
+    "\n\n" +
+    ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
 
   return output
 }

@@ -1,3 +1,11 @@
+import { safeCompress, shouldCompress } from "../shared/toon-compression"
+import type { ToonCompressionConfig } from "../shared/toon-compression"
+
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
+
 import type { AgentPromptMetadata } from "./types"
 
 export interface AvailableAgent {
@@ -158,7 +166,37 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
 }
 
 
-export function buildCategorySkillsDelegationGuide(categories: AvailableCategory[], skills: AvailableSkill[]): string {
+export function buildCategorySkillsDelegationGuide(
+  categories: AvailableCategory[],
+  skills: AvailableSkill[],
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG
+): string {
+  if (categories.length === 0 && skills.length === 0) return ""
+
+  // Check if we should compress the structured data
+  if (compressionConfig.enabled) {
+    // Use uniform structure for compression
+    const combinedData = [
+      ...categories.map((c) => ({
+        type: "category",
+        name: c.name,
+        description: c.description || c.name,
+        model: c.model ?? null,
+        location: null as string | null,
+      })),
+      ...skills.map((s) => ({
+        type: "skill",
+        name: s.name,
+        description: s.description,
+        model: null as string | undefined | null,
+        location: s.location,
+      })),
+    ]
+    if (shouldCompress(combinedData, compressionConfig.threshold)) {
+      const compressed = safeCompress(combinedData, compressionConfig)
+      return `[Compressed categories/skills data]\n${compressed}`
+    }
+  }
   if (categories.length === 0 && skills.length === 0) return ""
 
   const categoryRows = categories.map((c) => {
@@ -336,8 +374,41 @@ For implementation tasks, actively decompose and delegate to \`deep\` category a
 export function buildUltraworkSection(
   agents: AvailableAgent[],
   categories: AvailableCategory[],
-  skills: AvailableSkill[]
+  skills: AvailableSkill[],
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG
 ): string {
+  // Check if we should compress the structured data
+  if (compressionConfig.enabled) {
+    // Use uniform structure for compression
+    const combinedData = [
+      ...categories.map((c) => ({
+        type: "category",
+        name: c.name,
+        description: c.description || c.name,
+        model: c.model ?? null,
+        location: null as string | null,
+      })),
+      ...skills.map((s) => ({
+        type: "skill",
+        name: s.name,
+        description: s.description,
+        model: null as string | undefined | null,
+        location: s.location,
+      })),
+      ...agents.map((a) => ({
+        type: "agent",
+        name: a.name,
+        description: a.description,
+        model: null as string | undefined | null,
+        location: null as string | null,
+      })),
+    ]
+    if (shouldCompress(combinedData, compressionConfig.threshold)) {
+      const compressed = safeCompress(combinedData, compressionConfig)
+      return `[Compressed ultrawork data]\n${compressed}`
+    }
+  }
+
   const lines: string[] = []
 
   if (categories.length > 0) {

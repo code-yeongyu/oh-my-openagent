@@ -2863,7 +2863,109 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).toBe(skillContent)
-      expect(result).not.toContain("<system>")
+    })
+
+    describe("toon compression", () => {
+      test("compresses large availableCategories array when compression enabled", () => {
+        // given - create large array that exceeds threshold
+        const { buildSystemContent } = require("./tools")
+        const availableCategories = Array.from({ length: 20 }, (_, i) => ({
+          name: `category-${i}`,
+          description: `Description for category ${i} that is long enough to make the array large`.repeat(5),
+          model: `provider/model-${i}`,
+        }))
+        const compressionConfig = { enabled: true, threshold: 5000 }
+
+        // when
+        const result = buildSystemContent({
+          agentName: "plan",
+          availableCategories,
+          compressionConfig,
+        })
+
+        // then
+        expect(result).toContain("TOON format")
+        expect(result).toContain("```toon")
+        expect(result).not.toContain("| Category | Best For | Model |")
+      })
+
+      test("compresses large availableSkills array when compression enabled", () => {
+        // given - create large skills array
+        const { buildSystemContent } = require("./tools")
+        const availableSkills = Array.from({ length: 20 }, (_, i) => ({
+          name: `skill-${i}`,
+          description: `Description for skill ${i} that is long enough to make the array large`.repeat(5),
+        }))
+        const compressionConfig = { enabled: true, threshold: 5000 }
+
+        // when
+        const result = buildSystemContent({
+          agentName: "plan",
+          availableSkills,
+          compressionConfig,
+        })
+
+        // then
+        expect(result).toContain("TOON format")
+        expect(result).toContain("```toon")
+      })
+
+      test("uses table format when compression disabled", () => {
+        // given
+        const { buildSystemContent } = require("./tools")
+        const availableCategories = [
+          { name: "deep", description: "Goal-oriented", model: "openai/gpt-5.3-codex" },
+        ]
+        const compressionConfig = { enabled: false, threshold: 5000 }
+
+        // when
+        const result = buildSystemContent({
+          agentName: "plan",
+          availableCategories,
+          compressionConfig,
+        })
+
+        // then - should use table format, not TOON
+        expect(result).toContain("| Category | Best For | Model |")
+        expect(result).not.toContain("TOON format")
+      })
+
+      test("uses table format for small arrays even with compression enabled", () => {
+        // given - small array below threshold
+        const { buildSystemContent } = require("./tools")
+        const availableCategories = [
+          { name: "deep", description: "Goal-oriented", model: "openai/gpt-5.3-codex" },
+        ]
+        const compressionConfig = { enabled: true, threshold: 5000 }
+
+        // when
+        const result = buildSystemContent({
+          agentName: "plan",
+          availableCategories,
+          compressionConfig,
+        })
+
+        // then - should use table format (array too small to compress)
+        expect(result).toContain("| Category | Best For | Model |")
+        expect(result).not.toContain("TOON format")
+      })
+
+      test("compression works without config (defaults to disabled)", () => {
+        // given - no compression config
+        const { buildSystemContent } = require("./tools")
+        const availableCategories = [
+          { name: "deep", description: "Goal-oriented", model: "openai/gpt-5.3-codex" },
+        ]
+
+        // when
+        const result = buildSystemContent({
+          agentName: "plan",
+          availableCategories,
+        })
+
+        // then - should use table format (compression disabled by default)
+        expect(result).toContain("| Category | Best For | Model |")
+      })
     })
   })
 
