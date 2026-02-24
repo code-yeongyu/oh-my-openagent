@@ -5,6 +5,7 @@ import {
   formatHashLines,
   streamHashLinesFromLines,
   streamHashLinesFromUtf8,
+  compressStreamedOutput,
 } from "./hash-computation"
 
 describe("computeLineHash", () => {
@@ -149,5 +150,75 @@ describe("streamHashLinesFrom*", () => {
 
     //#then
     expect(result).toBe(formatHashLines(content))
+  })
+})
+
+describe("compressStreamedOutput", () => {
+  const defaultConfig = { enabled: false, threshold: 5000 }
+
+  async function* stringStream(chunks: string[]): AsyncGenerator<string> {
+    for (const chunk of chunks) {
+      yield chunk
+    }
+  }
+
+  it("returns buffered chunks as-is when compression disabled", async () => {
+    //#given
+    const chunks = ["a", "b", "c"]
+    const config = { enabled: false, threshold: 100 }
+
+    //#when
+    const result = await compressStreamedOutput(stringStream(chunks), config)
+
+    //#then
+    expect(result).toEqual(chunks)
+  })
+
+  it("returns buffered chunks when below threshold", async () => {
+    //#given
+    const chunks = ["a", "b"]
+    const config = { enabled: true, threshold: 100 }
+
+    //#when
+    const result = await compressStreamedOutput(stringStream(chunks), config)
+
+    //#then
+    expect(result).toEqual(chunks)
+  })
+
+  it("returns buffered chunks for short strings even if enabled", async () => {
+    //#given
+    const chunks = ["a", "b", "c"]
+    const config = { enabled: true, threshold: 100 }
+
+    //#when
+    const result = await compressStreamedOutput(stringStream(chunks), config)
+
+    //#then
+    expect(result).toEqual(chunks)
+  })
+
+  it("returns buffered chunks for non-uniform array", async () => {
+    //#given
+    const chunks = ["{\"a\":1}", "{\"b\":2}", "{\"c\":3}"]
+    const config = { enabled: true, threshold: 10 }
+
+    //#when
+    const result = await compressStreamedOutput(stringStream(chunks), config)
+
+    //#then
+    expect(result).toEqual(chunks)
+  })
+
+  it("handles empty stream", async () => {
+    //#given
+    const chunks: string[] = []
+    const config = { enabled: true, threshold: 100 }
+
+    //#when
+    const result = await compressStreamedOutput(stringStream(chunks), config)
+
+    //#then
+    expect(result).toEqual([])
   })
 })

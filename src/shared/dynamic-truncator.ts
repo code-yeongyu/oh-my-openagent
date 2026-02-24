@@ -1,10 +1,15 @@
 import type { PluginInput } from "@opencode-ai/plugin";
-import { normalizeSDKResponse } from "./normalize-sdk-response"
+import { normalizeSDKResponse } from "./normalize-sdk-response";
+import { safeCompress } from "./toon-compression";
+import type { ToonCompressionConfig } from "./toon-compression";
 
 const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 const DEFAULT_TARGET_MAX_TOKENS = 50_000;
-
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+	enabled: false,
+	threshold: 5000,
+};
 type ModelCacheStateLike = {
 	anthropicContext1MEnabled: boolean;
 }
@@ -41,34 +46,63 @@ export interface TruncationOptions {
 	targetMaxTokens?: number;
 	preserveHeaderLines?: number;
 	contextWindowLimit?: number;
+	compression?: ToonCompressionConfig;
 }
 
 function estimateTokens(text: string): number {
 	return Math.ceil(text.length / CHARS_PER_TOKEN_ESTIMATE);
 }
 
+function tryParseJson(value: string): unknown | null {
+	try {
+		return JSON.parse(value);
+	} catch {
+		return null;
+	}
+}
+
+function tryCompress(
+	output: string,
+	config: ToonCompressionConfig,
+): string {
+	if (!config.enabled) {
+		return output;
+	}
+
+	try {
+		const parsed = tryParseJson(output);
+		if (parsed === null) {
+			return output;
+		}
+		return safeCompress(parsed, config);
+	} catch {
+		return output;
+	}
+}
 export function truncateToTokenLimit(
 	output: string,
 	maxTokens: number,
 	preserveHeaderLines = 3,
+	compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
 ): TruncationResult {
 	if (typeof output !== 'string') {
 		return { result: String(output ?? ''), truncated: false };
 	}
 
-	const currentTokens = estimateTokens(output);
-
+	// Apply compression before truncation
+	const compressedOutput = tryCompress(output, compressionConfig);
+	const currentTokens = estimateTokens(compressedOutput);
 	if (currentTokens <= maxTokens) {
-		return { result: output, truncated: false };
+		return { result: compressedOutput, truncated: false };
 	}
 
-	const lines = output.split("\n");
+	const lines = compressedOutput.split("\n");
 
 	if (lines.length <= preserveHeaderLines) {
 		const maxChars = maxTokens * CHARS_PER_TOKEN_ESTIMATE;
 		return {
 			result:
-				output.slice(0, maxChars) +
+				compressedOutput.slice(0, maxChars) +
 				"\n\n[Output truncated due to context window limit]",
 			truncated: true,
 		};
@@ -176,7 +210,7 @@ export async function dynamicTruncate(
 
 	if (!usage) {
 		// Fallback: apply conservative truncation when context usage unavailable
-		return truncateToTokenLimit(output, targetMaxTokens, preserveHeaderLines);
+		return truncateToTokenLimit(output, targetMaxTokens, preserveHeaderLines, options.compression);
 	}
 
 	const maxOutputTokens = Math.min(
@@ -191,7 +225,7 @@ export async function dynamicTruncate(
 		};
 	}
 
-	return truncateToTokenLimit(output, maxOutputTokens, preserveHeaderLines);
+	return truncateToTokenLimit(output, maxOutputTokens, preserveHeaderLines, options.compression);
 }
 
 export function createDynamicTruncator(

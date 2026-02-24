@@ -33,6 +33,20 @@ export interface RunContext {
   directory: string
   abortController: AbortController
   verbose?: boolean
+  compression?: {
+    enabled: boolean
+    threshold: number
+  }
+}
+
+export interface CompressionConfig {
+  enabled: boolean
+  threshold: number
+}
+
+export const DEFAULT_COMPRESSION_CONFIG: CompressionConfig = {
+  enabled: false,
+  threshold: 5000,
 }
 
 export interface Todo {

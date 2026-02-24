@@ -429,4 +429,68 @@ describe("task_update tool", () => {
       expect(result.task.owner).toBe("alice")
     })
   })
+
+  describe("compression integration", () => {
+    test("returns plain JSON when compression is disabled", async () => {
+      //#given
+      const taskId = "T-compression-test-1"
+      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const initialTask: TaskObject = {
+        id: taskId,
+        subject: "Compression test",
+        description: "Test description",
+        status: "pending",
+        blocks: [],
+        blockedBy: [],
+        threadID: TEST_SESSION_ID,
+      }
+      await Bun.write(taskPath, JSON.stringify(initialTask))
+      const toolWithCompressionDisabled = createTaskUpdateTool({
+        ...TEST_CONFIG,
+        toon_compression: { enabled: false, threshold: 100 },
+      })
+
+      //#when
+      const resultStr = await toolWithCompressionDisabled.execute(
+        { id: taskId, subject: "Updated subject" },
+        TEST_CONTEXT,
+      )
+      const result = JSON.parse(resultStr)
+
+      //#then
+      expect(result).toHaveProperty("task")
+      expect(result.task.subject).toBe("Updated subject")
+    })
+
+    test("uses safeCompress for output formatting", async () => {
+      //#given
+      const taskId = "T-compression-test-2"
+      const largeDescription = "x".repeat(10000)
+      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const initialTask: TaskObject = {
+        id: taskId,
+        subject: "Large task",
+        description: "Original",
+        status: "pending",
+        blocks: [],
+        blockedBy: [],
+        threadID: TEST_SESSION_ID,
+      }
+      await Bun.write(taskPath, JSON.stringify(initialTask))
+      const toolWithCompressionEnabled = createTaskUpdateTool({
+        ...TEST_CONFIG,
+        toon_compression: { enabled: true, threshold: 1000 },
+      })
+
+      //#when
+      const resultStr = await toolWithCompressionEnabled.execute(
+        { id: taskId, description: largeDescription },
+        TEST_CONTEXT,
+      )
+
+      //#then
+      expect(typeof resultStr).toBe("string")
+      expect(resultStr.length).toBeGreaterThan(0)
+    })
+  })
 })

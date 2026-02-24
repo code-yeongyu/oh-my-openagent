@@ -2,16 +2,33 @@ import type { BackgroundTask } from "../../features/background-agent"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
+import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 import { formatDuration } from "./time-format"
 
 function getTimeString(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
-export async function formatTaskResult(task: BackgroundTask, client: BackgroundOutputClient): Promise<string> {
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
+
+export interface FormatTaskResultOptions {
+  compressionConfig?: ToonCompressionConfig
+}
+
+export async function formatTaskResult(
+  task: BackgroundTask,
+  client: BackgroundOutputClient,
+  options?: FormatTaskResultOptions,
+): Promise<string> {
   if (!task.sessionID) {
     return `Error: Task has no sessionID`
   }
+
+  const compressionConfig = options?.compressionConfig ?? DEFAULT_COMPRESSION_CONFIG
 
   const messagesResult: BackgroundOutputMessagesResult = await client.session.messages({
     path: { id: task.sessionID },
@@ -99,6 +116,29 @@ Session ID: ${task.sessionID}
 
   const textContent = extractedContent.filter((text) => text.length > 0).join("\n\n")
   const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
+
+  // Check if output should be compressed (based on final text length)
+  if (compressionConfig.enabled && textContent.length > compressionConfig.threshold) {
+    // Compress the structured message data for efficient LLM consumption
+    const messageData = newMessages.map((m) => ({
+      role: m.info?.role,
+      parts: m.parts,
+    }))
+    if (shouldCompress(messageData, compressionConfig.threshold)) {
+      const compressed = safeCompress(messageData, compressionConfig)
+      return `Task Result
+
+Task ID: ${task.id}
+Description: ${task.description}
+Duration: ${duration}
+Session ID: ${task.sessionID}
+
+---
+
+[Compressed output]
+${compressed}`
+    }
+  }
 
   return `Task Result
 

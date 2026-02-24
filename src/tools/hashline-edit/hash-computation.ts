@@ -1,5 +1,7 @@
 import { HASHLINE_DICT } from "./constants"
 import { createHashlineChunkFormatter } from "./hashline-chunk-formatter"
+import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
 const RE_SIGNIFICANT = /[\p{L}\p{N}]/u
 
@@ -26,6 +28,7 @@ export interface HashlineStreamOptions {
   startLine?: number
   maxChunkLines?: number
   maxChunkBytes?: number
+  compression?: ToonCompressionConfig
 }
 
 function isReadableStream(value: unknown): value is ReadableStream<Uint8Array> {
@@ -141,4 +144,30 @@ export async function* streamHashLinesFromLines(
 
   const finalChunk = chunkFormatter.flush()
   if (finalChunk) yield finalChunk
+}
+
+export const DEFAULT_TOON_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
+
+export async function compressStreamedOutput(
+  stream: AsyncGenerator<string>,
+  config: ToonCompressionConfig = DEFAULT_TOON_COMPRESSION_CONFIG
+): Promise<string[] | string> {
+  const buffered: string[] = []
+
+  for await (const chunk of stream) {
+    buffered.push(chunk)
+  }
+
+  if (!config.enabled) {
+    return buffered
+  }
+
+  if (!shouldCompress(buffered, config.threshold)) {
+    return buffered
+  }
+
+  return safeCompress(buffered, config)
 }

@@ -1,6 +1,7 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 import { getOpenCodeStorageDir } from "../../shared/data-path"
 import { truncateToolResult } from "./storage"
 import { truncateToolResultAsync } from "./tool-result-storage-sdk"
@@ -8,7 +9,17 @@ import { log } from "../../shared/logger"
 import { getMessageDir } from "../../shared/opencode-message-dir"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
+import { safeCompress } from "../../shared/toon-compression"
 
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
+
+function tryParseJson(value: string): unknown | null {
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
+}
 type OpencodeClient = PluginInput["client"]
 
 interface StoredToolPart {
@@ -54,11 +65,12 @@ export async function truncateToolOutputsByCallId(
   sessionID: string,
   callIds: Set<string>,
   client?: OpencodeClient,
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
 ): Promise<{ truncatedCount: number }> {
   if (callIds.size === 0) return { truncatedCount: 0 }
 
   if (client && isSqliteBackend()) {
-    return truncateToolOutputsByCallIdFromSDK(client, sessionID, callIds)
+    return truncateToolOutputsByCallIdFromSDK(client, sessionID, callIds, compressionConfig)
   }
 
   const messageIds = getMessageIds(sessionID)
@@ -81,6 +93,15 @@ export async function truncateToolOutputsByCallId(
         if (part.type !== "tool" || !part.callID) continue
         if (!callIds.has(part.callID)) continue
         if (!part.state?.output || part.truncated) continue
+
+        // Apply compression BEFORE truncation for efficiency (smaller payload to prune)
+        if (compressionConfig.enabled) {
+          const parsed = tryParseJson(part.state.output)
+          if (parsed !== null) {
+            part.state.output = safeCompress(parsed, compressionConfig)
+            writeFileSync(partPath, JSON.stringify(part, null, 2))
+          }
+        }
 
         const result = truncateToolResult(partPath)
         if (result.success) {
@@ -106,6 +127,7 @@ async function truncateToolOutputsByCallIdFromSDK(
   client: OpencodeClient,
   sessionID: string,
   callIds: Set<string>,
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
 ): Promise<{ truncatedCount: number }> {
   try {
     const response = await client.session.messages({ path: { id: sessionID } })
@@ -120,6 +142,14 @@ async function truncateToolOutputsByCallIdFromSDK(
         if (part.type !== "tool" || !part.callID) continue
         if (!callIds.has(part.callID)) continue
         if (!part.state?.output || part.state?.time?.compacted) continue
+
+        // Apply compression BEFORE truncation for efficiency (smaller payload to prune)
+        if (compressionConfig.enabled) {
+          const parsed = tryParseJson(part.state.output)
+          if (parsed !== null) {
+            part.state.output = safeCompress(parsed, compressionConfig)
+          }
+        }
 
         const result = await truncateToolResultAsync(client, sessionID, messageID, part.id, part)
         if (result.success) {

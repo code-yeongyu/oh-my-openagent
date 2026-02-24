@@ -833,4 +833,200 @@ describe("SkillMcpManager", () => {
       expect(mockLogin).not.toHaveBeenCalled()
     })
   })
+
+  describe("compression", () => {
+    it("returns raw data when compression is disabled (default)", async () => {
+      // given
+      const managerWithDefaultConfig = new SkillMcpManager()
+      const info: SkillMcpClientInfo = {
+        serverName: "test-server",
+        skillName: "test-skill",
+        sessionID: "session-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: { url: "https://example.com/mcp" },
+        skillName: "test-skill",
+      }
+      const testData = [{ id: 1, name: "item1" }, { id: 2, name: "item2" }]
+
+      const mockClient = {
+        callTool: mock(async () => ({ content: testData })),
+        close: mock(() => Promise.resolve()),
+      }
+
+      const getOrCreateSpy = spyOn(managerWithDefaultConfig as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // when
+      const result = await managerWithDefaultConfig.callTool(info, context, "test-tool", {})
+
+      // then - raw data returned when compression disabled
+      expect(result).toEqual(testData)
+    })
+
+    it("compresses large arrays when compression is enabled", async () => {
+      // given
+      const managerWithCompression = new SkillMcpManager({ enabled: true, threshold: 100 })
+      const info: SkillMcpClientInfo = {
+        serverName: "test-server",
+        skillName: "test-skill",
+        sessionID: "session-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: { url: "https://example.com/mcp" },
+        skillName: "test-skill",
+      }
+      // Create large uniform array that exceeds threshold
+      const testData = Array.from({ length: 20 }, (_, i) => ({
+        id: i,
+        name: `item-${i}`,
+        value: `data-${i}`,
+      }))
+
+      const mockClient = {
+        callTool: mock(async () => ({ content: testData })),
+        close: mock(() => Promise.resolve()),
+      }
+
+      const getOrCreateSpy = spyOn(managerWithCompression as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // when
+      const result = await managerWithCompression.callTool(info, context, "test-tool", {})
+
+      // then - result should be compressed (string)
+      expect(typeof result).toBe("string")
+      // Compressed output should be smaller than JSON
+      const jsonLength = JSON.stringify(testData).length
+      expect((result as string).length).toBeLessThan(jsonLength)
+    })
+
+    it("compresses readResource results when enabled", async () => {
+      // given
+      const managerWithCompression = new SkillMcpManager({ enabled: true, threshold: 100 })
+      const info: SkillMcpClientInfo = {
+        serverName: "test-server",
+        skillName: "test-skill",
+        sessionID: "session-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: { url: "https://example.com/mcp" },
+        skillName: "test-skill",
+      }
+      const testData = Array.from({ length: 20 }, (_, i) => ({
+        uri: `resource://${i}`,
+        content: `content-${i}`,
+      }))
+
+      const mockClient = {
+        readResource: mock(async () => ({ contents: testData })),
+        close: mock(() => Promise.resolve()),
+      }
+
+      const getOrCreateSpy = spyOn(managerWithCompression as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // when
+      const result = await managerWithCompression.readResource(info, context, "test://resource")
+
+      // then
+      expect(typeof result).toBe("string")
+    })
+
+    it("compresses getPrompt results when enabled", async () => {
+      // given
+      const managerWithCompression = new SkillMcpManager({ enabled: true, threshold: 100 })
+      const info: SkillMcpClientInfo = {
+        serverName: "test-server",
+        skillName: "test-skill",
+        sessionID: "session-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: { url: "https://example.com/mcp" },
+        skillName: "test-skill",
+      }
+      const testData = Array.from({ length: 20 }, (_, i) => ({
+        role: "user",
+        content: `Message ${i}`,
+      }))
+
+      const mockClient = {
+        getPrompt: mock(async () => ({ messages: testData })),
+        close: mock(() => Promise.resolve()),
+      }
+
+      const getOrCreateSpy = spyOn(managerWithCompression as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // when
+      const result = await managerWithCompression.getPrompt(info, context, "test-prompt", {})
+
+      // then
+      expect(typeof result).toBe("string")
+    })
+
+    it("does not compress error-like responses", async () => {
+      // given
+      const managerWithCompression = new SkillMcpManager({ enabled: true, threshold: 100 })
+      const info: SkillMcpClientInfo = {
+        serverName: "test-server",
+        skillName: "test-skill",
+        sessionID: "session-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: { url: "https://example.com/mcp" },
+        skillName: "test-skill",
+      }
+      const errorData = {
+        error: "Connection failed",
+        message: "Could not connect",
+      }
+
+      const mockClient = {
+        callTool: mock(async () => ({ content: errorData })),
+        close: mock(() => Promise.resolve()),
+      }
+
+      const getOrCreateSpy = spyOn(managerWithCompression as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // when
+      const result = await managerWithCompression.callTool(info, context, "test-tool", {})
+
+      // then - error data should NOT be compressed, returned as JSON
+      expect(result).toContain("error")
+      expect(result).toContain("Connection failed")
+    })
+
+    it("respects threshold setting", async () => {
+      // given - compression enabled with high threshold
+      const managerWithHighThreshold = new SkillMcpManager({ enabled: true, threshold: 10000 })
+      const info: SkillMcpClientInfo = {
+        serverName: "test-server",
+        skillName: "test-skill",
+        sessionID: "session-1",
+      }
+      const context: SkillMcpServerContext = {
+        config: { url: "https://example.com/mcp" },
+        skillName: "test-skill",
+      }
+      // Small data that won't exceed threshold
+      const testData = [{ id: 1, name: "item" }]
+
+      const mockClient = {
+        callTool: mock(async () => ({ content: testData })),
+        close: mock(() => Promise.resolve()),
+      }
+
+      const getOrCreateSpy = spyOn(managerWithHighThreshold as any, "getOrCreateClientWithRetry")
+      getOrCreateSpy.mockResolvedValue(mockClient)
+
+      // when
+      const result = await managerWithHighThreshold.callTool(info, context, "test-tool", {})
+
+      // then - data below threshold returns JSON string (not TOON compressed, not raw object)
+      expect(typeof result).toBe("string")
+      expect(result).toContain("\"id\":1")
+    })
+  })
 })

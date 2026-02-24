@@ -1,3 +1,6 @@
+import { safeCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
+
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import type { Prompt, Resource, Tool } from "@modelcontextprotocol/sdk/types.js"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
@@ -5,6 +8,12 @@ import { disconnectAll, disconnectSession, forceReconnect } from "./cleanup"
 import { getOrCreateClient, getOrCreateClientWithRetryImpl } from "./connection"
 import { handleStepUpIfNeeded } from "./oauth-handler"
 import type { SkillMcpClientInfo, SkillMcpManagerState, SkillMcpServerContext } from "./types"
+
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
+
 
 export class SkillMcpManager {
   private readonly state: SkillMcpManagerState = {
@@ -16,10 +25,25 @@ export class SkillMcpManager {
     cleanupHandlers: [],
     idleTimeoutMs: 5 * 60 * 1000,
   }
+  private compressionConfig: ToonCompressionConfig
+
+  constructor(compressionConfig?: ToonCompressionConfig) {
+    this.compressionConfig = compressionConfig ?? DEFAULT_COMPRESSION_CONFIG
+  }
+
+
 
   private getClientKey(info: SkillMcpClientInfo): string {
     return `${info.sessionID}:${info.skillName}:${info.serverName}`
   }
+  private compressResult(data: unknown): unknown {
+    if (!this.compressionConfig.enabled) {
+      return data
+    }
+    return safeCompress(data, this.compressionConfig)
+  }
+
+
 
   async getOrCreateClient(info: SkillMcpClientInfo, config: ClaudeCodeMcpServer): Promise<Client> {
     const clientKey = this.getClientKey(info)
@@ -63,17 +87,19 @@ export class SkillMcpManager {
     name: string,
     args: Record<string, unknown>
   ): Promise<unknown> {
-    return await this.withOperationRetry(info, context.config, async (client) => {
-      const result = await client.callTool({ name, arguments: args })
-      return result.content
+    const result = await this.withOperationRetry(info, context.config, async (client) => {
+      const response = await client.callTool({ name, arguments: args })
+      return response.content
     })
+    return this.compressResult(result)
   }
 
   async readResource(info: SkillMcpClientInfo, context: SkillMcpServerContext, uri: string): Promise<unknown> {
-    return await this.withOperationRetry(info, context.config, async (client) => {
-      const result = await client.readResource({ uri })
-      return result.contents
+    const result = await this.withOperationRetry(info, context.config, async (client) => {
+      const response = await client.readResource({ uri })
+      return response.contents
     })
+    return this.compressResult(result)
   }
 
   async getPrompt(
@@ -82,10 +108,11 @@ export class SkillMcpManager {
     name: string,
     args: Record<string, string>
   ): Promise<unknown> {
-    return await this.withOperationRetry(info, context.config, async (client) => {
-      const result = await client.getPrompt({ name, arguments: args })
-      return result.messages
+    const result = await this.withOperationRetry(info, context.config, async (client) => {
+      const response = await client.getPrompt({ name, arguments: args })
+      return response.messages
     })
+    return this.compressResult(result)
   }
 
   private async withOperationRetry<T>(
