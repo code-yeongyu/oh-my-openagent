@@ -16,7 +16,13 @@ const MISMATCH_CONTEXT = 2
 const LINE_REF_EXTRACT_PATTERN = /([0-9]+#[ZPMQVRWSNKTXJBYH]{2})/
 
 function normalizeLineRef(ref: string): string {
-  const trimmed = ref.trim()
+  const originalTrimmed = ref.trim()
+  let trimmed = originalTrimmed
+  trimmed = trimmed.replace(/^(?:>>>|[+-])\s*/, "")
+  trimmed = trimmed.replace(/\s*#\s*/, "#")
+  trimmed = trimmed.replace(/\|.*$/, "")
+  trimmed = trimmed.trim()
+
   if (HASHLINE_REF_PATTERN.test(trimmed)) {
     return trimmed
   }
@@ -26,7 +32,7 @@ function normalizeLineRef(ref: string): string {
     return extracted[1]
   }
 
-  return trimmed
+  return originalTrimmed
 }
 
 export function parseLineRef(ref: string): LineRef {
