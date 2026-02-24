@@ -40,6 +40,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   model_fallback: z.boolean().optional(),
   agents: AgentOverridesSchema.optional(),
   categories: CategoriesConfigSchema.optional(),
+  /** Custom display names for agents (e.g., { "sisyphus": "Builder" }). Maps config key to custom display name. */
+  agent_display_names: z.record(z.string(), z.string()).optional(),
   claude_code: ClaudeCodeConfigSchema.optional(),
   sisyphus_agent: SisyphusAgentConfigSchema.optional(),
   comment_checker: CommentCheckerConfigSchema.optional(),

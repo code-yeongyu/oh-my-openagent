@@ -17,23 +17,39 @@ export const AGENT_DISPLAY_NAMES: Record<string, string> = {
   "multimodal-looker": "multimodal-looker",
 }
 
+let userOverrides: Record<string, string> | undefined
+
+/**
+ * Apply user-defined display name overrides from config.
+ * Call once during plugin initialization, before config pipeline runs.
+ */
+export function applyUserDisplayNames(overrides: Record<string, string>): void {
+  userOverrides = Object.fromEntries(
+    Object.entries(overrides).map(([k, v]) => [k.toLowerCase(), v]),
+  )
+}
+
+export function resetUserDisplayNames(): void {
+  userOverrides = undefined
+}
+
 /**
  * Get display name for an agent config key.
  * Uses case-insensitive lookup for backward compatibility.
  * Returns original key if not found.
  */
 export function getAgentDisplayName(configKey: string): string {
-  // Try exact match first
+  const lowerKey = configKey.toLowerCase()
+  const userOverride = userOverrides?.[lowerKey]
+  if (userOverride !== undefined) return userOverride
+
   const exactMatch = AGENT_DISPLAY_NAMES[configKey]
   if (exactMatch !== undefined) return exactMatch
-  
-  // Fall back to case-insensitive search
-  const lowerKey = configKey.toLowerCase()
+
   for (const [k, v] of Object.entries(AGENT_DISPLAY_NAMES)) {
     if (k.toLowerCase() === lowerKey) return v
   }
-  
-  // Unknown agent: return original key
+
   return configKey
 }
 
@@ -47,6 +63,11 @@ const REVERSE_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
  */
 export function getAgentConfigKey(agentName: string): string {
   const lower = agentName.toLowerCase()
+  if (userOverrides) {
+    for (const [configKey, displayName] of Object.entries(userOverrides)) {
+      if (displayName.toLowerCase() === lower) return configKey
+    }
+  }
   const reversed = REVERSE_DISPLAY_NAMES[lower]
   if (reversed !== undefined) return reversed
   if (AGENT_DISPLAY_NAMES[lower] !== undefined) return lower
