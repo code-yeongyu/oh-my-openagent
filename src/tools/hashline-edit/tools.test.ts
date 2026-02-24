@@ -103,6 +103,25 @@ describe("createHashlineEditTool", () => {
     expect(result).toContain(">>>")
   })
 
+  it("does not classify invalid pos format as hash mismatch", async () => {
+    //#given
+    const filePath = path.join(tempDir, "invalid-format.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ op: "replace", pos: "42", lines: "updated" }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toContain("Error")
+    expect(result.toLowerCase()).not.toContain("hash mismatch")
+  })
+
   it("preserves literal backslash-n and supports string[] payload", async () => {
     //#given
     const filePath = path.join(tempDir, "test.txt")
