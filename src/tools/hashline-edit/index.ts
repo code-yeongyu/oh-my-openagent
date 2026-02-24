@@ -16,9 +16,5 @@ export type {
 export { NIBBLE_STR, HASHLINE_DICT, HASHLINE_REF_PATTERN, HASHLINE_OUTPUT_PATTERN } from "./constants"
 export {
   applyHashlineEdits,
-  applyInsertAfter,
-  applyInsertBefore,
-  applyReplaceLines,
-  applySetLine,
 } from "./edit-operations"
 export { createHashlineEditTool } from "./tools"
