@@ -1,5 +1,5 @@
 import { computeLineHash } from "./hash-computation"
-import { HASHLINE_REF_PATTERN, HASHLINE_LEGACY_REF_PATTERN } from "./constants"
+import { HASHLINE_REF_PATTERN } from "./constants"
 
 export interface LineRef {
   line: number
@@ -13,14 +13,11 @@ interface HashMismatch {
 
 const MISMATCH_CONTEXT = 2
 
-const LINE_REF_EXTRACT_PATTERN = /([0-9]+#[ZPMQVRWSNKTXJBYH]{2}|[0-9]+:[0-9a-fA-F]{2,})/
+const LINE_REF_EXTRACT_PATTERN = /([0-9]+#[ZPMQVRWSNKTXJBYH]{2})/
 
 function normalizeLineRef(ref: string): string {
   const trimmed = ref.trim()
   if (HASHLINE_REF_PATTERN.test(trimmed)) {
-    return trimmed
-  }
-  if (HASHLINE_LEGACY_REF_PATTERN.test(trimmed)) {
     return trimmed
   }
 
@@ -39,13 +36,6 @@ export function parseLineRef(ref: string): LineRef {
     return {
       line: Number.parseInt(match[1], 10),
       hash: match[2],
-    }
-  }
-  const legacyMatch = normalized.match(HASHLINE_LEGACY_REF_PATTERN)
-  if (legacyMatch) {
-    return {
-      line: Number.parseInt(legacyMatch[1], 10),
-      hash: legacyMatch[2],
     }
   }
   throw new Error(
