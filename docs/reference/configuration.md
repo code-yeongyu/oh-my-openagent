@@ -101,7 +101,7 @@ Here's a practical starting configuration:
     "writing": { "model": "kimi-for-coding/k2p5" },
 
     // visual-engineering — Gemini dominates visual tasks
-    "visual-engineering": { "model": "google/gemini-3-pro", "variant": "high" },
+    "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
 
     // Custom category for git operations
     "git": {
@@ -208,10 +208,10 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 
 | Category | Default Model | Description |
 |----------|---------------|-------------|
-| `visual-engineering` | `google/gemini-3-pro` (high) | Frontend, UI/UX, design, animation |
+| `visual-engineering` | `google/gemini-3.1-pro` (high) | Frontend, UI/UX, design, animation |
 | `ultrabrain` | `openai/gpt-5.3-codex` (xhigh) | Deep logical reasoning, complex architecture |
 | `deep` | `openai/gpt-5.3-codex` (medium) | Autonomous problem-solving, thorough research |
-| `artistry` | `google/gemini-3-pro` (high) | Creative/unconventional approaches |
+| `artistry` | `google/gemini-3.1-pro` (high) | Creative/unconventional approaches |
 | `quick` | `anthropic/claude-haiku-4-5` | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low` | `anthropic/claude-sonnet-4-6` | General tasks, low effort |
 | `unspecified-high` | `anthropic/claude-opus-4-6` (max) | General tasks, high effort |
@@ -565,7 +565,7 @@ Define `fallback_models` per agent or category:
   "agents": {
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
-      "fallback_models": ["openai/gpt-5.2", "google/gemini-3-pro"]
+      "fallback_models": ["openai/gpt-5.2", "google/gemini-3.1-pro"]
     }
   }
 }

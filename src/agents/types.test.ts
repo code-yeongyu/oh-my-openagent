@@ -39,7 +39,7 @@ describe("isGptModel", () => {
   });
 
   test("gemini models are not gpt", () => {
-    expect(isGptModel("google/gemini-3-pro")).toBe(false);
+    expect(isGptModel("google/gemini-3.1-pro")).toBe(false);
     expect(isGptModel("litellm/gemini-3-pro")).toBe(false);
   });
 
@@ -50,7 +50,7 @@ describe("isGptModel", () => {
 
 describe("isGeminiModel", () => {
   test("#given google provider models #then returns true", () => {
-    expect(isGeminiModel("google/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("google/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("google/gemini-3-flash")).toBe(true);
     expect(isGeminiModel("google/gemini-2.5-pro")).toBe(true);
   });

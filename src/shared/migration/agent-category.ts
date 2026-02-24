@@ -12,7 +12,7 @@
  * This map will be removed in a future major version once migration period ends.
  */
 export const MODEL_TO_CATEGORY_MAP: Record<string, string> = {
-  "google/gemini-3-pro": "visual-engineering",
+  "google/gemini-3.1-pro": "visual-engineering",
   "google/gemini-3-flash": "writing",
   "openai/gpt-5.2": "ultrabrain",
   "anthropic/claude-haiku-4-5": "quick",

@@ -167,7 +167,7 @@ The `opencode-antigravity-auth` plugin uses different model names than the built
 - `google/antigravity-claude-opus-4-5-thinking` — variants: `low`, `max`
 
 **Available models (Gemini CLI quota)**:
-- `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemini-3-flash-preview`, `google/gemini-3-pro-preview`
+- `google/gemini-2.5-flash`, `google/gemini-2.5-pro`, `google/gemini-3-flash-preview`, `google/gemini-3.1-pro-preview`
 
 > **Note**: Legacy tier-suffixed names like `google/antigravity-gemini-3-pro-high` still work but variants are recommended. Use `--variant=high` with the base model name instead.
 

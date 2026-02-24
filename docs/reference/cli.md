@@ -215,7 +215,7 @@ Configuration files support **JSONC (JSON with Comments)** format. You can use c
   /* Category customization */
   "categories": {
     "visual-engineering": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3.1-pro",
     },
   },
 }

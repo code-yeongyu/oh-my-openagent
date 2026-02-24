@@ -17,7 +17,7 @@ const TEST_AVAILABLE_MODELS = new Set([
   "anthropic/claude-opus-4-6",
   "anthropic/claude-sonnet-4-6",
   "anthropic/claude-haiku-4-5",
-  "google/gemini-3-pro",
+  "google/gemini-3.1-pro",
   "google/gemini-3-flash",
   "openai/gpt-5.2",
   "openai/gpt-5.3-codex",
@@ -73,7 +73,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("google/gemini-3-pro")
+      expect(category.model).toBe("google/gemini-3.1-pro")
       expect(category.variant).toBe("high")
     })
 
@@ -781,7 +781,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro")
+      expect(result!.config.model).toBe("google/gemini-3.1-pro")
       expect(result!.promptAppend).toContain("VISUAL/UI")
     })
 
@@ -805,7 +805,7 @@ describe("sisyphus-task", () => {
       const categoryName = "visual-engineering"
       const userCategories = {
         "visual-engineering": {
-          model: "google/gemini-3-pro",
+          model: "google/gemini-3.1-pro",
           prompt_append: "Custom instructions here",
         },
       }
@@ -845,7 +845,7 @@ describe("sisyphus-task", () => {
       const categoryName = "visual-engineering"
       const userCategories = {
         "visual-engineering": {
-          model: "google/gemini-3-pro",
+          model: "google/gemini-3.1-pro",
           temperature: 0.3,
         },
       }
@@ -868,7 +868,7 @@ describe("sisyphus-task", () => {
 
       // then - category's built-in model wins over inheritedModel
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro")
+      expect(result!.config.model).toBe("google/gemini-3.1-pro")
     })
 
     test("systemDefaultModel is used as fallback when custom category has no model", () => {
@@ -910,7 +910,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro")
+      expect(result!.config.model).toBe("google/gemini-3.1-pro")
     })
   })
 
@@ -3028,7 +3028,7 @@ describe("sisyphus-task", () => {
       
       // then should use category's built-in model (gemini-3-pro for visual-engineering)
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("google/gemini-3-pro")
+      expect(resolved!.model).toBe("google/gemini-3.1-pro")
     })
 
     test("systemDefaultModel is used when no other model is available", () => {

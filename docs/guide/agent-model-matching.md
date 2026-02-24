@@ -186,7 +186,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
     "quick": { "model": "opencode/gpt-5-nano" },
     "unspecified-low": { "model": "kimi-for-coding/k2p5" },
     "unspecified-high": { "model": "anthropic/claude-sonnet-4-6", "variant": "max" },
-    "visual-engineering": { "model": "google/gemini-3-pro", "variant": "high" },
+    "visual-engineering": { "model": "google/gemini-3.1-pro", "variant": "high" },
     "writing": { "model": "kimi-for-coding/k2p5" }
   },
 
