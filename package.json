@@ -58,6 +58,7 @@
     "@modelcontextprotocol/sdk": "^1.25.2",
     "@opencode-ai/plugin": "^1.1.19",
     "@opencode-ai/sdk": "^1.1.19",
+    "@toon-format/toon": "^2.1.0",
     "commander": "^14.0.2",
     "detect-libc": "^2.0.0",
     "diff": "^8.0.3",
