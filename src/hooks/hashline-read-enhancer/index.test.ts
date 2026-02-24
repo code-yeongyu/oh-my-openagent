@@ -164,7 +164,7 @@ describe("hashline-read-enhancer", () => {
     expect(lines[2]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\|const y = 2$/)
   })
 
-  it("appends LINE#ID output for write tool using metadata filepath", async () => {
+  it("appends simple summary for write tool instead of full hashlined content", async () => {
     //#given
     const hook = createHashlineReadEnhancerHook(mockCtx(), { hashline_edit: { enabled: true } })
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "hashline-write-"))
@@ -181,9 +181,10 @@ describe("hashline-read-enhancer", () => {
     await hook["tool.execute.after"](input, output)
 
     //#then
-    expect(output.output).toContain("Updated file (LINE#ID|content):")
-    expect(output.output).toMatch(/1#[ZPMQVRWSNKTXJBYH]{2}\|const x = 1/)
-    expect(output.output).toMatch(/2#[ZPMQVRWSNKTXJBYH]{2}\|const y = 2/)
+    expect(output.output).toContain("File written successfully.")
+    expect(output.output).toContain("2 lines written.")
+    expect(output.output).not.toContain("Updated file (LINE#ID|content):")
+    expect(output.output).not.toContain("const x = 1")
 
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
