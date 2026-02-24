@@ -88,9 +88,3 @@ export function applyHashlineEdits(content: string, edits: HashlineEdit[]): stri
   return applyHashlineEditsWithReport(content, edits).content
 }
 
-export {
-  applySetLine,
-  applyReplaceLines,
-  applyInsertAfter,
-  applyInsertBefore,
-} from "./edit-operation-primitives"
