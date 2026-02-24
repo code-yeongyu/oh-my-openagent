@@ -1,14 +1,14 @@
-# src/hooks/ — 44 Lifecycle Hooks
+# src/hooks/ — 46 Lifecycle Hooks
 
-**Generated:** 2026-02-21
+**Generated:** 2026-02-24
 
 ## OVERVIEW
 
-44 hooks across 39 directories + 6 standalone files. Three-tier composition: Core(35) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
+46 hooks across 39 directories + 6 standalone files. Three-tier composition: Core(37) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
 
 ## HOOK TIERS
 
-### Tier 1: Session Hooks (22) — `create-session-hooks.ts`
+### Tier 1: Session Hooks (23) — `create-session-hooks.ts`
 ## STRUCTURE
 ```
 hooks/
@@ -70,11 +70,12 @@ hooks/
 | questionLabelTruncator | tool.execute.before | Truncate long question labels |
 | taskResumeInfo | chat.message | Inject task context on resume |
 | anthropicEffort | chat.params | Adjust reasoning effort level |
-| jsonErrorRecovery | tool.execute.after | Detect JSON parse errors, inject correction reminder |
-| sisyphusGptHephaestusReminder | chat.message | Toast warning when Sisyphus uses GPT model |
-| taskReminder | tool.execute.after | Remind about task tools after 10 turns without usage |
+| modelFallback | chat.params | Provider-level model fallback on errors |
+| noSisyphusGpt | chat.message | Block Sisyphus from using GPT models (toast warning) |
+| noHephaestusNonGpt | chat.message | Block Hephaestus from using non-GPT models |
+| runtimeFallback | event | Auto-switch models on API provider errors |
 
-### Tier 2: Tool Guard Hooks (9) — `create-tool-guard-hooks.ts`
+### Tier 2: Tool Guard Hooks (10) — `create-tool-guard-hooks.ts`
 
 | Hook | Event | Purpose |
 |------|-------|---------|
@@ -87,6 +88,7 @@ hooks/
 | tasksTodowriteDisabler | tool.execute.before | Disable TodoWrite when task system active |
 | writeExistingFileGuard | tool.execute.before | Require Read before Write on existing files |
 | hashlineReadEnhancer | tool.execute.after | Enhance Read output with line hashes |
+| jsonErrorRecovery | tool.execute.after | Detect JSON parse errors, inject correction reminder |
 
 ### Tier 3: Transform Hooks (4) — `create-transform-hooks.ts`
 
