@@ -858,6 +858,41 @@ Supports:
 - `alwaysApply: true` for unconditional rules
 - Walks upward from file to project root, plus `~/.claude/rules/`
 
+## TOON Compression
+
+TOON Compression is an intelligent data optimization feature that reduces token consumption by compressing large, structured tool outputs and messages. It is particularly effective for large JSON arrays often returned by database queries, file listings, or API responses.
+
+### How it Works
+
+The feature uses the `@toon-format/toon` library to transform uniform JSON arrays (arrays where every item has the same structure) into a compact string format. This format is designed to be highly token-efficient while remaining understandable by LLMs.
+
+### Key Features
+,
+* **Automatic Detection**: Automatically identifies large uniform arrays and applies compression if they exceed the configured threshold.
+* **Safety Guards**: Never compresses error messages, stack traces, or binary data to ensure critical debugging information and raw data integrity are preserved.
+* **Threshold-Based**: Only activates when the output is large enough to benefit from compression (default: 5000 characters).
+* **Time-Limited**: Compression operations are strictly limited to 50ms to prevent any noticeable latency.
+* **Context-Aware**: Applied during both tool execution (pre-output) and session lifecycle hooks (post-processing).
+
+### When to Use
+,
+Enable TOON compression when working with:
+* Large datasets or search results
+* Extensive directory listings
+* High-volume log outputs
+* Repetitive structured data
+
+It can be enabled in your configuration:
+
+```json
+{
+  "toon_compression": {
+    "enabled": true,
+    "threshold": 5000
+  }
+}
+```
+
 ## Claude Code Compatibility
 
 Full compatibility layer for Claude Code configurations.

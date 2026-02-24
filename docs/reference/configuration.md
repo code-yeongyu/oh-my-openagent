@@ -31,6 +31,7 @@ Complete reference for `oh-my-opencode.jsonc` configuration. This document cover
 - [Advanced](#advanced)
   - [Runtime Fallback](#runtime-fallback)
   - [Hashline Edit](#hashline-edit)
+  - [TOON Compression](#toon-compression)
   - [Experimental](#experimental)
 - [Reference](#reference)
   - [Environment Variables](#environment-variables)
@@ -580,6 +581,24 @@ Replaces the built-in `Edit` tool with a hash-anchored version using `LINE#ID` r
 ```
 
 When enabled, two companion hooks are active: `hashline-read-enhancer` (annotates Read output) and `hashline-edit-diff-enhancer` (shows diffs). Disable them individually via `disabled_hooks`.
+
+### TOON Compression
+
+Configure structured data compression for LLM contexts.
+
+```json
+{
+  "toon_compression": {
+    "enabled": false,
+    "threshold": 5000
+  }
+}
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable structured data compression |
+| `threshold` | number | `5000` | Minimum character length before compression (min: 100) |
 
 ### Experimental
 

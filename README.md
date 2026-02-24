@@ -155,6 +155,7 @@ Even only with following subscriptions, ultrawork will work well (this project i
 |   🎯   | **Skill-Embedded MCPs**                                  | Skills carry their own MCP servers. No context bloat.                                                                                                                                                            |
 |   📋   | **Prometheus Planner**                                   | Interview-mode strategic planning before any execution.                                                                                                                                                          |
 |   🔍   | **`/init-deep`**                                         | Auto-generates hierarchical `AGENTS.md` files throughout your project. Great for both token efficiency and your agent's performance                                                                              |
+|   📦   | **TOON Compression**                                     | Intelligent structured data optimization. Squeezes token usage without losing meaning.                                                                                                                           |
 
 ### Discipline Agents
 
@@ -317,6 +318,7 @@ See full [Features Documentation](docs/reference/features.md).
 - **Session Tools**: List, read, search, and analyze session history
 - **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
 - **Model Setup**: Agent-model matching is built into the [Installation Guide](docs/guide/installation.md#step-5-understand-your-model-setup)
+- **TOON Compression**: Structured data optimization for token-efficient LLM contexts
 
 ## Configuration
 
