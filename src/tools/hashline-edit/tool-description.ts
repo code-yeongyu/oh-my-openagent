@@ -15,9 +15,9 @@ VALIDATION:
   CRITICAL: all operations validate against the same pre-edit file snapshot and apply bottom-up. Refs/tags are interpreted against the last-read version of the file.
 
 LINE#ID FORMAT (CRITICAL):
- Each line reference must be in "LINE#ID" format where:
- LINE: 1-based line number
- ID: Two CID letters from the set ZPMQVRWSNKTXJBYH
+ Each line reference must be in "{line_number}#{hash_id}" format where:
+ {line_number}: 1-based line number
+ {hash_id}: Two CID letters from the set ZPMQVRWSNKTXJBYH
 
 FILE MODES:
  delete=true deletes file and requires edits=[] with no rename
