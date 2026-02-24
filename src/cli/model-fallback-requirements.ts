@@ -17,9 +17,9 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   hephaestus: {
     fallbackChain: [
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
+      { providers: ["openai", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
     ],
-    requiresProvider: ["openai", "github-copilot", "opencode"],
+    requiresProvider: ["openai", "opencode"],
   },
   oracle: {
     fallbackChain: [
@@ -100,14 +100,14 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
   },
   ultrabrain: {
     fallbackChain: [
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.3-codex", variant: "xhigh" },
+      { providers: ["openai", "opencode"], model: "gpt-5.3-codex", variant: "xhigh" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "high" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
     ],
   },
   deep: {
     fallbackChain: [
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
+      { providers: ["openai", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "high" },
     ],
@@ -131,7 +131,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
   "unspecified-low": {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
+      { providers: ["openai", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },
     ],
   },
