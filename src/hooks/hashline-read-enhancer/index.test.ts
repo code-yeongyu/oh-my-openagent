@@ -211,6 +211,29 @@ describe("hashline-read-enhancer", () => {
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
+  it("does not overwrite write tool error output with success message", async () => {
+    //#given — write tool failed, but stale file exists from previous write
+    const hook = createHashlineReadEnhancerHook(mockCtx(), { hashline_edit: { enabled: true } })
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "hashline-err-"))
+    const filePath = path.join(tempDir, "demo.ts")
+    fs.writeFileSync(filePath, "const x = 1")
+    const input = { tool: "write", sessionID: "s", callID: "c" }
+    const output = {
+      title: "write",
+      output: "Error: EACCES: permission denied, open '" + filePath + "'",
+      metadata: { filepath: filePath },
+    }
+
+    //#when
+    await hook["tool.execute.after"](input, output)
+
+    //#then — error output must be preserved, not overwritten with success message
+    expect(output.output).toContain("Error: EACCES")
+    expect(output.output).not.toContain("File written successfully.")
+
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  })
+
   it("skips when feature is disabled", async () => {
     //#given
     const hook = createHashlineReadEnhancerHook(mockCtx(), { hashline_edit: { enabled: false } })
