@@ -5,6 +5,7 @@ import type { OhMyOpenCodeConfig } from "../../config/schema"
 import type { TaskObject, TaskStatus } from "./types"
 import { TaskObjectSchema } from "./types"
 import { readJsonSafe, getTaskDir } from "../../features/claude-tasks/storage"
+import { safeCompress } from "../../shared/toon-compression"
 
 interface TaskSummary {
   id: string
@@ -68,10 +69,13 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
         }
       })
 
-       return JSON.stringify({
-         tasks: summaries,
-         reminder: "1 task = 1 task. Maximize parallel execution by running independent tasks (tasks with empty blockedBy) concurrently."
-       })
+      const result = {
+        tasks: summaries,
+        reminder: "1 task = 1 task. Maximize parallel execution by running independent tasks (tasks with empty blockedBy) concurrently."
+      }
+      
+      const compressionConfig = config.toon_compression ?? { enabled: false, threshold: 5000 }
+      return safeCompress(result, compressionConfig)
     },
   })
 }

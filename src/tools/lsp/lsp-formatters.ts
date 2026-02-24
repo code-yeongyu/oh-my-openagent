@@ -1,3 +1,6 @@
+import { safeCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
+
 import { SYMBOL_KIND_MAP, SEVERITY_MAP } from "./constants"
 import { uriToPath } from "./lsp-client-wrapper"
 import type {
@@ -190,4 +193,96 @@ export function formatApplyResult(result: ApplyResult): string {
   }
 
   return lines.join("\n")
+}
+
+
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
+
+export function formatDiagnosticsOutput(
+  diagnostics: Diagnostic[],
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG
+): string {
+  if (diagnostics.length === 0) {
+    return "No diagnostics found"
+  }
+
+  const formattedItems = diagnostics.map((d) => ({
+    severity: formatSeverity(d.severity),
+    line: d.range.start.line + 1,
+    char: d.range.start.character,
+    source: d.source ?? null,
+    code: d.code ?? null,
+    message: d.message,
+  }))
+
+  const jsonString = JSON.stringify(formattedItems)
+  const shouldCompress =
+    compressionConfig.enabled &&
+    jsonString.length > compressionConfig.threshold &&
+    diagnostics.length >= 5
+
+  if (shouldCompress) {
+    const compressed = safeCompress(formattedItems, compressionConfig)
+    return `[Compressed diagnostics]\n${compressed}`
+  }
+
+  return diagnostics.map(formatDiagnostic).join("\n")
+}
+
+export function formatSymbolsOutput(
+  symbols: SymbolInfo[] | DocumentSymbol[],
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG
+): string {
+  if (symbols.length === 0) {
+    return "No symbols found"
+  }
+
+  const isDocumentSymbol = (s: SymbolInfo | DocumentSymbol): s is DocumentSymbol => "range" in s && "children" in s
+
+  if (isDocumentSymbol(symbols[0])) {
+    const docSymbols = symbols as DocumentSymbol[]
+    const formattedItems = docSymbols.map((s) => ({
+      name: s.name,
+      kind: formatSymbolKind(s.kind),
+      line: s.range.start.line + 1,
+      children: s.children?.length ?? 0,
+    }))
+
+    const jsonString = JSON.stringify(formattedItems)
+    const shouldCompress =
+      compressionConfig.enabled &&
+      jsonString.length > compressionConfig.threshold &&
+      symbols.length >= 5
+
+    if (shouldCompress) {
+      const compressed = safeCompress(formattedItems, compressionConfig)
+      return `[Compressed symbols]\n${compressed}`
+    }
+
+    return docSymbols.map((s) => formatDocumentSymbol(s)).join("\n")
+  }
+
+  const symInfos = symbols as SymbolInfo[]
+  const formattedItems = symInfos.map((s) => ({
+    name: s.name,
+    kind: formatSymbolKind(s.kind),
+    container: s.containerName ?? null,
+    location: formatLocation(s.location),
+  }))
+
+  const jsonString = JSON.stringify(formattedItems)
+  const shouldCompress =
+    compressionConfig.enabled &&
+    jsonString.length > compressionConfig.threshold &&
+    symbols.length >= 5
+
+  if (shouldCompress) {
+    const compressed = safeCompress(formattedItems, compressionConfig)
+    return `[Compressed symbols]\n${compressed}`
+  }
+
+  return symInfos.map(formatSymbolInfo).join("\n")
 }

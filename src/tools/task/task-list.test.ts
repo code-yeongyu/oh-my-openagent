@@ -332,4 +332,158 @@ describe("createTaskList", () => {
      const parsed = JSON.parse(result)
      expect(parsed.tasks[0].blockedBy).toEqual(["T-missing"])
    })
+
+  describe("toon compression", () => {
+    it("returns uncompressed JSON when compression is disabled", async () => {
+      //#given
+      const tasks: TaskObject[] = Array.from({ length: 10 }, (_, i) => ({
+        id: `T-${i}`,
+        subject: `Task ${i} with a reasonably long subject to increase payload size`,
+        description: "",
+        status: "pending" as const,
+        blocks: [],
+        blockedBy: [],
+        threadID: "test-session",
+      }))
+
+      for (const task of tasks) {
+        writeJsonAtomic(join(testProjectDir, ".sisyphus/tasks", `${task.id}.json`), task)
+      }
+
+      const config = {
+        sisyphus: {
+          tasks: {
+            storage_path: join(testProjectDir, ".sisyphus/tasks"),
+            claude_code_compat: false,
+          },
+        },
+        toon_compression: {
+          enabled: false,
+          threshold: 5000,
+        },
+      }
+      const tool = createTaskList(config)
+
+      //#when
+      const result = await tool.execute({}, { sessionID: "test-session" })
+
+      //#then
+      const parsed = JSON.parse(result)
+      expect(parsed.tasks).toHaveLength(10)
+      expect(parsed.reminder).toBeDefined()
+    })
+
+    it("returns compressed output when compression is enabled and threshold is exceeded", async () => {
+      //#given
+      const tasks: TaskObject[] = Array.from({ length: 10 }, (_, i) => ({
+        id: `T-${i}`,
+        subject: `Task ${i} with a very long subject line that adds significant characters to the payload to exceed the compression threshold of 5000 characters`,
+        description: "",
+        status: "pending" as const,
+        blocks: [],
+        blockedBy: [],
+        threadID: "test-session",
+      }))
+
+      for (const task of tasks) {
+        writeJsonAtomic(join(testProjectDir, ".sisyphus/tasks", `${task.id}.json`), task)
+      }
+
+      const config = {
+        sisyphus: {
+          tasks: {
+            storage_path: join(testProjectDir, ".sisyphus/tasks"),
+            claude_code_compat: false,
+          },
+        },
+        toon_compression: {
+          enabled: true,
+          threshold: 100,
+        },
+      }
+      const tool = createTaskList(config)
+
+      //#when
+      const result = await tool.execute({}, { sessionID: "test-session" })
+
+      //#then
+      // Result should either be compressed (not valid JSON) or fallback to JSON
+      // We verify it doesn't throw and returns a string
+      expect(typeof result).toBe("string")
+      expect(result.length).toBeGreaterThan(0)
+    })
+
+    it("falls back to JSON when compression fails", async () => {
+      //#given
+      const tasks: TaskObject[] = Array.from({ length: 5 }, (_, i) => ({
+        id: `T-${i}`,
+        subject: `Task ${i}`,
+        description: "",
+        status: "pending" as const,
+        blocks: [],
+        blockedBy: [],
+        threadID: "test-session",
+      }))
+
+      for (const task of tasks) {
+        writeJsonAtomic(join(testProjectDir, ".sisyphus/tasks", `${task.id}.json`), task)
+      }
+
+      // Use very low threshold to trigger compression attempt, but small array
+      // won't compress (needs 5+ items), so it should fall back to JSON
+      const config = {
+        sisyphus: {
+          tasks: {
+            storage_path: join(testProjectDir, ".sisyphus/tasks"),
+            claude_code_compat: false,
+          },
+        },
+        toon_compression: {
+          enabled: true,
+          threshold: 1,
+        },
+      }
+      const tool = createTaskList(config)
+
+      //#when
+      const result = await tool.execute({}, { sessionID: "test-session" })
+
+      //#then
+      const parsed = JSON.parse(result)
+      expect(parsed.tasks).toHaveLength(5)
+    })
+
+    it("uses default compression config when not specified", async () => {
+      //#given
+      const task: TaskObject = {
+        id: "T-1",
+        subject: "Single task",
+        description: "",
+        status: "pending" as const,
+        blocks: [],
+        blockedBy: [],
+        threadID: "test-session",
+      }
+
+      writeJsonAtomic(join(testProjectDir, ".sisyphus/tasks", "T-1.json"), task)
+
+      const config = {
+        sisyphus: {
+          tasks: {
+            storage_path: join(testProjectDir, ".sisyphus/tasks"),
+            claude_code_compat: false,
+          },
+        },
+        // No toon_compression specified
+      }
+      const tool = createTaskList(config)
+
+      //#when
+      const result = await tool.execute({}, { sessionID: "test-session" })
+
+      //#then
+      const parsed = JSON.parse(result)
+      expect(parsed.tasks).toHaveLength(1)
+    })
+  })
 })

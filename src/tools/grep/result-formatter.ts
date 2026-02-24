@@ -1,6 +1,16 @@
 import type { GrepResult, GrepMatch, CountResult } from "./types"
+import { safeCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 
-export function formatGrepResult(result: GrepResult): string {
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
+
+export function formatGrepResult(
+  result: GrepResult,
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
+): string {
   if (result.error) {
     return `Error: ${result.error}`
   }
@@ -17,6 +27,19 @@ export function formatGrepResult(result: GrepResult): string {
     lines.push("[Output truncated due to size limit]")
   }
   lines.push("")
+
+  const matchesJson = JSON.stringify(result.matches)
+  const shouldUseCompression =
+    compressionConfig.enabled &&
+    matchesJson.length > compressionConfig.threshold &&
+    result.matches.length >= 5
+
+  if (shouldUseCompression) {
+    const compressed = safeCompress(result.matches, compressionConfig)
+    lines.push("[Compressed matches]")
+    lines.push(compressed)
+    return lines.join("\n")
+  }
 
   const byFile = new Map<string, GrepMatch[]>()
   for (const match of result.matches) {

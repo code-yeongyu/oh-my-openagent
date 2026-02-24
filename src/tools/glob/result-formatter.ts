@@ -1,6 +1,11 @@
 import type { GlobResult } from "./types"
+import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
-export function formatGlobResult(result: GlobResult): string {
+export function formatGlobResult(
+  result: GlobResult,
+  compressionConfig?: ToonCompressionConfig
+): string {
   if (result.error) {
     return `Error: ${result.error}`
   }
@@ -13,8 +18,16 @@ export function formatGlobResult(result: GlobResult): string {
   lines.push(`Found ${result.totalFiles} file(s)`)
   lines.push("")
 
-  for (const file of result.files) {
-    lines.push(file.path)
+  const shouldUseCompression =
+    compressionConfig?.enabled === true &&
+    shouldCompress(result.files, compressionConfig.threshold)
+
+  if (shouldUseCompression) {
+    lines.push(safeCompress(result.files, compressionConfig))
+  } else {
+    for (const file of result.files) {
+      lines.push(file.path)
+    }
   }
 
   if (result.truncated) {

@@ -1,7 +1,12 @@
 import type { SessionInfo, SessionMessage, SearchResult } from "./types"
+import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 import { getSessionInfo, readSessionMessages } from "./storage"
 
-export async function formatSessionList(sessionIDs: string[]): Promise<string> {
+export async function formatSessionList(
+  sessionIDs: string[],
+  compressionConfig?: ToonCompressionConfig
+): Promise<string> {
   if (sessionIDs.length === 0) {
     return "No sessions found."
   }
@@ -38,7 +43,14 @@ export async function formatSessionList(sessionIDs: string[]): Promise<string> {
 
   const separator = "|" + colWidths.map((w) => "-".repeat(w + 2)).join("|") + "|"
 
-  return [formatRow(headers), separator, ...rows.map(formatRow)].join("\n")
+  const formatted = [formatRow(headers), separator, ...rows.map(formatRow)].join("\n")
+
+  // Apply compression if enabled and output exceeds threshold
+  if (compressionConfig?.enabled && shouldCompress(infos, compressionConfig.threshold)) {
+    return safeCompress(infos, compressionConfig)
+  }
+
+  return formatted
 }
 
 export function formatSessionMessages(
@@ -105,7 +117,10 @@ export function formatSessionInfo(info: SessionInfo): string {
   return lines.join("\n")
 }
 
-export function formatSearchResults(results: SearchResult[]): string {
+export function formatSearchResults(
+  results: SearchResult[],
+  compressionConfig?: ToonCompressionConfig
+): string {
   if (results.length === 0) {
     return "No matches found."
   }
@@ -119,7 +134,14 @@ export function formatSearchResults(results: SearchResult[]): string {
     lines.push(`  Matches: ${result.match_count}\n`)
   }
 
-  return lines.join("\n")
+  const formatted = lines.join("\n")
+
+  // Apply compression if enabled and output exceeds threshold
+  if (compressionConfig?.enabled && shouldCompress(results, compressionConfig.threshold)) {
+    return safeCompress(results, compressionConfig)
+  }
+
+  return formatted
 }
 
 export async function filterSessionsByDate(

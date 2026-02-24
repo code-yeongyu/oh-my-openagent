@@ -218,3 +218,186 @@ line4: baz qux`
     expect(result).toBe(output)
   })
 })
+
+describe("response compression", () => {
+  const sessionID = "test-session-1"
+  
+  it("compresses large uniform array responses above threshold", async () => {
+    // given - create a large uniform array that exceeds threshold
+    const largeData = Array.from({ length: 100 }, (_, i) => ({
+      id: i,
+      name: `item-${i}`,
+      value: `data-value-${i}`,
+    }))
+    
+    const mockManager = {
+      callTool: mock(() => Promise.resolve(largeData)),
+      readResource: mock(() => Promise.resolve([])),
+      getPrompt: mock(() => Promise.resolve([])),
+    } as unknown as SkillMcpManager
+    
+    const loadedSkills = [
+      createMockSkillWithMcp("test-skill", {
+        "test-server": { command: "echo" },
+      }),
+    ]
+    
+    const tool = createSkillMcpTool({
+      manager: mockManager,
+      getLoadedSkills: () => loadedSkills,
+      getSessionID: () => sessionID,
+    })
+    
+    // when
+    const result = await tool.execute(
+      { mcp_name: "test-server", tool_name: "test-tool" },
+      mockContext
+    )
+    
+    // then - compressed output should be more compact than JSON
+    const jsonLength = JSON.stringify(largeData, null, 2).length
+    expect(result.length).toBeLessThan(jsonLength)
+    expect(result).not.toContain("\"id\": 0")
+  })
+  
+  it("does not compress small responses below threshold", async () => {
+    // given
+    const smallData = [{ id: 1, name: "single-item" }]
+    
+    const mockManager = {
+      callTool: mock(() => Promise.resolve(smallData)),
+      readResource: mock(() => Promise.resolve([])),
+      getPrompt: mock(() => Promise.resolve([])),
+    } as unknown as SkillMcpManager
+    
+    const loadedSkills = [
+      createMockSkillWithMcp("test-skill", {
+        "test-server": { command: "echo" },
+      }),
+    ]
+    
+    const tool = createSkillMcpTool({
+      manager: mockManager,
+      getLoadedSkills: () => loadedSkills,
+      getSessionID: () => sessionID,
+    })
+    
+    // when
+    const result = await tool.execute(
+      { mcp_name: "test-server", tool_name: "test-tool" },
+      mockContext
+    )
+    
+    // then - small data should be JSON formatted
+    expect(result).toContain("\"id\":1")
+    expect(result).toContain("\"name\":\"single-item\"")
+  })
+  
+  it("does not compress error-like responses", async () => {
+    // given
+    const errorData = {
+      error: "Connection failed",
+      message: "Could not connect to server",
+    }
+    
+    const mockManager = {
+      callTool: mock(() => Promise.resolve(errorData)),
+      readResource: mock(() => Promise.resolve([])),
+      getPrompt: mock(() => Promise.resolve([])),
+    } as unknown as SkillMcpManager
+    
+    const loadedSkills = [
+      createMockSkillWithMcp("test-skill", {
+        "test-server": { command: "echo" },
+      }),
+    ]
+    
+    const tool = createSkillMcpTool({
+      manager: mockManager,
+      getLoadedSkills: () => loadedSkills,
+      getSessionID: () => sessionID,
+    })
+    
+    // when
+    const result = await tool.execute(
+      { mcp_name: "test-server", tool_name: "test-tool" },
+      mockContext
+    )
+    
+    // then - error data should NOT be compressed
+    expect(result).toContain("\"error\":\"Connection failed\"")
+    expect(result).toContain("\"message\":\"Could not connect to server\"")
+  })
+  
+  it("compresses resource responses above threshold", async () => {
+    // given
+    const largeData = Array.from({ length: 100 }, (_, i) => ({
+      uri: `resource://${i}`,
+      content: `content-${i}`,
+    }))
+    
+    const mockManager = {
+      callTool: mock(() => Promise.resolve([])),
+      readResource: mock(() => Promise.resolve(largeData)),
+      getPrompt: mock(() => Promise.resolve([])),
+    } as unknown as SkillMcpManager
+    
+    const loadedSkills = [
+      createMockSkillWithMcp("test-skill", {
+        "test-server": { command: "echo" },
+      }),
+    ]
+    
+    const tool = createSkillMcpTool({
+      manager: mockManager,
+      getLoadedSkills: () => loadedSkills,
+      getSessionID: () => sessionID,
+    })
+    
+    // when
+    const result = await tool.execute(
+      { mcp_name: "test-server", resource_name: "test://resource" },
+      mockContext
+    )
+    
+    // then - compressed output should be more compact
+    const jsonLength = JSON.stringify(largeData, null, 2).length
+    expect(result.length).toBeLessThan(jsonLength)
+  })
+  
+  it("compresses prompt responses above threshold", async () => {
+    // given
+    const largeData = Array.from({ length: 100 }, (_, i) => ({
+      role: "user",
+      content: `Message content ${i}`,
+    }))
+    
+    const mockManager = {
+      callTool: mock(() => Promise.resolve([])),
+      readResource: mock(() => Promise.resolve([])),
+      getPrompt: mock(() => Promise.resolve(largeData)),
+    } as unknown as SkillMcpManager
+    
+    const loadedSkills = [
+      createMockSkillWithMcp("test-skill", {
+        "test-server": { command: "echo" },
+      }),
+    ]
+    
+    const tool = createSkillMcpTool({
+      manager: mockManager,
+      getLoadedSkills: () => loadedSkills,
+      getSessionID: () => sessionID,
+    })
+    
+    // when
+    const result = await tool.execute(
+      { mcp_name: "test-server", prompt_name: "test-prompt" },
+      mockContext
+    )
+    
+    // then - compressed output should be more compact
+    const jsonLength = JSON.stringify(largeData, null, 2).length
+    expect(result.length).toBeLessThan(jsonLength)
+  })
+})

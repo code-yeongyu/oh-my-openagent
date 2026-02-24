@@ -1,12 +1,32 @@
 import type { AnalyzeResult, SgResult } from "./types"
+import { safeCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
-export function formatSearchResult(result: SgResult): string {
+const DEFAULT_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
+
+export function formatSearchResult(result: SgResult, config: ToonCompressionConfig = DEFAULT_CONFIG): string {
   if (result.error) {
     return `Error: ${result.error}`
   }
 
   if (result.matches.length === 0) {
     return "No matches found"
+  }
+
+  const compressed = safeCompress(result.matches, config)
+  if (compressed.startsWith("toon:")) {
+    const lines: string[] = []
+    if (result.truncated) {
+      const reason = result.truncatedReason === "max_matches"
+        ? `showing first ${result.matches.length} of ${result.totalMatches}`
+        : result.truncatedReason === "max_output_bytes"
+        ? "output exceeded 1MB limit"
+        : "search timed out"
+      lines.push(`[TRUNCATED] Results truncated (${reason})\n`)
+    }
+    lines.push(`Found ${result.matches.length} match(es)${result.truncated ? ` (truncated from ${result.totalMatches})` : ""}:\n`)
+    lines.push(compressed)
+    return lines.join("\n")
   }
 
   const lines: string[] = []
@@ -32,13 +52,33 @@ export function formatSearchResult(result: SgResult): string {
   return lines.join("\n")
 }
 
-export function formatReplaceResult(result: SgResult, isDryRun: boolean): string {
+export function formatReplaceResult(result: SgResult, isDryRun: boolean, config: ToonCompressionConfig = DEFAULT_CONFIG): string {
   if (result.error) {
     return `Error: ${result.error}`
   }
 
   if (result.matches.length === 0) {
     return "No matches found to replace"
+  }
+
+  const compressed = safeCompress(result.matches, config)
+  if (compressed.startsWith("toon:")) {
+    const prefix = isDryRun ? "[DRY RUN] " : ""
+    const lines: string[] = []
+    if (result.truncated) {
+      const reason = result.truncatedReason === "max_matches"
+        ? `showing first ${result.matches.length} of ${result.totalMatches}`
+        : result.truncatedReason === "max_output_bytes"
+        ? "output exceeded 1MB limit"
+        : "search timed out"
+      lines.push(`[TRUNCATED] Results truncated (${reason})\n`)
+    }
+    lines.push(`${prefix}${result.matches.length} replacement(s):\n`)
+    lines.push(compressed)
+    if (isDryRun) {
+      lines.push("\nUse dryRun=false to apply changes")
+    }
+    return lines.join("\n")
   }
 
   const prefix = isDryRun ? "[DRY RUN] " : ""
@@ -69,9 +109,16 @@ export function formatReplaceResult(result: SgResult, isDryRun: boolean): string
   return lines.join("\n")
 }
 
-export function formatAnalyzeResult(results: AnalyzeResult[], extractedMetaVars: boolean): string {
+export function formatAnalyzeResult(results: AnalyzeResult[], extractedMetaVars: boolean, config: ToonCompressionConfig = DEFAULT_CONFIG): string {
   if (results.length === 0) {
     return "No matches found"
+  }
+
+  const compressed = safeCompress(results, config)
+  if (compressed.startsWith("toon:")) {
+    const lines: string[] = [`Found ${results.length} match(es):\n`]
+    lines.push(compressed)
+    return lines.join("\n")
   }
 
   const lines: string[] = [`Found ${results.length} match(es):\n`]

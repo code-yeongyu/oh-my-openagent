@@ -3,11 +3,18 @@ import { SKILL_MCP_DESCRIPTION } from "./constants"
 import type { SkillMcpArgs } from "./types"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
+import { safeCompress } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 
 interface SkillMcpToolOptions {
   manager: SkillMcpManager
   getLoadedSkills: () => LoadedSkill[]
   getSessionID: () => string
+}
+
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: true,
+  threshold: 5000,
 }
 
 type OperationType = { type: "tool" | "resource" | "prompt"; name: string }
@@ -158,12 +165,12 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
       switch (operation.type) {
         case "tool": {
           const result = await manager.callTool(info, context, operation.name, parsedArgs)
-          output = JSON.stringify(result, null, 2)
+          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG)
           break
         }
         case "resource": {
           const result = await manager.readResource(info, context, operation.name)
-          output = JSON.stringify(result, null, 2)
+          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG)
           break
         }
         case "prompt": {
@@ -172,7 +179,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
             stringArgs[key] = String(value)
           }
           const result = await manager.getPrompt(info, context, operation.name, stringArgs)
-          output = JSON.stringify(result, null, 2)
+          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG)
           break
         }
       }
