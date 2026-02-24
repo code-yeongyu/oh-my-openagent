@@ -13,6 +13,7 @@ const CONTENT_OPEN_TAG = "<content>"
 const CONTENT_CLOSE_TAG = "</content>"
 const FILE_OPEN_TAG = "<file>"
 const FILE_CLOSE_TAG = "</file>"
+const OPENCODE_LINE_TRUNCATION_SUFFIX = "... (line truncated to 2000 chars)"
 
 function isReadTool(toolName: string): boolean {
   return toolName.toLowerCase() === "read"
@@ -54,6 +55,9 @@ function parseReadLine(line: string): { lineNumber: number; content: string } | 
 function transformLine(line: string): string {
   const parsed = parseReadLine(line)
   if (!parsed) {
+    return line
+  }
+  if (parsed.content.endsWith(OPENCODE_LINE_TRUNCATION_SUFFIX)) {
     return line
   }
   const hash = computeLineHash(parsed.lineNumber, parsed.content)

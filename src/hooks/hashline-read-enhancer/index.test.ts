@@ -84,6 +84,33 @@ describe("hashline-read-enhancer", () => {
     expect(lines[7]).toBe("</content>")
   })
 
+  it("keeps OpenCode-truncated lines unhashed while hashifying normal lines", async () => {
+    //#given
+    const hook = createHashlineReadEnhancerHook(mockCtx(), { hashline_edit: { enabled: true } })
+    const input = { tool: "read", sessionID: "s", callID: "c" }
+    const truncatedLine = `${"x".repeat(60)}... (line truncated to 2000 chars)`
+    const output = {
+      title: "demo.ts",
+      output: [
+        "<path>/tmp/demo.ts</path>",
+        "<type>file</type>",
+        "<content>",
+        `1: ${truncatedLine}`,
+        "2: normal line",
+        "</content>",
+      ].join("\n"),
+      metadata: {},
+    }
+
+    //#when
+    await hook["tool.execute.after"](input, output)
+
+    //#then
+    const lines = output.output.split("\n")
+    expect(lines[3]).toBe(`1: ${truncatedLine}`)
+    expect(lines[4]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\|normal line$/)
+  })
+
   it("hashifies plain read output without content tags", async () => {
     //#given
     const hook = createHashlineReadEnhancerHook(mockCtx(), { hashline_edit: { enabled: true } })
