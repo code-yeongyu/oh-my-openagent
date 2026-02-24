@@ -336,12 +336,11 @@ result = task(..., run_in_background=false)  // Never wait synchronously for exp
 \`\`\`
 
 ### Background Result Collection:
-1. Launch parallel agents → receive task_ids
-2. Continue immediate work
+1. Launch parallel agents \u2192 receive task_ids
+2. Continue immediate work (explore, librarian results)
 3. When results needed: \`background_output(task_id="...")\`
-4. Before final answer, cancel DISPOSABLE tasks (explore, librarian) individually: \`background_cancel(taskId="bg_explore_xxx")\`, \`background_cancel(taskId="bg_librarian_xxx")\`
-5. **NEVER cancel Oracle.** ALWAYS collect Oracle result via \`background_output(task_id="bg_oracle_xxx")\` before answering — even if you already have enough context.
-6. **NEVER use \`background_cancel(all=true)\`** — it kills Oracle. Cancel each disposable task by its specific taskId.
+4. **If Oracle is running**: STOP all other output. Follow Oracle Completion Protocol in <Oracle_Usage>.
+5. Cleanup: Cancel disposable tasks (explore, librarian) individually via \`background_cancel(taskId="...")\`. Never use \`background_cancel(all=true)\`.
 
 ### Search Stop Conditions
 
@@ -478,9 +477,9 @@ If verification fails:
 3. Report: "Done. Note: found N pre-existing lint errors unrelated to my changes."
 
 ### Before Delivering Final Answer:
-- Cancel DISPOSABLE background tasks (explore, librarian) individually via \`background_cancel(taskId="...")\`
-- **NEVER use \`background_cancel(all=true)\`.** Always cancel individually by taskId.
-- **Always wait for Oracle**: When Oracle is running and you have gathered enough context from your own exploration, your next action is \`background_output\` on Oracle — NOT delivering a final answer. Oracle's value is highest when you think you don't need it.
+- **If Oracle is running**: STOP. Follow Oracle Completion Protocol in <Oracle_Usage>. Do NOT deliver any answer.
+- Cancel disposable background tasks (explore, librarian) individually via \`background_cancel(taskId="...")\`.
+- **Never use \`background_cancel(all=true)\`.**
 </Behavior_Instructions>
 
 ${oracleSection}
