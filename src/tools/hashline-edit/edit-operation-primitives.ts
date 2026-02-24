@@ -80,7 +80,7 @@ export function applyInsertAfter(
   const result = [...lines]
   const newLines = stripInsertAnchorEcho(lines[line - 1], toNewLines(text))
   if (newLines.length === 0) {
-    throw new Error(`insert_after requires non-empty text for ${anchor}`)
+    throw new Error(`append (anchored) requires non-empty text for ${anchor}`)
   }
   result.splice(line, 0, ...newLines)
   return result
@@ -97,7 +97,7 @@ export function applyInsertBefore(
   const result = [...lines]
   const newLines = stripInsertBeforeEcho(lines[line - 1], toNewLines(text))
   if (newLines.length === 0) {
-    throw new Error(`insert_before requires non-empty text for ${anchor}`)
+    throw new Error(`prepend (anchored) requires non-empty text for ${anchor}`)
   }
   result.splice(line - 1, 0, ...newLines)
   return result
