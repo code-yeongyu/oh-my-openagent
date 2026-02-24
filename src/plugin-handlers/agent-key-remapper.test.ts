@@ -1,5 +1,6 @@
-import { describe, it, expect } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper"
+import { applyUserDisplayNames, resetUserDisplayNames } from "../shared/agent-display-names"
 
 describe("remapAgentKeysToDisplayNames", () => {
   it("remaps known agent keys to display names", () => {
@@ -61,5 +62,54 @@ describe("remapAgentKeysToDisplayNames", () => {
     expect(result["momus"]).toBeUndefined()
     expect(result["Sisyphus-Junior"]).toBeDefined()
     expect(result["sisyphus-junior"]).toBeUndefined()
+  })
+})
+
+describe("#given user-defined display name overrides", () => {
+  beforeEach(() => {
+    resetUserDisplayNames()
+  })
+
+  afterEach(() => {
+    resetUserDisplayNames()
+  })
+
+  it("#when remapping #then uses user override display name", () => {
+    applyUserDisplayNames({ sisyphus: "Builder" })
+    const agents = { sisyphus: { prompt: "test" } }
+
+    const result = remapAgentKeysToDisplayNames(agents)
+
+    expect(result["Builder"]).toBeDefined()
+    expect(result["Sisyphus (Ultraworker)"]).toBeUndefined()
+    expect(result["sisyphus"]).toBeUndefined()
+  })
+
+  it("#when remapping #then mixes user overrides with built-in defaults", () => {
+    applyUserDisplayNames({ sisyphus: "Builder" })
+    const agents = { sisyphus: {}, oracle: {}, atlas: {} }
+
+    const result = remapAgentKeysToDisplayNames(agents)
+
+    expect(Object.keys(result)).toEqual(["Builder", "oracle", "Atlas (Plan Executor)"])
+  })
+
+  it("#when remapping identity-mapped agent with override #then remaps to new name", () => {
+    applyUserDisplayNames({ oracle: "Wise One" })
+    const agents = { oracle: { prompt: "test" } }
+
+    const result = remapAgentKeysToDisplayNames(agents)
+
+    expect(result["Wise One"]).toBeDefined()
+    expect(result["oracle"]).toBeUndefined()
+  })
+
+  it("#when empty overrides applied #then remaps using built-in defaults", () => {
+    applyUserDisplayNames({})
+    const agents = { sisyphus: {}, oracle: {} }
+
+    const result = remapAgentKeysToDisplayNames(agents)
+
+    expect(Object.keys(result)).toEqual(["Sisyphus (Ultraworker)", "oracle"])
   })
 })
