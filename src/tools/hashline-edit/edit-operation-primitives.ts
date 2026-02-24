@@ -80,7 +80,7 @@ export function applyInsertAfter(
   const result = [...lines]
   const newLines = stripInsertAnchorEcho(lines[line - 1], toNewLines(text))
   if (newLines.length === 0) {
-    throw new Error(`insert_after requires non-empty text for ${anchor}`)
+    throw new Error(`append (anchored) requires non-empty text for ${anchor}`)
   }
   result.splice(line, 0, ...newLines)
   return result
@@ -97,35 +97,9 @@ export function applyInsertBefore(
   const result = [...lines]
   const newLines = stripInsertBeforeEcho(lines[line - 1], toNewLines(text))
   if (newLines.length === 0) {
-    throw new Error(`insert_before requires non-empty text for ${anchor}`)
+    throw new Error(`prepend (anchored) requires non-empty text for ${anchor}`)
   }
   result.splice(line - 1, 0, ...newLines)
-  return result
-}
-
-export function applyInsertBetween(
-  lines: string[],
-  afterAnchor: string,
-  beforeAnchor: string,
-  text: string | string[],
-  options?: EditApplyOptions
-): string[] {
-  if (shouldValidate(options)) {
-    validateLineRef(lines, afterAnchor)
-    validateLineRef(lines, beforeAnchor)
-  }
-  const { line: afterLine } = parseLineRef(afterAnchor)
-  const { line: beforeLine } = parseLineRef(beforeAnchor)
-  if (beforeLine <= afterLine) {
-    throw new Error(`insert_between requires after_line (${afterLine}) < before_line (${beforeLine})`)
-  }
-
-  const result = [...lines]
-  const newLines = stripInsertBoundaryEcho(lines[afterLine - 1], lines[beforeLine - 1], toNewLines(text))
-  if (newLines.length === 0) {
-    throw new Error(`insert_between requires non-empty text for ${afterAnchor}..${beforeAnchor}`)
-  }
-  result.splice(beforeLine - 1, 0, ...newLines)
   return result
 }
 
