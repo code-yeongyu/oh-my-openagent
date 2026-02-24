@@ -3,6 +3,7 @@ import { join } from "path"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 import { TaskGetInputSchema, TaskObjectSchema } from "./types"
 import { getTaskDir, readJsonSafe } from "../../features/claude-tasks/storage"
+import { safeCompress } from "../../shared/toon-compression"
 
 const TASK_ID_PATTERN = /^T-[A-Za-z0-9-]+$/
 
@@ -33,9 +34,10 @@ Returns null if the task does not exist or the file is invalid.`,
         const taskDir = getTaskDir(config)
         const taskPath = join(taskDir, `${taskId}.json`)
 
-         const task = readJsonSafe(taskPath, TaskObjectSchema)
+        const task = readJsonSafe(taskPath, TaskObjectSchema)
+        const compressionConfig = config.toon_compression ?? { enabled: false, threshold: 5000 }
 
-        return JSON.stringify({ task: task ?? null })
+        return safeCompress({ task: task ?? null }, compressionConfig)
       } catch (error) {
         if (error instanceof Error && error.message.includes("validation")) {
           return JSON.stringify({ error: "invalid_arguments" })

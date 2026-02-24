@@ -11,10 +11,22 @@ import { pollForCompletion } from "./poll-for-completion"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
+import { safeCompress, type ToonCompressionConfig } from "../../shared/toon-compression"
 
 export { resolveRunAgent }
 
 const EVENT_PROCESSOR_SHUTDOWN_TIMEOUT_MS = 2_000
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
+
+export function compressCliMessage(
+  message: string,
+  config: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
+): string {
+  return safeCompress(message, config)
+}
 
 export async function waitForEventProcessorShutdown(
   eventProcessor: Promise<void>,

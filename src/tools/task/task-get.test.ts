@@ -3,7 +3,11 @@ import { existsSync, rmSync, mkdirSync, writeFileSync } from "fs"
 import { join } from "path"
 import type { TaskObject } from "./types"
 import { createTaskGetTool } from "./task-get"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 
+function stripInternalMarker(str: string): string {
+  return str.replace(OMO_INTERNAL_INITIATOR_MARKER, "").trim()
+}
 const TEST_STORAGE = ".test-task-get-tool"
 const TEST_DIR = join(process.cwd(), TEST_STORAGE)
 const TEST_CONFIG = {
@@ -57,7 +61,7 @@ describe("task_get tool", () => {
 
       //#when
       const resultStr = await tool.execute({ id: taskId }, TEST_CONTEXT)
-      const result = JSON.parse(resultStr)
+      const result = JSON.parse(stripInternalMarker(resultStr))
 
       //#then
       expect(result).toHaveProperty("task")
@@ -73,7 +77,7 @@ describe("task_get tool", () => {
 
       //#when
       const resultStr = await tool.execute({ id: taskId }, TEST_CONTEXT)
-      const result = JSON.parse(resultStr)
+      const result = JSON.parse(stripInternalMarker(resultStr))
 
       //#then
       expect(result).toHaveProperty("task")
@@ -102,7 +106,7 @@ describe("task_get tool", () => {
 
       //#when
       const resultStr = await tool.execute({ id: taskId }, TEST_CONTEXT)
-      const result = JSON.parse(resultStr)
+      const result = JSON.parse(stripInternalMarker(resultStr))
 
       //#then
       expect(result.task).toEqual(taskData)
@@ -117,7 +121,7 @@ describe("task_get tool", () => {
 
       //#when
       const resultStr = await tool.execute({ id: invalidTaskId }, TEST_CONTEXT)
-      const result = JSON.parse(resultStr)
+      const result = JSON.parse(stripInternalMarker(resultStr))
 
       //#then
       expect(result).toHaveProperty("error")
@@ -132,7 +136,7 @@ describe("task_get tool", () => {
 
       //#when
       const resultStr = await tool.execute({ id: taskId }, TEST_CONTEXT)
-      const result = JSON.parse(resultStr)
+      const result = JSON.parse(stripInternalMarker(resultStr))
 
       //#then
       expect(result.task).toBeNull()
@@ -151,7 +155,7 @@ describe("task_get tool", () => {
 
       //#when
       const resultStr = await tool.execute({ id: taskId }, TEST_CONTEXT)
-      const result = JSON.parse(resultStr)
+      const result = JSON.parse(stripInternalMarker(resultStr))
 
       //#then
       expect(result.task).toBeNull()
@@ -163,7 +167,7 @@ describe("task_get tool", () => {
 
       //#when
       const resultStr = await tool.execute(args, TEST_CONTEXT)
-      const result = JSON.parse(resultStr)
+      const result = JSON.parse(stripInternalMarker(resultStr))
 
       //#then
       expect(result).toHaveProperty("error")
@@ -186,7 +190,7 @@ describe("task_get tool", () => {
 
       //#when
       const resultStr = await tool.execute({ id: taskId }, TEST_CONTEXT)
-      const result = JSON.parse(resultStr)
+      const result = JSON.parse(stripInternalMarker(resultStr))
 
       //#then
       expect(result.task.blocks).toEqual([])
@@ -210,13 +214,71 @@ describe("task_get tool", () => {
 
       //#when
       const resultStr = await tool.execute({ id: taskId }, TEST_CONTEXT)
-      const result = JSON.parse(resultStr)
+      const result = JSON.parse(stripInternalMarker(resultStr))
 
       //#then
       expect(result.task).not.toBeNull()
       expect(result.task.id).toBe(taskId)
       expect(result.task.owner).toBeUndefined()
       expect(result.task.metadata).toBeUndefined()
+    })
+  })
+
+  describe("compression integration", () => {
+    test("returns plain JSON when compression is disabled", async () => {
+      //#given
+      const taskId = "T-compression-test-1"
+      const taskData: TaskObject = {
+        id: taskId,
+        subject: "Compression test",
+        description: "Test description",
+        status: "pending",
+        blocks: [],
+        blockedBy: [],
+        threadID: TEST_SESSION_ID,
+      }
+      const taskFile = join(TEST_DIR, `${taskId}.json`)
+      writeFileSync(taskFile, JSON.stringify(taskData, null, 2))
+      const toolWithCompressionDisabled = createTaskGetTool({
+        ...TEST_CONFIG,
+        toon_compression: { enabled: false, threshold: 100 },
+      })
+
+      //#when
+      const resultStr = await toolWithCompressionDisabled.execute({ id: taskId }, TEST_CONTEXT)
+      const result = JSON.parse(stripInternalMarker(resultStr))
+
+      //#then
+      expect(result).toHaveProperty("task")
+      expect(result.task.id).toBe(taskId)
+    })
+
+    test("uses safeCompress for output formatting", async () => {
+      //#given
+      const taskId = "T-compression-test-2"
+      const largeDescription = "x".repeat(10000)
+      const taskData: TaskObject = {
+        id: taskId,
+        subject: "Large task",
+        description: largeDescription,
+        status: "pending",
+        blocks: [],
+        blockedBy: [],
+        threadID: TEST_SESSION_ID,
+      }
+      const taskFile = join(TEST_DIR, `${taskId}.json`)
+      writeFileSync(taskFile, JSON.stringify(taskData, null, 2))
+      const toolWithCompressionEnabled = createTaskGetTool({
+        ...TEST_CONFIG,
+        toon_compression: { enabled: true, threshold: 1000 },
+      })
+
+      //#when
+      const resultStr = await toolWithCompressionEnabled.execute({ id: taskId }, TEST_CONTEXT)
+
+      //#then
+      expect(typeof resultStr).toBe("string")
+      expect(resultStr.length).toBeGreaterThan(0)
     })
   })
 })

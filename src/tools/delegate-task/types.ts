@@ -6,6 +6,7 @@ import type {
   AvailableCategory,
   AvailableSkill,
 } from "../../agents/dynamic-agent-prompt-builder"
+import { safeCompress } from "../../shared/toon-compression"
 
 export type OpencodeClient = PluginInput["client"]
 
@@ -78,4 +79,11 @@ export interface BuildSystemContentInput {
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
   compressionConfig?: ToonCompressionConfig
+}
+
+export function compressDelegateTaskArgs(
+  args: DelegateTaskArgs,
+  config: ToonCompressionConfig
+): string {
+  return safeCompress(args, config)
 }

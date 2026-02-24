@@ -5,6 +5,8 @@ import {
   createInternalAgentTextPart,
   normalizeSDKResponse,
   resolveInheritedPromptTools,
+  safeCompress,
+  type ToonCompressionConfig,
 } from "../../shared"
 import {
   findNearestMessageWithFields,
@@ -25,6 +27,11 @@ import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
 
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
+
 function hasWritePermission(tools: Record<string, ToolPermission> | undefined): boolean {
   const editPermission = tools?.edit
   const writePermission = tools?.write
@@ -32,6 +39,14 @@ function hasWritePermission(tools: Record<string, ToolPermission> | undefined): 
     !tools ||
     (editPermission !== false && editPermission !== "deny" && writePermission !== false && writePermission !== "deny")
   )
+}
+
+export function formatTodoList(todos: Todo[], config: ToonCompressionConfig): string {
+  const formatted = todos.map((todo) => ({
+    status: todo.status,
+    content: todo.content,
+  }))
+  return safeCompress(formatted, config)
 }
 
 export async function injectContinuation(args: {
@@ -126,7 +141,7 @@ export async function injectContinuation(args: {
   }
 
   const incompleteTodos = todos.filter((todo) => todo.status !== "completed" && todo.status !== "cancelled")
-  const todoList = incompleteTodos.map((todo) => `- [${todo.status}] ${todo.content}`).join("\n")
+  const todoList = formatTodoList(incompleteTodos, DEFAULT_COMPRESSION_CONFIG)
   const prompt = `${CONTINUATION_PROMPT}
 
 [Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]

@@ -5,6 +5,8 @@ import type {
   LaunchInput,
   ResumeInput,
 } from "./types"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
+import { safeCompress } from "../../shared/toon-compression"
 import { TaskHistory } from "./task-history"
 import {
   log,
@@ -104,6 +106,7 @@ export class BackgroundManager {
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
   private onShutdown?: () => void
+  private toonCompressionConfig?: ToonCompressionConfig
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
@@ -121,6 +124,7 @@ export class BackgroundManager {
       onSubagentSessionCreated?: OnSubagentSessionCreated
       onShutdown?: () => void
       enableParentSessionNotifications?: boolean
+      toonCompressionConfig?: ToonCompressionConfig
     }
   ) {
     this.tasks = new Map()
@@ -134,7 +138,31 @@ export class BackgroundManager {
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.onShutdown = options?.onShutdown
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
+    this.toonCompressionConfig = options?.toonCompressionConfig
     this.registerProcessCleanup()
+  }
+
+  private readonly DEFAULT_TOON_CONFIG: ToonCompressionConfig = {
+    enabled: false,
+    threshold: 5000,
+  }
+
+  private compressPromptData(prompt: string): string {
+    const config = this.toonCompressionConfig ?? this.DEFAULT_TOON_CONFIG
+    if (!config.enabled) {
+      return prompt
+    }
+
+    try {
+      const parsed = JSON.parse(prompt)
+      if (typeof parsed === "object" && parsed !== null) {
+        return safeCompress(parsed, config)
+      }
+    } catch {
+      // Not valid JSON, return as-is
+    }
+
+    return prompt
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -363,7 +391,7 @@ export class BackgroundManager {
           setSessionTools(sessionID, tools)
           return tools
         })(),
-        parts: [createInternalAgentTextPart(input.prompt)],
+        parts: [createInternalAgentTextPart(this.compressPromptData(input.prompt))],
       },
     }).catch((error) => {
       log("[background-agent] promptAsync error:", error)
@@ -636,7 +664,7 @@ export class BackgroundManager {
           setSessionTools(existingTask.sessionID!, tools)
           return tools
         })(),
-        parts: [createInternalAgentTextPart(input.prompt)],
+        parts: [createInternalAgentTextPart(this.compressPromptData(input.prompt))],
       },
     }).catch((error) => {
       log("[background-agent] resume prompt error:", error)

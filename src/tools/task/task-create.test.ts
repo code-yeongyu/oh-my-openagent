@@ -297,5 +297,23 @@ describe("task_create tool", () => {
       expect(taskContent.subject).toBe("Test task")
       expect(taskContent.description).toBe("Test description")
     })
+
+    test("returns parseable JSON output", async () => {
+      //#given
+      const args = {
+        subject: "Test task for compression",
+      }
+
+      //#when
+      const resultStr = await tool.execute(args, TEST_CONTEXT)
+
+      //#then
+      // Output should always be valid JSON (compression or not)
+      const result = JSON.parse(resultStr)
+      expect(result).toHaveProperty("task")
+      expect(result.task).toHaveProperty("id")
+      expect(result.task).toHaveProperty("subject")
+      expect(result.task.subject).toBe("Test task for compression")
+    })
   })
 })

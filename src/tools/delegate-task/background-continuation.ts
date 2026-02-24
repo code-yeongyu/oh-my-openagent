@@ -1,21 +1,30 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
+import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { safeCompress } from "../../shared/toon-compression"
+
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
+  enabled: false,
+  threshold: 5000,
+}
 
 export async function executeBackgroundContinuation(
   args: DelegateTaskArgs,
   ctx: ToolContextWithMetadata,
   executorCtx: ExecutorContext,
-  parentContext: ParentContext
+  parentContext: ParentContext,
+  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
 ): Promise<string> {
   const { manager } = executorCtx
 
   try {
+    const compressedPrompt = safeCompress(args.prompt, compressionConfig)
     const task = await manager.resume({
       sessionId: args.session_id!,
-      prompt: args.prompt,
+      prompt: compressedPrompt,
       parentSessionID: parentContext.sessionID,
       parentMessageID: parentContext.messageID,
       parentModel: parentContext.model,

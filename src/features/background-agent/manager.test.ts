@@ -4034,3 +4034,312 @@ describe("BackgroundManager - tool permission spread order", () => {
     manager.shutdown()
   })
 })
+
+describe("BackgroundManager - toon compression integration", () => {
+  describe("compressPromptData", () => {
+    test("should not compress when toonCompressionConfig is not provided", async () => {
+      //#given
+      let capturedPrompt: string | undefined
+      const client = {
+        session: {
+          get: async () => ({ data: { directory: "/test/dir" } }),
+          create: async () => ({ data: { id: "session-1" } }),
+          promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+            const parts = args.body.parts as Array<{ text?: string }>
+            capturedPrompt = parts?.[0]?.text
+            return {}
+          },
+        },
+      }
+      const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+      const jsonData = JSON.stringify({ files: ["a.ts", "b.ts"], context: "test" })
+      const task: BackgroundTask = {
+        id: "task-no-compress",
+        status: "pending",
+        queuedAt: new Date(),
+        description: "test task",
+        prompt: jsonData,
+        agent: "explore",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+      const input: import("./types").LaunchInput = {
+        description: task.description,
+        prompt: jsonData,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+      }
+
+      //#when
+      await (manager as unknown as { startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> })
+        .startTask({ task, input })
+
+      //#then - prompt should contain the original JSON (compression disabled by default)
+      expect(capturedPrompt).toContain(jsonData)
+
+      manager.shutdown()
+    })
+
+    test("should not compress when toonCompressionConfig.enabled is false", async () => {
+      //#given
+      let capturedPrompt: string | undefined
+      const client = {
+        session: {
+          get: async () => ({ data: { directory: "/test/dir" } }),
+          create: async () => ({ data: { id: "session-1" } }),
+          promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+            const parts = args.body.parts as Array<{ text?: string }>
+            capturedPrompt = parts?.[0]?.text
+            return {}
+          },
+        },
+      }
+      const manager = new BackgroundManager(
+        { client, directory: tmpdir() } as unknown as PluginInput,
+        undefined,
+        { toonCompressionConfig: { enabled: false, threshold: 5000 } }
+      )
+      const jsonData = JSON.stringify({ files: ["a.ts", "b.ts"], context: "test" })
+      const task: BackgroundTask = {
+        id: "task-disabled-compress",
+        status: "pending",
+        queuedAt: new Date(),
+        description: "test task",
+        prompt: jsonData,
+        agent: "explore",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+      const input: import("./types").LaunchInput = {
+        description: task.description,
+        prompt: jsonData,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+      }
+
+      //#when
+      await (manager as unknown as { startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> })
+        .startTask({ task, input })
+
+      //#then - prompt should contain the original JSON (compression disabled)
+      expect(capturedPrompt).toContain(jsonData)
+
+      manager.shutdown()
+    })
+
+    test("should pass through non-JSON prompt unchanged even when compression enabled", async () => {
+      //#given
+      let capturedPrompt: string | undefined
+      const client = {
+        session: {
+          get: async () => ({ data: { directory: "/test/dir" } }),
+          create: async () => ({ data: { id: "session-1" } }),
+          promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+            const parts = args.body.parts as Array<{ text?: string }>
+            capturedPrompt = parts?.[0]?.text
+            return {}
+          },
+        },
+      }
+      const manager = new BackgroundManager(
+        { client, directory: tmpdir() } as unknown as PluginInput,
+        undefined,
+        { toonCompressionConfig: { enabled: true, threshold: 100 } }
+      )
+      const plainPrompt = "This is a plain text prompt, not JSON"
+      const task: BackgroundTask = {
+        id: "task-plain-prompt",
+        status: "pending",
+        queuedAt: new Date(),
+        description: "test task",
+        prompt: plainPrompt,
+        agent: "explore",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+      const input: import("./types").LaunchInput = {
+        description: task.description,
+        prompt: plainPrompt,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+      }
+
+      //#when
+      await (manager as unknown as { startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> })
+        .startTask({ task, input })
+
+      //#then - plain text should pass through unchanged (not valid JSON)
+      expect(capturedPrompt).toContain(plainPrompt)
+
+      manager.shutdown()
+    })
+
+    test("should pass through JSON object (non-array) unchanged even when compression enabled", async () => {
+      //#given - compression only works for uniform arrays, not objects
+      let capturedPrompt: string | undefined
+      const client = {
+        session: {
+          get: async () => ({ data: { directory: "/test/dir" } }),
+          create: async () => ({ data: { id: "session-1" } }),
+          promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+            const parts = args.body.parts as Array<{ text?: string }>
+            capturedPrompt = parts?.[0]?.text
+            return {}
+          },
+        },
+      }
+      const manager = new BackgroundManager(
+        { client, directory: tmpdir() } as unknown as PluginInput,
+        undefined,
+        { toonCompressionConfig: { enabled: true, threshold: 100 } }
+      )
+      const jsonData = JSON.stringify({ files: ["a.ts", "b.ts", "c.ts"], context: "test context data" })
+      const task: BackgroundTask = {
+        id: "task-object-not-compressed",
+        status: "pending",
+        queuedAt: new Date(),
+        description: "test task",
+        prompt: jsonData,
+        agent: "explore",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+      const input: import("./types").LaunchInput = {
+        description: task.description,
+        prompt: jsonData,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+      }
+
+      //#when
+      await (manager as unknown as { startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> })
+        .startTask({ task, input })
+
+      //#then - objects are not compressed, only uniform arrays
+      expect(capturedPrompt).toContain(jsonData)
+
+      manager.shutdown()
+    })
+
+    test("should compress uniform array prompt when compression enabled", async () => {
+      //#given - uniform array with 5+ items qualifies for compression
+      let capturedPrompt: string | undefined
+      const client = {
+        session: {
+          get: async () => ({ data: { directory: "/test/dir" } }),
+          create: async () => ({ data: { id: "session-1" } }),
+          promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+            const parts = args.body.parts as Array<{ text?: string }>
+            capturedPrompt = parts?.[0]?.text
+            return {}
+          },
+        },
+      }
+      const manager = new BackgroundManager(
+        { client, directory: tmpdir() } as unknown as PluginInput,
+        undefined,
+        { toonCompressionConfig: { enabled: true, threshold: 100 } }
+      )
+      // Uniform array with 5+ items that exceeds threshold
+      const jsonArray = [
+        { name: "file1.ts", path: "/src/file1.ts", size: 1024 },
+        { name: "file2.ts", path: "/src/file2.ts", size: 2048 },
+        { name: "file3.ts", path: "/src/file3.ts", size: 3072 },
+        { name: "file4.ts", path: "/src/file4.ts", size: 4096 },
+        { name: "file5.ts", path: "/src/file5.ts", size: 5120 },
+      ]
+      const jsonData = JSON.stringify(jsonArray)
+      const task: BackgroundTask = {
+        id: "task-compress-array",
+        status: "pending",
+        queuedAt: new Date(),
+        description: "test task",
+        prompt: jsonData,
+        agent: "explore",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      }
+      const input: import("./types").LaunchInput = {
+        description: task.description,
+        prompt: jsonData,
+        agent: task.agent,
+        parentSessionID: task.parentSessionID,
+        parentMessageID: task.parentMessageID,
+      }
+
+      //#when
+      await (manager as unknown as { startTask: (item: { task: BackgroundTask; input: import("./types").LaunchInput }) => Promise<void> })
+        .startTask({ task, input })
+
+      //#then - uniform array should be compressed (different from original)
+      expect(capturedPrompt).toBeDefined()
+      expect(capturedPrompt).not.toContain(jsonData)
+      // The compressed output should contain TOON format header
+      expect(capturedPrompt).toMatch(/\[5\]\{name,path,size\}/)
+
+      manager.shutdown()
+    })
+
+    test("should compress prompt in resume when compression enabled", async () => {
+      //#given - uniform array with 5+ items qualifies for compression
+      let capturedPrompt: string | undefined
+      const client = {
+        session: {
+          promptAsync: async (args: { path: { id: string }; body: Record<string, unknown> }) => {
+            const parts = args.body.parts as Array<{ text?: string }>
+            capturedPrompt = parts?.[0]?.text
+            return {}
+          },
+          abort: async () => ({}),
+        },
+      }
+      const manager = new BackgroundManager(
+        { client, directory: tmpdir() } as unknown as PluginInput,
+        undefined,
+        { toonCompressionConfig: { enabled: true, threshold: 100 } }
+      )
+      // Uniform array with 5+ items
+      const jsonArray = [
+        { id: 1, action: "read", status: "done" },
+        { id: 2, action: "write", status: "done" },
+        { id: 3, action: "read", status: "pending" },
+        { id: 4, action: "write", status: "pending" },
+        { id: 5, action: "delete", status: "pending" },
+      ]
+      const jsonData = JSON.stringify(jsonArray)
+      const task: BackgroundTask = {
+        id: "task-resume-compress",
+        sessionID: "session-resume",
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+        description: "resume task",
+        prompt: "original",
+        agent: "explore",
+        status: "completed",
+        startedAt: new Date(),
+        completedAt: new Date(),
+        concurrencyGroup: "explore",
+      }
+      getTaskMap(manager).set(task.id, task)
+
+      //#when
+      await manager.resume({
+        sessionId: "session-resume",
+        prompt: jsonData,
+        parentSessionID: "parent-session",
+        parentMessageID: "parent-message",
+      })
+
+      //#then - uniform array should be compressed
+      expect(capturedPrompt).toBeDefined()
+      expect(capturedPrompt).not.toContain(jsonData)
+      expect(capturedPrompt).toMatch(/\[5\]\{id,action,status\}/)
+
+      manager.shutdown()
+    })
+  })
+})

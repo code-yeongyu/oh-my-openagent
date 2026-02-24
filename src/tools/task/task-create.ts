@@ -10,6 +10,7 @@ import {
   acquireLock,
   generateTaskId,
 } from "../../features/claude-tasks/storage";
+import { safeCompress } from "../../shared/toon-compression";
 import { syncTaskTodoUpdate } from "./todo-sync";
 
 export function createTaskCreateTool(
@@ -92,12 +93,15 @@ async function handleCreate(
 
       await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
 
-      return JSON.stringify({
+      const result = {
         task: {
           id: validatedTask.id,
           subject: validatedTask.subject,
         },
-      });
+      };
+
+      const compressionConfig = config.toon_compression ?? { enabled: false, threshold: 5000 };
+      return safeCompress(result, compressionConfig);
     } finally {
       lock.release();
     }

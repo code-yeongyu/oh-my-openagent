@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../../config"
-import { resolveRunAgent, waitForEventProcessorShutdown } from "./runner"
+import { resolveRunAgent, waitForEventProcessorShutdown, compressCliMessage } from "./runner"
 
 const createConfig = (overrides: Partial<OhMyOpenCodeConfig> = {}): OhMyOpenCodeConfig => ({
   ...overrides,
@@ -113,5 +113,55 @@ describe("waitForEventProcessorShutdown", () => {
     //#then
     const elapsed = performance.now() - start
     expect(elapsed).toBeGreaterThanOrEqual(timeoutMs - 10)
+  })
+})
+
+
+describe("compressCliMessage", () => {
+  it("returns message as-is when compression is disabled", () => {
+    // given
+    const message = "Fix the bug in the authentication module"
+    const config = { enabled: false, threshold: 5000 }
+
+    // when
+    const result = compressCliMessage(message, config)
+
+    // then
+    expect(result).toBe(message)
+  })
+
+  it("returns message as-is when below threshold", () => {
+    // given
+    const message = "Short message"
+    const config = { enabled: true, threshold: 5000 }
+
+    // when
+    const result = compressCliMessage(message, config)
+
+    // then
+    expect(result).toBe(message)
+  })
+
+  it("uses default config when not provided", () => {
+    // given
+    const message = "Test message"
+
+    // when
+    const result = compressCliMessage(message)
+
+    // then
+    expect(result).toBe(message)
+  })
+
+  it("handles empty string", () => {
+    // given
+    const message = ""
+    const config = { enabled: true, threshold: 100 }
+
+    // when
+    const result = compressCliMessage(message, config)
+
+    // then
+    expect(result).toBe("")
   })
 })

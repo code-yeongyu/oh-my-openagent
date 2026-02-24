@@ -5,6 +5,8 @@ import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { getMessageDir } from "../../shared/opencode-message-dir"
+import { safeCompress, type ToonCompressionConfig } from "../../shared/toon-compression"
+
 
 export async function resolveParentContext(
   ctx: ToolContextWithMetadata,
@@ -44,4 +46,15 @@ export async function resolveParentContext(
     agent: parentAgent,
     model: parentModel,
   }
+}
+
+/**
+ * Serialize a ParentContext for transfer, applying TOON compression if enabled.
+ * Use this when passing context to external systems or when serialization is required.
+ */
+export function compressParentContext(
+  context: ParentContext,
+  config: ToonCompressionConfig
+): string {
+  return safeCompress(context, config)
 }

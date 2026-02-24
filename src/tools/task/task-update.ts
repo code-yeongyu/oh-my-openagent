@@ -1,3 +1,5 @@
+import { safeCompress } from "../../shared/toon-compression";
+
 import type { PluginInput } from "@opencode-ai/plugin";
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool";
 import { join } from "path";
@@ -136,7 +138,8 @@ async function handleUpdate(
 
       await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
 
-      return JSON.stringify({ task: validatedTask });
+      const compressionConfig = config.toon_compression ?? { enabled: false, threshold: 5000 };
+      return safeCompress({ task: validatedTask }, compressionConfig);
     } finally {
       lock.release();
     }
