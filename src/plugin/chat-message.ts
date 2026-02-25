@@ -97,6 +97,7 @@ export function createChatMessageHandler(args: {
       setSessionModel(input.sessionID, input.model)
     }
     await hooks.stopContinuationGuard?.["chat.message"]?.(input)
+    await hooks.backgroundNotificationHook?.["chat.message"]?.(input, output)
     await hooks.runtimeFallback?.["chat.message"]?.(input, output)
     await hooks.keywordDetector?.["chat.message"]?.(input, output)
     await hooks.claudeCodeHooks?.["chat.message"]?.(input, output)
