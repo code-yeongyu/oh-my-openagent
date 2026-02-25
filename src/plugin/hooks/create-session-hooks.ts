@@ -232,7 +232,10 @@ export function createSessionHooks(args: {
     : null
 
   const noHephaestusNonGpt = isHookEnabled("no-hephaestus-non-gpt")
-    ? safeHook("no-hephaestus-non-gpt", () => createNoHephaestusNonGptHook(ctx))
+    ? safeHook("no-hephaestus-non-gpt", () =>
+      createNoHephaestusNonGptHook(ctx, {
+        allowNonGptModel: pluginConfig.agents?.hephaestus?.allow_non_gpt_model,
+      }))
     : null
 
   const questionLabelTruncator = isHookEnabled("question-label-truncator")
