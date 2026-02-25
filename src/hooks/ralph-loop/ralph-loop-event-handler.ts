@@ -200,19 +200,6 @@ export function createRalphLoopEventHandler(
 			return
 		}
 
-		if (event.type === "session.stop") {
-			const sessionID = props?.sessionID as string | undefined
-			if (!sessionID) return
-
-			const state = options.loopState.getState()
-			if (state?.session_id === sessionID) {
-				options.loopState.clear()
-				log(`[${HOOK_NAME}] Session stopped, loop cleared`, { sessionID })
-			}
-			options.sessionRecovery.clear(sessionID)
-			return
-		}
-
 		if (event.type === "message.updated") {
 			const info = props?.info as Record<string, unknown> | undefined
 			const sessionID = info?.sessionID as string | undefined

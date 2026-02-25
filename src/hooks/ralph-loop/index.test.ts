@@ -274,6 +274,16 @@ describe("ralph-loop", () => {
       expect(parsedArguments.maxIterations).toBe(5)
       expect(parsedArguments.strategy).toBeUndefined()
     })
+
+    test("should parse flags correctly when unquoted prompt has leading spaces", () => {
+      const rawArguments = '   Build feature X --max-iterations=7 --strategy=continue'
+
+      const parsedArguments = parseRalphLoopArguments(rawArguments)
+
+      expect(parsedArguments.prompt).toBe("Build feature X")
+      expect(parsedArguments.maxIterations).toBe(7)
+      expect(parsedArguments.strategy).toBe("continue")
+    })
   })
 
   describe("hook", () => {
@@ -936,23 +946,6 @@ describe("ralph-loop", () => {
 
       // then - continuation should be injected (not blocked by recovery)
       expect(promptCalls.length).toBe(1)
-    })
-
-    test("should clear loop state on session.stop event", async () => {
-      const hook = createRalphLoopHook(createMockPluginInput())
-      hook.startLoop("session-123", "Build something")
-      expect(hook.getState()).not.toBeNull()
-
-      await hook.event({
-        event: {
-          type: "session.stop",
-          properties: {
-            sessionID: "session-123",
-          },
-        },
-      })
-
-      expect(hook.getState()).toBeNull()
     })
 
     test("should clear loop state on user abort (AbortError)", async () => {
