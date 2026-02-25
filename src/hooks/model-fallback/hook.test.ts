@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, test } from "bun:test"
 import {
   clearPendingModelFallback,
   createModelFallbackHook,
+  setSessionFallbackChain,
   setPendingModelFallback,
 } from "./hook"
 
 describe("model fallback hook", () => {
   beforeEach(() => {
     clearPendingModelFallback("ses_model_fallback_main")
+    clearPendingModelFallback("ses_model_fallback_ghcp")
   })
 
   test("applies pending fallback on chat.message by overriding model", async () => {
@@ -137,5 +139,49 @@ describe("model fallback hook", () => {
     //#then
     expect(toastCalls.length).toBe(1)
     expect(toastCalls[0]?.title).toBe("Model fallback")
+  })
+
+  test("transforms model names for github-copilot provider via fallback chain", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_ghcp"
+    clearPendingModelFallback(sessionID)
+
+    const hook = createModelFallbackHook() as unknown as {
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }
+
+    // Set a custom fallback chain that routes through github-copilot
+    setSessionFallbackChain(sessionID, [
+      { providers: ["github-copilot"], model: "claude-sonnet-4-6" },
+    ])
+
+    const set = setPendingModelFallback(
+      sessionID,
+      "Atlas (Plan Executor)",
+      "github-copilot",
+      "claude-sonnet-4-6",
+    )
+    expect(set).toBe(true)
+
+    const output = {
+      message: {
+        model: { providerID: "github-copilot", modelID: "claude-sonnet-4-6" },
+      },
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    //#when
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    //#then — model name should be transformed from hyphen to dot notation
+    expect(output.message["model"]).toEqual({
+      providerID: "github-copilot",
+      modelID: "claude-sonnet-4.6",
+    })
+
+    clearPendingModelFallback(sessionID)
   })
 })
