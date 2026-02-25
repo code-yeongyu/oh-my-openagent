@@ -9,6 +9,14 @@ interface EventInput {
   event: Event
 }
 
+interface ChatMessageInput {
+  sessionID: string
+}
+
+interface ChatMessageOutput {
+  parts: Array<{ type: string; text?: string; [key: string]: unknown }>
+}
+
 /**
  * Background notification hook - handles event routing to BackgroundManager.
  *
@@ -20,7 +28,15 @@ export function createBackgroundNotificationHook(manager: BackgroundManager) {
     manager.handleEvent(event)
   }
 
+  const chatMessageHandler = async (
+    input: ChatMessageInput,
+    output: ChatMessageOutput,
+  ): Promise<void> => {
+    manager.injectPendingNotificationsIntoChatMessage(output, input.sessionID)
+  }
+
   return {
+    "chat.message": chatMessageHandler,
     event: eventHandler,
   }
 }
