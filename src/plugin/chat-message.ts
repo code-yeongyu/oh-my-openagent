@@ -2,7 +2,12 @@ import type { OhMyOpenCodeConfig } from "../config"
 import type { PluginContext } from "./types"
 
 import { hasConnectedProvidersCache } from "../shared"
-import { setSessionModel } from "../shared/session-model-state"
+import {
+  clearSessionVariant,
+  getSessionVariant,
+  setSessionModel,
+  setSessionVariant,
+} from "../shared/session-model-state"
 import { setSessionAgent } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
@@ -70,6 +75,8 @@ export function createChatMessageHandler(args: {
     input: ChatMessageInput,
     output: ChatMessageHandlerOutput
   ): Promise<void> => {
+    let injectedPersistedVariant = false
+
     if (input.agent) {
       setSessionAgent(input.sessionID, input.agent)
     }
@@ -78,9 +85,26 @@ export function createChatMessageHandler(args: {
       firstMessageVariantGate.markApplied(input.sessionID)
     }
 
+    const initialVariant = output.message["variant"]
+    if (!(typeof initialVariant === "string" && initialVariant.length > 0)) {
+      const persistedVariant = getSessionVariant(input.sessionID)
+      if (persistedVariant !== undefined) {
+        output.message["variant"] = persistedVariant
+        injectedPersistedVariant = true
+      }
+    }
+
     if (!isRuntimeFallbackEnabled) {
       await hooks.modelFallback?.["chat.message"]?.(input, output)
     }
+
+    const outputVariant = output.message["variant"]
+    if (typeof outputVariant === "string" && outputVariant.length > 0) {
+      setSessionVariant(input.sessionID, outputVariant)
+    } else if (injectedPersistedVariant) {
+      clearSessionVariant(input.sessionID)
+    }
+
     const modelOverride = output.message["model"]
     if (
       modelOverride &&

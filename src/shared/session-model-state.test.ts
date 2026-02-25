@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { clearSessionModel, getSessionModel, setSessionModel } from "./session-model-state"
+import {
+  clearSessionModel,
+  clearSessionVariant,
+  getSessionModel,
+  getSessionVariant,
+  setSessionModel,
+  setSessionVariant,
+} from "./session-model-state"
 
 describe("session-model-state", () => {
   test("stores and retrieves a session model", () => {
@@ -26,5 +33,28 @@ describe("session-model-state", () => {
 
     //#then
     expect(getSessionModel(sessionID)).toBeUndefined()
+  })
+
+  test("stores and retrieves a session variant", () => {
+    //#given
+    const sessionID = "ses_variant"
+
+    //#when
+    setSessionVariant(sessionID, "medium")
+
+    //#then
+    expect(getSessionVariant(sessionID)).toBe("medium")
+  })
+
+  test("clears a session variant", () => {
+    //#given
+    const sessionID = "ses_variant_clear"
+    setSessionVariant(sessionID, "xhigh")
+
+    //#when
+    clearSessionVariant(sessionID)
+
+    //#then
+    expect(getSessionVariant(sessionID)).toBeUndefined()
   })
 })

@@ -11,9 +11,10 @@ import {
 
 type MessageInfo = {
 	agent?: string
-	model?: { providerID: string; modelID: string }
+	model?: { providerID: string; modelID: string; variant?: string }
 	modelID?: string
 	providerID?: string
+	variant?: string
 	tools?: Record<string, boolean | "allow" | "deny" | "ask">
 }
 
@@ -29,6 +30,7 @@ export async function injectContinuationPrompt(
 ): Promise<void> {
 	let agent: string | undefined
 	let model: { providerID: string; modelID: string } | undefined
+	let variant: string | undefined
 	let tools: Record<string, boolean | "allow" | "deny" | "ask"> | undefined
 	const sourceSessionID = options.inheritFromSessionID ?? options.sessionID
 
@@ -42,14 +44,38 @@ export async function injectContinuationPrompt(
 		const messages = normalizeSDKResponse(messagesResp, [] as Array<{ info?: MessageInfo }>)
 		for (let i = messages.length - 1; i >= 0; i--) {
 			const info = messages[i]?.info
-			if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
+			if (!info) {
+				continue
+			}
+
+			if (agent === undefined && typeof info.agent === "string") {
 				agent = info.agent
-				model =
-					info.model ??
-					(info.providerID && info.modelID
-						? { providerID: info.providerID, modelID: info.modelID }
-						: undefined)
+			}
+
+			if (model === undefined) {
+				if (info.model?.providerID && info.model?.modelID) {
+					model = {
+						providerID: info.model.providerID,
+						modelID: info.model.modelID,
+					}
+				} else if (info.providerID && info.modelID) {
+					model = { providerID: info.providerID, modelID: info.modelID }
+				}
+			}
+
+			if (variant === undefined) {
+				if (typeof info.variant === "string") {
+					variant = info.variant
+				} else if (typeof info.model?.variant === "string") {
+					variant = info.model.variant
+				}
+			}
+
+			if (tools === undefined && info.tools) {
 				tools = info.tools
+			}
+
+			if (agent !== undefined && model !== undefined && variant !== undefined && tools !== undefined) {
 				break
 			}
 		}
@@ -64,6 +90,7 @@ export async function injectContinuationPrompt(
 					modelID: currentMessage.model.modelID,
 				}
 				: undefined
+		variant = currentMessage?.model?.variant
 		tools = currentMessage?.tools
 	}
 
@@ -74,6 +101,7 @@ export async function injectContinuationPrompt(
 		body: {
 			...(agent !== undefined ? { agent } : {}),
 			...(model !== undefined ? { model } : {}),
+			...(variant !== undefined ? { variant } : {}),
 			...(inheritedTools ? { tools: inheritedTools } : {}),
 			parts: [createInternalAgentTextPart(options.prompt)],
 		},

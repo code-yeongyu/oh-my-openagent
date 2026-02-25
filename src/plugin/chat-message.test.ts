@@ -1,6 +1,7 @@
-import { describe, test, expect } from "bun:test"
+import { beforeEach, describe, test, expect } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message"
+import { clearSessionVariant, getSessionVariant, setSessionVariant } from "../shared/session-model-state"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
@@ -47,6 +48,10 @@ function createMockOutput(variant?: string): ChatMessageHandlerOutput {
 }
 
 describe("createChatMessageHandler - TUI variant passthrough", () => {
+  beforeEach(() => {
+    clearSessionVariant("test-session")
+  })
+
   test("first message: does not override TUI variant when user has no selection", async () => {
     //#given - first message, no user-selected variant
     const args = createMockHandlerArgs({ shouldOverride: true })
@@ -101,6 +106,46 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
 
     //#then - should stay undefined, not auto-resolved from config
     expect(output.message["variant"]).toBeUndefined()
+  })
+
+  test("persists explicit variant and reuses it when next message omits variant", async () => {
+    //#given
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+
+    const firstOutput = createMockOutput("medium")
+
+    //#when
+    await handler(input, firstOutput)
+    const secondOutput = createMockOutput()
+    await handler(input, secondOutput)
+
+    //#then
+    expect(firstOutput.message["variant"]).toBe("medium")
+    expect(secondOutput.message["variant"]).toBe("medium")
+  })
+
+  test("does not re-inject persisted variant when model fallback explicitly removes variant", async () => {
+    //#given
+    const args = createMockHandlerArgs({ shouldOverride: false })
+    args.hooks.modelFallback = {
+      "chat.message": async (_input: { sessionID: string }, output: ChatMessageHandlerOutput): Promise<void> => {
+        delete output.message["variant"]
+      },
+    }
+    setSessionVariant("test-session", "max")
+
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.message["variant"]).toBeUndefined()
+    expect(getSessionVariant("test-session")).toBeUndefined()
   })
 
   test("first message: marks gate as applied regardless of variant presence", async () => {

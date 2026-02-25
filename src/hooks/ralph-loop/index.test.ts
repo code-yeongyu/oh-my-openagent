@@ -11,10 +11,27 @@ import { parseRalphLoopArguments } from "./command-arguments"
 describe("ralph-loop", () => {
   const TEST_DIR = join(tmpdir(), "ralph-loop-test-" + Date.now())
   let promptCalls: Array<{ sessionID: string; text: string }>
+  let promptAsyncCalls: Array<{
+    sessionID: string
+    text: string
+    agent?: string
+    model?: { providerID: string; modelID: string }
+    variant?: string
+  }>
   let toastCalls: Array<{ title: string; message: string; variant: string }>
   let messagesCalls: Array<{ sessionID: string }>
   let createSessionCalls: Array<{ parentID?: string; title?: string; directory?: string }>
-  let mockSessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
+  let mockSessionMessages: Array<{
+    info?: {
+      role?: string
+      agent?: string
+      variant?: string
+      model?: { providerID: string; modelID: string; variant?: string }
+      providerID?: string
+      modelID?: string
+    }
+    parts?: Array<{ type: string; text?: string }>
+  }>
   let mockMessagesApiResponseShape: "data" | "array"
 
   function createMockPluginInput() {
@@ -28,10 +45,25 @@ describe("ralph-loop", () => {
             })
             return {}
           },
-          promptAsync: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
+          promptAsync: async (opts: {
+            path: { id: string }
+            body: {
+              parts: Array<{ type: string; text: string }>
+              agent?: string
+              model?: { providerID: string; modelID: string }
+              variant?: string
+            }
+          }) => {
             promptCalls.push({
               sessionID: opts.path.id,
               text: opts.body.parts[0].text,
+            })
+            promptAsyncCalls.push({
+              sessionID: opts.path.id,
+              text: opts.body.parts[0].text,
+              agent: opts.body.agent,
+              model: opts.body.model,
+              variant: opts.body.variant,
             })
             return {}
           },
@@ -68,6 +100,7 @@ describe("ralph-loop", () => {
 
   beforeEach(() => {
     promptCalls = []
+    promptAsyncCalls = []
     toastCalls = []
     messagesCalls = []
     createSessionCalls = []
@@ -536,6 +569,51 @@ describe("ralph-loop", () => {
       expect(promptCalls.length).toBe(1)
       expect(promptCalls[0].sessionID).toBe("new-session-1")
       expect(hook.getState()?.session_id).toBe("new-session-1")
+    })
+
+    test("should inherit agent and variant from previous session during reset continuation", async () => {
+      mockSessionMessages = [
+        {
+          info: {
+            role: "assistant",
+            agent: "hephaestus",
+            providerID: "openai",
+            modelID: "gpt-5.3-codex",
+          },
+          parts: [{ type: "text", text: "Working" }],
+        },
+        {
+          info: {
+            role: "assistant",
+            providerID: "openai",
+            modelID: "gpt-5.3-codex",
+            variant: "medium",
+          },
+          parts: [{ type: "text", text: "More work" }],
+        },
+      ]
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build a feature", { strategy: "reset" })
+
+      // when - session goes idle
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      expect(createSessionCalls.length).toBe(1)
+      expect(promptAsyncCalls.length).toBe(1)
+      expect(promptAsyncCalls[0].sessionID).toBe("new-session-1")
+      expect(promptAsyncCalls[0].agent).toBe("hephaestus")
+      expect(promptAsyncCalls[0].model).toEqual({
+        providerID: "openai",
+        modelID: "gpt-5.3-codex",
+      })
+      expect(promptAsyncCalls[0].variant).toBe("medium")
     })
 
     test("should not inject when no loop is active", async () => {
