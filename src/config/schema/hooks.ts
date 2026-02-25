@@ -50,7 +50,6 @@ export const HookNameSchema = z.enum([
   "anthropic-effort",
   "hashline-read-enhancer",
   "read-image-resizer",
-  "hashline-edit-diff-enhancer",
   "ansi-stripper",
 ])
 
