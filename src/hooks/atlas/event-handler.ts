@@ -130,6 +130,7 @@ export function createAtlasEventHandler(input: {
           remaining,
           total: progress.total,
           agent: boulderState.agent,
+          worktreePath: boulderState.worktree_path,
           backgroundManager,
           sessionState: state,
         })
