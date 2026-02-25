@@ -150,7 +150,8 @@ export function getPlanName(planPath: string): string {
 export function createBoulderState(
   planPath: string,
   sessionId: string,
-  agent?: string
+  agent?: string,
+  worktreePath?: string,
 ): BoulderState {
   return {
     active_plan: planPath,
@@ -158,5 +159,6 @@ export function createBoulderState(
     session_ids: [sessionId],
     plan_name: getPlanName(planPath),
     ...(agent !== undefined ? { agent } : {}),
+    ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
   }
 }
