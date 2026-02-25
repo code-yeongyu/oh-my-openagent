@@ -7,9 +7,12 @@ import { createStartWorkHook } from "./index"
 import {
   writeBoulderState,
   clearBoulderState,
+  readBoulderState,
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
 import * as sessionState from "../../features/claude-code-session-state"
+import * as worktreeDetector from "./worktree-detector"
+import * as worktreeDetector from "./worktree-detector"
 
 describe("start-work hook", () => {
   let testDir: string
@@ -400,6 +403,154 @@ describe("start-work hook", () => {
       // then
       expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "atlas")
       updateSpy.mockRestore()
+    })
+  })
+
+  describe("worktree support", () => {
+    let detectSpy: ReturnType<typeof spyOn>
+
+    beforeEach(() => {
+      detectSpy = spyOn(worktreeDetector, "detectWorktreePath").mockReturnValue(null)
+    })
+
+    afterEach(() => {
+      detectSpy.mockRestore()
+    })
+
+    test("should inject model-decides instructions when no --worktree flag", async () => {
+      // given - single plan, no worktree flag
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+      // then - model-decides instructions should appear
+      expect(output.parts[0].text).toContain("Worktree Setup Required")
+      expect(output.parts[0].text).toContain("git worktree list --porcelain")
+      expect(output.parts[0].text).toContain("git worktree add")
+    })
+
+    test("should inject worktree path when --worktree flag is valid", async () => {
+      // given - single plan + valid worktree path
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+      detectSpy.mockReturnValue("/validated/worktree")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /validated/worktree</user-request>\n</session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+      // then - validated path shown, no model-decides instructions
+      expect(output.parts[0].text).toContain("**Worktree**: /validated/worktree")
+      expect(output.parts[0].text).not.toContain("Worktree Setup Required")
+    })
+
+    test("should store worktree_path in boulder when --worktree is valid", async () => {
+      // given - plan + valid worktree
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+      detectSpy.mockReturnValue("/valid/wt")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /valid/wt</user-request>\n</session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+      // then - boulder.json has worktree_path
+      const state = readBoulderState(testDir)
+      expect(state?.worktree_path).toBe("/valid/wt")
+    })
+
+    test("should NOT store worktree_path when --worktree path is invalid", async () => {
+      // given - plan + invalid worktree path (detectWorktreePath returns null)
+      const plansDir = join(testDir, ".sisyphus", "plans")
+      mkdirSync(plansDir, { recursive: true })
+      writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+      // detectSpy already returns null by default
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /nonexistent/wt</user-request>\n</session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+      // then - worktree_path absent, setup instructions present
+      const state = readBoulderState(testDir)
+      expect(state?.worktree_path).toBeUndefined()
+      expect(output.parts[0].text).toContain("needs setup")
+      expect(output.parts[0].text).toContain("git worktree add /nonexistent/wt")
+    })
+
+    test("should update boulder worktree_path on resume when new --worktree given", async () => {
+      // given - existing boulder with old worktree, user provides new worktree
+      const planPath = join(testDir, "plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+      const existingState: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["old-session"],
+        plan_name: "plan",
+        worktree_path: "/old/wt",
+      }
+      writeBoulderState(testDir, existingState)
+      detectSpy.mockReturnValue("/new/wt")
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /new/wt</user-request>\n</session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"]({ sessionID: "session-456" }, output)
+
+      // then - boulder reflects updated worktree and new session appended
+      const state = readBoulderState(testDir)
+      expect(state?.worktree_path).toBe("/new/wt")
+      expect(state?.session_ids).toContain("session-456")
+    })
+
+    test("should show existing worktree on resume when no --worktree flag", async () => {
+      // given - existing boulder already has worktree_path, no flag given
+      const planPath = join(testDir, "plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+      const existingState: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: ["old-session"],
+        plan_name: "plan",
+        worktree_path: "/existing/wt",
+      }
+      writeBoulderState(testDir, existingState)
+
+      const hook = createStartWorkHook(createMockPluginInput())
+      const output = {
+        parts: [{ type: "text", text: "<session-context></session-context>" }],
+      }
+
+      // when
+      await hook["chat.message"]({ sessionID: "session-789" }, output)
+
+      // then - shows existing worktree, no model-decides instructions
+      expect(output.parts[0].text).toContain("/existing/wt")
+      expect(output.parts[0].text).not.toContain("Worktree Setup Required")
     })
   })
 })
