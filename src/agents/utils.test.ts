@@ -589,20 +589,22 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
     }
   })
 
-  test("hephaestus is created when github-copilot provider is connected", async () => {
-    // #given - github-copilot provider has models available
+  test("hephaestus is NOT created when only github-copilot is connected (gpt-5.3-codex unavailable via github-copilot)", async () => {
+    // #given - github-copilot provider has models available, but no cache
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["github-copilot/gpt-5.3-codex"])
     )
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
 
     try {
       // #when
       const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
 
-      // #then
-      expect(agents.hephaestus).toBeDefined()
+      // #then - hephaestus requires openai/opencode, github-copilot alone is insufficient
+      expect(agents.hephaestus).toBeUndefined()
     } finally {
       fetchSpy.mockRestore()
+      cacheSpy.mockRestore()
     }
   })
 
