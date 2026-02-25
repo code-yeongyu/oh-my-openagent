@@ -69,7 +69,9 @@
           "cancel-ralph",
           "refactor",
           "start-work",
-          "stop-continuation"
+          "stop-continuation",
+          "handoff",
+          "resume-handoff"
         ]
       }
     },

@@ -6,6 +6,7 @@ import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { RESUME_TEMPLATE } from "./templates/resume"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -93,6 +94,16 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[goal]",
+  },
+  "resume-handoff": {
+    description: "(builtin) Resume work from a previous /handoff session",
+    template: `<command-instruction>
+${RESUME_TEMPLATE}
+</command-instruction>
+<user-request>
+$ARGUMENTS
+</user-request>`,
+    argumentHint: "[task]",
   },
 }
 
