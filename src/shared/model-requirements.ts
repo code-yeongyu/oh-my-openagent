@@ -24,9 +24,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
   hephaestus: {
     fallbackChain: [
-      { providers: ["openai", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
     ],
-    requiresProvider: ["openai", "opencode"],
+    requiresProvider: ["openai", "github-copilot", "opencode"],
   },
   oracle: {
     fallbackChain: [
