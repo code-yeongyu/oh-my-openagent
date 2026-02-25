@@ -79,6 +79,7 @@ export interface SessionReadArgs {
   session_id: string
   include_todos?: boolean
   include_transcript?: boolean
+  offset?: number
   limit?: number
 }
 

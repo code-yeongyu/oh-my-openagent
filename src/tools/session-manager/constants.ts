@@ -27,17 +27,20 @@ Arguments:
 - session_id (required): Session ID to read
 - include_todos (optional): Include todo list if available (default: false)
 - include_transcript (optional): Include transcript log if available (default: false)
+- offset (optional): The message number to start reading from (1-indexed, default: 1)
 - limit (optional): Maximum number of messages to return (default: all)
 
 Example output:
 Session: ses_abc123
-Messages: 45
+Messages: 3-4 of 45
 Date Range: 2025-12-20 to 2025-12-24
 
-[Message 1] user (2025-12-20 10:30:00)
+Showing messages 3-4 of 45
+
+[Message 3] user (2025-12-20 10:35:00)
 Hello, can you help me with...
 
-[Message 2] assistant (2025-12-20 10:30:15)
+[Message 4] assistant (2025-12-20 10:35:15)
 Of course! Let me help you with...`
 
 export const SESSION_SEARCH_DESCRIPTION = `Search for content within OpenCode session messages.

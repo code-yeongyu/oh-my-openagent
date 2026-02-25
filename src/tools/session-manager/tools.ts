@@ -66,6 +66,7 @@ export function createSessionManagerTools(ctx: PluginInput): Record<string, Tool
       session_id: tool.schema.string().describe("Session ID to read"),
       include_todos: tool.schema.boolean().optional().describe("Include todo list if available (default: false)"),
       include_transcript: tool.schema.boolean().optional().describe("Include transcript log if available (default: false)"),
+      offset: tool.schema.number().optional().describe("The message number to start reading from (1-indexed, default: 1)"),
       limit: tool.schema.number().optional().describe("Maximum number of messages to return (default: all)"),
     },
     execute: async (args: SessionReadArgs, _context) => {
@@ -80,13 +81,28 @@ export function createSessionManagerTools(ctx: PluginInput): Record<string, Tool
           return `Session not found: ${args.session_id}`
         }
 
-        if (args.limit && args.limit > 0) {
-          messages = messages.slice(0, args.limit)
+        const totalMessages = messages.length
+
+        if (args.offset !== undefined) {
+          if (args.offset < 1) {
+            return `Error: offset must be >= 1, got ${args.offset}`
+          }
+          if (args.offset > totalMessages) {
+            return `Error: offset ${args.offset} exceeds total message count (${totalMessages})`
+          }
         }
+
+        const startIndex = args.offset !== undefined ? args.offset - 1 : 0
+        const endIndex = args.limit && args.limit > 0 ? startIndex + args.limit : undefined
+        messages = messages.slice(startIndex, endIndex)
 
         const todos = args.include_todos ? await readSessionTodos(args.session_id) : undefined
 
-        return formatSessionMessages(messages, args.include_todos, todos)
+        const shouldPaginate = args.offset !== undefined || (args.limit !== undefined && args.limit > 0)
+        return formatSessionMessages(messages, args.include_todos, todos, shouldPaginate ? {
+          offset: startIndex + 1,
+          totalMessages,
+        } : undefined)
       } catch (e) {
         return `Error: ${e instanceof Error ? e.message : String(e)}`
       }

@@ -44,7 +44,8 @@ export async function formatSessionList(sessionIDs: string[]): Promise<string> {
 export function formatSessionMessages(
   messages: SessionMessage[],
   includeTodos?: boolean,
-  todos?: Array<{ id?: string; content: string; status: string }>
+  todos?: Array<{ id?: string; content: string; status: string }>,
+  pagination?: { offset: number; totalMessages: number }
 ): string {
   if (messages.length === 0) {
     return "No messages found in this session."
@@ -52,10 +53,18 @@ export function formatSessionMessages(
 
   const lines: string[] = []
 
-  for (const msg of messages) {
+  if (pagination) {
+    const endIndex = pagination.offset + messages.length - 1
+    lines.push(`Showing messages ${pagination.offset}-${endIndex} of ${pagination.totalMessages}`)
+    lines.push("")
+  }
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+    const messageNumber = pagination ? pagination.offset + i : i + 1
     const timestamp = msg.time?.created ? new Date(msg.time.created).toISOString() : "Unknown time"
     const agent = msg.agent ? ` (${msg.agent})` : ""
-    lines.push(`\n[${msg.role}${agent}] ${timestamp}`)
+    lines.push(`\n[Message ${messageNumber}] ${msg.role}${agent} ${timestamp}`)
 
     for (const part of msg.parts) {
       if (part.type === "text" && part.text) {
