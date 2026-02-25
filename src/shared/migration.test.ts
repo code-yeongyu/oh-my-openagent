@@ -525,7 +525,13 @@ describe("MODEL_VERSION_MAP", () => {
     // then: Should contain correct mapping
     expect(MODEL_VERSION_MAP["anthropic/claude-opus-4-5"]).toBe("anthropic/claude-opus-4-6")
   })
-})
+
+  test("maps openai/gpt-5.3 to openai/gpt-5.3-codex", () => {
+    // given/when: Check MODEL_VERSION_MAP
+    // then: bare gpt-5.3 should migrate to gpt-5.3-codex
+    expect(MODEL_VERSION_MAP["openai/gpt-5.3"]).toBe("openai/gpt-5.3-codex")
+  })
+}
 
 describe("migrateModelVersions", () => {
   test("#given a config with gpt-5.2-codex model #when migrating model versions #then does not overwrite with non-existent gpt-5.3-codex", () => {
@@ -559,6 +565,22 @@ describe("migrateModelVersions", () => {
     expect(prometheus.model).toBe("anthropic/claude-opus-4-6")
   })
 
+
+  test("replaces bare openai/gpt-5.3 with openai/gpt-5.3-codex", () => {
+    // given: Agent config with bare gpt-5.3 (non-codex)
+    const agents = {
+      momus: { model: "openai/gpt-5.3", variant: "medium" },
+    }
+
+    // when: Migrate model versions
+    const { migrated, changed } = migrateModelVersions(agents)
+
+    // then: Model should be updated to codex variant
+    expect(changed).toBe(true)
+    const momus = migrated["momus"] as Record<string, unknown>
+    expect(momus.model).toBe("openai/gpt-5.3-codex")
+    expect(momus.variant).toBe("medium")
+  })
   test("leaves unknown model strings untouched", () => {
     // given: Agent config with unknown model
     const agents = {
