@@ -10,15 +10,21 @@ export type ParsedRalphLoopArguments = {
 const DEFAULT_PROMPT = "Complete the task as instructed"
 
 export function parseRalphLoopArguments(rawArguments: string): ParsedRalphLoopArguments {
-  const taskMatch = rawArguments.match(/^(["'])(.+?)\1/)
+  const taskMatch = rawArguments.match(/^("|')(.+?)\1/)
   const promptCandidate = taskMatch?.[2] ?? (rawArguments.startsWith("--") ? "" : rawArguments.split(/\s+--/)[0]?.trim() ?? "")
   const prompt = promptCandidate || DEFAULT_PROMPT
 
-  const maxIterationMatch = rawArguments.match(/--max-iterations=(\d+)/i)
-  const completionPromiseQuoted = rawArguments.match(/--completion-promise=(["'])(.+?)\1/i)
-  const completionPromiseUnquoted = rawArguments.match(/--completion-promise=([^\s"']+)/i)
+  const flagsSource = taskMatch
+    ? rawArguments.slice(taskMatch[0].length)
+    : rawArguments.startsWith("--")
+      ? rawArguments
+      : rawArguments.slice(promptCandidate.length)
+
+  const maxIterationMatch = flagsSource.match(/--max-iterations=(\d+)/i)
+  const completionPromiseQuoted = flagsSource.match(/--completion-promise=("|')(.+?)\1/i)
+  const completionPromiseUnquoted = flagsSource.match(/--completion-promise=([^\s"']+)/i)
   const completionPromise = completionPromiseQuoted?.[2] ?? completionPromiseUnquoted?.[1]
-  const strategyMatch = rawArguments.match(/--strategy=(reset|continue)/i)
+  const strategyMatch = flagsSource.match(/--strategy=(reset|continue)/i)
   const strategyValue = strategyMatch?.[1]?.toLowerCase()
 
   return {

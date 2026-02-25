@@ -9,10 +9,10 @@ export async function createIterationSession(
   parentSessionID: string,
   directory: string,
 ): Promise<string | null> {
+  void parentSessionID
+
   const createResult = await ctx.client.session.create({
-    body: {
-      title: "Ralph Loop Iteration",
-    },
+    body: {},
     query: { directory },
   })
 

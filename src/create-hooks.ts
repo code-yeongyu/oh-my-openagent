@@ -49,6 +49,22 @@ export function createHooks(args: {
     sessionRecovery: core.sessionRecovery,
   })
 
+  core.ralphLoop?.setOnLoopCompleted(async (sessionID: string) => {
+    continuation.stopContinuationGuard?.stop(sessionID)
+
+    const tasks = backgroundManager.getAllDescendantTasks(sessionID)
+    const runningOrPendingTasks = tasks.filter((task) => task.status === "running" || task.status === "pending")
+    await Promise.all(
+      runningOrPendingTasks.map((task) =>
+        backgroundManager.cancelTask(task.id, {
+          source: "ralph-loop.completed",
+          reason: "Ralph loop completed",
+          skipNotification: true,
+        }).catch(() => false)
+      )
+    )
+  })
+
   const skill = createSkillHooks({
     ctx,
     isHookEnabled,

@@ -264,6 +264,16 @@ describe("ralph-loop", () => {
       // then - strategy should be parsed as continue
       expect(parsedArguments.strategy).toBe("continue")
     })
+
+    test("should ignore strategy-like text inside quoted task prompt", () => {
+      const rawArguments = '"Fix docs mentioning --strategy=reset behavior" --max-iterations=5'
+
+      const parsedArguments = parseRalphLoopArguments(rawArguments)
+
+      expect(parsedArguments.prompt).toBe("Fix docs mentioning --strategy=reset behavior")
+      expect(parsedArguments.maxIterations).toBe(5)
+      expect(parsedArguments.strategy).toBeUndefined()
+    })
   })
 
   describe("hook", () => {
@@ -551,6 +561,21 @@ describe("ralph-loop", () => {
       expect(state?.strategy).toBe("continue")
     })
 
+    test("should default strategy to continue even when config default_strategy is reset", () => {
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        config: {
+          enabled: true,
+          default_max_iterations: 200,
+          default_strategy: "reset",
+        },
+      })
+
+      hook.startLoop("session-123", "Test task")
+
+      const state = hook.getState()
+      expect(state?.strategy).toBe("continue")
+    })
+
     test("should create new session for reset strategy", async () => {
       // given - hook with reset strategy
       const hook = createRalphLoopHook(createMockPluginInput())
@@ -654,6 +679,32 @@ describe("ralph-loop", () => {
       expect(promptCalls.length).toBe(0)
       expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
       expect(hook.getState()).toBeNull()
+    })
+
+    test("should run onLoopCompleted callback when loop finishes", async () => {
+      const transcriptPath = join(TEST_DIR, "transcript-callback.jsonl")
+      const completedSessions: string[] = []
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.setOnLoopCompleted((sessionID) => {
+        completedSessions.push(sessionID)
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
+
+      writeFileSync(
+        transcriptPath,
+        JSON.stringify({ type: "tool_result", tool_name: "write", tool_output: { output: "done <promise>DONE</promise>" } }) + "\n"
+      )
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      expect(completedSessions).toEqual(["session-123"])
     })
 
     test("should detect completion promise via session messages API", async () => {
@@ -885,6 +936,62 @@ describe("ralph-loop", () => {
 
       // then - continuation should be injected (not blocked by recovery)
       expect(promptCalls.length).toBe(1)
+    })
+
+    test("should clear loop state on session.stop event", async () => {
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build something")
+      expect(hook.getState()).not.toBeNull()
+
+      await hook.event({
+        event: {
+          type: "session.stop",
+          properties: {
+            sessionID: "session-123",
+          },
+        },
+      })
+
+      expect(hook.getState()).toBeNull()
+    })
+
+    test("should clear loop state on user abort (AbortError)", async () => {
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build something")
+      expect(hook.getState()).not.toBeNull()
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID: "session-123",
+            error: { name: "AbortError", message: "The operation was aborted" },
+          },
+        },
+      })
+
+      expect(hook.getState()).toBeNull()
+    })
+
+    test("should clear loop state when abort appears in message.updated error", async () => {
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build something")
+      expect(hook.getState()).not.toBeNull()
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID: "session-123",
+              role: "assistant",
+              error: { name: "MessageAbortedError", message: "Request interrupted" },
+            },
+          },
+        },
+      })
+
+      expect(hook.getState()).toBeNull()
     })
 
     test("should check last 3 assistant messages for completion", async () => {

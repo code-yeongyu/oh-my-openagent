@@ -18,4 +18,5 @@ export interface RalphLoopOptions {
   getTranscriptPath?: (sessionId: string) => string
   apiTimeout?: number
   checkSessionExists?: (sessionId: string) => Promise<boolean>
+  onLoopCompleted?: (sessionId: string) => Promise<void> | void
 }

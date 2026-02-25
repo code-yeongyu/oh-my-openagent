@@ -20,6 +20,7 @@ export interface RalphLoopHook {
   ) => boolean
   cancelLoop: (sessionID: string) => boolean
   getState: () => RalphLoopState | null
+  setOnLoopCompleted: (callback: (sessionID: string) => Promise<void> | void) => void
 }
 
 const DEFAULT_API_TIMEOUT = 5000 as const
@@ -46,6 +47,7 @@ export function createRalphLoopHook(
   const getTranscriptPath = options?.getTranscriptPath ?? getDefaultTranscriptPath
   const apiTimeout = options?.apiTimeout ?? DEFAULT_API_TIMEOUT
   const checkSessionExists = options?.checkSessionExists
+  let onLoopCompleted = options?.onLoopCompleted
 
 	const loopState = createLoopStateController({
 		directory: ctx.directory,
@@ -59,6 +61,9 @@ export function createRalphLoopHook(
 		apiTimeoutMs: apiTimeout,
 		getTranscriptPath,
 		checkSessionExists,
+		onLoopCompleted: async (sessionID: string) => {
+			await onLoopCompleted?.(sessionID)
+		},
 		sessionRecovery,
 		loopState,
 	})
@@ -86,5 +91,8 @@ export function createRalphLoopHook(
 		},
 		cancelLoop: loopState.cancelLoop,
 		getState: loopState.getState as () => RalphLoopState | null,
+		setOnLoopCompleted: (callback) => {
+			onLoopCompleted = callback
+		},
 	}
 }

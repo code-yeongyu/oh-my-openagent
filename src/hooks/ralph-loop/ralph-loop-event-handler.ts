@@ -19,7 +19,15 @@ type LoopStateController = {
 	incrementIteration: () => RalphLoopState | null
 	setSessionID: (sessionID: string) => RalphLoopState | null
 }
-type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; sessionRecovery: SessionRecovery; loopState: LoopStateController }
+type RalphLoopEventHandlerOptions = {
+	directory: string
+	apiTimeoutMs: number
+	getTranscriptPath: (sessionID: string) => string | undefined
+	checkSessionExists?: RalphLoopOptions["checkSessionExists"]
+	onLoopCompleted?: (sessionID: string) => Promise<void> | void
+	sessionRecovery: SessionRecovery
+	loopState: LoopStateController
+}
 
 export function createRalphLoopEventHandler(
 	ctx: PluginInput,
@@ -42,7 +50,6 @@ export function createRalphLoopEventHandler(
 			inFlightSessions.add(sessionID)
 
 			try {
-
 				if (options.sessionRecovery.isRecovering(sessionID)) {
 					log(`[${HOOK_NAME}] Skipped: in recovery`, { sessionID })
 					return
@@ -101,6 +108,7 @@ export function createRalphLoopEventHandler(
 					const title = state.ultrawork ? "ULTRAWORK LOOP COMPLETE!" : "Ralph Loop Complete!"
 					const message = state.ultrawork ? `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)` : `Task completed after ${state.iteration} iteration(s)`
 					await ctx.client.tui?.showToast?.({ body: { title, message, variant: "success", duration: 5000 } }).catch(() => {})
+					await options.onLoopCompleted?.(sessionID)
 					return
 				}
 
@@ -172,9 +180,9 @@ export function createRalphLoopEventHandler(
 
 		if (event.type === "session.error") {
 			const sessionID = props?.sessionID as string | undefined
-			const error = props?.error as { name?: string } | undefined
+			const error = props?.error
 
-			if (error?.name === "MessageAbortedError") {
+			if (isAbortError(error)) {
 				if (sessionID) {
 					const state = options.loopState.getState()
 					if (state?.session_id === sessionID) {
@@ -189,6 +197,60 @@ export function createRalphLoopEventHandler(
 			if (sessionID) {
 				options.sessionRecovery.markRecovering(sessionID)
 			}
+			return
+		}
+
+		if (event.type === "session.stop") {
+			const sessionID = props?.sessionID as string | undefined
+			if (!sessionID) return
+
+			const state = options.loopState.getState()
+			if (state?.session_id === sessionID) {
+				options.loopState.clear()
+				log(`[${HOOK_NAME}] Session stopped, loop cleared`, { sessionID })
+			}
+			options.sessionRecovery.clear(sessionID)
+			return
+		}
+
+		if (event.type === "message.updated") {
+			const info = props?.info as Record<string, unknown> | undefined
+			const sessionID = info?.sessionID as string | undefined
+			if (!sessionID) return
+
+			const state = options.loopState.getState()
+			if (!state || state.session_id !== sessionID) {
+				return
+			}
+
+			if (isAbortError(info?.error)) {
+				options.loopState.clear()
+				options.sessionRecovery.clear(sessionID)
+				log(`[${HOOK_NAME}] Abort detected via message.updated, loop cleared`, {
+					sessionID,
+				})
+			}
 		}
 	}
+}
+
+function isAbortError(error: unknown): boolean {
+	if (!error) return false
+
+	if (typeof error === "object") {
+		const errObj = error as Record<string, unknown>
+		const name = errObj.name as string | undefined
+		const message = (errObj.message as string | undefined)?.toLowerCase() ?? ""
+
+		if (name === "MessageAbortedError" || name === "AbortError") return true
+		if (name === "DOMException" && message.includes("abort")) return true
+		if (message.includes("aborted") || message.includes("cancelled") || message.includes("interrupted")) return true
+	}
+
+	if (typeof error === "string") {
+		const lower = error.toLowerCase()
+		return lower.includes("abort") || lower.includes("cancel") || lower.includes("interrupt")
+	}
+
+	return false
 }
