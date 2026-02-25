@@ -24,6 +24,7 @@ program
   .command("install")
   .description("Install and configure oh-my-opencode with interactive setup")
   .option("--no-tui", "Run in non-interactive mode (requires all options)")
+  .option("--project", "Write config to .opencode/oh-my-opencode.json in the current directory instead of global config")
   .option("--claude <value>", "Claude subscription: no, yes, max20")
   .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
@@ -50,6 +51,7 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   .action(async (options) => {
     const args: InstallArgs = {
       tui: options.tui !== false,
+      project: options.project ?? false,
       claude: options.claude,
       openai: options.openai,
       gemini: options.gemini,

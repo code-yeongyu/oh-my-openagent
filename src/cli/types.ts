@@ -3,6 +3,7 @@ export type BooleanArg = "no" | "yes"
 
 export interface InstallArgs {
   tui: boolean
+  project?: boolean
   claude?: ClaudeSubscription
   openai?: BooleanArg
   gemini?: BooleanArg
@@ -14,6 +15,7 @@ export interface InstallArgs {
 }
 
 export interface InstallConfig {
+  project?: boolean
   hasClaude: boolean
   isMax20: boolean
   hasOpenAI: boolean

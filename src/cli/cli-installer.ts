@@ -100,7 +100,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
   }
 
   printStep(step++, totalSteps, "Writing oh-my-opencode configuration...")
-  const omoResult = writeOmoConfig(config)
+  const omoResult = writeOmoConfig(config, { project: config.project })
   if (!omoResult.success) {
     printError(`Failed: ${omoResult.error}`)
     return 1

@@ -45,6 +45,32 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   const config = await promptInstallConfig(detected)
   if (!config) return 1
 
+  const configScope = await p.select<"global" | "project">({
+    message: "Where should model assignments be saved?",
+    options: [
+      {
+        value: "global",
+        label: "Global",
+        hint: "~/.config/opencode/oh-my-opencode.json",
+      },
+      {
+        value: "project",
+        label: "Project",
+        hint: ".opencode/oh-my-opencode.json in current directory",
+      },
+    ],
+    initialValue: args.project ? "project" : "global",
+  })
+  if (p.isCancel(configScope)) {
+    p.cancel("Installation cancelled.")
+    return 1
+  }
+
+  const installConfig = {
+    ...config,
+    project: configScope === "project",
+  }
+
   spinner.start("Adding oh-my-opencode to OpenCode config")
   const pluginResult = await addPluginToOpenCodeConfig(version)
   if (!pluginResult.success) {
@@ -54,9 +80,9 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   }
   spinner.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
 
-  if (config.hasGemini) {
+  if (installConfig.hasGemini) {
     spinner.start("Adding auth plugins (fetching latest versions)")
-    const authResult = await addAuthPlugins(config)
+    const authResult = await addAuthPlugins(installConfig)
     if (!authResult.success) {
       spinner.stop(`Failed to add auth plugins: ${authResult.error}`)
       p.outro(color.red("Installation failed."))
@@ -65,7 +91,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     spinner.stop(`Auth plugins added to ${color.cyan(authResult.configPath)}`)
 
     spinner.start("Adding provider configurations")
-    const providerResult = addProviderConfig(config)
+    const providerResult = addProviderConfig(installConfig)
     if (!providerResult.success) {
       spinner.stop(`Failed to add provider config: ${providerResult.error}`)
       p.outro(color.red("Installation failed."))
@@ -75,7 +101,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   }
 
   spinner.start("Writing oh-my-opencode configuration")
-  const omoResult = writeOmoConfig(config)
+  const omoResult = writeOmoConfig(installConfig, { project: installConfig.project })
   if (!omoResult.success) {
     spinner.stop(`Failed to write config: ${omoResult.error}`)
     p.outro(color.red("Installation failed."))
@@ -83,7 +109,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   }
   spinner.stop(`Config written to ${color.cyan(omoResult.configPath)}`)
 
-  if (!config.hasClaude) {
+  if (!installConfig.hasClaude) {
     console.log()
     console.log(color.bgRed(color.white(color.bold(" CRITICAL WARNING "))))
     console.log()
@@ -97,11 +123,17 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     console.log()
   }
 
-  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
+  if (
+    !installConfig.hasClaude &&
+    !installConfig.hasOpenAI &&
+    !installConfig.hasGemini &&
+    !installConfig.hasCopilot &&
+    !installConfig.hasOpencodeZen
+  ) {
     p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
   }
 
-  p.note(formatConfigSummary(config), isUpdate ? "Updated Configuration" : "Installation Complete")
+  p.note(formatConfigSummary(installConfig), isUpdate ? "Updated Configuration" : "Installation Complete")
 
   p.log.success(color.bold(isUpdate ? "Configuration updated!" : "Installation complete!"))
   p.log.message(`Run ${color.cyan("opencode")} to start!`)
@@ -120,11 +152,11 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
 
-  if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
+  if ((installConfig.hasClaude || installConfig.hasGemini || installConfig.hasCopilot) && !args.skipAuth) {
     const providers: string[] = []
-    if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
-    if (config.hasGemini) providers.push(`Google ${color.gray("→ OAuth with Antigravity")}`)
-    if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
+    if (installConfig.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
+    if (installConfig.hasGemini) providers.push(`Google ${color.gray("→ OAuth with Antigravity")}`)
+    if (installConfig.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
 
     console.log()
     console.log(color.bold("Authenticate Your Providers"))

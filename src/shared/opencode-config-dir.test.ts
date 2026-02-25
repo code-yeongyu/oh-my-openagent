@@ -4,6 +4,7 @@ import { join, resolve } from "node:path"
 import {
   getOpenCodeConfigDir,
   getOpenCodeConfigPaths,
+  getProjectOmoConfigPath,
   isDevBuild,
   detectExistingConfigDir,
   TAURI_APP_IDENTIFIER,
@@ -289,6 +290,19 @@ describe("opencode-config-dir", () => {
       expect(paths.configJsonc).toBe(join(expectedDir, "opencode.jsonc"))
       expect(paths.packageJson).toBe(join(expectedDir, "package.json"))
       expect(paths.omoConfig).toBe(join(expectedDir, "oh-my-opencode.json"))
+    })
+  })
+
+  describe("getProjectOmoConfigPath", () => {
+    test("returns .opencode/oh-my-opencode.json in the provided directory", () => {
+      // given a project directory
+      const projectDir = "/tmp/my-project"
+
+      // when resolving the project config path
+      const result = getProjectOmoConfigPath(projectDir)
+
+      // then returns the project-level config location
+      expect(result).toBe(join(projectDir, ".opencode", "oh-my-opencode.json"))
     })
   })
 
