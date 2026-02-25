@@ -308,7 +308,10 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     //#then
     expect(output.message.model).toEqual({ providerID: "anthropic", modelID: "claude-opus-4-6" })
     expect(output.message["variant"]).toBe("max")
-    expect(output.message["thinking"]).toBe("max")
+    expect(output.message["thinking"]).toEqual({
+      type: "enabled",
+      budgetTokens: 16000,
+    })
     expect(dbOverrideSpy).not.toHaveBeenCalled()
   })
 
@@ -324,7 +327,10 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     //#then
     expect(output.message.model).toBeUndefined()
     expect(output.message["variant"]).toBe("high")
-    expect(output.message["thinking"]).toBe("high")
+    expect(output.message["thinking"]).toEqual({
+      type: "enabled",
+      budgetTokens: 16000,
+    })
     expect(dbOverrideSpy).not.toHaveBeenCalled()
   })
 
