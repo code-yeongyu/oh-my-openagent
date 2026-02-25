@@ -11,6 +11,7 @@ describe("model fallback hook", () => {
   beforeEach(() => {
     clearPendingModelFallback("ses_model_fallback_main")
     clearPendingModelFallback("ses_model_fallback_ghcp")
+    clearPendingModelFallback("ses_model_fallback_google")
   })
 
   test("applies pending fallback on chat.message by overriding model", async () => {
@@ -180,6 +181,50 @@ describe("model fallback hook", () => {
     expect(output.message["model"]).toEqual({
       providerID: "github-copilot",
       modelID: "claude-sonnet-4.6",
+    })
+
+    clearPendingModelFallback(sessionID)
+  })
+
+  test("transforms model names for google provider via fallback chain", async () => {
+    //#given
+    const sessionID = "ses_model_fallback_google"
+    clearPendingModelFallback(sessionID)
+
+    const hook = createModelFallbackHook() as unknown as {
+      "chat.message"?: (
+        input: { sessionID: string },
+        output: { message: Record<string, unknown>; parts: Array<{ type: string; text?: string }> },
+      ) => Promise<void>
+    }
+
+    // Set a custom fallback chain that routes through google
+    setSessionFallbackChain(sessionID, [
+      { providers: ["google"], model: "gemini-3-pro" },
+    ])
+
+    const set = setPendingModelFallback(
+      sessionID,
+      "Oracle",
+      "google",
+      "gemini-3-pro",
+    )
+    expect(set).toBe(true)
+
+    const output = {
+      message: {
+        model: { providerID: "google", modelID: "gemini-3-pro" },
+      },
+      parts: [{ type: "text", text: "continue" }],
+    }
+
+    //#when
+    await hook["chat.message"]?.({ sessionID }, output)
+
+    //#then — model name should be transformed from gemini-3-pro to gemini-3-pro-preview
+    expect(output.message["model"]).toEqual({
+      providerID: "google",
+      modelID: "gemini-3-pro-preview",
     })
 
     clearPendingModelFallback(sessionID)
