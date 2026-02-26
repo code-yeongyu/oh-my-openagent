@@ -7,6 +7,8 @@ import { sanitizeEmptyMessagesBeforeSummarize } from "./message-builder"
 import { fixEmptyMessages } from "./empty-content-recovery"
 
 import { resolveCompactionModel } from "../shared/compaction-model-resolver"
+
+const SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS = 120_000
 export async function runSummarizeRetryStrategy(params: {
   sessionID: string
   msg: Record<string, unknown>
@@ -18,6 +20,27 @@ export async function runSummarizeRetryStrategy(params: {
   messageIndex?: number
 }): Promise<void> {
   const retryState = getOrCreateRetryState(params.autoCompactState, params.sessionID)
+  const now = Date.now()
+
+  if (retryState.firstAttemptTime === 0) {
+    retryState.firstAttemptTime = now
+  }
+
+  const elapsedTimeMs = now - retryState.firstAttemptTime
+  if (elapsedTimeMs >= SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS) {
+    clearSessionState(params.autoCompactState, params.sessionID)
+    await params.client.tui
+      .showToast({
+        body: {
+          title: "Auto Compact Timed Out",
+          message: "Compaction retries exceeded the timeout window. Please start a new session.",
+          variant: "error",
+          duration: 5000,
+        },
+      })
+      .catch(() => {})
+    return
+  }
 
   if (params.errorType?.includes("non-empty content")) {
     const attempt = getEmptyContentAttempt(params.autoCompactState, params.sessionID)
@@ -52,6 +75,7 @@ export async function runSummarizeRetryStrategy(params: {
 
   if (Date.now() - retryState.lastAttemptTime > 300000) {
     retryState.attempt = 0
+    retryState.firstAttemptTime = Date.now()
     params.autoCompactState.truncateStateBySession.delete(params.sessionID)
   }
 
@@ -92,10 +116,26 @@ export async function runSummarizeRetryStrategy(params: {
         })
         return
       } catch {
+        const remainingTimeMs = SUMMARIZE_RETRY_TOTAL_TIMEOUT_MS - (Date.now() - retryState.firstAttemptTime)
+        if (remainingTimeMs <= 0) {
+          clearSessionState(params.autoCompactState, params.sessionID)
+          await params.client.tui
+            .showToast({
+              body: {
+                title: "Auto Compact Timed Out",
+                message: "Compaction retries exceeded the timeout window. Please start a new session.",
+                variant: "error",
+                duration: 5000,
+              },
+            })
+            .catch(() => {})
+          return
+        }
+
         const delay =
           RETRY_CONFIG.initialDelayMs *
           Math.pow(RETRY_CONFIG.backoffFactor, retryState.attempt - 1)
-        const cappedDelay = Math.min(delay, RETRY_CONFIG.maxDelayMs)
+        const cappedDelay = Math.min(delay, RETRY_CONFIG.maxDelayMs, remainingTimeMs)
 
         setTimeout(() => {
           void runSummarizeRetryStrategy(params)
