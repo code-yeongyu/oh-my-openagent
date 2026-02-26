@@ -644,7 +644,7 @@ describe("ralph-loop", () => {
       expect(state?.strategy).toBe("continue")
     })
 
-    test("should default strategy to continue even when config default_strategy is reset", () => {
+    test("should use config default_strategy when strategy is not specified", () => {
       const hook = createRalphLoopHook(createMockPluginInput(), {
         config: {
           enabled: true,
@@ -656,7 +656,7 @@ describe("ralph-loop", () => {
       hook.startLoop("session-123", "Test task")
 
       const state = hook.getState()
-      expect(state?.strategy).toBe("continue")
+      expect(state?.strategy).toBe("reset")
     })
 
     test("should create new session for reset strategy", async () => {

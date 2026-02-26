@@ -40,7 +40,7 @@ export function createLoopStateController(options: {
 					loopOptions?.completionPromise ??
 					DEFAULT_COMPLETION_PROMISE,
 				ultrawork: loopOptions?.ultrawork,
-				strategy: loopOptions?.strategy ?? "continue",
+				strategy: loopOptions?.strategy ?? config?.default_strategy ?? "continue",
 				started_at: new Date().toISOString(),
 				prompt,
 				session_id: sessionID,
