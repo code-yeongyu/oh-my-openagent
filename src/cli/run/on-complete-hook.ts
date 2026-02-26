@@ -1,4 +1,5 @@
 import pc from "picocolors"
+import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 export async function executeOnCompleteHook(options: {
   command: string
@@ -17,7 +18,7 @@ export async function executeOnCompleteHook(options: {
   console.error(pc.dim(`Running on-complete hook: ${trimmedCommand}`))
 
   try {
-    const proc = Bun.spawn(["sh", "-c", trimmedCommand], {
+    const proc = spawnWithWindowsHide(["sh", "-c", trimmedCommand], {
       env: {
         ...process.env,
         SESSION_ID: sessionId,

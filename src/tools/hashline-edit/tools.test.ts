@@ -341,4 +341,81 @@ describe("createHashlineEditTool", () => {
     //#then
     expect(envelope.lineEnding).toBe("\r\n")
   })
+
+  it("rejects delete=true with non-empty edits before normalization", async () => {
+    //#given
+    const filePath = path.join(tempDir, "delete-reject.txt")
+    fs.writeFileSync(filePath, "line1")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        delete: true,
+        edits: [{ op: "replace", pos: "1#ZZ", lines: "bad" }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toContain("delete mode requires edits to be an empty array")
+    expect(fs.existsSync(filePath)).toBe(true)
+  })
+
+  it("rejects delete=true combined with rename", async () => {
+    //#given
+    const filePath = path.join(tempDir, "delete-rename.txt")
+    fs.writeFileSync(filePath, "line1")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        delete: true,
+        rename: path.join(tempDir, "new-name.txt"),
+        edits: [],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toContain("delete and rename cannot be used together")
+    expect(fs.existsSync(filePath)).toBe(true)
+  })
+
+  it("rejects missing file creation with anchored append", async () => {
+    //#given
+    const filePath = path.join(tempDir, "nonexistent.txt")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ op: "append", pos: "1#ZZ", lines: ["bad"] }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toContain("File not found")
+  })
+
+  it("allows missing file creation with unanchored append", async () => {
+    //#given
+    const filePath = path.join(tempDir, "newfile.txt")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ op: "append", lines: ["created"] }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.existsSync(filePath)).toBe(true)
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("created")
+    expect(result).toBe(`Updated ${filePath}`)
+  })
 })

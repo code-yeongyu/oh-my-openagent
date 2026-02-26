@@ -125,7 +125,7 @@ describe("runtime-fallback", () => {
       await hook.event({
         event: {
           type: "session.created",
-          properties: { info: { id: sessionID, model: "google/gemini-3-pro" } },
+          properties: { info: { id: sessionID, model: "google/gemini-3.1-pro" } },
         },
       })
 
@@ -1841,7 +1841,7 @@ describe("runtime-fallback", () => {
     test("should apply fallback model on next chat.message after error", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
-        pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2", "google/gemini-3-pro"]),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2", "google/gemini-3.1-pro"]),
       })
       const sessionID = "test-session-switch"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -1916,7 +1916,7 @@ describe("runtime-fallback", () => {
       const input = createMockPluginInput()
       const hook = createRuntimeFallbackHook(input, {
         config: createMockConfig({ notify_on_fallback: false }),
-        pluginConfig: createMockPluginConfigWithAgentFallback("oracle", ["openai/gpt-5.2", "google/gemini-3-pro"]),
+        pluginConfig: createMockPluginConfigWithAgentFallback("oracle", ["openai/gpt-5.2", "google/gemini-3.1-pro"]),
       })
       const sessionID = "test-agent-fallback"
 

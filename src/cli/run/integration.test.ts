@@ -3,6 +3,7 @@ import type { RunResult } from "./types"
 import { createJsonOutputManager } from "./json-output"
 import { resolveSession } from "./session-resolver"
 import { executeOnCompleteHook } from "./on-complete-hook"
+import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hide"
 import type { OpencodeClient } from "./types"
 import * as originalSdk from "@opencode-ai/sdk"
 import * as originalPortUtils from "../../shared/port-utils"
@@ -147,7 +148,7 @@ describe("integration: --session-id", () => {
     const result = resolveSession({ client: mockClient, sessionId, directory: "/test" })
 
     // then
-    await expect(result).rejects.toThrow(`Session not found: ${sessionId}`)
+    expect(result).rejects.toThrow(`Session not found: ${sessionId}`)
     expect(mockClient.session.get).toHaveBeenCalledWith({
       path: { id: sessionId },
       query: { directory: "/test" },
@@ -161,10 +162,13 @@ describe("integration: --on-complete", () => {
 
   beforeEach(() => {
     spyOn(console, "error").mockImplementation(() => {})
-    spawnSpy = spyOn(Bun, "spawn").mockReturnValue({
+    spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue({
       exited: Promise.resolve(0),
       exitCode: 0,
-    } as unknown as ReturnType<typeof Bun.spawn>)
+      stdout: undefined,
+      stderr: undefined,
+      kill: () => {},
+    } satisfies ReturnType<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>)
   })
 
   afterEach(() => {
@@ -186,7 +190,7 @@ describe("integration: --on-complete", () => {
 
     // then
     expect(spawnSpy).toHaveBeenCalledTimes(1)
-    const [_, options] = spawnSpy.mock.calls[0] as Parameters<typeof Bun.spawn>
+    const [_, options] = spawnSpy.mock.calls[0] as Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
     expect(options?.env?.SESSION_ID).toBe("session-123")
     expect(options?.env?.EXIT_CODE).toBe("0")
     expect(options?.env?.DURATION_MS).toBe("5000")
@@ -208,10 +212,13 @@ describe("integration: option combinations", () => {
     spyOn(console, "error").mockImplementation(() => {})
     mockStdout = createMockWriteStream()
     mockStderr = createMockWriteStream()
-    spawnSpy = spyOn(Bun, "spawn").mockReturnValue({
+    spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue({
       exited: Promise.resolve(0),
       exitCode: 0,
-    } as unknown as ReturnType<typeof Bun.spawn>)
+      stdout: undefined,
+      stderr: undefined,
+      kill: () => {},
+    } satisfies ReturnType<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>)
   })
 
   afterEach(() => {
@@ -249,9 +256,9 @@ describe("integration: option combinations", () => {
     const emitted = mockStdout.writes[0]!
     expect(() => JSON.parse(emitted)).not.toThrow()
     expect(spawnSpy).toHaveBeenCalledTimes(1)
-    const [args] = spawnSpy.mock.calls[0] as Parameters<typeof Bun.spawn>
+    const [args] = spawnSpy.mock.calls[0] as Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
     expect(args).toEqual(["sh", "-c", "echo done"])
-    const [_, options] = spawnSpy.mock.calls[0] as Parameters<typeof Bun.spawn>
+    const [_, options] = spawnSpy.mock.calls[0] as Parameters<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
     expect(options?.env?.SESSION_ID).toBe("session-123")
     expect(options?.env?.EXIT_CODE).toBe("0")
     expect(options?.env?.DURATION_MS).toBe("5000")

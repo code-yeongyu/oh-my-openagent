@@ -26,7 +26,7 @@ describe("model-resolution check", () => {
       // then: Should have category entries
       const visual = info.categories.find((c) => c.name === "visual-engineering")
       expect(visual).toBeDefined()
-      expect(visual!.requirement.fallbackChain[0]?.model).toBe("gemini-3-pro")
+      expect(visual!.requirement.fallbackChain[0]?.model).toBe("gemini-3.1-pro")
       expect(visual!.requirement.fallbackChain[0]?.providers).toContain("google")
     })
   })
