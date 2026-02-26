@@ -109,7 +109,7 @@ describe("createThinkModeHook", () => {
     const input = createHookInput({
       sessionID,
       providerID: "google",
-      modelID: "gemini-3-pro",
+      modelID: "gemini-3.1-pro",
     })
     const output = createHookOutput("Please solve this directly")
 

@@ -47,8 +47,8 @@ describe("isGptModel", () => {
   });
 
   test("gemini models are not gpt", () => {
-    expect(isGptModel("google/gemini-3-pro")).toBe(false);
-    expect(isGptModel("litellm/gemini-3-pro")).toBe(false);
+    expect(isGptModel("google/gemini-3.1-pro")).toBe(false);
+    expect(isGptModel("litellm/gemini-3.1-pro")).toBe(false);
   });
 
   test("opencode provider is not gpt", () => {
@@ -58,29 +58,29 @@ describe("isGptModel", () => {
 
 describe("isGeminiModel", () => {
   test("#given google provider models #then returns true", () => {
-    expect(isGeminiModel("google/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("google/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("google/gemini-3-flash")).toBe(true);
     expect(isGeminiModel("google/gemini-2.5-pro")).toBe(true);
   });
 
   test("#given google-vertex provider models #then returns true", () => {
-    expect(isGeminiModel("google-vertex/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("google-vertex/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("google-vertex/gemini-3-flash")).toBe(true);
   });
 
   test("#given github copilot gemini models #then returns true", () => {
-    expect(isGeminiModel("github-copilot/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("github-copilot/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("github-copilot/gemini-3-flash")).toBe(true);
   });
 
   test("#given litellm proxied gemini models #then returns true", () => {
-    expect(isGeminiModel("litellm/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("litellm/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("litellm/gemini-3-flash")).toBe(true);
     expect(isGeminiModel("litellm/gemini-2.5-pro")).toBe(true);
   });
 
   test("#given other proxied gemini models #then returns true", () => {
-    expect(isGeminiModel("custom-provider/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("custom-provider/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("ollama/gemini-3-flash")).toBe(true);
   });
 
