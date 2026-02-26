@@ -1,4 +1,4 @@
-import { describe, it, expect, spyOn } from "bun:test"
+const { describe, it, expect, spyOn } = require("bun:test")
 import type { RunContext } from "./types"
 import { createEventState } from "./events"
 import { handleSessionStatus, handleMessagePartUpdated, handleMessageUpdated, handleTuiToast } from "./event-handlers"
@@ -235,9 +235,7 @@ describe("handleMessagePartUpdated", () => {
 
   it("prints completion metadata once when assistant text part is completed", () => {
     // given
-    const nowSpy = spyOn(Date, "now")
-    nowSpy.mockReturnValueOnce(1000)
-    nowSpy.mockReturnValueOnce(3400)
+    const nowSpy = spyOn(Date, "now").mockReturnValue(3400)
 
     const ctx = createMockContext("ses_main")
     const state = createEventState()
@@ -259,6 +257,7 @@ describe("handleMessagePartUpdated", () => {
       } as any,
       state,
     )
+    state.messageStartedAtById["msg_1"] = 1000
 
     // when
     handleMessagePartUpdated(
