@@ -352,6 +352,94 @@ describe("custom agent overrides", () => {
     expect(agentsConfig[pKey].prompt).not.toContain("ghostwriter")
   })
 
+  test("prometheus prompt excludes disabled custom agents from catalog", async () => {
+    // #given
+    ;(agentLoader.loadUserAgents as any).mockReturnValue({
+      translator: {
+        name: "translator",
+        mode: "subagent",
+        description: "Translate and localize locale files",
+        prompt: "Translate content",
+      },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      disabled_agents: ["translator"],
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agentsConfig = config.agent as Record<string, { prompt?: string }>
+    const pKey = getAgentDisplayName("prometheus")
+    expect(agentsConfig[pKey]).toBeDefined()
+    expect(agentsConfig[pKey].prompt).not.toContain("translator")
+  })
+
+  test("prometheus custom prompt override still includes custom agent catalog", async () => {
+    // #given
+    ;(agentLoader.loadUserAgents as any).mockReturnValue({
+      translator: {
+        name: "translator",
+        mode: "subagent",
+        description: "Translate and localize locale files",
+        prompt: "Translate content",
+      },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {
+      agents: {
+        prometheus: {
+          prompt: "Custom planner prompt",
+        },
+      },
+      sisyphus_agent: {
+        planner_enabled: true,
+      },
+    }
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then
+    const agentsConfig = config.agent as Record<string, { prompt?: string }>
+    const pKey = getAgentDisplayName("prometheus")
+    expect(agentsConfig[pKey]).toBeDefined()
+    expect(agentsConfig[pKey].prompt).toContain("Custom planner prompt")
+    expect(agentsConfig[pKey].prompt).toContain("<custom_agent_catalog>")
+    expect(agentsConfig[pKey].prompt).toContain("translator")
+  })
+
   test("custom agent summary merge preserves flags when custom_agents adds description", async () => {
     // #given
     ;(agentLoader.loadUserAgents as any).mockReturnValue({

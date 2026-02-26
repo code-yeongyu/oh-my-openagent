@@ -23,6 +23,8 @@ describe("schema document generation", () => {
     expect(agentsSchema?.additionalProperties).toBeFalse()
     expect(customAgentsSchema).toBeDefined()
     expect(customPropertyNames?.pattern).toBeDefined()
+    expect(customPropertyNames?.pattern).toContain("[bB][uU][iI][lL][dD]")
+    expect(customPropertyNames?.pattern).toContain("[pP][lL][aA][nN]")
     expect(customAdditionalProperties).toBeDefined()
     expect(customAgentProperties?.model).toEqual({ type: "string" })
     expect(customAgentProperties?.temperature).toEqual(
