@@ -3,6 +3,7 @@ const { describe, expect, test, beforeEach, afterEach, spyOn } = require("bun:te
 const { createSessionNotification } = require("./session-notification")
 const { setMainSession, subagentSessions, _resetForTesting } = require("../features/claude-code-session-state")
 const utils = require("./session-notification-utils")
+const sender = require("./session-notification-sender")
 
 describe("session-notification input-needed events", () => {
   let notificationCalls: string[]
@@ -37,6 +38,10 @@ describe("session-notification input-needed events", () => {
     spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
     spyOn(utils, "getPowershellPath").mockResolvedValue("powershell")
     spyOn(utils, "startBackgroundCheck").mockImplementation(() => {})
+    spyOn(sender, "detectPlatform").mockReturnValue("darwin")
+    spyOn(sender, "sendSessionNotification").mockImplementation(async (_ctx: unknown, _platform: unknown, _title: unknown, message: string) => {
+      notificationCalls.push(message)
+    })
   })
 
   afterEach(() => {
@@ -47,7 +52,7 @@ describe("session-notification input-needed events", () => {
   test("sends question notification when question tool asks for input", async () => {
     const sessionID = "main-question"
     setMainSession(sessionID)
-    const hook = createSessionNotification(createMockPluginInput())
+    const hook = createSessionNotification(createMockPluginInput(), { enforceMainSessionFilter: false })
 
     await hook({
       event: {
@@ -74,7 +79,7 @@ describe("session-notification input-needed events", () => {
   test("sends permission notification for permission events", async () => {
     const sessionID = "main-permission"
     setMainSession(sessionID)
-    const hook = createSessionNotification(createMockPluginInput())
+    const hook = createSessionNotification(createMockPluginInput(), { enforceMainSessionFilter: false })
 
     await hook({
       event: {
