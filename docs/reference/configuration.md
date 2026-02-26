@@ -233,7 +233,10 @@ Example:
     "reviewer-fast": {
       "model": "anthropic/claude-haiku-4-5",
       "temperature": 0,
-      "reasoningEffort": "medium"
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 20000
+      }
     }
   }
 }
@@ -243,11 +246,13 @@ On-demand invocation through task delegation:
 
 ```ts
 task(
-  subagent_type="translator",
-  load_skills=[],
-  description="Translate release notes",
-  prompt="Translate docs/CHANGELOG.md into Korean while preserving markdown structure.",
-  run_in_background=false,
+  {
+    subagent_type: "translator",
+    load_skills: [],
+    description: "Translate release notes",
+    prompt: "Translate docs/CHANGELOG.md into Korean while preserving markdown structure.",
+    run_in_background: false,
+  },
 )
 ```
 
