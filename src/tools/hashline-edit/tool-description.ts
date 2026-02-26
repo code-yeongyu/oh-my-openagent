@@ -10,7 +10,7 @@ WORKFLOW:
 VALIDATION:
   Payload shape: { "filePath": string, "edits": [...], "delete"?: boolean, "rename"?: string }
   Each edit must be one of: replace, append, prepend
-  Edit shape: { "op": "replace"|"append"|"prepend", "pos"?: "LINE#ID", "end"?: "LINE#ID", "lines"?: string|string[]|null }
+  Edit shape: { "op": "replace"|"append"|"prepend", "pos"?: "LINE#ID", "end"?: "LINE#ID", "lines": string|string[]|null }
   lines must contain plain replacement text only (no LINE#ID prefixes, no diff + markers)
   CRITICAL: all operations validate against the same pre-edit file snapshot and apply bottom-up. Refs/tags are interpreted against the last-read version of the file.
 
