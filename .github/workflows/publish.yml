@@ -38,7 +38,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: stable
 
       - name: Install dependencies
         run: bun install
@@ -108,7 +108,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: stable
 
       - name: Install dependencies
         run: bun install
@@ -134,7 +134,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: stable
 
       - uses: actions/setup-node@v4
         with:
@@ -255,7 +255,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: stable
 
       - name: Install dependencies
         run: bun install
