@@ -390,13 +390,36 @@ project/
 
 **Purpose**: Self-referential development loop that runs until task completion
 
-**Named after**: Anthropic's Ralph Wiggum plugin
+**Named after**: the Ralph Wiggum loop pattern popularized by Geoffrey Huntley (this implementation supports both single-session continuation and fresh-session reset styles)
 
 **Usage**:
 ```
 /ralph-loop "Build a REST API with authentication"
 /ralph-loop "Refactor the payment module" --max-iterations=50
+/ralph-loop "Harden deployment pipeline" --strategy=reset --completion-promise=COMPLETE
 ```
+
+**Arguments / Flags**:
+
+| Flag | Values | Default | Description |
+|------|--------|---------|-------------|
+| `--max-iterations` | `1-1000` | `100` (or `ralph_loop.default_max_iterations`) | Maximum loop iterations before auto-stop |
+| `--completion-promise` | text | `DONE` | Completion marker detected as `<promise>TEXT</promise>` |
+| `--strategy` | `continue` \| `reset` | `ralph_loop.default_strategy` → `continue` | Controls whether each iteration continues in the same session or starts a fresh session |
+
+#### Ralph Loop Strategies: `continue` vs `reset`
+
+These are intentionally different techniques, not just minor modes.
+
+| Strategy | Philosophy | Iteration Behavior | Best For |
+|----------|------------|--------------------|----------|
+| `continue` | **Hot-context / session continuity** | Injects the next iteration prompt into the same session thread | HITL workflows, maintaining conversational context, debugging a single evolving thread |
+| `reset` | **Fresh-context / Ralph reset loop** | Creates a new top-level session for each iteration and replays the loop command for the next pass | Geoffrey Huntley-style looping to avoid context rot, longer AFK runs, stronger iteration isolation |
+
+**Important differences**:
+- `continue` keeps the same session history, so context accumulates across iterations.
+- `reset` starts each iteration in a fresh top-level session (with iteration titles) and passes the loop instructions forward, which is a fundamentally different looping approach.
+- If `--strategy` is omitted, the command uses `ralph_loop.default_strategy` from config. If config is also omitted, it defaults to `continue`.
 
 **Behavior**:
 - Agent works continuously toward the goal
@@ -404,7 +427,7 @@ project/
 - Auto-continues if agent stops without completion
 - Ends when: completion detected, max iterations reached (default 100), or `/cancel-ralph`
 
-**Configure**: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100 } }`
+**Configure**: `{ "ralph_loop": { "enabled": true, "default_max_iterations": 100, "default_strategy": "continue" } }`
 
 ### /ulw-loop
 

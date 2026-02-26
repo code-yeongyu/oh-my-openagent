@@ -21,6 +21,7 @@ Complete reference for `oh-my-opencode.jsonc` configuration. This document cover
   - [Skills](#skills)
   - [Hooks](#hooks)
   - [Commands](#commands)
+  - [Ralph Loop](#ralph-loop)
   - [Browser Automation](#browser-automation)
   - [Tmux Integration](#tmux-integration)
   - [Git Master](#git-master)
@@ -421,6 +422,37 @@ Disable built-in commands via `disabled_commands`:
 ```
 
 Available commands: `init-deep`, `start-work`
+
+### Ralph Loop
+
+Configure `/ralph-loop` continuation behavior and defaults:
+
+```json
+{
+  "ralph_loop": {
+    "enabled": true,
+    "default_max_iterations": 100,
+    "default_strategy": "continue",
+    "state_dir": ".opencode"
+  }
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `false` | Enables `/ralph-loop` command behavior |
+| `default_max_iterations` | `100` | Default iteration limit when `--max-iterations` is omitted |
+| `default_strategy` | `continue` | Default strategy when `--strategy` is omitted. `continue` keeps iterating in the same session; `reset` creates a fresh top-level session each iteration. |
+| `state_dir` | `.opencode` (internal default path behavior) | Custom state-file directory relative to project root |
+
+Strategy philosophy matters:
+- `continue`: session continuity (hot context), same-thread iterative execution.
+- `reset`: fresh context each iteration (new top-level session), aligned with reset-style Ralph loops where each pass starts clean.
+
+Flag precedence:
+- Explicit command flag (`--strategy=...`) overrides config.
+- If no flag is provided, `ralph_loop.default_strategy` is used.
+- If config is omitted, fallback is `continue`.
 
 ### Browser Automation
 
