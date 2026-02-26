@@ -21,7 +21,7 @@ export function buildContinuationPrompt(state: RalphLoopState): string {
 	)
 		.replace("{{MAX}}", String(state.max_iterations))
 		.replace("{{PROMISE}}", state.completion_promise)
-		.replace("{{PROMPT}}", state.raw_task_arguments ?? state.prompt)
+		.replace("{{PROMPT}}", () => state.raw_task_arguments ?? state.prompt)
 
 	return state.ultrawork ? `ultrawork ${continuationPrompt}` : continuationPrompt
 }

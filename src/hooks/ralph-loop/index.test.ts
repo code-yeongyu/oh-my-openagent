@@ -872,7 +872,8 @@ If done, output: <promise>SINGLE_TASK_COMPLETE</promise>" --strategy=continue --
 
     test("should replay raw task arguments in continue prompt original task section when available", async () => {
       const hook = createRalphLoopHook(createMockPluginInput())
-      const rawArguments = `"Task with \"alpha\" and C:\\temp\\ralph\\test plus {\"x\":\"y\",\"n\":\"\\n\"}" --strategy=continue --max-iterations=2 --completion-promise=NEVER_MATCH`
+      const backtickSubstitutionToken = "$`"
+      const rawArguments = `"Task with \"alpha\" and C:\\temp\\ralph\\test plus {\"x\":\"y\",\"n\":\"\\n\"} and dollar tokens $$ $& ${backtickSubstitutionToken}" --strategy=continue --max-iterations=2 --completion-promise=NEVER_MATCH`
 
       hook.startLoop("session-123", "fallback prompt", {
         strategy: "continue",
@@ -890,6 +891,7 @@ If done, output: <promise>SINGLE_TASK_COMPLETE</promise>" --strategy=continue --
       expect(promptCalls[0].text).toContain(`Original task:\n${rawArguments}`)
       expect(promptCalls[0].text).toContain("C:\\temp\\ralph\\test")
       expect(promptCalls[0].text).toContain('{"x":"y","n":"\\n"}')
+      expect(promptCalls[0].text).toContain("dollar tokens $$ $& $`")
     })
 
     test("should inherit agent and variant from previous session during reset continuation", async () => {
