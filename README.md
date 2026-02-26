@@ -184,7 +184,7 @@ textX, ANTLR4, tree-sitter, Langium, Chevrotain, PyEcore — both external DSLs 
 
 #### Cipher's Skill Architecture
 
-Cipher's DSL knowledge is modular. Instead of a monolithic prompt, Cipher loads **5 composable skills** that are injected at agent build time. This means any agent in the system can load the same DSL knowledge — Cipher isn't special, he's just the one who loads all of them by default.
+Cipher's DSL knowledge is modular. Instead of a monolithic prompt, Cipher loads **11 composable skills** that are injected at agent build time. This means any agent in the system can load the same DSL knowledge — Cipher isn't special, he's just the one who loads all of them by default.
 
 | Skill | Domain | What It Contains |
 |-------|--------|------------------|
@@ -193,18 +193,28 @@ Cipher's DSL knowledge is modular. Instead of a monolithic prompt, Cipher loads 
 | `dsl-codegen` | Code Generation | Source analysis, generator architecture (template/AST-walk/IR), language-specific idioms, multi-target generation |
 | `dsl-metamodel` | Metamodeling & textX | Complete textX grammar reference (assignments, rule types, references, modifiers, scoping), Python API (`obj_processors`, `scope_providers`, custom classes), PyEcore patterns |
 | `dsl-tooling` | IDE & Internal DSLs | Tree-sitter grammars, LSP implementation, fluent APIs, builder patterns, decorators, tagged template literals |
+| `dsl-textx-ecosystem` | textX Ecosystem | Registration system (entry points, `textx_languages`/`textx_generators`), generator framework (`textx generate`, Jinja2), multi-file models (ModelRepository, FQNImportURI), language composition, visualization (dot/PlantUML), textX-LS |
+| `dsl-pyecore-advanced` | PyEcore Advanced | Serialization (XMI/JSON, ResourceSet, URI), dynamic vs static metamodels (DynamicEPackage, pyecoregen), notifications (EObserver), @EMetaclass decorator, .ecore file loading, EMF interchange |
+| `dsl-model-transformation` | M2M Transforms | Model-to-model transformation patterns (motra), in-place vs out-place, rule-based mapping, trace models, ATL-style patterns, M2T with Jinja2, protected regions |
+| `dsl-testing` | DSL Testing | Grammar testing (pytest + textX), semantic validation testing (error assertions), code generator golden-file testing, property-based testing (Hypothesis), model roundtrip testing |
+| `dsl-validation` | Advanced Validation | OCL-style constraint patterns, well-formedness rules, multiplicity/cardinality checks, referential integrity, cycle detection, validation framework pattern with severity levels |
+| `dsl-composition` | Composition & Evolution | Language composition (multi-metamodel, grammar extension, referencing), DSL evolution (grammar versioning, backward compatibility), model migration, multiple concrete syntaxes |
 
 **How skills compose:**
 
 ```
-# Cipher loads ALL 5 (automatic — configured in the agent factory)
+# Cipher loads ALL 11 (automatic — configured in the agent factory)
 Cipher = dsl-core + dsl-grammar + dsl-codegen + dsl-metamodel + dsl-tooling
+       + dsl-textx-ecosystem + dsl-pyecore-advanced + dsl-model-transformation
+       + dsl-testing + dsl-validation + dsl-composition
 
 # Other agents can load specific skills for focused tasks
-task(category="source", load_skills=["dsl-core", "dsl-grammar"])        # just grammar work
-task(category="source", load_skills=["dsl-core", "dsl-codegen"])         # just transpiler work
-task(category="source", load_skills=["dsl-metamodel"])                   # just textX reference
-task(category="source", load_skills=["dsl-tooling"])                     # just tree-sitter/LSP
+task(category="source", load_skills=["dsl-core", "dsl-grammar"])                    # just grammar work
+task(category="source", load_skills=["dsl-core", "dsl-codegen"])                     # just transpiler work
+task(category="source", load_skills=["dsl-metamodel", "dsl-textx-ecosystem"])        # textX full stack
+task(category="source", load_skills=["dsl-pyecore-advanced", "dsl-model-transformation"])  # PyEcore + M2M
+task(category="source", load_skills=["dsl-testing", "dsl-validation"])               # testing + validation
+task(category="source", load_skills=["dsl-composition"])                             # language composition
 ```
 
 #### Internal DSL Engineering Workflow
@@ -440,7 +450,7 @@ See the full [Configuration Documentation](docs/configurations.md) for detailed 
 - **Config Locations**: `.opencode/matrixx.jsonc` or `.opencode/matrixx.json` (project), `~/.config/opencode/matrixx.jsonc` or `~/.config/opencode/matrixx.json` (user)
 - **JSONC Support**: Comments and trailing commas supported
 - **Agents**: Override models, temperatures, prompts, and permissions for any agent
-- **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits), `dsl-core/grammar/codegen/metamodel/tooling` (DSL engineering), `eu-horizon/academic-writing/academic-review/literature-review/research-methodology/grant-writing/deliverable-writing/project-management/technical-lead/scientific-presentation/data-management-plan/ip-exploitation` (research & technical leadership)
+- **Built-in Skills**: `playwright` (browser automation), `git-master` (atomic commits), `dsl-core/grammar/codegen/metamodel/tooling/textx-ecosystem/pyecore-advanced/model-transformation/testing/validation/composition` (DSL engineering), `eu-horizon/academic-writing/academic-review/literature-review/research-methodology/grant-writing/deliverable-writing/project-management/technical-lead/scientific-presentation/data-management-plan/ip-exploitation` (research & technical leadership)
 - **Morpheus Agent**: Main orchestrator with Oracle (Planner) and Seraph (Plan Consultant)
 - **Background Tasks**: Configure concurrency limits per provider/model
 - **Categories**: Domain-specific task delegation (`visual`, `business-logic`, custom)

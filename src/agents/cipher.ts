@@ -7,6 +7,12 @@ import { DSL_GRAMMAR_SKILL_NAME } from "../features/builtin-skills/skills/dsl-gr
 import { DSL_CODEGEN_SKILL_NAME } from "../features/builtin-skills/skills/dsl-codegen"
 import { DSL_METAMODEL_SKILL_NAME } from "../features/builtin-skills/skills/dsl-metamodel"
 import { DSL_TOOLING_SKILL_NAME } from "../features/builtin-skills/skills/dsl-tooling"
+import { DSL_TEXTX_ECOSYSTEM_SKILL_NAME } from "../features/builtin-skills/skills/dsl-textx-ecosystem"
+import { DSL_PYECORE_ADVANCED_SKILL_NAME } from "../features/builtin-skills/skills/dsl-pyecore-advanced"
+import { DSL_MODEL_TRANSFORMATION_SKILL_NAME } from "../features/builtin-skills/skills/dsl-model-transformation"
+import { DSL_TESTING_SKILL_NAME } from "../features/builtin-skills/skills/dsl-testing"
+import { DSL_VALIDATION_SKILL_NAME } from "../features/builtin-skills/skills/dsl-validation"
+import { DSL_COMPOSITION_SKILL_NAME } from "../features/builtin-skills/skills/dsl-composition"
 
 const MODE: AgentMode = "all"
 
@@ -16,6 +22,12 @@ const CIPHER_DSL_SKILLS = [
   DSL_CODEGEN_SKILL_NAME,
   DSL_METAMODEL_SKILL_NAME,
   DSL_TOOLING_SKILL_NAME,
+  DSL_TEXTX_ECOSYSTEM_SKILL_NAME,
+  DSL_PYECORE_ADVANCED_SKILL_NAME,
+  DSL_MODEL_TRANSFORMATION_SKILL_NAME,
+  DSL_TESTING_SKILL_NAME,
+  DSL_VALIDATION_SKILL_NAME,
+  DSL_COMPOSITION_SKILL_NAME,
 ]
 
 export const CIPHER_PROMPT_METADATA: AgentPromptMetadata = {

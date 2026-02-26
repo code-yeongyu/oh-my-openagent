@@ -62,7 +62,7 @@ describe("createCipherAgent", () => {
 
   //#given a model
   //#when creating the agent
-  //#then config should include all 5 DSL skills
+  //#then config should include all 11 DSL skills
   test("includes all DSL skills for skill-based knowledge injection", () => {
     const config = createCipherAgent("anthropic/claude-opus-4-6")
     const skills = (config as Record<string, unknown>).skills as string[]
@@ -72,7 +72,13 @@ describe("createCipherAgent", () => {
     expect(skills).toContain("dsl-codegen")
     expect(skills).toContain("dsl-metamodel")
     expect(skills).toContain("dsl-tooling")
-    expect(skills).toHaveLength(5)
+    expect(skills).toContain("dsl-textx-ecosystem")
+    expect(skills).toContain("dsl-pyecore-advanced")
+    expect(skills).toContain("dsl-model-transformation")
+    expect(skills).toContain("dsl-testing")
+    expect(skills).toContain("dsl-validation")
+    expect(skills).toContain("dsl-composition")
+    expect(skills).toHaveLength(11)
   })
 
   //#given a model

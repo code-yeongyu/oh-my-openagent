@@ -38,6 +38,12 @@ export const BuiltinSkillNameSchema = z.enum([
   "scientific-presentation",
   "data-management-plan",
   "ip-exploitation",
+  "dsl-textx-ecosystem",
+  "dsl-pyecore-advanced",
+  "dsl-model-transformation",
+  "dsl-testing",
+  "dsl-validation",
+  "dsl-composition",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
