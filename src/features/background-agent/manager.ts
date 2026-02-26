@@ -830,6 +830,8 @@ export class BackgroundManager {
         tasksToCancel.set(descendant.id, descendant)
       }
 
+      this.pendingNotifications.delete(sessionID)
+
       if (tasksToCancel.size === 0) return
 
       for (const task of tasksToCancel.values()) {
@@ -866,6 +868,13 @@ export class BackgroundManager {
           subagentSessions.delete(task.sessionID)
         }
       }
+
+      for (const task of tasksToCancel.values()) {
+        if (task.parentSessionID) {
+          this.pendingNotifications.delete(task.parentSessionID)
+        }
+      }
+
       SessionCategoryRegistry.remove(sessionID)
     }
 
