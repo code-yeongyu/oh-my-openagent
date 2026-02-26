@@ -21,7 +21,7 @@ It asks about your providers (Claude, OpenAI, Gemini, etc.) and generates optima
   // Override specific agent models
   "agents": {
     "oracle": { "model": "openai/gpt-5.2" },           // Use GPT for debugging
-    "librarian": { "model": "zai-coding-plan/glm-4.7" }, // Cheap model for research
+    "librarian": { "model": "zai-coding-plan/glm-5" }, // Cheap model for research
     "explore": { "model": "opencode/gpt-5-nano" }        // Free model for grep
   },
   
