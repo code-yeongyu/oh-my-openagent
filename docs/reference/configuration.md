@@ -443,7 +443,7 @@ Configure `/ralph-loop` continuation behavior and defaults:
 | `enabled` | `false` | Enables `/ralph-loop` command behavior |
 | `default_max_iterations` | `100` | Default iteration limit when `--max-iterations` is omitted |
 | `default_strategy` | `continue` | Default strategy when `--strategy` is omitted. `continue` keeps iterating in the same session; `reset` creates a fresh top-level session each iteration. |
-| `state_dir` | `.opencode` (internal default path behavior) | Custom state-file directory relative to project root |
+| `state_dir` | `.sisyphus/ralph-loop.local.md` (when omitted) | Custom Ralph-loop state file path relative to project root (despite the name, this behaves as a file path, not just a directory) |
 
 Strategy philosophy matters:
 - `continue`: session continuity (hot context), same-thread iterative execution.
