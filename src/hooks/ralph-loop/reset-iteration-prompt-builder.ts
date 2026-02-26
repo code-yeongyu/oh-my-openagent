@@ -9,6 +9,18 @@ function quoteCommandValue(value: string): string {
   return `"${escapedValue}"`
 }
 
+function buildPromptWithFlags(state: RalphLoopState, flagsText: string): string {
+  if (!state.prompt.includes("</ralph-prompt>")) {
+    return `<ralph-prompt>
+${state.prompt}
+</ralph-prompt>
+${flagsText}`
+  }
+
+  return `${quoteCommandValue(state.prompt)}
+${flagsText}`
+}
+
 export function buildLoopCommandArguments(state: RalphLoopState): string {
   const flags = [
     `--completion-promise=${quoteCommandValue(state.completion_promise)}`,
@@ -16,10 +28,7 @@ export function buildLoopCommandArguments(state: RalphLoopState): string {
     `--strategy=${state.strategy ?? "continue"}`,
   ]
 
-  return `<ralph-prompt>
-${state.prompt}
-</ralph-prompt>
-${flags.join(" ")}`
+  return buildPromptWithFlags(state, flags.join(" "))
 }
 
 export function buildResetIterationPrompt(state: RalphLoopState): string {

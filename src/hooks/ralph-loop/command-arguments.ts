@@ -21,6 +21,33 @@ type ParsedPrompt = {
   flagsSource: string
 }
 
+function isEscapedAt(input: string, index: number): boolean {
+  let backslashCount = 0
+  for (let cursor = index - 1; cursor >= 0; cursor--) {
+    if (input[cursor] !== "\\") {
+      break
+    }
+
+    backslashCount += 1
+  }
+
+  return backslashCount % 2 === 1
+}
+
+function findUnescapedQuoteBackward(input: string, quote: string, fromIndex: number): number {
+  for (let index = fromIndex; index >= 0; index--) {
+    if (input[index] !== quote) {
+      continue
+    }
+
+    if (!isEscapedAt(input, index)) {
+      return index
+    }
+  }
+
+  return -1
+}
+
 function decodeEscapedCharacter(char: string): string {
   if (char === "n") return "\\n"
   if (char === "r") return "\\r"
@@ -103,7 +130,7 @@ function parseQuotedPromptUsingTrailingFlags(
 
   if (firstFlagMatch) {
     const flagStart = firstNonWhitespace + 1 + (firstFlagMatch.index ?? 0)
-    const closingQuote = rawArguments.lastIndexOf(quote, flagStart - 1)
+    const closingQuote = findUnescapedQuoteBackward(rawArguments, quote, flagStart - 1)
     if (closingQuote > firstNonWhitespace) {
       const rawPrompt = rawArguments.slice(firstNonWhitespace + 1, closingQuote)
       return {
@@ -113,7 +140,7 @@ function parseQuotedPromptUsingTrailingFlags(
     }
   }
 
-  const closingQuote = rawArguments.lastIndexOf(quote)
+  const closingQuote = findUnescapedQuoteBackward(rawArguments, quote, rawArguments.length - 1)
   if (closingQuote > firstNonWhitespace) {
     const rawPrompt = rawArguments.slice(firstNonWhitespace + 1, closingQuote)
     return {

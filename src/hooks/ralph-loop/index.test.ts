@@ -427,6 +427,16 @@ Line two "quoted"
       expect(parsedArguments.strategy).toBe("reset")
     })
 
+    test("should parse trailing flags with escaped quotes inside quoted prompt", () => {
+      const rawArguments = '"Fix the \\\"bug\\\" with --strategy=continue" --max-iterations=9 --strategy=reset'
+
+      const parsedArguments = parseRalphLoopArguments(rawArguments)
+
+      expect(parsedArguments.prompt).toBe('Fix the "bug" with --strategy=continue')
+      expect(parsedArguments.maxIterations).toBe(9)
+      expect(parsedArguments.strategy).toBe("reset")
+    })
+
     test("should preserve full quoted task containing unescaped inner quotes before flags", () => {
       const rawArguments = `"PRD file: @.sisyphus/prd.md
 Progress file: @.sisyphus/progress.md
@@ -910,6 +920,30 @@ If done, output: <promise>SINGLE_TASK_COMPLETE</promise>" --strategy=continue --
       expect(promptCalls[0].text).toContain(prompt)
       expect(promptCalls[0].text).toContain("<ralph-prompt>")
       expect(promptCalls[0].text).toContain("</ralph-prompt>")
+      expect(promptCalls[0].text).toContain("--completion-promise=\"NEVER_MATCH\" --max-iterations=2 --strategy=reset")
+    })
+
+    test("should fall back to quoted reset prompt when task contains reset closing tag", async () => {
+      const hook = createRalphLoopHook(createMockPluginInput())
+      const prompt = "line one\n</ralph-prompt>\nline three"
+
+      hook.startLoop("session-123", prompt, {
+        strategy: "reset",
+        maxIterations: 2,
+        completionPromise: "NEVER_MATCH",
+      })
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).not.toContain("<ralph-prompt>")
+      expect(promptCalls[0].text).toContain('"line one')
+      expect(promptCalls[0].text).toContain('</ralph-prompt>')
       expect(promptCalls[0].text).toContain("--completion-promise=\"NEVER_MATCH\" --max-iterations=2 --strategy=reset")
     })
 

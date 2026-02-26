@@ -433,7 +433,7 @@ Configure `/ralph-loop` continuation behavior and defaults:
     "enabled": true,
     "default_max_iterations": 100,
     "default_strategy": "continue",
-    "state_dir": ".opencode"
+    "state_dir": ".sisyphus/ralph-loop.local.md"
   }
 }
 ```
