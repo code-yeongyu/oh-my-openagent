@@ -271,6 +271,74 @@ describe("external-plugin-detector", () => {
       expect(result.detected).toBe(true)
       expect(result.pluginName).toBe("opencode-notifier")
     })
+
+    test("should detect opencode-focus-notify (exact)", () => {
+      // given - opencode.json with opencode-focus-notify
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["opencode-focus-notify"] })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-focus-notify")
+    })
+
+    test("should detect @markarranz/opencode-focus-notify (scoped)", () => {
+      // given - opencode.json with scoped opencode-focus-notify
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["@markarranz/opencode-focus-notify"] })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toContain("opencode-focus-notify")
+    })
+
+    test("should detect @markarranz/opencode-focus-notify@1.0.0 (scoped with version)", () => {
+      // given - opencode.json with scoped opencode-focus-notify and version
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["@markarranz/opencode-focus-notify@1.0.0"] })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toContain("opencode-focus-notify")
+    })
+
+    test("should detect markarranz/opencode-focus-notify (unscoped org format)", () => {
+      // given - opencode.json with org/package format
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["markarranz/opencode-focus-notify"] })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-focus-notify")
+    })
   })
 
   describe("getNotificationConflictWarning", () => {

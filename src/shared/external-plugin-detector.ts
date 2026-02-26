@@ -22,6 +22,9 @@ const KNOWN_NOTIFICATION_PLUGINS = [
   "opencode-notifier",
   "@mohak34/opencode-notifier",
   "mohak34/opencode-notifier",
+  "opencode-focus-notify",
+  "@markarranz/opencode-focus-notify",
+  "markarranz/opencode-focus-notify",
 ]
 
 function getWindowsAppdataDir(): string | null {
