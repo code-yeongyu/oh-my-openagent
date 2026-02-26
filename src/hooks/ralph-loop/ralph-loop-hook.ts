@@ -24,6 +24,19 @@ export interface RalphLoopHook {
 
 const DEFAULT_API_TIMEOUT = 5000 as const
 
+function getMessageCountFromResponse(messagesResponse: unknown): number {
+  if (Array.isArray(messagesResponse)) {
+    return messagesResponse.length
+  }
+
+  if (typeof messagesResponse === "object" && messagesResponse !== null && "data" in messagesResponse) {
+    const data = (messagesResponse as { data?: unknown }).data
+    return Array.isArray(data) ? data.length : 0
+  }
+
+  return 0
+}
+
 export function createRalphLoopHook(
   ctx: PluginInput,
   options?: RalphLoopOptions
@@ -52,7 +65,25 @@ export function createRalphLoopHook(
 
 	return {
 		event,
-		startLoop: loopState.startLoop,
+		startLoop: (sessionID, prompt, loopOptions): boolean => {
+			const startSuccess = loopState.startLoop(sessionID, prompt, loopOptions)
+			if (!startSuccess || typeof loopOptions?.messageCountAtStart === "number") {
+				return startSuccess
+			}
+
+			ctx.client.session
+				.messages({
+					path: { id: sessionID },
+					query: { directory: ctx.directory },
+				})
+				.then((messagesResponse: unknown) => {
+					const messageCountAtStart = getMessageCountFromResponse(messagesResponse)
+					loopState.setMessageCountAtStart(sessionID, messageCountAtStart)
+				})
+				.catch(() => {})
+
+			return startSuccess
+		},
 		cancelLoop: loopState.cancelLoop,
 		getState: loopState.getState as () => RalphLoopState | null,
 	}

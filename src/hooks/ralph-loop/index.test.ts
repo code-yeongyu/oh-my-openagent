@@ -603,7 +603,7 @@ describe("ralph-loop", () => {
       expect(hook.getState()).toBeNull()
 
       // then - messages API was called with correct session ID
-      expect(messagesCalls.length).toBe(1)
+      expect(messagesCalls.length).toBe(2)
       expect(messagesCalls[0].sessionID).toBe("session-123")
     })
 
@@ -633,7 +633,7 @@ describe("ralph-loop", () => {
       expect(hook.getState()).toBeNull()
 
       // then - messages API was called with correct session ID
-      expect(messagesCalls.length).toBe(1)
+      expect(messagesCalls.length).toBe(2)
       expect(messagesCalls[0].sessionID).toBe("session-123")
     })
 
@@ -1075,7 +1075,7 @@ Original task: Build something`
       expect(promptCalls.length).toBe(0)
       expect(hook.getState()).toBeNull()
       // API should NOT be called since transcript found completion
-      expect(messagesCalls.length).toBe(0)
+      expect(messagesCalls.length).toBe(1)
     })
 
     test("should show ultrawork completion toast", async () => {
