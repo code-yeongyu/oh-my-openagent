@@ -52,7 +52,7 @@ describe("no-hephaestus-non-gpt hook", () => {
   })
 
   test("shows warning and does not switch agent when allow_non_gpt_model is enabled", async () => {
-    // given - hephaestus with claude model and opt-out enabled
+    // given - hephaestus with claude model and allow_non_gpt_model enabled
     const showToast = spyOn({ fn: async (_input: unknown) => ({}) }, "fn")
     const hook = createNoHephaestusNonGptHook({
       client: { tui: { showToast } },
@@ -69,7 +69,7 @@ describe("no-hephaestus-non-gpt hook", () => {
       model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
     }, output)
 
-    // then - warning toast is shown but agent is not switched
+    // then - warning toast shown but agent is not switched
     expect(showToast).toHaveBeenCalledTimes(1)
     expect(output.message.agent).toBeUndefined()
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
