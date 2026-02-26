@@ -16,7 +16,7 @@ export function toHashlineContent(content: string): string {
 }
 
 export function generateUnifiedDiff(oldContent: string, newContent: string, filePath: string): string {
-	return createTwoFilesPatch(filePath, filePath, oldContent, newContent)
+	return createTwoFilesPatch(filePath, filePath, oldContent, newContent, undefined, undefined, { context: 3 })
 }
 
 export function countLineDiffs(oldContent: string, newContent: string): { additions: number; deletions: number } {
