@@ -91,6 +91,13 @@ export function isAnthropicModel(model: string): boolean {
   return ANTHROPIC_INDICATORS.some((indicator) => lowered.includes(indicator))
 }
 
+const GEMINI_INDICATORS = ["gemini", "google-vertex/gemini", "google/gemini"]
+
+export function isGeminiModel(model: string): boolean {
+  const lowered = model.toLowerCase()
+  return GEMINI_INDICATORS.some((indicator) => lowered.includes(indicator))
+}
+
 export type BuiltinAgentName =
   | "morpheus"
   | "keymaker"

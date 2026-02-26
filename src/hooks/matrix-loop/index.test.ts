@@ -690,7 +690,7 @@ describe("matrix-loop", () => {
       expect(hook.getState()).toBeNull()
     })
 
-    test("should NOT detect completion if promise is older than last 3 assistant messages", async () => {
+    test("should detect completion even if promise is older than last 3 assistant messages", async () => {
       // given - promise appears in an assistant message older than last 3
       mockSessionMessages = [
         { info: { role: "user" }, parts: [{ type: "text", text: "Start task" }] },
@@ -709,9 +709,9 @@ describe("matrix-loop", () => {
         event: { type: "session.idle", properties: { sessionID: "session-123" } },
       })
 
-      // then - loop should continue (promise is older than last 3 assistant messages)
-      expect(promptCalls.length).toBe(1)
-      expect(hook.getState()?.iteration).toBe(2)
+      // then - loop should complete (scans all assistant messages backwards)
+      expect(promptCalls.length).toBe(0)
+      expect(hook.getState()).toBeNull()
     })
 
     test("should allow starting new loop while previous loop is active (different session)", async () => {
