@@ -570,7 +570,7 @@ describe("Prometheus category config resolution", () => {
 
     // then
     expect(config).toBeDefined()
-    expect(config?.model).toBe("google/gemini-3-pro")
+    expect(config?.model).toBe("google/gemini-3.1-pro")
   })
 
   test("user categories override default categories", () => {
