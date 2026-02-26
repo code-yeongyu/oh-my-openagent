@@ -307,6 +307,50 @@ describe("ralph-loop", () => {
       expect(parsedArguments.maxIterations).toBe(7)
       expect(parsedArguments.strategy).toBe("continue")
     })
+
+    test("should preserve multiline quoted prompts without literal escaped newlines", () => {
+      const rawArguments = '"Line one\nLine two" --max-iterations=5 --strategy=reset'
+
+      const parsedArguments = parseRalphLoopArguments(rawArguments)
+
+      expect(parsedArguments.prompt).toBe("Line one\nLine two")
+      expect(parsedArguments.prompt.includes("\\n")).toBe(false)
+      expect(parsedArguments.maxIterations).toBe(5)
+      expect(parsedArguments.strategy).toBe("reset")
+    })
+
+    test("should parse escaped quotes in quoted prompt", () => {
+      const rawArguments = '"Say \\\"hello\\\" to operator" --strategy=reset'
+
+      const parsedArguments = parseRalphLoopArguments(rawArguments)
+
+      expect(parsedArguments.prompt).toBe('Say "hello" to operator')
+      expect(parsedArguments.strategy).toBe("reset")
+    })
+
+    test("should parse escaped completion promise values", () => {
+      const rawArguments = '"Build feature" --completion-promise="ALL_\\\"DONE\\\"" --strategy=reset'
+
+      const parsedArguments = parseRalphLoopArguments(rawArguments)
+
+      expect(parsedArguments.completionPromise).toBe('ALL_"DONE"')
+      expect(parsedArguments.strategy).toBe("reset")
+    })
+
+    test("should parse reset prompt block format without quoting prompt text", () => {
+      const rawArguments = `<ralph-prompt>
+Line one
+Line two "quoted"
+</ralph-prompt>
+--completion-promise="SINGLE_TASK_COMPLETE" --max-iterations=50 --strategy=reset`
+
+      const parsedArguments = parseRalphLoopArguments(rawArguments)
+
+      expect(parsedArguments.prompt).toBe('Line one\nLine two "quoted"')
+      expect(parsedArguments.completionPromise).toBe("SINGLE_TASK_COMPLETE")
+      expect(parsedArguments.maxIterations).toBe(50)
+      expect(parsedArguments.strategy).toBe("reset")
+    })
   })
 
   describe("hook", () => {
@@ -709,6 +753,43 @@ describe("ralph-loop", () => {
       expect(promptCalls[0].text).toContain("[RALPH LOOP - Iteration 2/8]")
       expect(promptCalls[0].text).toContain("--completion-promise=\"ULW_DONE\"")
       expect(promptCalls[0].text).toContain("--strategy=reset")
+    })
+
+    test("should keep reset iteration prompt text unescaped for multiline tasks", async () => {
+      const hook = createRalphLoopHook(createMockPluginInput())
+      const multilinePrompt = "PRD file: @.sisyphus/prd.md\nProgress file: @.sisyphus/progress.md\n1. Work one task"
+
+      hook.startLoop("session-123", multilinePrompt, { strategy: "reset" })
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain(multilinePrompt)
+      expect(promptCalls[0].text.includes("\\n")).toBe(false)
+      expect(promptCalls[0].text.includes('"PRD file:')).toBe(false)
+    })
+
+    test("should keep continue iteration prompt text unescaped for multiline tasks", async () => {
+      const hook = createRalphLoopHook(createMockPluginInput())
+      const multilinePrompt = "PRD file: @.sisyphus/prd.md\nProgress file: @.sisyphus/progress.md\n1. Work one task"
+
+      hook.startLoop("session-123", multilinePrompt, { strategy: "continue" })
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].text).toContain(multilinePrompt)
+      expect(promptCalls[0].text.includes("\\n")).toBe(false)
     })
 
     test("should inherit agent and variant from previous session during reset continuation", async () => {

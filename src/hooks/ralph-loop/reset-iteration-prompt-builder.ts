@@ -1,15 +1,28 @@
 import type { RalphLoopState } from "./types"
 import { RALPH_LOOP_TEMPLATE } from "../../features/builtin-commands/templates/ralph-loop"
 
+const RESET_PROMPT_BLOCK_START = "<ralph-prompt>"
+const RESET_PROMPT_BLOCK_END = "</ralph-prompt>"
+
+function quoteCommandValue(value: string): string {
+  const escapedValue = value
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+
+  return `"${escapedValue}"`
+}
+
 function buildLoopCommandArguments(state: RalphLoopState): string {
-  const quotedPrompt = JSON.stringify(state.prompt)
   const flags = [
-    `--completion-promise=${JSON.stringify(state.completion_promise)}`,
+    `--completion-promise=${quoteCommandValue(state.completion_promise)}`,
     `--max-iterations=${state.max_iterations}`,
     `--strategy=${state.strategy ?? "continue"}`,
   ]
 
-  return `${quotedPrompt} ${flags.join(" ")}`
+  return `${RESET_PROMPT_BLOCK_START}
+${state.prompt}
+${RESET_PROMPT_BLOCK_END}
+${flags.join(" ")}`
 }
 
 export function buildResetIterationPrompt(state: RalphLoopState): string {
