@@ -16,7 +16,9 @@ describe("schema document generation", () => {
     const customAgentsSchema = asRecord(rootProperties?.custom_agents)
     const customPropertyNames = asRecord(customAgentsSchema?.propertyNames)
     const customAdditionalProperties = asRecord(customAgentsSchema?.additionalProperties)
-    const customAgentProperties = asRecord(customAdditionalProperties?.properties)
+    const defs = asRecord(schema.$defs)
+    const sharedAgentOverrideSchema = asRecord(defs?.agentOverrideConfig)
+    const sharedAgentProperties = asRecord(sharedAgentOverrideSchema?.properties)
 
     // then
     expect(agentsSchema).toBeDefined()
@@ -26,8 +28,10 @@ describe("schema document generation", () => {
     expect(customPropertyNames?.pattern).toContain("[bB][uU][iI][lL][dD]")
     expect(customPropertyNames?.pattern).toContain("[pP][lL][aA][nN]")
     expect(customAdditionalProperties).toBeDefined()
-    expect(customAgentProperties?.model).toEqual({ type: "string" })
-    expect(customAgentProperties?.temperature).toEqual(
+    expect(customAdditionalProperties?.$ref).toBe("#/$defs/agentOverrideConfig")
+    expect(sharedAgentOverrideSchema).toBeDefined()
+    expect(sharedAgentProperties?.model).toEqual({ type: "string" })
+    expect(sharedAgentProperties?.temperature).toEqual(
       expect.objectContaining({ type: "number" }),
     )
   })
