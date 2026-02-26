@@ -138,6 +138,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -355,6 +358,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -576,6 +582,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -793,6 +802,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -1017,6 +1029,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -1234,6 +1249,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -1455,6 +1473,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -1672,6 +1693,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -1893,6 +1917,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -2110,6 +2137,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -2331,6 +2361,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -2548,6 +2581,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -2769,6 +2805,9 @@
             "description": {
               "type": "string"
             },
+            "display_name": {
+              "type": "string"
+            },
             "mode": {
               "type": "string",
               "enum": [
@@ -2986,6 +3025,9 @@
               "type": "boolean"
             },
             "description": {
+              "type": "string"
+            },
+            "display_name": {
               "type": "string"
             },
             "mode": {
@@ -3252,15 +3294,6 @@
           }
         },
         "additionalProperties": false
-      }
-    },
-    "agent_display_names": {
-      "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
-      "additionalProperties": {
-        "type": "string"
       }
     },
     "claude_code": {

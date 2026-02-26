@@ -26,8 +26,15 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   startTmuxCheck()
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
-  if (pluginConfig.agent_display_names) {
-    applyUserDisplayNames(pluginConfig.agent_display_names)
+  if (pluginConfig.agents) {
+    const displayNames = Object.fromEntries(
+      Object.entries(pluginConfig.agents)
+        .filter(([, cfg]) => cfg?.display_name)
+        .map(([key, cfg]) => [key, cfg!.display_name!]),
+    )
+    if (Object.keys(displayNames).length > 0) {
+      applyUserDisplayNames(displayNames)
+    }
   }
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
 
