@@ -110,7 +110,7 @@ describe("pollSyncSession", () => {
 
       //#then
       expect(result).toBeNull()
-      expect(callCount).toBeGreaterThan(2)
+      expect(callCount).toBeGreaterThanOrEqual(2)
     })
 
     test("keeps polling when finish is 'unknown' (non-terminal)", async () => {
@@ -594,6 +594,258 @@ describe("pollSyncSession", () => {
 
       //#then - should complete normally (stall counter was reset by non-idle status)
       expect(result).toBeNull()
+    })
+
+    test("detects orphaned tool call when no tool result ever arrives", async () => {
+      //#given - assistant made tool calls, session idle, but no tool result posted
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 10,
+        MIN_STABILITY_TIME_MS: 0,
+        STABILITY_POLLS_REQUIRED: 100,
+        MAX_POLL_TIME_MS: 30000,
+      })
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+              {
+                info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "tool-calls" },
+                parts: [{ type: "tool-call", text: "calling tool" }],
+              },
+            ],
+          }),
+          status: async () => ({ data: { "ses_orphan": { type: "idle" } } }),
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_orphan",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      //#then - should break via orphaned tool call detection, not 10-min timeout
+      expect(result).toBeNull()
+    })
+  })
+
+  describe("stability-based completion", () => {
+    test("completes when message count stabilizes with assistant content", async () => {
+      //#given - assistant responded, finish set but IDs missing (isSessionComplete fails at ID check)
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 10,
+        MIN_STABILITY_TIME_MS: 0,
+        STABILITY_POLLS_REQUIRED: 2,
+        MAX_POLL_TIME_MS: 30000,
+      })
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { role: "user", time: { created: 1000 } } },
+              {
+                info: { role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+                parts: [{ type: "text", text: "Response with finish but no IDs" }],
+              },
+            ],
+          }),
+          status: async () => ({ data: { "ses_stable": { type: "idle" } } }),
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_stable",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      //#then - should complete via stability detection (not timeout)
+      expect(result).toBeNull()
+    })
+
+    test("does not fire stability when no assistant message exists", async () => {
+      //#given - only user messages, session idle — stability should NOT trigger
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 10,
+        MIN_STABILITY_TIME_MS: 0,
+        STABILITY_POLLS_REQUIRED: 1,
+        MAX_POLL_TIME_MS: 30000,
+      })
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            ],
+          }),
+          status: async () => ({ data: { "ses_noa": { type: "idle" } } }),
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_noa",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      //#then - should detect stall (no assistant), not stability completion
+      expect(result).toContain("Session stalled")
+      expect(result).toContain("no assistant response")
+    })
+
+    test("resets stability counter when message count changes", async () => {
+      //#given - messages grow (IDs omitted so isSessionComplete fails at ID check,
+      //         finish set so fallback text check doesn't trigger — only stability works)
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 10,
+        MIN_STABILITY_TIME_MS: 0,
+        STABILITY_POLLS_REQUIRED: 2,
+        MAX_POLL_TIME_MS: 30000,
+      })
+
+      let callCount = 0
+      const mockClient = {
+        session: {
+          messages: async () => {
+            callCount++
+            if (callCount <= 2) {
+              return {
+                data: [
+                  { info: { role: "user", time: { created: 1000 } } },
+                  {
+                    info: { role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+                    parts: [{ type: "text", text: "Partial" }],
+                  },
+                ],
+              }
+            }
+            if (callCount <= 4) {
+              return {
+                data: [
+                  { info: { role: "user", time: { created: 1000 } } },
+                  {
+                    info: { role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+                    parts: [{ type: "text", text: "Partial" }],
+                  },
+                  { info: { role: "user", time: { created: 3000 } } },
+                  {
+                    info: { role: "assistant", time: { created: 4000 }, finish: "end_turn" },
+                    parts: [{ type: "text", text: "More" }],
+                  },
+                ],
+              }
+            }
+            return {
+              data: [
+                { info: { role: "user", time: { created: 1000 } } },
+                {
+                  info: { role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+                  parts: [{ type: "text", text: "Partial" }],
+                },
+                { info: { role: "user", time: { created: 3000 } } },
+                {
+                  info: { role: "assistant", time: { created: 4000 }, finish: "end_turn" },
+                  parts: [{ type: "text", text: "More" }],
+                },
+              ],
+            }
+          },
+          status: async () => ({ data: { "ses_grow": { type: "idle" } } }),
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_grow",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      //#then - should complete via stability after messages stop growing
+      expect(result).toBeNull()
+      expect(callCount).toBeGreaterThan(4)
+    })
+  })
+
+  describe("hasAssistantContent", () => {
+    test("returns true when assistant has text content", () => {
+      const { hasAssistantContent } = require("./sync-session-poller")
+
+      //#given
+      const messages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Hello" }] },
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "Response" }] },
+      ]
+
+      //#then
+      expect(hasAssistantContent(messages)).toBe(true)
+    })
+
+    test("returns true when assistant has reasoning content", () => {
+      const { hasAssistantContent } = require("./sync-session-poller")
+
+      //#given
+      const messages = [
+        { info: { role: "assistant" }, parts: [{ type: "reasoning", text: "Thinking..." }] },
+      ]
+
+      //#then
+      expect(hasAssistantContent(messages)).toBe(true)
+    })
+
+    test("returns false when assistant has only tool-call parts", () => {
+      const { hasAssistantContent } = require("./sync-session-poller")
+
+      //#given
+      const messages = [
+        { info: { role: "assistant" }, parts: [{ type: "tool-call", text: "calling" }] },
+      ]
+
+      //#then
+      expect(hasAssistantContent(messages)).toBe(false)
+    })
+
+    test("returns false when no assistant messages", () => {
+      const { hasAssistantContent } = require("./sync-session-poller")
+
+      //#given
+      const messages = [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Hello" }] },
+      ]
+
+      //#then
+      expect(hasAssistantContent(messages)).toBe(false)
+    })
+
+    test("returns false when assistant text is empty/whitespace", () => {
+      const { hasAssistantContent } = require("./sync-session-poller")
+
+      //#given
+      const messages = [
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "  " }] },
+      ]
+
+      //#then
+      expect(hasAssistantContent(messages)).toBe(false)
     })
   })
 

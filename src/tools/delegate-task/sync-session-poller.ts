@@ -8,6 +8,7 @@ const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 
 const STALL_NO_RESPONSE_POLLS = 15
 const STALL_TOOL_CALLS_POLLS = 10
+const STALL_ORPHANED_TOOL_CALL_POLLS = 20
 
 export function isSessionComplete(messages: SessionMessage[]): boolean {
   let lastUser: SessionMessage | undefined
@@ -41,6 +42,18 @@ export function hasToolResultAfterAssistant(messages: SessionMessage[]): boolean
   return lastUser.info.id > lastAssistant.info.id
 }
 
+export function hasAssistantContent(messages: SessionMessage[]): boolean {
+  return messages.some((m) => {
+    if (m.info?.role !== "assistant") return false
+    const parts = m.parts ?? []
+    return parts.some((p) => {
+      if (p.type !== "text" && p.type !== "reasoning") return false
+      const text = (p.text ?? "").trim()
+      return text.length > 0
+    })
+  })
+}
+
 export async function pollSyncSession(
   ctx: ToolContextWithMetadata,
   client: OpencodeClient,
@@ -58,6 +71,8 @@ export async function pollSyncSession(
   let pollCount = 0
   let timedOut = false
   let idleStallCount = 0
+  let lastMsgCount = 0
+  let stableIdlePolls = 0
 
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse })
 
@@ -87,23 +102,26 @@ export async function pollSyncSession(
         pollCount,
         elapsed: Math.floor((Date.now() - pollStart) / 1000) + "s",
         sessionStatus: sessionStatus?.type ?? "not_in_status",
+        idleStallCount,
+        stableIdlePolls,
       })
     }
 
     if (sessionStatus && sessionStatus.type !== "idle") {
       idleStallCount = 0
+      lastMsgCount = 0
+      stableIdlePolls = 0
       continue
     }
 
-    let messagesResult: { data?: unknown } | SessionMessage[]
-    try {
-      messagesResult = await client.session.messages({ path: { id: input.sessionID } })
-    } catch (error) {
+    const messagesResult = await client.session.messages({ path: { id: input.sessionID } }).catch((error) => {
       log("[task] Poll messages fetch failed, retrying", { sessionID: input.sessionID, error: String(error) })
-      continue
-    }
-    const rawData = (messagesResult as { data?: unknown })?.data ?? messagesResult
-    const msgs = Array.isArray(rawData) ? (rawData as SessionMessage[]) : []
+      return undefined
+    })
+    if (!messagesResult) continue
+    const msgs = normalizeSDKResponse(messagesResult, [] as SessionMessage[], {
+      preferResponseOnMissingData: true,
+    })
 
     if (input.anchorMessageCount !== undefined && msgs.length <= input.anchorMessageCount) {
       continue
@@ -115,17 +133,9 @@ export async function pollSyncSession(
     }
 
     const lastAssistant = [...msgs].reverse().find((m) => m.info?.role === "assistant")
-    const hasAssistantText = msgs.some((m) => {
-      if (m.info?.role !== "assistant") return false
-      const parts = m.parts ?? []
-      return parts.some((p) => {
-        if (p.type !== "text" && p.type !== "reasoning") return false
-        const text = (p.text ?? "").trim()
-        return text.length > 0
-      })
-    })
+    const hasText = hasAssistantContent(msgs)
 
-    if (!lastAssistant?.info?.finish && hasAssistantText) {
+    if (!lastAssistant?.info?.finish && hasText) {
       log("[task] Poll complete - assistant text detected (fallback)", {
         sessionID: input.sessionID,
         pollCount,
@@ -154,6 +164,35 @@ export async function pollSyncSession(
           pollCount,
         })
         break
+      }
+
+      if (idleStallCount >= STALL_ORPHANED_TOOL_CALL_POLLS) {
+        log("[task] Session stalled - orphaned tool call with no result", {
+          sessionID: input.sessionID,
+          finishReason,
+          idleStallCount,
+          pollCount,
+        })
+        break
+      }
+    }
+
+    if (lastAssistant && msgs.length > 0 && Date.now() - pollStart >= syncTiming.MIN_STABILITY_TIME_MS) {
+      const currentMsgCount = msgs.length
+      if (currentMsgCount === lastMsgCount) {
+        stableIdlePolls++
+        if (stableIdlePolls >= syncTiming.STABILITY_POLLS_REQUIRED) {
+          log("[task] Poll complete - stable idle detected (message count unchanged)", {
+            sessionID: input.sessionID,
+            pollCount,
+            stableIdlePolls,
+            msgCount: currentMsgCount,
+          })
+          break
+        }
+      } else {
+        stableIdlePolls = 0
+        lastMsgCount = currentMsgCount
       }
     }
   }
