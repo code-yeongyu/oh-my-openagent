@@ -19,6 +19,8 @@ import {
   truncateToTokenBudget,
 } from "./token-limiter"
 
+const TRUNCATION_MARKER_TOKEN_OVERHEAD = estimateTokenCount("\n[TRUNCATED]")
+
 describe("token-limiter", () => {
   test("estimateTokenCount uses 1 token per 4 chars approximation", () => {
     // given
@@ -40,7 +42,62 @@ describe("token-limiter", () => {
     const result = truncateToTokenBudget(content, maxTokens)
 
     // then
-    expect(estimateTokenCount(result)).toBeLessThanOrEqual(maxTokens)
+    expect(estimateTokenCount(result)).toBeLessThanOrEqual(maxTokens + TRUNCATION_MARKER_TOKEN_OVERHEAD)
+  })
+
+  describe("truncateToTokenBudget", () => {
+    describe("#given content that exceeds budget", () => {
+      describe("#when content has newlines", () => {
+        test("#then should truncate at last newline boundary", () => {
+          // #given
+          const content = "line-1\nline-2\nline-3"
+
+          // #when
+          const result = truncateToTokenBudget(content, 2)
+
+          // #then
+          expect(result).toBe("line-1\n[TRUNCATED]")
+        })
+
+        test("#then should append [TRUNCATED] marker", () => {
+          // #given
+          const content = "line-1\nline-2\nline-3"
+
+          // #when
+          const result = truncateToTokenBudget(content, 2)
+
+          // #then
+          expect(result).toContain("[TRUNCATED]")
+        })
+      })
+
+      describe("#when content is single long line with no newlines", () => {
+        test("#then should slice and append [TRUNCATED] marker", () => {
+          // #given
+          const content = "A".repeat(30)
+
+          // #when
+          const result = truncateToTokenBudget(content, 2)
+
+          // #then
+          expect(result).toBe("AAAAAAAA\n[TRUNCATED]")
+        })
+      })
+    })
+
+    describe("#given content within budget", () => {
+      test("#then should return content unchanged without marker", () => {
+        // #given
+        const content = "line-1\nline-2"
+
+        // #when
+        const result = truncateToTokenBudget(content, 20)
+
+        // #then
+        expect(result).toBe(content)
+        expect(result).not.toContain("[TRUNCATED]")
+      })
+    })
   })
 
   test("buildSystemContentWithTokenLimit returns undefined when there is no content", () => {
@@ -76,10 +133,10 @@ describe("token-limiter", () => {
     const result = buildSystemContentWithTokenLimit(input, 80)
 
     // then
-    expect(result).toContain("AGENTS_CONTEXT:keep")
-    expect(result).toContain("CATEGORY_APPEND:keep")
+    expect(result).toContain("AGENTS_C")
+    expect(result).toContain("CATE")
     expect(result).toContain("SKILL_ALPHA:")
-    expect(estimateTokenCount(result as string)).toBeLessThanOrEqual(80)
+    expect(estimateTokenCount(result as string)).toBeLessThanOrEqual(80 + TRUNCATION_MARKER_TOKEN_OVERHEAD)
   })
 
   test("buildSystemContentWithTokenLimit truncates category after skills are exhausted", () => {
@@ -95,9 +152,9 @@ describe("token-limiter", () => {
     const result = buildSystemContentWithTokenLimit(input, 30)
 
     // then
-    expect(result).toContain("AGENTS_CONTEXT:keep")
+    expect(result).toContain("AGENTS_C")
     expect(result).not.toContain("SKILL_ALPHA:" + "a".repeat(80))
-    expect(estimateTokenCount(result as string)).toBeLessThanOrEqual(30)
+    expect(estimateTokenCount(result as string)).toBeLessThanOrEqual(30 + TRUNCATION_MARKER_TOKEN_OVERHEAD)
   })
 
   test("buildSystemContentWithTokenLimit truncates agents context last", () => {
@@ -116,6 +173,6 @@ describe("token-limiter", () => {
     expect(result).toContain("AGENTS_CONTEXT:")
     expect(result).not.toContain("SKILL_ALPHA:")
     expect(result).not.toContain("CATEGORY_APPEND:")
-    expect(estimateTokenCount(result as string)).toBeLessThanOrEqual(10)
+    expect(estimateTokenCount(result as string)).toBeLessThanOrEqual(10 + TRUNCATION_MARKER_TOKEN_OVERHEAD)
   })
 })

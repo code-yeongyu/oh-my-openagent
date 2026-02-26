@@ -20,7 +20,13 @@ export function truncateToTokenBudget(content: string, maxTokens: number): strin
     return content
   }
 
-  return content.slice(0, maxCharacters)
+  const sliced = content.slice(0, maxCharacters)
+  const lastNewline = sliced.lastIndexOf("\n")
+  if (lastNewline > 0) {
+    return `${sliced.slice(0, lastNewline)}\n[TRUNCATED]`
+  }
+
+  return `${sliced}\n[TRUNCATED]`
 }
 
 function joinSystemParts(parts: string[]): string | undefined {
