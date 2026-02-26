@@ -178,7 +178,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     expect(models).toBeTruthy()
 
     const required = [
-      "antigravity-gemini-3-pro",
+      "antigravity-gemini-3.1-pro",
       "antigravity-gemini-3-flash",
       "antigravity-claude-sonnet-4-6",
       "antigravity-claude-sonnet-4-6-thinking",
@@ -206,7 +206,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
 
     // #when checking Gemini Pro variants
-    const pro = models["antigravity-gemini-3-pro"]
+    const pro = models["antigravity-gemini-3.1-pro"]
     // #then should have low and high variants
     expect(pro.variants).toBeTruthy()
     expect(pro.variants.low).toBeTruthy()
