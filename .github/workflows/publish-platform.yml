@@ -82,6 +82,52 @@ jobs:
           cd packages/${{ matrix.platform }}
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
+      - name: Pre-download baseline compile target
+        if: steps.check.outputs.skip != 'true' && endsWith(matrix.platform, '-baseline')
+        shell: bash
+        run: |
+          BUN_VERSION=$(bun --version)
+          PLATFORM="${{ matrix.platform }}"
+          PKG_NAME="bun-${PLATFORM}"
+          CACHE_DIR=$(bun pm cache)
+          CACHE_DEST="${CACHE_DIR}/${PKG_NAME}-v${BUN_VERSION}"
+          
+          if [[ -f "$CACHE_DEST" ]]; then
+            echo "✓ Compile target already cached at ${CACHE_DEST}"
+            exit 0
+          fi
+          
+          echo "Pre-downloading ${PKG_NAME} v${BUN_VERSION} to ${CACHE_DEST}"
+          TARBALL_URL="https://registry.npmjs.org/@oven/bun-${PLATFORM}/-/bun-${PLATFORM}-${BUN_VERSION}.tgz"
+          echo "URL: ${TARBALL_URL}"
+          
+          mkdir -p "$(dirname "$CACHE_DEST")"
+          TMP_DIR=$(mktemp -d)
+          
+          # Download and extract the bun binary from npm tarball
+          curl -fsSL --retry 5 --retry-delay 5 "${TARBALL_URL}" | tar -xzf - -C "${TMP_DIR}"
+          
+          if [[ "$PLATFORM" == windows-* ]]; then
+            BIN_NAME="bun.exe"
+          else
+            BIN_NAME="bun"
+          fi
+          
+          # npm tarball has package/bin/bun structure
+          if [[ -f "${TMP_DIR}/package/bin/${BIN_NAME}" ]]; then
+            cp "${TMP_DIR}/package/bin/${BIN_NAME}" "${CACHE_DEST}"
+          elif [[ -f "${TMP_DIR}/package/${BIN_NAME}" ]]; then
+            cp "${TMP_DIR}/package/${BIN_NAME}" "${CACHE_DEST}"
+          else
+            echo "Could not find ${BIN_NAME} in tarball, listing contents:"
+            find "${TMP_DIR}" -type f
+            exit 1
+          fi
+          
+          chmod +x "${CACHE_DEST}" 2>/dev/null || true
+          echo "✓ Pre-downloaded to ${CACHE_DEST}"
+          ls -lh "${CACHE_DEST}"
+
       - name: Build binary
         if: steps.check.outputs.skip != 'true'
         uses: nick-fields/retry@v3
