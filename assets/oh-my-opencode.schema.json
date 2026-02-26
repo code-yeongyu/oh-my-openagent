@@ -962,6 +962,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "allow_non_gpt_model": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -3624,10 +3627,33 @@
                     ],
                     "additionalProperties": false
                   }
+                },
+                "retry_on_fail": {
+                  "default": 0,
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 5
+                },
+                "retry_failed_if_others_finished": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "cancel_retrying_on_quorum": {
+                  "default": true,
+                  "type": "boolean"
+                },
+                "stuck_threshold_seconds": {
+                  "default": 120,
+                  "type": "number",
+                  "minimum": 30
                 }
               },
               "required": [
-                "members"
+                "members",
+                "retry_on_fail",
+                "retry_failed_if_others_finished",
+                "cancel_retrying_on_quorum",
+                "stuck_threshold_seconds"
               ],
               "additionalProperties": false
             }
@@ -3727,6 +3753,11 @@
           },
           "prompt_append": {
             "type": "string"
+          },
+          "max_prompt_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
           },
           "is_unstable_agent": {
             "type": "boolean"
