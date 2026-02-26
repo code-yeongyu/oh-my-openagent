@@ -6,6 +6,9 @@ import { normalizeSDKResponse } from "../../shared"
 
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 
+const STALL_NO_RESPONSE_POLLS = 15
+const STALL_TOOL_CALLS_POLLS = 10
+
 export function isSessionComplete(messages: SessionMessage[]): boolean {
   let lastUser: SessionMessage | undefined
   let lastAssistant: SessionMessage | undefined
@@ -21,6 +24,21 @@ export function isSessionComplete(messages: SessionMessage[]): boolean {
   if (NON_TERMINAL_FINISH_REASONS.has(lastAssistant.info.finish)) return false
   if (!lastUser?.info?.id || !lastAssistant?.info?.id) return false
   return lastUser.info.id < lastAssistant.info.id
+}
+
+export function hasToolResultAfterAssistant(messages: SessionMessage[]): boolean {
+  let lastAssistant: SessionMessage | undefined
+  let lastUser: SessionMessage | undefined
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (!lastAssistant && msg.info?.role === "assistant") lastAssistant = msg
+    if (!lastUser && msg.info?.role === "user") lastUser = msg
+    if (lastUser && lastAssistant) break
+  }
+
+  if (!lastAssistant?.info?.id || !lastUser?.info?.id) return false
+  return lastUser.info.id > lastAssistant.info.id
 }
 
 export async function pollSyncSession(
@@ -39,6 +57,7 @@ export async function pollSyncSession(
   const pollStart = Date.now()
   let pollCount = 0
   let timedOut = false
+  let idleStallCount = 0
 
   log("[task] Starting poll loop", { sessionID: input.sessionID, agentToUse: input.agentToUse })
 
@@ -72,6 +91,7 @@ export async function pollSyncSession(
     }
 
     if (sessionStatus && sessionStatus.type !== "idle") {
+      idleStallCount = 0
       continue
     }
 
@@ -111,6 +131,30 @@ export async function pollSyncSession(
         pollCount,
       })
       break
+    }
+
+    idleStallCount++
+
+    if (!lastAssistant && idleStallCount >= STALL_NO_RESPONSE_POLLS) {
+      log("[task] Session stalled - no assistant response after idle", {
+        sessionID: input.sessionID,
+        idleStallCount,
+        pollCount,
+      })
+      return `Session stalled: no assistant response generated after ${idleStallCount} idle polls. The model may have failed to start.\n\nSession ID: ${input.sessionID}`
+    }
+
+    const finishReason = lastAssistant?.info?.finish
+    if (finishReason && NON_TERMINAL_FINISH_REASONS.has(finishReason) && idleStallCount >= STALL_TOOL_CALLS_POLLS) {
+      if (hasToolResultAfterAssistant(msgs)) {
+        log("[task] Session stalled after tool call - tool result present but no new response", {
+          sessionID: input.sessionID,
+          finishReason,
+          idleStallCount,
+          pollCount,
+        })
+        break
+      }
     }
   }
 

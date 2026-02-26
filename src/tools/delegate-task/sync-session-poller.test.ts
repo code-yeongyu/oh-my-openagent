@@ -426,9 +426,175 @@ describe("pollSyncSession", () => {
       //#when
       const result = isSessionComplete(messages)
 
-      //#then - should return false (missing user id)
+       //#then - should return false (missing user id)
       expect(result).toBe(false)
   })
 })
+
+  describe("hasToolResultAfterAssistant", () => {
+    test("returns true when user message id > assistant message id", () => {
+      const { hasToolResultAfterAssistant } = require("./sync-session-poller")
+
+      //#given
+      const messages = [
+        { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+        { info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "tool-calls" } },
+        { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+      ]
+
+      //#when
+      const result = hasToolResultAfterAssistant(messages)
+
+      //#then
+      expect(result).toBe(true)
+    })
+
+    test("returns false when assistant message is last", () => {
+      const { hasToolResultAfterAssistant } = require("./sync-session-poller")
+
+      //#given
+      const messages = [
+        { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+        { info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" } },
+      ]
+
+      //#when
+      const result = hasToolResultAfterAssistant(messages)
+
+      //#then
+      expect(result).toBe(false)
+    })
+
+    test("returns false when no messages", () => {
+      const { hasToolResultAfterAssistant } = require("./sync-session-poller")
+
+      //#when
+      const result = hasToolResultAfterAssistant([])
+
+      //#then
+      expect(result).toBe(false)
+    })
+  })
+
+  describe("stall detection", () => {
+    test("detects stall when no assistant response after idle", async () => {
+      //#given - session idle with only user message, no assistant ever responds
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 10,
+        MIN_STABILITY_TIME_MS: 0,
+        STABILITY_POLLS_REQUIRED: 1,
+        MAX_POLL_TIME_MS: 30000,
+      })
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            ],
+          }),
+          status: async () => ({ data: { "ses_stall": { type: "idle" } } }),
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_stall",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      //#then - should detect stall, not timeout after full MAX_POLL_TIME_MS
+      expect(result).toContain("Session stalled")
+      expect(result).toContain("no assistant response")
+    })
+
+    test("detects stall when tool-calls finish but no follow-up response", async () => {
+      //#given - assistant made tool calls, tool result exists, but no new assistant response
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 10,
+        MIN_STABILITY_TIME_MS: 0,
+        STABILITY_POLLS_REQUIRED: 1,
+        MAX_POLL_TIME_MS: 30000,
+      })
+
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+              {
+                info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "tool-calls" },
+                parts: [{ type: "tool-call", text: "calling tool" }],
+              },
+              { info: { id: "msg_003", role: "user", time: { created: 3000 } } },
+            ],
+          }),
+          status: async () => ({ data: { "ses_toolstall": { type: "idle" } } }),
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_toolstall",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      //#then - should break (not timeout) because tool result exists but no follow-up
+      expect(result).toBeNull()
+    })
+
+    test("resets stall counter when session goes non-idle", async () => {
+      //#given - session alternates between running and idle, then completes
+      const { pollSyncSession } = require("./sync-session-poller")
+
+      __setTimingConfig({
+        POLL_INTERVAL_MS: 10,
+        MIN_STABILITY_TIME_MS: 0,
+        STABILITY_POLLS_REQUIRED: 1,
+        MAX_POLL_TIME_MS: 5000,
+      })
+
+      let callCount = 0
+      const mockClient = {
+        session: {
+          messages: async () => ({
+            data: [
+              { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+              {
+                info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "stop" },
+                parts: [{ type: "text", text: "Done" }],
+              },
+            ],
+          }),
+          status: async () => {
+            callCount++
+            if (callCount <= 5) {
+              return { data: { "ses_reset": { type: "running" } } }
+            }
+            return { data: { "ses_reset": { type: "idle" } } }
+          },
+        },
+      }
+
+      //#when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_reset",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      //#then - should complete normally (stall counter was reset by non-idle status)
+      expect(result).toBeNull()
+    })
+  })
 
 })
