@@ -13,6 +13,7 @@ export interface RalphLoopHook {
     options?: {
       maxIterations?: number
       completionPromise?: string
+      messageCountAtStart?: number
       ultrawork?: boolean
       strategy?: "reset" | "continue"
     }

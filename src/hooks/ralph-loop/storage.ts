@@ -44,6 +44,12 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
       active: isActive,
       iteration: iterationNum,
       max_iterations: Number(data.max_iterations) || DEFAULT_MAX_ITERATIONS,
+      message_count_at_start:
+        typeof data.message_count_at_start === "number"
+          ? data.message_count_at_start
+          : typeof data.message_count_at_start === "string" && data.message_count_at_start.trim() !== ""
+            ? Number(data.message_count_at_start)
+            : undefined,
       completion_promise: stripQuotes(data.completion_promise) || DEFAULT_COMPLETION_PROMISE,
       started_at: stripQuotes(data.started_at) || new Date().toISOString(),
       prompt: body.trim(),
@@ -72,13 +78,17 @@ export function writeState(
     const sessionIdLine = state.session_id ? `session_id: "${state.session_id}"\n` : ""
     const ultraworkLine = state.ultrawork !== undefined ? `ultrawork: ${state.ultrawork}\n` : ""
     const strategyLine = state.strategy ? `strategy: "${state.strategy}"\n` : ""
+    const messageCountAtStartLine =
+      typeof state.message_count_at_start === "number"
+        ? `message_count_at_start: ${state.message_count_at_start}\n`
+        : ""
     const content = `---
 active: ${state.active}
 iteration: ${state.iteration}
 max_iterations: ${state.max_iterations}
 completion_promise: "${state.completion_promise}"
 started_at: "${state.started_at}"
-${sessionIdLine}${ultraworkLine}${strategyLine}---
+${sessionIdLine}${ultraworkLine}${strategyLine}${messageCountAtStartLine}---
 ${state.prompt}
 `
 
