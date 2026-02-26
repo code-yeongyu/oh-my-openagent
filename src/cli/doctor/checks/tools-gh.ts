@@ -1,3 +1,5 @@
+import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
+
 export interface GhCliInfo {
   installed: boolean
   version: string | null
@@ -19,7 +21,7 @@ async function checkBinaryExists(binary: string): Promise<{ exists: boolean; pat
 
 async function getGhVersion(): Promise<string | null> {
   try {
-    const processResult = Bun.spawn(["gh", "--version"], { stdout: "pipe", stderr: "pipe" })
+    const processResult = spawnWithWindowsHide(["gh", "--version"], { stdout: "pipe", stderr: "pipe" })
     const output = await new Response(processResult.stdout).text()
     await processResult.exited
     if (processResult.exitCode !== 0) return null
@@ -38,7 +40,7 @@ async function getGhAuthStatus(): Promise<{
   error: string | null
 }> {
   try {
-    const processResult = Bun.spawn(["gh", "auth", "status"], {
+    const processResult = spawnWithWindowsHide(["gh", "auth", "status"], {
       stdout: "pipe",
       stderr: "pipe",
       env: { ...process.env, GH_NO_UPDATE_NOTIFIER: "1" },

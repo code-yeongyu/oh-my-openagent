@@ -1,6 +1,7 @@
 import type { InteractiveBashSessionState } from "./types";
 import { loadInteractiveBashSessionState } from "./storage";
 import { OMO_SESSION_PREFIX } from "./constants";
+import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide";
 
 export function getOrCreateState(sessionID: string, sessionStates: Map<string, InteractiveBashSessionState>): InteractiveBashSessionState {
   if (!sessionStates.has(sessionID)) {
@@ -24,7 +25,7 @@ export async function killAllTrackedSessions(
 ): Promise<void> {
   for (const sessionName of state.tmuxSessions) {
     try {
-      const proc = Bun.spawn(["tmux", "kill-session", "-t", sessionName], {
+      const proc = spawnWithWindowsHide(["tmux", "kill-session", "-t", sessionName], {
         stdout: "ignore",
         stderr: "ignore",
       });
