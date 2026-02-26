@@ -33,6 +33,14 @@ function formatResolvedTitle(task: BackgroundTask): string {
   return `${label} - ${task.description}`
 }
 
+function isTaskActiveStatus(status: BackgroundTask["status"]): boolean {
+  return status === "pending" || status === "running"
+}
+
+function appendTimeoutNote(output: string, timeoutMs: number): string {
+  return `${output}\n\n> **Timed out waiting** after ${timeoutMs}ms. Task is still running; showing latest available output.`
+}
+
 export function createBackgroundOutput(manager: BackgroundOutputManager, client: BackgroundOutputClient): ToolDefinition {
   return tool({
     description: BACKGROUND_OUTPUT_DESCRIPTION,
@@ -83,7 +91,9 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
 
         let resolvedTask = task
 
-        if (shouldBlock && (task.status === "pending" || task.status === "running")) {
+        let didTimeoutWhileActive = false
+
+        if (shouldBlock && isTaskActiveStatus(task.status)) {
           const startTime = Date.now()
           while (Date.now() - startTime < timeoutMs) {
             await delay(1000)
@@ -93,30 +103,39 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
               return `Task was deleted: ${args.task_id}`
             }
 
-            if (currentTask.status !== "pending" && currentTask.status !== "running") {
-              resolvedTask = currentTask
+            resolvedTask = currentTask
+
+            if (!isTaskActiveStatus(currentTask.status)) {
               break
             }
           }
 
-          const finalCheck = manager.getTask(args.task_id)
-          if (finalCheck) {
-            resolvedTask = finalCheck
+          if (isTaskActiveStatus(resolvedTask.status)) {
+            const finalCheck = manager.getTask(args.task_id)
+            if (finalCheck) {
+              resolvedTask = finalCheck
+            }
+          }
+
+          if (isTaskActiveStatus(resolvedTask.status)) {
+            didTimeoutWhileActive = true
           }
         }
 
-        const isActive = resolvedTask.status === "pending" || resolvedTask.status === "running"
+        const isActive = isTaskActiveStatus(resolvedTask.status)
         const includeThinking = isActive || (args.include_thinking ?? false)
         const includeToolResults = isActive || (args.include_tool_results ?? false)
 
         if (fullSession) {
-          return await formatFullSession(resolvedTask, client, {
+          const output = await formatFullSession(resolvedTask, client, {
             includeThinking,
             messageLimit: args.message_limit,
             sinceMessageId: args.since_message_id,
             includeToolResults,
             thinkingMaxChars: args.thinking_max_chars,
           })
+
+          return didTimeoutWhileActive ? appendTimeoutNote(output, timeoutMs) : output
         }
 
         if (resolvedTask.status === "completed") {
@@ -127,7 +146,8 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           return formatTaskStatus(resolvedTask)
         }
 
-        return formatTaskStatus(resolvedTask)
+        const statusOutput = formatTaskStatus(resolvedTask)
+        return didTimeoutWhileActive ? appendTimeoutNote(statusOutput, timeoutMs) : statusOutput
       } catch (error) {
         return `Error getting output: ${error instanceof Error ? error.message : String(error)}`
       }
