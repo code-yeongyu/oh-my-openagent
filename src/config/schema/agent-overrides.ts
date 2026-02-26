@@ -81,8 +81,27 @@ const RESERVED_CUSTOM_AGENT_NAMES = OverridableAgentNameSchema.options
 const RESERVED_CUSTOM_AGENT_NAME_SET = new Set(
   RESERVED_CUSTOM_AGENT_NAMES.map((name) => name.toLowerCase()),
 )
+function escapeRegexLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function toCaseInsensitiveLiteralPattern(value: string): string {
+  return value
+    .split("")
+    .map((char) => {
+      if (/^[A-Za-z]$/.test(char)) {
+        const lower = char.toLowerCase()
+        const upper = char.toUpperCase()
+        return `[${lower}${upper}]`
+      }
+
+      return escapeRegexLiteral(char)
+    })
+    .join("")
+}
+
 const RESERVED_CUSTOM_AGENT_NAME_PATTERN = new RegExp(
-  `^(?!(?:${RESERVED_CUSTOM_AGENT_NAMES.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})$).+`,
+  `^(?!(?:${RESERVED_CUSTOM_AGENT_NAMES.map(toCaseInsensitiveLiteralPattern).join("|")})$).+`,
 )
 
 export const CustomAgentOverridesSchema = z

@@ -3152,7 +3152,7 @@
       "type": "object",
       "propertyNames": {
         "type": "string",
-        "pattern": "^(?!(?:build|plan|sisyphus|hephaestus|sisyphus-junior|OpenCode-Builder|prometheus|metis|momus|oracle|librarian|explore|multimodal-looker|atlas)$).+"
+        "pattern": "^(?!(?:[bB][uU][iI][lL][dD]|[pP][lL][aA][nN]|[sS][iI][sS][yY][pP][hH][uU][sS]|[hH][eE][pP][hH][aA][eE][sS][tT][uU][sS]|[sS][iI][sS][yY][pP][hH][uU][sS]-[jJ][uU][nN][iI][oO][rR]|[oO][pP][eE][nN][cC][oO][dD][eE]-[bB][uU][iI][lL][dD][eE][rR]|[pP][rR][oO][mM][eE][tT][hH][eE][uU][sS]|[mM][eE][tT][iI][sS]|[mM][oO][mM][uU][sS]|[oO][rR][aA][cC][lL][eE]|[lL][iI][bB][rR][aA][rR][iI][aA][nN]|[eE][xX][pP][lL][oO][rR][eE]|[mM][uU][lL][tT][iI][mM][oO][dD][aA][lL]-[lL][oO][oO][kK][eE][rR]|[aA][tT][lL][aA][sS])$).+"
       },
       "additionalProperties": {
         "type": "object",

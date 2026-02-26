@@ -82,6 +82,15 @@ export async function applyAgentConfig(params: {
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const currentModel = params.config.model as string | undefined;
+  const disabledAgentNames = new Set(
+    (migratedDisabledAgents ?? []).map((agent) => agent.toLowerCase()),
+  );
+  const filterDisabledAgents = (agents: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.entries(agents).filter(
+        ([name]) => !disabledAgentNames.has(name.toLowerCase()),
+      ),
+    );
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
@@ -99,19 +108,25 @@ export async function applyAgentConfig(params: {
   );
 
   const configAgent = params.config.agent as AgentConfigRecord | undefined;
+  const filteredUserAgents = filterDisabledAgents(userAgents as Record<string, unknown>);
+  const filteredProjectAgents = filterDisabledAgents(projectAgents as Record<string, unknown>);
+  const filteredPluginAgents = filterDisabledAgents(pluginAgents as Record<string, unknown>);
+  const filteredConfigAgentsForSummary = filterDisabledAgents(
+    (configAgent as Record<string, unknown> | undefined) ?? {},
+  );
   const mergedCategories = mergeCategories(params.pluginConfig.categories)
   const knownCustomAgentNames = collectKnownCustomAgentNames(
-    userAgents as Record<string, unknown>,
-    projectAgents as Record<string, unknown>,
-    pluginAgents as Record<string, unknown>,
-    configAgent as Record<string, unknown> | undefined,
+    filteredUserAgents,
+    filteredProjectAgents,
+    filteredPluginAgents,
+    filteredConfigAgentsForSummary,
   )
 
   const customAgentSummaries = mergeCustomAgentSummaries(
-    collectCustomAgentSummariesFromRecord(userAgents as Record<string, unknown>),
-    collectCustomAgentSummariesFromRecord(projectAgents as Record<string, unknown>),
-    collectCustomAgentSummariesFromRecord(pluginAgents as Record<string, unknown>),
-    collectCustomAgentSummariesFromRecord(configAgent as Record<string, unknown> | undefined),
+    collectCustomAgentSummariesFromRecord(filteredUserAgents),
+    collectCustomAgentSummariesFromRecord(filteredProjectAgents),
+    collectCustomAgentSummariesFromRecord(filteredPluginAgents),
+    collectCustomAgentSummariesFromRecord(filteredConfigAgentsForSummary),
     filterSummariesByKnownNames(
       collectCustomAgentSummariesFromRecord(
         params.pluginConfig.custom_agents as Record<string, unknown> | undefined,
@@ -135,14 +150,6 @@ export async function applyAgentConfig(params: {
     useTaskSystem,
     disableOmoEnv,
   );
-  const disabledAgentNames = new Set(
-    (migratedDisabledAgents ?? []).map(a => a.toLowerCase())
-  );
-
-  const filterDisabledAgents = (agents: Record<string, unknown>) =>
-    Object.fromEntries(
-      Object.entries(agents).filter(([name]) => !disabledAgentNames.has(name.toLowerCase()))
-    );
   const isSisyphusEnabled = params.pluginConfig.sisyphus_agent?.disabled !== true;
   const builderEnabled =
     params.pluginConfig.sisyphus_agent?.default_builder_enabled ?? false;
@@ -230,9 +237,9 @@ export async function applyAgentConfig(params: {
       ...Object.fromEntries(
         Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus"),
       ),
-      ...filterDisabledAgents(userAgents),
-      ...filterDisabledAgents(projectAgents),
-      ...filterDisabledAgents(pluginAgents),
+      ...filteredUserAgents,
+      ...filteredProjectAgents,
+      ...filteredPluginAgents,
       ...filteredConfigAgents,
       build: { ...migratedBuild, mode: "subagent", hidden: true },
       ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
@@ -240,9 +247,9 @@ export async function applyAgentConfig(params: {
   } else {
     params.config.agent = {
       ...builtinAgents,
-      ...filterDisabledAgents(userAgents),
-      ...filterDisabledAgents(projectAgents),
-      ...filterDisabledAgents(pluginAgents),
+      ...filteredUserAgents,
+      ...filteredProjectAgents,
+      ...filteredPluginAgents,
       ...configAgent,
     };
   }

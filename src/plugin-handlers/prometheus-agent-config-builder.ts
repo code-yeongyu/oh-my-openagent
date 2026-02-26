@@ -103,5 +103,12 @@ export async function buildPrometheusAgentConfig(params: {
   if (prompt_append && typeof merged.prompt === "string") {
     merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append);
   }
+  if (
+    customAgentBlock
+    && typeof merged.prompt === "string"
+    && !merged.prompt.includes("<custom_agent_catalog>")
+  ) {
+    merged.prompt = merged.prompt + customAgentBlock;
+  }
   return merged;
 }
