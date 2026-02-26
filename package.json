@@ -77,11 +77,15 @@
   "optionalDependencies": {
     "oh-my-opencode-darwin-arm64": "3.8.5",
     "oh-my-opencode-darwin-x64": "3.8.5",
+    "oh-my-opencode-darwin-x64-baseline": "3.8.5",
     "oh-my-opencode-linux-arm64": "3.8.5",
     "oh-my-opencode-linux-arm64-musl": "3.8.5",
     "oh-my-opencode-linux-x64": "3.8.5",
+    "oh-my-opencode-linux-x64-baseline": "3.8.5",
     "oh-my-opencode-linux-x64-musl": "3.8.5",
-    "oh-my-opencode-windows-x64": "3.8.5"
+    "oh-my-opencode-linux-x64-musl-baseline": "3.8.5",
+    "oh-my-opencode-windows-x64": "3.8.5",
+    "oh-my-opencode-windows-x64-baseline": "3.8.5"
   },
   "trustedDependencies": [
     "@ast-grep/cli",
