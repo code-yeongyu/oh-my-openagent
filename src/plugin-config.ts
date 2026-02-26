@@ -81,12 +81,21 @@ export function detectLikelyBuiltinAgentTypos(
 
 export function detectUnknownBuiltinAgentKeys(
   rawConfig: Record<string, unknown>,
+  excludeKeys: string[] = [],
 ): string[] {
   const agents = rawConfig.agents;
   if (!agents || typeof agents !== "object") return [];
 
+  const excluded = new Set(excludeKeys.map((key) => key.toLowerCase()));
+
   return Object.keys(agents).filter(
-    (key) => !BUILTIN_AGENT_OVERRIDE_KEYS_BY_LOWER.has(key.toLowerCase()),
+    (key) => {
+      const lower = key.toLowerCase();
+      return (
+        !BUILTIN_AGENT_OVERRIDE_KEYS_BY_LOWER.has(lower)
+        && !excluded.has(lower)
+      );
+    },
   );
 }
 
@@ -194,7 +203,10 @@ export function loadConfigFromPath(
         });
       }
 
-      const unknownAgentKeys = detectUnknownBuiltinAgentKeys(rawConfig);
+      const unknownAgentKeys = detectUnknownBuiltinAgentKeys(
+        rawConfig,
+        typoWarnings.map((warning) => warning.key),
+      );
       if (unknownAgentKeys.length > 0) {
         const unknownKeysMsg = unknownAgentKeys.map((key) => `agents.${key}`).join(", ");
         const migrationHint = "Move custom entries from agents.* to custom_agents.*";

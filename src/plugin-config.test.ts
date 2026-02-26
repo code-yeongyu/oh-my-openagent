@@ -370,4 +370,30 @@ describe("detectUnknownBuiltinAgentKeys", () => {
 
     expect(unknownKeys).toEqual([])
   })
+
+  it("excludes typo keys when explicitly provided", () => {
+    const rawConfig = {
+      agents: {
+        sisyphuss: { model: "openai/gpt-5.2" },
+        translator: { model: "google/gemini-3-flash-preview" },
+      },
+    }
+
+    const unknownKeys = detectUnknownBuiltinAgentKeys(rawConfig, ["sisyphuss"])
+
+    expect(unknownKeys).toEqual(["translator"])
+  })
+
+  it("excludes typo keys case-insensitively", () => {
+    const rawConfig = {
+      agents: {
+        Sisyphuss: { model: "openai/gpt-5.2" },
+        translator: { model: "google/gemini-3-flash-preview" },
+      },
+    }
+
+    const unknownKeys = detectUnknownBuiltinAgentKeys(rawConfig, ["sisyphuss"])
+
+    expect(unknownKeys).toEqual(["translator"])
+  })
 })
