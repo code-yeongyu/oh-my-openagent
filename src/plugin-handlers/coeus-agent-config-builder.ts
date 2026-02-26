@@ -71,7 +71,7 @@ export async function buildCoeusAgentConfig(params: {
     mode: "all",
     prompt: COEUS_SYSTEM_PROMPT,
     description: `${(params.configAgentCoeus?.description as string) ?? "Recursive planner"} (Coeus - OhMyOpenCode)`,
-    color: (params.configAgentCoeus?.color as string) ?? "#9C27B0",
+    color: (params.configAgentCoeus?.color as string) ?? "#A98181",
     ...(temperatureToUse !== undefined ? { temperature: temperatureToUse } : {}),
     ...(topPToUse !== undefined ? { top_p: topPToUse } : {}),
     ...(maxTokensToUse !== undefined ? { maxTokens: maxTokensToUse } : {}),
