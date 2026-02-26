@@ -9,6 +9,7 @@ export function remapAgentKeysToDisplayNames(
     const displayName = AGENT_DISPLAY_NAMES[key]
     if (displayName && displayName !== key) {
       result[displayName] = value
+      result[key] = value
     } else {
       result[key] = value
     }
