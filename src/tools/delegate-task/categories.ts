@@ -56,11 +56,12 @@ export function resolveCategoryConfig(
     inheritedModel: defaultConfig?.model, // Category's built-in model takes precedence over system default
     systemDefault: systemDefaultModel,
   })
+  const hasUserModelOverride = userConfig?.model !== undefined
   const config: CategoryConfig = {
     ...defaultConfig,
     ...userConfig,
     model,
-    variant: userConfig?.variant ?? defaultConfig?.variant,
+    variant: userConfig?.variant ?? (hasUserModelOverride ? undefined : defaultConfig?.variant),
   }
 
   let promptAppend = defaultPromptAppend

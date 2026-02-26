@@ -914,6 +914,46 @@ describe("morpheus-task", () => {
     })
   })
 
+  describe("variant inheritance with user model override", () => {
+    test("does not inherit default variant when user overrides model", () => {
+      //#given - source default has variant "xhigh", user overrides model only
+      const categoryName = "source"
+      const userCategories = { source: { model: "google-vertex-anthropic/claude-opus-4-6@default" } }
+
+      //#when
+      const result = resolveCategoryConfig(categoryName, { userCategories, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
+
+      //#then - variant should NOT be inherited from the default "source" config
+      expect(result).not.toBeNull()
+      expect(result!.config.variant).toBeUndefined()
+    })
+
+    test("uses user explicit variant even when user also overrides model", () => {
+      //#given - user overrides both model and variant
+      const categoryName = "source"
+      const userCategories = { source: { model: "google-vertex-anthropic/claude-opus-4-6@default", variant: "high" } }
+
+      //#when
+      const result = resolveCategoryConfig(categoryName, { userCategories, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
+
+      //#then
+      expect(result).not.toBeNull()
+      expect(result!.config.variant).toBe("high")
+    })
+
+    test("inherits default variant when user does not override model", () => {
+      //#given - construct default has variant "high", user does not override
+      const categoryName = "construct"
+
+      //#when
+      const result = resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL })
+
+      //#then - variant should be inherited from default
+      expect(result).not.toBeNull()
+      expect(result!.config.variant).toBe("high")
+    })
+  })
+
   describe("category variant", () => {
     test("passes variant to background model payload", async () => {
       // given
