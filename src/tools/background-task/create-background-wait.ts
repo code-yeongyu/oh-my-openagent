@@ -1,9 +1,9 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundOutputManager, BackgroundOutputClient } from "./clients"
 import { BACKGROUND_WAIT_DESCRIPTION } from "./constants"
+import { formatCouncilTaskResult, isCouncilTask } from "./council-result-format"
 import { delay } from "./delay"
 import { formatTaskResult } from "./task-result-format"
-import { formatTaskStatus } from "./task-status-format"
 
 const DEFAULT_TIMEOUT_MS = 120_000
 const MAX_TIMEOUT_MS = 600_000
@@ -26,7 +26,15 @@ export function createBackgroundWait(manager: BackgroundOutputManager, client: B
 
       const taskIds = args.task_ids
       if (!taskIds || taskIds.length === 0) {
-        return "Error: task_ids array is required and must not be empty."
+        return JSON.stringify({
+          error: "task_ids array is required and must not be empty.",
+          progress: { done: 0, total: 0, bar: "" },
+          members: [],
+          remaining_task_ids: [],
+          completed_task: null,
+          timeout: false,
+          aborted: false,
+        }, null, 2)
       }
 
       const timeoutMs = Math.min(args.timeout ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS)
@@ -39,7 +47,7 @@ export function createBackgroundWait(manager: BackgroundOutputManager, client: B
       const startTime = Date.now()
       while (Date.now() - startTime < timeoutMs) {
         if (abort?.aborted) {
-          return buildProgressSummary(manager, taskIds, true)
+          return buildProgressSummary(manager, taskIds, { aborted: true })
         }
 
         await delay(1000)
@@ -50,7 +58,7 @@ export function createBackgroundWait(manager: BackgroundOutputManager, client: B
         }
       }
 
-      return buildProgressSummary(manager, taskIds, true)
+      return buildProgressSummary(manager, taskIds, { timeout: true })
     },
   })
 }
@@ -66,6 +74,49 @@ function findFirstTerminal(manager: BackgroundOutputManager, taskIds: string[]):
   return undefined
 }
 
+function buildMemberEntry(manager: BackgroundOutputManager, id: string): Record<string, unknown> {
+  const task = manager.getTask(id)
+  if (!task) {
+    return { task_id: id, description: id, status: "not_found" }
+  }
+
+  const entry: Record<string, unknown> = {
+    task_id: id,
+    description: task.description || id,
+    status: task.status,
+  }
+
+  if (task.sessionState) entry.session_state = task.sessionState
+  if (task.progress?.lastUpdate) {
+    entry.last_activity_s = Math.floor((Date.now() - task.progress.lastUpdate.getTime()) / 1000)
+  }
+  if (task.progress?.toolCalls !== undefined) entry.tool_calls = task.progress.toolCalls
+  if (task.error) entry.error = task.error
+  if (task.startedAt) entry.duration_s = Math.floor((Date.now() - task.startedAt.getTime()) / 1000)
+  if (task.sessionID) entry.session_id = task.sessionID
+
+  return entry
+}
+
+function buildProgressSummary(
+  manager: BackgroundOutputManager,
+  taskIds: string[],
+  flags: { timeout?: boolean; aborted?: boolean },
+): string {
+  const doneIds = taskIds.filter((id) => isTerminal(manager.getTask(id)?.status ?? ""))
+  const members = taskIds.map((id) => buildMemberEntry(manager, id))
+  const remaining = taskIds.filter((id) => !isTerminal(manager.getTask(id)?.status ?? ""))
+
+  return JSON.stringify({
+    progress: { done: doneIds.length, total: taskIds.length, bar: progressBar(doneIds.length, taskIds.length) },
+    members,
+    remaining_task_ids: remaining,
+    completed_task: null,
+    timeout: flags.timeout ?? false,
+    aborted: flags.aborted ?? false,
+  }, null, 2)
+}
+
 async function buildCompletionResult(
   completed: { id: string; status: string },
   manager: BackgroundOutputManager,
@@ -73,56 +124,54 @@ async function buildCompletionResult(
   allIds: string[],
 ): Promise<string> {
   const task = manager.getTask(completed.id)
-  if (!task) return `Task was deleted: ${completed.id}`
+  if (!task) {
+    return JSON.stringify({
+      progress: { done: 0, total: allIds.length, bar: progressBar(0, allIds.length) },
+      members: allIds.map((id) => buildMemberEntry(manager, id)),
+      remaining_task_ids: allIds,
+      completed_task: { task_id: completed.id, description: completed.id, status: "not_found", error: "Task was deleted" },
+      timeout: false,
+      aborted: false,
+    }, null, 2)
+  }
 
-  const taskResult = task.status === "completed"
-    ? await formatTaskResult(task, client)
-    : formatTaskStatus(task)
-
-  const summary = buildProgressSummary(manager, allIds, false)
+  const doneIds = allIds.filter((id) => isTerminal(manager.getTask(id)?.status ?? ""))
+  const members = allIds.map((id) => buildMemberEntry(manager, id))
   const remaining = allIds.filter((id) => !isTerminal(manager.getTask(id)?.status ?? ""))
 
-  const lines = [summary, "", "---", "", taskResult]
+  const completedTask: Record<string, unknown> = {
+    task_id: task.id,
+    description: task.description || task.id,
+    status: task.status,
+  }
 
-  if (remaining.length > 0) {
-    const idList = remaining.map((id) => `"${id}"`).join(", ")
-    lines.push("", `**${remaining.length} task${remaining.length === 1 ? "" : "s"} still running.** Call background_wait again with task_ids: [${idList}]`)
+  if (task.startedAt) {
+    const endTime = task.completedAt ?? new Date()
+    completedTask.duration_s = Math.floor((endTime.getTime() - task.startedAt.getTime()) / 1000)
+  }
+  if (task.sessionID) completedTask.session_id = task.sessionID
+
+  if (task.status === "completed") {
+    if (isCouncilTask(task)) {
+      const councilResult = await formatCouncilTaskResult(task, client)
+      completedTask.has_response = councilResult.has_response
+      completedTask.response_complete = councilResult.response_complete
+      completedTask.result = councilResult.result
+    } else {
+      completedTask.result = await formatTaskResult(task, client)
+    }
   } else {
-    lines.push("", "**All tasks complete.** Proceed with synthesis.")
+    if (task.error) completedTask.error = task.error
   }
 
-  return lines.join("\n")
-}
-
-function buildProgressSummary(manager: BackgroundOutputManager, taskIds: string[], isTimeout: boolean): string {
-  const done = taskIds.filter((id) => isTerminal(manager.getTask(id)?.status ?? ""))
-  const total = taskIds.length
-
-  const header = isTimeout
-    ? `## Still Waiting: [${progressBar(done.length, total)}] ${done.length}/${total}`
-    : `## Council Progress: [${progressBar(done.length, total)}] ${done.length}/${total}`
-
-  const lines = [header, ""]
-
-  for (const id of taskIds) {
-    const t = manager.getTask(id)
-    if (!t) {
-      lines.push(`- \`${id}\` — not found`)
-      continue
-    }
-    const marker = isTerminal(t.status) ? "received" : "waiting..."
-    lines.push(`- ${t.description || t.id} — ${marker}`)
-  }
-
-  if (isTimeout) {
-    const remaining = taskIds.filter((id) => !isTerminal(manager.getTask(id)?.status ?? ""))
-    if (remaining.length > 0) {
-      const idList = remaining.map((id) => `"${id}"`).join(", ")
-      lines.push("", `**Timeout — tasks still running.** Call background_wait again with task_ids: [${idList}]`)
-    }
-  }
-
-  return lines.join("\n")
+  return JSON.stringify({
+    progress: { done: doneIds.length, total: allIds.length, bar: progressBar(doneIds.length, allIds.length) },
+    members,
+    remaining_task_ids: remaining,
+    completed_task: completedTask,
+    timeout: false,
+    aborted: false,
+  }, null, 2)
 }
 
 function progressBar(done: number, total: number): string {
