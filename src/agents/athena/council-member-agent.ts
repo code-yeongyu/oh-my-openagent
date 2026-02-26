@@ -1,7 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
 import { createAgentToolAllowlist } from "../../shared"
-import { applyModelThinkingConfig } from "./model-thinking-config"
 
 const MODE: AgentMode = "subagent"
 
@@ -57,12 +56,7 @@ You MUST wrap your final analysis in <COUNCIL_MEMBER_RESPONSE> tags. This is how
 </COUNCIL_MEMBER_RESPONSE>
 \`\`\`
 
-If you do not wrap your response in these tags, your analysis will not be included in the synthesis.
-
-## CRITICAL: Do NOT use TodoWrite
-- Do NOT create todos or task lists
-- Do NOT use the TodoWrite tool under any circumstances
-- Simply report your findings directly in your response`
+If you do not wrap your response in these tags, your analysis will not be included in the synthesis.`
 
 export const COUNCIL_SOLO_ADDENDUM = `
 ## Solo Analysis Mode
@@ -129,6 +123,6 @@ export function createCouncilMemberAgent(model: string): AgentConfig {
     ...restrictions,
   }
 
-  return applyModelThinkingConfig(base, model)
+  return base
 }
 createCouncilMemberAgent.mode = MODE

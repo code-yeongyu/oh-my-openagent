@@ -1,7 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
 import { createAgentToolRestrictions } from "../../shared/permission-compat"
-import { applyModelThinkingConfig } from "./model-thinking-config"
 
 const MODE: AgentMode = "primary"
 
@@ -326,6 +325,6 @@ export function createAthenaAgent(model: string): AgentConfig {
     color: "#1F8EFA",
   }
 
-  return applyModelThinkingConfig(base, model)
+  return base
 }
 createAthenaAgent.mode = MODE

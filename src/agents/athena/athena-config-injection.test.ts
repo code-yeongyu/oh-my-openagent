@@ -21,6 +21,14 @@ describe("Athena prompt config injection placeholders", () => {
       it("#then contains timeout reference with 30000", () => {
         expect(athenaConfig.prompt).toContain("30000")
       })
+
+      it("#then contains RETRY_FAILED_IF_OTHERS_FINISHED placeholder", () => {
+        expect(athenaConfig.prompt).toContain("{RETRY_FAILED_IF_OTHERS_FINISHED}")
+      })
+
+      it("#then contains CANCEL_RETRYING_ON_QUORUM placeholder", () => {
+        expect(athenaConfig.prompt).toContain("{CANCEL_RETRYING_ON_QUORUM}")
+      })
     })
   })
 })

@@ -61,36 +61,45 @@ Returns the file path to reference in subsequent task() calls.`
         return "Prompt cannot be empty."
       }
 
+      if (args.mode !== undefined && args.mode !== "solo" && args.mode !== "delegation") {
+        return `Invalid mode: "${args.mode}". Valid modes: "solo", "delegation".`
+      }
+
       const mode = args.mode === "delegation" ? "delegation" : "solo"
-      const tmpDir = join(directory, COUNCIL_TMP_DIR)
-      await mkdir(tmpDir, { recursive: true })
 
-      const filename = `athena-council-${randomUUID().slice(0, 8)}.md`
-      const filePath = join(tmpDir, filename)
+      try {
+        const tmpDir = join(directory, COUNCIL_TMP_DIR)
+        await mkdir(tmpDir, { recursive: true })
 
-      const modeAddendum = mode === "delegation" ? COUNCIL_DELEGATION_ADDENDUM : COUNCIL_SOLO_ADDENDUM
-      const content = `${modeAddendum}
+        const filename = `athena-council-${randomUUID().slice(0, 8)}.md`
+        const filePath = join(tmpDir, filename)
+
+        const modeAddendum = mode === "delegation" ? COUNCIL_DELEGATION_ADDENDUM : COUNCIL_SOLO_ADDENDUM
+        const content = `${modeAddendum}
 
 ## Analysis Question
 
 ${args.prompt}`
 
-      await writeFile(filePath, content, "utf-8")
+        await writeFile(filePath, content, "utf-8")
 
-      setTimeout(() => {
-        unlink(filePath).catch((err) => {
-          log("[prepare-council-prompt] Failed to clean up temp file", { filePath, error: String(err) })
-        })
-      }, CLEANUP_DELAY_MS)
+        setTimeout(() => {
+          unlink(filePath).catch((err) => {
+            log("[prepare-council-prompt] Failed to clean up temp file", { filePath, error: String(err) })
+          })
+        }, CLEANUP_DELAY_MS)
 
-      log("[prepare-council-prompt] Saved prompt", { filePath, length: args.prompt.length, mode })
+        log("[prepare-council-prompt] Saved prompt", { filePath, length: args.prompt.length, mode })
 
-      return `Council prompt saved to: ${filePath} (mode: ${mode})
+        return `Council prompt saved to: ${filePath} (mode: ${mode})
 
 Use this path in each council member's task() call:
 - prompt: "Read ${filePath} for your instructions."
 
 The file auto-deletes after 30 minutes.`
+      } catch (err) {
+        return `Error saving council prompt: ${String(err)}`
+      }
     },
   })
 }
