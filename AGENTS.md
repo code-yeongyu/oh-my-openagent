@@ -122,7 +122,7 @@ bunx oh-my-opencode run     # Non-interactive session
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
 | ci.yml | push/PR | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
-| publish.yml | manual | Version bump, npm publish, platform binaries, GitHub release, merge to master |
+| publish.yml | manual | Version bump, npm publish, platform binaries, GitHub release, merge to dev |
 | publish-platform.yml | called | 11 platform binaries via bun compile (darwin/linux/windows) |
 | sisyphus-agent.yml | @mention | AI agent handles issues/PRs |
 
