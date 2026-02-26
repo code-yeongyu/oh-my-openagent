@@ -5,20 +5,11 @@
  * See: https://github.com/code-yeongyu/oh-my-opencode/issues/379
  */
 export function createEnvContext(): string {
-  const now = new Date()
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
   const locale = Intl.DateTimeFormat().resolvedOptions().locale
 
-  const dateStr = now.toLocaleDateString(locale, {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  })
-
   return `
 <omo-env>
-  Current date: ${dateStr}
   Timezone: ${timezone}
   Locale: ${locale}
 </omo-env>`
