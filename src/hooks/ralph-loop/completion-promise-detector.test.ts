@@ -9,13 +9,19 @@ type SessionMessage = {
 }
 
 function createPluginInput(messages: SessionMessage[]): PluginInput {
-  return {
-    client: {
-      session: {
-        messages: async () => ({ data: messages }),
-      },
-    },
+  const pluginInput = {
+    client: { session: {} } as PluginInput["client"],
+    project: {} as PluginInput["project"],
+    directory: "/tmp",
+    worktree: "/tmp",
+    serverUrl: new URL("http://localhost"),
+    $: {} as PluginInput["$"],
   } as PluginInput
+
+  pluginInput.client.session.messages =
+    (async () => ({ data: messages })) as unknown as PluginInput["client"]["session"]["messages"]
+
+  return pluginInput
 }
 
 describe("detectCompletionInSessionMessages", () => {
