@@ -2,8 +2,14 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import { readContinuationMarker } from "../../features/run-continuation-state"
 import { createStopContinuationGuardHook } from "./index"
+
+type CancelCall = {
+  taskId: string
+  options?: Parameters<BackgroundManager["cancelTask"]>[1]
+}
 
 describe("stop-continuation-guard", () => {
   const tempDirs: string[] = []
@@ -32,6 +38,33 @@ describe("stop-continuation-guard", () => {
       },
       directory: createTempDir(),
     } as any
+  }
+
+  function createBackgroundTask(status: BackgroundTask["status"], id: string): BackgroundTask {
+    return {
+      id,
+      status,
+      description: `${id} description`,
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+      prompt: "prompt",
+      agent: "sisyphus-junior",
+    }
+  }
+
+  function createMockBackgroundManager(tasks: BackgroundTask[], cancelCalls: CancelCall[]): Pick<BackgroundManager, "getAllDescendantTasks" | "cancelTask"> {
+    return {
+      getAllDescendantTasks: () => tasks,
+      cancelTask: async (taskId: string, options?: Parameters<BackgroundManager["cancelTask"]>[1]) => {
+        cancelCalls.push({ taskId, options })
+        return true
+      },
+    }
+  }
+
+  async function flushMicrotasks(): Promise<void> {
+    await Promise.resolve()
+    await Promise.resolve()
   }
 
   test("should mark session as stopped", () => {
@@ -165,5 +198,32 @@ describe("stop-continuation-guard", () => {
 
     // then - should not throw and stopped session remains stopped
     expect(guard.isStopped("some-session")).toBe(true)
+  })
+
+  test("should cancel only running and pending background tasks on stop", async () => {
+    // given - a background manager with mixed task statuses
+    const cancelCalls: CancelCall[] = []
+    const backgroundManager = createMockBackgroundManager(
+      [
+        createBackgroundTask("running", "task-running"),
+        createBackgroundTask("pending", "task-pending"),
+        createBackgroundTask("completed", "task-completed"),
+      ],
+      cancelCalls,
+    )
+    const guard = createStopContinuationGuardHook(createMockPluginInput(), {
+      backgroundManager,
+    })
+
+    // when - stop continuation is triggered
+    guard.stop("test-session-bg")
+    await flushMicrotasks()
+
+    // then - only running and pending tasks are cancelled
+    expect(cancelCalls).toHaveLength(2)
+    expect(cancelCalls[0]?.taskId).toBe("task-running")
+    expect(cancelCalls[0]?.options?.abortSession).toBe(true)
+    expect(cancelCalls[1]?.taskId).toBe("task-pending")
+    expect(cancelCalls[1]?.options?.abortSession).toBe(false)
   })
 })
