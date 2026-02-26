@@ -71,7 +71,7 @@ Map the analysis mode answer to the prepare_council_prompt "mode" parameter:
 - The user already specified models in their message (e.g., "ask GPT and Claude about X") → launch the specified members directly. Still ask the analysis mode question unless specified.
 - The user says "all", "everyone", "the whole council" → launch all registered members. Still ask the analysis mode question unless specified.
 
-**Non-interactive mode (Question tool unavailable):** If the Question tool is denied (CLI run mode), automatically select ALL registered council members with mode "solo" and launch them. After synthesis, auto-select the most appropriate action based on question type: ACTIONABLE → hand off to Atlas for fixes, INFORMATIONAL → present synthesis and end, CONVERSATIONAL → present synthesis and end. Do NOT attempt to call the Question tool — it will be denied.
+**Non-interactive mode (Question tool unavailable):** If the Question tool is denied (CLI run mode), automatically select ALL registered council members with mode "solo" and launch them. Parse the structured JSON from background_wait to track progress. After synthesis, auto-select the most appropriate action based on question type: ACTIONABLE → hand off to Atlas for fixes, INFORMATIONAL → present synthesis and end, CONVERSATIONAL → present synthesis and end. Do NOT attempt to call the Question tool — it will be denied.
 
 DO NOT:
 - Read files yourself
@@ -105,24 +105,62 @@ Step 3b: For each selected member, call the task tool with:
 - IMPORTANT: Use EXACTLY the subagent_type names listed in your available council members below — they must match precisely.
 
 Step 4: Collect results with progress using background_wait:
-- After launching all members, call background_wait(task_ids=[...all task IDs...]) with ONLY the task_ids parameter.
-- background_wait blocks until ANY one of the given tasks completes, then returns that task's result plus a progress bar.
-- Then call background_wait again with the REMAINING task IDs (the tool output tells you which IDs remain).
-- Repeat until all members are collected (background_wait will say "All tasks complete" when done).
-- After EACH call returns, display a progress bar showing overall status. Example format:
+- After launching all members, call background_wait(task_ids=[...all task IDs...], timeout=30000).
+- background_wait returns structured JSON. Parse it to understand member states.
+- The JSON structure contains: progress (done/total/bar), members (array with status, session_state, last_activity_s), completed_task (with result data), remaining_task_ids, timeout, aborted.
+- After EACH call returns, display a progress bar showing overall status:
 
   \`\`\`
   Council progress: [##--] 2/4
-  - Claude Opus 4.6 — ✅
-  - GPT 5.3 Codex — ✅
-  - Kimi K2.5 — 🕓
-  - MiniMax M2.5 — 🕓
+  - Claude Opus 4.6 — ✅ (complete, has response)
+  - GPT 5.3 Codex — ✅ (complete, has response)
+  - Kimi K2.5 — 🕓 (running, 45s)
+  - MiniMax M2.5 — 🕓 (running, 30s)
   \`\`\`
-  
-- Do NOT pass a timeout parameter to background_wait. The default (120s) is correct and the tool returns instantly when any task finishes.
+
+- Use status indicators: ✅ complete with response, 🕓 running, ❌ failed/error, 🔄 retrying
+- If background_wait returns with remaining_task_ids, call it again with those IDs.
+- Repeat until all members are collected.
 - Do NOT use background_output for collecting council results — use background_wait exclusively.
 - Do NOT ask the final action question while any launched member is still pending.
 - Do NOT present interim synthesis from partial results. Wait for all members first.
+
+Step 4.5: Detect failed or stuck members.
+For each member in the background_wait JSON response, check:
+- **Stuck**: session_state == "idle" AND last_activity_s > {STUCK_THRESHOLD_SECONDS} → treat as failed. The member went idle and hasn't done anything for too long.
+- **Running but inactive**: session_state == "running" AND last_activity_s > {STUCK_THRESHOLD_SECONDS} → the member may be waiting for a delegate. Continue waiting — do NOT treat as failed yet.
+- **Error/cancelled**: status == "error" or status == "cancelled" → failed. Check the error field for details.
+- **Completed**: status == "completed" → proceed to Step 4.6 for verification.
+
+Step 4.6: Verify completed members have valid responses.
+For each completed member, check the completed_task JSON fields:
+- has_response: true AND response_complete: true → ✅ Use this result for synthesis.
+- has_response: true AND response_complete: false → Member started but didn't finish. Nudge: call task(session_id=<member_session_id>, run_in_background=true, prompt="Your analysis is incomplete. Please finish and wrap your final analysis in <COUNCIL_MEMBER_RESPONSE>...</COUNCIL_MEMBER_RESPONSE> tags."). Max 1 nudge per member.
+- has_response: false AND status: "completed" → Member completed but didn't use tags. Nudge: call task(session_id=<member_session_id>, run_in_background=true, prompt="Please write your findings wrapped in <COUNCIL_MEMBER_RESPONSE>...</COUNCIL_MEMBER_RESPONSE> tags."). Max 1 nudge per member.
+- has_response: false AND status: "error" → Failed. Apply retry logic (Step 4.7).
+
+After nudging, call background_wait with the new task IDs to collect nudged results.
+If a nudge's result still lacks complete tags, use whatever partial output is available with a reduced confidence note in synthesis.
+
+Step 4.7: Retry failed members (if configured).
+Config values (injected at runtime):
+- retry_on_fail = {RETRY_ON_FAIL} (max retry attempts per failed member, 0 = no retries)
+- retry_failed_if_others_finished = {RETRY_FAILED_IF_OTHERS_FINISHED} (false = retry only while others running, true = retry even after all others done)
+- cancel_retrying_on_quorum = {CANCEL_RETRYING_ON_QUORUM} (true = cancel in-flight retries when 2+ successful)
+
+If retry_on_fail > 0 and a member failed:
+- If retry_failed_if_others_finished == false: retry only while other members are still running. Once all non-failed members complete, stop retrying and synthesize with what you have.
+- If retry_failed_if_others_finished == true: retry even after other members are done. Wait for retry results before synthesizing.
+- Track retry count per member. Never exceed retry_on_fail attempts.
+- Retries: use task(session_id=<member_session_id>, run_in_background=true, prompt="Your previous attempt failed. Please retry the analysis.") if session exists. If no session, launch fresh task.
+- Show retry status in progress bar with 🔄 marker.
+
+If cancel_retrying_on_quorum == true and 2+ members have successful responses (has_response=true, response_complete=true): cancel any in-flight retries using background_cancel and proceed to synthesis.
+
+**Quorum enforcement (minimum 2 successful):**
+Before starting synthesis (Step 5+), verify at least 2 members have has_response=true AND response_complete=true.
+- If <2 successful after all retries and nudges: do NOT synthesize. Report the failures with reasons to the user. Suggest re-running the council with different members or settings.
+- Example failure message: "Council quorum not met: only N/M members produced valid responses. [Details of failures]. Consider re-running with different council members."
 
 Step 5: Classify the question intent BEFORE synthesizing.
 
