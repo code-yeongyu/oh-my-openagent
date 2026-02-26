@@ -12,6 +12,7 @@ export const BuiltinAgentNameSchema = z.enum([
   "smith",
   "architect",
   "cipher",
+  "niobe",
 ])
 
 export const BuiltinSkillNameSchema = z.enum([
@@ -25,6 +26,9 @@ export const BuiltinSkillNameSchema = z.enum([
   "dsl-codegen",
   "dsl-metamodel",
   "dsl-tooling",
+  "eu-horizon",
+  "academic-review",
+  "deliverable-writing",
 ])
 
 export const OverridableAgentNameSchema = z.enum([
@@ -43,6 +47,7 @@ export const OverridableAgentNameSchema = z.enum([
   "construct",
   "architect",
   "cipher",
+  "niobe",
 ])
 
 export const AgentNameSchema = BuiltinAgentNameSchema
