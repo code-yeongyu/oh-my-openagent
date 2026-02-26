@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { appendSessionId, getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { appendSessionId, findBoulderForSession, getPlanProgress, getSessionPlanName, readBoulderState } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { isCallerOrchestrator } from "../../shared/session-utils"
 import { collectGitDiffStats, formatFileChanges } from "../../shared/git-worktree"
@@ -61,18 +61,21 @@ export function createToolExecuteAfterHandler(input: {
       const fileChanges = formatFileChanges(gitStats)
       const subagentSessionId = extractSessionIdFromOutput(toolOutput.output)
 
-      const boulderState = readBoulderState(ctx.directory)
+      const planName = toolInput.sessionID ? getSessionPlanName(toolInput.sessionID) : undefined
+      const boulderState = planName
+        ? readBoulderState(ctx.directory, planName)
+        : toolInput.sessionID
+          ? (findBoulderForSession(ctx.directory, toolInput.sessionID) ?? readBoulderState(ctx.directory))
+          : readBoulderState(ctx.directory)
       if (boulderState) {
         const progress = getPlanProgress(boulderState.active_plan)
-
         if (toolInput.sessionID && !boulderState.session_ids?.includes(toolInput.sessionID)) {
-          appendSessionId(ctx.directory, toolInput.sessionID)
+          appendSessionId(ctx.directory, toolInput.sessionID, boulderState.plan_name)
           log(`[${HOOK_NAME}] Appended session to boulder`, {
             sessionID: toolInput.sessionID,
             plan: boulderState.plan_name,
           })
         }
-
         // Preserve original subagent response - critical for debugging failed tasks
         const originalResponse = toolOutput.output
 

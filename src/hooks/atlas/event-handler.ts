@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { findBoulderForSession, getPlanProgress, getSessionPlanName, readBoulderState } from "../../features/boulder-state"
 import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
@@ -41,7 +41,10 @@ export function createAtlasEventHandler(input: {
       log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
       // Read boulder state FIRST to check if this session is part of an active boulder
-      const boulderState = readBoulderState(ctx.directory)
+      const planName = getSessionPlanName(sessionID)
+      const boulderState = planName
+        ? readBoulderState(ctx.directory, planName)
+        : findBoulderForSession(ctx.directory, sessionID)
       const isBoulderSession = boulderState?.session_ids?.includes(sessionID) ?? false
 
       const isBackgroundTaskSession = subagentSessions.has(sessionID)

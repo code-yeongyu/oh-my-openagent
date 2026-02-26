@@ -4,10 +4,10 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
 
 1. **Find available plans**: Search for Prometheus-generated plan files at \`.sisyphus/plans/\`
 
-2. **Check for active boulder state**: Read \`.sisyphus/boulder.json\` if it exists
+2. **Check for active boulder state**: Read \`.sisyphus/boulders/{plan-name}.json\` if it exists
 
 3. **Decision logic**:
-   - If \`.sisyphus/boulder.json\` exists AND plan is NOT complete (has unchecked boxes):
+   - If \`.sisyphus/boulders/{plan-name}.json\` exists AND plan is NOT complete (has unchecked boxes):
      - **APPEND** current session to session_ids
      - Continue work on existing plan
    - If no active plan OR plan is complete:
@@ -15,7 +15,7 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
      - If ONE plan: auto-select it
      - If MULTIPLE plans: show list with timestamps, ask user to select
 
-4. **Create/Update boulder.json**:
+4. **Create/Update \`.sisyphus/boulders/{plan-name}.json\`:
    \`\`\`json
    {
      "active_plan": "/absolute/path/to/plan.md",
@@ -67,6 +67,6 @@ Reading plan and beginning execution...
 ## CRITICAL
 
 - The session_id is injected by the hook - use it directly
-- Always update boulder.json BEFORE starting work
+- Always update the boulder file BEFORE starting work
 - Read the FULL plan file before delegating any tasks
 - Follow atlas delegation protocols (7-section format)`

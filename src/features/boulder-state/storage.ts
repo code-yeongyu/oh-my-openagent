@@ -7,14 +7,17 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
 import type { BoulderState, PlanProgress } from "./types"
-import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
+import { BOULDER_DIR, BOULDER_FILE, BOULDERS_DIR, PROMETHEUS_PLANS_DIR } from "./constants"
 
-export function getBoulderFilePath(directory: string): string {
+export function getBoulderFilePath(directory: string, planName?: string): string {
+  if (planName) {
+    return join(directory, BOULDER_DIR, BOULDERS_DIR, `${planName}.json`)
+  }
   return join(directory, BOULDER_DIR, BOULDER_FILE)
 }
 
-export function readBoulderState(directory: string): BoulderState | null {
-  const filePath = getBoulderFilePath(directory)
+export function readBoulderState(directory: string, planName?: string): BoulderState | null {
+  const filePath = getBoulderFilePath(directory, planName)
 
   if (!existsSync(filePath)) {
     return null
@@ -35,8 +38,8 @@ export function readBoulderState(directory: string): BoulderState | null {
   }
 }
 
-export function writeBoulderState(directory: string, state: BoulderState): boolean {
-  const filePath = getBoulderFilePath(directory)
+export function writeBoulderState(directory: string, state: BoulderState, planName?: string): boolean {
+  const filePath = getBoulderFilePath(directory, planName)
 
   try {
     const dir = dirname(filePath)
@@ -51,16 +54,17 @@ export function writeBoulderState(directory: string, state: BoulderState): boole
   }
 }
 
-export function appendSessionId(directory: string, sessionId: string): BoulderState | null {
-  const state = readBoulderState(directory)
+export function appendSessionId(directory: string, sessionId: string, planName?: string): BoulderState | null {
+  // If planName given but per-plan file doesn't exist, fall back to legacy path
+  const resolvedPlanName = planName && existsSync(getBoulderFilePath(directory, planName)) ? planName : undefined
+  const state = readBoulderState(directory, resolvedPlanName)
   if (!state) return null
-
   if (!state.session_ids?.includes(sessionId)) {
     if (!Array.isArray(state.session_ids)) {
       state.session_ids = []
     }
     state.session_ids.push(sessionId)
-    if (writeBoulderState(directory, state)) {
+    if (writeBoulderState(directory, state, resolvedPlanName)) {
       return state
     }
   }
@@ -68,8 +72,8 @@ export function appendSessionId(directory: string, sessionId: string): BoulderSt
   return state
 }
 
-export function clearBoulderState(directory: string): boolean {
-  const filePath = getBoulderFilePath(directory)
+export function clearBoulderState(directory: string, planName?: string): boolean {
+  const filePath = getBoulderFilePath(directory, planName)
 
   try {
     if (existsSync(filePath)) {
@@ -80,6 +84,44 @@ export function clearBoulderState(directory: string): boolean {
   } catch {
     return false
   }
+}
+
+export function findBoulderForSession(directory: string, sessionID: string): BoulderState | null {
+  const bouldersDirectory = join(directory, BOULDER_DIR, BOULDERS_DIR)
+
+  // Check per-plan boulders first
+  if (existsSync(bouldersDirectory)) {
+    try {
+      const files = readdirSync(bouldersDirectory)
+      for (const file of files) {
+        if (!file.endsWith(".json")) continue
+        try {
+          const content = readFileSync(join(bouldersDirectory, file), "utf-8")
+          const parsed = JSON.parse(content)
+          if (
+            parsed &&
+            typeof parsed === "object" &&
+            !Array.isArray(parsed) &&
+            Array.isArray(parsed.session_ids) &&
+            parsed.session_ids.includes(sessionID)
+          ) {
+            return parsed as BoulderState
+          }
+        } catch {
+          continue
+        }
+      }
+    } catch {
+      // Fall through to legacy check
+    }
+  }
+
+  // Fall back to legacy boulder.json
+  const legacyState = readBoulderState(directory)
+  if (legacyState?.session_ids?.includes(sessionID)) {
+    return legacyState
+  }
+  return null
 }
 
 /**

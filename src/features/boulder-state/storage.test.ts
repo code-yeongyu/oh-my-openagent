@@ -7,12 +7,15 @@ import {
   writeBoulderState,
   appendSessionId,
   clearBoulderState,
+  getBoulderFilePath,
+  findBoulderForSession,
   getPlanProgress,
   getPlanName,
   createBoulderState,
   findPrometheusPlans,
 } from "./storage"
 import type { BoulderState } from "./types"
+import { BOULDERS_DIR, BOULDER_DIR } from "./constants"
 
 describe("boulder-state", () => {
   const TEST_DIR = join(tmpdir(), "boulder-state-test-" + Date.now())
@@ -362,6 +365,152 @@ describe("boulder-state", () => {
 
       //#then - state should not have agent field (backward compatible)
       expect(state.agent).toBeUndefined()
+    })
+  })
+
+  describe("per-plan storage", () => {
+    test("getBoulderFilePath should return per-plan path when planName provided", () => {
+      //#given - directory and plan name
+      //#when
+      const result = getBoulderFilePath(TEST_DIR, "my-plan")
+      //#then
+      expect(result).toBe(join(TEST_DIR, BOULDER_DIR, BOULDERS_DIR, "my-plan.json"))
+    })
+
+    test("getBoulderFilePath should return default path when planName not provided", () => {
+      //#given - directory without plan name
+      //#when
+      const result = getBoulderFilePath(TEST_DIR)
+      //#then
+      expect(result).toBe(join(TEST_DIR, BOULDER_DIR, "boulder.json"))
+    })
+
+    test("writeBoulderState should write to per-plan path when planName provided", () => {
+      //#given - state and plan name
+      const state: BoulderState = {
+        active_plan: "/test/plan.md",
+        started_at: "2026-01-02T12:00:00Z",
+        session_ids: ["ses-123"],
+        plan_name: "my-plan",
+      }
+      //#when
+      const success = writeBoulderState(TEST_DIR, state, "my-plan")
+      //#then
+      expect(success).toBe(true)
+      const filePath = join(TEST_DIR, BOULDER_DIR, BOULDERS_DIR, "my-plan.json")
+      expect(existsSync(filePath)).toBe(true)
+    })
+
+    test("readBoulderState should read from per-plan path when planName provided", () => {
+      //#given - state written to per-plan path
+      const state: BoulderState = {
+        active_plan: "/test/plan.md",
+        started_at: "2026-01-02T12:00:00Z",
+        session_ids: ["ses-123"],
+        plan_name: "my-plan",
+      }
+      writeBoulderState(TEST_DIR, state, "my-plan")
+      //#when
+      const result = readBoulderState(TEST_DIR, "my-plan")
+      //#then
+      expect(result).not.toBeNull()
+      expect(result?.plan_name).toBe("my-plan")
+      expect(result?.session_ids).toEqual(["ses-123"])
+    })
+
+    test("clearBoulderState should delete only per-plan file when planName provided", () => {
+      //#given - multiple plan files
+      const state1: BoulderState = {
+        active_plan: "/test/plan1.md",
+        started_at: "2026-01-02T12:00:00Z",
+        session_ids: ["ses-1"],
+        plan_name: "plan-1",
+      }
+      const state2: BoulderState = {
+        active_plan: "/test/plan2.md",
+        started_at: "2026-01-02T12:00:00Z",
+        session_ids: ["ses-2"],
+        plan_name: "plan-2",
+      }
+      writeBoulderState(TEST_DIR, state1, "plan-1")
+      writeBoulderState(TEST_DIR, state2, "plan-2")
+      //#when
+      clearBoulderState(TEST_DIR, "plan-1")
+      //#then
+      expect(readBoulderState(TEST_DIR, "plan-1")).toBeNull()
+      expect(readBoulderState(TEST_DIR, "plan-2")).not.toBeNull()
+    })
+
+    test("appendSessionId should modify only per-plan file when planName provided", () => {
+      //#given - state with one session
+      const state: BoulderState = {
+        active_plan: "/test/plan.md",
+        started_at: "2026-01-02T12:00:00Z",
+        session_ids: ["ses-1"],
+        plan_name: "my-plan",
+      }
+      writeBoulderState(TEST_DIR, state, "my-plan")
+      //#when
+      const result = appendSessionId(TEST_DIR, "ses-2", "my-plan")
+      //#then
+      expect(result).not.toBeNull()
+      expect(result?.session_ids).toEqual(["ses-1", "ses-2"])
+    })
+
+    test("findBoulderForSession should return matching boulder state", () => {
+      //#given - multiple plan files with different sessions
+      const state1: BoulderState = {
+        active_plan: "/test/plan1.md",
+        started_at: "2026-01-02T12:00:00Z",
+        session_ids: ["ses-123"],
+        plan_name: "plan-1",
+      }
+      const state2: BoulderState = {
+        active_plan: "/test/plan2.md",
+        started_at: "2026-01-02T12:00:00Z",
+        session_ids: ["ses-456"],
+        plan_name: "plan-2",
+      }
+      writeBoulderState(TEST_DIR, state1, "plan-1")
+      writeBoulderState(TEST_DIR, state2, "plan-2")
+      //#when
+      const result = findBoulderForSession(TEST_DIR, "ses-123")
+      //#then
+      expect(result).not.toBeNull()
+      expect(result?.plan_name).toBe("plan-1")
+      expect(result?.session_ids).toContain("ses-123")
+    })
+
+    test("findBoulderForSession should return null when session not found", () => {
+      //#given - plan files without matching session
+      const state: BoulderState = {
+        active_plan: "/test/plan.md",
+        started_at: "2026-01-02T12:00:00Z",
+        session_ids: ["ses-123"],
+        plan_name: "my-plan",
+      }
+      writeBoulderState(TEST_DIR, state, "my-plan")
+      //#when
+      const result = findBoulderForSession(TEST_DIR, "unknown-ses")
+      //#then
+      expect(result).toBeNull()
+    })
+
+    test("backward compat: readBoulderState without planName reads from default boulder.json", () => {
+      //#given - state written to default boulder.json
+      const state: BoulderState = {
+        active_plan: "/test/plan.md",
+        started_at: "2026-01-02T12:00:00Z",
+        session_ids: ["ses-legacy"],
+        plan_name: "legacy-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+      //#when
+      const result = readBoulderState(TEST_DIR)
+      //#then
+      expect(result).not.toBeNull()
+      expect(result?.plan_name).toBe("legacy-plan")
+      expect(result?.session_ids).toContain("ses-legacy")
     })
   })
 })
