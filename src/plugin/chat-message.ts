@@ -11,6 +11,7 @@ import {
 import { setSessionAgent } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
+import { updateIterationSessionTitle } from "../hooks/ralph-loop/iteration-session-title"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -175,11 +176,28 @@ export function createChatMessageHandler(args: {
         const rawTask = taskMatch?.[1]?.trim() || ""
         const parsedArguments = parseRalphLoopArguments(rawTask)
 
-        hooks.ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
+        const started = hooks.ralphLoop.startLoop(input.sessionID, parsedArguments.prompt, {
           maxIterations: parsedArguments.maxIterations,
           completionPromise: parsedArguments.completionPromise,
           strategy: parsedArguments.strategy,
         })
+
+        if (started) {
+          const loopState = hooks.ralphLoop.getState()
+          if (
+            loopState?.active &&
+            loopState.session_id === input.sessionID &&
+            (loopState.strategy === "reset" || loopState.strategy === "continue")
+          ) {
+            await updateIterationSessionTitle(
+              ctx.client,
+              input.sessionID,
+              ctx.directory,
+              loopState.iteration,
+              loopState.max_iterations,
+            )
+          }
+        }
       } else if (isCancelRalphTemplate) {
         hooks.ralphLoop.cancelLoop(input.sessionID)
       }

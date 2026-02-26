@@ -6,6 +6,7 @@ import { buildContinuationPrompt } from "./continuation-prompt-builder"
 import { buildResetIterationPrompt } from "./reset-iteration-prompt-builder"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
 import { createIterationSession, selectSessionInTui } from "./session-reset-strategy"
+import { updateIterationSessionTitle } from "./iteration-session-title"
 
 type ContinuationOptions = {
   directory: string
@@ -29,6 +30,8 @@ export async function continueIteration(
       ctx,
       options.previousSessionID,
       options.directory,
+      state.iteration,
+      state.max_iterations,
     )
     if (!newSessionID) {
       return
@@ -62,6 +65,14 @@ export async function continueIteration(
   }
 
   const continuationPrompt = buildContinuationPrompt(state)
+
+  await updateIterationSessionTitle(
+    ctx.client,
+    options.previousSessionID,
+    options.directory,
+    state.iteration,
+    state.max_iterations,
+  )
 
   await injectContinuationPrompt(ctx, {
     sessionID: options.previousSessionID,

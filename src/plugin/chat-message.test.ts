@@ -202,6 +202,120 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     expect(output.parts[0].text).toContain("[BACKGROUND TASK COMPLETED]")
   })
 
+  test("updates session title for first reset iteration", async () => {
+    const args = createMockHandlerArgs()
+    let loopState: {
+      active: boolean
+      iteration: number
+      max_iterations: number
+      completion_promise: string
+      started_at: string
+      prompt: string
+      session_id: string
+      strategy: "reset"
+    } | null = null
+
+    args.hooks.ralphLoop = {
+      getState: () => loopState,
+      startLoop: (
+        sessionID: string,
+        prompt: string,
+        options?: { maxIterations?: number; completionPromise?: string; strategy?: "reset" | "continue" },
+      ) => {
+        loopState = {
+          active: true,
+          iteration: 1,
+          max_iterations: options?.maxIterations ?? 100,
+          completion_promise: options?.completionPromise ?? "DONE",
+          started_at: new Date().toISOString(),
+          prompt,
+          session_id: sessionID,
+          strategy: "reset",
+        }
+        return true
+      },
+      cancelLoop: () => false,
+      event: async () => {},
+      setOnLoopCompleted: () => {},
+    }
+
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const output = createMockOutput()
+    output.parts = [
+      {
+        type: "text",
+        text: `You are starting a Ralph Loop\n<user-task>"Build title handling" --strategy=reset --max-iterations=50</user-task>`,
+      },
+    ]
+
+    await handler(input, output)
+
+    expect(args._sessionUpdateCalls).toHaveLength(1)
+    expect(args._sessionUpdateCalls[0]).toEqual({
+      path: { id: "test-session" },
+      body: { title: "Ralph loop iteration 1/50" },
+      query: { directory: "/tmp/test-project" },
+    })
+  })
+
+  test("updates session title for first continue iteration", async () => {
+    const args = createMockHandlerArgs()
+    let loopState: {
+      active: boolean
+      iteration: number
+      max_iterations: number
+      completion_promise: string
+      started_at: string
+      prompt: string
+      session_id: string
+      strategy: "continue"
+    } | null = null
+
+    args.hooks.ralphLoop = {
+      getState: () => loopState,
+      startLoop: (
+        sessionID: string,
+        prompt: string,
+        options?: { maxIterations?: number; completionPromise?: string; strategy?: "reset" | "continue" },
+      ) => {
+        loopState = {
+          active: true,
+          iteration: 1,
+          max_iterations: options?.maxIterations ?? 100,
+          completion_promise: options?.completionPromise ?? "DONE",
+          started_at: new Date().toISOString(),
+          prompt,
+          session_id: sessionID,
+          strategy: "continue",
+        }
+        return true
+      },
+      cancelLoop: () => false,
+      event: async () => {},
+      setOnLoopCompleted: () => {},
+    }
+
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const output = createMockOutput()
+    output.parts = [
+      {
+        type: "text",
+        text: `You are starting a Ralph Loop\n<user-task>"Build title handling" --strategy=continue --max-iterations=50</user-task>`,
+      },
+    ]
+
+    await handler(input, output)
+
+    expect(args._sessionUpdateCalls).toHaveLength(1)
+    expect(args._sessionUpdateCalls[0]).toEqual({
+      path: { id: "test-session" },
+      body: { title: "Ralph loop iteration 1/50" },
+      query: { directory: "/tmp/test-project" },
+    })
+  })
+
   test("does not restart active ralph loop when reset iteration prompt is injected into new session", async () => {
     const startLoopCalls: Array<{ sessionID: string; prompt: string }> = []
     const args = createMockHandlerArgs()

@@ -146,11 +146,13 @@ describe("session-reset-strategy selectSessionInTui", () => {
       ctx as never,
       "ses_previous_parent",
       "/tmp/project",
+      3,
+      50,
     )
 
     expect(sessionID).toBe("ses_new_iteration")
     expect(calls).toHaveLength(1)
-    expect(calls[0].body).toEqual({})
+    expect(calls[0].body).toEqual({ title: "Ralph loop iteration 3/50" })
     expect(calls[0].query).toEqual({ directory: "/tmp/project" })
   })
 })

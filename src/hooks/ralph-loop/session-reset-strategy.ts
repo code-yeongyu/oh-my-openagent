@@ -3,16 +3,19 @@ import { getServerBaseUrl } from "../../shared/opencode-http-api"
 import { getServerBasicAuthHeader } from "../../shared/opencode-server-auth"
 import { isRecord } from "../../shared/record-type-guard"
 import { log } from "../../shared/logger"
+import { buildIterationSessionTitle } from "./iteration-session-title"
 
 export async function createIterationSession(
   ctx: PluginInput,
   parentSessionID: string,
   directory: string,
+  iteration: number,
+  maxIterations: number,
 ): Promise<string | null> {
   void parentSessionID
 
   const createResult = await ctx.client.session.create({
-    body: {},
+    body: { title: buildIterationSessionTitle(iteration, maxIterations) },
     query: { directory },
   })
 

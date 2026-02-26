@@ -21,6 +21,7 @@ describe("ralph-loop", () => {
   let toastCalls: Array<{ title: string; message: string; variant: string }>
   let messagesCalls: Array<{ sessionID: string }>
   let createSessionCalls: Array<{ parentID?: string; title?: string; directory?: string }>
+  let updateSessionCalls: Array<{ sessionID: string; title?: string; directory?: string }>
   let mockSessionMessages: Array<{
     info?: {
       role?: string
@@ -96,6 +97,11 @@ describe("ralph-loop", () => {
             if (!sessionID) {
               throw new Error("missing session id")
             }
+            updateSessionCalls.push({
+              sessionID,
+              title: opts.body?.title ?? opts.title,
+              directory: opts.query?.directory ?? opts.directory,
+            })
             return {}
           },
         },
@@ -120,6 +126,7 @@ describe("ralph-loop", () => {
     toastCalls = []
     messagesCalls = []
     createSessionCalls = []
+    updateSessionCalls = []
     mockSessionMessages = []
     mockMessagesApiResponseShape = "data"
 
@@ -367,6 +374,12 @@ describe("ralph-loop", () => {
       expect(promptCalls[0].text).toContain("RALPH LOOP")
       expect(promptCalls[0].text).toContain("Build a feature")
       expect(promptCalls[0].text).toContain("2/10")
+      expect(updateSessionCalls.length).toBe(1)
+      expect(updateSessionCalls[0]).toEqual({
+        sessionID: "session-123",
+        title: "Ralph loop iteration 2/10",
+        directory: TEST_DIR,
+      })
 
       // then - iteration should be incremented
       const state = hook.getState()
@@ -661,6 +674,7 @@ describe("ralph-loop", () => {
 
       // then - new session should be created and continuation injected there
       expect(createSessionCalls.length).toBe(1)
+      expect(createSessionCalls[0].title).toBe("Ralph loop iteration 2/100")
       expect(promptCalls.length).toBe(1)
       expect(promptCalls[0].sessionID).toBe("new-session-1")
       expect(promptCalls[0].text).toContain("<command-instruction>")
@@ -688,6 +702,8 @@ describe("ralph-loop", () => {
       })
 
       expect(promptCalls.length).toBe(1)
+      expect(createSessionCalls.length).toBe(1)
+      expect(createSessionCalls[0].title).toBe("Ralph loop iteration 2/8")
       expect(promptCalls[0].sessionID).toBe("new-session-1")
       expect(promptCalls[0].text).toMatch(/^ultrawork\s+/)
       expect(promptCalls[0].text).toContain("[RALPH LOOP - Iteration 2/8]")
