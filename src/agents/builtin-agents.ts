@@ -217,9 +217,22 @@ export async function createBuiltinAgents(
         log("[builtin-agents] Some council members were skipped during registration", { skippedMembers })
       }
 
+      const retryOnFail = councilConfig.retry_on_fail ?? 0
+      const retryIfFinished = councilConfig.retry_failed_if_others_finished ?? false
+      const cancelOnQuorum = councilConfig.cancel_retrying_on_quorum ?? true
+      const stuckThreshold = councilConfig.stuck_threshold_seconds ?? 120
+
+      let athenaPrompt = (result["athena"].prompt ?? "") + councilTaskInstructions
+      athenaPrompt = athenaPrompt
+        .replace(/\{RETRY_ON_FAIL\}/g, String(retryOnFail))
+        .replace(/\{RETRY_FAILED_IF_OTHERS_FINISHED\}/g, String(retryIfFinished))
+        .replace(/\{CANCEL_RETRYING_ON_QUORUM\}/g, String(cancelOnQuorum))
+        .replace(/\{STUCK_THRESHOLD_SECONDS\}/g, String(stuckThreshold))
+      athenaPrompt += `\n\n## Council Resilience Config\n- retry_on_fail: ${retryOnFail}\n- retry_failed_if_others_finished: ${retryIfFinished}\n- cancel_retrying_on_quorum: ${cancelOnQuorum}\n- stuck_threshold_seconds: ${stuckThreshold}`
+
       result["athena"] = {
         ...result["athena"],
-        prompt: (result["athena"].prompt ?? "") + councilTaskInstructions,
+        prompt: athenaPrompt,
       }
     } else {
       result["athena"] = applyMissingCouncilGuard(result["athena"], skippedMembers)
