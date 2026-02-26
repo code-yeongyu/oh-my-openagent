@@ -154,6 +154,7 @@ jobs:
   # =============================================================================
   publish:
     needs: build
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -176,14 +177,16 @@ jobs:
           fi
 
       - name: Download artifact
+        id: download
         if: steps.check.outputs.skip != 'true'
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: binary-${{ matrix.platform }}
           path: .
 
       - name: Extract artifact
-        if: steps.check.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true' && steps.download.outcome == 'success'
         run: |
           PLATFORM="${{ matrix.platform }}"
           mkdir -p packages/${PLATFORM}
@@ -199,13 +202,13 @@ jobs:
           ls -la packages/${PLATFORM}/bin/
 
       - uses: actions/setup-node@v4
-        if: steps.check.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true' && steps.download.outcome == 'success'
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Publish ${{ matrix.platform }}
-        if: steps.check.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true' && steps.download.outcome == 'success'
         run: |
           cd packages/${{ matrix.platform }}
           
