@@ -26,4 +26,5 @@ export interface SessionState {
   lastEventWasAbortError?: boolean
   lastContinuationInjectedAt?: number
   promptFailureCount: number
+  lastFailureAt?: number
 }
