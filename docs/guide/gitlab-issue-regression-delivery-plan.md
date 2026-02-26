@@ -12,10 +12,25 @@ Ship the current regression fixes with strict issue workflow discipline:
 
 Use milestone-first delivery with issue/work-order tracking:
 
+### Source of Truth
+
+- GitLab group: `ktai` (private)
+- Projects in scope:
+  - `ktai/ktai-desktop`
+  - `ktai/ktai-mobile`
+
+Verified active milestones in both projects:
+
+1. `M0-Architecture-and-UX-Freeze` (`2026-02-26` -> `2026-03-04`)
+2. `M1-Desktop-OEM-Alpha` (`2026-03-05` -> `2026-03-19`)
+3. `M2-Mobile-Realtime-MVP` (`2026-03-20` -> `2026-04-02`)
+4. `M3-Security-and-Beta` (`2026-04-03` -> `2026-04-16`)
+
 ### M1 - Regression Baseline Stabilization
 
 - Scope: fallback + session-notification regressions only
 - Delivery unit: PR `#2119`
+- GitLab mapping: `ktai-desktop` M1 issue stream (`#4/#5/#6` readiness baseline)
 - Gate:
   - all PR checks green
   - acceptance criteria AC-1/AC-2/AC-3 pass
@@ -25,6 +40,7 @@ Use milestone-first delivery with issue/work-order tracking:
 
 - Scope: `default_injection_toggle` + default managed plugin discovery when DB missing
 - Delivery unit: PR `#2122` (stacked on M1 baseline)
+- GitLab mapping: `ktai-desktop` M1 issue `[OEM] oh-my-opencode 默认集成 + 可关闭策略` (`#5`)
 - Gate:
   - all PR checks green
   - extended tests + typecheck + build pass
@@ -37,6 +53,13 @@ Use milestone-first delivery with issue/work-order tracking:
   - rerun targeted regression suite on `dev`
   - confirm no new check regressions
   - publish milestone closure comment with evidence links
+
+### Downstream Alignment (Mobile)
+
+- Mobile M2 open work orders:
+  - `ktai-mobile#6` `[M2] 移动端远控核心交互实现`
+  - `ktai-mobile#7` `[M2] 移动端重连与稳定性优化`
+- This repository's current delivery acts as upstream dependency for those mobile work orders.
 
 ## Scope Lock
 
