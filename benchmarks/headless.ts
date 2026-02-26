@@ -151,11 +151,14 @@ async function run() {
             model: modelId,
           })
           break
-        case "tool-result":
+        case "tool-result": {
+          const output = typeof part.result === "string" ? part.result : JSON.stringify(part.result)
+          const isError = typeof output === "string" && output.startsWith("Error:")
           emit({
             type: "tool_result",
             tool_call_id: part.toolCallId,
-            output: typeof part.result === "string" ? part.result : JSON.stringify(part.result),
+            output,
+            ...(isError ? { error: output } : {}),
           })
           break
       }

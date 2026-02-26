@@ -25,9 +25,13 @@ let perModelTimeoutSec = 900; // 15 min default per model (5 tests)
 const rawArgs = process.argv.slice(2);
 for (let i = 0; i < rawArgs.length; i++) {
   if (rawArgs[i] === "--timeout" && i + 1 < rawArgs.length) {
-    perModelTimeoutSec = Number.parseInt(rawArgs[i + 1], 10);
+    const parsed = Number.parseInt(rawArgs[i + 1], 10);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      console.error(`Invalid --timeout value: ${rawArgs[i + 1]}`);
+      process.exit(1);
+    }
+    perModelTimeoutSec = parsed;
     i++;
-  }
 }
 
 // ── Colors ────────────────────────────────────────────────────
@@ -228,8 +232,9 @@ const main = async () => {
   // Per-model results
   for (const r of allResults) {
     const timeStr = `${(r.durationMs / 1000).toFixed(0)}s`;
-    const color = r.totalPassed === r.totalTests ? GREEN : r.totalPassed > 0 ? YELLOW : RED;
-    console.log(`  ${r.modelShort.padEnd(8)} ${color}${r.totalPassed}/${r.totalTests}${RESET} (${timeStr})`);
+    const color = r.error ? RED : r.totalPassed === r.totalTests ? GREEN : r.totalPassed > 0 ? YELLOW : RED;
+    const label = r.error ? `ERROR: ${r.error}` : `${r.totalPassed}/${r.totalTests}`;
+    console.log(`  ${r.modelShort.padEnd(8)} ${color}${label}${RESET} (${timeStr})`);
     for (const t of r.tests) {
       const icon = t.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
       console.log(`    ${icon} ${t.name}`);
@@ -240,8 +245,9 @@ const main = async () => {
 
   // Overall
   const totalModels = allResults.length;
+  const erroredModels = allResults.filter((r) => r.error).length;
   const perfectModels = allResults.filter(
-    (r) => r.totalPassed === r.totalTests
+    (r) => !r.error && r.totalPassed === r.totalTests && r.totalTests > 0
   ).length;
   console.log(
     `${BOLD}Models with 100%: ${perfectModels}/${totalModels}${RESET}`
@@ -255,7 +261,12 @@ const main = async () => {
 
   console.log();
 
-  if (perfectModels === totalModels) {
+  if (erroredModels > 0) {
+    console.log(
+      `${BOLD}${RED}${erroredModels} model(s) errored. See details above.${RESET}\n`
+    );
+    process.exit(1);
+  } else if (perfectModels === totalModels) {
     console.log(`${BOLD}${GREEN}🎉 ALL MODELS PASSED ALL TESTS!${RESET}\n`);
     process.exit(0);
   } else {

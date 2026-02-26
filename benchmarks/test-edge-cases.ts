@@ -53,6 +53,7 @@ interface TestCase {
   fileName: string;
   name: string;
   prompt: string;
+  skipFileCreate?: boolean;
   validate: (content: string) => { passed: boolean; reason: string };
 }
 
@@ -288,6 +289,7 @@ const TEST_CASES: TestCase[] = [
     name: "7. Create new file via append",
     fileName: "create-via-append.txt",
     fileContent: "",
+    skipFileCreate: true,
     prompt: [
       "Create create-via-append.txt via edit_file append (do not call read_file first).",
       "Use one call with edits: [{ op: 'append', lines: ['created line 1', 'created line 2'] }].",
@@ -597,7 +599,7 @@ const TEST_CASES: TestCase[] = [
           reason: "non-target lines changed unexpectedly",
         };
       }
-      if (lines[1].trim() !== "middle-content") {
+      if (lines[1] !== "middle-content") {
         return {
           passed: false,
           reason: `line 2 expected 'middle-content' but got ${JSON.stringify(lines[1])}`,
@@ -907,7 +909,9 @@ async function runTestCase(
   duration: number;
 }> {
   const testFile = join(testDir, tc.fileName);
-  writeFileSync(testFile, tc.fileContent, "utf-8");
+  if (!tc.skipFileCreate) {
+    writeFileSync(testFile, tc.fileContent, "utf-8");
+  }
 
   const headlessScript = resolve(import.meta.dir, "headless.ts");
   const headlessArgs = [
