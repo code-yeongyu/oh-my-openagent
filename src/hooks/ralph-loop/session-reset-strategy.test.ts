@@ -7,15 +7,24 @@ describe("session-reset-strategy selectSessionInTui", () => {
   const originalUsername = process.env.OPENCODE_SERVER_USERNAME
   const originalPassword = process.env.OPENCODE_SERVER_PASSWORD
 
+  const restoreEnv = (key: "OPENCODE_SERVER_USERNAME" | "OPENCODE_SERVER_PASSWORD", value: string | undefined) => {
+    if (value === undefined) {
+      delete process.env[key]
+      return
+    }
+
+    process.env[key] = value
+  }
+
   beforeEach(() => {
-    process.env.OPENCODE_SERVER_USERNAME = originalUsername
-    process.env.OPENCODE_SERVER_PASSWORD = originalPassword
+    restoreEnv("OPENCODE_SERVER_USERNAME", originalUsername)
+    restoreEnv("OPENCODE_SERVER_PASSWORD", originalPassword)
     globalThis.fetch = originalFetch
   })
 
   afterEach(() => {
-    process.env.OPENCODE_SERVER_USERNAME = originalUsername
-    process.env.OPENCODE_SERVER_PASSWORD = originalPassword
+    restoreEnv("OPENCODE_SERVER_USERNAME", originalUsername)
+    restoreEnv("OPENCODE_SERVER_PASSWORD", originalPassword)
     globalThis.fetch = originalFetch
   })
 

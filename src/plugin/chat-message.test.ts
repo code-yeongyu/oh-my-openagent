@@ -2,6 +2,7 @@ import { beforeEach, describe, test, expect } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message"
 import { clearSessionVariant, getSessionVariant, setSessionVariant } from "../shared/session-model-state"
+import { buildResetIterationPrompt } from "../hooks/ralph-loop/reset-iteration-prompt-builder"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
@@ -11,8 +12,20 @@ function createMockHandlerArgs(overrides?: {
   shouldOverride?: boolean
 }) {
   const appliedSessions: string[] = []
+  const sessionUpdateCalls: unknown[] = []
   return {
-    ctx: { client: { tui: { showToast: async () => {} } } } as any,
+    ctx: {
+      directory: "/tmp/test-project",
+      client: {
+        tui: { showToast: async () => {} },
+        session: {
+          update: async (params: unknown) => {
+            sessionUpdateCalls.push(params)
+            return {}
+          },
+        },
+      },
+    } as any,
     pluginConfig: (overrides?.pluginConfig ?? {}) as any,
     firstMessageVariantGate: {
       shouldOverride: () => overrides?.shouldOverride ?? false,
@@ -28,6 +41,7 @@ function createMockHandlerArgs(overrides?: {
       ralphLoop: null,
     } as any,
     _appliedSessions: appliedSessions,
+    _sessionUpdateCalls: sessionUpdateCalls,
   }
 }
 
@@ -187,4 +201,97 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     expect(output.parts).toHaveLength(1)
     expect(output.parts[0].text).toContain("[BACKGROUND TASK COMPLETED]")
   })
+
+  test("does not restart active ralph loop when reset iteration prompt is injected into new session", async () => {
+    const startLoopCalls: Array<{ sessionID: string; prompt: string }> = []
+    const args = createMockHandlerArgs()
+    args.hooks.ralphLoop = {
+      getState: () => ({
+        active: true,
+        iteration: 2,
+        max_iterations: 2,
+        completion_promise: "DONE",
+        started_at: new Date().toISOString(),
+        prompt: "Say hi",
+        session_id: "test-session",
+        strategy: "reset",
+      }),
+      startLoop: (sessionID: string, prompt: string) => {
+        startLoopCalls.push({ sessionID, prompt })
+        return true
+      },
+      cancelLoop: () => false,
+      event: async () => {},
+      setOnLoopCompleted: () => {},
+    }
+
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const output = createMockOutput()
+    output.parts = [
+      {
+        type: "text",
+        text: buildResetIterationPrompt({
+          active: true,
+          iteration: 2,
+          max_iterations: 2,
+          completion_promise: "DONE",
+          started_at: new Date().toISOString(),
+          prompt: "Say hi",
+          session_id: "test-session",
+          strategy: "reset",
+        }),
+      },
+    ]
+
+    await handler(input, output)
+
+    expect(startLoopCalls).toHaveLength(0)
+  })
+
+  test("does not start a new ralph loop for reset iteration prompt even before state rebinding", async () => {
+    const startLoopCalls: Array<{ sessionID: string; prompt: string }> = []
+    const args = createMockHandlerArgs()
+    args.hooks.ralphLoop = {
+      getState: () => ({
+        active: true,
+        iteration: 2,
+        max_iterations: 10,
+        completion_promise: "DONE",
+        started_at: new Date().toISOString(),
+        prompt: "Say hi",
+        session_id: "old-session",
+        strategy: "reset",
+      }),
+      startLoop: (sessionID: string, prompt: string) => {
+        startLoopCalls.push({ sessionID, prompt })
+        return true
+      },
+      cancelLoop: () => false,
+      event: async () => {},
+      setOnLoopCompleted: () => {},
+    }
+
+    const handler = createChatMessageHandler(args)
+    const input = { ...createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" }), sessionID: "new-session" }
+    const output = createMockOutput()
+    output.parts = [{
+      type: "text",
+      text: buildResetIterationPrompt({
+        active: true,
+        iteration: 2,
+        max_iterations: 10,
+        completion_promise: "DONE",
+        started_at: new Date().toISOString(),
+        prompt: "Say hi",
+        session_id: "new-session",
+        strategy: "reset",
+      }),
+    }]
+
+    await handler(input, output)
+
+    expect(startLoopCalls).toHaveLength(0)
+  })
+
 })

@@ -3,6 +3,7 @@ import type { RalphLoopState } from "./types"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./constants"
 import { buildContinuationPrompt } from "./continuation-prompt-builder"
+import { buildResetIterationPrompt } from "./reset-iteration-prompt-builder"
 import { injectContinuationPrompt } from "./continuation-prompt-injector"
 import { createIterationSession, selectSessionInTui } from "./session-reset-strategy"
 
@@ -21,9 +22,9 @@ export async function continueIteration(
   options: ContinuationOptions,
 ): Promise<void> {
   const strategy = state.strategy ?? "continue"
-  const continuationPrompt = buildContinuationPrompt(state)
 
   if (strategy === "reset") {
+    const resetPrompt = buildResetIterationPrompt(state)
     const newSessionID = await createIterationSession(
       ctx,
       options.previousSessionID,
@@ -32,16 +33,6 @@ export async function continueIteration(
     if (!newSessionID) {
       return
     }
-
-    await injectContinuationPrompt(ctx, {
-      sessionID: newSessionID,
-      inheritFromSessionID: options.previousSessionID,
-      prompt: continuationPrompt,
-      directory: options.directory,
-      apiTimeoutMs: options.apiTimeoutMs,
-    })
-
-    await selectSessionInTui(ctx.client, newSessionID)
 
     const boundState = options.loopState.setSessionID(newSessionID)
     if (!boundState) {
@@ -52,8 +43,25 @@ export async function continueIteration(
       return
     }
 
+    try {
+      await injectContinuationPrompt(ctx, {
+        sessionID: newSessionID,
+        inheritFromSessionID: options.previousSessionID,
+        prompt: resetPrompt,
+        directory: options.directory,
+        apiTimeoutMs: options.apiTimeoutMs,
+      })
+    } catch (error) {
+      options.loopState.setSessionID(options.previousSessionID)
+      throw error
+    }
+
+    await selectSessionInTui(ctx.client, newSessionID)
+
     return
   }
+
+  const continuationPrompt = buildContinuationPrompt(state)
 
   await injectContinuationPrompt(ctx, {
     sessionID: options.previousSessionID,

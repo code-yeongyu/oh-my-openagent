@@ -21,6 +21,7 @@ export interface RalphLoopHook {
   cancelLoop: (sessionID: string) => boolean
   getState: () => RalphLoopState | null
   setOnLoopCompleted: (callback: (sessionID: string) => Promise<void> | void) => void
+  setShouldDeferIteration: (callback: (sessionID: string) => Promise<boolean> | boolean) => void
 }
 
 const DEFAULT_API_TIMEOUT = 5000 as const
@@ -48,6 +49,7 @@ export function createRalphLoopHook(
   const apiTimeout = options?.apiTimeout ?? DEFAULT_API_TIMEOUT
   const checkSessionExists = options?.checkSessionExists
   let onLoopCompleted = options?.onLoopCompleted
+  let shouldDeferIteration = options?.shouldDeferIteration
 
 	const loopState = createLoopStateController({
 		directory: ctx.directory,
@@ -63,6 +65,9 @@ export function createRalphLoopHook(
 		checkSessionExists,
 		onLoopCompleted: async (sessionID: string) => {
 			await onLoopCompleted?.(sessionID)
+		},
+		shouldDeferIteration: async (sessionID: string) => {
+			return (await shouldDeferIteration?.(sessionID)) ?? false
 		},
 		sessionRecovery,
 		loopState,
@@ -93,6 +98,9 @@ export function createRalphLoopHook(
 		getState: loopState.getState as () => RalphLoopState | null,
 		setOnLoopCompleted: (callback) => {
 			onLoopCompleted = callback
+		},
+		setShouldDeferIteration: (callback) => {
+			shouldDeferIteration = callback
 		},
 	}
 }

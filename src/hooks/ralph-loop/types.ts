@@ -19,4 +19,5 @@ export interface RalphLoopOptions {
   apiTimeout?: number
   checkSessionExists?: (sessionId: string) => Promise<boolean>
   onLoopCompleted?: (sessionId: string) => Promise<void> | void
+  shouldDeferIteration?: (sessionId: string) => Promise<boolean> | boolean
 }

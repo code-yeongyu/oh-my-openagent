@@ -82,6 +82,22 @@ describe("ralph-loop", () => {
             })
             return { data: { id: `new-session-${createSessionCalls.length}` } }
           },
+          update: async (opts: {
+            path?: { id: string }
+            body?: { title?: string }
+            query?: { directory?: string }
+            sessionID?: string
+            title?: string
+            directory?: string
+            pathSessionID?: string
+          }) => {
+            const pathRecord = opts.path as { id?: string; sessionID?: string } | undefined
+            const sessionID = pathRecord?.id ?? pathRecord?.sessionID ?? opts.sessionID
+            if (!sessionID) {
+              throw new Error("missing session id")
+            }
+            return {}
+          },
         },
         tui: {
           showToast: async (opts: { body: { title: string; message: string; variant: string } }) => {
@@ -357,6 +373,50 @@ describe("ralph-loop", () => {
       expect(state?.iteration).toBe(2)
     })
 
+    test("should defer iteration while shouldDeferIteration returns true", async () => {
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        shouldDeferIteration: () => true,
+      })
+      hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      expect(promptCalls.length).toBe(0)
+      expect(hook.getState()?.iteration).toBe(1)
+    })
+
+    test("should continue once shouldDeferIteration switches from true to false", async () => {
+      let shouldDefer = true
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        shouldDeferIteration: () => shouldDefer,
+      })
+      hook.startLoop("session-123", "Build a feature", { maxIterations: 10 })
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      shouldDefer = false
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
+    })
+
     test("should stop loop when max iterations reached", async () => {
       // given - loop at max iteration
       const hook = createRalphLoopHook(createMockPluginInput())
@@ -603,7 +663,36 @@ describe("ralph-loop", () => {
       expect(createSessionCalls.length).toBe(1)
       expect(promptCalls.length).toBe(1)
       expect(promptCalls[0].sessionID).toBe("new-session-1")
+      expect(promptCalls[0].text).toContain("<command-instruction>")
+      expect(promptCalls[0].text).toContain("You are starting a Ralph Loop")
+      expect(promptCalls[0].text).toContain("<user-task>")
+      expect(promptCalls[0].text).toContain("--strategy=reset")
+      expect(promptCalls[0].text).toContain("[RALPH LOOP - Iteration 2/")
       expect(hook.getState()?.session_id).toBe("new-session-1")
+    })
+
+    test("should replay full loop command for ULW reset iteration", async () => {
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Ship CSS fixes", {
+        strategy: "reset",
+        ultrawork: true,
+        maxIterations: 8,
+        completionPromise: "ULW_DONE",
+      })
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      expect(promptCalls.length).toBe(1)
+      expect(promptCalls[0].sessionID).toBe("new-session-1")
+      expect(promptCalls[0].text).toMatch(/^ultrawork\s+/)
+      expect(promptCalls[0].text).toContain("[RALPH LOOP - Iteration 2/8]")
+      expect(promptCalls[0].text).toContain("--completion-promise=\"ULW_DONE\"")
+      expect(promptCalls[0].text).toContain("--strategy=reset")
     })
 
     test("should inherit agent and variant from previous session during reset continuation", async () => {
@@ -987,6 +1076,27 @@ describe("ralph-loop", () => {
       expect(hook.getState()).toBeNull()
     })
 
+    test("should clear loop state when message.updated error message is nested in data.message", async () => {
+      const hook = createRalphLoopHook(createMockPluginInput())
+      hook.startLoop("session-123", "Build something")
+      expect(hook.getState()).not.toBeNull()
+
+      await hook.event({
+        event: {
+          type: "message.updated",
+          properties: {
+            info: {
+              sessionID: "session-123",
+              role: "assistant",
+              error: { data: { message: "Request was aborted by user" } },
+            },
+          },
+        },
+      })
+
+      expect(hook.getState()).toBeNull()
+    })
+
     test("should check last 3 assistant messages for completion", async () => {
       // given - multiple assistant messages, promise in recent (not last) assistant message
       mockSessionMessages = [
@@ -1338,7 +1448,7 @@ Original task: Build something`
           },
         },
       }
-      const hook = createRalphLoopHook(errorMock as any, {
+      const hook = createRalphLoopHook(errorMock as unknown as Parameters<typeof createRalphLoopHook>[0], {
         getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
         apiTimeout: 100,
       })

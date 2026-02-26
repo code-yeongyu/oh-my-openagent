@@ -159,11 +159,18 @@ export function createChatMessageHandler(args: {
       const isRalphLoopTemplate =
         promptText.includes("You are starting a Ralph Loop") &&
         promptText.includes("<user-task>")
+      const isRalphResetIterationPrompt =
+        promptText.includes("[RALPH LOOP - Iteration ") &&
+        promptText.includes("<command-instruction>") &&
+        promptText.includes("<user-task>")
       const isCancelRalphTemplate = promptText.includes(
         "Cancel the currently active Ralph Loop",
       )
+      const activeRalphLoopState = hooks.ralphLoop.getState()
+      const isActiveRalphLoopSession =
+        activeRalphLoopState?.active === true && activeRalphLoopState.session_id === input.sessionID
 
-      if (isRalphLoopTemplate) {
+      if (isRalphLoopTemplate && !isRalphResetIterationPrompt && !isActiveRalphLoopSession) {
         const taskMatch = promptText.match(/<user-task>\s*([\s\S]*?)\s*<\/user-task>/i)
         const rawTask = taskMatch?.[1]?.trim() || ""
         const parsedArguments = parseRalphLoopArguments(rawTask)

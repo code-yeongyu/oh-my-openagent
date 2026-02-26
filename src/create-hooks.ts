@@ -8,6 +8,7 @@ import type { ModelCacheState } from "./plugin-state"
 import { createCoreHooks } from "./plugin/hooks/create-core-hooks"
 import { createContinuationHooks } from "./plugin/hooks/create-continuation-hooks"
 import { createSkillHooks } from "./plugin/hooks/create-skill-hooks"
+import { normalizeSDKResponse } from "./shared"
 
 export type CreatedHooks = ReturnType<typeof createHooks>
 
@@ -63,6 +64,33 @@ export function createHooks(args: {
         }).catch(() => false)
       )
     )
+  })
+
+  core.ralphLoop?.setShouldDeferIteration(async (sessionID: string) => {
+    const hasRunningDescendantTasks = backgroundManager
+      .getAllDescendantTasks(sessionID)
+      .some((task) => task.status === "running" || task.status === "pending")
+
+    if (hasRunningDescendantTasks) {
+      return true
+    }
+
+    try {
+      const response = await ctx.client.session.todo({ path: { id: sessionID } })
+      const todos = normalizeSDKResponse(response, [] as Array<{ status?: string }>, {
+        preferResponseOnMissingData: true,
+      })
+
+      if (!todos || todos.length === 0) {
+        return false
+      }
+
+      return todos.some(
+        (todo) => todo.status !== "completed" && todo.status !== "cancelled"
+      )
+    } catch {
+      return true
+    }
   })
 
   const skill = createSkillHooks({
