@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, it, test } from "bun:test"
 import { z } from "zod"
 import { AthenaConfigSchema, CouncilConfigSchema, CouncilMemberSchema } from "./athena"
 
@@ -427,5 +427,106 @@ describe("AthenaConfigSchema", () => {
 
     //#then
     expect(result.success).toBe(false)
+  })
+})
+
+describe("CouncilConfigSchema — resilience fields", () => {
+  const validMembers = [
+    { model: "openai/gpt-5.3-codex", name: "member-a" },
+    { model: "anthropic/claude-opus-4-6", name: "member-b" },
+  ]
+
+  describe("#given minimal config with only members", () => {
+    describe("#when parsed", () => {
+      it("#then applies default retry_on_fail of 0", () => {
+        const result = CouncilConfigSchema.safeParse({ members: validMembers })
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.retry_on_fail).toBe(0)
+        }
+      })
+
+      it("#then applies default retry_failed_if_others_finished of false", () => {
+        const result = CouncilConfigSchema.safeParse({ members: validMembers })
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.retry_failed_if_others_finished).toBe(false)
+        }
+      })
+
+      it("#then applies default cancel_retrying_on_quorum of true", () => {
+        const result = CouncilConfigSchema.safeParse({ members: validMembers })
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.cancel_retrying_on_quorum).toBe(true)
+        }
+      })
+
+      it("#then applies default stuck_threshold_seconds of 120", () => {
+        const result = CouncilConfigSchema.safeParse({ members: validMembers })
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.stuck_threshold_seconds).toBe(120)
+        }
+      })
+    })
+  })
+
+  describe("#given config with all resilience fields set", () => {
+    describe("#when parsed", () => {
+      it("#then uses provided values instead of defaults", () => {
+        const config = {
+          members: validMembers,
+          retry_on_fail: 3,
+          retry_failed_if_others_finished: true,
+          cancel_retrying_on_quorum: false,
+          stuck_threshold_seconds: 60,
+        }
+        const result = CouncilConfigSchema.safeParse(config)
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.retry_on_fail).toBe(3)
+          expect(result.data.retry_failed_if_others_finished).toBe(true)
+          expect(result.data.cancel_retrying_on_quorum).toBe(false)
+          expect(result.data.stuck_threshold_seconds).toBe(60)
+        }
+      })
+    })
+  })
+
+  describe("#given retry_on_fail below minimum", () => {
+    describe("#when parsed with -1", () => {
+      it("#then fails validation", () => {
+        const result = CouncilConfigSchema.safeParse({ members: validMembers, retry_on_fail: -1 })
+        expect(result.success).toBe(false)
+      })
+    })
+  })
+
+  describe("#given retry_on_fail above maximum", () => {
+    describe("#when parsed with 6", () => {
+      it("#then fails validation", () => {
+        const result = CouncilConfigSchema.safeParse({ members: validMembers, retry_on_fail: 6 })
+        expect(result.success).toBe(false)
+      })
+    })
+  })
+
+  describe("#given stuck_threshold_seconds below minimum", () => {
+    describe("#when parsed with 10", () => {
+      it("#then fails validation", () => {
+        const result = CouncilConfigSchema.safeParse({ members: validMembers, stuck_threshold_seconds: 10 })
+        expect(result.success).toBe(false)
+      })
+    })
+  })
+
+  describe("#given backward-compatible config with only members", () => {
+    describe("#when parsed", () => {
+      it("#then succeeds without errors — new fields are optional", () => {
+        const result = CouncilConfigSchema.safeParse({ members: validMembers })
+        expect(result.success).toBe(true)
+      })
+    })
   })
 })
