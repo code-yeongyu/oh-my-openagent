@@ -31,6 +31,8 @@ export interface BackgroundTask {
   result?: string
   error?: string
   progress?: TaskProgress
+  /** Current session state cached from polling (e.g., 'idle', 'running', 'retry') */
+  sessionState?: string
   parentModel?: { providerID: string; modelID: string }
   model?: { providerID: string; modelID: string; variant?: string }
   /** Fallback chain for runtime retry on model errors */

@@ -1212,6 +1212,7 @@ export class BackgroundManager {
     // Atomically mark as completed to prevent race conditions
     task.status = "completed"
     task.completedAt = new Date()
+    task.sessionState = undefined
     this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
 
     // Release concurrency BEFORE any async operations to prevent slot leaks
@@ -1522,6 +1523,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
 
       try {
         const sessionStatus = allStatuses[sessionID]
+        task.sessionState = sessionStatus?.type
         
         if (sessionStatus?.type === "idle") {
           if (this.recentlyCompactedSessions.has(sessionID)) {
