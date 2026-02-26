@@ -66,6 +66,7 @@ export async function injectBoulderContinuation(input: {
     log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
   } catch (err) {
     sessionState.promptFailureCount += 1
+    sessionState.lastFailureAt = Date.now()
     log(`[${HOOK_NAME}] Boulder continuation failed`, {
       sessionID,
       error: String(err),
