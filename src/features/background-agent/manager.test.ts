@@ -2987,6 +2987,28 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
     manager.shutdown()
     resetToastManager()
   })
+
+  test("should clean pending notifications for deleted sessions", () => {
+    //#given
+    const manager = createBackgroundManager()
+    const sessionID = "session-pending-notifications"
+
+    manager.queuePendingNotification(sessionID, "<system-reminder>queued</system-reminder>")
+    expect(getPendingNotifications(manager).get(sessionID)).toEqual([
+      "<system-reminder>queued</system-reminder>",
+    ])
+
+    //#when
+    manager.handleEvent({
+      type: "session.deleted",
+      properties: { info: { id: sessionID } },
+    })
+
+    //#then
+    expect(getPendingNotifications(manager).has(sessionID)).toBe(false)
+
+    manager.shutdown()
+  })
 })
 
 describe("BackgroundManager.handleEvent - session.error", () => {
