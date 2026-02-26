@@ -24,19 +24,7 @@
     "disabled_agents": {
       "type": "array",
       "items": {
-        "type": "string",
-        "enum": [
-          "sisyphus",
-          "hephaestus",
-          "prometheus",
-          "oracle",
-          "librarian",
-          "explore",
-          "multimodal-looker",
-          "metis",
-          "momus",
-          "atlas"
-        ]
+        "type": "string"
       }
     },
     "disabled_skills": {
