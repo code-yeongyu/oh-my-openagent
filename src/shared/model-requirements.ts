@@ -26,7 +26,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["openai", "opencode"], model: "gpt-5.3-codex", variant: "medium" },
     ],
-    requiresProvider: ["openai", "opencode"],
+    // Provider restriction removed to support custom OpenAI-compatible providers
+    // Users can configure any model via oh-my-opencode.json
   },
   oracle: {
     fallbackChain: [

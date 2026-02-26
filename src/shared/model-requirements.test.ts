@@ -168,14 +168,14 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("opencode")
   })
 
-  test("hephaestus requires openai/opencode provider (not github-copilot since gpt-5.3-codex unavailable there)", () => {
+  test("hephaestus has no provider restriction (supports custom OpenAI-compatible providers)", () => {
     // #given - hephaestus agent requirement
     const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
 
     // #when - accessing hephaestus requirement
-    // #then - requiresProvider is set to openai and opencode only (github-copilot removed)
+    // #then - requiresProvider is undefined to allow custom providers via user config
     expect(hephaestus).toBeDefined()
-    expect(hephaestus.requiresProvider).toEqual(["openai", "opencode"])
+    expect(hephaestus.requiresProvider).toBeUndefined()
     expect(hephaestus.requiresModel).toBeUndefined()
   })
 
