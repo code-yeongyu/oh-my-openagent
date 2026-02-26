@@ -21,6 +21,10 @@ export const CouncilMemberSchema = z.object({
 
 export const CouncilConfigSchema = z.object({
   members: z.array(CouncilMemberSchema).min(2),
+  retry_on_fail: z.number().min(0).max(5).default(0),
+  retry_failed_if_others_finished: z.boolean().default(false),
+  cancel_retrying_on_quorum: z.boolean().default(true),
+  stuck_threshold_seconds: z.number().min(30).default(120),
 }).strict()
 
 export type CouncilMemberConfig = z.infer<typeof CouncilMemberSchema>
