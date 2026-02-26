@@ -26,6 +26,7 @@ export function createLoopStateController(options: {
 				messageCountAtStart?: number
 				ultrawork?: boolean
 				strategy?: "reset" | "continue"
+				rawTaskArguments?: string
 			},
 		): boolean {
 			const state: RalphLoopState = {
@@ -43,6 +44,7 @@ export function createLoopStateController(options: {
 				strategy: loopOptions?.strategy ?? config?.default_strategy ?? "continue",
 				started_at: new Date().toISOString(),
 				prompt,
+				raw_task_arguments: loopOptions?.rawTaskArguments,
 				session_id: sessionID,
 			}
 

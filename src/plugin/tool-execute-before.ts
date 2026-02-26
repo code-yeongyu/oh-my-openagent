@@ -77,6 +77,7 @@ export function createToolExecuteBeforeHandler(args: {
           maxIterations: parsedArguments.maxIterations,
           completionPromise: parsedArguments.completionPromise,
           strategy: parsedArguments.strategy,
+          rawTaskArguments: rawArgs,
         })
       } else if (command === "cancel-ralph" && sessionID) {
         hooks.ralphLoop.cancelLoop(sessionID)
@@ -89,6 +90,7 @@ export function createToolExecuteBeforeHandler(args: {
           maxIterations: parsedArguments.maxIterations,
           completionPromise: parsedArguments.completionPromise,
           strategy: parsedArguments.strategy,
+          rawTaskArguments: rawArgs,
         })
       }
     }

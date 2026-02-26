@@ -10,6 +10,10 @@ function quoteCommandValue(value: string): string {
 }
 
 function buildLoopCommandArguments(state: RalphLoopState): string {
+  if (state.raw_task_arguments) {
+    return state.raw_task_arguments
+  }
+
   const flags = [
     `--completion-promise=${quoteCommandValue(state.completion_promise)}`,
     `--max-iterations=${state.max_iterations}`,

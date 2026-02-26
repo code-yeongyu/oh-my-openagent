@@ -180,6 +180,7 @@ export function createChatMessageHandler(args: {
           maxIterations: parsedArguments.maxIterations,
           completionPromise: parsedArguments.completionPromise,
           strategy: parsedArguments.strategy,
+          rawTaskArguments: rawTask,
         })
 
         if (started) {

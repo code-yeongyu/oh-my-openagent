@@ -16,6 +16,11 @@ type ParsedQuoted = {
   endIndex: number
 }
 
+type ParsedPrompt = {
+  prompt: string
+  flagsSource: string
+}
+
 function decodeEscapedCharacter(char: string): string {
   if (char === "n") return "\n"
   if (char === "r") return "\r"
@@ -56,6 +61,70 @@ function parseQuotedAt(input: string, startIndex: number): ParsedQuoted | null {
   return null
 }
 
+function decodeQuotedValue(rawValue: string): string {
+  let value = ""
+  let escaped = false
+
+  for (let index = 0; index < rawValue.length; index++) {
+    const char = rawValue[index]
+
+    if (escaped) {
+      value += decodeEscapedCharacter(char)
+      escaped = false
+      continue
+    }
+
+    if (char === "\\") {
+      escaped = true
+      continue
+    }
+
+    value += char
+  }
+
+  if (escaped) {
+    value += "\\"
+  }
+
+  return value
+}
+
+function parseQuotedPromptUsingTrailingFlags(
+  rawArguments: string,
+  firstNonWhitespace: number,
+): ParsedPrompt | null {
+  const quote = rawArguments[firstNonWhitespace]
+  if (quote !== '"' && quote !== "'") {
+    return null
+  }
+
+  const afterOpeningQuote = rawArguments.slice(firstNonWhitespace + 1)
+  const firstFlagMatch = /\s--(?:completion-promise|max-iterations|strategy)=/i.exec(afterOpeningQuote)
+
+  if (firstFlagMatch) {
+    const flagStart = firstNonWhitespace + 1 + (firstFlagMatch.index ?? 0)
+    const closingQuote = rawArguments.lastIndexOf(quote, flagStart - 1)
+    if (closingQuote > firstNonWhitespace) {
+      const rawPrompt = rawArguments.slice(firstNonWhitespace + 1, closingQuote)
+      return {
+        prompt: decodeQuotedValue(rawPrompt) || DEFAULT_PROMPT,
+        flagsSource: rawArguments.slice(flagStart),
+      }
+    }
+  }
+
+  const closingQuote = rawArguments.lastIndexOf(quote)
+  if (closingQuote > firstNonWhitespace) {
+    const rawPrompt = rawArguments.slice(firstNonWhitespace + 1, closingQuote)
+    return {
+      prompt: decodeQuotedValue(rawPrompt) || DEFAULT_PROMPT,
+      flagsSource: rawArguments.slice(closingQuote + 1),
+    }
+  }
+
+  return null
+}
+
 function parseLeadingPrompt(rawArguments: string): { prompt: string; flagsSource: string } {
   let firstNonWhitespace = 0
   while (firstNonWhitespace < rawArguments.length && /\s/.test(rawArguments[firstNonWhitespace] ?? "")) {
@@ -75,6 +144,11 @@ function parseLeadingPrompt(rawArguments: string): { prompt: string; flagsSource
         flagsSource: rawArguments.slice(resetPromptBlockEnd + RESET_PROMPT_BLOCK_END.length),
       }
     }
+  }
+
+  const trailingFlagQuotedPrompt = parseQuotedPromptUsingTrailingFlags(rawArguments, firstNonWhitespace)
+  if (trailingFlagQuotedPrompt) {
+    return trailingFlagQuotedPrompt
   }
 
   const leadingQuotedPrompt = parseQuotedAt(rawArguments, firstNonWhitespace)
