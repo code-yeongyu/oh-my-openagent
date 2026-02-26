@@ -1,18 +1,24 @@
 import type { HashlineEdit } from "./types"
 import { toNewLines } from "./edit-text-normalization"
+import { normalizeLineRef } from "./validation"
 
 function normalizeEditPayload(payload: string | string[]): string {
   return toNewLines(payload).join("\n")
 }
 
+function canonicalAnchor(anchor: string | undefined): string {
+  if (!anchor) return ""
+  return normalizeLineRef(anchor)
+}
+
 function buildDedupeKey(edit: HashlineEdit): string {
   switch (edit.op) {
     case "replace":
-      return `replace|${edit.pos}|${edit.end ?? ""}|${normalizeEditPayload(edit.lines)}`
+      return `replace|${canonicalAnchor(edit.pos)}|${edit.end ? canonicalAnchor(edit.end) : ""}|${normalizeEditPayload(edit.lines)}`
     case "append":
-      return `append|${edit.pos ?? ""}|${normalizeEditPayload(edit.lines)}`
+      return `append|${canonicalAnchor(edit.pos)}|${normalizeEditPayload(edit.lines)}`
     case "prepend":
-      return `prepend|${edit.pos ?? ""}|${normalizeEditPayload(edit.lines)}`
+      return `prepend|${canonicalAnchor(edit.pos)}|${normalizeEditPayload(edit.lines)}`
     default:
       return JSON.stringify(edit)
   }
