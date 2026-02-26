@@ -138,7 +138,10 @@ export function getNextFallback(
       continue
     }
 
-    const providerID = selectFallbackProvider(fallback.providers, state.providerID)
+    const preferredProviderID = fallback.providers.find(
+      (provider) => provider.toLowerCase() === state.providerID.toLowerCase(),
+    )
+    const providerID = preferredProviderID ?? selectFallbackProvider(fallback.providers, state.providerID)
     state.pending = false
 
     log("[model-fallback] Using fallback for session: " + sessionID + ", attempt: " + attemptCount + ", model: " + fallback.model)
