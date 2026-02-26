@@ -6,12 +6,12 @@ export function transformModelForProvider(provider: string, model: string): stri
 			.replace("claude-sonnet-4-5", "claude-sonnet-4.5")
 			.replace("claude-haiku-4-5", "claude-haiku-4.5")
 			.replace("claude-sonnet-4", "claude-sonnet-4")
-			.replace(/gemini-3-pro(?!-)/g, "gemini-3-pro-preview")
+			.replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
 			.replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
 	}
 	if (provider === "google") {
 		return model
-			.replace(/gemini-3-pro(?!-)/g, "gemini-3-pro-preview")
+			.replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
 			.replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
 	}
 	return model

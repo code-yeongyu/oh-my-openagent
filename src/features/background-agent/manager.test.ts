@@ -191,6 +191,10 @@ function getPendingByParent(manager: BackgroundManager): Map<string, Set<string>
   return (manager as unknown as { pendingByParent: Map<string, Set<string>> }).pendingByParent
 }
 
+function getPendingNotifications(manager: BackgroundManager): Map<string, string[]> {
+  return (manager as unknown as { pendingNotifications: Map<string, string[]> }).pendingNotifications
+}
+
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
   return (manager as unknown as { completionTimers: Map<string, ReturnType<typeof setTimeout>> }).completionTimers
 }
@@ -1057,6 +1061,49 @@ describe("BackgroundManager.notifyParentSession - aborted parent", () => {
 
     manager.shutdown()
   })
+
+  test("should queue notification when promptAsync aborts while parent is idle", async () => {
+    //#given
+    const promptMock = async () => {
+      const error = new Error("Request aborted while waiting for input")
+      error.name = "MessageAbortedError"
+      throw error
+    }
+    const client = {
+      session: {
+        prompt: promptMock,
+        promptAsync: promptMock,
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-aborted-idle-queue",
+      sessionID: "session-child",
+      parentSessionID: "session-parent",
+      parentMessageID: "msg-parent",
+      description: "task idle queue",
+      prompt: "test",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getPendingByParent(manager).set("session-parent", new Set([task.id]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    const queuedNotifications = getPendingNotifications(manager).get("session-parent") ?? []
+    expect(queuedNotifications).toHaveLength(1)
+    expect(queuedNotifications[0]).toContain("<system-reminder>")
+    expect(queuedNotifications[0]).toContain("[ALL BACKGROUND TASKS COMPLETE]")
+
+    manager.shutdown()
+  })
 })
 
 describe("BackgroundManager.notifyParentSession - notifications toggle", () => {
@@ -1100,6 +1147,29 @@ describe("BackgroundManager.notifyParentSession - notifications toggle", () => {
 
     //#then
     expect(promptCalled).toBe(false)
+
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager.injectPendingNotificationsIntoChatMessage", () => {
+  test("should prepend queued notifications to first text part and clear queue", () => {
+    // given
+    const manager = createBackgroundManager()
+    manager.queuePendingNotification("session-parent", "<system-reminder>queued-one</system-reminder>")
+    manager.queuePendingNotification("session-parent", "<system-reminder>queued-two</system-reminder>")
+    const output = {
+      parts: [{ type: "text", text: "User prompt" }],
+    }
+
+    // when
+    manager.injectPendingNotificationsIntoChatMessage(output, "session-parent")
+
+    // then
+    expect(output.parts[0].text).toContain("<system-reminder>queued-one</system-reminder>")
+    expect(output.parts[0].text).toContain("<system-reminder>queued-two</system-reminder>")
+    expect(output.parts[0].text).toContain("User prompt")
+    expect(getPendingNotifications(manager).get("session-parent")).toBeUndefined()
 
     manager.shutdown()
   })

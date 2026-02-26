@@ -1,21 +1,16 @@
 export interface ThinkModeState {
   requested: boolean
   modelSwitched: boolean
-  thinkingConfigInjected: boolean
+  variantSet: boolean
   providerID?: string
   modelID?: string
 }
 
-export interface ModelRef {
+interface ModelRef {
   providerID: string
   modelID: string
 }
 
-export interface MessageWithModel {
+interface MessageWithModel {
   model?: ModelRef
-}
-
-export interface ThinkModeInput {
-  parts: Array<{ type: string; text?: string }>
-  message: MessageWithModel
 }

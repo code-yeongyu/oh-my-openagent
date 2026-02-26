@@ -41,6 +41,23 @@ describe("generateUnifiedDiff", () => {
     expect(diff).toContain(" line 13")
   })
 
+  it("limits each hunk to three context lines", () => {
+    //#given
+    const oldContent = createNumberedLines(20)
+    const newLines = oldContent.split("\n")
+    newLines[9] = "line 10 updated"
+    const newContent = newLines.join("\n")
+
+    //#when
+    const diff = generateUnifiedDiff(oldContent, newContent, "sample.txt")
+
+    //#then
+    expect(diff).toContain(" line 7")
+    expect(diff).toContain(" line 13")
+    expect(diff).not.toContain(" line 6")
+    expect(diff).not.toContain(" line 14")
+  })
+
   it("returns a diff string for identical content", () => {
     //#given
     const oldContent = "alpha\nbeta\ngamma"

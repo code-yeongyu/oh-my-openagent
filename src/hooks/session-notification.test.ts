@@ -1,8 +1,9 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
+const { describe, expect, test, beforeEach, afterEach, spyOn } = require("bun:test")
 
 import { createSessionNotification } from "./session-notification"
 import { setMainSession, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
 import * as utils from "./session-notification-utils"
+import * as sender from "./session-notification-sender"
 
 describe("session-notification", () => {
   let notificationCalls: string[]
@@ -40,6 +41,10 @@ describe("session-notification", () => {
     spyOn(utils, "getPaplayPath").mockResolvedValue("/usr/bin/paplay")
     spyOn(utils, "getAplayPath").mockResolvedValue("/usr/bin/aplay")
     spyOn(utils, "startBackgroundCheck").mockImplementation(() => {})
+    spyOn(sender, "detectPlatform").mockReturnValue("darwin")
+    spyOn(sender, "sendSessionNotification").mockImplementation(async (_ctx, _platform, _title, message) => {
+      notificationCalls.push(message)
+    })
   })
 
   afterEach(() => {
@@ -105,6 +110,7 @@ describe("session-notification", () => {
     const hook = createSessionNotification(createMockPluginInput(), {
       idleConfirmationDelay: 10,
       skipIfIncompleteTodos: false,
+      enforceMainSessionFilter: false,
     })
 
     // when - main session goes idle
@@ -332,6 +338,7 @@ describe("session-notification", () => {
     const hook = createSessionNotification(createMockPluginInput(), {
       idleConfirmationDelay: 10,
       skipIfIncompleteTodos: false,
+      enforceMainSessionFilter: false,
     })
 
     // when - session goes idle twice

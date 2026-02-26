@@ -399,6 +399,43 @@ describe("promptSyncWithModelSuggestionRetry", () => {
     expect(promptAsyncMock).toHaveBeenCalledTimes(0)
   })
 
+  it("should abort and throw timeout error when sync prompt hangs", async () => {
+    // given a client where sync prompt never resolves unless aborted
+    let receivedSignal: AbortSignal | undefined
+    const promptMock = mock((input: { signal?: AbortSignal }) => {
+      receivedSignal = input.signal
+      return new Promise((_, reject) => {
+        const signal = input.signal
+        if (!signal) {
+          return
+        }
+        signal.addEventListener("abort", () => {
+          reject(signal.reason)
+        })
+      })
+    })
+    const client = {
+      session: {
+        prompt: promptMock,
+        promptAsync: mock(() => Promise.resolve()),
+      },
+    }
+
+    // when calling with short timeout
+    // then should abort the request and throw timeout error
+    await expect(
+      promptSyncWithModelSuggestionRetry(client as any, {
+        path: { id: "session-1" },
+        body: {
+          parts: [{ type: "text", text: "hello" }],
+          model: { providerID: "anthropic", modelID: "claude-sonnet-4" },
+        },
+      }, { timeoutMs: 1 })
+    ).rejects.toThrow("prompt timed out after 1ms")
+
+    expect(receivedSignal?.aborted).toBe(true)
+  })
+
   it("should retry with suggested model on ProviderModelNotFoundError", async () => {
     // given a client that fails first with model-not-found, then succeeds
     const promptMock = mock()

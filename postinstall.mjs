@@ -2,7 +2,7 @@
 // Runs after npm install to verify platform binary is available
 
 import { createRequire } from "node:module";
-import { getPlatformPackage, getBinaryPath } from "./bin/platform.js";
+import { getPlatformPackageCandidates, getBinaryPath } from "./bin/platform.js";
 
 const require = createRequire(import.meta.url);
 
@@ -27,12 +27,28 @@ function main() {
   const libcFamily = getLibcFamily();
   
   try {
-    const pkg = getPlatformPackage({ platform, arch, libcFamily });
-    const binPath = getBinaryPath(pkg, platform);
-    
-    // Try to resolve the binary
-    require.resolve(binPath);
-    console.log(`✓ oh-my-opencode binary installed for ${platform}-${arch}`);
+    const packageCandidates = getPlatformPackageCandidates({
+      platform,
+      arch,
+      libcFamily,
+    });
+
+    const resolvedPackage = packageCandidates.find((pkg) => {
+      try {
+        require.resolve(getBinaryPath(pkg, platform));
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    if (!resolvedPackage) {
+      throw new Error(
+        `No platform binary package installed. Tried: ${packageCandidates.join(", ")}`
+      );
+    }
+
+    console.log(`✓ oh-my-opencode binary installed for ${platform}-${arch} (${resolvedPackage})`);
   } catch (error) {
     console.warn(`⚠ oh-my-opencode: ${error.message}`);
     console.warn(`  The CLI may not work on this platform.`);

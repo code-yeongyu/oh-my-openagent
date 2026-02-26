@@ -33,7 +33,7 @@ function resolveToolCallID(ctx: ToolContextWithCallID): string | undefined {
 
 function canCreateFromMissingFile(edits: HashlineEdit[]): boolean {
   if (edits.length === 0) return false
-  return edits.every((edit) => edit.op === "append" || edit.op === "prepend")
+  return edits.every((edit) => (edit.op === "append" || edit.op === "prepend") && !edit.pos)
 }
 
 function buildSuccessMeta(
@@ -86,18 +86,18 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
     const filePath = args.filePath
     const { delete: deleteMode, rename } = args
 
+    if (deleteMode && rename) {
+      return "Error: delete and rename cannot be used together"
+    }
+    if (deleteMode && args.edits.length > 0) {
+      return "Error: delete mode requires edits to be an empty array"
+    }
+
     if (!deleteMode && (!args.edits || !Array.isArray(args.edits) || args.edits.length === 0)) {
       return "Error: edits parameter must be a non-empty array"
     }
 
     const edits = deleteMode ? [] : normalizeHashlineEdits(args.edits)
-
-    if (deleteMode && rename) {
-      return "Error: delete and rename cannot be used together"
-    }
-    if (deleteMode && edits.length > 0) {
-      return "Error: delete mode requires edits to be an empty array"
-    }
 
     const file = Bun.file(filePath)
     const exists = await file.exists()

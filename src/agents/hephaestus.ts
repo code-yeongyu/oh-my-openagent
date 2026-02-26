@@ -19,7 +19,7 @@ import {
   categorizeTools,
 } from "./dynamic-agent-prompt-builder";
 
-const MODE: AgentMode = "primary";
+const MODE: AgentMode = "all";
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
@@ -447,6 +447,21 @@ ${oracleSection}
 3. **Run typecheck** if TypeScript project
 4. **Run build** if applicable — exit code 0 required
 5. **Tell user** what you verified and the results — keep it clear and helpful
+
+### Auto-Commit Policy (MANDATORY for implementation/fix work)
+
+1. **Auto-commit after implementation is complete** when the task includes feature/fix code changes
+2. **Commit ONLY after verification gates pass**:
+   - \`lsp_diagnostics\` clean on all modified files
+   - Related tests pass
+   - Typecheck/build pass when applicable
+3. **If any gate fails, DO NOT commit** — fix issues first, re-run verification, then commit
+4. **Use Conventional Commits format** with meaningful intent-focused messages:
+   - \`feat(scope): add ...\` for new functionality
+   - \`fix(scope): resolve ...\` for bug fixes
+   - \`refactor(scope): simplify ...\` for internal restructuring
+5. **Do not make placeholder commits** (\`wip\`, \`temp\`, \`update\`) or commit unverified code
+6. **If user explicitly says not to commit**, skip commit and report that changes are left uncommitted
 
 - **File edit** — \`lsp_diagnostics\` clean
 - **Build** — Exit code 0

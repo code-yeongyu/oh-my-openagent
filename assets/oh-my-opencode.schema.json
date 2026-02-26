@@ -24,19 +24,7 @@
     "disabled_agents": {
       "type": "array",
       "items": {
-        "type": "string",
-        "enum": [
-          "sisyphus",
-          "hephaestus",
-          "prometheus",
-          "oracle",
-          "librarian",
-          "explore",
-          "multimodal-looker",
-          "metis",
-          "momus",
-          "atlas"
-        ]
+        "type": "string"
       }
     },
     "disabled_skills": {
@@ -960,6 +948,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "allow_non_gpt_model": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -3473,6 +3464,11 @@
           },
           "prompt_append": {
             "type": "string"
+          },
+          "max_prompt_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
           },
           "is_unstable_agent": {
             "type": "boolean"
