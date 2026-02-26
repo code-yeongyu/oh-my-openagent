@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { BackgroundManager } from "../../features/background-agent"
 
 import {
   clearContinuationMarker,
@@ -7,6 +8,11 @@ import {
 import { log } from "../../shared/logger"
 
 const HOOK_NAME = "stop-continuation-guard"
+
+type StopContinuationBackgroundManager = Pick<
+  BackgroundManager,
+  "getAllDescendantTasks" | "cancelTask"
+>
 
 export interface StopContinuationGuard {
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
@@ -17,7 +23,10 @@ export interface StopContinuationGuard {
 }
 
 export function createStopContinuationGuardHook(
-  ctx: PluginInput
+  ctx: PluginInput,
+  options?: {
+    backgroundManager?: StopContinuationBackgroundManager
+  }
 ): StopContinuationGuard {
   const stoppedSessions = new Set<string>()
 
@@ -25,6 +34,38 @@ export function createStopContinuationGuardHook(
     stoppedSessions.add(sessionID)
     setContinuationMarkerSource(ctx.directory, sessionID, "stop", "stopped", "continuation stopped")
     log(`[${HOOK_NAME}] Continuation stopped for session`, { sessionID })
+
+    const backgroundManager = options?.backgroundManager
+    if (!backgroundManager) {
+      return
+    }
+
+    const cancellableTasks = backgroundManager
+      .getAllDescendantTasks(sessionID)
+      .filter((task) => task.status === "running" || task.status === "pending")
+
+    if (cancellableTasks.length === 0) {
+      return
+    }
+
+    void Promise.allSettled(
+      cancellableTasks.map(async (task) => {
+        await backgroundManager.cancelTask(task.id, {
+          source: "stop-continuation",
+          reason: "Continuation stopped via /stop-continuation",
+          abortSession: task.status === "running",
+          skipNotification: true,
+        })
+      })
+    ).then((results) => {
+      const cancelledCount = results.filter((result) => result.status === "fulfilled").length
+      const failedCount = results.length - cancelledCount
+      log(`[${HOOK_NAME}] Cancelled background tasks for stopped session`, {
+        sessionID,
+        cancelledCount,
+        failedCount,
+      })
+    })
   }
 
   const isStopped = (sessionID: string): boolean => {
