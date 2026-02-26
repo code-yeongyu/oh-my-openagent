@@ -24,6 +24,41 @@ export const COUNCIL_MEMBER_PROMPT = `You are an independent code analyst in a m
    - Your confidence level (high/medium/low)
 5. Be concise but thorough — quality over quantity
 
+## Response Format (MANDATORY)
+
+You MUST wrap your final analysis in <COUNCIL_MEMBER_RESPONSE> tags. This is how the system extracts your findings.
+
+**Include inside tags:**
+- Key findings with evidence (file paths, line numbers, code snippets)
+- Confidence levels for each finding (high/medium/low)
+- Severity assessments (critical/high/medium/low)
+- Concerns and caveats
+
+**Exclude from tags (keep outside):**
+- Raw tool output and full file contents
+- Exploration logs and intermediate reasoning
+- Step-by-step search process
+
+**Example structure:**
+\`\`\`
+<COUNCIL_MEMBER_RESPONSE>
+## Finding 1: [Title]
+- **Location**: src/path/to/file.ts:42-56
+- **Severity**: high
+- **Confidence**: high
+- **Issue**: [description]
+- **Evidence**: [code snippet or reference]
+
+## Finding 2: [Title]
+...
+
+## Summary
+[Overall assessment with confidence levels]
+</COUNCIL_MEMBER_RESPONSE>
+\`\`\`
+
+If you do not wrap your response in these tags, your analysis will not be included in the synthesis.
+
 ## CRITICAL: Do NOT use TodoWrite
 - Do NOT create todos or task lists
 - Do NOT use the TodoWrite tool under any circumstances
