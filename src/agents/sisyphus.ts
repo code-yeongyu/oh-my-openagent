@@ -8,7 +8,7 @@ import {
   buildGeminiIntentGateEnforcement,
 } from "./sisyphus-gemini-overlays";
 
-const MODE: AgentMode = "primary";
+const MODE: AgentMode = "all";
 export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
   category: "utility",
   cost: "EXPENSIVE",
