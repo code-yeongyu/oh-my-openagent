@@ -194,22 +194,22 @@ When GitHub Copilot is the best available provider, oh-my-opencode uses these mo
 | **Sisyphus**  | `github-copilot/claude-opus-4.5` |
 | **Oracle**    | `github-copilot/gpt-5.2`         |
 | **Explore**   | `opencode/gpt-5-nano`              |
-| **Librarian** | `zai-coding-plan/glm-4.7` (if Z.ai available) or fallback |
+| **Librarian** | `zai-coding-plan/glm-5` (if Z.ai available) or fallback |
 
 GitHub Copilot acts as a proxy provider, routing requests to underlying models based on your subscription.
 
 #### Z.ai Coding Plan
 
-Z.ai Coding Plan provides access to GLM-4.7 models. When enabled, the **Librarian agent always uses `zai-coding-plan/glm-4.7`** regardless of other available providers.
+Z.ai Coding Plan provides access to GLM models (including GLM-5). When enabled, the **Librarian agent always uses `zai-coding-plan/glm-5`** regardless of other available providers.
 
 If Z.ai is the only provider available, all agents will use GLM models:
 
 | Agent         | Model                            |
 | ------------- | -------------------------------- |
-| **Sisyphus**  | `zai-coding-plan/glm-4.7`        |
-| **Oracle**    | `zai-coding-plan/glm-4.7`        |
+| **Sisyphus**  | `zai-coding-plan/glm-5`          |
+| **Oracle**    | `zai-coding-plan/glm-5`          |
 | **Explore**   | `zai-coding-plan/glm-4.7-flash`  |
-| **Librarian** | `zai-coding-plan/glm-4.7`        |
+| **Librarian** | `zai-coding-plan/glm-5`          |
 
 #### OpenCode Zen
 

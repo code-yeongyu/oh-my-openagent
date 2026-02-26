@@ -129,14 +129,14 @@ Here's a real-world config for a user with **Claude, OpenAI, Gemini, and Z.ai** 
   "agents": {
     // Override specific agents only - rest use fallback chain
     "atlas": { "model": "anthropic/claude-sonnet-4-5", "variant": "max" },
-    "librarian": { "model": "zai-coding-plan/glm-4.7" },
+    "librarian": { "model": "zai-coding-plan/glm-5" },
     "explore": { "model": "opencode/gpt-5-nano" },
     "multimodal-looker": { "model": "zai-coding-plan/glm-4.6v" }
   },
   "categories": {
     // Override categories for cost optimization
     "quick": { "model": "opencode/gpt-5-nano" },
-    "unspecified-low": { "model": "zai-coding-plan/glm-4.7" }
+    "unspecified-low": { "model": "zai-coding-plan/glm-5" }
   },
   "experimental": {
     "aggressive_truncation": true
