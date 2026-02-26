@@ -31,7 +31,6 @@ export function createHashlineEditTool(): ToolDefinition {
             end: tool.schema.string().optional().describe("Range end anchor in LINE#ID format"),
             lines: tool.schema
               .union([tool.schema.string(), tool.schema.array(tool.schema.string()), tool.schema.null()])
-              .optional()
               .describe("Replacement or inserted lines. null/[] deletes with replace"),
           })
         )
