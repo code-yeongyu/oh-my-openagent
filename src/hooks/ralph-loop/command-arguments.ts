@@ -22,9 +22,9 @@ type ParsedPrompt = {
 }
 
 function decodeEscapedCharacter(char: string): string {
-  if (char === "n") return "\n"
-  if (char === "r") return "\r"
-  if (char === "t") return "\t"
+  if (char === "n") return "\\n"
+  if (char === "r") return "\\r"
+  if (char === "t") return "\\t"
   return char
 }
 

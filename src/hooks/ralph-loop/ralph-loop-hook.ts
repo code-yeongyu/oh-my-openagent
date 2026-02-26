@@ -16,7 +16,6 @@ export interface RalphLoopHook {
       messageCountAtStart?: number
       ultrawork?: boolean
       strategy?: "reset" | "continue"
-      rawTaskArguments?: string
     }
   ) => boolean
   cancelLoop: (sessionID: string) => boolean

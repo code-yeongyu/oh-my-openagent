@@ -1,12 +1,13 @@
 /// <reference types="bun-types" />
 import { describe, expect, test, beforeEach, afterEach } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createRalphLoopHook } from "./index"
 import { readState, writeState, clearState } from "./storage"
 import type { RalphLoopState } from "./types"
 import { parseRalphLoopArguments } from "./command-arguments"
+import { buildLoopCommandArguments } from "./reset-iteration-prompt-builder"
 
 describe("ralph-loop", () => {
   const TEST_DIR = join(tmpdir(), "ralph-loop-test-" + Date.now())
@@ -213,41 +214,57 @@ describe("ralph-loop", () => {
       expect(readResult?.strategy).toBe("reset")
     })
 
-    test("should store and read raw task arguments field", () => {
+    test("should preserve prompt body as canonical opaque text", () => {
       const state: RalphLoopState = {
         active: true,
         iteration: 1,
         max_iterations: 50,
         completion_promise: "DONE",
         started_at: "2025-12-30T01:00:00Z",
-        prompt: "Build a REST API",
-        raw_task_arguments: '"Build a REST API with \"quotes\"" --strategy=reset --max-iterations=50',
+        prompt: '"Build a REST API with \"quotes\"" --strategy=reset --max-iterations=50 --completion-promise=DONE',
       }
 
       writeState(TEST_DIR, state)
       const readResult = readState(TEST_DIR)
 
-      expect(readResult?.raw_task_arguments).toBe(state.raw_task_arguments)
+      expect(readResult?.prompt).toBe(
+        '"Build a REST API with \"quotes\"" --strategy=reset --max-iterations=50 --completion-promise=DONE',
+      )
     })
 
-    test("should preserve literal backslash escape sequences in raw task arguments", () => {
+    test("should keep prompt body canonical and store it only once", () => {
       const state: RalphLoopState = {
         active: true,
         iteration: 1,
         max_iterations: 2,
         completion_promise: "NEVER_MATCH",
         started_at: "2025-12-30T01:00:00Z",
-        prompt: "fallback",
-        raw_task_arguments:
-          '"Path check: C:\\temp\\ralph\\test and json {\"n\":\"\\n\"}" --strategy=continue --max-iterations=2 --completion-promise=NEVER_MATCH',
+        prompt: "PRD file: @prd.md\nProgress file: @progress.md",
+      }
+
+      writeState(TEST_DIR, state)
+      const rawFile = readFileSync(join(TEST_DIR, ".sisyphus/ralph-loop.local.md"), "utf-8")
+      const promptOccurrences = rawFile.split("PRD file: @prd.md").length - 1
+
+      expect(rawFile).toContain("---\nPRD file: @prd.md")
+      expect(promptOccurrences).toBe(1)
+    })
+
+    test("should preserve leading and trailing whitespace in canonical prompt body", () => {
+      const prompt = "\n  keep leading and trailing whitespace  \n"
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 1,
+        max_iterations: 3,
+        completion_promise: "DONE",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt,
       }
 
       writeState(TEST_DIR, state)
       const readResult = readState(TEST_DIR)
 
-      expect(readResult?.raw_task_arguments).toContain("C:\\temp\\ralph\\test")
-      expect(readResult?.raw_task_arguments).toContain('{"n":"\\n"}')
-      expect(readResult?.raw_task_arguments?.includes("C:\temp")).toBe(false)
+      expect(readResult?.prompt).toBe(prompt)
     })
 
     test("should return null for non-existent state", () => {
@@ -389,6 +406,27 @@ Line two "quoted"
       expect(parsedArguments.strategy).toBe("reset")
     })
 
+    test("should parse generated reset command arguments with strict prompt boundary", () => {
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 2,
+        max_iterations: 2,
+        completion_promise: "NEVER_MATCH",
+        started_at: "2025-12-30T01:00:00Z",
+        prompt:
+          "PRD file: @prd.md\nProgress file: @progress.md\n1. Work ONLY one tiny task.\nSpecial chars: {\"x\":\"y\",\"n\":\"\\n\"}",
+        strategy: "reset",
+      }
+
+      const replayedArguments = buildLoopCommandArguments(state)
+      const parsedArguments = parseRalphLoopArguments(replayedArguments)
+
+      expect(parsedArguments.prompt).toBe(state.prompt)
+      expect(parsedArguments.completionPromise).toBe("NEVER_MATCH")
+      expect(parsedArguments.maxIterations).toBe(2)
+      expect(parsedArguments.strategy).toBe("reset")
+    })
+
     test("should preserve full quoted task containing unescaped inner quotes before flags", () => {
       const rawArguments = `"PRD file: @.sisyphus/prd.md
 Progress file: @.sisyphus/progress.md
@@ -402,7 +440,7 @@ If done, output: <promise>SINGLE_TASK_COMPLETE</promise>" --strategy=continue --
       const parsedArguments = parseRalphLoopArguments(rawArguments)
 
       expect(parsedArguments.prompt).toContain('double quotes: "alpha"')
-      expect(parsedArguments.prompt).toContain('json-like text: {"x":"y","n":"\n"}')
+      expect(parsedArguments.prompt).toContain('json-like text: {"x":"y","n":"\\n"}')
       expect(parsedArguments.prompt).toContain("If done, output: <promise>SINGLE_TASK_COMPLETE</promise>")
       expect(parsedArguments.strategy).toBe("continue")
       expect(parsedArguments.maxIterations).toBe(2)
@@ -828,7 +866,8 @@ If done, output: <promise>SINGLE_TASK_COMPLETE</promise>" --strategy=continue --
       expect(promptCalls.length).toBe(1)
       expect(promptCalls[0].text).toContain(multilinePrompt)
       expect(promptCalls[0].text.includes("\\n")).toBe(false)
-      expect(promptCalls[0].text).not.toContain("<ralph-prompt>")
+      expect(promptCalls[0].text).toContain("<ralph-prompt>")
+      expect(promptCalls[0].text).toContain("</ralph-prompt>")
       expect(promptCalls[0].text.includes('"PRD file:')).toBe(false)
     })
 
@@ -850,13 +889,14 @@ If done, output: <promise>SINGLE_TASK_COMPLETE</promise>" --strategy=continue --
       expect(promptCalls[0].text.includes("\\n")).toBe(false)
     })
 
-    test("should replay raw task arguments verbatim in reset iteration when available", async () => {
+    test("should include flags in reset iteration command body", async () => {
       const hook = createRalphLoopHook(createMockPluginInput())
-      const rawArguments = `"PRD file: @.sisyphus/prd.md\nSpecial chars: \"alpha\" and {\"x\":\"y\"}" --strategy=reset --max-iterations=2 --completion-promise=NEVER_MATCH`
+      const prompt = "PRD file: @.sisyphus/prd.md\nSpecial chars: \"alpha\" and {\"x\":\"y\"}"
 
-      hook.startLoop("session-123", "fallback prompt", {
+      hook.startLoop("session-123", prompt, {
         strategy: "reset",
-        rawTaskArguments: rawArguments,
+        maxIterations: 2,
+        completionPromise: "NEVER_MATCH",
       })
 
       await hook.event({
@@ -867,17 +907,21 @@ If done, output: <promise>SINGLE_TASK_COMPLETE</promise>" --strategy=continue --
       })
 
       expect(promptCalls.length).toBe(1)
-      expect(promptCalls[0].text).toContain(rawArguments)
+      expect(promptCalls[0].text).toContain(prompt)
+      expect(promptCalls[0].text).toContain("<ralph-prompt>")
+      expect(promptCalls[0].text).toContain("</ralph-prompt>")
+      expect(promptCalls[0].text).toContain("--completion-promise=\"NEVER_MATCH\" --max-iterations=2 --strategy=reset")
     })
 
-    test("should replay raw task arguments in continue prompt original task section when available", async () => {
+    test("should keep continue prompt original task section free of replay flags", async () => {
       const hook = createRalphLoopHook(createMockPluginInput())
       const backtickSubstitutionToken = "$`"
-      const rawArguments = `"Task with \"alpha\" and C:\\temp\\ralph\\test plus {\"x\":\"y\",\"n\":\"\\n\"} and dollar tokens $$ $& ${backtickSubstitutionToken}" --strategy=continue --max-iterations=2 --completion-promise=NEVER_MATCH`
+      const prompt = `Task with "alpha" and C:\\temp\\ralph\\test plus {"x":"y","n":"\\n"} and dollar tokens $$ $& ${backtickSubstitutionToken}`
 
-      hook.startLoop("session-123", "fallback prompt", {
+      hook.startLoop("session-123", prompt, {
         strategy: "continue",
-        rawTaskArguments: rawArguments,
+        maxIterations: 2,
+        completionPromise: "NEVER_MATCH",
       })
 
       await hook.event({
@@ -888,9 +932,10 @@ If done, output: <promise>SINGLE_TASK_COMPLETE</promise>" --strategy=continue --
       })
 
       expect(promptCalls.length).toBe(1)
-      expect(promptCalls[0].text).toContain(`Original task:\n${rawArguments}`)
-      expect(promptCalls[0].text).toContain("C:\\temp\\ralph\\test")
-      expect(promptCalls[0].text).toContain('{"x":"y","n":"\\n"}')
+      expect(promptCalls[0].text).toContain(`Original task:\n${prompt}`)
+      expect(promptCalls[0].text).not.toContain("--completion-promise=")
+      expect(promptCalls[0].text).not.toContain("--max-iterations=")
+      expect(promptCalls[0].text).not.toContain("--strategy=")
       expect(promptCalls[0].text).toContain("dollar tokens $$ $& $`")
     })
 

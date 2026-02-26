@@ -8,7 +8,6 @@ export interface RalphLoopState {
   completion_promise: string
   started_at: string
   prompt: string
-  raw_task_arguments?: string
   session_id?: string
   ultrawork?: boolean
   strategy?: "reset" | "continue"

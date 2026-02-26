@@ -4,13 +4,6 @@ import { parseFrontmatter } from "../../shared/frontmatter"
 import type { RalphLoopState } from "./types"
 import { DEFAULT_STATE_FILE, DEFAULT_COMPLETION_PROMISE, DEFAULT_MAX_ITERATIONS } from "./constants"
 
-function toLiteralBlock(value: string): string {
-  return value
-    .split("\n")
-    .map((line) => `  ${line}`)
-    .join("\n")
-}
-
 export function getStateFilePath(directory: string, customPath?: string): string {
   return customPath
     ? join(directory, customPath)
@@ -62,10 +55,7 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
       max_iterations: Number(data.max_iterations) || DEFAULT_MAX_ITERATIONS,
       completion_promise: stripQuotes(data.completion_promise) || DEFAULT_COMPLETION_PROMISE,
       started_at: stripQuotes(data.started_at) || new Date().toISOString(),
-      prompt: body.trim(),
-      raw_task_arguments: typeof data.raw_task_arguments === "string"
-        ? data.raw_task_arguments
-        : undefined,
+      prompt: body,
       session_id: data.session_id ? stripQuotes(data.session_id) : undefined,
       ultrawork: data.ultrawork === true || data.ultrawork === "true" ? true : undefined,
       strategy: data.strategy === "reset" || data.strategy === "continue" ? data.strategy : undefined,
@@ -91,18 +81,16 @@ export function writeState(
     const sessionIdLine = state.session_id ? `session_id: "${state.session_id}"\n` : ""
     const ultraworkLine = state.ultrawork !== undefined ? `ultrawork: ${state.ultrawork}\n` : ""
     const strategyLine = state.strategy ? `strategy: "${state.strategy}"\n` : ""
-    const rawTaskArgumentsLine = state.raw_task_arguments
-      ? `raw_task_arguments: |-\n${toLiteralBlock(state.raw_task_arguments)}\n`
-      : ""
+    const promptBody = state.prompt
     const content = `---
+format_version: 2
 active: ${state.active}
 iteration: ${state.iteration}
 max_iterations: ${state.max_iterations}
 completion_promise: "${state.completion_promise}"
 started_at: "${state.started_at}"
-${sessionIdLine}${ultraworkLine}${strategyLine}${rawTaskArgumentsLine}---
-${state.prompt}
-`
+${sessionIdLine}${ultraworkLine}${strategyLine}---
+${promptBody}`
 
     writeFileSync(filePath, content, "utf-8")
     return true

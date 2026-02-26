@@ -9,18 +9,16 @@ function quoteCommandValue(value: string): string {
   return `"${escapedValue}"`
 }
 
-function buildLoopCommandArguments(state: RalphLoopState): string {
-  if (state.raw_task_arguments) {
-    return state.raw_task_arguments
-  }
-
+export function buildLoopCommandArguments(state: RalphLoopState): string {
   const flags = [
     `--completion-promise=${quoteCommandValue(state.completion_promise)}`,
     `--max-iterations=${state.max_iterations}`,
     `--strategy=${state.strategy ?? "continue"}`,
   ]
 
-  return `${state.prompt}
+  return `<ralph-prompt>
+${state.prompt}
+</ralph-prompt>
 ${flags.join(" ")}`
 }
 
