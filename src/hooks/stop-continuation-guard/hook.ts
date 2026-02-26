@@ -4,6 +4,12 @@ import { log } from "../../shared/logger"
 
 const HOOK_NAME = "stop-continuation-guard"
 
+export interface StopContinuationGuardOptions {
+  backgroundManager?: {
+    cancelAllForSession: (sessionID: string) => number
+  }
+}
+
 export interface StopContinuationGuard {
   event: (input: { event: { type: string; properties?: unknown } }) => Promise<void>
   "chat.message": (input: { sessionID?: string }) => Promise<void>
@@ -13,13 +19,21 @@ export interface StopContinuationGuard {
 }
 
 export function createStopContinuationGuardHook(
-  _ctx: PluginInput
+  _ctx: PluginInput,
+  options?: StopContinuationGuardOptions
 ): StopContinuationGuard {
   const stoppedSessions = new Set<string>()
 
   const stop = (sessionID: string): void => {
     stoppedSessions.add(sessionID)
     log(`[${HOOK_NAME}] Continuation stopped for session`, { sessionID })
+
+    if (options?.backgroundManager) {
+      const cancelled = options.backgroundManager.cancelAllForSession(sessionID)
+      if (cancelled > 0) {
+        log(`[${HOOK_NAME}] Cancelled ${cancelled} background task(s) for session`, { sessionID })
+      }
+    }
   }
 
   const isStopped = (sessionID: string): boolean => {
