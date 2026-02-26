@@ -130,6 +130,8 @@ export function mergeConfigs(
       ]),
     ],
     claude_code: deepMerge(base.claude_code, override.claude_code),
+    default_injection_toggle:
+      override.default_injection_toggle ?? base.default_injection_toggle,
   };
 }
 

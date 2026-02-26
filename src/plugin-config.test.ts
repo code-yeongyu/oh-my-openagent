@@ -237,3 +237,19 @@ describe("parseConfigPartially", () => {
     });
   });
 });
+
+describe("default_injection_toggle field", () => {
+  it("parses and merges boolean values correctly", () => {
+    const base: OhMyOpenCodeConfig = { default_injection_toggle: false };
+    const override: OhMyOpenCodeConfig = { default_injection_toggle: true };
+    const result = mergeConfigs(base, override);
+    expect(result.default_injection_toggle).toBe(true);
+  });
+
+  it("keeps undefined when not provided", () => {
+    const base: OhMyOpenCodeConfig = {};
+    const override: OhMyOpenCodeConfig = {};
+    const result = mergeConfigs(base, override);
+    expect(result.default_injection_toggle).toBeUndefined();
+  });
+});

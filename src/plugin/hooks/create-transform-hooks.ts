@@ -15,7 +15,9 @@ import { safeCreateHook } from "../../shared/safe-create-hook"
 export type TransformHooks = {
   claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
-  contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
+  contextInjectorMessagesTransform:
+    | ReturnType<typeof createContextInjectorMessagesTransformHook>
+    | null
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
 }
 
@@ -27,6 +29,7 @@ export function createTransformHooks(args: {
 }): TransformHooks {
   const { ctx, pluginConfig, isHookEnabled } = args
   const safeHookEnabled = args.safeHookEnabled ?? true
+  const isContextInjectionEnabled = pluginConfig.default_injection_toggle ?? true
 
   const claudeCodeHooks = isHookEnabled("claude-code-hooks")
     ? safeCreateHook(
@@ -52,8 +55,13 @@ export function createTransformHooks(args: {
       )
     : null
 
-  const contextInjectorMessagesTransform =
-    createContextInjectorMessagesTransformHook(contextCollector)
+  const contextInjectorMessagesTransform = isContextInjectionEnabled
+    ? safeCreateHook(
+        "context-injector",
+        () => createContextInjectorMessagesTransformHook(contextCollector),
+        { enabled: safeHookEnabled },
+      )
+    : null
 
   const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
     ? safeCreateHook(

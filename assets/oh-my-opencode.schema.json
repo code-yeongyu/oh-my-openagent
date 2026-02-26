@@ -82,6 +82,9 @@
     "hashline_edit": {
       "type": "boolean"
     },
+    "default_injection_toggle": {
+      "type": "boolean"
+    },
     "model_fallback": {
       "type": "boolean"
     },
@@ -960,6 +963,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "allow_non_gpt_model": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -3247,6 +3253,11 @@
           },
           "prompt_append": {
             "type": "string"
+          },
+          "max_prompt_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
           },
           "is_unstable_agent": {
             "type": "boolean"
