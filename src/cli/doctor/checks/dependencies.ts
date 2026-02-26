@@ -3,6 +3,7 @@ import { createRequire } from "node:module"
 import { dirname, join } from "node:path"
 
 import type { DependencyInfo } from "../types"
+import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
 
 async function checkBinaryExists(binary: string): Promise<{ exists: boolean; path: string | null }> {
   try {
@@ -18,7 +19,7 @@ async function checkBinaryExists(binary: string): Promise<{ exists: boolean; pat
 
 async function getBinaryVersion(binary: string): Promise<string | null> {
   try {
-    const proc = Bun.spawn([binary, "--version"], { stdout: "pipe", stderr: "pipe" })
+    const proc = spawnWithWindowsHide([binary, "--version"], { stdout: "pipe", stderr: "pipe" })
     const output = await new Response(proc.stdout).text()
     await proc.exited
     if (proc.exitCode === 0) {
@@ -140,4 +141,3 @@ export async function checkCommentChecker(): Promise<DependencyInfo> {
     path: resolvedPath,
   }
 }
-

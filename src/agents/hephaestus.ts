@@ -19,7 +19,7 @@ import {
   categorizeTools,
 } from "./dynamic-agent-prompt-builder";
 
-const MODE: AgentMode = "primary";
+const MODE: AgentMode = "all";
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {

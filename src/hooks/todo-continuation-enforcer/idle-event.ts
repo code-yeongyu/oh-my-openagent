@@ -16,6 +16,7 @@ import {
   MAX_CONSECUTIVE_FAILURES,
 } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
+import { hasUnansweredQuestion } from "./pending-question-detection"
 import { getIncompleteCount } from "./todo"
 import type { MessageInfo, ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
@@ -73,6 +74,10 @@ export async function handleSessionIdle(args: {
     const messages = normalizeSDKResponse(messagesResp, [] as Array<{ info?: MessageInfo }>)
     if (isLastAssistantMessageAborted(messages)) {
       log(`[${HOOK_NAME}] Skipped: last assistant message was aborted (API fallback)`, { sessionID })
+      return
+    }
+    if (hasUnansweredQuestion(messages)) {
+      log(`[${HOOK_NAME}] Skipped: pending question awaiting user response`, { sessionID })
       return
     }
   } catch (error) {

@@ -1,4 +1,5 @@
 import { delimiter, dirname, join } from "node:path"
+import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 const OPENCODE_COMMANDS = ["opencode", "opencode-desktop"] as const
 const WINDOWS_SUFFIXES = ["", ".exe", ".cmd", ".bat", ".ps1"] as const
@@ -41,7 +42,7 @@ export function collectCandidateBinaryPaths(
 
 export async function canExecuteBinary(binaryPath: string): Promise<boolean> {
   try {
-    const proc = Bun.spawn([binaryPath, "--version"], {
+    const proc = spawnWithWindowsHide([binaryPath, "--version"], {
       stdout: "pipe",
       stderr: "pipe",
     })
