@@ -52,6 +52,7 @@ export async function detectCompletionInSessionMessages(
 		promise: string
 		apiTimeoutMs: number
 		directory: string
+		sinceMessageIndex?: number
 	},
 ): Promise<boolean> {
 	try {
@@ -75,7 +76,12 @@ export async function detectCompletionInSessionMessages(
 				? responseData
 				: []
 
-		const assistantMessages = (messageArray as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
+		const scopedMessages =
+			typeof options.sinceMessageIndex === "number" && options.sinceMessageIndex >= 0 && options.sinceMessageIndex < messageArray.length
+				? messageArray.slice(options.sinceMessageIndex)
+				: messageArray
+
+		const assistantMessages = (scopedMessages as OpenCodeSessionMessage[]).filter((msg) => msg.info?.role === "assistant")
 		if (assistantMessages.length === 0) return false
 
 		const pattern = buildPromisePattern(options.promise)
