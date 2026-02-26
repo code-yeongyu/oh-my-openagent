@@ -36,7 +36,7 @@ async function waitUntil(condition: () => boolean): Promise<void> {
 }
 
 describe("ralph-loop reset strategy race condition", () => {
-  test("should continue iteration when old session idle arrives before TUI switch completes", async () => {
+  test("should skip duplicate idle while reset iteration handling is in flight", async () => {
     // given - reset strategy loop with blocked TUI session switch
     const promptCalls: Array<{ sessionID: string; text: string }> = []
     const createSessionCalls: Array<{ parentID?: string }> = []
@@ -85,7 +85,7 @@ describe("ralph-loop reset strategy race condition", () => {
           },
         },
       },
-    } as Parameters<typeof createRalphLoopHook>[0])
+    } as unknown as Parameters<typeof createRalphLoopHook>[0])
 
     hook.startLoop("session-old", "Build feature", { strategy: "reset" })
 
@@ -100,14 +100,12 @@ describe("ralph-loop reset strategy race condition", () => {
       event: { type: "session.idle", properties: { sessionID: "session-old" } },
     })
 
-    await waitUntil(() => selectSessionCalls > 1)
-
     selectSessionDeferred.resolve()
     await Promise.all([firstIdleEvent, secondIdleEvent])
 
-    // then - second idle should not be skipped during reset transition
-    expect(createSessionCalls.length).toBe(2)
-    expect(promptCalls.length).toBe(2)
-    expect(hook.getState()?.iteration).toBe(3)
+    // then - duplicate idle should be skipped to prevent concurrent continuation injection
+    expect(createSessionCalls.length).toBe(1)
+    expect(promptCalls.length).toBe(1)
+    expect(hook.getState()?.iteration).toBe(2)
   })
 })

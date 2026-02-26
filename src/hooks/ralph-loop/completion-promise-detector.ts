@@ -79,8 +79,8 @@ export async function detectCompletionInSessionMessages(
 		if (assistantMessages.length === 0) return false
 
 		const pattern = buildPromisePattern(options.promise)
-		const recentAssistants = assistantMessages.slice(-3)
-		for (const assistant of recentAssistants) {
+		for (let index = assistantMessages.length - 1; index >= 0; index -= 1) {
+			const assistant = assistantMessages[index]
 			if (!assistant.parts) continue
 
 			let responseText = ""
