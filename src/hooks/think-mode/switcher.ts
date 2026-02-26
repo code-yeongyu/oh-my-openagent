@@ -62,8 +62,8 @@ const HIGH_VARIANT_MAP: Record<string, string> = {
   "claude-sonnet-4-6": "claude-sonnet-4-6-high",
   "claude-opus-4-6": "claude-opus-4-6-high",
    // Gemini
-   "gemini-3-pro": "gemini-3-pro-high",
-   "gemini-3-pro-low": "gemini-3-pro-high",
+   "gemini-3-1-pro": "gemini-3-1-pro-high",
+   "gemini-3-1-pro-low": "gemini-3-1-pro-high",
    "gemini-3-flash": "gemini-3-flash-high",
   // GPT-5
   "gpt-5": "gpt-5-high",
@@ -82,7 +82,7 @@ const HIGH_VARIANT_MAP: Record<string, string> = {
   "gpt-5-2-chat-latest": "gpt-5-2-chat-latest-high",
   "gpt-5-2-pro": "gpt-5-2-pro-high",
   // Antigravity (Google)
-  "antigravity-gemini-3-pro": "antigravity-gemini-3-pro-high",
+  "antigravity-gemini-3-1-pro": "antigravity-gemini-3-1-pro-high",
   "antigravity-gemini-3-flash": "antigravity-gemini-3-flash-high",
 }
 
@@ -113,5 +113,4 @@ export function isAlreadyHighVariant(modelID: string): boolean {
   const { base } = extractModelPrefix(normalized)
   return ALREADY_HIGH.has(base) || base.endsWith("-high")
 }
-
 
