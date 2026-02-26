@@ -1,9 +1,6 @@
 import type { RalphLoopState } from "./types"
 import { RALPH_LOOP_TEMPLATE } from "../../features/builtin-commands/templates/ralph-loop"
 
-const RESET_PROMPT_BLOCK_START = "<ralph-prompt>"
-const RESET_PROMPT_BLOCK_END = "</ralph-prompt>"
-
 function quoteCommandValue(value: string): string {
   const escapedValue = value
     .replace(/\\/g, "\\\\")
@@ -19,9 +16,7 @@ function buildLoopCommandArguments(state: RalphLoopState): string {
     `--strategy=${state.strategy ?? "continue"}`,
   ]
 
-  return `${RESET_PROMPT_BLOCK_START}
-${state.prompt}
-${RESET_PROMPT_BLOCK_END}
+  return `${state.prompt}
 ${flags.join(" ")}`
 }
 

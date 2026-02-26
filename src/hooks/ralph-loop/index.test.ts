@@ -771,6 +771,7 @@ Line two "quoted"
       expect(promptCalls.length).toBe(1)
       expect(promptCalls[0].text).toContain(multilinePrompt)
       expect(promptCalls[0].text.includes("\\n")).toBe(false)
+      expect(promptCalls[0].text).not.toContain("<ralph-prompt>")
       expect(promptCalls[0].text.includes('"PRD file:')).toBe(false)
     })
 
@@ -1434,6 +1435,33 @@ Original task: Build something`
       expect(promptCalls.length).toBe(0)
       expect(toastCalls.some((t) => t.title === "Ralph Loop Complete!")).toBe(true)
       expect(hook.getState()).toBeNull()
+    })
+
+    test("should NOT detect completion from non-write tool_result output", async () => {
+      const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const toolResultEntry = JSON.stringify({
+        type: "tool_result",
+        timestamp: new Date().toISOString(),
+        tool_name: "read",
+        tool_input: {},
+        tool_output: { output: "Do NOT output <promise>NEVER_MATCH</promise>." },
+      })
+      writeFileSync(transcriptPath, toolResultEntry + "\n")
+
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "NEVER_MATCH" })
+
+      await hook.event({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: "session-123" },
+        },
+      })
+
+      expect(promptCalls.length).toBe(1)
+      expect(hook.getState()?.iteration).toBe(2)
     })
 
     test("should check transcript BEFORE API to optimize performance", async () => {

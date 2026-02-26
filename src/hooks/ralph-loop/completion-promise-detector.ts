@@ -9,6 +9,16 @@ interface OpenCodeSessionMessage {
 	parts?: Array<{ type: string; text?: string }>
 }
 
+type TranscriptEntry = {
+	type?: string
+	info?: { role?: string }
+	parts?: Array<{ type?: string; text?: string }>
+	content?: string
+	text?: string
+	tool_name?: string
+	tool_output?: { output?: string } | string
+}
+
 function escapeRegex(str: string): string {
 	return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
@@ -32,9 +42,55 @@ export function detectCompletionInTranscript(
 
 		for (const line of lines) {
 			try {
-				const entry = JSON.parse(line) as { type?: string }
-				if (entry.type === "user") continue
-				if (pattern.test(line)) return true
+				const entry = JSON.parse(line) as TranscriptEntry
+
+				if (entry.type === "user") {
+					continue
+				}
+
+				if (entry.type === "tool_result") {
+					if (entry.tool_name !== "write") {
+						continue
+					}
+
+					const toolOutput = entry.tool_output
+					const outputText =
+						typeof toolOutput === "string"
+							? toolOutput
+							: typeof toolOutput?.output === "string"
+								? toolOutput.output
+								: ""
+
+					if (outputText && pattern.test(outputText)) {
+						return true
+					}
+
+					continue
+				}
+
+				const isAssistantEntry = entry.type === "assistant" || entry.info?.role === "assistant"
+				if (!isAssistantEntry) {
+					continue
+				}
+
+				if (typeof entry.text === "string" && pattern.test(entry.text)) {
+					return true
+				}
+
+				if (typeof entry.content === "string" && pattern.test(entry.content)) {
+					return true
+				}
+
+				if (Array.isArray(entry.parts)) {
+					const responseText = entry.parts
+						.filter((part) => part?.type === "text" && typeof part.text === "string")
+						.map((part) => part.text ?? "")
+						.join("\n")
+
+					if (responseText && pattern.test(responseText)) {
+						return true
+					}
+				}
 			} catch {
 				continue
 			}
