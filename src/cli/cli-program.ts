@@ -23,7 +23,7 @@ program
 program
   .command("install")
   .description("Install and configure oh-my-opencode with interactive setup")
-  .option("--no-tui", "Run in non-interactive mode (requires all options)")
+  .option("--no-tui", "Run in non-interactive mode")
   .option("--claude <value>", "Claude subscription: no, yes, max20")
   .option("--openai <value>", "OpenAI/ChatGPT subscription: no, yes (default: no)")
   .option("--gemini <value>", "Gemini integration: no, yes")
@@ -31,14 +31,18 @@ program
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
+  .option("--lmstudio <url>", "LMStudio endpoint URL (e.g., http://localhost:1234/v1)")
+  .option("--ollama <url>", "Ollama endpoint URL (e.g., http://localhost:11434)")
+  .option("--vllm <url>", "vLLM endpoint URL (e.g., http://localhost:8000/v1)")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
   $ bunx oh-my-opencode install
   $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
+  $ bunx oh-my-opencode install --no-tui --claude=yes --gemini=no --copilot=no --lmstudio=http://localhost:1234/v1
 
-Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
+Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > Local):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
   OpenAI        Native openai/ models (GPT-5.2 for Oracle)
   Gemini        Native google/ models (Gemini 3 Pro, Flash)
@@ -46,6 +50,9 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-6, etc.)
    Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
+  LMStudio      lmstudio/ models (local low-priority fallback)
+  Ollama        ollama/ models (local low-priority fallback)
+  vLLM          vllm/ models (local low-priority fallback)
 `)
   .action(async (options) => {
     const args: InstallArgs = {
@@ -57,6 +64,9 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
       opencodeZen: options.opencodeZen,
       zaiCodingPlan: options.zaiCodingPlan,
       kimiForCoding: options.kimiForCoding,
+      lmstudio: options.lmstudio,
+      ollama: options.ollama,
+      vllm: options.vllm,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)

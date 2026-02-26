@@ -21,6 +21,15 @@ const ZAI_MODEL = "zai-coding-plan/glm-4.7"
 const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json"
 
+function resolveLocalTargetModel(
+	target: "explore" | "librarian" | "atlas" | "multimodal-looker" | "quick" | "unspecified-low",
+	availability: ReturnType<typeof toProviderAvailability>
+): { model: string; variant?: string } | null {
+	return resolveModelFromChain(
+		[{ providers: ["lmstudio", "ollama", "vllm"], model: `local:${target}` }],
+		availability
+	)
+}
 
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
@@ -32,7 +41,10 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.opencodeZen ||
     avail.copilot ||
     avail.zai ||
-    avail.kimiForCoding
+    avail.kimiForCoding ||
+    avail.lmstudio ||
+    avail.ollama ||
+    avail.vllm
 
   if (!hasAnyProvider) {
     return {
@@ -65,7 +77,27 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       } else if (avail.copilot) {
         agents[role] = { model: "github-copilot/gpt-5-mini" }
       } else {
-        agents[role] = { model: "opencode/gpt-5-nano" }
+        const resolvedLocal = resolveLocalTargetModel("explore", avail)
+        if (resolvedLocal) {
+          agents[role] = { model: resolvedLocal.model }
+        } else {
+          agents[role] = { model: "opencode/gpt-5-nano" }
+        }
+      }
+      continue
+    }
+
+    if (role === "librarian") {
+      const resolved = resolveModelFromChain(req.fallbackChain, avail)
+      const localLibrarian = resolveLocalTargetModel("librarian", avail)
+
+      if (resolved?.model === "opencode/glm-4.7-free" && localLibrarian) {
+        agents[role] = { model: localLibrarian.model }
+      } else if (resolved) {
+        const variant = resolved.variant ?? req.variant
+        agents[role] = variant ? { model: resolved.model, variant } : { model: resolved.model }
+      } else {
+        agents[role] = { model: ULTIMATE_FALLBACK }
       }
       continue
     }
@@ -92,6 +124,12 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
 
     const resolved = resolveModelFromChain(req.fallbackChain, avail)
     if (resolved) {
+      const localMultimodal = role === "multimodal-looker" ? resolveLocalTargetModel("multimodal-looker", avail) : null
+      if (resolved.model === "opencode/gpt-5-nano" && localMultimodal) {
+        agents[role] = { model: localMultimodal.model }
+        continue
+      }
+
       const variant = resolved.variant ?? req.variant
       agents[role] = variant ? { model: resolved.model, variant } : { model: resolved.model }
     } else {
@@ -115,6 +153,12 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
 
     const resolved = resolveModelFromChain(fallbackChain, avail)
     if (resolved) {
+      const localQuick = cat === "quick" ? resolveLocalTargetModel("quick", avail) : null
+      if (resolved.model === "opencode/gpt-5-nano" && localQuick) {
+        categories[cat] = { model: localQuick.model }
+        continue
+      }
+
       const variant = resolved.variant ?? req.variant
       categories[cat] = variant ? { model: resolved.model, variant } : { model: resolved.model }
     } else {

@@ -1,3 +1,5 @@
+import type { LocalProviderModels } from "./types"
+
 export interface ProviderAvailability {
 	native: {
 		claude: boolean
@@ -8,6 +10,10 @@ export interface ProviderAvailability {
 	copilot: boolean
 	zai: boolean
 	kimiForCoding: boolean
+	lmstudio: boolean
+	ollama: boolean
+	vllm: boolean
+	localProviderModels: LocalProviderModels
 	isMaxPlan: boolean
 }
 

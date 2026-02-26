@@ -1,5 +1,7 @@
 import color from "picocolors"
 import type { InstallArgs } from "./types"
+import { mapProbeResultsToLocalProviderModels } from "./local-model-capabilities"
+import { probeLocalProviders } from "./local-provider-probe"
 import {
   addAuthPlugins,
   addPluginToOpenCodeConfig,
@@ -24,6 +26,12 @@ import {
   validateNonTuiArgs,
 } from "./install-validators"
 
+function localProviderLabel(provider: "lmstudio" | "ollama" | "vllm"): string {
+  if (provider === "lmstudio") return "LMStudio"
+  if (provider === "vllm") return "vLLM"
+  return "Ollama"
+}
+
 export async function runCliInstaller(args: InstallArgs, version: string): Promise<number> {
   const validation = validateNonTuiArgs(args)
   if (!validation.valid) {
@@ -34,7 +42,7 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     }
     console.log()
     printInfo(
-      "Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> --gemini=<no|yes> --copilot=<no|yes>",
+      "Usage: bunx oh-my-opencode install --no-tui --claude=<no|yes|max20> [provider options]",
     )
     console.log()
     return 1
@@ -67,6 +75,34 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
 
   const config = argsToConfig(args)
 
+  printStep(step++, totalSteps, "Probing local model providers...")
+  if (config.hasLmstudio || config.hasOllama || config.hasVllm) {
+    const probeResults = await probeLocalProviders({
+      lmstudioUrl: config.lmstudioUrl,
+      ollamaUrl: config.ollamaUrl,
+      vllmUrl: config.vllmUrl,
+    })
+
+    config.localProviderModels = mapProbeResultsToLocalProviderModels(probeResults)
+
+    for (const result of probeResults) {
+      const label = localProviderLabel(result.provider)
+      if (result.warning) {
+        printWarning(`${label} probe failed (${result.url}): ${result.warning}`)
+        continue
+      }
+
+      if (result.models.length === 0) {
+        printWarning(`${label} probe returned no models (${result.url})`)
+      } else {
+        const preview = result.models.slice(0, 3).map((model) => model.id).join(", ")
+        printSuccess(`${label}: found ${result.models.length} model(s)${preview ? ` (${preview})` : ""}`)
+      }
+    }
+  } else {
+    printInfo("No local provider URLs provided. Skipping local probe.")
+  }
+
   printStep(step++, totalSteps, "Adding oh-my-opencode plugin...")
   const pluginResult = await addPluginToOpenCodeConfig(version)
   if (!pluginResult.success) {
@@ -77,9 +113,10 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     `Plugin ${isUpdate ? "verified" : "added"} ${SYMBOLS.arrow} ${color.dim(pluginResult.configPath)}`,
   )
 
-  const needsProviderSetup = config.hasGemini || config.hasOpenAI || config.hasCopilot
+  const needsAuthSetup = config.hasGemini || config.hasOpenAI || config.hasCopilot
+  const needsProviderSetup = needsAuthSetup || config.hasLmstudio || config.hasOllama || config.hasVllm
 
-  if (needsProviderSetup) {
+  if (needsAuthSetup) {
     printStep(step++, totalSteps, "Adding auth plugins...")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
@@ -87,7 +124,12 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
       return 1
     }
     printSuccess(`Auth plugins configured ${SYMBOLS.arrow} ${color.dim(authResult.configPath)}`)
+  } else {
+    printStep(step++, totalSteps, "Skipping auth plugins...")
+    printInfo("No cloud provider auth plugins required.")
+  }
 
+  if (needsProviderSetup) {
     printStep(step++, totalSteps, "Adding provider configurations...")
     const providerResult = addProviderConfig(config)
     if (!providerResult.success) {
@@ -96,7 +138,8 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     }
     printSuccess(`Providers configured ${SYMBOLS.arrow} ${color.dim(providerResult.configPath)}`)
   } else {
-    step += 2
+    printStep(step++, totalSteps, "Skipping provider configurations...")
+    printInfo("No provider configuration changes required.")
   }
 
   printStep(step++, totalSteps, "Writing oh-my-opencode configuration...")
@@ -128,7 +171,10 @@ export async function runCliInstaller(args: InstallArgs, version: string): Promi
     !config.hasOpenAI &&
     !config.hasGemini &&
     !config.hasCopilot &&
-    !config.hasOpencodeZen
+    !config.hasOpencodeZen &&
+    !config.hasLmstudio &&
+    !config.hasOllama &&
+    !config.hasVllm
   ) {
     printWarning("No model providers configured. Using opencode/big-pickle as fallback.")
   }

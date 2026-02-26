@@ -45,6 +45,9 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   const config = await promptInstallConfig(detected)
   if (!config) return 1
 
+  const needsAuthSetup = config.hasGemini || config.hasOpenAI || config.hasCopilot
+  const needsProviderSetup = needsAuthSetup || config.hasLmstudio || config.hasOllama || config.hasVllm
+
   spinner.start("Adding oh-my-opencode to OpenCode config")
   const pluginResult = await addPluginToOpenCodeConfig(version)
   if (!pluginResult.success) {
@@ -54,7 +57,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   }
   spinner.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
 
-  if (config.hasGemini) {
+  if (needsAuthSetup) {
     spinner.start("Adding auth plugins (fetching latest versions)")
     const authResult = await addAuthPlugins(config)
     if (!authResult.success) {
@@ -63,7 +66,9 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
       return 1
     }
     spinner.stop(`Auth plugins added to ${color.cyan(authResult.configPath)}`)
+  }
 
+  if (needsProviderSetup) {
     spinner.start("Adding provider configurations")
     const providerResult = addProviderConfig(config)
     if (!providerResult.success) {
@@ -97,7 +102,16 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
     console.log()
   }
 
-  if (!config.hasClaude && !config.hasOpenAI && !config.hasGemini && !config.hasCopilot && !config.hasOpencodeZen) {
+  if (
+    !config.hasClaude &&
+    !config.hasOpenAI &&
+    !config.hasGemini &&
+    !config.hasCopilot &&
+    !config.hasOpencodeZen &&
+    !config.hasLmstudio &&
+    !config.hasOllama &&
+    !config.hasVllm
+  ) {
     p.log.warn("No model providers configured. Using opencode/big-pickle as fallback.")
   }
 

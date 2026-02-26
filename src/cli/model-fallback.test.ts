@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { generateModelConfig } from "./model-fallback"
 import type { InstallConfig } from "./types"
+import { createEmptyLocalProviderModels } from "./local-model-capabilities"
 
 function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
   return {
@@ -13,6 +14,10 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasOpencodeZen: false,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
+    hasLmstudio: false,
+    hasOllama: false,
+    hasVllm: false,
+    localProviderModels: createEmptyLocalProviderModels(),
     ...overrides,
   }
 }
