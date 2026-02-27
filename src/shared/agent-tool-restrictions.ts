@@ -46,8 +46,6 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
   },
 
   athena: {
-    write: false,
-    edit: false,
     call_omo_agent: false,
   },
 
