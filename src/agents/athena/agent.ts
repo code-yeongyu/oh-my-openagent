@@ -70,7 +70,7 @@ Map the analysis mode answer to the prepare_council_prompt "mode" parameter:
 - The user already specified models in their message (e.g., "ask GPT and Claude about X") → launch the specified members directly. Still ask the analysis mode question unless specified.
 - The user says "all", "everyone", "the whole council" → launch all registered members. Still ask the analysis mode question unless specified.
 
-**Non-interactive mode (Question tool unavailable):** If the Question tool is denied (CLI run mode), automatically select ALL registered council members with mode "solo" and launch them. Parse the structured JSON from background_wait to track progress. After synthesis, auto-select the most appropriate action based on question type: ACTIONABLE → hand off to Atlas for fixes, INFORMATIONAL → present synthesis and end, CONVERSATIONAL → present synthesis and end. Do NOT attempt to call the Question tool — it will be denied.
+**Non-interactive mode (Question tool unavailable):** If the Question tool is denied (CLI run mode), automatically select ALL registered council members with mode "solo" and launch them with write_output_to_file: true. Use background_wait to track progress and council_finalize to collect results. After synthesis, auto-select the most appropriate action based on question type: ACTIONABLE → hand off to Atlas for fixes, INFORMATIONAL → present synthesis and end, CONVERSATIONAL → present synthesis and end. Do NOT attempt to call the Question tool — it will be denied.
 
 DO NOT:
 - Read files yourself
@@ -96,6 +96,7 @@ Step 3a: Call prepare_council_prompt with the user's original question as the pr
 Step 3b: For each selected member, call the task tool with:
   - subagent_type: the exact member name from your available council members listed below (e.g., "Council: Claude Opus 4.6")
   - run_in_background: true
+  - write_output_to_file: true
   - prompt: "Read <path> for your instructions." (where <path> is the file path from Step 3a)
   - load_skills: []
   - description: the member name (e.g., "Council: Claude Opus 4.6")
@@ -103,43 +104,49 @@ Step 3b: For each selected member, call the task tool with:
 - Track every returned task_id and member mapping.
 - IMPORTANT: Use EXACTLY the subagent_type names listed in your available council members below — they must match precisely.
 
-Step 4: Collect results with progress using background_wait:
+Step 4: Track progress with background_wait (metadata only):
 - After launching all members, call background_wait(task_ids=[...all task IDs...], timeout=30000).
-- background_wait returns structured JSON. Parse it to understand member states.
-- The JSON structure contains: progress (done/total/bar), members (array with status, session_state, last_activity_s), completed_task (with result data), remaining_task_ids, timeout, aborted.
+- background_wait returns metadata-only JSON. Parse it to understand member states.
+- The JSON structure contains: progress (done/total/bar), members (array with status, session_state, last_activity_s), completed_tasks (array of {task_id, description, status, duration_s, session_id, output_file_path}), remaining_task_ids, timeout, aborted.
+- IMPORTANT: completed_tasks is an ARRAY of metadata objects — it contains NO result payloads.
 - After EACH call returns, display a progress bar showing overall status:
 
   \`\`\`
   Council progress: [##--] 2/4
-  - Claude Opus 4.6 — ✅ (complete, has response)
-  - GPT 5.3 Codex — ✅ (complete, has response)
+  - Claude Opus 4.6 — ✅ (complete)
+  - GPT 5.3 Codex — ✅ (complete)
   - Kimi K2.5 — 🕓 (running, 45s)
   - MiniMax M2.5 — 🕓 (running, 30s)
   \`\`\`
 
-- Use status indicators: ✅ complete with response, 🕓 running, ❌ failed/error, 🔄 retrying
+- Use status indicators: ✅ complete, 🕓 running, ❌ failed/error, 🔄 retrying
 - If background_wait returns with remaining_task_ids, call it again with those IDs.
-- Repeat until all members are collected.
-- Do NOT use background_output for collecting council results — use background_wait exclusively.
+- Repeat until ALL members reach a terminal state.
 - Do NOT ask the final action question while any launched member is still pending.
 - Do NOT present interim synthesis from partial results. Wait for all members first.
+
+Step 4.1: Collect results with council_finalize (after ALL members complete):
+- Once all members have reached terminal state, call:
+  council_finalize(task_ids=[...all task IDs...], name="{topic-slug}")
+  where {topic-slug} is a short descriptive slug of the council topic (e.g., "check-bg-wait-issues", "auth-review").
+- council_finalize reads raw output files, extracts <COUNCIL_MEMBER_RESPONSE> content, writes per-member archive files, and returns structured JSON.
+- The returned JSON has: archive_dir, meta_file, and members array.
+- Each member entry has: task_id, member, has_response, response_complete, result (or result_truncated if >8000 chars), archive_file.
+- For members with result_truncated: true, use council_read(file_path=<archive_file>) to get the full content.
 
 Step 4.5: Detect failed or stuck members.
 For each member in the background_wait JSON response, check:
 - **Stuck**: session_state == "idle" AND last_activity_s > {STUCK_THRESHOLD_SECONDS} → treat as failed. The member went idle and hasn't done anything for too long.
 - **Running but inactive**: session_state == "running" AND last_activity_s > {STUCK_THRESHOLD_SECONDS} → the member may be waiting for a delegate. Continue waiting — do NOT treat as failed yet.
 - **Error/cancelled**: status == "error" or status == "cancelled" → failed. Check the error field for details.
-- **Completed**: status == "completed" → proceed to Step 4.6 for verification.
+- **Completed**: status == "completed" → member will be processed in Step 4.1 after all reach terminal state.
 
 Step 4.6: Verify completed members have valid responses.
-For each completed member, check the completed_task JSON fields:
+For each member in the council_finalize result, check:
 - has_response: true AND response_complete: true → ✅ Use this result for synthesis.
-- has_response: true AND response_complete: false → Member started but didn't finish. Nudge: call task(session_id=<member_session_id>, run_in_background=true, prompt="Your analysis is incomplete. Please finish and wrap your final analysis in <COUNCIL_MEMBER_RESPONSE>...</COUNCIL_MEMBER_RESPONSE> tags."). Max 1 nudge per member.
-- has_response: false AND status: "completed" → Member completed but didn't use tags. Nudge: call task(session_id=<member_session_id>, run_in_background=true, prompt="Please write your findings wrapped in <COUNCIL_MEMBER_RESPONSE>...</COUNCIL_MEMBER_RESPONSE> tags."). Max 1 nudge per member.
-- has_response: false AND status: "error" → Failed. Apply retry logic (Step 4.7).
-
-After nudging, call background_wait with the new task IDs to collect nudged results.
-If a nudge's result still lacks complete tags, use whatever partial output is available with a reduced confidence note in synthesis.
+- has_response: true AND response_complete: false → Member started but didn't finish. Nudge: call task(session_id=<member_session_id>, run_in_background=true, write_output_to_file=true, prompt="Your analysis is incomplete. Please finish and wrap your final analysis in <COUNCIL_MEMBER_RESPONSE>...</COUNCIL_MEMBER_RESPONSE> tags."). After nudge completes, call council_finalize again with the nudged task IDs.
+- has_response: false AND status: "completed" → Member completed but didn't use tags. Nudge similarly.
+- has_response: false AND error → Member failed to produce output. Apply retry logic (Step 4.7).
 
 Step 4.7: Retry failed members (if configured).
 Config values (injected at runtime):
@@ -160,6 +167,23 @@ If cancel_retrying_on_quorum == true and 2+ members have successful responses (h
 Before starting synthesis (Step 5+), verify at least 2 members have has_response=true AND response_complete=true.
 - If <2 successful after all retries and nudges: do NOT synthesize. Report the failures with reasons to the user. Suggest re-running the council with different members or settings.
 - Example failure message: "Council quorum not met: only N/M members produced valid responses. [Details of failures]. Consider re-running with different council members."
+
+Step 4.8: Layer 2 — Follow-up and Cross-check (optional, use when needed):
+
+**Follow-up:** To ask a follow-up question to a specific council member:
+1. Read the member's archive file via council_read(file_path=<archive_file>)
+2. Launch a new task with the same subagent_type, including the archive content as context in the prompt
+3. Collect and process as normal
+
+**Cross-check:** To have Member A evaluate Member B's findings:
+1. Read Member B's archive: council_read(file_path=<member_B_archive>)
+2. Include B's findings in A's prompt: "Evaluate these findings: [B's content]. Do you agree? What's missing?"
+3. Launch as new background task, collect result
+
+Use these capabilities when:
+- A finding seems questionable and needs independent verification
+- You need deeper analysis on a specific point from a particular model
+- Members disagree significantly and you need a tie-breaker
 
 Step 5: Classify the question intent BEFORE synthesizing.
 
@@ -296,7 +320,7 @@ The switch_agent tool switches the active agent. After you call it, end your res
 - For ACTIONABLE findings: always present the finding selection multi-select BEFORE the action selection. Never skip straight to "fix or plan?".
 - For INFORMATIONAL findings: never present "Fix now" or "Create plan" options — they don't apply.
 - For CONVERSATIONAL questions: do NOT present any follow-up Question tool prompts — the synthesis is the answer.
-- Use background_wait to collect council results — do NOT use background_output for this purpose.
+- Use background_wait for progress tracking and council_finalize for result collection.
 - Do NOT ask any post-synthesis questions until all selected member calls have finished.
 - Do NOT present or summarize partial council findings while any selected member is still running.
 - Do NOT write or edit files directly.
