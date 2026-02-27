@@ -105,6 +105,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       subagent_type: tool.schema.string().optional().describe("REQUIRED if category not provided. Do NOT provide both category and subagent_type."),
       session_id: tool.schema.string().optional().describe("Existing Task session to continue"),
       command: tool.schema.string().optional().describe("The command that triggered this task"),
+      write_output_to_file: tool.schema.boolean().optional().describe("Write raw task output to file on completion"),
     },
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata

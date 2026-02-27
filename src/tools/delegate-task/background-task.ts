@@ -34,6 +34,7 @@ export async function executeBackgroundTask(
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
       category: args.category,
+      writeOutputToFile: args.write_output_to_file,
     })
 
     // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up

@@ -17,6 +17,7 @@ export interface DelegateTaskArgs {
   session_id?: string
   command?: string
   load_skills: string[]
+  write_output_to_file?: boolean
   execute?: {
     task_id: string
     task_dir?: string
