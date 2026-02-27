@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test"
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper"
 
 describe("remapAgentKeysToDisplayNames", () => {
-  it("remaps known agent keys to display names", () => {
+  it("remaps known agent keys to display names while preserving original keys", () => {
     // given agents with lowercase keys
     const agents = {
       sisyphus: { prompt: "test", mode: "primary" },
@@ -12,10 +12,11 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then known agents get display name keys
+    // then known agents get display name keys and original keys remain accessible
     expect(result["Sisyphus (Ultraworker)"]).toBeDefined()
     expect(result["oracle"]).toBeDefined()
-    expect(result["sisyphus"]).toBeUndefined()
+    expect(result["sisyphus"]).toBeDefined()
+    expect(result["Sisyphus (Ultraworker)"]).toBe(result["sisyphus"])
   })
 
   it("preserves unknown agent keys unchanged", () => {
@@ -31,7 +32,7 @@ describe("remapAgentKeysToDisplayNames", () => {
     expect(result["custom-agent"]).toBeDefined()
   })
 
-  it("remaps all core agents", () => {
+  it("remaps all core agents while preserving original keys", () => {
     // given all core agents
     const agents = {
       sisyphus: {},
@@ -46,15 +47,20 @@ describe("remapAgentKeysToDisplayNames", () => {
     // when remapping
     const result = remapAgentKeysToDisplayNames(agents)
 
-    // then all get display name keys
-    expect(Object.keys(result)).toEqual([
-      "Sisyphus (Ultraworker)",
-      "Hephaestus (Deep Agent)",
-      "Prometheus (Plan Builder)",
-      "Atlas (Plan Executor)",
-      "Metis (Plan Consultant)",
-      "Momus (Plan Critic)",
-      "Sisyphus-Junior",
-    ])
+    // then all get display name keys while original keys still work
+    expect(result["Sisyphus (Ultraworker)"]).toBeDefined()
+    expect(result["sisyphus"]).toBeDefined()
+    expect(result["Hephaestus (Deep Agent)"]).toBeDefined()
+    expect(result["hephaestus"]).toBeDefined()
+    expect(result["Prometheus (Plan Builder)"]).toBeDefined()
+    expect(result["prometheus"]).toBeDefined()
+    expect(result["Atlas (Plan Executor)"]).toBeDefined()
+    expect(result["atlas"]).toBeDefined()
+    expect(result["Metis (Plan Consultant)"]).toBeDefined()
+    expect(result["metis"]).toBeDefined()
+    expect(result["Momus (Plan Critic)"]).toBeDefined()
+    expect(result["momus"]).toBeDefined()
+    expect(result["Sisyphus-Junior"]).toBeDefined()
+    expect(result["sisyphus-junior"]).toBeDefined()
   })
 })

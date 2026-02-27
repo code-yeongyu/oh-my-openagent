@@ -1,0 +1,19 @@
+{
+  "name": "hashline-edit-benchmark",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hashline edit tool benchmark using Vercel AI SDK with FriendliAI provider",
+  "scripts": {
+    "bench:basic": "bun run test-edit-ops.ts",
+    "bench:edge": "bun run test-edge-cases.ts",
+    "bench:multi": "bun run test-multi-model.ts",
+    "bench:all": "bun run bench:basic && bun run bench:edge"
+  },
+  "dependencies": {
+    "ai": "^6.0.94",
+    "@ai-sdk/openai": "^1.3.0",
+    "@friendliai/ai-provider": "^1.0.9",
+    "zod": "^4.1.0"
+  }
+}

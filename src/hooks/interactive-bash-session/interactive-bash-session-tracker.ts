@@ -6,6 +6,7 @@ import {
 import { OMO_SESSION_PREFIX, buildSessionReminderMessage } from "./constants";
 import type { InteractiveBashSessionState } from "./types";
 import { subagentSessions } from "../../features/claude-code-session-state";
+import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide";
 
 type AbortSession = (args: { path: { id: string } }) => Promise<unknown>
 
@@ -19,7 +20,7 @@ async function killAllTrackedSessions(
 ): Promise<void> {
   for (const sessionName of state.tmuxSessions) {
     try {
-      const proc = Bun.spawn(["tmux", "kill-session", "-t", sessionName], {
+      const proc = spawnWithWindowsHide(["tmux", "kill-session", "-t", sessionName], {
         stdout: "ignore",
         stderr: "ignore",
       })

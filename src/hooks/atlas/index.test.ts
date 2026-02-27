@@ -9,7 +9,7 @@ import {
   readBoulderState,
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
-import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
+import { _resetForTesting, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -933,7 +933,7 @@ describe("atlas hook", () => {
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
-     test("should inject when last agent is sisyphus and boulder targets atlas explicitly", async () => {
+    test("should inject when last agent is sisyphus and boulder targets atlas explicitly", async () => {
        // given - boulder explicitly set to atlas, but last agent is sisyphus (initial state after /start-work)
        const planPath = join(TEST_DIR, "test-plan.md")
        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -1154,6 +1154,144 @@ describe("atlas hook", () => {
       }
     })
 
+    test("should keep skipping continuation during 5-minute backoff after 2 consecutive failures", async () => {
+      //#given - boulder state with incomplete plan and prompt always fails
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const promptMock = mock(() => Promise.reject(new Error("Bad Request")))
+      const mockInput = createMockPluginInput({ promptMock })
+      const hook = createAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        //#when - third idle occurs inside 5-minute backoff window
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 60000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+
+        //#then - third attempt should still be skipped
+        expect(promptMock).toHaveBeenCalledTimes(2)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
+    test("should retry continuation after 5-minute backoff expires following 2 consecutive failures", async () => {
+      //#given - boulder state with incomplete plan and prompt always fails
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const promptMock = mock(() => Promise.reject(new Error("Bad Request")))
+      const mockInput = createMockPluginInput({ promptMock })
+      const hook = createAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        //#when - third idle occurs after 5+ minutes
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 300000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+
+        //#then - third attempt should run after backoff expiration
+        expect(promptMock).toHaveBeenCalledTimes(3)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
+    test("should reset prompt failure counter after successful retry beyond backoff window", async () => {
+      //#given - boulder state with incomplete plan and success on first retry after backoff
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const promptMock = mock((): Promise<void> => Promise.reject(new Error("Bad Request")))
+      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
+      promptMock.mockImplementationOnce(() => Promise.reject(new Error("Bad Request")))
+      promptMock.mockImplementationOnce(() => Promise.resolve(undefined))
+      const mockInput = createMockPluginInput({ promptMock })
+      const hook = createAtlasHook(mockInput)
+
+      const originalDateNow = Date.now
+      let now = 0
+      Date.now = () => now
+
+      try {
+        //#when - fail twice, recover after backoff with success, then fail twice again
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 300000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+        now += 6000
+
+        await hook.handler({ event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } } })
+        await flushMicrotasks()
+
+        //#then - success retry resets counter, so two additional failures are allowed before skip
+        expect(promptMock).toHaveBeenCalledTimes(5)
+      } finally {
+        Date.now = originalDateNow
+      }
+    })
+
     test("should reset continuation failure state on session.compacted event", async () => {
       //#given - boulder state with incomplete plan and prompt always fails
       const planPath = join(TEST_DIR, "test-plan.md")
@@ -1246,6 +1384,39 @@ describe("atlas hook", () => {
       })
 
       // then - should call prompt because session state was cleaned
+      expect(mockInput._promptMock).toHaveBeenCalled()
+    })
+
+    test("should inject when session agent was updated to atlas by start-work even if message storage agent differs", async () => {
+      // given - boulder targets atlas, but nearest stored message still says hephaestus
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+        agent: "atlas",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      cleanupMessageStorage(MAIN_SESSION_ID)
+      setupMessageStorage(MAIN_SESSION_ID, "hephaestus")
+      updateSessionAgent(MAIN_SESSION_ID, "atlas")
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then - should continue because start-work updated session agent to atlas
       expect(mockInput._promptMock).toHaveBeenCalled()
     })
   })

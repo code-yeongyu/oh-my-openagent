@@ -4,6 +4,7 @@ export interface RalphLoopState {
   active: boolean
   iteration: number
   max_iterations: number
+  message_count_at_start?: number
   completion_promise: string
   started_at: string
   prompt: string

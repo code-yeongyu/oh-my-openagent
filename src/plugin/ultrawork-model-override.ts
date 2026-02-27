@@ -8,7 +8,6 @@ import { scheduleDeferredModelOverride } from "./ultrawork-db-model-override"
 const CODE_BLOCK = /```[\s\S]*?```/g
 const INLINE_CODE = /`[^`]+`/g
 const ULTRAWORK_PATTERN = /\b(ultrawork|ulw)\b/i
-const ULTRAWORK_THINKING_CONFIG = { type: "enabled", budgetTokens: 16000 } as const
 
 export function detectUltrawork(text: string): boolean {
   const clean = text.replace(CODE_BLOCK, "").replace(INLINE_CODE, "")
@@ -115,11 +114,12 @@ export function applyUltraworkModelOverrideOnMessage(
   const override = resolveUltraworkOverride(pluginConfig, inputAgentName, output, sessionID)
   if (!override) return
 
+  if (override.variant) {
+    output.message["variant"] = override.variant
+    output.message["thinking"] = override.variant
+  }
+
   if (!override.providerID || !override.modelID) {
-    if (override.variant) {
-      output.message["variant"] = override.variant
-      output.message["thinking"] = { ...ULTRAWORK_THINKING_CONFIG }
-    }
     return
   }
 
@@ -133,11 +133,8 @@ export function applyUltraworkModelOverrideOnMessage(
   if (!messageId) {
     log("[ultrawork-model-override] No message ID found, falling back to direct mutation")
     output.message.model = targetModel
-    if (override.variant) {
-      output.message["variant"] = override.variant
-      output.message["thinking"] = { ...ULTRAWORK_THINKING_CONFIG }
-    }
     return
+
   }
 
   const fromModel = (output.message.model as { modelID?: string } | undefined)?.modelID ?? "unknown"

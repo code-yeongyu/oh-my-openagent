@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { applyHashlineEdits } from "./edit-operations"
+import { applyHashlineEdits, applyHashlineEditsWithReport } from "./edit-operations"
 import { applyAppend, applyInsertAfter, applyPrepend, applyReplaceLines, applySetLine } from "./edit-operation-primitives"
 import { computeLineHash } from "./hash-computation"
 import type { HashlineEdit } from "./types"
@@ -387,5 +387,25 @@ describe("hashline edit operations", () => {
 
     //#then
     expect(result).toEqual("replaced A\nline 3\nreplaced B")
+  })
+})
+
+describe("dedupe anchor canonicalization", () => {
+  it("deduplicates edits with whitespace-variant anchors", () => {
+    //#given
+    const content = "line 1\nline 2"
+    const lines = content.split("\n")
+    const canonical = `1#${computeLineHash(1, lines[0])}`
+    const spaced = ` 1 # ${computeLineHash(1, lines[0])} `
+
+    //#when
+    const report = applyHashlineEditsWithReport(content, [
+      { op: "append", pos: canonical, lines: ["inserted"] },
+      { op: "append", pos: spaced, lines: ["inserted"] },
+    ])
+
+    //#then
+    expect(report.deduplicatedEdits).toBe(1)
+    expect(report.content).toBe("line 1\ninserted\nline 2")
   })
 })

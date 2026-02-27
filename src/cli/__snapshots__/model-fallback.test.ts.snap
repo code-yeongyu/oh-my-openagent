@@ -325,7 +325,7 @@ exports[`generateModelConfig single native provider uses Gemini models when only
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -334,34 +334,34 @@ exports[`generateModelConfig single native provider uses Gemini models when only
       "model": "opencode/glm-4.7-free",
     },
     "metis": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "momus": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "multimodal-looker": {
       "model": "google/gemini-3-flash-preview",
     },
     "oracle": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "prometheus": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
     },
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "quick": {
       "model": "google/gemini-3-flash-preview",
     },
     "ultrabrain": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "unspecified-high": {
@@ -371,7 +371,7 @@ exports[`generateModelConfig single native provider uses Gemini models when only
       "model": "google/gemini-3-flash-preview",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {
@@ -386,7 +386,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
@@ -395,44 +395,44 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "model": "opencode/glm-4.7-free",
     },
     "metis": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "momus": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "multimodal-looker": {
       "model": "google/gemini-3-flash-preview",
     },
     "oracle": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "prometheus": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
     },
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "quick": {
       "model": "google/gemini-3-flash-preview",
     },
     "ultrabrain": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "unspecified-high": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
     },
     "unspecified-low": {
       "model": "google/gemini-3-flash-preview",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {
@@ -485,7 +485,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "deep": {
@@ -506,7 +506,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {
@@ -559,7 +559,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "deep": {
@@ -581,7 +581,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {
@@ -634,7 +634,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
   },
   "categories": {
     "artistry": {
-      "model": "opencode/gemini-3-pro",
+      "model": "opencode/gemini-3.1-pro",
       "variant": "high",
     },
     "deep": {
@@ -655,7 +655,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "opencode/gemini-3-pro",
+      "model": "opencode/gemini-3.1-pro",
       "variant": "high",
     },
     "writing": {
@@ -708,7 +708,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
   },
   "categories": {
     "artistry": {
-      "model": "opencode/gemini-3-pro",
+      "model": "opencode/gemini-3.1-pro",
       "variant": "high",
     },
     "deep": {
@@ -730,7 +730,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "opencode/gemini-3-pro",
+      "model": "opencode/gemini-3.1-pro",
       "variant": "high",
     },
     "writing": {
@@ -779,14 +779,14 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
   },
   "categories": {
     "artistry": {
-      "model": "github-copilot/gemini-3-pro-preview",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "quick": {
       "model": "github-copilot/claude-haiku-4.5",
     },
     "ultrabrain": {
-      "model": "github-copilot/gemini-3-pro-preview",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "unspecified-high": {
@@ -796,7 +796,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "visual-engineering": {
-      "model": "github-copilot/gemini-3-pro-preview",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {
@@ -845,14 +845,14 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
   },
   "categories": {
     "artistry": {
-      "model": "github-copilot/gemini-3-pro-preview",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "quick": {
       "model": "github-copilot/claude-haiku-4.5",
     },
     "ultrabrain": {
-      "model": "github-copilot/gemini-3-pro-preview",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "unspecified-high": {
@@ -863,7 +863,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "visual-engineering": {
-      "model": "github-copilot/gemini-3-pro-preview",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {
@@ -1026,7 +1026,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
   },
   "categories": {
     "artistry": {
-      "model": "opencode/gemini-3-pro",
+      "model": "opencode/gemini-3.1-pro",
       "variant": "high",
     },
     "deep": {
@@ -1047,7 +1047,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "opencode/gemini-3-pro",
+      "model": "opencode/gemini-3.1-pro",
       "variant": "high",
     },
     "writing": {
@@ -1100,7 +1100,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
   },
   "categories": {
     "artistry": {
-      "model": "github-copilot/gemini-3-pro-preview",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "deep": {
@@ -1121,7 +1121,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "visual-engineering": {
-      "model": "github-copilot/gemini-3-pro-preview",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {
@@ -1217,7 +1217,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "google/gemini-3-flash-preview",
     },
     "oracle": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "prometheus": {
@@ -1231,14 +1231,14 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "quick": {
       "model": "anthropic/claude-haiku-4-5",
     },
     "ultrabrain": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "unspecified-high": {
@@ -1248,7 +1248,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {
@@ -1301,7 +1301,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
   },
   "categories": {
     "artistry": {
-      "model": "github-copilot/gemini-3-pro-preview",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "deep": {
@@ -1322,7 +1322,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "github-copilot/claude-sonnet-4.5",
     },
     "visual-engineering": {
-      "model": "github-copilot/gemini-3-pro-preview",
+      "model": "github-copilot/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {
@@ -1375,7 +1375,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "deep": {
@@ -1396,7 +1396,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {
@@ -1449,7 +1449,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
   },
   "categories": {
     "artistry": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "deep": {
@@ -1471,7 +1471,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "model": "anthropic/claude-sonnet-4-5",
     },
     "visual-engineering": {
-      "model": "google/gemini-3-pro-preview",
+      "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "writing": {

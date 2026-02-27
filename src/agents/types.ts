@@ -70,14 +70,9 @@ function extractModelName(model: string): string {
   return model.includes("/") ? model.split("/").pop() ?? model : model
 }
 
-const GPT_MODEL_PREFIXES = ["gpt-", "gpt4", "o1", "o3", "o4"]
-
 export function isGptModel(model: string): boolean {
-  if (model.startsWith("openai/") || model.startsWith("github-copilot/gpt-"))
-    return true
-
   const modelName = extractModelName(model).toLowerCase()
-  return GPT_MODEL_PREFIXES.some((prefix) => modelName.startsWith(prefix))
+  return modelName.includes("gpt")
 }
 
 const GEMINI_PROVIDERS = ["google/", "google-vertex/"]

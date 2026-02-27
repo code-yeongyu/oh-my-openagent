@@ -6,7 +6,7 @@ export function getOrCreateRetryState(
 ): RetryState {
   let state = autoCompactState.retryStateBySession.get(sessionID)
   if (!state) {
-    state = { attempt: 0, lastAttemptTime: 0 }
+    state = { attempt: 0, lastAttemptTime: 0, firstAttemptTime: 0 }
     autoCompactState.retryStateBySession.set(sessionID, state)
   }
   return state
