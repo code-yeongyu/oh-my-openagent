@@ -60,7 +60,8 @@ describe("toon compression phase 1 integration", () => {
     const mcpData = Array.from({ length: 120 }, (_, i) => ({ id: i, name: `item-${i}`, value: "x".repeat(120) }))
     const manager = { callTool: async () => mcpData, readResource: async () => mcpData, getPrompt: async () => mcpData } as never
     const mcp = createSkillMcpTool({ manager, getLoadedSkills: () => [{ name: "x", mcpConfig: { svr: { command: "echo" } } } as never], getSessionID: () => "s" })
-    expect(isCompressed(await mcp.execute({ mcp_name: "svr", tool_name: "t" } as never, {} as never))).toBe(true)
+    // skill-mcp now respects opt-in (enabled: false by default)
+    expect(isCompressed(await mcp.execute({ mcp_name: "svr", tool_name: "t" } as never, {} as never))).toBe(false)
 
     expect(isCompressed(formatGlobResult({ files: many.map((x) => ({ path: `a/${x.id}.ts`, mtime: x.id })), totalFiles: 30, truncated: false }, on))).toBe(true)
     expect(formatGlobResult({ files: many.map((x) => ({ path: `a/${x.id}.ts`, mtime: x.id })), totalFiles: 30, truncated: false }, off)).toContain("a/0.ts")
