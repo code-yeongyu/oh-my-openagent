@@ -51,6 +51,12 @@ export interface BackgroundTask {
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
+  /** Flag to write raw output to file on completion */
+  writeOutputToFile?: boolean
+  /** Path to the output file after successful write */
+  outputFilePath?: string
+  /** Race condition guard: prevents concurrent re-entry during async completion */
+  _isCompleting?: boolean
 
   /** Last message count for stability detection */
   lastMsgCount?: number
@@ -74,6 +80,8 @@ export interface LaunchInput {
   skills?: string[]
   skillContent?: string
   category?: string
+  /** Flag to write raw output to file on completion */
+  writeOutputToFile?: boolean
 }
 
 export interface ResumeInput {
