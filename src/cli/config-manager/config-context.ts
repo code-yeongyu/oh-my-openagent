@@ -1,4 +1,4 @@
-import { getOpenCodeConfigPaths } from "../../shared"
+import { log, getOpenCodeConfigPaths } from "../../shared"
 import type {
   OpenCodeBinaryType,
   OpenCodeConfigPaths,
@@ -19,9 +19,7 @@ export function initConfigContext(binary: OpenCodeBinaryType, version: string | 
 
 export function getConfigContext(): ConfigContext {
   if (!configContext) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[config-context] getConfigContext() called before initConfigContext(); defaulting to CLI paths.")
-    }
+    log("[config-context] getConfigContext() called before initConfigContext(); defaulting to CLI paths.")
     const paths = getOpenCodeConfigPaths({ binary: "opencode", version: null })
     configContext = { binary: "opencode", version: null, paths }
   }
