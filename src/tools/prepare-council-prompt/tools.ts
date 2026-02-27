@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { writeFile, unlink, mkdir, readdir, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
-import { COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM } from "../../agents/athena"
+import { COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM, COUNCIL_INTENT_ADDENDUMS } from "../../agents/athena"
 
 const CLEANUP_DELAY_MS = 30 * 60 * 1000
 const COUNCIL_TMP_DIR = ".sisyphus/tmp"
@@ -44,6 +44,12 @@ The "mode" parameter controls whether council members can delegate exploration t
 - "solo" (default): Members do all exploration themselves. More thorough but uses more tokens.
 - "delegation": Members can delegate to explore/librarian agents. Faster, lighter context.
 
+The "intent" parameter controls the analysis framework injected into the prompt:
+- "AUDIT" (default): Find issues, risks, violations with severity ratings.
+- "EVALUATE": Compare options against criteria, surface tradeoffs.
+- "PLAN": Define current state, target state, phased path.
+- "EXPLAIN": Build understanding of mechanisms and relationships.
+
 Returns the file path to reference in subsequent task() calls.`
 
   cleanupStaleTempFiles(directory).catch((err) => {
@@ -55,8 +61,9 @@ Returns the file path to reference in subsequent task() calls.`
     args: {
       prompt: tool.schema.string().describe("The full analysis prompt/question for council members"),
       mode: tool.schema.string().optional().describe('Analysis mode: "solo" (default) or "delegation"'),
+      intent: tool.schema.string().optional().describe('Question intent: "AUDIT", "EVALUATE", "PLAN", "EXPLAIN"'),
     },
-    async execute(args: { prompt: string; mode?: string }) {
+    async execute(args: { prompt: string; mode?: string; intent?: string }) {
       if (!args.prompt?.trim()) {
         return "Prompt cannot be empty."
       }
@@ -64,6 +71,13 @@ Returns the file path to reference in subsequent task() calls.`
       if (args.mode !== undefined && args.mode !== "solo" && args.mode !== "delegation") {
         return `Invalid mode: "${args.mode}". Valid modes: "solo", "delegation".`
       }
+
+      const validIntents = ["AUDIT", "EVALUATE", "PLAN", "EXPLAIN"]
+      if (args.intent !== undefined && !validIntents.includes(args.intent.toUpperCase())) {
+        return `Invalid intent: "${args.intent}". Valid intents: "AUDIT", "EVALUATE", "PLAN", "EXPLAIN".`
+      }
+
+      const resolvedIntent = args.intent?.toUpperCase() ?? "AUDIT"
 
       const mode = args.mode === "delegation" ? "delegation" : "solo"
 
@@ -75,7 +89,10 @@ Returns the file path to reference in subsequent task() calls.`
         const filePath = join(tmpDir, filename)
 
         const modeAddendum = mode === "delegation" ? COUNCIL_DELEGATION_ADDENDUM : COUNCIL_SOLO_ADDENDUM
+        const intentAddendum = COUNCIL_INTENT_ADDENDUMS[resolvedIntent] ?? COUNCIL_INTENT_ADDENDUMS["AUDIT"]
         const content = `${modeAddendum}
+
+${intentAddendum}
 
 ## Analysis Question
 
@@ -91,7 +108,7 @@ ${args.prompt}`
 
         log("[prepare-council-prompt] Saved prompt", { filePath, length: args.prompt.length, mode })
 
-        return `Council prompt saved to: ${filePath} (mode: ${mode})
+        return `Council prompt saved to: ${filePath} (mode: ${mode}, intent: ${resolvedIntent})
 
 Use this path in each council member's task() call:
 - prompt: "Read ${filePath} for your instructions."

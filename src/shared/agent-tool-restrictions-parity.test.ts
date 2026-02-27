@@ -14,7 +14,7 @@ import { getAgentToolRestrictions } from "./agent-tool-restrictions"
 
 // Surface 1: Athena deny-list from src/agents/athena/agent.ts
 // createAgentToolRestrictions(["write", "edit", "call_omo_agent"])
-const ATHENA_DENY_LIST = ["write", "edit", "call_omo_agent"]
+const ATHENA_DENY_LIST = ["call_omo_agent"]
 
 // Surface 3: Council-member allowlist from src/agents/athena/council-member-agent.ts
 // createAgentToolAllowlist([...])

@@ -20,5 +20,27 @@ describe("COUNCIL_MEMBER_PROMPT", () => {
         expect(COUNCIL_MEMBER_PROMPT).toContain("</COUNCIL_MEMBER_RESPONSE>")
       })
     })
+
+    describe("#when checking for audit bias regression", () => {
+      it("#then does not contain severity (moved to AUDIT addendum)", () => {
+        expect(COUNCIL_MEMBER_PROMPT).not.toContain("severity")
+      })
+
+      it("#then does not contain Search the codebase (codebase-specific)", () => {
+        expect(COUNCIL_MEMBER_PROMPT).not.toContain("Search the codebase")
+      })
+
+      it("#then does not contain Focus on finding real issues (AUDIT-specific)", () => {
+        expect(COUNCIL_MEMBER_PROMPT).not.toContain("Focus on finding real issues")
+      })
+
+      it("#then does not contain AUDIT-style numbered finding headers", () => {
+        expect(COUNCIL_MEMBER_PROMPT).not.toMatch(/## Finding \d/)
+      })
+
+      it("#then contains evidence-based (generic analysis language)", () => {
+        expect(COUNCIL_MEMBER_PROMPT).toContain("evidence-based")
+      })
+    })
   })
 })

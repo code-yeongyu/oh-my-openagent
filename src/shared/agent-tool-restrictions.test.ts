@@ -7,8 +7,6 @@ describe("agent-tool-restrictions", () => {
     //#when
     const restrictions = getAgentToolRestrictions("athena")
     //#then
-    expect(restrictions.write).toBe(false)
-    expect(restrictions.edit).toBe(false)
     expect(restrictions.call_omo_agent).toBe(false)
   })
 
