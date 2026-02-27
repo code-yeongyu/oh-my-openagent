@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
-import { subagentSessions } from "../../features/claude-code-session-state"
+import { getSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { HOOK_NAME } from "./hook-name"
@@ -97,8 +97,10 @@ export function createAtlasEventHandler(input: {
         return
       }
 
+      const sessionAgent = getSessionAgent(sessionID)
       const lastAgent = await getLastAgentFromSession(sessionID, ctx.client)
-      const lastAgentKey = getAgentConfigKey(lastAgent ?? "")
+      const effectiveAgent = sessionAgent ?? lastAgent
+      const lastAgentKey = getAgentConfigKey(effectiveAgent ?? "")
       const requiredAgent = getAgentConfigKey(boulderState.agent ?? "atlas")
       const lastAgentMatchesRequired = lastAgentKey === requiredAgent
       const boulderAgentDefaultsToAtlas = requiredAgent === "atlas"
@@ -108,7 +110,7 @@ export function createAtlasEventHandler(input: {
       if (!agentMatches) {
         log(`[${HOOK_NAME}] Skipped: last agent does not match boulder agent`, {
           sessionID,
-          lastAgent: lastAgent ?? "unknown",
+          lastAgent: effectiveAgent ?? "unknown",
           requiredAgent,
         })
         return
