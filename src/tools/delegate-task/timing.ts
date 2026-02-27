@@ -6,6 +6,8 @@ let WAIT_FOR_SESSION_TIMEOUT_MS = 30000
 let MAX_POLL_TIME_MS = 10 * 60 * 1000
 let SESSION_CONTINUATION_STABILITY_MS = 5000
 
+export const DEFAULT_SYNC_POLL_TIMEOUT_MS = 600_000
+
 export function getTimingConfig() {
   return {
     POLL_INTERVAL_MS,
