@@ -9,7 +9,7 @@ import {
   readBoulderState,
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
-import { _resetForTesting, subagentSessions } from "../../features/claude-code-session-state"
+import { _resetForTesting, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -933,7 +933,7 @@ describe("atlas hook", () => {
       expect(callArgs.body.parts[0].text).toContain("2 remaining")
     })
 
-     test("should inject when last agent is sisyphus and boulder targets atlas explicitly", async () => {
+    test("should inject when last agent is sisyphus and boulder targets atlas explicitly", async () => {
        // given - boulder explicitly set to atlas, but last agent is sisyphus (initial state after /start-work)
        const planPath = join(TEST_DIR, "test-plan.md")
        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
@@ -1384,6 +1384,39 @@ describe("atlas hook", () => {
       })
 
       // then - should call prompt because session state was cleaned
+      expect(mockInput._promptMock).toHaveBeenCalled()
+    })
+
+    test("should inject when session agent was updated to atlas by start-work even if message storage agent differs", async () => {
+      // given - boulder targets atlas, but nearest stored message still says hephaestus
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+        agent: "atlas",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      cleanupMessageStorage(MAIN_SESSION_ID)
+      setupMessageStorage(MAIN_SESSION_ID, "hephaestus")
+      updateSessionAgent(MAIN_SESSION_ID, "atlas")
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      // then - should continue because start-work updated session agent to atlas
       expect(mockInput._promptMock).toHaveBeenCalled()
     })
   })

@@ -279,6 +279,30 @@ describe("applyUltraworkModelOverrideOnMessage", () => {
     )
   })
 
+  test("should override keyword-detector variant with configured ultrawork variant on deferred path", () => {
+    //#given
+    const config = createConfig("sisyphus", {
+      model: "anthropic/claude-opus-4-6",
+      variant: "extended",
+    })
+    const output = createOutput("ultrawork do something", { messageId: "msg_123" })
+    output.message["variant"] = "max"
+    output.message["thinking"] = "max"
+    const tui = createMockTui()
+
+    //#when
+    applyUltraworkModelOverrideOnMessage(config, "sisyphus", output, tui)
+
+    //#then
+    expect(dbOverrideSpy).toHaveBeenCalledWith(
+      "msg_123",
+      { providerID: "anthropic", modelID: "claude-opus-4-6" },
+      "extended",
+    )
+    expect(output.message["variant"]).toBe("extended")
+    expect(output.message["thinking"]).toBe("extended")
+  })
+
   test("should NOT mutate output.message.model when message ID present", () => {
     //#given
     const sonnetModel = { providerID: "anthropic", modelID: "claude-sonnet-4-6" }

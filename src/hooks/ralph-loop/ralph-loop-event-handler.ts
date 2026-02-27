@@ -84,6 +84,7 @@ export function createRalphLoopEventHandler(
 						promise: state.completion_promise,
 						apiTimeoutMs: options.apiTimeoutMs,
 						directory: options.directory,
+						sinceMessageIndex: state.message_count_at_start,
 					})
 
 				if (completionViaTranscript || completionViaApi) {

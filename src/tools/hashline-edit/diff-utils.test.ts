@@ -1,5 +1,6 @@
 /// <reference types="bun-types" />
 import { describe, expect, it } from "bun:test"
+import { parsePatch } from "diff"
 import { generateUnifiedDiff } from "./diff-utils"
 
 function createNumberedLines(totalLineCount: number): string {
@@ -7,6 +8,66 @@ function createNumberedLines(totalLineCount: number): string {
 }
 
 describe("generateUnifiedDiff", () => {
+  describe("#given OpenCode compatibility format", () => {
+    it("#then includes the Index header emitted by diff library", () => {
+      //#given
+      const oldContent = "a\n"
+      const newContent = "b\n"
+
+      //#when
+      const diff = generateUnifiedDiff(oldContent, newContent, "test.ts")
+
+      //#then
+      expect(diff).toContain("Index: test.ts")
+    })
+
+    it("#then includes unified --- and +++ file headers", () => {
+      //#given
+      const oldContent = "a\n"
+      const newContent = "b\n"
+
+      //#when
+      const diff = generateUnifiedDiff(oldContent, newContent, "test.ts")
+
+      //#then
+      expect(diff).toContain("--- test.ts")
+      expect(diff).toContain("+++ test.ts")
+    })
+
+    it("#then remains parseable by OpenCode parsePatch flow", () => {
+      //#given
+      const oldContent = "line1\nline2\n"
+      const newContent = "line1\nline2-updated\n"
+
+      //#when
+      const diff = generateUnifiedDiff(oldContent, newContent, "test.ts")
+      const patches = parsePatch(diff)
+
+      //#then
+      expect(patches).toHaveLength(1)
+      expect(patches[0]?.oldFileName).toBe("test.ts")
+      expect(patches[0]?.newFileName).toBe("test.ts")
+      expect(patches[0]?.hunks).toHaveLength(1)
+    })
+  })
+
+  describe("#given content without trailing newline", () => {
+    it("#then keeps no-newline markers parseable", () => {
+      //#given
+      const oldContent = "a"
+      const newContent = "b"
+
+      //#when
+      const diff = generateUnifiedDiff(oldContent, newContent, "test.ts")
+      const patches = parsePatch(diff)
+      const hunkLines = patches[0]?.hunks[0]?.lines ?? []
+
+      //#then
+      expect(diff).toContain("\\ No newline at end of file")
+      expect(hunkLines).toEqual(["-a", "\\ No newline at end of file", "+b", "\\ No newline at end of file"])
+    })
+  })
+
   it("creates separate hunks for distant changes", () => {
     //#given
     const oldContent = createNumberedLines(60)
