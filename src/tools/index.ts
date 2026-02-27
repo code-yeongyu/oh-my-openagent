@@ -54,7 +54,7 @@ export function createBackgroundTools(manager: BackgroundManager, client: Openco
   return {
     background_output: createBackgroundOutput(outputManager, client),
     background_cancel: createBackgroundCancel(manager, cancelClient),
-    background_wait: createBackgroundWait(outputManager, client),
+    background_wait: createBackgroundWait(outputManager),
   }
 }
 

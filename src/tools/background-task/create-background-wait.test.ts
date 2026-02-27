@@ -2,7 +2,7 @@
 
 import { describe, test, expect, beforeEach } from "bun:test"
 import type { BackgroundTask } from "../../features/background-agent"
-import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
+import type { BackgroundOutputManager } from "./clients"
 import { createBackgroundWait } from "./create-background-wait"
 import { resetMessageCursor } from "../../shared/session-cursor"
 
@@ -26,18 +26,6 @@ function createMockManager(tasks: Record<string, Partial<BackgroundTask>>): Back
   }
 }
 
-function createMockClient(responseText = "Test result content"): BackgroundOutputClient {
-  return {
-    session: {
-      messages: async () => [{
-        id: "msg_1",
-        info: { role: "assistant", time: new Date().toISOString() },
-        parts: [{ type: "text", text: responseText }],
-      }],
-    },
-  }
-}
-
 const toolContext = {
   sessionID: "test-session",
   messageID: "test-message",
@@ -52,10 +40,9 @@ describe("createBackgroundWait", () => {
 
   describe("#given empty task_ids", () => {
     describe("#when execute is called with empty array", () => {
-      test("#then returns JSON with error and empty members", async () => {
+      test("#then returns JSON with error and empty completed_tasks", async () => {
         const manager = createMockManager({})
-        const client = createMockClient()
-        const tool = createBackgroundWait(manager, client)
+        const tool = createBackgroundWait(manager)
 
         const result = await tool.execute({ task_ids: [] }, toolContext)
 
@@ -63,17 +50,16 @@ describe("createBackgroundWait", () => {
         expect(parsed.error).toBe("task_ids array is required and must not be empty.")
         expect(parsed.members).toEqual([])
         expect(parsed.remaining_task_ids).toEqual([])
-        expect(parsed.completed_task).toBeNull()
+        expect(parsed.completed_tasks).toEqual([])
         expect(parsed.timeout).toBe(false)
         expect(parsed.aborted).toBe(false)
       })
     })
   })
 
-  describe("#given a completed council task", () => {
+  describe("#given a completed task", () => {
     describe("#when execute is called with that task_id", () => {
-      test("#then returns JSON with council-specific fields", async () => {
-        const councilResponse = "<COUNCIL_MEMBER_RESPONSE>Council verdict here</COUNCIL_MEMBER_RESPONSE>"
+      test("#then returns metadata-only completed_tasks array with no result field", async () => {
         const manager = createMockManager({
           "task-1": {
             status: "completed",
@@ -83,19 +69,21 @@ describe("createBackgroundWait", () => {
             completedAt: new Date(),
           },
         })
-        const client = createMockClient(councilResponse)
-        const tool = createBackgroundWait(manager, client)
+        const tool = createBackgroundWait(manager)
 
         const result = await tool.execute({ task_ids: ["task-1"] }, toolContext)
 
         const parsed = JSON.parse(result)
-        expect(parsed.completed_task).toBeDefined()
-        expect(parsed.completed_task.task_id).toBe("task-1")
-        expect(parsed.completed_task.status).toBe("completed")
-        expect(parsed.completed_task.has_response).toBe(true)
-        expect(parsed.completed_task.response_complete).toBe(true)
-        expect(parsed.completed_task.result).toBe("Council verdict here")
-        expect(parsed.completed_task.duration_s).toBeTypeOf("number")
+        expect(parsed.completed_tasks).toBeArray()
+        expect(parsed.completed_tasks).toHaveLength(1)
+        expect(parsed.completed_tasks[0].task_id).toBe("task-1")
+        expect(parsed.completed_tasks[0].status).toBe("completed")
+        expect(parsed.completed_tasks[0].description).toBe("Council analysis")
+        expect(parsed.completed_tasks[0].duration_s).toBeTypeOf("number")
+        expect(parsed.completed_tasks[0].session_id).toBeDefined()
+        expect(parsed.completed_tasks[0].result).toBeUndefined()
+        expect(parsed.completed_tasks[0].has_response).toBeUndefined()
+        expect(parsed.completed_tasks[0].response_complete).toBeUndefined()
         expect(parsed.timeout).toBe(false)
         expect(parsed.aborted).toBe(false)
       })
@@ -104,7 +92,7 @@ describe("createBackgroundWait", () => {
 
   describe("#given a completed non-council task", () => {
     describe("#when execute is called with that task_id", () => {
-      test("#then returns JSON with result as string and no council fields", async () => {
+      test("#then returns metadata-only entry with no result field", async () => {
         const manager = createMockManager({
           "task-2": {
             status: "completed",
@@ -114,19 +102,19 @@ describe("createBackgroundWait", () => {
             completedAt: new Date(),
           },
         })
-        const client = createMockClient("Exploration complete: found 5 files")
-        const tool = createBackgroundWait(manager, client)
+        const tool = createBackgroundWait(manager)
 
         const result = await tool.execute({ task_ids: ["task-2"] }, toolContext)
 
         const parsed = JSON.parse(result)
-        expect(parsed.completed_task).toBeDefined()
-        expect(parsed.completed_task.task_id).toBe("task-2")
-        expect(parsed.completed_task.status).toBe("completed")
-        expect(parsed.completed_task.result).toBeTypeOf("string")
-        expect(parsed.completed_task.result).toContain("Exploration complete")
-        expect(parsed.completed_task.has_response).toBeUndefined()
-        expect(parsed.completed_task.response_complete).toBeUndefined()
+        expect(parsed.completed_tasks).toBeArray()
+        expect(parsed.completed_tasks).toHaveLength(1)
+        expect(parsed.completed_tasks[0].task_id).toBe("task-2")
+        expect(parsed.completed_tasks[0].status).toBe("completed")
+        expect(parsed.completed_tasks[0].description).toBe("Explore codebase")
+        expect(parsed.completed_tasks[0].result).toBeUndefined()
+        expect(parsed.completed_tasks[0].has_response).toBeUndefined()
+        expect(parsed.completed_tasks[0].response_complete).toBeUndefined()
         expect(parsed.timeout).toBe(false)
       })
     })
@@ -134,7 +122,7 @@ describe("createBackgroundWait", () => {
 
   describe("#given an error task", () => {
     describe("#when execute is called with that task_id", () => {
-      test("#then returns JSON with error field on completed_task", async () => {
+      test("#then returns completed_tasks entry with error field and no result", async () => {
         const manager = createMockManager({
           "task-3": {
             status: "error",
@@ -144,17 +132,17 @@ describe("createBackgroundWait", () => {
             startedAt: new Date(Date.now() - 2000),
           },
         })
-        const client = createMockClient()
-        const tool = createBackgroundWait(manager, client)
+        const tool = createBackgroundWait(manager)
 
         const result = await tool.execute({ task_ids: ["task-3"] }, toolContext)
 
         const parsed = JSON.parse(result)
-        expect(parsed.completed_task).toBeDefined()
-        expect(parsed.completed_task.task_id).toBe("task-3")
-        expect(parsed.completed_task.status).toBe("error")
-        expect(parsed.completed_task.error).toBe("Model failed")
-        expect(parsed.completed_task.result).toBeUndefined()
+        expect(parsed.completed_tasks).toBeArray()
+        expect(parsed.completed_tasks).toHaveLength(1)
+        expect(parsed.completed_tasks[0].task_id).toBe("task-3")
+        expect(parsed.completed_tasks[0].status).toBe("error")
+        expect(parsed.completed_tasks[0].error).toBe("Model failed")
+        expect(parsed.completed_tasks[0].result).toBeUndefined()
         expect(parsed.timeout).toBe(false)
       })
     })
@@ -166,8 +154,7 @@ describe("createBackgroundWait", () => {
         const manager = createMockManager({
           "known-task": { status: "completed", agent: "explore" },
         })
-        const client = createMockClient()
-        const tool = createBackgroundWait(manager, client)
+        const tool = createBackgroundWait(manager)
 
         const result = await tool.execute({ task_ids: ["known-task", "unknown-task"] }, toolContext)
 
@@ -181,7 +168,7 @@ describe("createBackgroundWait", () => {
 
   describe("#given a running task with session state and progress", () => {
     describe("#when that task plus a completed task are waited on", () => {
-      test("#then completed task returns immediately and running task appears in members with session_state", async () => {
+      test("#then completed task appears in completed_tasks and running task in members with session_state", async () => {
         const now = new Date()
         const manager = createMockManager({
           "running-task": {
@@ -199,13 +186,14 @@ describe("createBackgroundWait", () => {
             completedAt: now,
           },
         })
-        const client = createMockClient("Done result")
-        const tool = createBackgroundWait(manager, client)
+        const tool = createBackgroundWait(manager)
 
         const result = await tool.execute({ task_ids: ["running-task", "done-task"] }, toolContext)
 
         const parsed = JSON.parse(result)
-        expect(parsed.completed_task.task_id).toBe("done-task")
+        expect(parsed.completed_tasks).toBeArray()
+        expect(parsed.completed_tasks).toHaveLength(1)
+        expect(parsed.completed_tasks[0].task_id).toBe("done-task")
 
         const runningMember = parsed.members.find((m: Record<string, unknown>) => m.task_id === "running-task")
         expect(runningMember).toBeDefined()
@@ -224,13 +212,14 @@ describe("createBackgroundWait", () => {
           "t2": { status: "completed", agent: "explore", startedAt: new Date() },
           "t3": { status: "running", agent: "oracle" },
         })
-        const client = createMockClient("Result from t2")
-        const tool = createBackgroundWait(manager, client)
+        const tool = createBackgroundWait(manager)
 
         const result = await tool.execute({ task_ids: ["t1", "t2", "t3"] }, toolContext)
 
         const parsed = JSON.parse(result)
-        expect(parsed.completed_task.task_id).toBe("t2")
+        expect(parsed.completed_tasks).toBeArray()
+        expect(parsed.completed_tasks).toHaveLength(1)
+        expect(parsed.completed_tasks[0].task_id).toBe("t2")
         expect(parsed.remaining_task_ids).toContain("t1")
         expect(parsed.remaining_task_ids).toContain("t3")
         expect(parsed.remaining_task_ids).not.toContain("t2")
@@ -242,16 +231,62 @@ describe("createBackgroundWait", () => {
     })
   })
 
+  describe("#given a task with outputFilePath", () => {
+    describe("#when execute is called with that task_id", () => {
+      test("#then completed_tasks entry includes output_file_path", async () => {
+        const manager = createMockManager({
+          "task-out": {
+            status: "completed",
+            agent: "explore",
+            description: "Task with output",
+            startedAt: new Date(Date.now() - 1000),
+            completedAt: new Date(),
+            outputFilePath: "/tmp/output-task-out.md",
+          },
+        })
+        const tool = createBackgroundWait(manager)
+
+        const result = await tool.execute({ task_ids: ["task-out"] }, toolContext)
+
+        const parsed = JSON.parse(result)
+        expect(parsed.completed_tasks[0].output_file_path).toBe("/tmp/output-task-out.md")
+      })
+    })
+  })
+
+  describe("#given multiple terminal tasks", () => {
+    describe("#when execute is called with all task_ids", () => {
+      test("#then completed_tasks contains ALL terminal tasks", async () => {
+        const manager = createMockManager({
+          "t1": { status: "completed", agent: "explore", startedAt: new Date(), completedAt: new Date() },
+          "t2": { status: "error", agent: "oracle", error: "failed", startedAt: new Date() },
+          "t3": { status: "running", agent: "explore" },
+        })
+        const tool = createBackgroundWait(manager)
+
+        const result = await tool.execute({ task_ids: ["t1", "t2", "t3"] }, toolContext)
+
+        const parsed = JSON.parse(result)
+        expect(parsed.completed_tasks).toBeArray()
+        expect(parsed.completed_tasks).toHaveLength(2)
+        const ids = parsed.completed_tasks.map((t: Record<string, unknown>) => t.task_id)
+        expect(ids).toContain("t1")
+        expect(ids).toContain("t2")
+        expect(parsed.remaining_task_ids).toEqual(["t3"])
+      })
+    })
+  })
+
   describe("#given all results from every code path", () => {
     describe("#when JSON.parse is applied to each result", () => {
-      test("#then every result is valid JSON", async () => {
+      test("#then every result is valid JSON with completed_tasks array", async () => {
         const now = new Date()
         const results: string[] = []
 
-        const emptyTool = createBackgroundWait(createMockManager({}), createMockClient())
+        const emptyTool = createBackgroundWait(createMockManager({}))
         results.push(await emptyTool.execute({ task_ids: [] }, toolContext))
 
-        const councilTool = createBackgroundWait(
+        const completedTool = createBackgroundWait(
           createMockManager({
             "c1": {
               status: "completed",
@@ -260,12 +295,11 @@ describe("createBackgroundWait", () => {
               completedAt: now,
             },
           }),
-          createMockClient("<COUNCIL_MEMBER_RESPONSE>verdict</COUNCIL_MEMBER_RESPONSE>"),
         )
-        results.push(await councilTool.execute({ task_ids: ["c1"] }, toolContext))
+        results.push(await completedTool.execute({ task_ids: ["c1"] }, toolContext))
 
         resetMessageCursor()
-        const nonCouncilTool = createBackgroundWait(
+        const exploreTool = createBackgroundWait(
           createMockManager({
             "nc1": {
               status: "completed",
@@ -274,30 +308,29 @@ describe("createBackgroundWait", () => {
               completedAt: now,
             },
           }),
-          createMockClient("result text"),
         )
-        results.push(await nonCouncilTool.execute({ task_ids: ["nc1"] }, toolContext))
+        results.push(await exploreTool.execute({ task_ids: ["nc1"] }, toolContext))
 
         const errorTool = createBackgroundWait(
           createMockManager({ "e1": { status: "error", error: "boom" } }),
-          createMockClient(),
         )
         results.push(await errorTool.execute({ task_ids: ["e1"] }, toolContext))
 
         const abortController = new AbortController()
         abortController.abort()
         const abortedContext = { ...toolContext, abort: abortController.signal }
-        const notFoundTool = createBackgroundWait(createMockManager({}), createMockClient())
+        const notFoundTool = createBackgroundWait(createMockManager({}))
         results.push(await notFoundTool.execute({ task_ids: ["missing"] }, abortedContext))
 
         const cancelledTool = createBackgroundWait(
           createMockManager({ "x1": { status: "cancelled", agent: "explore" } }),
-          createMockClient(),
         )
         results.push(await cancelledTool.execute({ task_ids: ["x1"] }, toolContext))
 
         for (const result of results) {
-          expect(() => JSON.parse(result)).not.toThrow()
+          const parsed = JSON.parse(result)
+          expect(parsed).toBeDefined()
+          expect(Array.isArray(parsed.completed_tasks)).toBe(true)
         }
       })
     })

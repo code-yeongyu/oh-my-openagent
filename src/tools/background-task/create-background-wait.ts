@@ -1,9 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import type { BackgroundOutputManager, BackgroundOutputClient } from "./clients"
+import type { BackgroundOutputManager } from "./clients"
 import { BACKGROUND_WAIT_DESCRIPTION } from "./constants"
-import { formatCouncilTaskResult, isCouncilTask } from "./council-result-format"
 import { delay } from "./delay"
-import { formatTaskResult } from "./task-result-format"
 
 const DEFAULT_TIMEOUT_MS = 120_000
 const MAX_TIMEOUT_MS = 600_000
@@ -14,7 +12,7 @@ function isTerminal(status: string): boolean {
   return TERMINAL_STATUSES.has(status)
 }
 
-export function createBackgroundWait(manager: BackgroundOutputManager, client: BackgroundOutputClient): ToolDefinition {
+export function createBackgroundWait(manager: BackgroundOutputManager): ToolDefinition {
   return tool({
     description: BACKGROUND_WAIT_DESCRIPTION,
     args: {
@@ -31,7 +29,7 @@ export function createBackgroundWait(manager: BackgroundOutputManager, client: B
           progress: { done: 0, total: 0, bar: "" },
           members: [],
           remaining_task_ids: [],
-          completed_task: null,
+          completed_tasks: [],
           timeout: false,
           aborted: false,
         }, null, 2)
@@ -39,9 +37,9 @@ export function createBackgroundWait(manager: BackgroundOutputManager, client: B
 
       const timeoutMs = Math.min(args.timeout ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS)
 
-      const alreadyTerminal = findFirstTerminal(manager, taskIds)
-      if (alreadyTerminal) {
-        return await buildCompletionResult(alreadyTerminal, manager, client, taskIds)
+      const alreadyTerminal = findAllTerminal(manager, taskIds)
+      if (alreadyTerminal.length > 0) {
+        return buildCompletionResult(alreadyTerminal, manager, taskIds)
       }
 
       const startTime = Date.now()
@@ -52,9 +50,9 @@ export function createBackgroundWait(manager: BackgroundOutputManager, client: B
 
         await delay(1000)
 
-        const found = findFirstTerminal(manager, taskIds)
-        if (found) {
-          return await buildCompletionResult(found, manager, client, taskIds)
+        const found = findAllTerminal(manager, taskIds)
+        if (found.length > 0) {
+          return buildCompletionResult(found, manager, taskIds)
         }
       }
 
@@ -63,15 +61,16 @@ export function createBackgroundWait(manager: BackgroundOutputManager, client: B
   })
 }
 
-function findFirstTerminal(manager: BackgroundOutputManager, taskIds: string[]): { id: string; status: string } | undefined {
+function findAllTerminal(manager: BackgroundOutputManager, taskIds: string[]): { id: string; status: string }[] {
+  const terminal: { id: string; status: string }[] = []
   for (const id of taskIds) {
     const task = manager.getTask(id)
     if (!task) continue
     if (isTerminal(task.status)) {
-      return { id, status: task.status }
+      terminal.push({ id, status: task.status })
     }
   }
-  return undefined
+  return terminal
 }
 
 function buildMemberEntry(manager: BackgroundOutputManager, id: string): Record<string, unknown> {
@@ -111,64 +110,45 @@ function buildProgressSummary(
     progress: { done: doneIds.length, total: taskIds.length, bar: progressBar(doneIds.length, taskIds.length) },
     members,
     remaining_task_ids: remaining,
-    completed_task: null,
+    completed_tasks: [],
     timeout: flags.timeout ?? false,
     aborted: flags.aborted ?? false,
   }, null, 2)
 }
 
-async function buildCompletionResult(
-  completed: { id: string; status: string },
+function buildCompletionResult(
+  completedTasks: { id: string; status: string }[],
   manager: BackgroundOutputManager,
-  client: BackgroundOutputClient,
   allIds: string[],
-): Promise<string> {
-  const task = manager.getTask(completed.id)
-  if (!task) {
-    return JSON.stringify({
-      progress: { done: 0, total: allIds.length, bar: progressBar(0, allIds.length) },
-      members: allIds.map((id) => buildMemberEntry(manager, id)),
-      remaining_task_ids: allIds,
-      completed_task: { task_id: completed.id, description: completed.id, status: "not_found", error: "Task was deleted" },
-      timeout: false,
-      aborted: false,
-    }, null, 2)
-  }
-
+): string {
   const doneIds = allIds.filter((id) => isTerminal(manager.getTask(id)?.status ?? ""))
   const members = allIds.map((id) => buildMemberEntry(manager, id))
   const remaining = allIds.filter((id) => !isTerminal(manager.getTask(id)?.status ?? ""))
 
-  const completedTask: Record<string, unknown> = {
-    task_id: task.id,
-    description: task.description || task.id,
-    status: task.status,
-  }
+  const completedTaskEntries = completedTasks.map(({ id }) => {
+    const task = manager.getTask(id)
+    if (!task) return { task_id: id, status: "not_found", error: "Task was deleted" }
 
-  if (task.startedAt) {
-    const endTime = task.completedAt ?? new Date()
-    completedTask.duration_s = Math.floor((endTime.getTime() - task.startedAt.getTime()) / 1000)
-  }
-  if (task.sessionID) completedTask.session_id = task.sessionID
-
-  if (task.status === "completed") {
-    if (isCouncilTask(task)) {
-      const councilResult = await formatCouncilTaskResult(task, client)
-      completedTask.has_response = councilResult.has_response
-      completedTask.response_complete = councilResult.response_complete
-      completedTask.result = councilResult.result
-    } else {
-      completedTask.result = await formatTaskResult(task, client)
+    const entry: Record<string, unknown> = {
+      task_id: task.id,
+      description: task.description || task.id,
+      status: task.status,
     }
-  } else {
-    if (task.error) completedTask.error = task.error
-  }
+    if (task.startedAt) {
+      const endTime = task.completedAt ?? new Date()
+      entry.duration_s = Math.floor((endTime.getTime() - task.startedAt.getTime()) / 1000)
+    }
+    if (task.sessionID) entry.session_id = task.sessionID
+    if (task.outputFilePath) entry.output_file_path = task.outputFilePath
+    if (task.error) entry.error = task.error
+    return entry
+  })
 
   return JSON.stringify({
     progress: { done: doneIds.length, total: allIds.length, bar: progressBar(doneIds.length, allIds.length) },
     members,
     remaining_task_ids: remaining,
-    completed_task: completedTask,
+    completed_tasks: completedTaskEntries,
     timeout: false,
     aborted: false,
   }, null, 2)
