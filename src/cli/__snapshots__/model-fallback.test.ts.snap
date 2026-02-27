@@ -845,7 +845,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "opencode/gpt-5-nano",
     },
     "librarian": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
     "metis": {
       "model": "opencode/big-pickle",
@@ -886,7 +886,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
       "model": "opencode/big-pickle",
     },
     "writing": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
   },
 }
@@ -903,7 +903,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/gpt-5-nano",
     },
     "librarian": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
     "metis": {
       "model": "opencode/big-pickle",
@@ -921,7 +921,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/big-pickle",
     },
     "sisyphus": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
   },
   "categories": {
@@ -944,7 +944,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/big-pickle",
     },
     "writing": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
   },
 }
@@ -1089,7 +1089,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
     "metis": {
       "model": "anthropic/claude-opus-4-5",
@@ -1216,7 +1216,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "model": "opencode/claude-haiku-4-5",
     },
     "librarian": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
     "metis": {
       "model": "github-copilot/claude-opus-4.5",
@@ -1280,7 +1280,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
     "metis": {
       "model": "anthropic/claude-opus-4-5",
@@ -1344,7 +1344,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "model": "anthropic/claude-haiku-4-5",
     },
     "librarian": {
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "zai-coding-plan/glm-5",
     },
     "metis": {
       "model": "anthropic/claude-opus-4-5",

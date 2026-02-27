@@ -13,7 +13,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   sisyphus: {
     fallbackChain: [
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-5", variant: "max" },
-      { providers: ["zai-coding-plan"], model: "glm-4.7" },
+      { providers: ["zai-coding-plan"], model: "glm-5" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2-codex", variant: "medium" },
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro" },
     ],
@@ -27,7 +27,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   },
    librarian: {
      fallbackChain: [
-       { providers: ["zai-coding-plan"], model: "glm-4.7" },
+       { providers: ["zai-coding-plan"], model: "glm-5" },
        { providers: ["opencode"], model: "big-pickle" },
        { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
      ],
@@ -124,7 +124,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-flash" },
       { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-5" },
-      { providers: ["zai-coding-plan"], model: "glm-4.7" },
+      { providers: ["zai-coding-plan"], model: "glm-5" },
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
     ],
   },
