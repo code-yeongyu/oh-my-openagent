@@ -1,3 +1,4 @@
+import { resolve } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRgFiles } from "./cli"
@@ -25,7 +26,7 @@ export function createGlobTools(ctx: PluginInput): Record<string, ToolDefinition
     execute: async (args) => {
       try {
         const cli = await resolveGrepCliWithAutoInstall()
-        const searchPath = args.path ?? ctx.directory
+        const searchPath = args.path ? resolve(ctx.directory, args.path) : ctx.directory
         const paths = [searchPath]
 
         const result = await runRgFiles(
