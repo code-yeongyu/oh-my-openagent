@@ -89,7 +89,7 @@ describe("toon compression phase 1 integration", () => {
     failSafeCompress.mockRestore()
 
     const truncator = await import("../shared/dynamic-truncator")
-    spyOn(truncator, "createDynamicTruncator").mockReturnValue({ truncate: async (_sid: string, out: string) => ({ result: out, truncated: false }), truncateSync: () => ({ result: "", truncated: false }), getUsage: async () => null })
+    const createDynamicTruncatorSpy = spyOn(truncator, "createDynamicTruncator").mockReturnValue({ truncate: async (_sid: string, out: string) => ({ result: out, truncated: false }), truncateSync: () => ({ result: "", truncated: false }), getUsage: async () => null })
     const truncOn = createToolOutputTruncatorHook({} as never, { compression: on })
     const truncOff = createToolOutputTruncatorHook({} as never, { compression: off })
     const t1 = { title: "x", output: JSON.stringify(many), metadata: {} }
@@ -98,6 +98,7 @@ describe("toon compression phase 1 integration", () => {
     await truncOff["tool.execute.after"]({ tool: "grep", sessionID: "s", callID: "c" }, t2 as never)
     expect(isCompressed(t1.output)).toBe(true)
     expect(t2.output).toBe(JSON.stringify(many))
+    createDynamicTruncatorSpy.mockRestore()
 
     const ctx = {
       client: {
