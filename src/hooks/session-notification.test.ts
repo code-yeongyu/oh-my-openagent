@@ -366,9 +366,7 @@ describe("session-notification", () => {
     expect(notificationCalls).toHaveLength(1)
   })
 
-  test("should use terminal-notifier with -activate when available on darwin", async () => {
-    // given - terminal-notifier is available and __CFBundleIdentifier is set
-    spyOn(sender, "sendSessionNotification").mockRestore()
+  function createSenderMockCtx() {
     const notifyCalls: string[] = []
     const mockCtx = {
       $: async (cmd: TemplateStringsArray | string, ...values: any[]) => {
@@ -379,41 +377,40 @@ describe("session-notification", () => {
         return { stdout: "", stderr: "", exitCode: 0 }
       },
     } as any
+    return { mockCtx, notifyCalls }
+  }
+
+  test("should use terminal-notifier with -activate when available on darwin", async () => {
+    // given - terminal-notifier is available and __CFBundleIdentifier is set
+    spyOn(sender, "sendSessionNotification").mockRestore()
+    const { mockCtx, notifyCalls } = createSenderMockCtx()
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
     const originalEnv = process.env.__CFBundleIdentifier
     process.env.__CFBundleIdentifier = "com.mitchellh.ghostty"
 
-    // when - sendSessionNotification is called directly on darwin
-    await sender.sendSessionNotification(mockCtx, "darwin", "Test Title", "Test Message")
+    try {
+      // when - sendSessionNotification is called directly on darwin
+      await sender.sendSessionNotification(mockCtx, "darwin", "Test Title", "Test Message")
 
-    // then - notification uses terminal-notifier with -activate flag
-    expect(notifyCalls.length).toBeGreaterThanOrEqual(1)
-    const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
-    expect(tnCall).toBeDefined()
-    expect(tnCall).toContain("-activate")
-    expect(tnCall).toContain("com.mitchellh.ghostty")
-
-    // cleanup
-    if (originalEnv !== undefined) {
-      process.env.__CFBundleIdentifier = originalEnv
-    } else {
-      delete process.env.__CFBundleIdentifier
+      // then - notification uses terminal-notifier with -activate flag
+      expect(notifyCalls.length).toBeGreaterThanOrEqual(1)
+      const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
+      expect(tnCall).toBeDefined()
+      expect(tnCall).toContain("-activate")
+      expect(tnCall).toContain("com.mitchellh.ghostty")
+    } finally {
+      if (originalEnv !== undefined) {
+        process.env.__CFBundleIdentifier = originalEnv
+      } else {
+        delete process.env.__CFBundleIdentifier
+      }
     }
   })
 
   test("should fall back to osascript when terminal-notifier is not available", async () => {
     // given - terminal-notifier is NOT available
     spyOn(sender, "sendSessionNotification").mockRestore()
-    const notifyCalls: string[] = []
-    const mockCtx = {
-      $: async (cmd: TemplateStringsArray | string, ...values: any[]) => {
-        const cmdStr = typeof cmd === "string"
-          ? cmd
-          : cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
-        notifyCalls.push(cmdStr)
-        return { stdout: "", stderr: "", exitCode: 0 }
-      },
-    } as any
+    const { mockCtx, notifyCalls } = createSenderMockCtx()
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue(null)
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
 
@@ -431,33 +428,24 @@ describe("session-notification", () => {
   test("should use terminal-notifier without -activate when __CFBundleIdentifier is not set", async () => {
     // given - terminal-notifier available but no bundle ID
     spyOn(sender, "sendSessionNotification").mockRestore()
-    const notifyCalls: string[] = []
-    const mockCtx = {
-      $: async (cmd: TemplateStringsArray | string, ...values: any[]) => {
-        const cmdStr = typeof cmd === "string"
-          ? cmd
-          : cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
-        notifyCalls.push(cmdStr)
-        return { stdout: "", stderr: "", exitCode: 0 }
-      },
-    } as any
+    const { mockCtx, notifyCalls } = createSenderMockCtx()
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
     const originalEnv = process.env.__CFBundleIdentifier
     delete process.env.__CFBundleIdentifier
 
-    // when - sendSessionNotification is called directly on darwin
-    await sender.sendSessionNotification(mockCtx, "darwin", "Test Title", "Test Message")
+    try {
+      // when - sendSessionNotification is called directly on darwin
+      await sender.sendSessionNotification(mockCtx, "darwin", "Test Title", "Test Message")
 
-    // then - terminal-notifier used but without -activate flag
-    expect(notifyCalls.length).toBeGreaterThanOrEqual(1)
-    const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
-    expect(tnCall).toBeDefined()
-    expect(tnCall).not.toContain("-activate")
-
-    // cleanup
-    if (originalEnv !== undefined) {
-      process.env.__CFBundleIdentifier = originalEnv
+      // then - terminal-notifier used but without -activate flag
+      expect(notifyCalls.length).toBeGreaterThanOrEqual(1)
+      const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
+      expect(tnCall).toBeDefined()
+      expect(tnCall).not.toContain("-activate")
+    } finally {
+      if (originalEnv !== undefined) {
+        process.env.__CFBundleIdentifier = originalEnv
+      }
     }
   })
-
 })
