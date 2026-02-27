@@ -222,7 +222,38 @@
 - `bun run build` => pass (`exit 0`)
 - `lsp_diagnostics` (error severity) clean on all changed TS files.
 
-**Plan-file guardrail:**
-- `changes/.../tasks.md` was not edited in this task (plan file remains read-only per execution constraints).
+**Plan-file synchronization (2026-02-28T03:15:00Z):**
+- Synchronized `tasks.md` Task 3 checkboxes to `[x]` to match completed implementation state.
+
+**Status**: [COMPLETED]
+
+### [2026-02-28T12:45:00Z] Task: 4. Execute Wave B from rehearsal-derived execution sheet
+
+**Execution sheet:**
+- Created `changes/route-c-bae3bdc2-downstream-preservation/evidence/wave-b-execution-sheet.md`.
+- Captured concrete path list, conflict-resolution choices, preserve/equivalent mapping, apply set, and targeted verification commands.
+
+**Wave B code application (sheet-listed only):**
+- Applied from `rescue/pre-merge-bae3bdc2`:
+  - `src/hooks/todo-continuation-enforcer.ts`
+  - `src/hooks/todo-continuation-enforcer.test.ts`
+  - `src/tools/session-manager/storage.ts`
+  - `src/tools/session-manager/storage.test.ts`
+  - `src/tools/session-manager/tools.ts`
+  - `src/tools/session-manager/tools.context.test.ts`
+  - `src/tools/delegate-task/tools.test.ts`
+
+**Wave B preserve outcomes (no unapproved required loss):**
+- Required Wave B path check => `WAVE_B_REQUIRED_MISSING=0`.
+- Missing-path detail => `WAVE_B_REQUIRED_MISSING_PATHS=<none>`.
+- No new unapproved exception introduced for required Wave B runtime paths.
+
+**Verification results:**
+- `bun test src/hooks/todo-continuation-enforcer.test.ts` => pass (`39 pass, 0 fail`)
+- `bun test src/tools/session-manager/storage.test.ts src/tools/session-manager/tools.context.test.ts src/tools/session-manager/tools.test.ts` => pass (`32 pass, 0 fail`)
+- `bun test src/tools/delegate-task/tools.test.ts` => pass (`90 pass, 0 fail`)
+- `bun test src/shared/task-parser.test.ts src/shared/wave-grouper.test.ts` => pass (`41 pass, 0 fail`)
+- `bun run build` => pass (`exit 0`)
+- `lsp_diagnostics` (error severity) clean on all changed Wave B TS files.
 
 **Status**: [COMPLETED]

@@ -134,3 +134,25 @@ Status legend:
 | RP-029 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
 | RP-043 | applied (hybrid rewrite) | `PRESERVE` | Startup/session-created repair behavior forward-ported with local equivalent import rewrite. |
 | RP-044 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+
+## Wave B Execution Outcome (Task 4)
+
+| Patch ID | Wave B Action | Outcome | Notes |
+|---|---|---|---|
+| RP-012 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-013 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-035 | no-edit | `PROPOSED_DROP` | EX-governed test path remains unchanged in this wave. |
+| RP-036 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-041 | applied (compatibility keep) | `EQUIVALENT_REWRITE` | `todo-continuation-enforcer.ts` synced from rescue; fallback-agent + active-boulder-session guard behavior preserved. |
+| RP-042 | applied (test sync, equivalent surface) | `PROPOSED_DROP` | Synced legacy test path `src/hooks/todo-continuation-enforcer.test.ts` to match Wave B runtime behavior under EX governance. |
+| RP-050 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-052 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-055 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-056 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-057 | applied (test sync) | `PROPOSED_DROP` | Delegate-task verification updated from rescue while remaining EX-governed test scope. |
+| RP-059 | applied | `PRESERVE` | Session storage normalization logic synced from rescue (Windows/Git-Bash/WSL path variants). |
+| RP-060 | applied (test sync) | `PROPOSED_DROP` | Added context-directory test coverage for `session_list` behavior. |
+| RP-061 | applied | `PRESERVE` | `session_list` now resolves directory from tool context when `project_path` is absent. |
+| RP-103 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-104 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-105 | applied (test sync) | `PROPOSED_DROP` | Added cross-platform directory match tests for storage query behavior. |

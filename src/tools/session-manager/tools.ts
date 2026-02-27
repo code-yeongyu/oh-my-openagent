@@ -34,10 +34,10 @@ export const session_list: ToolDefinition = tool({
     to_date: tool.schema.string().optional().describe("Filter sessions until this date (ISO 8601 format)"),
     project_path: tool.schema.string().optional().describe("Filter sessions by project path (default: current working directory)"),
   },
-  execute: async (args: SessionListArgs, _context) => {
+  execute: async (args: SessionListArgs, context) => {
     try {
-      const directory = args.project_path ?? process.cwd()
-      let sessions = await getMainSessions({ directory })
+      const directory = args.project_path ?? context.directory ?? process.cwd()
+      const sessions = await getMainSessions({ directory })
       let sessionIDs = sessions.map((s) => s.id)
 
       if (args.from_date || args.to_date) {

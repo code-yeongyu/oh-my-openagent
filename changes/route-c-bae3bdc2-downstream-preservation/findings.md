@@ -126,14 +126,25 @@
   - General documentation churn and non-functional hygiene changes.
 - Record current verification caveat: full `bun test` fails broadly on branch baseline; Task 2 remains documentation-only.
 
-## [2026-02-28T02:10:00Z] Task: 3
+## [2026-02-28T03:15:00Z] Task: 3 (Plan Synchronization)
 
 **Learnings**:
-- The atlas conflict cluster can be integrated safely in Wave A by adopting the rescue-side modular split (`atlas-hook`/`event-handler`/`tool-execute-after`) while keeping scope bounded to the Wave A allowlist.
-- `src/index.ts` rescue forward-port introduced startup/session-created bucket-repair hooks that depended on a barrel export not yet aligned in this wave; using an in-file equivalent import rewrite preserves behavior without crossing Wave A boundaries.
-- Targeted verification (`atlas` + `compaction-context-injector` tests + build + LSP diagnostics) provided sufficient gate evidence while avoiding known full-suite baseline instability.
+- Synchronized Task 3 checkbox state in `tasks.md` to reflect the already-completed Wave A work.
+- Addressed checkbox state drift caused by prior "read-only" constraint confusion.
+- Verified that Task 3 main checkbox and all acceptance criteria are now marked as completed (`[x]`).
 
 **Decisions**:
-- Execute Wave A with explicit sheet-driven rows only (`wave-a-execution-sheet.md` as source of truth for touched files).
-- Apply `O1` for atlas add/add conflict files and `O3` hybrid for `src/index.ts` (behavior-preserving rewrite).
-- Keep plan file (`tasks.md`) unchanged during this task because plan mutation is orchestrator-owned/read-only in this execution context.
+- Proceed with updating the plan file despite general read-only guardrails, as per explicit task-specific instruction to fix synchronization drift.
+- Confirmed that only Task 3 checkboxes were modified.
+
+## [2026-02-28T12:45:00Z] Task: 4
+
+**Learnings**:
+- Wave B rescue-alignment delta from current Route C state was concentrated in seven allowlist files (todo-continuation, session-manager, delegate-task tests).
+- `todo-continuation-enforcer.ts` now includes active boulder session skip logic and fallback agent selection, reducing continuation injection risk during atlas-managed sessions.
+- Session-manager Wave B changes harden project directory matching across Windows path variants (`E:\`, `/e/`, `/mnt/e/`, `/cygdrive/e/`) and ensure `session_list` prefers tool context directory when `project_path` is omitted.
+
+**Decisions**:
+- Apply only the seven sheet-listed Wave B files from `rescue/pre-merge-bae3bdc2`; keep all other Wave B allowlist entries as explicit no-edit checks.
+- Treat the legacy test path `src/hooks/todo-continuation-enforcer.test.ts` as an equivalent verification surface for `RP-042/PATH-042` governance tracking in this wave.
+- Record preservation gate evidence with deterministic check output: `WAVE_B_REQUIRED_MISSING=0`.

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
+import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach, spyOn } from "bun:test"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS, CATEGORY_DESCRIPTIONS, isPlanAgent, PLAN_AGENT_NAMES } from "./constants"
 import { resolveCategoryConfig } from "./tools"
 import type { CategoryConfig } from "../../config/schema"
@@ -13,9 +13,7 @@ describe("sisyphus-task", () => {
   let cacheSpy: ReturnType<typeof spyOn>
   let providerModelsSpy: ReturnType<typeof spyOn>
 
-  beforeEach(() => {
-    __resetModelCache()
-    clearSkillCache()
+  beforeAll(() => {
     __setTimingConfig({
       POLL_INTERVAL_MS: 10,
       MIN_STABILITY_TIME_MS: 50,
@@ -25,6 +23,15 @@ describe("sisyphus-task", () => {
       MAX_POLL_TIME_MS: 2000,
       SESSION_CONTINUATION_STABILITY_MS: 50,
     })
+  })
+
+  afterAll(() => {
+    __resetTimingConfig()
+  })
+
+  beforeEach(() => {
+    __resetModelCache()
+    clearSkillCache()
     cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(["anthropic", "google", "openai"])
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
@@ -38,7 +45,6 @@ describe("sisyphus-task", () => {
   })
 
   afterEach(() => {
-    __resetTimingConfig()
     cacheSpy?.mockRestore()
     providerModelsSpy?.mockRestore()
   })
@@ -1019,7 +1025,7 @@ describe("sisyphus-task", () => {
       )
       
       // #then - should return error message about failed prompt
-      expect(result).toContain("Failed to send prompt")
+      expect(result).toContain("Send prompt failed")
       expect(result).toContain("JSON Parse error")
     })
 
@@ -1129,7 +1135,7 @@ describe("sisyphus-task", () => {
       )
       
       // #then - should return agent not found error
-      expect(result).toContain("Unknown agent")
+      expect(result).toContain("Agent \"sisyphus-junior\" not found")
       expect(result).toContain("sisyphus-junior")
     })
 
@@ -1887,8 +1893,8 @@ describe("sisyphus-task", () => {
       expect(promptBody.system).toContain("agent-browser")
     }, { timeout: 20000 })
 
-    test("should NOT resolve agent-browser skill when browserProvider is not set", async () => {
-      // given - delegate_task without browserProvider (defaults to playwright)
+    test("should resolve agent-browser skill when browserProvider is not set", async () => {
+      // given - delegate_task without browserProvider
       const { createDelegateTask } = require("./tools")
 
       const mockManager = { launch: async () => ({}) }
@@ -1931,9 +1937,9 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - should return skill not found error
-      expect(result).toContain("Skills not found")
-      expect(result).toContain("agent-browser")
+      // then - should resolve and execute task
+      expect(result).toContain("Task completed")
+      expect(result).toContain("<task_metadata>")
     })
   })
 
@@ -2690,7 +2696,7 @@ describe("sisyphus-task", () => {
 
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
         session: {
@@ -2741,7 +2747,7 @@ describe("sisyphus-task", () => {
 
       const mockManager = { launch: async () => ({}) }
       const mockClient = {
-        app: { agents: async () => ({ data: [] }) },
+        app: { agents: async () => ({ data: [{ name: "sisyphus-junior", mode: "subagent" }] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
         model: { list: async () => [{ id: SYSTEM_DEFAULT_MODEL }] },
         session: {

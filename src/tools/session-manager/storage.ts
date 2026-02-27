@@ -8,10 +8,43 @@ export interface GetMainSessionsOptions {
   directory?: string
 }
 
+function normalizeDirectoryPathForMatch(value: string): string {
+  let normalized = value.trim().replace(/\\/g, "/")
+
+  const driveRootMatch = normalized.match(/^\/([A-Za-z])(?:\/(.*))?$/)
+  if (driveRootMatch) {
+    const [, drive, rest] = driveRootMatch
+    normalized = `${drive}:/${rest ?? ""}`
+  }
+
+  const wslMatch = normalized.match(/^\/mnt\/([A-Za-z])(?:\/(.*))?$/)
+  if (wslMatch) {
+    const [, drive, rest] = wslMatch
+    normalized = `${drive}:/${rest ?? ""}`
+  }
+
+  const cygdriveMatch = normalized.match(/^\/cygdrive\/([A-Za-z])(?:\/(.*))?$/)
+  if (cygdriveMatch) {
+    const [, drive, rest] = cygdriveMatch
+    normalized = `${drive}:/${rest ?? ""}`
+  }
+
+  while (normalized.length > 1 && normalized.endsWith("/")) {
+    normalized = normalized.slice(0, -1)
+  }
+
+  if (/^[A-Za-z]:/.test(normalized)) {
+    return normalized.toLowerCase()
+  }
+
+  return normalized
+}
+
 export async function getMainSessions(options: GetMainSessionsOptions): Promise<SessionMetadata[]> {
   if (!existsSync(SESSION_STORAGE)) return []
 
   const sessions: SessionMetadata[] = []
+  const targetDirectory = options.directory ? normalizeDirectoryPathForMatch(options.directory) : undefined
 
   try {
     const projectDirs = await readdir(SESSION_STORAGE, { withFileTypes: true })
@@ -30,7 +63,10 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
 
           if (meta.parentID) continue
 
-          if (options.directory && meta.directory !== options.directory) continue
+          if (targetDirectory) {
+            const sessionDirectory = normalizeDirectoryPathForMatch(meta.directory)
+            if (sessionDirectory !== targetDirectory) continue
+          }
 
           sessions.push(meta)
         } catch {

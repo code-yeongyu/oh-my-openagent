@@ -2,7 +2,8 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import type { BackgroundManager } from "../features/background-agent"
-import { getMainSessionID, subagentSessions } from "../features/claude-code-session-state"
+import { readBoulderState } from "../features/boulder-state"
+import { getMainSessionID, getSessionAgent, subagentSessions } from "../features/claude-code-session-state"
 import {
     findNearestMessageWithFields,
     MESSAGE_STORAGE,
@@ -163,8 +164,6 @@ export function createTodoContinuationEnforcer(
 
   async function injectContinuation(
     sessionID: string,
-    incompleteCount: number,
-    total: number,
     resolvedInfo?: ResolvedMessageInfo
   ): Promise<void> {
     const state = sessions.get(sessionID)
@@ -216,6 +215,12 @@ export function createTodoContinuationEnforcer(
       tools = tools ?? prevMessage?.tools
     }
 
+    if (!agentName) {
+      const fallbackAgent = getSessionAgent(sessionID) ?? "sisyphus"
+      agentName = fallbackAgent
+      log(`[${HOOK_NAME}] Using fallback agent for continuation`, { sessionID, agent: fallbackAgent })
+    }
+
     if (agentName && skipAgents.includes(agentName)) {
       log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
       return
@@ -264,7 +269,6 @@ ${todoList}`
   function startCountdown(
     sessionID: string,
     incompleteCount: number,
-    total: number,
     resolvedInfo?: ResolvedMessageInfo
   ): void {
     const state = getState(sessionID)
@@ -283,7 +287,7 @@ ${todoList}`
 
     state.countdownTimer = setTimeout(() => {
       cancelCountdown(sessionID)
-      injectContinuation(sessionID, incompleteCount, total, resolvedInfo)
+      injectContinuation(sessionID, resolvedInfo)
     }, COUNTDOWN_SECONDS * 1000)
 
     log(`[${HOOK_NAME}] Countdown started`, { sessionID, seconds: COUNTDOWN_SECONDS, incompleteCount })
@@ -320,6 +324,18 @@ ${todoList}`
 
       if (mainSessionID && !isMainSession && !isBackgroundTaskSession) {
         log(`[${HOOK_NAME}] Skipped: not main or background task session`, { sessionID })
+        return
+      }
+
+      const boulderState = readBoulderState(ctx.directory)
+      const isActiveBoulderSession = Boolean(
+        boulderState?.active_plan && boulderState.session_ids.includes(sessionID)
+      )
+      if (isActiveBoulderSession) {
+        log(`[${HOOK_NAME}] Skipped: active boulder session handled by atlas`, {
+          sessionID,
+          plan: boulderState?.plan_name,
+        })
         return
       }
 
@@ -392,6 +408,7 @@ ${todoList}`
       try {
         const messagesResp = await ctx.client.session.messages({
           path: { id: sessionID },
+          query: { directory: ctx.directory },
         })
         const messages = (messagesResp.data ?? []) as Array<{
           info?: {
@@ -436,7 +453,7 @@ ${todoList}`
         return
       }
 
-      startCountdown(sessionID, incompleteCount, todos.length, resolvedInfo)
+      startCountdown(sessionID, incompleteCount, resolvedInfo)
       return
     }
 

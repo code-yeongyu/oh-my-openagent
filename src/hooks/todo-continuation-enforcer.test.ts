@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdirSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { randomUUID } from "node:crypto"
 
 import type { BackgroundManager } from "../features/background-agent"
-import { setMainSession, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
+import { writeBoulderState } from "../features/boulder-state"
+import { setMainSession, setSessionAgent, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
 import { createTodoContinuationEnforcer } from "./todo-continuation-enforcer"
 
 type TimerCallback = (...args: any[]) => void
@@ -1147,10 +1152,10 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
-  test("should inject when agent info is undefined but skipAgents is empty", async () => {
+  test("should inject using default fallback agent when agent info is undefined", async () => {
     fakeTimers.restore()
-    // given - session with no agent info but skipAgents is empty
-    const sessionID = "main-no-agent-no-skip"
+    // given - session with no agent info and no session agent
+    const sessionID = "main-no-agent"
     setMainSession(sessionID)
 
     const mockMessagesNoAgent = [
@@ -1191,8 +1196,97 @@ describe("todo-continuation-enforcer", () => {
 
     await wait(2500)
 
-    // then - continuation injected (no agents to skip)
+    // then - continuation injected with fallback agent
     expect(promptCalls.length).toBe(1)
+    expect(promptCalls[0].agent).toBe("sisyphus")
+  }, { timeout: 15000 })
+
+  test("should fallback to session agent when message agent is undefined", async () => {
+    fakeTimers.restore()
+    // given - no agent in messages, but session agent exists
+    const sessionID = "main-fallback-agent"
+    setMainSession(sessionID)
+    setSessionAgent(sessionID, "sisyphus")
+
+    const mockMessagesNoAgent = [
+      { info: { id: "msg-1", role: "user" } },
+      { info: { id: "msg-2", role: "assistant" } },
+    ]
+
+    const mockInput = {
+      client: {
+        session: {
+          todo: async () => ({
+            data: [{ id: "1", content: "Task 1", status: "pending", priority: "high" }],
+          }),
+          messages: async () => ({ data: mockMessagesNoAgent }),
+          prompt: async (opts: any) => {
+            promptCalls.push({
+              sessionID: opts.path.id,
+              agent: opts.body.agent,
+              model: opts.body.model,
+              text: opts.body.parts[0].text,
+            })
+            return {}
+          },
+        },
+        tui: { showToast: async () => ({}) },
+      },
+      directory: "/tmp/test",
+    } as any
+
+    const hook = createTodoContinuationEnforcer(mockInput, {
+      skipAgents: [],
+    })
+
+    // when
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await wait(2500)
+
+    // then
+    expect(promptCalls.length).toBe(1)
+    expect(promptCalls[0].agent).toBe("sisyphus")
+  }, { timeout: 15000 })
+
+  test("should skip todo continuation for active boulder sessions", async () => {
+    fakeTimers.restore()
+    // given - active boulder session should be handled by atlas
+    const sessionID = "main-boulder-session"
+    setMainSession(sessionID)
+
+    const testDir = join(tmpdir(), `todo-boulder-${randomUUID()}`)
+    mkdirSync(testDir, { recursive: true })
+
+    writeBoulderState(testDir, {
+      active_plan: "changes/test-plan/tasks.md",
+      started_at: new Date().toISOString(),
+      session_ids: [sessionID],
+      plan_name: "test-plan",
+      phase: "executing",
+      last_updated: new Date().toISOString(),
+      agent: "atlas",
+    })
+
+    const mockInput = createMockPluginInput()
+    mockInput.directory = testDir
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    try {
+      // when
+      await hook.handler({
+        event: { type: "session.idle", properties: { sessionID } },
+      })
+
+      await wait(2500)
+
+      // then
+      expect(promptCalls).toHaveLength(0)
+    } finally {
+      rmSync(testDir, { recursive: true, force: true })
+    }
   }, { timeout: 15000 })
 
   test("should not inject when isContinuationStopped returns true", async () => {

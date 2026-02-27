@@ -127,3 +127,25 @@ Source-of-truth mapping: each path entry maps 1:1 to `required-patches.md` via `
 | PATH-029 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
 | PATH-043 | applied (hybrid rewrite) | `PRESERVE` | Startup/session-created repair behavior forward-ported with local equivalent import rewrite. |
 | PATH-044 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+
+## Wave B Execution Outcome (Task 4)
+
+| Path ID | Wave B Action | Outcome | Notes |
+|---|---|---|---|
+| PATH-012 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-013 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-035 | no-edit | `PROPOSED_DROP` | EX-governed test path remains unchanged in this wave. |
+| PATH-036 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-041 | applied (compatibility keep) | `EQUIVALENT_REWRITE` | `todo-continuation-enforcer.ts` synced from rescue; boulder-session guard + fallback-agent behavior retained. |
+| PATH-042 | applied (test sync, equivalent surface) | `PROPOSED_DROP` | Synced legacy test path `src/hooks/todo-continuation-enforcer.test.ts` as equivalent verification surface under EX governance. |
+| PATH-050 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-052 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-055 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-056 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-057 | applied (test sync) | `PROPOSED_DROP` | Delegate-task test suite synced from rescue while remaining EX-governed test scope. |
+| PATH-059 | applied | `PRESERVE` | Session storage path normalization synced from rescue. |
+| PATH-060 | applied (test sync) | `PROPOSED_DROP` | Added context-directory test for `session_list` call path. |
+| PATH-061 | applied | `PRESERVE` | `session_list` directory resolution now prefers `context.directory` fallback. |
+| PATH-103 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-104 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-105 | applied (test sync) | `PROPOSED_DROP` | Added cross-platform storage matching tests for directory variants. |

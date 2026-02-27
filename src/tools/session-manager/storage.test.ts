@@ -295,6 +295,82 @@ describe("session-manager storage - getMainSessions", () => {
     expect(sessionsB[0].id).toBe("ses_projB")
   })
 
+  test("getMainSessions matches Windows directory variants (slashes, case, trailing separator)", async () => {
+    // given
+    const projectID = "proj_windows"
+    const now = Date.now()
+    const storedDirectory = "E:\\github\\oh-my-opencode-merge-lab"
+
+    createSessionMetadata(projectID, "ses_windows", {
+      directory: storedDirectory,
+      updated: now,
+    })
+    createMessageForSession("ses_windows", "msg_001", now)
+
+    // when
+    const slashVariant = await storage.getMainSessions({
+      directory: "E:/github/oh-my-opencode-merge-lab",
+    })
+    const driveCaseVariant = await storage.getMainSessions({
+      directory: "e:\\github\\oh-my-opencode-merge-lab",
+    })
+    const trailingSlashVariant = await storage.getMainSessions({
+      directory: "E:\\github\\oh-my-opencode-merge-lab\\",
+    })
+
+    // then
+    expect(slashVariant.map((s) => s.id)).toContain("ses_windows")
+    expect(driveCaseVariant.map((s) => s.id)).toContain("ses_windows")
+    expect(trailingSlashVariant.map((s) => s.id)).toContain("ses_windows")
+  })
+
+  test("getMainSessions matches Git Bash and WSL Windows path variants", async () => {
+    // given
+    const projectID = "proj_windows_mounted"
+    const now = Date.now()
+    const storedDirectory = "E:\\github\\oh-my-opencode-merge-lab"
+
+    createSessionMetadata(projectID, "ses_windows_mounted", {
+      directory: storedDirectory,
+      updated: now,
+    })
+    createMessageForSession("ses_windows_mounted", "msg_001", now)
+
+    // when
+    const gitBashVariant = await storage.getMainSessions({
+      directory: "/e/github/oh-my-opencode-merge-lab",
+    })
+    const wslVariant = await storage.getMainSessions({
+      directory: "/mnt/e/github/oh-my-opencode-merge-lab",
+    })
+    const cygwinVariant = await storage.getMainSessions({
+      directory: "/cygdrive/e/github/oh-my-opencode-merge-lab",
+    })
+
+    // then
+    expect(gitBashVariant.map((s) => s.id)).toContain("ses_windows_mounted")
+    expect(wslVariant.map((s) => s.id)).toContain("ses_windows_mounted")
+    expect(cygwinVariant.map((s) => s.id)).toContain("ses_windows_mounted")
+  })
+
+  test("getMainSessions keeps POSIX directory matching case-sensitive", async () => {
+    // given
+    const projectID = "proj_posix"
+    const now = Date.now()
+
+    createSessionMetadata(projectID, "ses_posix", {
+      directory: "/Path/To/Project",
+      updated: now,
+    })
+    createMessageForSession("ses_posix", "msg_001", now)
+
+    // when
+    const sessions = await storage.getMainSessions({ directory: "/path/to/project" })
+
+    // then
+    expect(sessions.map((s) => s.id)).not.toContain("ses_posix")
+  })
+
   test("getMainSessions returns all main sessions when directory is not specified", async () => {
     // given
     const projectA = "proj_aaa"
