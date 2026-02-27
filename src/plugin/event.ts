@@ -137,7 +137,7 @@ export function createEventHandler(args: {
   // Event subscriptions: which event types each hook cares about.
   // Hooks mapped to string[] only fire for those event types; "*" fires for all.
   // Unlisted hooks default to "*" (backward compat).
-  const SESSION_LIFECYCLE = ["session.idle", "session.created", "session.deleted", "session.status", "session.error", "session.updated"];
+  const SESSION_LIFECYCLE = ["session.idle", "session.created", "session.deleted", "session.compacted", "session.status", "session.error", "session.updated"];
   const MESSAGE_EVENTS = ["message.updated", "message.part.updated"];
   const HOOK_SUBSCRIPTIONS: Record<string, string[] | "*"> = {
     // ALL events including deltas (transcript tracking, streaming output monitoring)
@@ -154,17 +154,17 @@ export function createEventHandler(args: {
     backgroundNotificationHook: SESSION_LIFECYCLE,
     autoUpdateChecker: SESSION_LIFECYCLE,
     // Message events (no deltas)
-    contextWindowMonitor: [...MESSAGE_EVENTS, "session.status"],
+    contextWindowMonitor: [...MESSAGE_EVENTS, "session.status", "session.deleted"],
     anthropicContextWindowLimitRecovery: MESSAGE_EVENTS,
-    compactionTodoPreserver: MESSAGE_EVENTS,
-    writeExistingFileGuard: MESSAGE_EVENTS,
-    todoContinuationEnforcer: MESSAGE_EVENTS,
-    atlasHook: MESSAGE_EVENTS,
+    compactionTodoPreserver: [...MESSAGE_EVENTS, "session.deleted", "session.compacted"],
+    writeExistingFileGuard: [...MESSAGE_EVENTS, "session.deleted"],
+    todoContinuationEnforcer: [...MESSAGE_EVENTS, "session.deleted"],
+    atlasHook: [...MESSAGE_EVENTS, "session.compacted"],
     // Chat-level events
-    directoryAgentsInjector: ["session.created", "message.updated"],
-    directoryReadmeInjector: ["session.created", "message.updated"],
-    rulesInjector: ["session.created", "message.updated"],
-    thinkMode: ["session.created", "message.updated"],
+    directoryAgentsInjector: ["session.created", "session.compacted", "message.updated"],
+    directoryReadmeInjector: ["session.created", "session.deleted", "session.compacted", "message.updated"],
+    rulesInjector: ["session.created", "session.compacted", "message.updated"],
+    thinkMode: ["session.created", "session.deleted", "message.updated"],
   };
 
   // Hooks that MUST be awaited (order-dependent or mutate state read by later hooks)
@@ -203,7 +203,7 @@ export function createEventHandler(args: {
       if (AWAITED_HOOKS.has(name)) {
         await Promise.resolve(invoke(input));
       } else {
-        Promise.resolve(invoke(input)).catch((err) => log("[hook] error:", { hook: name, error: err }));
+        Promise.resolve().then(() => invoke(input)).catch((err) => log("[hook] error:", { hook: name, error: err }));
       }
     }
   };
