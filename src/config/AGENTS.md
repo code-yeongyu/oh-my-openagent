@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-7ZB|22 schema files composing `OhMyOpenCodeConfigSchema`. Zod v4 validation with `safeParse()`. All fields optional — omitted fields use plugin defaults.
+22 schema files composing `OhMyOpenCodeConfigSchema`. Zod v4 validation with `safeParse()`. All fields optional — omitted fields use plugin defaults.
 
 ## SCHEMA TREE
 
@@ -33,8 +33,7 @@ config/schema/
 ├── dynamic-context-pruning.ts  # Context pruning settings
 ├── start-work.ts              # StartWorkConfigSchema (auto_commit)
 └── internal/permission.ts      # AgentPermissionSchema
-├── start-work.ts               # StartWorkConfigSchema (auto_commit)
-└── internal/permission.ts      # AgentPermissionSchema
+
 ```
 
 ## ROOT SCHEMA FIELDS (28)
