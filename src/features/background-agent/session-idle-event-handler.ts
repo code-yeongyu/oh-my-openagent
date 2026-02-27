@@ -11,10 +11,9 @@ export function handleSessionIdleBackgroundEvent(args: {
   properties: Record<string, unknown>
   findBySession: (sessionID: string) => BackgroundTask | undefined
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
-  recentlyCompactedSessions?: Set<string>
-  onPostCompactionIdle?: (task: BackgroundTask, sessionID: string) => void
   validateSessionHasOutput: (sessionID: string) => Promise<boolean>
   checkSessionTodos: (sessionID: string) => Promise<boolean>
+  nudgeCouncilMemberIfNeeded?: (task: BackgroundTask, sessionID: string) => Promise<boolean>
   tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
   emitIdleEvent: (sessionID: string) => void
 }): void {
@@ -22,10 +21,9 @@ export function handleSessionIdleBackgroundEvent(args: {
     properties,
     findBySession,
     idleDeferralTimers,
-    recentlyCompactedSessions,
-    onPostCompactionIdle,
     validateSessionHasOutput,
     checkSessionTodos,
+    nudgeCouncilMemberIfNeeded,
     tryCompleteTask,
     emitIdleEvent,
   } = args
@@ -36,12 +34,6 @@ export function handleSessionIdleBackgroundEvent(args: {
   const task = findBySession(sessionID)
   if (!task || task.status !== "running") return
 
-  if (recentlyCompactedSessions?.has(sessionID)) {
-    recentlyCompactedSessions.delete(sessionID)
-    log("[background-agent] Skipping post-compaction session.idle:", { taskId: task.id, sessionID })
-    onPostCompactionIdle?.(task, sessionID)
-    return
-  }
 
   const startedAt = task.startedAt
   if (!startedAt) return
@@ -101,6 +93,11 @@ export function handleSessionIdleBackgroundEvent(args: {
       if (hasIncompleteTodos) {
         log("[background-agent] Task has incomplete todos, waiting for todo-continuation:", task.id)
         return
+      }
+
+      if (nudgeCouncilMemberIfNeeded) {
+        const nudged = await nudgeCouncilMemberIfNeeded(task, sessionID)
+        if (nudged) return
       }
 
       await tryCompleteTask(task, "session.idle event")

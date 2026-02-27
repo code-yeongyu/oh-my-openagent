@@ -22,12 +22,13 @@ describe("agent-tool-restrictions", () => {
     expect(restrictions.grep).toBe(true)
     expect(restrictions.call_omo_agent).toBe(true)
     expect(restrictions.background_output).toBe(true)
+    expect(restrictions.background_wait).toBe(true)
+    expect(restrictions.background_cancel).toBe(true)
     // Explicitly denied tools
     expect(restrictions.todowrite).toBe(false)
     expect(restrictions.todoread).toBe(false)
     // Unlisted tools are undefined (SDK applies wildcard at runtime)
     expect(restrictions.switch_agent).toBeUndefined()
-    expect(restrictions.background_wait).toBeUndefined()
   })
 
   test("#given dynamic council member name #when getAgentToolRestrictions #then returns council-member restrictions", () => {
@@ -43,6 +44,8 @@ describe("agent-tool-restrictions", () => {
     expect(restrictions.grep).toBe(true)
     expect(restrictions.call_omo_agent).toBe(true)
     expect(restrictions.background_output).toBe(true)
+    expect(restrictions.background_wait).toBe(true)
+    expect(restrictions.background_cancel).toBe(true)
     // Explicitly denied tools
     expect(restrictions.todowrite).toBe(false)
     expect(restrictions.todoread).toBe(false)
@@ -51,6 +54,5 @@ describe("agent-tool-restrictions", () => {
     expect(restrictions.write).toBeUndefined()
     expect(restrictions.edit).toBeUndefined()
     expect(restrictions.task).toBeUndefined()
-    expect(restrictions.background_wait).toBeUndefined()
   })
 })

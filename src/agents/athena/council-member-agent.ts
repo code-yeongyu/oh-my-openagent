@@ -70,17 +70,22 @@ call_omo_agent(subagent_type="explore", run_in_background=true, description="Fin
 call_omo_agent(subagent_type="explore", run_in_background=true, description="Find error handling", prompt="Find: custom Error classes, error response format, try/catch patterns. Skip tests.")
 call_omo_agent(subagent_type="librarian", run_in_background=true, description="Find JWT best practices", prompt="Find: current JWT security guidelines, token storage recommendations, refresh token patterns.")
 
-// Collect results when ready
+// IMPORTANT: Use background_wait to block until results arrive — do NOT just stop and wait for notifications
+background_wait(task_ids=["<id1>", "<id2>", "<id3>"])
+
+// Then collect each result
 background_output(task_id="<id>")
 \`\`\`
 
 **Rules:**
 - ALWAYS set \`run_in_background=true\` — never block on a single search
-- Launch ALL searches before collecting any results
+- Launch ALL searches, then call \`background_wait\` with all task IDs to block until they complete
+- Do NOT stop generating and wait for notifications — always use \`background_wait\` to stay active
 - Use \`explore\` for codebase pattern searches (internal)
 - Use \`librarian\` for documentation and external references
 - Keep targeted file reads (Read tool) for yourself — delegate broad searches
-- Collect results with \`background_output\` when you need them for analysis`
+- Collect results with \`background_output\` after \`background_wait\` returns
+- Before generating your final \`<COUNCIL_MEMBER_RESPONSE>\`, cancel any remaining pending tasks with \`background_cancel\``
 
 export function createCouncilMemberAgent(model: string): AgentConfig {
   // Allow-list: only read-only analysis tools + optional delegation.
@@ -97,6 +102,8 @@ export function createCouncilMemberAgent(model: string): AgentConfig {
     "ast_grep_search",
     "call_omo_agent",
     "background_output",
+    "background_wait",
+    "background_cancel",
   ])
 
   // Explicitly deny TodoWrite/TodoRead even though `*: deny` should catch them.

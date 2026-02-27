@@ -69,6 +69,8 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
     ast_grep_search: true,
     call_omo_agent: true,
     background_output: true,
+    background_wait: true,
+    background_cancel: true,
     todowrite: false,
     todoread: false,
   },

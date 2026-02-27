@@ -141,7 +141,7 @@ export function createToolRegistry(args: {
     ...taskToolsRecord,
     ...hashlineToolsRecord,
     prepare_council_prompt: createPrepareCouncilPromptTool(ctx.directory),
-    council_finalize: createCouncilFinalize(),
+    council_finalize: createCouncilFinalize(ctx.directory),
     council_read: createCouncilRead(),
   }
 

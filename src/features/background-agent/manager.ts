@@ -44,14 +44,14 @@ import { tryFallbackRetry } from "./fallback-retry-handler"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
 import { isCompactionAgent, findNearestMessageExcludingCompaction } from "./compaction-aware-message-resolver"
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
-import { sendPostCompactionContinuation } from "./post-compaction-continuation"
-import { COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 
 import { writeTaskOutput } from "./task-output-writer"
+import { isCouncilMemberAgent, sendCouncilContinuationNudge, resetCouncilNudgeCount } from "./council-continuation-enforcer"
+import { sessionHasCouncilResponse } from "./council-response-checker"
 type OpencodeClient = PluginInput["client"]
 
 
@@ -115,7 +115,6 @@ export class BackgroundManager {
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
-  private recentlyCompactedSessions: Set<string> = new Set()
   private enableParentSessionNotifications: boolean
   readonly taskHistory = new TaskHistory()
 
@@ -692,6 +691,18 @@ export class BackgroundManager {
     }
   }
 
+  private async nudgeCouncilMemberIfNeeded(task: BackgroundTask, sessionID: string): Promise<boolean> {
+    if (!isCouncilMemberAgent(task.agent)) return false
+
+    const hasResponse = await sessionHasCouncilResponse(this.client, sessionID)
+    if (hasResponse) {
+      resetCouncilNudgeCount(task.id)
+      return false
+    }
+
+    return sendCouncilContinuationNudge(this.client, task, sessionID)
+  }
+
   handleEvent(event: Event): void {
     const props = event.properties
 
@@ -757,7 +768,6 @@ export class BackgroundManager {
       const task = this.findBySession(sessionID)
       if (!task || task.status !== "running") return
 
-      this.recentlyCompactedSessions.add(sessionID)
       if (task.progress) {
         task.progress.lastUpdate = new Date()
       }
@@ -770,14 +780,9 @@ export class BackgroundManager {
         properties: props as Record<string, unknown>,
         findBySession: (id) => this.findBySession(id),
         idleDeferralTimers: this.idleDeferralTimers,
-        recentlyCompactedSessions: this.recentlyCompactedSessions,
-        onPostCompactionIdle: (t, sid) => {
-          if (t.agent?.startsWith(COUNCIL_MEMBER_KEY_PREFIX)) {
-            sendPostCompactionContinuation(this.client, t, sid)
-          }
-        },
         validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
         checkSessionTodos: (id) => this.checkSessionTodos(id),
+        nudgeCouncilMemberIfNeeded: (task, sid) => this.nudgeCouncilMemberIfNeeded(task, sid),
         tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
         emitIdleEvent: (sessionID) => this.handleEvent({ type: "session.idle", properties: { sessionID } }),
       })
@@ -905,7 +910,6 @@ export class BackgroundManager {
       }
 
       SessionCategoryRegistry.remove(sessionID)
-      this.recentlyCompactedSessions.delete(sessionID)
     }
 
     if (event.type === "session.status") {
@@ -1234,6 +1238,7 @@ export class BackgroundManager {
     task.completedAt = new Date()
     task.sessionState = undefined
     this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+    resetCouncilNudgeCount(task.id)
 
     // Release concurrency BEFORE any async operations to prevent slot leaks
     if (task.concurrencyKey) {
@@ -1546,11 +1551,6 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         task.sessionState = sessionStatus?.type
         
         if (sessionStatus?.type === "idle") {
-          if (this.recentlyCompactedSessions.has(sessionID)) {
-            this.recentlyCompactedSessions.delete(sessionID)
-            log("[background-agent] Polling: skipping post-compaction idle:", task.id)
-            continue
-          }
 
           // Refresh lastUpdate so the next poll's stale check doesn't kill
           // the task while we're awaiting async validation
@@ -1573,6 +1573,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
             continue
           }
+
+          const councilNudged = await this.nudgeCouncilMemberIfNeeded(task, sessionID)
+          if (councilNudged) continue
 
           await this.tryCompleteTask(task, "polling (idle status)")
           continue
@@ -1664,7 +1667,6 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.pendingNotifications.clear()
     this.pendingByParent.clear()
     this.notificationQueueByParent.clear()
-    this.recentlyCompactedSessions.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
     this.unregisterProcessCleanup()

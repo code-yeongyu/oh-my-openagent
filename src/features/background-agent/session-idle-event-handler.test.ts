@@ -336,5 +336,72 @@ describe("handleSessionIdleBackgroundEvent", () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
       expect(tryCompleteTask).not.toHaveBeenCalled()
     })
+
+    it("#when nudgeCouncilMemberIfNeeded is provided and returns true #then should not complete task", async () => {
+      //#given
+      const task = createRunningTask()
+      const tryCompleteTask = mock(() => Promise.resolve(true))
+      const nudgeCouncilMemberIfNeeded = mock(() => Promise.resolve(true))
+
+      //#when
+      handleSessionIdleBackgroundEvent({
+        properties: { sessionID: task.sessionID! },
+        findBySession: () => task,
+        idleDeferralTimers: new Map(),
+        validateSessionHasOutput: () => Promise.resolve(true),
+        checkSessionTodos: () => Promise.resolve(false),
+        nudgeCouncilMemberIfNeeded,
+        tryCompleteTask,
+        emitIdleEvent: () => {},
+      })
+
+      //#then
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(tryCompleteTask).not.toHaveBeenCalled()
+    })
+
+    it("#when nudgeCouncilMemberIfNeeded is provided and returns false #then should complete task", async () => {
+      //#given
+      const task = createRunningTask()
+      const tryCompleteTask = mock(() => Promise.resolve(true))
+      const nudgeCouncilMemberIfNeeded = mock(() => Promise.resolve(false))
+
+      //#when
+      handleSessionIdleBackgroundEvent({
+        properties: { sessionID: task.sessionID! },
+        findBySession: () => task,
+        idleDeferralTimers: new Map(),
+        validateSessionHasOutput: () => Promise.resolve(true),
+        checkSessionTodos: () => Promise.resolve(false),
+        nudgeCouncilMemberIfNeeded,
+        tryCompleteTask,
+        emitIdleEvent: () => {},
+      })
+
+      //#then
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(tryCompleteTask).toHaveBeenCalledWith(task, "session.idle event")
+    })
+
+    it("#when nudgeCouncilMemberIfNeeded is not provided #then should complete task normally", async () => {
+      //#given
+      const task = createRunningTask()
+      const tryCompleteTask = mock(() => Promise.resolve(true))
+
+      //#when
+      handleSessionIdleBackgroundEvent({
+        properties: { sessionID: task.sessionID! },
+        findBySession: () => task,
+        idleDeferralTimers: new Map(),
+        validateSessionHasOutput: () => Promise.resolve(true),
+        checkSessionTodos: () => Promise.resolve(false),
+        tryCompleteTask,
+        emitIdleEvent: () => {},
+      })
+
+      //#then
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      expect(tryCompleteTask).toHaveBeenCalledWith(task, "session.idle event")
+    })
   })
 })
