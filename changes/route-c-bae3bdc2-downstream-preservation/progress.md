@@ -195,3 +195,34 @@
 
 **Status**: [COMPLETED]
 
+### [2026-02-28T02:10:00Z] Task: 3. Execute Wave A from rehearsal-derived execution sheet
+
+**Execution sheet:**
+- Created `changes/route-c-bae3bdc2-downstream-preservation/evidence/wave-a-execution-sheet.md`.
+- Sheet includes concrete allowlist, per-item conflict option (`O1/O3`), preserve/equivalent mapping, and targeted test commands.
+
+**Wave A code application (sheet-listed only):**
+- Applied from `rescue/pre-merge-bae3bdc2`:
+  - `src/hooks/atlas/index.ts`
+  - `src/hooks/atlas/atlas-hook.ts`
+  - `src/hooks/atlas/event-handler.ts`
+  - `src/hooks/atlas/system-reminder-templates.ts`
+  - `src/hooks/atlas/tool-execute-after.ts`
+  - `src/hooks/atlas/index.test.ts`
+- Applied hybrid equivalent rewrite in-scope:
+  - `src/index.ts` (forward-port startup/session-created repair behavior; local import rewrite to `./shared/session-bucket-repair` to avoid out-of-scope barrel edits)
+
+**Wave A preserve outcomes (no unapproved required loss):**
+- Required-preserve checks (Wave A runtime paths) => `WAVE_A_REQUIRED_MISSING=0`.
+- No new exception IDs introduced.
+
+**Verification results:**
+- `bun test src/hooks/atlas/index.test.ts` => pass (`31 pass, 0 fail`)
+- `bun test src/hooks/compaction-context-injector/index.test.ts` => pass (`4 pass, 0 fail`)
+- `bun run build` => pass (`exit 0`)
+- `lsp_diagnostics` (error severity) clean on all changed TS files.
+
+**Plan-file guardrail:**
+- `changes/.../tasks.md` was not edited in this task (plan file remains read-only per execution constraints).
+
+**Status**: [COMPLETED]

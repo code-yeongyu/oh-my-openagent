@@ -104,3 +104,36 @@
 - Use `route-c/bae3bdc2-preserve-downstream` as the primary workspace for all re-fusion waves.
 - Set all wave checkpoint tags to the baseline commit initially; they will be updated at the end of each wave execution.
 
+## [2026-02-28T01:30:00Z] Task: 2
+
+**Learnings**:
+- Built a comprehensive architecture-loss map identifying Atlas, Todo Continuation, Session Manager, Runtime Fallback, and Builtin Skills as high-risk structural zones.
+- Wave boundaries are successfully aligned with logical subsystem dependencies:
+  - Wave A: Core orchestration and hook lifecycle foundation.
+  - Wave B: Task continuation, session persistence, and delegation logic.
+  - Wave C: Runtime skills, fallback behavior, and support tooling.
+- Identified significant "Out of scope" churn (`.qoder/**`, `AGENTS.md`, and test-only files) that would inflate conflict pressure without runtime benefit.
+
+**Decisions**:
+- Adopt the following allowlist path patterns for Route C execution:
+  - **Wave A**: `src/hooks/atlas/**`, `src/hooks/index.ts`, `src/index.ts`, `src/plugin-handlers/config-handler.ts`, `src/hooks/anthropic-context-window-limit-recovery/index.ts`, `src/hooks/compaction-context-injector/**`.
+  - **Wave B**: `src/hooks/todo-continuation-enforcer*`, `src/tools/session-manager/**`, `src/features/boulder-state/**`, `src/tools/delegate-task/**`, `src/shared/session-utils.ts`, `src/shared/task-parser.ts`, `src/shared/wave-grouper.ts`, `src/hooks/ralph-loop/**`.
+  - **Wave C**: `src/features/builtin-skills/**`, `src/hooks/keyword-detector/**`, `src/hooks/rules-injector/**`, `src/hooks/runtime-fallback/**`, `src/hooks/auto-slash-command/**`, `src/hooks/prometheus-md-only/**`, `src/hooks/start-work/**`, `src/features/opencode-skill-loader/**`, `src/shared/model-*.ts`, `src/shared/session-bucket-repair.ts`, `src/tools/background-task/**`, `src/tools/lsp/**`, `src/tools/skill/**`, `src/tools/slashcommand/**`, `src/cli/**`, `src/config/schema.ts`, `package.json`.
+- Define "Out of Scope for Route C":
+  - `.qoder/**` (repowiki and other knowledge base files).
+  - `src/**/AGENTS.md` (unless explicitly required for runtime tool prompts).
+  - `src/**/*.test.ts` and `src/**/__snapshots__/**` (preserved only as secondary verification targets).
+  - General documentation churn and non-functional hygiene changes.
+- Record current verification caveat: full `bun test` fails broadly on branch baseline; Task 2 remains documentation-only.
+
+## [2026-02-28T02:10:00Z] Task: 3
+
+**Learnings**:
+- The atlas conflict cluster can be integrated safely in Wave A by adopting the rescue-side modular split (`atlas-hook`/`event-handler`/`tool-execute-after`) while keeping scope bounded to the Wave A allowlist.
+- `src/index.ts` rescue forward-port introduced startup/session-created bucket-repair hooks that depended on a barrel export not yet aligned in this wave; using an in-file equivalent import rewrite preserves behavior without crossing Wave A boundaries.
+- Targeted verification (`atlas` + `compaction-context-injector` tests + build + LSP diagnostics) provided sufficient gate evidence while avoiding known full-suite baseline instability.
+
+**Decisions**:
+- Execute Wave A with explicit sheet-driven rows only (`wave-a-execution-sheet.md` as source of truth for touched files).
+- Apply `O1` for atlas add/add conflict files and `O3` hybrid for `src/index.ts` (behavior-preserving rewrite).
+- Keep plan file (`tasks.md`) unchanged during this task because plan mutation is orchestrator-owned/read-only in this execution context.

@@ -143,6 +143,7 @@ import { loadPluginConfig } from "./plugin-config";
 import { createModelCacheState } from "./plugin-state";
 import { createConfigHandler } from "./plugin-handlers";
 import { createHookExecutor } from "./shared/hook-executor";
+import { repairMisbucketedSessionMetadata } from "./shared/session-bucket-repair";
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
@@ -153,6 +154,19 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   startTmuxCheck();
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx);
+  await repairMisbucketedSessionMetadata({
+    directory: ctx.directory,
+  })
+    .then((result) => {
+      if (result.repaired > 0) {
+        log("[session-bucket-repair] startup repair completed", result);
+      }
+    })
+    .catch((error) => {
+      log("[session-bucket-repair] startup repair failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
   const detector = createContextDetector();
   const projectContext = detector.detect(ctx.directory);
   const disabledHooks = new Set<HookName>();
@@ -967,6 +981,26 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
           | { id?: string; title?: string; parentID?: string }
           | undefined;
         log("[event] session.created", { sessionInfo, props });
+        if (sessionInfo?.id) {
+          void repairMisbucketedSessionMetadata({
+            directory: ctx.directory,
+            sessionID: sessionInfo.id,
+          })
+            .then((result) => {
+              if (result.repaired > 0) {
+                log("[session-bucket-repair] session.created repair completed", {
+                  sessionID: sessionInfo.id,
+                  ...result,
+                });
+              }
+            })
+            .catch((error) => {
+              log("[session-bucket-repair] session.created repair failed", {
+                sessionID: sessionInfo.id,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            });
+        }
         if (!sessionInfo?.parentID) {
           setMainSession(sessionInfo?.id);
         }

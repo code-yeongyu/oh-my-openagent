@@ -117,3 +117,20 @@ Status legend:
 | RP-104 | `src/tools/delegate-task/categories.ts` | `semantic-risk` | `PRESERVE` | R0.2 semantic-risk + R0.3 impact | Runtime-critical or coordination-critical behavior path must be preserved. |
 | RP-105 | `src/tools/session-manager/storage.test.ts` | `semantic-risk` | `PROPOSED_DROP` | R0.2 semantic-risk + R0.3 impact | Test/snapshot-only delta; runtime behavior governed by paired implementation entries. |
 | RP-106 | `src/tools/slashcommand/types.ts` | `semantic-risk` | `EQUIVALENT_REWRITE` | R0.2 semantic-risk + R0.3 impact | Semantic-risk path; accept only evidence-backed equivalent behavior during fusion. |
+
+## Wave A Execution Outcome (Task 3)
+
+| Patch ID | Wave A Action | Outcome | Notes |
+|---|---|---|---|
+| RP-019 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-020 | applied | `PRESERVE` | `src/hooks/atlas/atlas-hook.ts` added from rescue Wave A source. |
+| RP-021 | applied | `PRESERVE` | `src/hooks/atlas/event-handler.ts` added from rescue Wave A source. |
+| RP-022 | applied (test sync) | `PROPOSED_DROP` | EX-004 remains unchanged; test was kept aligned for targeted verification. |
+| RP-023 | applied | `PRESERVE` | Atlas monolith entry replaced by modular barrel export. |
+| RP-024 | applied | `PRESERVE` | `system-reminder-templates.ts` added from rescue Wave A source. |
+| RP-025 | applied | `PRESERVE` | `tool-execute-after.ts` added from rescue Wave A source. |
+| RP-027 | no-edit | `PROPOSED_DROP` | EX-006 unchanged. |
+| RP-028 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-029 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| RP-043 | applied (hybrid rewrite) | `PRESERVE` | Startup/session-created repair behavior forward-ported with local equivalent import rewrite. |
+| RP-044 | no-edit | `PRESERVE` | File present and unchanged in this wave. |

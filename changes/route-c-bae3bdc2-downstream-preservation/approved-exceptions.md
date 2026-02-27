@@ -33,3 +33,11 @@ Each row includes explicit rationale and evidence pointers.
 | EX-026 | `src/shared/session-bucket-repair.test.ts` | `PROPOSED_DROP` | Test-only delta. Runtime bucket repair path retained separately. | `RP-100`, `PATH-100` |
 | EX-027 | `src/shared/wave-grouper.test.ts` | `PROPOSED_DROP` | Test-only delta. Runtime wave grouper path retained separately. | `RP-102`, `PATH-102` |
 | EX-028 | `src/tools/session-manager/storage.test.ts` | `PROPOSED_DROP` | Test-only delta. Runtime session storage path retained separately. | `RP-105`, `PATH-105` |
+
+## Wave A Task 3 Note
+
+- No new exception IDs were added in Wave A.
+- Existing Wave A-adjacent exception entries remain unchanged:
+  - `EX-004` (`src/hooks/atlas/index.test.ts`)
+  - `EX-006` (`src/hooks/compaction-context-injector/index.test.ts`)
+- `UNAPPROVED_REQUIRED_PATH_LOSS=0` for Wave A required runtime paths.

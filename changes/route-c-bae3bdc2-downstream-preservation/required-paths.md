@@ -110,3 +110,20 @@ Source-of-truth mapping: each path entry maps 1:1 to `required-patches.md` via `
 | PATH-104 | `src/tools/delegate-task/categories.ts` | `runtime-src` | `PRESERVE` | `RP-104` |
 | PATH-105 | `src/tools/session-manager/storage.test.ts` | `runtime-src` | `PROPOSED_DROP` | `RP-105` |
 | PATH-106 | `src/tools/slashcommand/types.ts` | `runtime-src` | `EQUIVALENT_REWRITE` | `RP-106` |
+
+## Wave A Execution Outcome (Task 3)
+
+| Path ID | Wave A Action | Outcome | Notes |
+|---|---|---|---|
+| PATH-019 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-020 | applied | `PRESERVE` | `src/hooks/atlas/atlas-hook.ts` added from rescue Wave A source. |
+| PATH-021 | applied | `PRESERVE` | `src/hooks/atlas/event-handler.ts` added from rescue Wave A source. |
+| PATH-022 | applied (test sync) | `PROPOSED_DROP` | EX-004 remains unchanged; test kept aligned for targeted verification. |
+| PATH-023 | applied | `PRESERVE` | Atlas entry switched to modular barrel export. |
+| PATH-024 | applied | `PRESERVE` | `system-reminder-templates.ts` added from rescue Wave A source. |
+| PATH-025 | applied | `PRESERVE` | `tool-execute-after.ts` added from rescue Wave A source. |
+| PATH-027 | no-edit | `PROPOSED_DROP` | EX-006 unchanged. |
+| PATH-028 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-029 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
+| PATH-043 | applied (hybrid rewrite) | `PRESERVE` | Startup/session-created repair behavior forward-ported with local equivalent import rewrite. |
+| PATH-044 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
