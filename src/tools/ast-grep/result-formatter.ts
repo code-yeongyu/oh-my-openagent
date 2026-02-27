@@ -13,7 +13,15 @@ export function formatSearchResult(result: SgResult, config: ToonCompressionConf
     return "No matches found"
   }
 
-  const compressed = safeCompress(result.matches, config)
+  const matchesWith1IndexedLines = result.matches.map(match => ({
+    ...match,
+    range: {
+      ...match.range,
+      start: { ...match.range.start, line: match.range.start.line + 1 },
+      end: { ...match.range.end, line: match.range.end.line + 1 }
+    }
+  }))
+  const compressed = safeCompress(matchesWith1IndexedLines, config)
   if (compressed.startsWith("toon:")) {
     const lines: string[] = []
     if (result.truncated) {
@@ -61,7 +69,15 @@ export function formatReplaceResult(result: SgResult, isDryRun: boolean, config:
     return "No matches found to replace"
   }
 
-  const compressed = safeCompress(result.matches, config)
+  const matchesWith1IndexedLines = result.matches.map(match => ({
+    ...match,
+    range: {
+      ...match.range,
+      start: { ...match.range.start, line: match.range.start.line + 1 },
+      end: { ...match.range.end, line: match.range.end.line + 1 }
+    }
+  }))
+  const compressed = safeCompress(matchesWith1IndexedLines, config)
   if (compressed.startsWith("toon:")) {
     const prefix = isDryRun ? "[DRY RUN] " : ""
     const lines: string[] = []
@@ -114,7 +130,15 @@ export function formatAnalyzeResult(results: AnalyzeResult[], extractedMetaVars:
     return "No matches found"
   }
 
-  const compressed = safeCompress(results, config)
+  const resultsWith1IndexedLines = results.map(result => ({
+    ...result,
+    range: {
+      ...result.range,
+      start: { ...result.range.start, line: result.range.start.line + 1 },
+      end: { ...result.range.end, line: result.range.end.line + 1 }
+    }
+  }))
+  const compressed = safeCompress(resultsWith1IndexedLines, config)
   if (compressed.startsWith("toon:")) {
     const lines: string[] = [`Found ${results.length} match(es):\n`]
     lines.push(compressed)

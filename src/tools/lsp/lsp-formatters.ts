@@ -240,7 +240,7 @@ export function formatSymbolsOutput(
     return "No symbols found"
   }
 
-  const isDocumentSymbol = (s: SymbolInfo | DocumentSymbol): s is DocumentSymbol => "range" in s && "children" in s
+  const isDocumentSymbol = (s: SymbolInfo | DocumentSymbol): s is DocumentSymbol => "range" in s && "selectionRange" in s
 
   if (isDocumentSymbol(symbols[0])) {
     const docSymbols = symbols as DocumentSymbol[]

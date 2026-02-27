@@ -172,5 +172,10 @@ export function compressForLLM(data: unknown, config: ToonCompressionConfig): st
     return toPlainTextString(data)
   }
 
-  return encodeWithTimeout(data)
+  try {
+    return encodeWithTimeout(data)
+  } catch (error) {
+    console.warn("[toon-compression] Compression failed, falling back to plain text:", error)
+    return toPlainTextString(data)
+  }
 }

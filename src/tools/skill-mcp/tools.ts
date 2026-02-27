@@ -13,7 +13,7 @@ interface SkillMcpToolOptions {
 }
 
 const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: true,
+  enabled: false,
   threshold: 5000,
 }
 

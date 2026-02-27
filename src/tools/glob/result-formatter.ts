@@ -23,7 +23,8 @@ export function formatGlobResult(
     shouldCompress(result.files, compressionConfig.threshold)
 
   if (shouldUseCompression) {
-    lines.push(safeCompress(result.files, compressionConfig))
+    const pathsOnly = result.files.map(f => ({ path: f.path }))
+    lines.push(safeCompress(pathsOnly, compressionConfig))
   } else {
     for (const file of result.files) {
       lines.push(file.path)

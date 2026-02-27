@@ -113,7 +113,11 @@ describe("formatGlobResult", () => {
 
       // Real TOON library produces toon: prefix
       expect(output).toContain("toon:")
+
+      // Should NOT expose mtime or other internal properties
+      expect(output).not.toContain("mtime")
     })
+
 
     it("still includes file count header", () => {
       const files = Array.from({ length: 100 }, (_, i) => ({
