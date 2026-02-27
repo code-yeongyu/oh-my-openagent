@@ -867,7 +867,7 @@ TOON Compression is an intelligent data optimization feature that reduces token 
 The feature uses the `@toon-format/toon` library to transform uniform JSON arrays (arrays where every item has the same structure) into a compact string format. This format is designed to be highly token-efficient while remaining understandable by LLMs.
 
 ### Key Features
-,
+
 * **Automatic Detection**: Automatically identifies large uniform arrays and applies compression if they exceed the configured threshold.
 * **Safety Guards**: Never compresses error messages, stack traces, or binary data to ensure critical debugging information and raw data integrity are preserved.
 * **Threshold-Based**: Only activates when the output is large enough to benefit from compression (default: 5000 characters).
@@ -875,7 +875,7 @@ The feature uses the `@toon-format/toon` library to transform uniform JSON array
 * **Context-Aware**: Applied during both tool execution (pre-output) and session lifecycle hooks (post-processing).
 
 ### When to Use
-,
+
 Enable TOON compression when working with:
 * Large datasets or search results
 * Extensive directory listings

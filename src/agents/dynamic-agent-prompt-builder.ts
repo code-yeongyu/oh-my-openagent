@@ -197,8 +197,6 @@ export function buildCategorySkillsDelegationGuide(
       return `[Compressed categories/skills data]\n${compressed}`
     }
   }
-  if (categories.length === 0 && skills.length === 0) return ""
-
   const categoryRows = categories.map((c) => {
     const desc = c.description || c.name
     return `- \`${c.name}\` — ${desc}`

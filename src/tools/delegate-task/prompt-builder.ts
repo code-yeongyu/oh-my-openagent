@@ -57,7 +57,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
       if (shouldCompressCategories && availableCategories) {
         parts.push("### AVAILABLE CATEGORIES (TOON format)")
         parts.push("```toon")
-        parts.push(safeCompress(availableCategories, compressionConfig!))
+        parts.push(safeCompress(availableCategories, compressionConfig ?? { enabled: false, threshold: 5000 }))
         parts.push("```")
       } else if (availableCategories && availableCategories.length > 0) {
         parts.push("### AVAILABLE CATEGORIES")
@@ -72,14 +72,14 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
         parts.push("")
         parts.push("### AVAILABLE SKILLS (TOON format)")
         parts.push("```toon")
-        parts.push(safeCompress(availableSkills, compressionConfig!))
+        parts.push(safeCompress(availableSkills, compressionConfig ?? { enabled: false, threshold: 5000 }))
         parts.push("```")
       } else if (availableSkills && availableSkills.length > 0) {
         parts.push("")
         parts.push("### AVAILABLE SKILLS")
         parts.push("")
         const skillRows = availableSkills.map(s => `| ${s.name} | ${s.description} |`).join("\n")
-        parts.push("| Skill | Domain |")
+        parts.push("| Skill | Description |")
         parts.push("|-------|--------|")
         parts.push(skillRows)
       }
