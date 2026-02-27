@@ -24,3 +24,14 @@ export interface PlanProgress {
   /** Whether all tasks are done */
   isComplete: boolean
 }
+
+export interface ArchiveResult {
+  /** Whether the archive operation succeeded */
+  success: boolean
+  /** Path to the archived plan file (if successful) */
+  archivedPlanPath?: string
+  /** Path to the archived notepad file (if successful and existed) */
+  archivedNotepadPath?: string
+  /** Error message (if failed) */
+  error?: string
+}
