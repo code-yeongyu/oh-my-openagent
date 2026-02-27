@@ -164,3 +164,23 @@
 **Verification**:
 - Wave C targeted tests passed (`13 + 82 + 11 + 15` test cases, `0 fail`).
 - `bun run build` passed and LSP diagnostics (`error`) were clean on all changed Wave C TypeScript files.
+
+## [2026-02-27T19:00:11Z] Task: 6
+
+**Learnings**:
+- Dual-gate closure is reproducible with a compact deterministic command set: functional checks (`bun run build` + targeted test bundle) and preservation parser checks against Route C ledgers.
+- Preservation metrics were machine-checkable with explicit key/value outputs and resolved to zero-loss (`REQUIRED_PATCHES_MISSING=0`, `UNAPPROVED_REQUIRED_PATH_LOSS=0`).
+
+**Decisions**:
+- Record Task 6 outputs as three dedicated evidence artifacts (`functional-gate-summary.md`, `preservation-gate-summary.md`, `missing-required-items.md`) with command transcript snippets and explicit PASS/FAIL verdict lines.
+- Keep `missing-required-items.md` explicitly empty (`<none>`) for both required patches and required paths.
+
+## [2026-02-27T19:09:52Z] Task: 7
+
+**Learnings**:
+- Final Route C closure is clearer when report language explicitly separates required downstream preservation from full-repository no-loss claims.
+- PR readiness quality improves when the gate snippet is copied as machine-checkable `KEY=VALUE` lines and linked to exception ledger IDs.
+
+**Decisions**:
+- Finalize Route C handoff with two dedicated docs (`report.md`, `pr-summary.md`) plus explicit references to Task 6 evidence artifacts.
+- Keep boundary disclosure explicit: include residual risk and rollback notes while avoiding over-claiming beyond Route C governed scope.

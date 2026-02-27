@@ -304,3 +304,42 @@
 - `lsp_diagnostics` (error severity) clean on all changed Wave C TS files.
 
 **Status**: [COMPLETED]
+
+### [2026-02-27T19:00:11Z] Task: 6. Execute dual-gate consolidation audit
+
+**Completed work:**
+- Created machine-checkable dual-gate evidence files:
+  - `changes/route-c-bae3bdc2-downstream-preservation/evidence/functional-gate-summary.md`
+  - `changes/route-c-bae3bdc2-downstream-preservation/evidence/preservation-gate-summary.md`
+  - `changes/route-c-bae3bdc2-downstream-preservation/evidence/missing-required-items.md`
+- Captured exact command transcript snippets, exit code summaries, and explicit PASS/FAIL verdict lines.
+
+**Functional gate results:**
+- `bun run build` => pass (`exit 0`)
+- `bun test src/shared/task-parser.test.ts src/shared/wave-grouper.test.ts src/tools/session-manager/storage.test.ts src/tools/session-manager/tools.context.test.ts src/tools/session-manager/tools.test.ts` => pass (`73 pass, 0 fail`)
+
+**Preservation gate results (deterministic parser command set):**
+- `REQUIRED_PATCHES_MISSING=0`
+- `UNAPPROVED_REQUIRED_PATH_LOSS=0`
+- `MISSING_REQUIRED_PATCH_IDS=<none>`
+- `MISSING_REQUIRED_PATHS=<none>`
+
+**Status**: [COMPLETED]
+
+### [2026-02-27T19:09:52Z] Task: 7. Finalize Route C report, boundary disclosure, and PR readiness
+
+**Completed work:**
+- Created final report:
+  - `changes/route-c-bae3bdc2-downstream-preservation/report.md`
+- Created PR-ready summary (explicit base branch included):
+  - `changes/route-c-bae3bdc2-downstream-preservation/pr-summary.md`
+- Included Task 6 evidence artifacts in finalization scope:
+  - `changes/route-c-bae3bdc2-downstream-preservation/evidence/functional-gate-summary.md`
+  - `changes/route-c-bae3bdc2-downstream-preservation/evidence/preservation-gate-summary.md`
+  - `changes/route-c-bae3bdc2-downstream-preservation/evidence/missing-required-items.md`
+
+**Finalization highlights:**
+- Report includes: Executive Summary, Preservation Scope, Preserved vs Equivalent-Rewrite vs Approved-Exceptions, Dual-Gate Results, Residual Risks, Rollback Notes, and Boundary Disclosure.
+- PR summary includes explicit base branch `dev`, concise bullet summary, gate result snippet, and exception-ledger reference.
+
+**Status**: [COMPLETED]

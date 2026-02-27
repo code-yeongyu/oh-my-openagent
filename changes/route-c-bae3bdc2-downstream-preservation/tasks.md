@@ -407,7 +407,7 @@ Rehearsal Phase (R0.1 -> R0.7)
   **Commit**: YES
   - Message: `chore(route-c): initialize baseline branch and checkpoints`
 
-- [ ] 2. Build architecture-loss map and wave allowlists
+- [x] 2. Build architecture-loss map and wave allowlists
 
   **What to do**:
   - Generate per-module risk map from deltas among:
@@ -430,13 +430,13 @@ Rehearsal Phase (R0.1 -> R0.7)
   - `src/features/builtin-skills/skills.ts`, `src/hooks/keyword-detector/*`, `src/hooks/rules-injector/*` — skill/runtime behavior drift zone.
 
   **Acceptance Criteria**:
-  - [ ] `findings.md` contains Wave A/B/C allowlists with concrete path patterns.
-  - [ ] `required-paths.md` contains only runtime-relevant paths (no `.qoder/**`).
-  - [ ] Out-of-scope list documented and non-empty.
+  - [x] `findings.md` contains Wave A/B/C allowlists with concrete path patterns.
+  - [x] `required-paths.md` contains only runtime-relevant paths (no `.qoder/**`).
+  - [x] Out-of-scope list documented and non-empty.
 
   **Commit**: NO (group with Task 3 prep if desired)
 
-- [ ] 3. Execute Wave A from rehearsal-derived execution sheet (placeholder-to-concrete)
+- [x] 3. Execute Wave A from rehearsal-derived execution sheet (placeholder-to-concrete)
 
   **What to do**:
   - Before applying code changes, generate:
@@ -461,15 +461,15 @@ Rehearsal Phase (R0.1 -> R0.7)
   - `changes/route-c-bae3bdc2-downstream-preservation/evidence/fusion-path-matrix.md`
 
   **Acceptance Criteria**:
-  - [ ] Wave A execution sheet exists and has non-empty path list + test commands.
-  - [ ] `bun run build` -> exit `0`
-  - [ ] All targeted tests listed in Wave A execution sheet -> `0 fail`
-  - [ ] Wave A required ledger entries show zero unapproved loss.
+  - [x] Wave A execution sheet exists and has non-empty path list + test commands.
+  - [x] `bun run build` -> exit `0`
+  - [x] All targeted tests listed in Wave A execution sheet -> `0 fail`
+  - [x] Wave A required ledger entries show zero unapproved loss.
 
   **Commit**: YES
   - Message: `fix(route-c): refusion wave-a with preservation gate`
 
-- [ ] 4. Execute Wave B from rehearsal-derived execution sheet (placeholder-to-concrete)
+- [x] 4. Execute Wave B from rehearsal-derived execution sheet (placeholder-to-concrete)
 
   **What to do**:
   - Generate:
@@ -488,15 +488,15 @@ Rehearsal Phase (R0.1 -> R0.7)
   - `changes/route-c-bae3bdc2-downstream-preservation/evidence/rehearsal-conflicts.md`
 
   **Acceptance Criteria**:
-  - [ ] Wave B execution sheet exists and has non-empty path list + test commands.
-  - [ ] `bun run build` -> exit `0`
-  - [ ] All targeted tests listed in Wave B execution sheet -> `0 fail`
-  - [ ] Wave B required ledger entries show zero unapproved loss.
+  - [x] Wave B execution sheet exists and has non-empty path list + test commands.
+  - [x] `bun run build` -> exit `0`
+  - [x] All targeted tests listed in Wave B execution sheet -> `0 fail`
+  - [x] Wave B required ledger entries show zero unapproved loss.
 
   **Commit**: YES
   - Message: `fix(route-c): refusion wave-b with preservation gate`
 
-- [ ] 5. Execute Wave C from rehearsal-derived execution sheet (placeholder-to-concrete)
+- [x] 5. Execute Wave C from rehearsal-derived execution sheet (placeholder-to-concrete)
 
   **What to do**:
   - Generate:
@@ -516,15 +516,15 @@ Rehearsal Phase (R0.1 -> R0.7)
   - `changes/route-c-bae3bdc2-downstream-preservation/required-paths.md`
 
   **Acceptance Criteria**:
-  - [ ] Wave C execution sheet exists and has non-empty path list + test commands.
-  - [ ] `bun run build` -> exit `0`
-  - [ ] All targeted tests listed in Wave C execution sheet -> `0 fail`
-  - [ ] Remaining required entries are all resolved or explicitly approved in exceptions.
+  - [x] Wave C execution sheet exists and has non-empty path list + test commands.
+  - [x] `bun run build` -> exit `0`
+  - [x] All targeted tests listed in Wave C execution sheet -> `0 fail`
+  - [x] Remaining required entries are all resolved or explicitly approved in exceptions.
 
   **Commit**: YES
   - Message: `fix(route-c): refusion wave-c with preservation gate`
 
-- [ ] 6. Execute dual-gate consolidation audit
+- [x] 6. Execute dual-gate consolidation audit
 
   **What to do**:
   - Run full dual-gate audit and store outputs under:
@@ -544,15 +544,15 @@ Rehearsal Phase (R0.1 -> R0.7)
   - `changes/recovery-functional-equivalence-verification/evidence/task3-inventory-reconciliation.md` — closure proof format.
 
   **Acceptance Criteria**:
-  - [ ] `bun run build` -> exit `0`
-  - [ ] `bun test src/shared/task-parser.test.ts src/shared/wave-grouper.test.ts src/tools/session-manager/storage.test.ts src/tools/session-manager/tools.context.test.ts src/tools/session-manager/tools.test.ts` -> `0 fail`
-  - [ ] Preservation check command set reports:
+  - [x] `bun run build` -> exit `0`
+  - [x] `bun test src/shared/task-parser.test.ts src/shared/wave-grouper.test.ts src/tools/session-manager/storage.test.ts src/tools/session-manager/tools.context.test.ts src/tools/session-manager/tools.test.ts` -> `0 fail`
+  - [x] Preservation check command set reports:
     - `REQUIRED_PATCHES_MISSING=0`
     - `UNAPPROVED_REQUIRED_PATH_LOSS=0`
 
   **Commit**: NO (can be grouped with Task 7 docs)
 
-- [ ] 7. Finalize Route C report, boundary disclosure, and PR readiness
+- [x] 7. Finalize Route C report, boundary disclosure, and PR readiness
 
   **What to do**:
   - Write final report summarizing:
@@ -572,9 +572,9 @@ Rehearsal Phase (R0.1 -> R0.7)
   - `changes/route-c-bae3bdc2-downstream-preservation/*.md` — Route C ledgers and evidence outputs.
 
   **Acceptance Criteria**:
-  - [ ] Final report explicitly states preservation scope and exclusions.
-  - [ ] PR summary contains dual-gate result and exception ledger reference.
-  - [ ] `git status --short` includes only intended Route C files.
+  - [x] Final report explicitly states preservation scope and exclusions.
+  - [x] PR summary contains dual-gate result and exception ledger reference.
+  - [x] `git status --short` includes only intended Route C files.
 
   **Commit**: YES
   - Message: `docs(route-c): finalize preservation and verification report`
