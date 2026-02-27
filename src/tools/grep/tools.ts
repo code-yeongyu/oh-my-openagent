@@ -1,3 +1,4 @@
+import { resolve } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRg, runRgCount } from "./cli"
@@ -35,7 +36,7 @@ export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition
     execute: async (args) => {
       try {
         const globs = args.include ? [args.include] : undefined
-        const searchPath = args.path ?? ctx.directory
+        const searchPath = args.path ? resolve(ctx.directory, args.path) : ctx.directory
         const paths = [searchPath]
         const outputMode = args.output_mode ?? "files_with_matches"
         const headLimit = args.head_limit ?? 0
