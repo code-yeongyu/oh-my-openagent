@@ -1,6 +1,6 @@
 import { resolve } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { tool, type ToolDefinition, type ToolContext } from "@opencode-ai/plugin/tool"
+import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRgFiles } from "./cli"
 import { resolveGrepCliWithAutoInstall } from "./constants"
 import { formatGlobResult } from "./result-formatter"
@@ -23,10 +23,11 @@ export function createGlobTools(ctx: PluginInput): Record<string, ToolDefinition
             "simply omit it for the default behavior. Must be a valid directory path if provided."
         ),
     },
-    execute: async (args, context: ToolContext) => {
+    execute: async (args, context) => {
       try {
         const cli = await resolveGrepCliWithAutoInstall()
-        const dir = context?.directory ?? ctx.directory
+        const runtimeCtx = context as Record<string, unknown>
+        const dir = typeof runtimeCtx.directory === "string" ? runtimeCtx.directory : ctx.directory
         const searchPath = args.path ? resolve(dir, args.path) : dir
         const paths = [searchPath]
 
