@@ -570,10 +570,12 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // when - ultrawork keyword detected with prometheus agent
     await hook["chat.message"]({ sessionID, agent: "prometheus" }, output)
 
-    // then - ultrawork should be skipped for planner agents, text unchanged
+    // then - ultrawork should be skipped for planner agents (other keywords may still inject)
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork plan this feature")
+    expect(textPart!.text).toContain("ultrawork plan this feature")
+    expect(textPart!.text).toContain("[plan-mode]")
+    expect(textPart!.text).not.toContain("<ultrawork-mode>")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
     expect(textPart!.text).not.toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
   })
@@ -591,10 +593,12 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // when - ultrawork keyword detected with planner agent
     await hook["chat.message"]({ sessionID, agent: "Prometheus (Planner)" }, output)
 
-    // then - ultrawork should be skipped, text unchanged
+    // then - ultrawork should be skipped (other planner-related keywords may still inject)
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ulw create a work plan")
+    expect(textPart!.text).toContain("ulw create a work plan")
+    expect(textPart!.text).toContain("[plan-mode]")
+    expect(textPart!.text).not.toContain("<ultrawork-mode>")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 
@@ -663,11 +667,14 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     }
     await hook["chat.message"]({ sessionID: sisyphusSessionID, agent: "sisyphus" }, sisyphusOutput)
 
-    // then - prometheus should have no injection, sisyphus should have normal ultrawork
+    // then - prometheus should skip ultrawork (but may still inject plan-mode), sisyphus should have normal ultrawork
     const prometheusTextPart = prometheusOutput.parts.find(p => p.type === "text")
-    expect(prometheusTextPart!.text).toBe("ultrawork plan")
+    expect(prometheusTextPart!.text).toContain("ultrawork plan")
+    expect(prometheusTextPart!.text).toContain("[plan-mode]")
+    expect(prometheusTextPart!.text).not.toContain("<ultrawork-mode>")
 
     const sisyphusTextPart = sisyphusOutput.parts.find(p => p.type === "text")
+    expect(sisyphusTextPart!.text).toContain("<ultrawork-mode>")
     expect(sisyphusTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
     expect(sisyphusTextPart!.text).toContain("---")
     expect(sisyphusTextPart!.text).toContain("implement")
@@ -719,10 +726,12 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     // when - hook receives input.agent="prometheus" with no session state
     await hook["chat.message"]({ sessionID, agent: "prometheus" }, output)
 
-    // then - prometheus fallback from input.agent, ultrawork skipped
+    // then - prometheus fallback from input.agent, ultrawork skipped (plan-mode may still inject)
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
-    expect(textPart!.text).toBe("ultrawork plan this")
+    expect(textPart!.text).toContain("ultrawork plan this")
+    expect(textPart!.text).toContain("[plan-mode]")
+    expect(textPart!.text).not.toContain("<ultrawork-mode>")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 })

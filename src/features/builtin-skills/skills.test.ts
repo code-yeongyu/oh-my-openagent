@@ -131,6 +131,7 @@ describe("createBuiltinSkills", () => {
 
 	test("should exclude playwright when it is in disabledSkills", () => {
 		// #given
+		const allSkills = createBuiltinSkills()
 		const options = { disabledSkills: new Set(["playwright"]) }
 
 		// #when
@@ -141,11 +142,12 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
 		expect(skills.map((s) => s.name)).toContain("git-master")
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
-		expect(skills.length).toBe(3)
+		expect(skills.length).toBe(allSkills.length - 1)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
 		// #given
+		const allSkills = createBuiltinSkills()
 		const options = { disabledSkills: new Set(["playwright", "git-master"]) }
 
 		// #when
@@ -156,14 +158,13 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).not.toContain("git-master")
 		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
-		expect(skills.length).toBe(2)
+		expect(skills.length).toBe(allSkills.length - 2)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
 		// #given
-		const options = {
-			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser"]),
-		}
+		const allSkills = createBuiltinSkills()
+		const options = { disabledSkills: new Set(allSkills.map((skill) => skill.name)) }
 
 		// #when
 		const skills = createBuiltinSkills(options)
@@ -174,13 +175,14 @@ describe("createBuiltinSkills", () => {
 
 	test("should return all skills when disabledSkills set is empty", () => {
 		// #given
+		const allSkills = createBuiltinSkills()
 		const options = { disabledSkills: new Set<string>() }
 
 		// #when
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(4)
+		expect(skills.length).toBe(allSkills.length)
 	})
 
 })

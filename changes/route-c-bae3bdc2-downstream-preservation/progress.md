@@ -257,3 +257,50 @@
 - `lsp_diagnostics` (error severity) clean on all changed Wave B TS files.
 
 **Status**: [COMPLETED]
+
+### [2026-02-28T16:20:00Z] Task: 5. Execute Wave C from rehearsal-derived execution sheet
+
+**Execution sheet:**
+- Created `changes/route-c-bae3bdc2-downstream-preservation/evidence/wave-c-execution-sheet.md`.
+- Captured concrete Wave C allowlist, per-entry closure matrix (43 required entries), apply set, and targeted verification command set.
+
+**Wave C code application (sheet-listed only):**
+- Applied from `rescue/pre-merge-bae3bdc2`:
+  - `src/cli/__snapshots__/model-fallback.test.ts.snap`
+  - `src/cli/doctor/checks/version.test.ts`
+  - `src/cli/install.test.ts`
+  - `src/cli/mcp-oauth/login.test.ts`
+  - `src/features/builtin-skills/mdsel/cli-src/selector/parser.test.ts`
+  - `src/features/builtin-skills/mdsel/cli-src/selector/parser.ts`
+  - `src/features/builtin-skills/skills.test.ts`
+  - `src/features/builtin-skills/skills.ts`
+  - `src/hooks/keyword-detector/index.test.ts`
+  - `src/hooks/prometheus-md-only/index.test.ts`
+  - `src/hooks/rules-injector/finder.test.ts`
+  - `src/hooks/rules-injector/finder.ts`
+  - `src/hooks/start-work/index.test.ts`
+  - `src/tools/skill/tools.test.ts`
+
+**Wave C ledger updates:**
+- Added `## Wave C Execution Outcome (Task 5)` sections to:
+  - `required-patches.md`
+  - `required-paths.md`
+- Recorded all Wave C required entries (`43`) as either `PRESERVE`, `EQUIVALENT_REWRITE`, or approved `PROPOSED_DROP` exceptions.
+
+**Wave C preserve outcomes (no unapproved required loss):**
+- Preservation check output:
+  - `WAVE_C_REQUIRED_TOTAL=43`
+  - `WAVE_C_REQUIRED_MISSING=0`
+  - `WAVE_C_UNAPPROVED_EXCEPTION_MISSING=0`
+  - `WAVE_C_REQUIRED_MISSING_PATHS=<none>`
+  - `WAVE_C_UNAPPROVED_PATHS=<none>`
+
+**Verification results:**
+- `bun test src/features/builtin-skills/skills.test.ts src/features/builtin-skills/mdsel/cli-src/selector/parser.test.ts` => pass (`13 pass, 0 fail`)
+- `bun test src/hooks/keyword-detector/index.test.ts src/hooks/prometheus-md-only/index.test.ts src/hooks/rules-injector/finder.test.ts src/hooks/start-work/index.test.ts` => pass (`82 pass, 0 fail`)
+- `bun test src/tools/skill/tools.test.ts` => pass (`11 pass, 0 fail`)
+- `bun test src/cli/doctor/checks/version.test.ts src/cli/install.test.ts src/cli/mcp-oauth/login.test.ts` => pass (`15 pass, 0 fail`)
+- `bun run build` => pass (`exit 0`)
+- `lsp_diagnostics` (error severity) clean on all changed Wave C TS files.
+
+**Status**: [COMPLETED]

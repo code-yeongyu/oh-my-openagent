@@ -13,10 +13,15 @@ const mockConsoleError = mock(() => {})
 describe("install CLI - binary check behavior", () => {
   let tempDir: string
   let originalEnv: string | undefined
+  let originalConsoleLog: typeof console.log
+  let originalFetch: typeof globalThis.fetch
   let isOpenCodeInstalledSpy: ReturnType<typeof spyOn>
   let getOpenCodeVersionSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
+    originalConsoleLog = console.log
+    originalFetch = globalThis.fetch
+
     // given temporary config directory
     tempDir = join(tmpdir(), `omo-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tempDir, { recursive: true })
@@ -46,12 +51,22 @@ describe("install CLI - binary check behavior", () => {
 
     isOpenCodeInstalledSpy?.mockRestore()
     getOpenCodeVersionSpy?.mockRestore()
+    console.log = originalConsoleLog
+    globalThis.fetch = originalFetch
   })
 
   test("non-TUI mode: should show warning but continue when OpenCode binary not found", async () => {
     // given OpenCode binary is NOT installed
     isOpenCodeInstalledSpy = spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(false)
     getOpenCodeVersionSpy = spyOn(configManager, "getOpenCodeVersion").mockResolvedValue(null)
+
+    // given mock npm fetch
+    globalThis.fetch = mock(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ latest: "3.0.0" }),
+      } as Response)
+    ) as unknown as typeof fetch
 
     const args: InstallArgs = {
       tui: false,

@@ -124,7 +124,7 @@ class Parser {
     const startPos = this.peek().position;
     let nodeType: 'root' | 'heading' | 'section' | 'block' | 'page' | 'all';
     let subtype: HeadingLevel | BlockType | undefined;
-    let index: number | undefined;
+    let index: number | number[] | undefined;
 
     // Parse node type
     if (this.match(TokenType.STAR)) {
@@ -274,13 +274,14 @@ class Parser {
         if (!this.check(TokenType.NUMBER)) {
           throw this.error('INVALID_INDEX', `Expected number after '-' for range`);
         }
+        const rangeStart = indices[indices.length - 1] ?? firstIndex;
         const endToken = this.advance();
         const endIndex = parseInt(endToken.value, 10);
-        if (endIndex < firstIndex) {
+        if (endIndex < rangeStart) {
           throw this.error('INVALID_INDEX', `Range end must be >= start`);
         }
         // Expand range
-        for (let i = firstIndex + 1; i <= endIndex; i++) {
+        for (let i = rangeStart + 1; i <= endIndex; i++) {
           indices.push(i);
         }
         break; // Range is terminal

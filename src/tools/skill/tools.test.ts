@@ -1,35 +1,18 @@
 import { describe, it, expect, beforeEach, mock, spyOn } from "bun:test"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
-import * as fs from "node:fs"
 import { createSkillTool } from "./tools"
 import { SkillMcpManager } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { Tool as McpTool } from "@modelcontextprotocol/sdk/types.js"
 
-const originalReadFileSync = fs.readFileSync.bind(fs)
-
-mock.module("node:fs", () => ({
-  ...fs,
-  readFileSync: (path: string, encoding?: string) => {
-    if (typeof path === "string" && path.includes("/skills/")) {
-      return `---
-description: Test skill description
----
-Test skill body content`
-    }
-    return originalReadFileSync(path, encoding as BufferEncoding)
-  },
-}))
-
 function createMockSkill(name: string, options: { agent?: string } = {}): LoadedSkill {
   return {
     name,
-    path: `/test/skills/${name}/SKILL.md`,
     resolvedPath: `/test/skills/${name}`,
     definition: {
       name,
       description: `Test skill ${name}`,
-      template: "Test template",
+      template: `<skill-instruction>Test template for ${name}</skill-instruction>`,
       agent: options.agent,
     },
     scope: "opencode-project",
@@ -39,12 +22,11 @@ function createMockSkill(name: string, options: { agent?: string } = {}): Loaded
 function createMockSkillWithMcp(name: string, mcpServers: Record<string, unknown>): LoadedSkill {
   return {
     name,
-    path: `/test/skills/${name}/SKILL.md`,
     resolvedPath: `/test/skills/${name}`,
     definition: {
       name,
       description: `Test skill ${name}`,
-      template: "Test template",
+      template: `<skill-instruction>Test template for ${name}</skill-instruction>`,
     },
     scope: "opencode-project",
     mcpConfig: mcpServers as LoadedSkill["mcpConfig"],

@@ -149,3 +149,55 @@ Source-of-truth mapping: each path entry maps 1:1 to `required-patches.md` via `
 | PATH-103 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
 | PATH-104 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
 | PATH-105 | applied (test sync) | `PROPOSED_DROP` | Added cross-platform storage matching tests for directory variants. |
+
+## Wave C Execution Outcome (Task 5)
+
+| Path ID | Wave C Action | Outcome | Notes |
+|---|---|---|---|
+| PATH-004 | no-edit (validated) | `EQUIVALENT_REWRITE` | Already aligned in branch; equivalent rewrite retained. |
+| PATH-005 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| PATH-006 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-007 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-008 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-009 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-010 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-015 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| PATH-016 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-017 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-018 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-026 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| PATH-031 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-032 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-033 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| PATH-034 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-037 | applied (rescue sync) | `PRESERVE` | Runtime finder behavior synced from rescue. |
+| PATH-038 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-039 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| PATH-040 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-046 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| PATH-047 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-048 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-049 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-054 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-058 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-062 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| PATH-063 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| PATH-064 | no-edit (validated) | `EQUIVALENT_REWRITE` | Already aligned in branch; equivalent rewrite retained. |
+| PATH-066 | no-edit (validated) | `EQUIVALENT_REWRITE` | Already aligned in branch; manifest equivalent rewrite retained. |
+| PATH-072 | applied (rescue sync) | `PROPOSED_DROP` | Snapshot-only exception-governed path synced from rescue. |
+| PATH-087 | applied (rescue sync) | `PRESERVE` | Runtime builtin-skills behavior synced from rescue. |
+| PATH-089 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| PATH-090 | no-edit (validated) | `EQUIVALENT_REWRITE` | Already aligned in branch; equivalent rewrite retained. |
+| PATH-091 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| PATH-092 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-093 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-096 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| PATH-097 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| PATH-098 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| PATH-099 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-101 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| PATH-106 | no-edit (validated) | `EQUIVALENT_REWRITE` | Already aligned in branch; equivalent rewrite retained. |
+
+- `WAVE_C_REQUIRED_TOTAL=43`
+- `WAVE_C_REQUIRED_MISSING=0`
+- `WAVE_C_UNAPPROVED_EXCEPTION_MISSING=0`

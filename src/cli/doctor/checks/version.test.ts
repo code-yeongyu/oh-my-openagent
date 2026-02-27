@@ -1,148 +1,171 @@
-import { describe, it, expect, spyOn, afterEach } from "bun:test"
-import * as version from "./version"
+import { afterEach, describe, expect, it, spyOn } from "bun:test";
+import * as updateChecker from "../../../hooks/auto-update-checker/checker";
+import * as version from "./version";
 
 describe("version check", () => {
-  describe("getVersionInfo", () => {
-    it("returns version check info structure", async () => {
-      // given
-      // when getting version info
-      const info = await version.getVersionInfo()
+	describe("getVersionInfo", () => {
+		it("returns version check info structure", async () => {
+			// given
+			const localDevSpy = spyOn(
+				updateChecker,
+				"isLocalDevMode",
+			).mockReturnValue(false);
+			const pluginEntrySpy = spyOn(
+				updateChecker,
+				"findPluginEntry",
+			).mockReturnValue(null);
+			const cachedVersionSpy = spyOn(
+				updateChecker,
+				"getCachedVersion",
+			).mockReturnValue("3.2.3");
+			const latestVersionSpy = spyOn(
+				updateChecker,
+				"getLatestVersion",
+			).mockResolvedValue("3.2.3");
 
-      // then should have expected structure
-      expect(typeof info.isUpToDate).toBe("boolean")
-      expect(typeof info.isLocalDev).toBe("boolean")
-      expect(typeof info.isPinned).toBe("boolean")
-    })
-  })
+			// when getting version info
+			const info = await version.getVersionInfo();
 
-  describe("checkVersionStatus", () => {
-    let getInfoSpy: ReturnType<typeof spyOn>
+			// then should have expected structure
+			expect(typeof info.isUpToDate).toBe("boolean");
+			expect(typeof info.isLocalDev).toBe("boolean");
+			expect(typeof info.isPinned).toBe("boolean");
 
-    afterEach(() => {
-      getInfoSpy?.mockRestore()
-    })
+			localDevSpy.mockRestore();
+			pluginEntrySpy.mockRestore();
+			cachedVersionSpy.mockRestore();
+			latestVersionSpy.mockRestore();
+		});
+	});
 
-    it("returns pass when in local dev mode", async () => {
-      // given local dev mode
-      getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
-        currentVersion: "local-dev",
-        latestVersion: "2.7.0",
-        isUpToDate: true,
-        isLocalDev: true,
-        isPinned: false,
-      })
+	describe("checkVersionStatus", () => {
+		let getInfoSpy: ReturnType<typeof spyOn>;
 
-      // when checking
-      const result = await version.checkVersionStatus()
+		afterEach(() => {
+			getInfoSpy?.mockRestore();
+		});
 
-      // then should pass with dev message
-      expect(result.status).toBe("pass")
-      expect(result.message).toContain("local development")
-    })
+		it("returns pass when in local dev mode", async () => {
+			// given local dev mode
+			getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
+				currentVersion: "local-dev",
+				latestVersion: "2.7.0",
+				isUpToDate: true,
+				isLocalDev: true,
+				isPinned: false,
+			});
 
-    it("returns pass when pinned", async () => {
-      // given pinned version
-      getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
-        currentVersion: "2.6.0",
-        latestVersion: "2.7.0",
-        isUpToDate: true,
-        isLocalDev: false,
-        isPinned: true,
-      })
+			// when checking
+			const result = await version.checkVersionStatus();
 
-      // when checking
-      const result = await version.checkVersionStatus()
+			// then should pass with dev message
+			expect(result.status).toBe("pass");
+			expect(result.message).toContain("local development");
+		});
 
-      // then should pass with pinned message
-      expect(result.status).toBe("pass")
-      expect(result.message).toContain("Pinned")
-    })
+		it("returns pass when pinned", async () => {
+			// given pinned version
+			getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
+				currentVersion: "2.6.0",
+				latestVersion: "2.7.0",
+				isUpToDate: true,
+				isLocalDev: false,
+				isPinned: true,
+			});
 
-    it("returns warn when unable to determine version", async () => {
-      // given no version info
-      getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
-        currentVersion: null,
-        latestVersion: "2.7.0",
-        isUpToDate: false,
-        isLocalDev: false,
-        isPinned: false,
-      })
+			// when checking
+			const result = await version.checkVersionStatus();
 
-      // when checking
-      const result = await version.checkVersionStatus()
+			// then should pass with pinned message
+			expect(result.status).toBe("pass");
+			expect(result.message).toContain("Pinned");
+		});
 
-      // then should warn
-      expect(result.status).toBe("warn")
-      expect(result.message).toContain("Unable to determine")
-    })
+		it("returns warn when unable to determine version", async () => {
+			// given no version info
+			getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
+				currentVersion: null,
+				latestVersion: "2.7.0",
+				isUpToDate: false,
+				isLocalDev: false,
+				isPinned: false,
+			});
 
-    it("returns warn when network error", async () => {
-      // given network error
-      getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
-        currentVersion: "2.6.0",
-        latestVersion: null,
-        isUpToDate: true,
-        isLocalDev: false,
-        isPinned: false,
-      })
+			// when checking
+			const result = await version.checkVersionStatus();
 
-      // when checking
-      const result = await version.checkVersionStatus()
+			// then should warn
+			expect(result.status).toBe("warn");
+			expect(result.message).toContain("Unable to determine");
+		});
 
-      // then should warn
-      expect(result.status).toBe("warn")
-      expect(result.details?.some((d) => d.includes("network"))).toBe(true)
-    })
+		it("returns warn when network error", async () => {
+			// given network error
+			getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
+				currentVersion: "2.6.0",
+				latestVersion: null,
+				isUpToDate: true,
+				isLocalDev: false,
+				isPinned: false,
+			});
 
-    it("returns warn when update available", async () => {
-      // given update available
-      getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
-        currentVersion: "2.6.0",
-        latestVersion: "2.7.0",
-        isUpToDate: false,
-        isLocalDev: false,
-        isPinned: false,
-      })
+			// when checking
+			const result = await version.checkVersionStatus();
 
-      // when checking
-      const result = await version.checkVersionStatus()
+			// then should warn
+			expect(result.status).toBe("warn");
+			expect(result.details?.some((d) => d.includes("network"))).toBe(true);
+		});
 
-      // then should warn with update info
-      expect(result.status).toBe("warn")
-      expect(result.message).toContain("Update available")
-      expect(result.message).toContain("2.6.0")
-      expect(result.message).toContain("2.7.0")
-    })
+		it("returns warn when update available", async () => {
+			// given update available
+			getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
+				currentVersion: "2.6.0",
+				latestVersion: "2.7.0",
+				isUpToDate: false,
+				isLocalDev: false,
+				isPinned: false,
+			});
 
-    it("returns pass when up to date", async () => {
-      // given up to date
-      getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
-        currentVersion: "2.7.0",
-        latestVersion: "2.7.0",
-        isUpToDate: true,
-        isLocalDev: false,
-        isPinned: false,
-      })
+			// when checking
+			const result = await version.checkVersionStatus();
 
-      // when checking
-      const result = await version.checkVersionStatus()
+			// then should warn with update info
+			expect(result.status).toBe("warn");
+			expect(result.message).toContain("Update available");
+			expect(result.message).toContain("2.6.0");
+			expect(result.message).toContain("2.7.0");
+		});
 
-      // then should pass
-      expect(result.status).toBe("pass")
-      expect(result.message).toContain("Up to date")
-    })
-  })
+		it("returns pass when up to date", async () => {
+			// given up to date
+			getInfoSpy = spyOn(version, "getVersionInfo").mockResolvedValue({
+				currentVersion: "2.7.0",
+				latestVersion: "2.7.0",
+				isUpToDate: true,
+				isLocalDev: false,
+				isPinned: false,
+			});
 
-  describe("getVersionCheckDefinition", () => {
-    it("returns valid check definition", () => {
-      // given
-      // when getting definition
-      const def = version.getVersionCheckDefinition()
+			// when checking
+			const result = await version.checkVersionStatus();
 
-      // then should have required properties
-      expect(def.id).toBe("version-status")
-      expect(def.category).toBe("updates")
-      expect(def.critical).toBe(false)
-    })
-  })
-})
+			// then should pass
+			expect(result.status).toBe("pass");
+			expect(result.message).toContain("Up to date");
+		});
+	});
+
+	describe("getVersionCheckDefinition", () => {
+		it("returns valid check definition", () => {
+			// given
+			// when getting definition
+			const def = version.getVersionCheckDefinition();
+
+			// then should have required properties
+			expect(def.id).toBe("version-status");
+			expect(def.category).toBe("updates");
+			expect(def.critical).toBe(false);
+		});
+	});
+});

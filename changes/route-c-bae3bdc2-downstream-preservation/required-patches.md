@@ -156,3 +156,55 @@ Status legend:
 | RP-103 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
 | RP-104 | no-edit | `PRESERVE` | File present and unchanged in this wave. |
 | RP-105 | applied (test sync) | `PROPOSED_DROP` | Added cross-platform directory match tests for storage query behavior. |
+
+## Wave C Execution Outcome (Task 5)
+
+| Patch ID | Wave C Action | Outcome | Notes |
+|---|---|---|---|
+| RP-004 | no-edit (validated) | `EQUIVALENT_REWRITE` | Already aligned in branch; equivalent rewrite retained. |
+| RP-005 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| RP-006 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-007 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-008 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-009 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-010 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-015 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| RP-016 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-017 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-018 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-026 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| RP-031 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-032 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-033 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| RP-034 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-037 | applied (rescue sync) | `PRESERVE` | Runtime finder behavior synced from rescue. |
+| RP-038 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-039 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| RP-040 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-046 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| RP-047 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-048 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-049 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-054 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-058 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-062 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| RP-063 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| RP-064 | no-edit (validated) | `EQUIVALENT_REWRITE` | Already aligned in branch; equivalent rewrite retained. |
+| RP-066 | no-edit (validated) | `EQUIVALENT_REWRITE` | Already aligned in branch; manifest equivalent rewrite retained. |
+| RP-072 | applied (rescue sync) | `PROPOSED_DROP` | Snapshot-only exception-governed path synced from rescue. |
+| RP-087 | applied (rescue sync) | `PRESERVE` | Runtime builtin-skills behavior synced from rescue. |
+| RP-089 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| RP-090 | no-edit (validated) | `EQUIVALENT_REWRITE` | Already aligned in branch; equivalent rewrite retained. |
+| RP-091 | applied (rescue sync) | `PROPOSED_DROP` | Test-only exception-governed path synced from rescue. |
+| RP-092 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-093 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-096 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| RP-097 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| RP-098 | no-edit (validated) | `PROPOSED_DROP` | Exception-governed test path remains approved. |
+| RP-099 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-101 | no-edit (validated) | `PRESERVE` | Already aligned in branch. |
+| RP-106 | no-edit (validated) | `EQUIVALENT_REWRITE` | Already aligned in branch; equivalent rewrite retained. |
+
+- `WAVE_C_REQUIRED_TOTAL=43`
+- `WAVE_C_REQUIRED_MISSING=0`
+- `WAVE_C_UNAPPROVED_EXCEPTION_MISSING=0`

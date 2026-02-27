@@ -148,3 +148,19 @@
 - Apply only the seven sheet-listed Wave B files from `rescue/pre-merge-bae3bdc2`; keep all other Wave B allowlist entries as explicit no-edit checks.
 - Treat the legacy test path `src/hooks/todo-continuation-enforcer.test.ts` as an equivalent verification surface for `RP-042/PATH-042` governance tracking in this wave.
 - Record preservation gate evidence with deterministic check output: `WAVE_B_REQUIRED_MISSING=0`.
+
+## [2026-02-28T16:20:00Z] Task: 5
+
+**Learnings**:
+- Wave C reconciliation against `rescue/pre-merge-bae3bdc2` narrowed to 14 sheet-listed files in allowlist scope, with 43 required ledger entries closed via applied or validated no-edit outcomes.
+- The highest-value runtime-preservation touchpoints in Wave C were `src/features/builtin-skills/skills.ts` and `src/hooks/rules-injector/finder.ts`; remaining changes were test/snapshot governance sync.
+- Preservation gate validation can be made deterministic with ledger-driven checks: required present paths (`PRESERVE`/`EQUIVALENT_REWRITE`) + approved exception coverage for `PROPOSED_DROP`.
+
+**Decisions**:
+- Keep Wave C implementation strictly bound to execution-sheet apply rows; no additional allowlist paths were edited beyond the 14 listed files.
+- Close both `required-patches.md` and `required-paths.md` with explicit Wave C outcome tables and machine-checkable summary statements.
+- Record Wave C preservation evidence with explicit zero-loss statement: `WAVE_C_REQUIRED_MISSING=0` and `WAVE_C_UNAPPROVED_EXCEPTION_MISSING=0`.
+
+**Verification**:
+- Wave C targeted tests passed (`13 + 82 + 11 + 15` test cases, `0 fail`).
+- `bun run build` passed and LSP diagnostics (`error`) were clean on all changed Wave C TypeScript files.

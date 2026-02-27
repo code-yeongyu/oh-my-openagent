@@ -184,7 +184,7 @@ describe("findRuleFiles", () => {
       const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
 
       // then should find claude rules
-      const paths = candidates.map((c) => c.path);
+      const paths = candidates.map((c) => c.path.replace(/\\/g, "/"));
       expect(paths.some((p) => p.includes(".claude/rules/"))).toBe(true);
     });
 
@@ -201,7 +201,7 @@ describe("findRuleFiles", () => {
       const candidates = findRuleFiles(TEST_DIR, homeDir, currentFile);
 
       // then should find cursor rules
-      const paths = candidates.map((c) => c.path);
+      const paths = candidates.map((c) => c.path.replace(/\\/g, "/"));
       expect(paths.some((p) => p.includes(".cursor/rules/"))).toBe(true);
     });
 
@@ -251,7 +251,7 @@ describe("findRuleFiles", () => {
 
       // then should find all rules
       expect(candidates.length).toBeGreaterThanOrEqual(4);
-      const paths = candidates.map((c) => c.path);
+      const paths = candidates.map((c) => c.path.replace(/\\/g, "/"));
       expect(paths.some((p) => p.includes(".claude/rules/"))).toBe(true);
       expect(paths.some((p) => p.includes(".cursor/rules/"))).toBe(true);
       expect(paths.some((p) => p.includes(".github/instructions/"))).toBe(
