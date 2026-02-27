@@ -59,6 +59,7 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.rulesInjector?.["tool.execute.before"]?.(input, output)
     await hooks.tasksTodowriteDisabler?.["tool.execute.before"]?.(input, output)
     await hooks.prometheusMdOnly?.["tool.execute.before"]?.(input, output)
+    await hooks.athenaSisyphusOnly?.["tool.execute.before"]?.(input, output)
     await hooks.sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
 
