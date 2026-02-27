@@ -1,4 +1,5 @@
 import { getConfigDir } from "./config-context"
+import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 const BUN_INSTALL_TIMEOUT_SECONDS = 60
 const BUN_INSTALL_TIMEOUT_MS = BUN_INSTALL_TIMEOUT_SECONDS * 1000
@@ -16,7 +17,7 @@ export async function runBunInstall(): Promise<boolean> {
 
 export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
   try {
-    const proc = Bun.spawn(["bun", "install"], {
+    const proc = spawnWithWindowsHide(["bun", "install"], {
       cwd: getConfigDir(),
       stdout: "inherit",
       stderr: "inherit",

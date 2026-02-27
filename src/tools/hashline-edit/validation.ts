@@ -15,7 +15,7 @@ const MISMATCH_CONTEXT = 2
 
 const LINE_REF_EXTRACT_PATTERN = /([0-9]+#[ZPMQVRWSNKTXJBYH]{2})/
 
-function normalizeLineRef(ref: string): string {
+export function normalizeLineRef(ref: string): string {
   const originalTrimmed = ref.trim()
   let trimmed = originalTrimmed
   trimmed = trimmed.replace(/^(?:>>>|[+-])\s*/, "")

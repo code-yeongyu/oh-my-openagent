@@ -14,6 +14,7 @@ export interface CategoryResolutionResult {
   agentToUse: string
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
   categoryPromptAppend: string | undefined
+  maxPromptTokens?: number
   modelInfo: ModelFallbackInfo | undefined
   actualModel: string | undefined
   isUnstableAgent: boolean
@@ -51,6 +52,7 @@ export async function resolveCategoryExecution(
         agentToUse: "",
         categoryModel: undefined,
         categoryPromptAppend: undefined,
+        maxPromptTokens: undefined,
         modelInfo: undefined,
         actualModel: undefined,
         isUnstableAgent: false,
@@ -68,6 +70,7 @@ Available categories: ${allCategoryNames}`,
       agentToUse: "",
       categoryModel: undefined,
       categoryPromptAppend: undefined,
+      maxPromptTokens: undefined,
       modelInfo: undefined,
       actualModel: undefined,
       isUnstableAgent: false,
@@ -111,6 +114,7 @@ Available categories: ${allCategoryNames}`,
           agentToUse: "",
           categoryModel: undefined,
           categoryPromptAppend: undefined,
+          maxPromptTokens: undefined,
           modelInfo: undefined,
           actualModel: undefined,
           isUnstableAgent: false,
@@ -154,6 +158,7 @@ Available categories: ${allCategoryNames}`,
       agentToUse: "",
       categoryModel: undefined,
       categoryPromptAppend: undefined,
+      maxPromptTokens: undefined,
       modelInfo: undefined,
       actualModel: undefined,
       isUnstableAgent: false,
@@ -177,6 +182,7 @@ Available categories: ${categoryNames.join(", ")}`,
     agentToUse: SISYPHUS_JUNIOR_AGENT,
     categoryModel,
     categoryPromptAppend,
+    maxPromptTokens: resolved.config.max_prompt_tokens,
     modelInfo,
     actualModel,
     isUnstableAgent,

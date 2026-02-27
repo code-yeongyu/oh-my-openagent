@@ -2,11 +2,17 @@ import { describe, test, expect } from "bun:test";
 import { isGptModel, isGeminiModel } from "./types";
 
 describe("isGptModel", () => {
-  test("standard openai provider models", () => {
+  test("standard openai provider gpt models", () => {
     expect(isGptModel("openai/gpt-5.2")).toBe(true);
     expect(isGptModel("openai/gpt-4o")).toBe(true);
-    expect(isGptModel("openai/o1")).toBe(true);
-    expect(isGptModel("openai/o3-mini")).toBe(true);
+  });
+
+  test("o-series models are not gpt by name", () => {
+    expect(isGptModel("openai/o1")).toBe(false);
+    expect(isGptModel("openai/o3-mini")).toBe(false);
+    expect(isGptModel("litellm/o1")).toBe(false);
+    expect(isGptModel("litellm/o3-mini")).toBe(false);
+    expect(isGptModel("litellm/o4-mini")).toBe(false);
   });
 
   test("github copilot gpt models", () => {
@@ -17,14 +23,16 @@ describe("isGptModel", () => {
   test("litellm proxied gpt models", () => {
     expect(isGptModel("litellm/gpt-5.2")).toBe(true);
     expect(isGptModel("litellm/gpt-4o")).toBe(true);
-    expect(isGptModel("litellm/o1")).toBe(true);
-    expect(isGptModel("litellm/o3-mini")).toBe(true);
-    expect(isGptModel("litellm/o4-mini")).toBe(true);
   });
 
   test("other proxied gpt models", () => {
     expect(isGptModel("ollama/gpt-4o")).toBe(true);
     expect(isGptModel("custom-provider/gpt-5.2")).toBe(true);
+  });
+
+  test("venice provider gpt models", () => {
+    expect(isGptModel("venice/gpt-5.2")).toBe(true);
+    expect(isGptModel("venice/gpt-4o")).toBe(true);
   });
 
   test("gpt4 prefix without hyphen (legacy naming)", () => {
@@ -39,8 +47,8 @@ describe("isGptModel", () => {
   });
 
   test("gemini models are not gpt", () => {
-    expect(isGptModel("google/gemini-3-pro")).toBe(false);
-    expect(isGptModel("litellm/gemini-3-pro")).toBe(false);
+    expect(isGptModel("google/gemini-3.1-pro")).toBe(false);
+    expect(isGptModel("litellm/gemini-3.1-pro")).toBe(false);
   });
 
   test("opencode provider is not gpt", () => {
@@ -50,29 +58,29 @@ describe("isGptModel", () => {
 
 describe("isGeminiModel", () => {
   test("#given google provider models #then returns true", () => {
-    expect(isGeminiModel("google/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("google/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("google/gemini-3-flash")).toBe(true);
     expect(isGeminiModel("google/gemini-2.5-pro")).toBe(true);
   });
 
   test("#given google-vertex provider models #then returns true", () => {
-    expect(isGeminiModel("google-vertex/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("google-vertex/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("google-vertex/gemini-3-flash")).toBe(true);
   });
 
   test("#given github copilot gemini models #then returns true", () => {
-    expect(isGeminiModel("github-copilot/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("github-copilot/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("github-copilot/gemini-3-flash")).toBe(true);
   });
 
   test("#given litellm proxied gemini models #then returns true", () => {
-    expect(isGeminiModel("litellm/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("litellm/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("litellm/gemini-3-flash")).toBe(true);
     expect(isGeminiModel("litellm/gemini-2.5-pro")).toBe(true);
   });
 
   test("#given other proxied gemini models #then returns true", () => {
-    expect(isGeminiModel("custom-provider/gemini-3-pro")).toBe(true);
+    expect(isGeminiModel("custom-provider/gemini-3.1-pro")).toBe(true);
     expect(isGeminiModel("ollama/gemini-3-flash")).toBe(true);
   });
 

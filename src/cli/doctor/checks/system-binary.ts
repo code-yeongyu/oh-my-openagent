@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { spawnWithWindowsHide } from "../../../shared/spawn-with-windows-hide"
 
 import { OPENCODE_BINARIES } from "../constants"
 
@@ -110,7 +111,7 @@ export async function getOpenCodeVersion(
 ): Promise<string | null> {
   try {
     const command = buildVersionCommand(binaryPath, platform)
-    const processResult = Bun.spawn(command, { stdout: "pipe", stderr: "pipe" })
+    const processResult = spawnWithWindowsHide(command, { stdout: "pipe", stderr: "pipe" })
     const output = await new Response(processResult.stdout).text()
     await processResult.exited
 

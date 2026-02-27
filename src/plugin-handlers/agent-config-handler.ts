@@ -106,6 +106,15 @@ export async function applyAgentConfig(params: {
     ]),
   );
 
+  const disabledAgentNames = new Set(
+    (migratedDisabledAgents ?? []).map(a => a.toLowerCase())
+  );
+
+  const filterDisabledAgents = (agents: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.entries(agents).filter(([name]) => !disabledAgentNames.has(name.toLowerCase()))
+    );
+
   const isSisyphusEnabled = params.pluginConfig.sisyphus_agent?.disabled !== true;
   const builderEnabled =
     params.pluginConfig.sisyphus_agent?.default_builder_enabled ?? false;
@@ -194,9 +203,9 @@ export async function applyAgentConfig(params: {
       ...Object.fromEntries(
         Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus"),
       ),
-      ...userAgents,
-      ...projectAgents,
-      ...pluginAgents,
+      ...filterDisabledAgents(userAgents),
+      ...filterDisabledAgents(projectAgents),
+      ...filterDisabledAgents(pluginAgents),
       ...filteredConfigAgents,
       build: { ...migratedBuild, mode: "subagent", hidden: true },
       ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
@@ -204,9 +213,9 @@ export async function applyAgentConfig(params: {
   } else {
     params.config.agent = {
       ...builtinAgents,
-      ...userAgents,
-      ...projectAgents,
-      ...pluginAgents,
+      ...filterDisabledAgents(userAgents),
+      ...filterDisabledAgents(projectAgents),
+      ...filterDisabledAgents(pluginAgents),
       ...configAgent,
     };
   }

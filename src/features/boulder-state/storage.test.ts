@@ -269,6 +269,71 @@ describe("boulder-state", () => {
       expect(progress.isComplete).toBe(false)
     })
 
+    test("should count space-indented unchecked checkbox", () => {
+      // given - plan file with a two-space indented checkbox
+      const planPath = join(TEST_DIR, "space-indented-plan.md")
+      writeFileSync(planPath, `# Plan
+  - [ ] indented task
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(1)
+      expect(progress.completed).toBe(0)
+      expect(progress.isComplete).toBe(false)
+    })
+
+    test("should count tab-indented unchecked checkbox", () => {
+      // given - plan file with a tab-indented checkbox
+      const planPath = join(TEST_DIR, "tab-indented-plan.md")
+      writeFileSync(planPath, `# Plan
+	- [ ] tab-indented task
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(1)
+      expect(progress.completed).toBe(0)
+      expect(progress.isComplete).toBe(false)
+    })
+
+    test("should count mixed top-level checked and indented unchecked checkboxes", () => {
+      // given - plan file with checked top-level and unchecked indented task
+      const planPath = join(TEST_DIR, "mixed-indented-plan.md")
+      writeFileSync(planPath, `# Plan
+- [x] top-level completed task
+  - [ ] nested unchecked task
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(2)
+      expect(progress.completed).toBe(1)
+      expect(progress.isComplete).toBe(false)
+    })
+
+    test("should count space-indented completed checkbox", () => {
+      // given - plan file with a two-space indented completed checkbox
+      const planPath = join(TEST_DIR, "indented-completed-plan.md")
+      writeFileSync(planPath, `# Plan
+  - [x] indented completed task
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(1)
+      expect(progress.completed).toBe(1)
+      expect(progress.isComplete).toBe(true)
+    })
+
     test("should return isComplete true when all checked", () => {
       // given - all tasks completed
       const planPath = join(TEST_DIR, "complete-plan.md")

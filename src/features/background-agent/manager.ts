@@ -95,6 +95,7 @@ export class BackgroundManager {
 
   private tasks: Map<string, BackgroundTask>
   private notifications: Map<string, BackgroundTask[]>
+  private pendingNotifications: Map<string, string[]>
   private pendingByParent: Map<string, Set<string>>  // Track pending tasks per parent for batching
   private client: OpencodeClient
   private directory: string
@@ -129,6 +130,7 @@ export class BackgroundManager {
   ) {
     this.tasks = new Map()
     this.notifications = new Map()
+    this.pendingNotifications = new Map()
     this.pendingByParent = new Map()
     this.client = ctx.client
     this.directory = ctx.directory
@@ -856,6 +858,8 @@ export class BackgroundManager {
         tasksToCancel.set(descendant.id, descendant)
       }
 
+      this.pendingNotifications.delete(sessionID)
+
       if (tasksToCancel.size === 0) return
 
       for (const task of tasksToCancel.values()) {
@@ -892,6 +896,13 @@ export class BackgroundManager {
           subagentSessions.delete(task.sessionID)
         }
       }
+
+      for (const task of tasksToCancel.values()) {
+        if (task.parentSessionID) {
+          this.pendingNotifications.delete(task.parentSessionID)
+        }
+      }
+
       SessionCategoryRegistry.remove(sessionID)
     }
 
@@ -943,6 +954,32 @@ export class BackgroundManager {
 
   clearNotifications(sessionID: string): void {
     this.notifications.delete(sessionID)
+  }
+
+  queuePendingNotification(sessionID: string | undefined, notification: string): void {
+    if (!sessionID) return
+    const existingNotifications = this.pendingNotifications.get(sessionID) ?? []
+    existingNotifications.push(notification)
+    this.pendingNotifications.set(sessionID, existingNotifications)
+  }
+
+  injectPendingNotificationsIntoChatMessage(output: { parts: Array<{ type: string; text?: string; [key: string]: unknown }> }, sessionID: string): void {
+    const pendingNotifications = this.pendingNotifications.get(sessionID)
+    if (!pendingNotifications || pendingNotifications.length === 0) {
+      return
+    }
+
+    this.pendingNotifications.delete(sessionID)
+    const notificationContent = pendingNotifications.join("\n\n")
+    const firstTextPartIndex = output.parts.findIndex((part) => part.type === "text")
+
+    if (firstTextPartIndex === -1) {
+      output.parts.unshift(createInternalAgentTextPart(notificationContent))
+      return
+    }
+
+    const originalText = output.parts[firstTextPartIndex].text ?? ""
+    output.parts[firstTextPartIndex].text = `${notificationContent}\n\n---\n\n${originalText}`
   }
 
   /**
@@ -1368,6 +1405,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               taskId: task.id,
               parentSessionID: task.parentSessionID,
             })
+            this.queuePendingNotification(task.parentSessionID, notification)
           } else {
             log("[background-agent] Failed to send notification:", error)
           }
@@ -1596,6 +1634,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.concurrencyManager.clear()
     this.tasks.clear()
     this.notifications.clear()
+    this.pendingNotifications.clear()
     this.pendingByParent.clear()
     this.notificationQueueByParent.clear()
     this.queuesByKey.clear()

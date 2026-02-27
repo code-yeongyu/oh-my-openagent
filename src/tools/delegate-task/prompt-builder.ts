@@ -1,6 +1,22 @@
 import type { BuildSystemContentInput } from "./types"
 import { buildPlanAgentSystemPrepend, isPlanAgent } from "./constants"
 import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import { buildSystemContentWithTokenLimit } from "./token-limiter"
+
+const FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT = 24000
+
+function usesFreeOrLocalModel(model: { providerID: string; modelID: string; variant?: string } | undefined): boolean {
+  if (!model) {
+    return false
+  }
+
+  const provider = model.providerID.toLowerCase()
+  const modelId = model.modelID.toLowerCase()
+  return provider.includes("local")
+    || provider === "ollama"
+    || provider === "lmstudio"
+    || modelId.includes("free")
+}
 
 /**
  * Build the system content to inject into the agent prompt.
@@ -10,7 +26,11 @@ import { safeCompress, shouldCompress } from "../../shared/toon-compression"
 export function buildSystemContent(input: BuildSystemContentInput): string | undefined {
   const {
     skillContent,
+    skillContents,
     categoryPromptAppend,
+    agentsContext,
+    maxPromptTokens,
+    model,
     agentName,
     availableCategories,
     availableSkills,
@@ -74,23 +94,17 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
     planAgentPrepend = ""
   }
 
-  if (!skillContent && !categoryPromptAppend && !planAgentPrepend) {
-    return undefined
-  }
+  const effectiveMaxPromptTokens = maxPromptTokens
+    ?? (usesFreeOrLocalModel(model) ? FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT : undefined)
 
-  const parts: string[] = []
-
-  if (planAgentPrepend) {
-    parts.push(planAgentPrepend)
-  }
-
-  if (skillContent) {
-    parts.push(skillContent)
-  }
-
-  if (categoryPromptAppend) {
-    parts.push(categoryPromptAppend)
-  }
-
-  return parts.join("\n\n") || undefined
+  return buildSystemContentWithTokenLimit(
+    {
+      skillContent,
+      skillContents,
+      categoryPromptAppend,
+      agentsContext: agentsContext ?? planAgentPrepend,
+      planAgentPrepend,
+    },
+    effectiveMaxPromptTokens
+  )
 }

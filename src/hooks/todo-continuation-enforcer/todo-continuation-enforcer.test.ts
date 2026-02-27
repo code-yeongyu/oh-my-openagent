@@ -297,6 +297,31 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should not inject when remaining todos are blocked or deleted", async () => {
+    // given - session where non-completed todos are only blocked/deleted
+    const sessionID = "main-blocked-deleted"
+    setMainSession(sessionID)
+
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: [
+      { id: "1", content: "Blocked task", status: "blocked", priority: "high" },
+      { id: "2", content: "Deleted task", status: "deleted", priority: "medium" },
+      { id: "3", content: "Done task", status: "completed", priority: "low" },
+    ]})
+
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no continuation injected
+    expect(promptCalls).toHaveLength(0)
+  })
+
   test("should not inject when background tasks are running", async () => {
     // given - session with running background tasks
     const sessionID = "main-789"
@@ -1663,7 +1688,6 @@ describe("todo-continuation-enforcer", () => {
   test("should cancel all countdowns via cancelAllCountdowns", async () => {
     // given - multiple sessions with running countdowns
     const session1 = "main-cancel-all-1"
-    const session2 = "main-cancel-all-2"
     setMainSession(session1)
 
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})

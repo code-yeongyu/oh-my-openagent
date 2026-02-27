@@ -69,8 +69,8 @@ export async function processEvents(
     if (ctx.abortController.signal.aborted) break
 
     try {
-      const rawPayload = event as EventPayload
-      if (!rawPayload?.type) {
+      const payload = event as EventPayload
+      if (!payload?.type) {
         if (ctx.verbose) {
           const config = getCompressionConfig(ctx)
           const eventStr = compressPayloadData(event, config, false)
@@ -82,19 +82,22 @@ export async function processEvents(
       const config = getCompressionConfig(ctx)
 
       if (ctx.verbose) {
-        const compressedStr = compressEventPayload(rawPayload, config)
+        const compressedStr = compressEventPayload(payload, config)
         console.error(pc.dim(`[event] ${compressedStr}`))
       }
 
-      handleSessionError(ctx, rawPayload, state)
-      handleSessionIdle(ctx, rawPayload, state)
-      handleSessionStatus(ctx, rawPayload, state)
-      handleMessagePartUpdated(ctx, rawPayload, state)
-      handleMessagePartDelta(ctx, rawPayload, state)
-      handleMessageUpdated(ctx, rawPayload, state)
-      handleToolExecute(ctx, rawPayload, state)
-      handleToolResult(ctx, rawPayload, state)
-      handleTuiToast(ctx, rawPayload, state)
+      // Update last event timestamp for watchdog detection
+      state.lastEventTimestamp = Date.now()
+
+      handleSessionError(ctx, payload, state)
+      handleSessionIdle(ctx, payload, state)
+      handleSessionStatus(ctx, payload, state)
+      handleMessagePartUpdated(ctx, payload, state)
+      handleMessagePartDelta(ctx, payload, state)
+      handleMessageUpdated(ctx, payload, state)
+      handleToolExecute(ctx, payload, state)
+      handleToolResult(ctx, payload, state)
+      handleTuiToast(ctx, payload, state)
     } catch (err) {
       console.error(pc.red(`[event error] ${err}`))
     }
