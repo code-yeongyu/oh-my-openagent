@@ -166,7 +166,15 @@ export async function formatFullSession(
       role: m.info?.role,
       agent: m.info?.agent,
       time: m.info?.time,
-      parts: m.parts,
+      parts: m.parts?.map((part) => {
+        if (part.type === "thinking" && part.thinking) {
+          return { ...part, thinking: truncateText(part.thinking, thinkingMaxChars) }
+        }
+        if (part.type === "reasoning" && part.text) {
+          return { ...part, text: truncateText(part.text, thinkingMaxChars) }
+        }
+        return part
+      }),
     }))
 
     if (shouldCompress(messageData, compressionConfig.threshold)) {
