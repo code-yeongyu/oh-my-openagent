@@ -6,6 +6,8 @@ import {
   buildGeminiDelegationOverride,
   buildGeminiVerificationOverride,
   buildGeminiIntentGateEnforcement,
+  buildGeminiToolGuide,
+  buildGeminiToolCallExamples,
 } from "./sisyphus-gemini-overlays";
 
 const MODE: AgentMode = "all";
@@ -32,6 +34,7 @@ import {
   buildHardBlocksSection,
   buildAntiPatternsSection,
   buildDeepParallelSection,
+  buildNonClaudePlannerSection,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder";
 
@@ -170,6 +173,7 @@ function buildDynamicSisyphusPrompt(
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const deepParallelSection = buildDeepParallelSection(model, availableCategories);
+  const nonClaudePlannerSection = buildNonClaudePlannerSection(model);
   const taskManagementSection = buildTaskManagementSection(useTaskSystem);
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
@@ -363,6 +367,8 @@ STOP searching when:
 3. Mark \`completed\` as soon as done (don't batch) - OBSESSIVELY TRACK YOUR WORK USING TODO TOOLS
 
 ${categorySkillsGuide}
+
+${nonClaudePlannerSection}
 
 ${deepParallelSection}
 
@@ -564,12 +570,25 @@ export function createSisyphusAgent(
     : buildDynamicSisyphusPrompt(model, [], tools, skills, categories, useTaskSystem);
 
   if (isGeminiModel(model)) {
+    // 1. Intent gate + tool mandate — early in prompt (after intent verbalization)
     prompt = prompt.replace(
       "</intent_verbalization>",
       `</intent_verbalization>\n\n${buildGeminiIntentGateEnforcement()}\n\n${buildGeminiToolMandate()}`
     );
-    prompt += "\n" + buildGeminiDelegationOverride();
-    prompt += "\n" + buildGeminiVerificationOverride();
+
+    // 2. Tool guide + examples — after tool_usage_rules (where tools are discussed)
+    prompt = prompt.replace(
+      "</tool_usage_rules>",
+      `</tool_usage_rules>\n\n${buildGeminiToolGuide()}\n\n${buildGeminiToolCallExamples()}`
+    );
+
+    // 3. Delegation + verification overrides — before Constraints (NOT at prompt end)
+    //    Gemini suffers from lost-in-the-middle: content at prompt end gets weaker attention.
+    //    Placing these before <Constraints> ensures they're in a high-attention zone.
+    prompt = prompt.replace(
+      "<Constraints>",
+      `${buildGeminiDelegationOverride()}\n\n${buildGeminiVerificationOverride()}\n\n<Constraints>`
+    );
   }
 
   const permission = {
