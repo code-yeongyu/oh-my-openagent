@@ -21,10 +21,29 @@ const ZAI_MODEL = "zai-coding-plan/glm-4.7"
 const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json"
 
-
+const OPENCODE_ZEN_GO_AGENT_MODELS: Record<string, string> = {
+  sisyphus: "opencode-go/glm-5",
+  oracle: "opencode-go/glm-5",
+  hephaestus: "opencode-go/minimax-m2.5",
+  librarian: "opencode-go/minimax-m2.5",
+  explore: "opencode-go/minimax-m2.5",
+  frontend: "opencode-go/kimi-k2.5",
+  document: "opencode-go/kimi-k2.5",
+}
 
 export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const avail = toProviderAvailability(config)
+
+  if (avail.opencodeZenGo) {
+    const agents: Record<string, AgentConfig> = Object.fromEntries(
+      Object.entries(OPENCODE_ZEN_GO_AGENT_MODELS).map(([role, model]) => [role, { model }])
+    )
+    return {
+      $schema: SCHEMA_URL,
+      agents,
+    }
+  }
+
   const hasAnyProvider =
     avail.native.claude ||
     avail.native.openai ||

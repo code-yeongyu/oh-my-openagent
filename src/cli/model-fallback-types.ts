@@ -5,6 +5,7 @@ export interface ProviderAvailability {
 		gemini: boolean
 	}
 	opencodeZen: boolean
+	opencodeZenGo: boolean
 	copilot: boolean
 	zai: boolean
 	kimiForCoding: boolean

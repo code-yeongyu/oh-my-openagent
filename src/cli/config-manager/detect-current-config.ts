@@ -10,17 +10,18 @@ function detectProvidersFromOmoConfig(): {
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
+  hasOpencodeZenGo: boolean
 } {
   const omoConfigPath = getOmoConfigPath()
   if (!existsSync(omoConfigPath)) {
-    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
+    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, hasOpencodeZenGo: false }
   }
 
   try {
     const content = readFileSync(omoConfigPath, "utf-8")
     const omoConfig = parseJsonc<Record<string, unknown>>(content)
     if (!omoConfig || typeof omoConfig !== "object") {
-      return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
+      return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, hasOpencodeZenGo: false }
     }
 
     const configStr = JSON.stringify(omoConfig)
@@ -28,10 +29,11 @@ function detectProvidersFromOmoConfig(): {
     const hasOpencodeZen = configStr.includes('"opencode/')
     const hasZaiCodingPlan = configStr.includes('"zai-coding-plan/')
     const hasKimiForCoding = configStr.includes('"kimi-for-coding/')
+    const hasOpencodeZenGo = configStr.includes('"opencode-go/')
 
-    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding }
+    return { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeZenGo }
   } catch {
-    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false }
+    return { hasOpenAI: true, hasOpencodeZen: true, hasZaiCodingPlan: false, hasKimiForCoding: false, hasOpencodeZenGo: false }
   }
 }
 
@@ -46,6 +48,7 @@ export function detectCurrentConfig(): DetectedConfig {
     hasOpencodeZen: true,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
+    hasOpencodeZenGo: false,
   }
 
   const { format, path } = detectConfigFormat()
@@ -68,11 +71,12 @@ export function detectCurrentConfig(): DetectedConfig {
 
   result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
 
-  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding } = detectProvidersFromOmoConfig()
+  const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding, hasOpencodeZenGo } = detectProvidersFromOmoConfig()
   result.hasOpenAI = hasOpenAI
   result.hasOpencodeZen = hasOpencodeZen
   result.hasZaiCodingPlan = hasZaiCodingPlan
   result.hasKimiForCoding = hasKimiForCoding
+  result.hasOpencodeZenGo = hasOpencodeZenGo
 
   return result
 }

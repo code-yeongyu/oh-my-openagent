@@ -38,6 +38,7 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
+  lines.push(formatProvider("OpenCode Zen Go", config.hasOpencodeZenGo, "GLM-5/Kimi K2.5/MiniMax M2.5"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -147,6 +148,10 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
   }
 
+  if (args.opencodeZenGo !== undefined && !["no", "yes"].includes(args.opencodeZenGo)) {
+    errors.push(`Invalid --opencode-zen-go value: ${args.opencodeZenGo} (expected: no, yes)`)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
@@ -160,6 +165,7 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
     hasKimiForCoding: args.kimiForCoding === "yes",
+    hasOpencodeZenGo: args.opencodeZenGo === "yes",
   }
 }
 
@@ -171,6 +177,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
   kimiForCoding: BooleanArg
+  opencodeZenGo: BooleanArg
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -185,5 +192,6 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
     kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+    opencodeZenGo: detected.hasOpencodeZenGo ? "yes" : "no",
   }
 }

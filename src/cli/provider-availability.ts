@@ -9,6 +9,7 @@ export function toProviderAvailability(config: InstallConfig): ProviderAvailabil
 			gemini: config.hasGemini,
 		},
 		opencodeZen: config.hasOpencodeZen,
+		opencodeZenGo: config.hasOpencodeZenGo,
 		copilot: config.hasCopilot,
 		zai: config.hasZaiCodingPlan,
 		kimiForCoding: config.hasKimiForCoding,
@@ -23,6 +24,7 @@ export function isProviderAvailable(provider: string, availability: ProviderAvai
 		google: availability.native.gemini,
 		"github-copilot": availability.copilot,
 		opencode: availability.opencodeZen,
+		"opencode-go": availability.opencodeZenGo,
 		"zai-coding-plan": availability.zai,
 		"kimi-for-coding": availability.kimiForCoding,
 	}

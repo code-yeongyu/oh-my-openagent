@@ -100,6 +100,16 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!kimiForCoding) return null
 
+  const opencodeZenGo = await selectOrCancel({
+    message: "Do you have an OpenCode Zen Go subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "OpenCode Zen Go ($10/month)", hint: "GLM-5/Kimi K2.5/MiniMax M2.5 via opencode-go/" },
+    ],
+    initialValue: initial.opencodeZenGo,
+  })
+  if (!opencodeZenGo) return null
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
@@ -109,5 +119,6 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
+    hasOpencodeZenGo: opencodeZenGo === "yes",
   }
 }
