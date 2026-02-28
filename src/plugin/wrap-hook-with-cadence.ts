@@ -87,8 +87,16 @@ export function wrapHookWithCadence<T extends Record<string, unknown>>(
         return handler(input, ...rest)
       }
     } else {
-      // Pass through other handlers unchanged
-      wrappedHook[handlerName] = handler
+      // Gate all other handlers (chat.message, chat.params, chat.headers, system.transform, etc.)
+      // These handlers receive an input object with sessionID, so cadence gating applies.
+      wrappedHook[handlerName] = async (input: any, ...rest: any[]) => {
+        const sessionID = input?.sessionID
+        if (sessionID && !cadenceTracker.shouldFire(hookName, sessionID)) {
+          return // Skip this turn
+        }
+        // If no sessionID found (shouldn't happen for gatable hooks), pass through
+        return handler(input, ...rest)
+      }
     }
   }
 
