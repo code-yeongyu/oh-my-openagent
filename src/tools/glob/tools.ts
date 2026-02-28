@@ -29,12 +29,11 @@ export function createGlobTools(ctx: PluginInput): Record<string, ToolDefinition
         const runtimeCtx = context as Record<string, unknown>
         const dir = typeof runtimeCtx.directory === "string" ? runtimeCtx.directory : ctx.directory
         const searchPath = args.path ? resolve(dir, args.path) : dir
-        const paths = [searchPath]
 
         const result = await runRgFiles(
           {
             pattern: args.pattern,
-            paths,
+            paths: [searchPath],
           },
           cli
         )
