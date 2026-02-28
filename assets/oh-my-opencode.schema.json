@@ -3845,9 +3845,13 @@
           "type": "boolean"
         },
         "threshold": {
-          "default": 5000,
+          "default": 100,
           "type": "number",
-          "minimum": 100
+          "minimum": 10
+        },
+        "maxEncodingSize": {
+          "type": "number",
+          "minimum": 1000
         }
       },
       "required": [
