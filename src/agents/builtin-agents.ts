@@ -221,6 +221,7 @@ export async function createBuiltinAgents(
       const retryIfFinished = councilConfig.retry_failed_if_others_finished ?? false
       const cancelOnQuorum = councilConfig.cancel_retrying_on_quorum ?? true
       const stuckThreshold = councilConfig.stuck_threshold_seconds ?? 120
+      const memberMaxRunning = councilConfig.member_max_running_seconds ?? 1800
 
       let athenaPrompt = (result["athena"].prompt ?? "") + councilTaskInstructions
       athenaPrompt = athenaPrompt
@@ -228,7 +229,8 @@ export async function createBuiltinAgents(
         .replace(/\{RETRY_FAILED_IF_OTHERS_FINISHED\}/g, String(retryIfFinished))
         .replace(/\{CANCEL_RETRYING_ON_QUORUM\}/g, String(cancelOnQuorum))
         .replace(/\{STUCK_THRESHOLD_SECONDS\}/g, String(stuckThreshold))
-      athenaPrompt += `\n\n## Council Resilience Config\n- retry_on_fail: ${retryOnFail}\n- retry_failed_if_others_finished: ${retryIfFinished}\n- cancel_retrying_on_quorum: ${cancelOnQuorum}\n- stuck_threshold_seconds: ${stuckThreshold}`
+        .replace(/\{MEMBER_MAX_RUNNING_SECONDS\}/g, String(memberMaxRunning))
+      athenaPrompt += `\n\n## Council Resilience Config\n- retry_on_fail: ${retryOnFail}\n- retry_failed_if_others_finished: ${retryIfFinished}\n- cancel_retrying_on_quorum: ${cancelOnQuorum}\n- stuck_threshold_seconds: ${stuckThreshold}\n- member_max_running_seconds: ${memberMaxRunning}`
 
       result["athena"] = {
         ...result["athena"],

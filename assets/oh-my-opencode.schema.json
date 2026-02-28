@@ -3632,6 +3632,11 @@
                   "default": 120,
                   "type": "number",
                   "minimum": 30
+                },
+                "member_max_running_seconds": {
+                  "default": 1800,
+                  "type": "number",
+                  "minimum": 60
                 }
               },
               "required": [
@@ -3639,7 +3644,8 @@
                 "retry_on_fail",
                 "retry_failed_if_others_finished",
                 "cancel_retrying_on_quorum",
-                "stuck_threshold_seconds"
+                "stuck_threshold_seconds",
+                "member_max_running_seconds"
               ],
               "additionalProperties": false
             }

@@ -31,23 +31,7 @@ You MUST wrap your final analysis in <COUNCIL_MEMBER_RESPONSE> tags. This is how
 - Exploration logs and intermediate reasoning
 - Step-by-step search process
 
-**Example structure:**
-\`\`\`
-<COUNCIL_MEMBER_RESPONSE>
-## Point 1: [Title]
-- **Observation**: [what you found]
-- **Confidence**: high
-- **Details**: [supporting evidence or reasoning]
-
-## Point 2: [Title]
-...
-
-## Summary
-[Overall assessment with confidence levels]
-</COUNCIL_MEMBER_RESPONSE>
-\`\`\`
-
-If you do not wrap your response in these tags, your analysis will not be included in the synthesis.`
+If you do not wrap your response in <COUNCIL_MEMBER_RESPONSE> tags, your analysis will not be included in the synthesis.`
 
 export const COUNCIL_SOLO_ADDENDUM = `
 ## Solo Analysis Mode
@@ -85,7 +69,9 @@ background_output(task_id="<id>")
 - Use \`librarian\` for documentation and external references
 - Keep targeted file reads (Read tool) for yourself — delegate broad searches
 - Collect results with \`background_output\` after \`background_wait\` returns
-- Before generating your final \`<COUNCIL_MEMBER_RESPONSE>\`, cancel any remaining pending tasks with \`background_cancel\``
+- Before generating your final \`<COUNCIL_MEMBER_RESPONSE>\`, wait for all the background tasks to finish. 
+- If you decide to form your final response before background tasks finishes, cancel any remaining pending tasks with \`background_cancel\`
+`
 
 export function createCouncilMemberAgent(model: string): AgentConfig {
   // Allow-list: only read-only analysis tools + optional delegation.

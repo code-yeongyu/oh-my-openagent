@@ -13,6 +13,7 @@ describe("council-member-agents", () => {
       retry_failed_if_others_finished: false,
       cancel_retrying_on_quorum: true,
       stuck_threshold_seconds: 120,
+      member_max_running_seconds: 1800,
     }
     //#when
     const result = registerCouncilMemberAgents(config)
@@ -32,6 +33,7 @@ describe("council-member-agents", () => {
       retry_failed_if_others_finished: false,
       cancel_retrying_on_quorum: true,
       stuck_threshold_seconds: 120,
+      member_max_running_seconds: 1800,
     }
     //#when
     const result = registerCouncilMemberAgents(config)
@@ -52,6 +54,7 @@ describe("council-member-agents", () => {
       retry_failed_if_others_finished: false,
       cancel_retrying_on_quorum: true,
       stuck_threshold_seconds: 120,
+      member_max_running_seconds: 1800,
     }
     //#when
     const result = registerCouncilMemberAgents(config)
@@ -72,6 +75,7 @@ describe("council-member-agents", () => {
       retry_failed_if_others_finished: false,
       cancel_retrying_on_quorum: true,
       stuck_threshold_seconds: 120,
+      member_max_running_seconds: 1800,
     }
     //#when
     const result = registerCouncilMemberAgents(config)

@@ -34,7 +34,6 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | Multimodal-Looker | ALL except read |
 | Atlas | task, call_omo_agent |
 | Momus | write, edit, task |
-| Athena | write, edit, call_omo_agent |
 | Council-Member | ALL except read, grep, glob, lsp_*, ast_grep_search (allow-list) |
 
 ## STRUCTURE

@@ -469,6 +469,14 @@ describe("CouncilConfigSchema — resilience fields", () => {
           expect(result.data.stuck_threshold_seconds).toBe(120)
         }
       })
+
+      it("#then applies default member_max_running_seconds of 1800", () => {
+        const result = CouncilConfigSchema.safeParse({ members: validMembers })
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.member_max_running_seconds).toBe(1800)
+        }
+      })
     })
   })
 
@@ -481,6 +489,7 @@ describe("CouncilConfigSchema — resilience fields", () => {
           retry_failed_if_others_finished: true,
           cancel_retrying_on_quorum: false,
           stuck_threshold_seconds: 60,
+          member_max_running_seconds: 2400,
         }
         const result = CouncilConfigSchema.safeParse(config)
         expect(result.success).toBe(true)
@@ -489,6 +498,7 @@ describe("CouncilConfigSchema — resilience fields", () => {
           expect(result.data.retry_failed_if_others_finished).toBe(true)
           expect(result.data.cancel_retrying_on_quorum).toBe(false)
           expect(result.data.stuck_threshold_seconds).toBe(60)
+          expect(result.data.member_max_running_seconds).toBe(2400)
         }
       })
     })
@@ -516,6 +526,15 @@ describe("CouncilConfigSchema — resilience fields", () => {
     describe("#when parsed with 10", () => {
       it("#then fails validation", () => {
         const result = CouncilConfigSchema.safeParse({ members: validMembers, stuck_threshold_seconds: 10 })
+        expect(result.success).toBe(false)
+      })
+    })
+  })
+
+  describe("#given member_max_running_seconds below minimum", () => {
+    describe("#when parsed with 30", () => {
+      it("#then fails validation", () => {
+        const result = CouncilConfigSchema.safeParse({ members: validMembers, member_max_running_seconds: 30 })
         expect(result.success).toBe(false)
       })
     })

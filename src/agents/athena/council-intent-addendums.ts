@@ -63,7 +63,7 @@ You are conducting an **audit** — your goal is to find discrete issues, risks,
 - Severity determines priority: critical (blocks/breaks), high (significant risk), medium (should fix), low (nice to fix)
 - For each finding, provide the specific location (reference, section, or component where it occurs)
 - State your confidence: high (clear evidence), medium (likely but needs verification), low (suspicion, investigate further)
-- **This is a broad sweep, not a targeted trace.** If you are starting from a specific symptom and need to find its root cause, that is DIAGNOSE — not AUDIT.
+- **This is a broad sweep, not a targeted trace.**.
 
 **Required output fields per finding:**
 - Title, Severity (critical/high/medium/low), Location, Confidence (high/medium/low)
