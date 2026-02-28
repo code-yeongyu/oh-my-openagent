@@ -10,7 +10,11 @@ function stringifyFallback(data: unknown): string {
 
     return String(data)
   } catch {
-    return String(data)
+    try {
+      return String(data)
+    } catch {
+      return "[unserializable]"
+    }
   }
 }
 

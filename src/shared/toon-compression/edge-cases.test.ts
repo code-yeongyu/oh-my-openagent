@@ -245,4 +245,28 @@ describe("toon-compression/edge-cases", () => {
       expect(result).toContain("null")
     })
   })
+
+  describe("#given unstringifiable objects", () => {
+    it("#then safeCompress returns [unserializable] for circular Object.create(null)", () => {
+      // Object.create(null) has no toString, and circular ref makes JSON.stringify throw
+      const nullProto: { self?: unknown } = Object.create(null)
+      nullProto.self = nullProto
+
+      const result = safeCompress(nullProto, enabledConfig)
+      expect(result).toBe("[unserializable]")
+    })
+
+    it("#then safeCompress returns [unserializable] for circular object with throwing toString", () => {
+      // Circular ref makes JSON.stringify throw, throwing toString makes String() throw
+      const throwing: { self?: unknown; toString(): string } = {
+        toString() {
+          throw new Error("Cannot stringify")
+        },
+      }
+      throwing.self = throwing
+
+      const result = safeCompress(throwing, enabledConfig)
+      expect(result).toBe("[unserializable]")
+    })
+  })
 })
