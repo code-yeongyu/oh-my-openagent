@@ -96,11 +96,11 @@ function extractBatchData(messages: MessageWithParts[]): unknown[] {
 
     return {
       role: message.info.role,
+      timestamp: message.info.time?.created ?? null,
       textContents,
       thinkingContents,
       toolUses,
       toolResults,
-
     }
   })
 }
