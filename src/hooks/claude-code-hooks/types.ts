@@ -12,13 +12,23 @@ export type ClaudeHookEvent =
 
 export interface HookMatcher {
   matcher: string
-  hooks: HookCommand[]
+  hooks: HookAction[]
 }
 
 export interface HookCommand {
   type: "command"
   command: string
 }
+
+export interface HookHttp {
+  type: "http"
+  url: string
+  headers?: Record<string, string>
+  allowedEnvVars?: string[]
+  timeout?: number
+}
+
+export type HookAction = HookCommand | HookHttp
 
 export interface ClaudeHooksConfig {
   PreToolUse?: HookMatcher[]

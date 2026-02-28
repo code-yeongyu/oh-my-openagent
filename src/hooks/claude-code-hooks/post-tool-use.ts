@@ -3,8 +3,8 @@ import type {
   PostToolUseOutput,
   ClaudeHooksConfig,
 } from "./types"
-import { findMatchingHooks, executeHookCommand, objectToSnakeCase, transformToolName, log } from "../../shared"
-import { DEFAULT_CONFIG } from "./plugin-config"
+import { findMatchingHooks, objectToSnakeCase, transformToolName, log } from "../../shared"
+import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { buildTranscriptFromSession, deleteTempTranscript } from "./transcript"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 
@@ -94,22 +94,17 @@ export async function executePostToolUseHooks(
      for (const matcher of matchers) {
        if (!matcher.hooks || matcher.hooks.length === 0) continue
        for (const hook of matcher.hooks) {
-         if (hook.type !== "command") continue
+         if (hook.type !== "command" && hook.type !== "http") continue
 
-         if (isHookCommandDisabled("PostToolUse", hook.command, extendedConfig ?? null)) {
+         if (hook.type === "command" && isHookCommandDisabled("PostToolUse", hook.command, extendedConfig ?? null)) {
           log("PostToolUse hook command skipped (disabled by config)", { command: hook.command, toolName: ctx.toolName })
           continue
         }
 
-        const hookName = hook.command.split("/").pop() || hook.command
+        const hookName = getHookIdentifier(hook)
         if (!firstHookName) firstHookName = hookName
 
-        const result = await executeHookCommand(
-          hook.command,
-          JSON.stringify(stdinData),
-          ctx.cwd,
-          { forceZsh: DEFAULT_CONFIG.forceZsh, zshPath: DEFAULT_CONFIG.zshPath }
-        )
+        const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)
 
         if (result.stdout) {
           messages.push(result.stdout)
