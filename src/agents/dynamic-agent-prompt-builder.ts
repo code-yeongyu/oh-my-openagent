@@ -277,12 +277,11 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 
 ### Oracle Background Task Policy:
 
-**You MUST collect Oracle results before your final answer. No exceptions.**
+**Collect Oracle results before your final answer. No exceptions.**
 
-- Oracle may take several minutes. This is normal and expected.
-- When Oracle is running and you finish your own exploration/analysis, your next action is \`background_output(task_id="...")\` on Oracle — NOT delivering a final answer.
-- Oracle catches blind spots you cannot see — its value is HIGHEST when you think you don't need it.
-- **NEVER** cancel Oracle. **NEVER** use \`background_cancel(all=true)\` when Oracle is running. Cancel disposable tasks (explore, librarian) individually by taskId instead.
+- Oracle takes minutes. When done with your own work: **end your response** — wait for the \`<system-reminder>\`.
+- Do NOT poll \`background_output\` on a running Oracle. The notification will come.
+- Never cancel Oracle.
 </Oracle_Usage>`
 }
 
@@ -292,8 +291,8 @@ export function buildHardBlocksSection(): string {
     "- Commit without explicit request — **Never**",
     "- Speculate about unread code — **Never**",
     "- Leave code in broken state after failures — **Never**",
-    "- `background_cancel(all=true)` when Oracle is running — **Never.** Cancel tasks individually by taskId.",
-    "- Delivering final answer before collecting Oracle result — **Never.** Always `background_output` Oracle first.",
+    "- `background_cancel(all=true)` — **Never.** Always cancel individually by taskId.",
+    "- Delivering final answer before collecting Oracle result — **Never.**",
   ]
 
   return `## Hard Blocks (NEVER violate)
@@ -308,8 +307,8 @@ export function buildAntiPatternsSection(): string {
     "- **Testing**: Deleting failing tests to \"pass\"",
     "- **Search**: Firing agents for single-line typos or obvious syntax errors",
     "- **Debugging**: Shotgun debugging, random changes",
-    "- **Background Tasks**: `background_cancel(all=true)` — always cancel individually by taskId",
-    "- **Oracle**: Skipping Oracle results when Oracle was launched — ALWAYS collect via `background_output`",
+    "- **Background Tasks**: Polling `background_output` on running tasks — end response and wait for notification",
+    "- **Oracle**: Delivering answer without collecting Oracle results",
   ]
 
   return `## Anti-Patterns (BLOCKING violations)
