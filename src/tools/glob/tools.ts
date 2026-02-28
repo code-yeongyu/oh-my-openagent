@@ -26,12 +26,11 @@ export function createGlobTools(ctx: PluginInput): Record<string, ToolDefinition
       try {
         const cli = await resolveGrepCliWithAutoInstall()
         const searchPath = args.path ?? ctx.directory
-        const paths = [searchPath]
 
         const result = await runRgFiles(
           {
             pattern: args.pattern,
-            paths,
+            paths: [searchPath],
           },
           cli
         )
