@@ -81,10 +81,14 @@ export interface PluginManifest {
  * Hooks configuration
  */
 export interface HookEntry {
-  type: "command" | "prompt" | "agent"
+  type: "command" | "prompt" | "agent" | "http"
   command?: string
   prompt?: string
   agent?: string
+  url?: string
+  headers?: Record<string, string>
+  allowedEnvVars?: string[]
+  timeout?: number
 }
 
 export interface HookMatcher {

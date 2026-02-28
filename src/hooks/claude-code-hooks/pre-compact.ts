@@ -3,8 +3,8 @@ import type {
   PreCompactOutput,
   ClaudeHooksConfig,
 } from "./types"
-import { findMatchingHooks, executeHookCommand, log } from "../../shared"
-import { DEFAULT_CONFIG } from "./plugin-config"
+import { findMatchingHooks, log } from "../../shared"
+import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 
 export interface PreCompactContext {
@@ -50,22 +50,17 @@ export async function executePreCompactHooks(
    for (const matcher of matchers) {
      if (!matcher.hooks || matcher.hooks.length === 0) continue
      for (const hook of matcher.hooks) {
-       if (hook.type !== "command") continue
+       if (hook.type !== "command" && hook.type !== "http") continue
 
-       if (isHookCommandDisabled("PreCompact", hook.command, extendedConfig ?? null)) {
+       if (hook.type === "command" && isHookCommandDisabled("PreCompact", hook.command, extendedConfig ?? null)) {
         log("PreCompact hook command skipped (disabled by config)", { command: hook.command })
         continue
       }
 
-      const hookName = hook.command.split("/").pop() || hook.command
+      const hookName = getHookIdentifier(hook)
       if (!firstHookName) firstHookName = hookName
 
-      const result = await executeHookCommand(
-        hook.command,
-        JSON.stringify(stdinData),
-        ctx.cwd,
-        { forceZsh: DEFAULT_CONFIG.forceZsh, zshPath: DEFAULT_CONFIG.zshPath }
-      )
+      const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)
 
       if (result.exitCode === 2) {
         log("PreCompact hook blocked", { hookName, stderr: result.stderr })
