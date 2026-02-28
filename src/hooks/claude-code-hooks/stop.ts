@@ -3,8 +3,8 @@ import type {
   StopOutput,
   ClaudeHooksConfig,
 } from "./types"
-import { findMatchingHooks, executeHookCommand, log } from "../../shared"
-import { DEFAULT_CONFIG } from "./plugin-config"
+import { findMatchingHooks, log } from "../../shared"
+import { dispatchHook } from "./dispatch-hook"
 import { getTodoPath } from "./todo"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 
@@ -68,19 +68,14 @@ export async function executeStopHooks(
    for (const matcher of matchers) {
      if (!matcher.hooks || matcher.hooks.length === 0) continue
      for (const hook of matcher.hooks) {
-       if (hook.type !== "command") continue
+       if (hook.type !== "command" && hook.type !== "http") continue
 
-       if (isHookCommandDisabled("Stop", hook.command, extendedConfig ?? null)) {
+       if (hook.type === "command" && isHookCommandDisabled("Stop", hook.command, extendedConfig ?? null)) {
         log("Stop hook command skipped (disabled by config)", { command: hook.command })
         continue
       }
 
-      const result = await executeHookCommand(
-        hook.command,
-        JSON.stringify(stdinData),
-        ctx.cwd,
-        { forceZsh: DEFAULT_CONFIG.forceZsh, zshPath: DEFAULT_CONFIG.zshPath }
-      )
+      const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)
 
       // Check exit code first - exit code 2 means block
       if (result.exitCode === 2) {
