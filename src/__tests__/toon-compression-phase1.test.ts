@@ -132,4 +132,47 @@ describe("toon compression phase 1 integration", () => {
     await chat({ sessionID: "s" }, chatOut as never)
     expect(typeof chatOut.message["_compressedParts"]).toBe("string")
   })
+
+
+  test("message-batch-compressor extracts all 3 thinking types", async () => {
+    const thinkingTypes = ["thinking", "reasoning", "redacted_thinking"]
+    const messages = thinkingTypes.map((t, i) => ({
+      info: { id: `m${i}`, role: "assistant" as const },
+      // `thinking` uses .thinking field, `reasoning`/`redacted_thinking` use .text
+      parts: [{ type: t, ...(t === "thinking" ? { thinking: `content-${t}` } : { text: `content-${t}` }) }]
+    }))
+    // Add padding to meet MIN_BATCH_SIZE
+    while (messages.length < 10) {
+      messages.push({ info: { id: `p${messages.length}`, role: "assistant" as const }, parts: [{ type: "text", text: "padding" }] })
+    }
+    const hook = createMessageBatchCompressorHook(on)
+    const output = { messages }
+    await hook["experimental.chat.messages.transform"]!({}, output as never)
+    expect(output.messages).toHaveLength(1)
+    const compressedText = (output.messages[0].parts[0] as { text: string }).text
+    // All 3 thinking types should be in compressed output
+    expect(compressedText).toContain("content-thinking")
+    expect(compressedText).toContain("content-reasoning")
+    expect(compressedText).toContain("content-redacted_thinking")
+  })
+
+  test("message-batch-compressor excludes images from compressed output", async () => {
+    const messages = Array.from({ length: 10 }, (_, i) => ({
+      info: { id: `m${i}`, role: "assistant" as const },
+      parts: [
+        { type: "text", text: `text-${i}` },
+        { type: "image", source: { data: "base64imagedata", mimeType: "image/png" } }
+      ]
+    }))
+    const hook = createMessageBatchCompressorHook(on)
+    const output = { messages }
+    await hook["experimental.chat.messages.transform"]!({}, output as never)
+    expect(output.messages).toHaveLength(1)
+    const compressedText = (output.messages[0].parts[0] as { text: string }).text
+    // Images should NOT be in compressed output
+    expect(compressedText).not.toContain("base64imagedata")
+    expect(compressedText).not.toContain("image/png")
+    // But text should be present
+    expect(compressedText).toContain("text-")
+  })
 })

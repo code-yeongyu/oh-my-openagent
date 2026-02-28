@@ -1,6 +1,8 @@
 import type { Message, Part } from "@opencode-ai/sdk"
 import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 
+import { THINKING_TYPES } from "../session-recovery/constants"
+
 import { safeCompress } from "../../shared/toon-compression"
 import { log } from "../../shared"
 
@@ -30,13 +32,6 @@ type ExtractedToolResult = {
   error: unknown
 }
 
-type ExtractedImage = {
-  callID: string
-  source: unknown
-  mimeType: unknown
-  data: unknown
-  url: unknown
-}
 
 function extractBatchData(messages: MessageWithParts[]): unknown[] {
   return messages.map((message) => {
@@ -44,7 +39,7 @@ function extractBatchData(messages: MessageWithParts[]): unknown[] {
     const thinkingContents: string[] = []
     const toolUses: ExtractedToolUse[] = []
     const toolResults: ExtractedToolResult[] = []
-    const images: ExtractedImage[] = []
+
 
     for (const part of message.parts) {
       const maybePart = part as {
@@ -67,10 +62,12 @@ function extractBatchData(messages: MessageWithParts[]): unknown[] {
         continue
       }
 
-      if (maybePart.type === "thinking") {
-        thinkingContents.push(
-          typeof maybePart.thinking === "string" ? maybePart.thinking : ""
-        )
+      if (THINKING_TYPES.has(maybePart.type as string)) {
+        // `thinking` type uses .thinking, `reasoning`/`redacted_thinking` use .text
+        const content = maybePart.type === "thinking" 
+          ? maybePart.thinking 
+          : maybePart.text
+        thinkingContents.push(typeof content === "string" ? content : "")
         continue
       }
 
@@ -92,14 +89,8 @@ function extractBatchData(messages: MessageWithParts[]): unknown[] {
         continue
       }
 
-      if (maybePart.type === "image") {
-        images.push({
-          callID: typeof maybePart.callID === "string" ? maybePart.callID : "",
-          source: maybePart.source,
-          mimeType: maybePart.mimeType,
-          data: maybePart.data,
-          url: maybePart.url,
-        })
+      else {
+        log("[message-batch-compressor] Unknown part type:", maybePart.type)
       }
     }
 
@@ -109,7 +100,7 @@ function extractBatchData(messages: MessageWithParts[]): unknown[] {
       thinkingContents,
       toolUses,
       toolResults,
-      images,
+
     }
   })
 }
