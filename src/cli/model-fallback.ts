@@ -27,6 +27,9 @@ const OPENCODE_ZEN_GO_AGENT_MODELS: Record<string, string> = {
   hephaestus: "opencode-go/minimax-m2.5",
   librarian: "opencode-go/minimax-m2.5",
   explore: "opencode-go/minimax-m2.5",
+}
+
+const OPENCODE_ZEN_GO_CATEGORY_MODELS: Record<string, string> = {
   frontend: "opencode-go/kimi-k2.5",
   document: "opencode-go/kimi-k2.5",
 }
@@ -38,9 +41,13 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     const agents: Record<string, AgentConfig> = Object.fromEntries(
       Object.entries(OPENCODE_ZEN_GO_AGENT_MODELS).map(([role, model]) => [role, { model }])
     )
+    const categories: Record<string, CategoryConfig> = Object.fromEntries(
+      Object.entries(OPENCODE_ZEN_GO_CATEGORY_MODELS).map(([name, model]) => [name, { model }])
+    )
     return {
       $schema: SCHEMA_URL,
       agents,
+      categories,
     }
   }
 
