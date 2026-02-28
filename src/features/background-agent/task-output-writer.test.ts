@@ -74,7 +74,7 @@ describe("writeTaskOutput", () => {
       ])
       const task = createMockTask()
 
-      const result = await writeTaskOutput(task, client)
+      const result = await writeTaskOutput(task, client, ".")
 
       expect(result).toBe(`${TEST_OUTPUT_DIR}/bg_test_123.md`)
       expect(existsSync(result!)).toBe(true)
@@ -99,7 +99,7 @@ describe("writeTaskOutput", () => {
       const client = createMockClient([])
       const task = createMockTask({ sessionID: undefined })
 
-      const result = await writeTaskOutput(task, client)
+      const result = await writeTaskOutput(task, client, ".")
 
       expect(result).toBeNull()
       expect(existsSync(`${TEST_OUTPUT_DIR}/bg_test_123.md`)).toBe(false)
@@ -111,7 +111,7 @@ describe("writeTaskOutput", () => {
       const client = createErrorClient("Session not found")
       const task = createMockTask()
 
-      const result = await writeTaskOutput(task, client)
+      const result = await writeTaskOutput(task, client, ".")
 
       expect(result).toBeNull()
       expect(existsSync(`${TEST_OUTPUT_DIR}/bg_test_123.md`)).toBe(false)
@@ -123,7 +123,7 @@ describe("writeTaskOutput", () => {
       const client = createMockClient([])
       const task = createMockTask()
 
-      const result = await writeTaskOutput(task, client)
+      const result = await writeTaskOutput(task, client, ".")
 
       expect(result).toBe(`${TEST_OUTPUT_DIR}/bg_test_123.md`)
       expect(existsSync(result!)).toBe(true)
@@ -149,7 +149,7 @@ describe("writeTaskOutput", () => {
       ])
       const task = createMockTask()
 
-      const result = await writeTaskOutput(task, client)
+      const result = await writeTaskOutput(task, client, ".")
 
       expect(result).toBe(`${TEST_OUTPUT_DIR}/bg_test_123.md`)
       expect(existsSync(TEST_OUTPUT_DIR)).toBe(true)
@@ -171,7 +171,7 @@ describe("writeTaskOutput", () => {
       ])
       const task = createMockTask()
 
-      const result = await writeTaskOutput(task, client)
+      const result = await writeTaskOutput(task, client, ".")
 
       const content = await readFile(result!, "utf-8")
       expect(content).toContain("Let me think about this...")
@@ -195,7 +195,7 @@ describe("writeTaskOutput", () => {
       ])
       const task = createMockTask()
 
-      const result = await writeTaskOutput(task, client)
+      const result = await writeTaskOutput(task, client, ".")
 
       const content = await readFile(result!, "utf-8")
       const firstIdx = content.indexOf("First message")
@@ -209,7 +209,7 @@ describe("writeTaskOutput", () => {
       const client = createMockClient([])
       const task = createMockTask({ completedAt: undefined })
 
-      const result = await writeTaskOutput(task, client)
+      const result = await writeTaskOutput(task, client, ".")
 
       const content = await readFile(result!, "utf-8")
       expect(content).toContain("completed_at: unknown")

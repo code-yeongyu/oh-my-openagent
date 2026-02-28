@@ -1229,7 +1229,7 @@ export class BackgroundManager {
 
     // Write output to file if requested (before status flip)
     if (task.writeOutputToFile) {
-      const filePath = await writeTaskOutput(task, this.client)
+      const filePath = await writeTaskOutput(task, this.client, this.directory)
       if (filePath) task.outputFilePath = filePath
     }
 

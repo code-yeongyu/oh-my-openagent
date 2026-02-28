@@ -1,8 +1,9 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { readFile } from "node:fs/promises"
+import { join } from "node:path"
 import { extractCouncilResponse } from "./council-response-extractor"
 
-export function createCouncilRead(): ToolDefinition {
+export function createCouncilRead(basePath?: string): ToolDefinition {
   return tool({
     description:
       "Read a council archive file and extract the council member response. Use this to access full results for truncated members or for follow-up/cross-check analysis.",
@@ -15,7 +16,9 @@ export function createCouncilRead(): ToolDefinition {
       }
 
       try {
-        const content = await readFile(args.file_path, "utf-8")
+        const base = basePath ?? process.cwd()
+        const absPath = join(base, args.file_path)
+        const content = await readFile(absPath, "utf-8")
         const extraction = extractCouncilResponse(content)
         return JSON.stringify(extraction, null, 2)
       } catch {

@@ -32,10 +32,9 @@ describe("createCouncilRead", () => {
       const archivePath = join(sisyphusDir, "member-1.txt")
       await writeFile(archivePath, "Some preamble\n<COUNCIL_MEMBER_RESPONSE>Full analysis here</COUNCIL_MEMBER_RESPONSE>")
 
-      const tool = createCouncilRead()
+      const tool = createCouncilRead(tempDir)
       const relativePath = `.sisyphus/member-1.txt`
 
-      process.chdir(tempDir)
       const result = await tool.execute({ file_path: relativePath }, toolContext)
       const parsed = JSON.parse(result)
 
@@ -50,10 +49,9 @@ describe("createCouncilRead", () => {
       const archivePath = join(sisyphusDir, "member-2.txt")
       await writeFile(archivePath, "<COUNCIL_MEMBER_RESPONSE>Partial analysis still writing...")
 
-      const tool = createCouncilRead()
+      const tool = createCouncilRead(tempDir)
       const relativePath = `.sisyphus/member-2.txt`
 
-      process.chdir(tempDir)
       const result = await tool.execute({ file_path: relativePath }, toolContext)
       const parsed = JSON.parse(result)
 
@@ -67,10 +65,9 @@ describe("createCouncilRead", () => {
       const archivePath = join(sisyphusDir, "member-3.txt")
       await writeFile(archivePath, "Just some plain text without any tags.")
 
-      const tool = createCouncilRead()
+      const tool = createCouncilRead(tempDir)
       const relativePath = `.sisyphus/member-3.txt`
 
-      process.chdir(tempDir)
       const result = await tool.execute({ file_path: relativePath }, toolContext)
       const parsed = JSON.parse(result)
 
@@ -80,7 +77,7 @@ describe("createCouncilRead", () => {
 
   describe("#given a path outside .sisyphus/", () => {
     it("#then returns Access denied error", async () => {
-      const tool = createCouncilRead()
+      const tool = createCouncilRead(tempDir)
       const result = await tool.execute({ file_path: "/etc/passwd" }, toolContext)
       const parsed = JSON.parse(result)
 
@@ -90,10 +87,9 @@ describe("createCouncilRead", () => {
 
   describe("#given a missing file within .sisyphus/", () => {
     it("#then returns has_response false with File not found error", async () => {
-      const tool = createCouncilRead()
+      const tool = createCouncilRead(tempDir)
       const relativePath = `.sisyphus/nonexistent-file.txt`
 
-      process.chdir(tempDir)
       const result = await tool.execute({ file_path: relativePath }, toolContext)
       const parsed = JSON.parse(result)
 
@@ -105,7 +101,7 @@ describe("createCouncilRead", () => {
 
   describe("#given a path traversal attempt", () => {
     it("#then returns Access denied error", async () => {
-      const tool = createCouncilRead()
+      const tool = createCouncilRead(tempDir)
       const result = await tool.execute({ file_path: "../../../etc/passwd" }, toolContext)
       const parsed = JSON.parse(result)
 

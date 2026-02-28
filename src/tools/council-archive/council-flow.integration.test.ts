@@ -75,16 +75,13 @@ function createMockManager(tasks: Record<string, Partial<BackgroundTask>>): Back
 }
 
 let tmpDir: string
-let originalCwd: string
 
 beforeEach(async () => {
   tmpDir = await mkdtemp(join(tmpdir(), "council-flow-"))
   await mkdir(join(tmpDir, ".sisyphus", "task-outputs"), { recursive: true })
-  originalCwd = process.cwd()
 })
 
 afterEach(async () => {
-  process.chdir(originalCwd)
   await rm(tmpDir, { recursive: true, force: true })
 })
 
@@ -142,8 +139,7 @@ describe("council archive integration flow", () => {
           expect(archiveContent).toBe(agents[i].response)
         }
 
-        process.chdir(tmpDir)
-        const readTool = createCouncilRead()
+        const readTool = createCouncilRead(tmpDir)
 
         for (let i = 0; i < agents.length; i++) {
           const taskOutputPath = join(".sisyphus", "task-outputs", `${agents[i].id}.md`)
@@ -183,8 +179,7 @@ describe("council archive integration flow", () => {
         const archiveContent = await readFile(join(tmpDir, member.archive_file!), "utf-8")
         expect(archiveContent).toBe("Analysis still in progress...")
 
-        process.chdir(tmpDir)
-        const readTool = createCouncilRead()
+        const readTool = createCouncilRead(tmpDir)
         const taskOutputPath = join(".sisyphus", "task-outputs", `${taskId}.md`)
         const readResult = await readTool.execute({ file_path: taskOutputPath }, toolContext)
         const parsed = JSON.parse(readResult)
@@ -284,8 +279,7 @@ describe("council archive integration flow", () => {
         const fullContent = await readFile(join(tmpDir, member.archive_file!), "utf-8")
         expect(fullContent).toHaveLength(9000)
 
-        process.chdir(tmpDir)
-        const readTool = createCouncilRead()
+        const readTool = createCouncilRead(tmpDir)
         const taskOutputPath = join(".sisyphus", "task-outputs", `${taskId}.md`)
         const readResult = await readTool.execute({ file_path: taskOutputPath }, toolContext)
         const parsed = JSON.parse(readResult)

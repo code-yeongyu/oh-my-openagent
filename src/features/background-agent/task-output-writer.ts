@@ -1,5 +1,5 @@
 import { mkdir, writeFile, rename } from "node:fs/promises"
-import { dirname } from "node:path"
+import { dirname, join } from "node:path"
 import { log } from "../../shared"
 import type { BackgroundTask } from "./types"
 import type { BackgroundOutputClient } from "../../tools/background-task/clients"
@@ -53,6 +53,7 @@ function formatTranscript(
 export async function writeTaskOutput(
   task: BackgroundTask,
   client: BackgroundOutputClient,
+  directory: string,
 ): Promise<string | null> {
   if (!task.sessionID) {
     return null
@@ -74,7 +75,7 @@ export async function writeTaskOutput(
     const transcript = formatTranscript(messages)
     const content = `${frontmatter}\n\n${transcript}`
 
-    const outputPath = `${OUTPUT_DIR}/${task.id}.md`
+    const outputPath = join(directory, OUTPUT_DIR, `${task.id}.md`)
     const tmpPath = `${outputPath}.tmp`
 
     await mkdir(dirname(outputPath), { recursive: true })
