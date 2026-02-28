@@ -40,6 +40,16 @@ export function formatSeverity(severity: number | undefined): string {
   return SEVERITY_MAP[severity] || `unknown(${severity})`
 }
 
+function formatDocumentSymbolForCompression(s: DocumentSymbol): object {
+  return {
+    name: s.name,
+    kind: formatSymbolKind(s.kind),
+    line: s.range.start.line + 1,
+    children: s.children?.map(formatDocumentSymbolForCompression) ?? [],
+  }
+}
+
+
 export function formatDocumentSymbol(symbol: DocumentSymbol, indent = 0): string {
   const prefix = "  ".repeat(indent)
   const kind = formatSymbolKind(symbol.kind)
@@ -244,12 +254,7 @@ export function formatSymbolsOutput(
 
   if (isDocumentSymbol(symbols[0])) {
     const docSymbols = symbols as DocumentSymbol[]
-    const formattedItems = docSymbols.map((s) => ({
-      name: s.name,
-      kind: formatSymbolKind(s.kind),
-      line: s.range.start.line + 1,
-      children: s.children?.length ?? 0,
-    }))
+    const formattedItems = docSymbols.map(formatDocumentSymbolForCompression)
 
     const jsonString = JSON.stringify(formattedItems)
     const shouldCompress =

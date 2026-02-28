@@ -22,6 +22,22 @@ export function formatGrepResult(
   const lines: string[] = []
   const isFilesOnlyMode = result.matches.every((match) => match.line === 0 && match.text.trim() === "")
 
+  // Files-only mode: return filenames immediately, skip compression
+  if (isFilesOnlyMode) {
+    const files = [...new Set(result.matches.map((m) => m.file))]
+    lines.push(`Found ${result.totalMatches} match(es) in ${result.filesSearched} file(s)`)
+    if (result.truncated) {
+      lines.push("[Output truncated due to size limit]")
+    }
+    lines.push("")
+    for (const file of files) {
+      lines.push(file)
+      lines.push("")
+    }
+    return lines.join("\n")
+  }
+
+  // Add header for non-files-only mode
   lines.push(`Found ${result.totalMatches} match(es) in ${result.filesSearched} file(s)`)
   if (result.truncated) {
     lines.push("[Output truncated due to size limit]")
@@ -50,14 +66,12 @@ export function formatGrepResult(
 
   for (const [file, matches] of byFile) {
     lines.push(file)
-    if (!isFilesOnlyMode) {
-      for (const match of matches) {
-        const trimmedText = match.text.trim()
-        if (match.line === 0 && trimmedText === "") {
-          continue
-        }
-        lines.push(`  ${match.line}: ${trimmedText}`)
+    for (const match of matches) {
+      const trimmedText = match.text.trim()
+      if (match.line === 0 && trimmedText === "") {
+        continue
       }
+      lines.push(`  ${match.line}: ${trimmedText}`)
     }
     lines.push("")
   }
