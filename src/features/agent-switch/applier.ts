@@ -2,9 +2,8 @@ import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
 import { clearPendingSwitch, getPendingSwitch } from "./state"
 import { waitForSessionIdle } from "./session-status"
-import { fetchMessages, shouldClearAsAlreadyApplied, verifySwitchObserved } from "./apply-verification"
-import { getLatestUserAgent } from "./message-inspection"
-import { syncCliTuiAgentSelectionAfterSwitch } from "./tui-agent-sync"
+import { shouldClearAsAlreadyApplied } from "./apply-verification"
+import { createFreshSession } from "./session-creator"
 import {
   clearInFlight,
   clearRetryState,
@@ -24,6 +23,7 @@ type SessionClient = {
       path: { id: string }
       body: { agent: string; parts: Array<{ type: "text"; text: string }> }
     }) => Promise<unknown>
+    create?: (input?: { body?: { parentID?: string; title?: string } }) => Promise<unknown>
     messages: (input: { path: { id: string } }) => Promise<unknown>
     status?: () => Promise<unknown>
   }
@@ -135,40 +135,26 @@ export async function applyPendingSwitch(args: {
       throw new Error("session not idle before applying agent switch")
     }
 
-    const beforeMessages = await fetchMessages({ client, sessionID })
-    const sourceUserAgent = getLatestUserAgent(beforeMessages)
-
-    const usedAgent = await tryPromptWithCandidates({
+    const newSessionID = await createFreshSession({
       client,
-      sessionID,
+      sourceSessionID: sessionID,
+      targetAgent: pending.agent,
+    })
+
+    await tryPromptWithCandidates({
+      client,
+      sessionID: newSessionID,
       agent: pending.agent,
       context: pending.context,
       source,
     })
 
-    const verified = await verifySwitchObserved({
-      client,
-      sessionID,
-      targetAgent: pending.agent,
-      baselineCount: beforeMessages.length,
-    })
-    if (!verified) {
-      throw new Error(`agent switch not observed after prompt (attempted ${usedAgent})`)
-    }
-
     clearPendingSwitch(sessionID)
     clearRetryState(sessionID)
 
-    await syncCliTuiAgentSelectionAfterSwitch({
-      client,
-      sessionID,
-      source,
-      sourceAgent: sourceUserAgent,
-      targetAgent: pending.agent,
-    })
-
-    log("[agent-switch] Pending switch applied", {
-      sessionID,
+    log("[agent-switch] Pending switch applied via fresh session", {
+      sourceSessionID: sessionID,
+      newSessionID,
       source,
       agent: pending.agent,
     })

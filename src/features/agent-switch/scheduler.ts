@@ -12,6 +12,7 @@ type SessionClient = {
       path: { id: string }
       body: { agent: string; parts: Array<{ type: "text"; text: string }> }
     }) => Promise<unknown>
+    create?: (input?: { body?: { parentID?: string; title?: string } }) => Promise<unknown>
     messages: (input: { path: { id: string } }) => Promise<unknown>
     status?: () => Promise<unknown>
   }
