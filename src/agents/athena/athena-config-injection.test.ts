@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import { describe, expect, it } from "bun:test"
 import { createAthenaAgent } from "./agent"
 
@@ -40,9 +42,9 @@ describe("Athena prompt config injection placeholders", () => {
 
       it("#then uses sequential workflow step numbering", () => {
         expect(athenaConfig.prompt).toContain("Step 12: Synthesize")
-        expect(athenaConfig.prompt).toContain("Step 13: Determine the follow-up path")
-        expect(athenaConfig.prompt).toContain("Step 14: ACTIONABLE findings")
-        expect(athenaConfig.prompt).toContain("Step 15: INFORMATIONAL findings")
+        expect(athenaConfig.prompt).toContain("Step 13: Determine follow-up path from council_finalize runtime guidance")
+        expect(athenaConfig.prompt).toContain("Step 14: Execute the runtime guidance action flow")
+        expect(athenaConfig.prompt).toContain("Step 15: Fallback behavior if runtime guidance is missing")
       })
 
       it("#then omits legacy mixed step labels", () => {
@@ -71,11 +73,10 @@ describe("Athena prompt config injection placeholders", () => {
         expect(step2Index).toBeGreaterThan(step1Index)
       })
 
-      it("#then keeps edge-case disambiguation inside step 3 classification", () => {
+      it("#then uses primary-objective wording for step 3 classification", () => {
         const prompt = athenaConfig.prompt ?? ""
-        expect(prompt).toContain("Step 3: Classify the question intent.")
-        expect(prompt).toContain("Classification disambiguation rule:")
-        expect(prompt).not.toContain("Before selecting a route, apply this interpretation rule")
+        expect(prompt).toContain("Step 3: Classify the question intent by primary objective.")
+        expect(prompt).not.toContain("Classification disambiguation rule:")
       })
 
       it("#then requires question tool routing in self-answerable path", () => {
@@ -93,7 +94,7 @@ describe("Athena prompt config injection placeholders", () => {
       })
 
       it("#then keeps intent classification anchored to step 3 wording", () => {
-        expect(athenaConfig.prompt).toContain("Step 3: Classify the question intent.")
+        expect(athenaConfig.prompt).toContain("Step 3: Classify the question intent by primary objective.")
         expect(athenaConfig.prompt).toContain("Then proceed to Step 2.")
         expect(athenaConfig.prompt).not.toContain("Then classify intent and proceed to Step 2.")
         expect(athenaConfig.prompt).not.toContain("Classify intent immediately and proceed to Step 2.")
@@ -101,6 +102,12 @@ describe("Athena prompt config injection placeholders", () => {
 
       it("#then excludes non-interactive mode branch from runtime prompt", () => {
         expect(athenaConfig.prompt).not.toContain("Non-interactive mode (Question tool unavailable)")
+      })
+
+      it("#then requires passing intent to council_finalize and honoring injected runtime guidance", () => {
+        expect(athenaConfig.prompt).toContain("intent=\"{intent from Step 3}\"")
+        expect(athenaConfig.prompt).toContain("runtime guidance message injected by council_finalize")
+        expect(athenaConfig.prompt).toContain("<athena_runtime_guidance>")
       })
     })
   })

@@ -3,7 +3,13 @@ import { readFile, writeFile, mkdir, rename } from "node:fs/promises"
 import { join, isAbsolute, resolve } from "node:path"
 import { randomBytes } from "node:crypto"
 import { extractCouncilResponse } from "./council-response-extractor"
+import {
+  buildAthenaRuntimeGuidance,
+  getValidCouncilIntents,
+  resolveCouncilIntent,
+} from "../../agents/athena"
 import { log } from "../../shared/logger"
+import type { ContextCollector } from "../../features/context-injector"
 import type { CouncilFinalizeArgs, CouncilMemberResult, CouncilFinalizeResult } from "./types"
 
 interface MetaMember {
@@ -14,6 +20,12 @@ interface MetaMember {
   archive_file: string
   has_response: boolean
   response_complete: boolean
+}
+
+type RegisterContext = Pick<ContextCollector, "register">
+
+type CouncilFinalizeToolContext = {
+  sessionID?: string
 }
 
 function slugify(text: string): string {
@@ -66,19 +78,46 @@ function formatMetaYaml(archiveName: string, createdAt: string, members: MetaMem
   return lines.join("\n") + "\n"
 }
 
-export function createCouncilFinalize(basePath?: string): ToolDefinition {
+export function createCouncilFinalize(
+  basePath?: string,
+  options?: { contextCollector?: RegisterContext }
+): ToolDefinition {
+  const collector = options?.contextCollector
+
   return tool({
     description:
-      "Finalize council task outputs: extract COUNCIL_MEMBER_RESPONSE content from raw task output files, write per-member archive files, and create meta.yaml.",
+      "Finalize council task outputs: extract COUNCIL_MEMBER_RESPONSE content from raw task output files, write per-member archive files, inject intent-specific Athena runtime guidance, and create meta.yaml.",
     args: {
       task_ids: tool.schema
         .array(tool.schema.string())
         .describe("Array of background task IDs whose output files should be processed"),
       name: tool.schema.string().describe("Council name used in the archive directory name"),
+      intent: tool.schema
+        .string()
+        .optional()
+        .describe(`Classified question intent used for runtime Athena guidance injection. Valid intents: ${getValidCouncilIntents().join(", ")}`),
       question: tool.schema.string().optional().describe("Original user question that triggered the council"),
       prompt_file: tool.schema.string().optional().describe("Path to the council prompt temp file (will be moved into the archive)"),
     },
-    async execute(args: CouncilFinalizeArgs) {
+    async execute(args: CouncilFinalizeArgs, toolContext: CouncilFinalizeToolContext) {
+      const resolvedIntent = resolveCouncilIntent(args.intent)
+      if (args.intent && !resolvedIntent) {
+        return `Invalid intent: "${args.intent}". Valid intents: ${getValidCouncilIntents().join(", ")}.`
+      }
+
+      if (collector && resolvedIntent && toolContext.sessionID) {
+        collector.register(toolContext.sessionID, {
+          id: "athena-runtime-guidance",
+          source: "custom",
+          priority: "critical",
+          content: buildAthenaRuntimeGuidance(resolvedIntent),
+          metadata: {
+            intent: resolvedIntent,
+            source: "council_finalize",
+          },
+        })
+      }
+
       const base = basePath ?? process.cwd()
       const hexId = randomBytes(2).toString("hex")
       const archiveName = `council-${args.name}-${hexId}`

@@ -1,6 +1,7 @@
 export interface CouncilFinalizeArgs {
   task_ids: string[]
   name: string
+  intent?: string
   question?: string
   prompt_file?: string
 }

@@ -86,6 +86,40 @@ describe("switch_agent tool", () => {
     expect(entry?.agent).toBe("prometheus")
   })
 
+  //#given valid hephaestus switch args
+  //#when execute is called
+  //#then it stores pending switch for hephaestus
+  test("should queue switch to hephaestus", async () => {
+    const tool = createToolWithMockClient()
+    const result = await tool.execute(
+      { agent: "Hephaestus", context: "Implement the selected diagnosis fix" },
+      toolContext
+    )
+
+    expect(result).toContain("hephaestus")
+    expect(result).toContain("switch")
+
+    const entry = consumePendingSwitch(sessionID)
+    expect(entry?.agent).toBe("hephaestus")
+  })
+
+  //#given valid sisyphus switch args
+  //#when execute is called
+  //#then it stores pending switch for sisyphus
+  test("should queue switch to sisyphus", async () => {
+    const tool = createToolWithMockClient()
+    const result = await tool.execute(
+      { agent: "Sisyphus", context: "Implement the selected diagnosis fix" },
+      toolContext
+    )
+
+    expect(result).toContain("sisyphus")
+    expect(result).toContain("switch")
+
+    const entry = consumePendingSwitch(sessionID)
+    expect(entry?.agent).toBe("sisyphus")
+  })
+
   //#given an invalid agent name
   //#when execute is called
   //#then it returns an error
