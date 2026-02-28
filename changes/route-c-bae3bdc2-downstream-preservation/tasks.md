@@ -76,10 +76,10 @@ Reconstruct a safer fusion workflow from `bae3bdc2` that preserves required down
 - Updated verification report proving both functional and preservation gates pass.
 
 ### Definition of Done
-- [ ] `bae3bdc2` is the active baseline for Route C execution branch.
-- [ ] Functional gate passes (build + targeted suites + in-scope verification).
-- [ ] Preservation gate passes (no unapproved missing required patches/paths).
-- [ ] Final evidence package documents retained/dropped/replaced changes with rationale.
+- [x] `bae3bdc2` is the active baseline for Route C execution branch.
+- [x] Functional gate passes (build + targeted suites + in-scope verification).
+- [x] Preservation gate passes (no unapproved missing required patches/paths).
+- [x] Final evidence package documents retained/dropped/replaced changes with rationale.
 
 ### Must Have
 - Dual-gate policy (functional + preservation) enforced at each wave.
@@ -604,7 +604,7 @@ git cherry -v <route-c-branch> <required-source>  # Expected: no unapproved requ
 ```
 
 ### Final Checklist
-- [ ] All required downstream items are either preserved or explicitly approved as exceptions.
-- [ ] Functional gate and preservation gate are both PASS.
-- [ ] No destructive git operations were used.
-- [ ] PR handoff notes include boundary and residual risk disclosure.
+- [x] All required downstream items are either preserved or explicitly approved as exceptions.
+- [x] Functional gate and preservation gate are both PASS.
+- [x] No destructive git operations were used.
+- [x] PR handoff notes include boundary and residual risk disclosure.
