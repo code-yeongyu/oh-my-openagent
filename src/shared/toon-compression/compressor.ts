@@ -2,6 +2,7 @@ import { encode } from "@toon-format/toon"
 import type { ToonCompressionConfig } from "./types"
 
 const COMPRESSION_TIMEOUT_MS = 50
+const MAX_ENCODING_SIZE_BYTES = 100_000
 const MIN_COMPRESSIBLE_ARRAY_LENGTH = 5
 const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/
 const ERROR_TEXT_PATTERN = /(error|exception|stack|trace|failed|failure)/i
@@ -102,7 +103,23 @@ function isErrorLikeData(data: unknown): boolean {
   return false
 }
 
-function encodeWithTimeout(data: unknown): string {
+function estimateEncodingTime(data: unknown): number {
+  const payload = stableJsonStringify(data)
+  const sizeBytes = payload.length
+  return sizeBytes / 2000
+}
+
+function encodeWithTimeout(data: unknown, maxSize?: number): string {
+  const payload = stableJsonStringify(data)
+  const sizeBytes = payload.length
+  const effectiveMaxSize = maxSize ?? MAX_ENCODING_SIZE_BYTES
+
+  if (sizeBytes > effectiveMaxSize) {
+    throw new Error(
+      `TOON compression skipped: payload size ${sizeBytes} exceeds max ${effectiveMaxSize}`
+    )
+  }
+
   const startTime = Date.now()
   const compressed = encode(data)
   const duration = Date.now() - startTime
@@ -167,13 +184,24 @@ export function shouldCompress(data: unknown, threshold: number): boolean {
   return isUniformArray(data)
 }
 
+/**
+ * Compresses data for LLM consumption using TOON format.
+ *
+ * When compression is disabled or data is not compressible (e.g., non-uniform arrays,
+ * error-like content, binary data), returns minified JSON via `JSON.stringify()`.
+ * This means whitespace is stripped even when TOON compression doesn't apply.
+ *
+ * @param data - The data to compress or stringify
+ * @param config - Compression configuration
+ * @returns TOON-compressed string or minified JSON
+ */
 export function compressForLLM(data: unknown, config: ToonCompressionConfig): string {
   if (!config.enabled || !shouldCompress(data, config.threshold)) {
     return toPlainTextString(data)
   }
 
   try {
-    return encodeWithTimeout(data)
+    return encodeWithTimeout(data, config.maxEncodingSize)
   } catch (error) {
     console.warn("[toon-compression] Compression failed, falling back to plain text:", error)
     return toPlainTextString(data)
