@@ -84,6 +84,8 @@ to gather context if needed to understand the question.
 
 Then decide:
 
+**Edge case — creative verb + technical object:** "create a plan", "create a test", "write a migration" → the technical object determines intent (PLAN, AUDIT, PLAN respectively). Don't classify as CREATE just because the verb is creative.
+
 A) SELF-ANSWERABLE — The question is simple/direct and doesn't benefit from
    multi-model analysis. Examples: "what does this function do?", "which file
    handles auth?", "explain this error message".
@@ -108,19 +110,31 @@ Step 1.5: Classify the question intent.
 
 Read the original question and match it to the FIRST fitting intent:
 
-- **AUDIT** — Signals: "find issues", "review", "audit", "what's wrong", "bugs", "problems", "security", "code review"
-  → Seeks defects, risks, or improvements that lead to code changes.
+- **DIAGNOSE** — Signals: "why is X happening", "debug", "root cause", "fix this", "not working", "broken", "failing", "crashes when", "error when"
+  → Seeks to trace a specific observed problem to its root cause.
 
-- **EVALUATE** — Signals: "compare", "alternatives", "options", "should we", "X or Y", "tradeoffs", "pros and cons", "recommend", "better way"
-  → Seeks evaluation of multiple options or approaches, or help choosing between them.
+- **AUDIT** — Signals: "find issues", "review", "audit", "what's wrong", "bugs", "problems", "security", "code review"
+  → Seeks defects, risks, or improvements via broad sweep that lead to code changes.
 
 - **PLAN** — Signals: "how to migrate", "transition", "upgrade", "move from X to Y", "step by step", "roadmap", "adoption strategy"
   → Seeks a phased plan for transitioning between states.
 
+- **EVALUATE** — Signals: "compare", "alternatives", "options", "should we", "X or Y", "tradeoffs", "pros and cons", "recommend", "better way"
+  → Seeks evaluation of multiple options or approaches, or help choosing between them.
+
 - **EXPLAIN** — Signals: "how does X work", "architecture", "explain", "deep dive", "research", "best practices", "design"
   → Seeks deep understanding of a system's structure, patterns, or broad knowledge synthesis.
 
-Precedence for ambiguous questions: AUDIT > PLAN > EVALUATE > EXPLAIN.
+- **CREATE** — Signals: "write", "create", "generate", "draft", "brainstorm", "compose", "design me", "come up with"
+  → Seeks production of a deliverable (code, prose, design, spec). Note: "create a plan" → PLAN, "create a test" → AUDIT.
+
+- **PERSPECTIVES** — Signals: "what do you think", "opinions on", "your take", "perspectives", "thoughts about"
+  → Seeks genuine viewpoints from multiple angles, with the council members taking positions.
+
+- **FREEFORM** — No specific signals; this is the fallback when nothing else matches.
+  → No analytical framework imposed. The question doesn't fit any structured intent above.
+
+Precedence for ambiguous questions: DIAGNOSE > AUDIT > PLAN > EVALUATE > EXPLAIN > CREATE > PERSPECTIVES > FREEFORM.
 
 Bake the classified intent into your prepare_council_prompt call (Step 3a).
 
@@ -300,11 +314,54 @@ Example structure:
 > **Open questions**:
 > - Members disagreed on whether the retry mechanism is exponential or linear
 
-Then determine the follow-up path:
-- AUDIT → **ACTIONABLE** path (Step 7A)
-- EVALUATE, PLAN, EXPLAIN → **INFORMATIONAL** path (Step 7B)
+### DIAGNOSE format
+Structure around the investigation. Show what symptom was reported, what hypotheses the council explored, and where they converged on a root cause. Agreement level on the root cause = confidence. If members identified different root causes, present each with its supporting evidence and let the evidence quality determine which is most likely. End with a recommended fix targeting the highest-confidence root cause.
 
-If the question has both AUDIT and other aspects, use AUDIT format with ACTIONABLE path.
+Example structure:
+> **Symptom**: API returns 500 on /users endpoint after deploy
+>
+> **Root cause (unanimous)**: Database migration #47 added NOT NULL column without default — all 3 members traced to this.
+> **Causal chain**: 500 error \u2190 INSERT fails \u2190 column \`role\` has no default \u2190 migration #47
+>
+> **Contributing factors**: No migration validation in CI (2/3 members noted)
+>
+> **Recommended fix**: Add DEFAULT 'user' to migration, add migration linting to CI
+
+### CREATE format
+Do NOT merge or synthesize — present each member's creation side-by-side as a gallery. Let the user see the different creative approaches and choose. Note which elements each creation shares (convergent choices) vs. where they diverged (creative differences). If there's a clearly superior creation, say so and why.
+
+Example structure:
+> **Member 1 (Claude)**: [Title or brief description]
+> [Full creation]
+>
+> **Member 2 (GPT)**: [Title or brief description]
+> [Full creation]
+>
+> **Convergent choices**: Both used [X approach], both included [Y element]
+> **Creative differences**: Claude went [direction A], GPT went [direction B]
+> **Assessment**: [Which works best for the stated goal, if distinguishable]
+
+### PERSPECTIVES format
+Map where each council member falls on the spectrum of perspectives. Identify the core tensions — where do the perspectives genuinely collide? Note which perspectives had the strongest evidence behind them. Synthesize into a balanced view that acknowledges the crux of each position.
+
+Example structure:
+> **Perspective map**:
+> - "Monolith first" — argued by Claude, GPT (pragmatism, proven at scale)
+> - "Microservices now" — argued by Kimi (team structure demands it)
+> - "Modular monolith" — argued by MiniMax (compromise position)
+>
+> **Core tension**: Organizational structure vs. technical simplicity
+> **Strongest evidence**: "Monolith first" backed by concrete case studies; "Microservices now" backed by Conway's Law applied to this specific team
+> **Synthesis position**: [Your assessed best path, with conditions]
+
+### FREEFORM format
+Simple aggregation — find where members agree and disagree. Preserve the diversity of responses rather than forcing them into a rigid structure. If members took very different approaches to answering, that itself is informative — note it.
+
+Then determine the follow-up path:
+- DIAGNOSE, AUDIT → **ACTIONABLE** path (Step 7A)
+- EVALUATE, PLAN, EXPLAIN, CREATE, PERSPECTIVES, FREEFORM → **INFORMATIONAL** path (Step 7B)
+
+If the question has both DIAGNOSE/AUDIT and other aspects, use the more specific format (DIAGNOSE for targeted problems, AUDIT for broad sweeps) with ACTIONABLE path.
 
 ### Path A: ACTIONABLE findings
 

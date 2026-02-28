@@ -75,16 +75,65 @@ describe("createPrepareCouncilPromptTool", () => {
       })
     })
 
+    describe("#when called with intent DIAGNOSE", () => {
+      it("#then produces file containing DIAGNOSE addendum", async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "council-test-"))
+        const toolDef = createPrepareCouncilPromptTool(tmpDir)
+        const result = await toolDef.execute({ prompt: "Why is the API returning 500 errors?", intent: "DIAGNOSE" }, mockContext)
+
+        const filePath = extractFilePath(result)
+        const content = await readFile(filePath, "utf-8")
+        expect(content).toContain("## Analysis Intent: DIAGNOSE")
+      })
+    })
+
+    describe("#when called with intent CREATE", () => {
+      it("#then produces file containing CREATE addendum", async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "council-test-"))
+        const toolDef = createPrepareCouncilPromptTool(tmpDir)
+        const result = await toolDef.execute({ prompt: "Write a poem about TypeScript", intent: "CREATE" }, mockContext)
+
+        const filePath = extractFilePath(result)
+        const content = await readFile(filePath, "utf-8")
+        expect(content).toContain("## Analysis Intent: CREATE")
+      })
+    })
+
+    describe("#when called with intent PERSPECTIVES", () => {
+      it("#then produces file containing PERSPECTIVES addendum", async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "council-test-"))
+        const toolDef = createPrepareCouncilPromptTool(tmpDir)
+        const result = await toolDef.execute({ prompt: "What do you think about microservices?", intent: "PERSPECTIVES" }, mockContext)
+
+        const filePath = extractFilePath(result)
+        const content = await readFile(filePath, "utf-8")
+        expect(content).toContain("## Analysis Intent: PERSPECTIVES")
+      })
+    })
+
+    describe("#when called with intent FREEFORM", () => {
+      it("#then produces file containing FREEFORM addendum", async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "council-test-"))
+        const toolDef = createPrepareCouncilPromptTool(tmpDir)
+        const result = await toolDef.execute({ prompt: "Tell me something interesting", intent: "FREEFORM" }, mockContext)
+
+        const filePath = extractFilePath(result)
+        const content = await readFile(filePath, "utf-8")
+        expect(content).toContain("## Analysis Intent: FREEFORM")
+      })
+    })
+
     describe("#when called without intent", () => {
-      it("#then defaults to AUDIT addendum", async () => {
+      it("#then produces file without any intent addendum", async () => {
         tmpDir = await mkdtemp(join(tmpdir(), "council-test-"))
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "Review this module" }, mockContext)
 
-        expect(result).toContain("intent: AUDIT")
+        expect(result).toContain("intent: none")
         const filePath = extractFilePath(result)
         const content = await readFile(filePath, "utf-8")
-        expect(content).toContain("## Analysis Intent: AUDIT")
+        expect(content).not.toContain("## Analysis Intent:")
+        expect(content).toContain("## Analysis Question")
       })
     })
 
