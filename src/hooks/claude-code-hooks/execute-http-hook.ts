@@ -9,23 +9,14 @@ export function interpolateEnvVars(
 ): string {
   const allowedSet = new Set(allowedEnvVars)
 
-  let result = value.replace(/\$\{(\w+)\}/g, (_match, varName: string) => {
+  return value.replace(/\$\{(\w+)\}|\$(\w+)/g, (_match, bracedVar: string | undefined, bareVar: string | undefined) => {
+    const varName = (bracedVar ?? bareVar) as string
     if (allowedSet.has(varName)) {
       return process.env[varName] ?? ""
     }
     return ""
   })
-
-  result = result.replace(/\$(\w+)/g, (_match, varName: string) => {
-    if (allowedSet.has(varName)) {
-      return process.env[varName] ?? ""
-    }
-    return ""
-  })
-
-  return result
 }
-
 function resolveHeaders(
   hook: HookHttp
 ): Record<string, string> {
