@@ -4,6 +4,8 @@ import {
   findFirstMessageWithAgent,
   findNearestMessageWithFieldsFromSDK,
   findFirstMessageWithAgentFromSDK,
+  generateMessageId,
+  generatePartId,
   injectHookMessage,
 } from "./injector"
 import { isSqliteBackend, resetSqliteBackendCache } from "../../shared/opencode-storage-detection"
@@ -189,6 +191,38 @@ describe("findFirstMessageWithAgentFromSDK", () => {
     const result = await findFirstMessageWithAgentFromSDK(mockClient as any, "ses_123")
 
     expect(result).toBeNull()
+  })
+})
+
+describe("generateMessageId", () => {
+  it("returns deterministic sequential IDs with fixed format", () => {
+    // given
+    const format = /^msg_\d{12}$/
+
+    // when
+    const firstId = generateMessageId()
+    const secondId = generateMessageId()
+
+    // then
+    expect(firstId).toMatch(format)
+    expect(secondId).toMatch(format)
+    expect(Number(secondId.slice(4))).toBe(Number(firstId.slice(4)) + 1)
+  })
+})
+
+describe("generatePartId", () => {
+  it("returns deterministic sequential IDs with fixed format", () => {
+    // given
+    const format = /^prt_\d{12}$/
+
+    // when
+    const firstId = generatePartId()
+    const secondId = generatePartId()
+
+    // then
+    expect(firstId).toMatch(format)
+    expect(secondId).toMatch(format)
+    expect(Number(secondId.slice(4))).toBe(Number(firstId.slice(4)) + 1)
   })
 })
 

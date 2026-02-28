@@ -29,6 +29,9 @@ interface SDKMessage {
   }
 }
 
+let messageCounter = 0
+let partCounter = 0
+
 function convertSDKMessageToStoredMessage(msg: SDKMessage): StoredMessage | null {
   const info = msg.info
   if (!info) return null
@@ -204,16 +207,12 @@ export function findFirstMessageWithAgent(messageDir: string): string | null {
   return null
 }
 
-function generateMessageId(): string {
-  const timestamp = Date.now().toString(16)
-  const random = Math.random().toString(36).substring(2, 14)
-  return `msg_${timestamp}${random}`
+export function generateMessageId(): string {
+  return `msg_${String(++messageCounter).padStart(12, "0")}`
 }
 
-function generatePartId(): string {
-  const timestamp = Date.now().toString(16)
-  const random = Math.random().toString(36).substring(2, 10)
-  return `prt_${timestamp}${random}`
+export function generatePartId(): string {
+  return `prt_${String(++partCounter).padStart(12, "0")}`
 }
 
 function getOrCreateMessageDir(sessionID: string): string {

@@ -64,6 +64,51 @@ describe("createContextInjectorMessagesTransformHook", () => {
     expect(output.messages[2].parts[1].text).toBe("Second message")
   })
 
+  it("uses deterministic synthetic part ID across repeated transforms", async () => {
+    // given
+    const hook = createContextInjectorMessagesTransformHook(collector)
+    const sessionID = "ses_transform_deterministic"
+    const baseMessage = createMockMessage("user", "Stable message", sessionID)
+
+    collector.register(sessionID, {
+      id: "ctx-1",
+      source: "keyword-detector",
+      content: "Injected context",
+    })
+    const firstOutput = {
+      messages: [structuredClone(baseMessage)],
+    }
+
+    // when
+    await hook["experimental.chat.messages.transform"]!({}, firstOutput)
+
+    // then
+    const firstSyntheticPart = firstOutput.messages[0].parts[0]
+    expect(
+      "synthetic" in firstSyntheticPart && firstSyntheticPart.synthetic === true
+    ).toBe(true)
+
+    // given
+    collector.register(sessionID, {
+      id: "ctx-2",
+      source: "keyword-detector",
+      content: "Injected context",
+    })
+    const secondOutput = {
+      messages: [structuredClone(baseMessage)],
+    }
+
+    // when
+    await hook["experimental.chat.messages.transform"]!({}, secondOutput)
+
+    // then
+    const secondSyntheticPart = secondOutput.messages[0].parts[0]
+    expect(
+      "synthetic" in secondSyntheticPart && secondSyntheticPart.synthetic === true
+    ).toBe(true)
+    expect(secondSyntheticPart.id).toBe(firstSyntheticPart.id)
+  })
+
   it("does nothing when no pending context", async () => {
     // given
     const hook = createContextInjectorMessagesTransformHook(collector)

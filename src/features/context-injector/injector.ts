@@ -158,7 +158,7 @@ export function createContextInjectorMessagesTransformHook(
 
       // synthetic part pattern (minimal fields)
       const syntheticPart = {
-        id: `synthetic_hook_${Date.now()}`,
+        id: `synthetic_hook_${sessionID}`,
         messageID: lastUserMessage.info.id,
         sessionID: (lastUserMessage.info as { sessionID?: string }).sessionID ?? "",
         type: "text" as const,

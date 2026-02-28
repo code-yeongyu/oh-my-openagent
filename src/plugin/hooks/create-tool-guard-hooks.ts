@@ -12,6 +12,7 @@ import {
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
   createHashlineReadEnhancerHook,
+  createReadImageResizerHook,
   createJsonErrorRecoveryHook,
 } from "../../hooks"
 import {
@@ -33,6 +34,7 @@ export type ToolGuardHooks = {
   writeExistingFileGuard: ReturnType<typeof createWriteExistingFileGuardHook> | null
   hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
   jsonErrorRecovery: ReturnType<typeof createJsonErrorRecoveryHook> | null
+  readImageResizer: ReturnType<typeof createReadImageResizerHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -105,6 +107,10 @@ export function createToolGuardHooks(args: {
     ? safeHook("json-error-recovery", () => createJsonErrorRecoveryHook(ctx))
     : null
 
+  const readImageResizer = isHookEnabled("read-image-resizer")
+    ? safeHook("read-image-resizer", () => createReadImageResizerHook(ctx))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -116,5 +122,6 @@ export function createToolGuardHooks(args: {
     writeExistingFileGuard,
     hashlineReadEnhancer,
     jsonErrorRecovery,
+    readImageResizer,
   }
 }

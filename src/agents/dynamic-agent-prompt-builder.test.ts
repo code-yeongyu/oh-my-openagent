@@ -4,6 +4,8 @@ import { describe, it, expect } from "bun:test"
 import {
   buildCategorySkillsDelegationGuide,
   buildUltraworkSection,
+  buildDeepParallelSection,
+  buildNonClaudePlannerSection,
   type AvailableSkill,
   type AvailableCategory,
   type AvailableAgent,
@@ -169,6 +171,88 @@ describe("buildUltraworkSection", () => {
     //#then: should have single section
     expect(result).toContain("Built-in Skills")
     expect(result).not.toContain("User-Installed Skills")
+  })
+})
+
+describe("buildDeepParallelSection", () => {
+  const deepCategory: AvailableCategory = { name: "deep", description: "Autonomous problem-solving" }
+  const otherCategory: AvailableCategory = { name: "quick", description: "Trivial tasks" }
+
+  it("#given non-Claude model with deep category #when building #then returns parallel delegation section", () => {
+    //#given
+    const model = "google/gemini-3-pro"
+    const categories = [deepCategory, otherCategory]
+
+    //#when
+    const result = buildDeepParallelSection(model, categories)
+
+    //#then
+    expect(result).toContain("Deep Parallel Delegation")
+    expect(result).toContain("EVERY independent unit")
+    expect(result).toContain("run_in_background=true")
+    expect(result).toContain("4 independent units")
+  })
+
+  it("#given Claude model #when building #then returns empty", () => {
+    //#given
+    const model = "anthropic/claude-opus-4-6"
+    const categories = [deepCategory]
+
+    //#when
+    const result = buildDeepParallelSection(model, categories)
+
+    //#then
+    expect(result).toBe("")
+  })
+
+  it("#given non-Claude model without deep category #when building #then returns empty", () => {
+    //#given
+    const model = "openai/gpt-5.2"
+    const categories = [otherCategory]
+
+    //#when
+    const result = buildDeepParallelSection(model, categories)
+
+    //#then
+    expect(result).toBe("")
+  })
+})
+
+describe("buildNonClaudePlannerSection", () => {
+  it("#given non-Claude model #when building #then returns plan agent section", () => {
+    //#given
+    const model = "google/gemini-3-pro"
+
+    //#when
+    const result = buildNonClaudePlannerSection(model)
+
+    //#then
+    expect(result).toContain("Plan Agent")
+    expect(result).toContain("session_id")
+    expect(result).toContain("Multi-step")
+  })
+
+  it("#given Claude model #when building #then returns empty", () => {
+    //#given
+    const model = "anthropic/claude-sonnet-4-6"
+
+    //#when
+    const result = buildNonClaudePlannerSection(model)
+
+    //#then
+    expect(result).toBe("")
+  })
+
+  it("#given GPT model #when building #then returns plan agent section", () => {
+    //#given
+    const model = "openai/gpt-5.2"
+
+    //#when
+    const result = buildNonClaudePlannerSection(model)
+
+    //#then
+    expect(result).toContain("Plan Agent")
+    expect(result).not.toBe("")
   })
 })
 
