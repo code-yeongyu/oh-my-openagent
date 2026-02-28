@@ -139,4 +139,73 @@ describe("createMessageBatchCompressorHook", () => {
       expect(output.messages.length).toBe(4)
     })
   })
+
+  describe("image preservation", () => {
+    it("should preserve image parts during compression", async () => {
+      //#given a batch of messages including image parts
+      const config = { enabled: true, threshold: 5000 }
+      const hook = createMessageBatchCompressorHook(config)
+
+      const imagePart: Part = {
+        type: "image",
+        source: { data: "base64imagedata", mimeType: "image/png" },
+      } as Part
+
+      const messages: MessageWithParts[] = [
+        createMockMessage({ role: "user", parts: [{ type: "text", text: "hello" } as Part] }),
+        createMockMessage({ role: "assistant", parts: [{ type: "text", text: "world" } as Part, imagePart] }),
+        createMockMessage({ role: "user", parts: [{ type: "text", text: "test" } as Part] }),
+        createMockMessage({ role: "assistant", parts: [{ type: "text", text: "response" } as Part] }),
+        createMockMessage({ role: "user", parts: [{ type: "text", text: "end" } as Part] }),
+      ]
+
+      const output = { messages }
+
+      //#when the hook compresses the batch
+      await hook["experimental.chat.messages.transform"]!({}, output)
+
+      //#then image should be preserved in the compressed output
+      expect(output.messages.length).toBe(1)
+      const parts = output.messages[0].parts
+      expect(parts.length).toBe(2) // 1 text + 1 image
+      expect(parts[0].type).toBe("text")
+      expect(parts[1].type).toBe("image")
+      expect((parts[1] as { source?: { data: string } }).source.data).toBe("base64imagedata")
+    })
+
+    it("should preserve multiple image parts from different messages", async () => {
+      //#given a batch with multiple images across messages
+      const config = { enabled: true, threshold: 5000 }
+      const hook = createMessageBatchCompressorHook(config)
+
+      const image1: Part = {
+        type: "image",
+        source: { data: "image1data", mimeType: "image/png" },
+      } as Part
+      const image2: Part = {
+        type: "image",
+        source: { data: "image2data", mimeType: "image/jpeg" },
+      } as Part
+
+      const messages: MessageWithParts[] = [
+        createMockMessage({ role: "user", parts: [{ type: "text", text: "msg1" } as Part, image1] }),
+        createMockMessage({ role: "assistant", parts: [{ type: "text", text: "msg2" } as Part] }),
+        createMockMessage({ role: "user", parts: [{ type: "text", text: "msg3" } as Part] }),
+        createMockMessage({ role: "assistant", parts: [{ type: "text", text: "msg4" } as Part, image2] }),
+        createMockMessage({ role: "user", parts: [{ type: "text", text: "msg5" } as Part] }),
+      ]
+
+      const output = { messages }
+
+      //#when the hook compresses the batch
+      await hook["experimental.chat.messages.transform"]!({}, output)
+
+      //#then both images should be preserved
+      expect(output.messages.length).toBe(1)
+      const parts = output.messages[0].parts
+      expect(parts.length).toBe(3) // 1 text + 2 images
+      const imageParts = parts.filter((p) => p.type === "image")
+      expect(imageParts.length).toBe(2)
+    })
+  })
 })

@@ -33,13 +33,14 @@ type ExtractedToolResult = {
 }
 
 
-function extractBatchData(messages: MessageWithParts[]): unknown[] {
-  return messages.map((message) => {
+function extractBatchData(messages: MessageWithParts[]): { batchData: unknown[]; imageParts: Part[] } {
+  const imageParts: Part[] = []
+
+  const batchData = messages.map((message) => {
     const textContents: string[] = []
     const thinkingContents: string[] = []
     const toolUses: ExtractedToolUse[] = []
     const toolResults: ExtractedToolResult[] = []
-
 
     for (const part of message.parts) {
       const maybePart = part as {
@@ -63,9 +64,8 @@ function extractBatchData(messages: MessageWithParts[]): unknown[] {
       }
 
       if (THINKING_TYPES.has(maybePart.type as string)) {
-        // `thinking` type uses .thinking, `reasoning`/`redacted_thinking` use .text
-        const content = maybePart.type === "thinking" 
-          ? maybePart.thinking 
+        const content = maybePart.type === "thinking"
+          ? maybePart.thinking
           : maybePart.text
         thinkingContents.push(typeof content === "string" ? content : "")
         continue
@@ -89,8 +89,9 @@ function extractBatchData(messages: MessageWithParts[]): unknown[] {
         continue
       }
 
-      else {
-        log("[message-batch-compressor] Unknown part type:", maybePart.type)
+      if (maybePart.type === "image") {
+        imageParts.push(part)
+        continue
       }
     }
 
@@ -103,6 +104,8 @@ function extractBatchData(messages: MessageWithParts[]): unknown[] {
       toolResults,
     }
   })
+
+  return { batchData, imageParts }
 }
 
 export function createMessageBatchCompressorHook(
@@ -120,8 +123,10 @@ export function createMessageBatchCompressorHook(
         return
       }
 
-      const batchData = extractBatchData(messages)
+      const { batchData, imageParts } = extractBatchData(messages)
       const compressed = safeCompress(batchData, config)
+
+      const parts: Part[] = [{ type: "text", text: compressed } as Part, ...imageParts]
 
       output.messages = [
         {
@@ -129,13 +134,14 @@ export function createMessageBatchCompressorHook(
             id: "compressed-batch",
             role: "assistant",
           } as Message,
-          parts: [{ type: "text", text: compressed }] as Part[],
+          parts,
         },
       ]
 
       log("[message-batch-compressor] Compressed message batch", {
         originalCount: messages.length,
         compressedLength: compressed.length,
+        imageCount: imageParts.length,
       })
     },
   }
