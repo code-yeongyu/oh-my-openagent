@@ -227,6 +227,15 @@ describe("interpolateEnvVars", () => {
     expect(result).toBe("abc:")
   })
 
+  it("#given ${VAR} where value contains $ANOTHER #when both allowed #then does not double-interpolate", async () => {
+    process.env = { ...process.env, TOKEN: "val$SECRET", SECRET: "oops" }
+    const { interpolateEnvVars } = await import("./execute-http-hook")
+
+    const result = interpolateEnvVars("Bearer ${TOKEN}", ["TOKEN", "SECRET"])
+
+    expect(result).toBe("Bearer val$SECRET")
+  })
+
   it("#given no allowedEnvVars #when called #then replaces all with empty", async () => {
     const { interpolateEnvVars } = await import("./execute-http-hook")
 
