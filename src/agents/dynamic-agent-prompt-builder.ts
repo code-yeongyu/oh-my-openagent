@@ -316,6 +316,22 @@ export function buildAntiPatternsSection(): string {
 ${patterns.join("\n")}`
 }
 
+export function buildNonClaudePlannerSection(model: string): string {
+  const isNonClaude = !model.toLowerCase().includes('claude')
+  if (!isNonClaude) return ""
+
+  return `### Plan Agent Dependency (Non-Claude)
+
+Multi-step task? **ALWAYS consult Plan Agent first.** Do NOT start implementation without a plan.
+
+- Single-file fix or trivial change → proceed directly
+- Anything else (2+ steps, unclear scope, architecture) → \`task(subagent_type="plan", ...)\` FIRST
+- Use \`session_id\` to resume the same Plan Agent — ask follow-up questions aggressively
+- If ANY part of the task is ambiguous, ask Plan Agent before guessing
+
+Plan Agent returns a structured work breakdown with parallel execution opportunities. Follow it.`
+}
+
 export function buildDeepParallelSection(model: string, categories: AvailableCategory[]): string {
   const isNonClaude = !model.toLowerCase().includes('claude')
   const hasDeepCategory = categories.some(c => c.name === 'deep')
@@ -324,12 +340,13 @@ export function buildDeepParallelSection(model: string, categories: AvailableCat
 
   return `### Deep Parallel Delegation
 
-For implementation tasks, actively decompose and delegate to \`deep\` category agents in parallel.
+Delegate EVERY independent unit to a \`deep\` agent in parallel (\`run_in_background=true\`).
+If a task decomposes into 4 independent units, spawn 4 agents simultaneously — not 1 at a time.
 
-1. Break the implementation into independent work units
-2. Maximize parallel deep agents — spawn one per independent unit (\`run_in_background=true\`)
-3. Give each agent a GOAL, not step-by-step instructions — deep agents explore and solve autonomously
-4. Collect results, integrate, verify coherence`
+1. Decompose the implementation into independent work units
+2. Assign one \`deep\` agent per unit — all via \`run_in_background=true\`
+3. Give each agent a clear GOAL with success criteria, not step-by-step instructions
+4. Collect all results, integrate, verify coherence across units`
 }
 
 export function buildUltraworkSection(
