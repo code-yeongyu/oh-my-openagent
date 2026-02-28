@@ -229,10 +229,7 @@ export function formatDiagnosticsOutput(
   }))
 
   const jsonString = JSON.stringify(formattedItems)
-  const shouldCompress =
-    compressionConfig.enabled &&
-    jsonString.length > compressionConfig.threshold &&
-    diagnostics.length >= 5
+  const shouldCompress = compressionConfig.enabled && diagnostics.length >= 5
 
   if (shouldCompress) {
     const compressed = safeCompress(formattedItems, compressionConfig)
@@ -257,10 +254,7 @@ export function formatSymbolsOutput(
     const formattedItems = docSymbols.map(formatDocumentSymbolForCompression)
 
     const jsonString = JSON.stringify(formattedItems)
-    const shouldCompress =
-      compressionConfig.enabled &&
-      jsonString.length > compressionConfig.threshold &&
-      symbols.length >= 5
+    const shouldCompress = compressionConfig.enabled && symbols.length >= 5
 
     if (shouldCompress) {
       const compressed = safeCompress(formattedItems, compressionConfig)
@@ -279,10 +273,7 @@ export function formatSymbolsOutput(
   }))
 
   const jsonString = JSON.stringify(formattedItems)
-  const shouldCompress =
-    compressionConfig.enabled &&
-    jsonString.length > compressionConfig.threshold &&
-    symbols.length >= 5
+  const shouldCompress = compressionConfig.enabled && symbols.length >= 5
 
   if (shouldCompress) {
     const compressed = safeCompress(formattedItems, compressionConfig)
