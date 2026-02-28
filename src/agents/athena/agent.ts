@@ -180,12 +180,14 @@ Step 4: Track progress with background_wait (metadata only):
 
 Step 4.1: Collect results with council_finalize (after ALL members complete):
 - Once all members have reached terminal state, call:
-  council_finalize(task_ids=[...all task IDs...], name="{topic-slug}")
+  council_finalize(task_ids=[...all task IDs...], name="{topic-slug}", question="{original user question}", prompt_file="{path from prepare_council_prompt}")
   where {topic-slug} is a short descriptive slug of the council topic (e.g., "check-bg-wait-issues", "auth-review").
-- council_finalize reads raw output files, extracts <COUNCIL_MEMBER_RESPONSE> content, writes per-member archive files, and returns structured JSON.
+  Pass "question" with the original user question that triggered this council.
+  Pass "prompt_file" with the temp file path returned by prepare_council_prompt (it will be moved into the archive).
+- council_finalize reads raw output files, extracts clean response content from <COUNCIL_MEMBER_RESPONSE>, writes per-member archive files, and returns structured JSON.
 - The returned JSON has: archive_dir, meta_file, and members array.
-- Each member entry has: task_id, member, has_response, response_complete, result (or result_truncated if >8000 chars), archive_file.
-- For members with result_truncated: true, use council_read(file_path=<archive_file>) to get the full content.
+- Each member entry has: task_id, member, has_response, response_complete, and archive_file.
+- council_finalize does NOT return member content inline. Read member content from archive_file via council_read(file_path=<archive_file>), which returns raw archive content directly (no tag extraction step).
 
 Step 4.5: Detect failed or stuck members.
 For each member in the background_wait JSON response, check:
@@ -198,7 +200,7 @@ Step 4.6: Verify completed members have valid responses.
 For each member in the council_finalize result, check:
 - has_response: true AND response_complete: true → ✅ Use this result for synthesis.
 - has_response: true AND response_complete: false → Member started but didn't finish. Nudge: call task(session_id=<member_session_id>, run_in_background=true, write_output_to_file=true, prompt="Your analysis is incomplete. Please finish and wrap your final analysis in <COUNCIL_MEMBER_RESPONSE>...</COUNCIL_MEMBER_RESPONSE> tags."). After nudge completes, call council_finalize again with the nudged task IDs.
-- has_response: false AND status: "completed" → Member completed but didn't use tags. Nudge similarly.
+- has_response: false and background_wait status for the same task_id is "completed" → Member completed but didn't use tags. Nudge similarly.
 - has_response: false AND error → Member failed to produce output. Apply retry logic (Step 4.7).
 
 Step 4.7: Retry failed members (if configured).
@@ -239,6 +241,8 @@ Use these capabilities when:
 - Members disagree significantly and you need a tie-breaker
 
 Step 5: Synthesize the collected council member outputs using the format for the intent classified in Step 1.5.
+
+Before synthesis, for every member with has_response=true and archive_file present, read the member output from archive_file using council_read and use that content as the source for synthesis.
 
 **Universal requirements (ALL formats):**
 - Track which members agree and disagree on each point — agreement level is your confidence signal

@@ -1,6 +1,8 @@
 export interface CouncilFinalizeArgs {
   task_ids: string[]
   name: string
+  question?: string
+  prompt_file?: string
 }
 
 export interface CouncilMemberResult {
@@ -8,8 +10,6 @@ export interface CouncilMemberResult {
   member: string
   has_response: boolean
   response_complete?: boolean
-  result?: string
-  result_truncated?: boolean
   archive_file?: string
   error?: string
 }

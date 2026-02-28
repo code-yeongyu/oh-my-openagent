@@ -1,12 +1,10 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import { readFile, writeFile, mkdir } from "node:fs/promises"
-import { join } from "node:path"
+import { readFile, writeFile, mkdir, rename } from "node:fs/promises"
+import { join, isAbsolute, resolve } from "node:path"
 import { randomBytes } from "node:crypto"
 import { extractCouncilResponse } from "./council-response-extractor"
+import { log } from "../../shared/logger"
 import type { CouncilFinalizeArgs, CouncilMemberResult, CouncilFinalizeResult } from "./types"
-
-const RESULT_SIZE_LIMIT = 8000
-const PREVIEW_SIZE = 500
 
 interface MetaMember {
   task_id: string
@@ -25,6 +23,10 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, "")
 }
 
+function toPosixPath(pathValue: string): string {
+  return pathValue.replace(/\\/g, "/")
+}
+
 function extractAgentFromFrontmatter(content: string): string | null {
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/)
   if (!fmMatch) return null
@@ -32,12 +34,24 @@ function extractAgentFromFrontmatter(content: string): string | null {
   return agentLine ? agentLine[1].trim() : null
 }
 
-function formatMetaYaml(archiveName: string, createdAt: string, members: MetaMember[]): string {
+function formatMetaYaml(archiveName: string, createdAt: string, members: MetaMember[], question?: string, promptFile?: string): string {
   const lines: string[] = [
     `archive_name: ${archiveName}`,
     `created_at: ${createdAt}`,
-    "members:",
   ]
+
+  if (question) {
+    lines.push(`question: |`)
+    for (const qLine of question.split("\n")) {
+      lines.push(`  ${qLine}`)
+    }
+  }
+
+  if (promptFile) {
+    lines.push(`prompt_file: ${promptFile}`)
+  }
+
+  lines.push("members:")
 
   for (const m of members) {
     lines.push(`  - task_id: ${m.task_id}`)
@@ -61,12 +75,15 @@ export function createCouncilFinalize(basePath?: string): ToolDefinition {
         .array(tool.schema.string())
         .describe("Array of background task IDs whose output files should be processed"),
       name: tool.schema.string().describe("Council name used in the archive directory name"),
+      question: tool.schema.string().optional().describe("Original user question that triggered the council"),
+      prompt_file: tool.schema.string().optional().describe("Path to the council prompt temp file (will be moved into the archive)"),
     },
     async execute(args: CouncilFinalizeArgs) {
       const base = basePath ?? process.cwd()
       const hexId = randomBytes(2).toString("hex")
       const archiveName = `council-${args.name}-${hexId}`
       const relArchiveDir = join(".sisyphus", "athena", archiveName)
+      const relArchiveDirForOutput = toPosixPath(relArchiveDir)
       const absArchiveDir = join(base, relArchiveDir)
 
       await mkdir(absArchiveDir, { recursive: true })
@@ -76,6 +93,7 @@ export function createCouncilFinalize(basePath?: string): ToolDefinition {
 
       for (const taskId of args.task_ids) {
         const relTaskOutput = join(".sisyphus", "task-outputs", `${taskId}.md`)
+        const relTaskOutputForOutput = toPosixPath(relTaskOutput)
         const absTaskOutput = join(base, relTaskOutput)
 
         let fileContent: string
@@ -92,7 +110,7 @@ export function createCouncilFinalize(basePath?: string): ToolDefinition {
             task_id: taskId,
             member: "unknown",
             member_slug: "unknown",
-            task_output_path: relTaskOutput,
+            task_output_path: relTaskOutputForOutput,
             archive_file: "",
             has_response: false,
             response_complete: false,
@@ -101,10 +119,12 @@ export function createCouncilFinalize(basePath?: string): ToolDefinition {
         }
 
         const agentName = extractAgentFromFrontmatter(fileContent) ?? "unknown"
-        const memberSlug = slugify(agentName)
+        const memberSlug = slugify(agentName) || "unknown"
+        const taskSlug = slugify(taskId) || taskId.replace(/[^a-zA-Z0-9_-]+/g, "-")
         const extraction = extractCouncilResponse(fileContent)
 
-        const relArchiveFile = join(relArchiveDir, `${memberSlug}.md`)
+        const relArchiveFile = join(relArchiveDir, `${memberSlug}-${taskSlug}.md`)
+        const relArchiveFileForOutput = toPosixPath(relArchiveFile)
         const absArchiveFile = join(base, relArchiveFile)
 
         const memberResult: CouncilMemberResult = {
@@ -119,14 +139,7 @@ export function createCouncilFinalize(basePath?: string): ToolDefinition {
 
         if (extraction.result !== null) {
           await writeFile(absArchiveFile, extraction.result, "utf-8")
-          memberResult.archive_file = relArchiveFile
-
-          if (extraction.result.length > RESULT_SIZE_LIMIT) {
-            memberResult.result = extraction.result.slice(0, PREVIEW_SIZE)
-            memberResult.result_truncated = true
-          } else {
-            memberResult.result = extraction.result
-          }
+          memberResult.archive_file = relArchiveFileForOutput
         }
 
         members.push(memberResult)
@@ -134,21 +147,38 @@ export function createCouncilFinalize(basePath?: string): ToolDefinition {
           task_id: taskId,
           member: agentName,
           member_slug: memberSlug,
-          task_output_path: relTaskOutput,
-          archive_file: extraction.result !== null ? relArchiveFile : "",
+          task_output_path: relTaskOutputForOutput,
+          archive_file: extraction.result !== null ? relArchiveFileForOutput : "",
           has_response: extraction.has_response,
           response_complete: extraction.response_complete,
         })
       }
 
+      let relPromptFile: string | undefined
+      if (args.prompt_file) {
+        try {
+          const promptFilename = "council-prompt.md"
+          const absPromptSrc = isAbsolute(args.prompt_file) ? args.prompt_file : resolve(base, args.prompt_file)
+          const absPromptDest = join(absArchiveDir, promptFilename)
+          await rename(absPromptSrc, absPromptDest).catch(async () => {
+            const content = await readFile(absPromptSrc, "utf-8")
+            await writeFile(absPromptDest, content, "utf-8")
+          })
+          relPromptFile = toPosixPath(join(relArchiveDir, promptFilename))
+        } catch (err) {
+          log("[council-finalize] Failed to move prompt file", { promptFile: args.prompt_file, error: String(err) })
+        }
+      }
+
       const relMetaFile = join(relArchiveDir, "meta.yaml")
+      const relMetaFileForOutput = toPosixPath(relMetaFile)
       const absMetaFile = join(base, relMetaFile)
       const createdAt = new Date().toISOString()
-      await writeFile(absMetaFile, formatMetaYaml(archiveName, createdAt, metaMembers), "utf-8")
+      await writeFile(absMetaFile, formatMetaYaml(archiveName, createdAt, metaMembers, args.question, relPromptFile), "utf-8")
 
       const result: CouncilFinalizeResult = {
-        archive_dir: relArchiveDir,
-        meta_file: relMetaFile,
+        archive_dir: relArchiveDirForOutput,
+        meta_file: relMetaFileForOutput,
         members,
       }
 

@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createCouncilFinalize } from "./create-council-finalize"
+import { createCouncilRead } from "./create-council-read"
 import type { CouncilFinalizeResult } from "./types"
 
 function mockTaskOutput(agent: string, responseBody: string, complete = true): string {
@@ -71,8 +72,8 @@ describe("createCouncilFinalize", () => {
         expect(member.task_id).toBe(agents[i].id)
         expect(member.has_response).toBe(true)
         expect(member.response_complete).toBe(true)
-        expect(member.result).toBe(agents[i].response)
-        expect(member.result_truncated).toBeUndefined()
+        expect(member).not.toHaveProperty("result")
+        expect(member).not.toHaveProperty("result_truncated")
         expect(member.error).toBeUndefined()
         expect(member.archive_file).toBeDefined()
       }
@@ -113,19 +114,23 @@ describe("createCouncilFinalize", () => {
       expect(result.members).toHaveLength(3)
 
       expect(result.members[0].has_response).toBe(true)
-      expect(result.members[0].result).toBe("Opus findings")
+      expect(result.members[0].archive_file).toBeDefined()
+      expect(result.members[0]).not.toHaveProperty("result")
+      expect(result.members[0]).not.toHaveProperty("result_truncated")
 
       expect(result.members[1].has_response).toBe(false)
       expect(result.members[1].error).toBe("Task output file not found")
       expect(result.members[1].member).toBe("unknown")
 
       expect(result.members[2].has_response).toBe(true)
-      expect(result.members[2].result).toBe("Gemini findings")
+      expect(result.members[2].archive_file).toBeDefined()
+      expect(result.members[2]).not.toHaveProperty("result")
+      expect(result.members[2]).not.toHaveProperty("result_truncated")
     })
   })
 
   describe("#given large response exceeding 8000 chars", () => {
-    it("#then truncates result and sets result_truncated flag", async () => {
+    it("#then keeps full content in archive and council_read returns full response", async () => {
       const largeResponse = "x".repeat(9000)
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_large.md"),
@@ -142,12 +147,18 @@ describe("createCouncilFinalize", () => {
 
       const member = result.members[0]
       expect(member.has_response).toBe(true)
-      expect(member.result_truncated).toBe(true)
-      expect(member.result).toHaveLength(500)
-      expect(member.result).toBe("x".repeat(500))
+      expect(member.archive_file).toBeDefined()
+      expect(member).not.toHaveProperty("result")
+      expect(member).not.toHaveProperty("result_truncated")
 
-      const fullContent = await readFile(join(tmpDir, member.archive_file!), "utf-8")
-      expect(fullContent).toHaveLength(9000)
+      const readTool = createCouncilRead(tmpDir)
+      const readResult = await readTool.execute({ file_path: member.archive_file! }, mockCtx)
+      const parsed = JSON.parse(readResult)
+
+      expect(parsed.has_response).toBe(true)
+      expect(parsed.response_complete).toBe(true)
+      expect(parsed.result).toHaveLength(9000)
+      expect(parsed.result).toBe(largeResponse)
     })
   })
 
@@ -183,9 +194,42 @@ describe("createCouncilFinalize", () => {
       const member = result.members[0]
       expect(member.has_response).toBe(true)
       expect(member.response_complete).toBe(true)
-      expect(member.result).toBe("")
-      expect(member.result_truncated).toBeUndefined()
       expect(member.archive_file).toBeDefined()
+      expect(member).not.toHaveProperty("result")
+      expect(member).not.toHaveProperty("result_truncated")
+    })
+  })
+
+  describe("#given two members that slugify to same member slug", () => {
+    it("#then each member gets a unique archive_file keyed by task id", async () => {
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", "bg_alpha.md"),
+        mockTaskOutput("Agent A+B", "First response"),
+        "utf-8",
+      )
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", "bg_beta.md"),
+        mockTaskOutput("Agent A B", "Second response"),
+        "utf-8",
+      )
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["bg_alpha", "bg_beta"], name: "collision" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      const firstArchive = result.members[0].archive_file
+      const secondArchive = result.members[1].archive_file
+      expect(firstArchive).toBeDefined()
+      expect(secondArchive).toBeDefined()
+      expect(firstArchive).not.toBe(secondArchive)
+
+      const firstContent = await readFile(join(tmpDir, firstArchive!), "utf-8")
+      const secondContent = await readFile(join(tmpDir, secondArchive!), "utf-8")
+      expect(firstContent).toContain("First response")
+      expect(secondContent).toContain("Second response")
     })
   })
 })

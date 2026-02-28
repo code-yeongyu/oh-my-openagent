@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it, beforeEach, afterEach } from "bun:test"
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createCouncilFinalize } from "./create-council-finalize"
@@ -88,7 +88,7 @@ afterEach(async () => {
 describe("council archive integration flow", () => {
   describe("#given 3 council members with valid output files", () => {
     describe("#when finalize is called and then each archive is read", () => {
-      it("#then creates archive with correct structure and council_read extracts content from task outputs", async () => {
+      it("#then creates archive with correct structure and council_read extracts content from archives", async () => {
         const agents = [
           { id: "bg_opus", agent: "Council: Claude Opus", response: "Opus deep analysis of architecture" },
           { id: "bg_gpt", agent: "Council: GPT-5", response: "GPT pragmatic code review" },
@@ -119,8 +119,6 @@ describe("council archive integration flow", () => {
           expect(member.task_id).toBe(agents[i].id)
           expect(member.has_response).toBe(true)
           expect(member.response_complete).toBe(true)
-          expect(member.result).toBe(agents[i].response)
-          expect(member.result_truncated).toBeUndefined()
           expect(member.error).toBeUndefined()
           expect(member.archive_file).toBeDefined()
         }
@@ -142,8 +140,7 @@ describe("council archive integration flow", () => {
         const readTool = createCouncilRead(tmpDir)
 
         for (let i = 0; i < agents.length; i++) {
-          const taskOutputPath = join(".sisyphus", "task-outputs", `${agents[i].id}.md`)
-          const readResult = await readTool.execute({ file_path: taskOutputPath }, toolContext)
+          const readResult = await readTool.execute({ file_path: result.members[i].archive_file! }, toolContext)
           const parsed = JSON.parse(readResult)
 
           expect(parsed.has_response).toBe(true)
@@ -156,7 +153,7 @@ describe("council archive integration flow", () => {
 
   describe("#given a member with incomplete tags (no closing tag)", () => {
     describe("#when finalize is called and archive is read", () => {
-      it("#then has_response is true and response_complete is false in both finalize and read", async () => {
+      it("#then finalize marks incomplete but council_read still returns raw archived content", async () => {
         const taskId = "bg_partial"
         await writeFile(
           join(tmpDir, ".sisyphus", "task-outputs", `${taskId}.md`),
@@ -180,12 +177,11 @@ describe("council archive integration flow", () => {
         expect(archiveContent).toBe("Analysis still in progress...")
 
         const readTool = createCouncilRead(tmpDir)
-        const taskOutputPath = join(".sisyphus", "task-outputs", `${taskId}.md`)
-        const readResult = await readTool.execute({ file_path: taskOutputPath }, toolContext)
+        const readResult = await readTool.execute({ file_path: member.archive_file! }, toolContext)
         const parsed = JSON.parse(readResult)
 
         expect(parsed.has_response).toBe(true)
-        expect(parsed.response_complete).toBe(false)
+        expect(parsed.response_complete).toBe(true)
         expect(parsed.result).toBe("Analysis still in progress...")
       })
     })
@@ -210,7 +206,6 @@ describe("council archive integration flow", () => {
         const member = result.members[0]
         expect(member.has_response).toBe(false)
         expect(member.archive_file).toBeUndefined()
-        expect(member.result).toBeUndefined()
       })
     })
   })
@@ -239,21 +234,21 @@ describe("council archive integration flow", () => {
         expect(result.members).toHaveLength(3)
 
         expect(result.members[0].has_response).toBe(true)
-        expect(result.members[0].result).toBe("First analysis")
+        expect(result.members[0].archive_file).toBeDefined()
 
         expect(result.members[1].has_response).toBe(false)
         expect(result.members[1].error).toBe("Task output file not found")
         expect(result.members[1].member).toBe("unknown")
 
         expect(result.members[2].has_response).toBe(true)
-        expect(result.members[2].result).toBe("Third analysis")
+        expect(result.members[2].archive_file).toBeDefined()
       })
     })
   })
 
   describe("#given a very large council response exceeding 8000 chars", () => {
     describe("#when finalize is called and then archive is read", () => {
-      it("#then finalize truncates to 500 char preview but full content is available via council_read", async () => {
+      it("#then finalize stores full output and council_read returns full response", async () => {
         const largeResponse = "A".repeat(9000)
         const taskId = "bg_large"
         await writeFile(
@@ -271,22 +266,88 @@ describe("council archive integration flow", () => {
 
         const member = result.members[0]
         expect(member.has_response).toBe(true)
-        expect(member.result_truncated).toBe(true)
-        expect(member.result).toHaveLength(500)
-        expect(member.result).toBe("A".repeat(500))
         expect(member.archive_file).toBeDefined()
 
         const fullContent = await readFile(join(tmpDir, member.archive_file!), "utf-8")
         expect(fullContent).toHaveLength(9000)
 
         const readTool = createCouncilRead(tmpDir)
-        const taskOutputPath = join(".sisyphus", "task-outputs", `${taskId}.md`)
-        const readResult = await readTool.execute({ file_path: taskOutputPath }, toolContext)
+        const readResult = await readTool.execute({ file_path: member.archive_file! }, toolContext)
         const parsed = JSON.parse(readResult)
 
         expect(parsed.has_response).toBe(true)
         expect(parsed.response_complete).toBe(true)
         expect(parsed.result).toHaveLength(9000)
+      })
+    })
+  })
+
+  describe("#given question and prompt_file params", () => {
+    describe("#when finalize is called with question and prompt_file", () => {
+      it("#then meta.yaml includes question and prompt_file, and prompt file is moved to archive", async () => {
+        const taskId = "bg_with_meta"
+        await writeFile(
+          join(tmpDir, ".sisyphus", "task-outputs", `${taskId}.md`),
+          mockTaskOutput("Council: Opus", "Analysis result"),
+          "utf-8",
+        )
+
+        const tmpPromptDir = join(tmpDir, ".sisyphus", "tmp")
+        await mkdir(tmpPromptDir, { recursive: true })
+        const promptFile = join(".sisyphus", "tmp", "athena-council-test.md")
+        await writeFile(join(tmpDir, promptFile), "Council prompt content here", "utf-8")
+
+        const finalizeTool = createCouncilFinalize(tmpDir)
+        const resultStr = await finalizeTool.execute(
+          {
+            task_ids: [taskId],
+            name: "meta-test",
+            question: "What is the best architecture for this app?",
+            prompt_file: promptFile,
+          },
+          toolContext,
+        )
+        const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+        const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
+        expect(metaContent).toContain("question: |")
+        expect(metaContent).toContain("  What is the best architecture for this app?")
+        expect(metaContent).toContain("prompt_file:")
+        expect(metaContent).toContain("council-prompt.md")
+
+        const promptDest = join(tmpDir, result.archive_dir, "council-prompt.md")
+        const promptContent = await readFile(promptDest, "utf-8")
+        expect(promptContent).toBe("Council prompt content here")
+
+        const originalExists = await stat(join(tmpDir, promptFile)).then(() => true).catch(() => false)
+        expect(originalExists).toBe(false)
+      })
+    })
+
+    describe("#when finalize is called with question only (no prompt_file)", () => {
+      it("#then meta.yaml includes question but no prompt_file", async () => {
+        const taskId = "bg_question_only"
+        await writeFile(
+          join(tmpDir, ".sisyphus", "task-outputs", `${taskId}.md`),
+          mockTaskOutput("Council: GPT", "GPT analysis"),
+          "utf-8",
+        )
+
+        const finalizeTool = createCouncilFinalize(tmpDir)
+        const resultStr = await finalizeTool.execute(
+          {
+            task_ids: [taskId],
+            name: "question-only",
+            question: "How should we handle auth?",
+          },
+          toolContext,
+        )
+        const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+        const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
+        expect(metaContent).toContain("question: |")
+        expect(metaContent).toContain("  How should we handle auth?")
+        expect(metaContent).not.toContain("prompt_file:")
       })
     })
   })
