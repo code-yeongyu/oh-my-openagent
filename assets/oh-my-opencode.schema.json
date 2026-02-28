@@ -3845,7 +3845,7 @@
           "type": "boolean"
         },
         "threshold": {
-          "default": 100,
+          "default": 5000,
           "type": "number",
           "minimum": 10
         },

@@ -598,7 +598,7 @@ Configure structured data compression for LLM contexts.
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enabled` | boolean | `false` | Enable structured data compression |
-| `threshold` | number | `5000` | Minimum character length before compression (min: 100) |
+| `threshold` | number | `5000` | Minimum character length before compression (min: 10) |
 
 ### Experimental
 
