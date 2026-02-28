@@ -4,7 +4,6 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRgFiles } from "./cli"
 import { resolveGrepCliWithAutoInstall } from "./constants"
 import { formatGlobResult } from "./result-formatter"
-import { extractDirectoryPrefix } from "./extract-directory-prefix"
 
 export function createGlobTools(ctx: PluginInput): Record<string, ToolDefinition> {
   const glob: ToolDefinition = tool({
@@ -30,14 +29,11 @@ export function createGlobTools(ctx: PluginInput): Record<string, ToolDefinition
         const runtimeCtx = context as Record<string, unknown>
         const dir = typeof runtimeCtx.directory === "string" ? runtimeCtx.directory : ctx.directory
         const searchPath = args.path ? resolve(dir, args.path) : dir
-        const { prefix, glob: effectivePattern } = extractDirectoryPrefix(args.pattern)
-        const effectivePath = prefix ? resolve(searchPath, prefix) : searchPath
-        const paths = [effectivePath]
 
         const result = await runRgFiles(
           {
-            pattern: effectivePattern,
-            paths,
+            pattern: args.pattern,
+            paths: [searchPath],
           },
           cli
         )
