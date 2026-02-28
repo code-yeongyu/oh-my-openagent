@@ -29,6 +29,8 @@ const COUNCIL_MEMBER_ALLOWLIST = [
   "ast_grep_search",
   "call_omo_agent",
   "background_output",
+  "background_wait",
+  "background_cancel",
 ]
 
 // Tools granted to Athena by tool-config-handler.ts (not in deny-list, not in AGENT_RESTRICTIONS)
