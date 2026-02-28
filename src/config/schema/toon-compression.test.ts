@@ -55,7 +55,7 @@ describe("ToonCompressionConfigSchema", () => {
   })
 
   describe("threshold field", () => {
-    test("defaults to 100 when not provided", () => {
+    test("defaults to 5000 when not provided", () => {
       // given
       const config = {}
 
@@ -63,7 +63,7 @@ describe("ToonCompressionConfigSchema", () => {
       const result = ToonCompressionConfigSchema.parse(config)
 
       // then
-      expect(result.threshold).toBe(100)
+      expect(result.threshold).toBe(5000)
     })
 
     test("accepts valid threshold value", () => {
@@ -117,6 +117,69 @@ describe("ToonCompressionConfigSchema", () => {
     })
   })
 
+  describe("maxEncodingSize field", () => {
+    test("accepts value at minimum (10240)", () => {
+      // given
+      const config = { maxEncodingSize: 10240 }
+
+      // when
+      const result = ToonCompressionConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.maxEncodingSize).toBe(10240)
+      }
+    })
+
+    test("rejects value below minimum (10239)", () => {
+      // given
+      const config = { maxEncodingSize: 10239 }
+
+      // when
+      const result = ToonCompressionConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(false)
+    })
+
+    test("accepts values above minimum", () => {
+      // given
+      const config = { maxEncodingSize: 50000 }
+
+      // when
+      const result = ToonCompressionConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.maxEncodingSize).toBe(50000)
+      }
+    })
+
+    test("is optional and undefined when not provided", () => {
+      // given
+      const config = {}
+
+      // when
+      const result = ToonCompressionConfigSchema.parse(config)
+
+      // then
+      expect(result.maxEncodingSize).toBeUndefined()
+    })
+
+    test("rejects non-number maxEncodingSize", () => {
+      // given
+      const config = { maxEncodingSize: "10240" }
+
+      // when
+      const result = ToonCompressionConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(false)
+    })
+  })
+
   describe("combined fields", () => {
     test("accepts both enabled and threshold", () => {
       // given
@@ -142,7 +205,7 @@ describe("ToonCompressionConfigSchema", () => {
 
       // then
       expect(result.enabled).toBe(true)
-      expect(result.threshold).toBe(100)
+      expect(result.threshold).toBe(5000)
     })
   })
 })
