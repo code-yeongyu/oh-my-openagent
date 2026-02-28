@@ -1,5 +1,5 @@
 import type { BuildSystemContentInput } from "./types"
-import { buildPlanAgentSystemPrepend, isPlanAgent } from "./constants"
+import { buildPlanAgentSystemPrepend, isPlanAgent, PLAN_AGENT_SYSTEM_PREPEND_STATIC_BEFORE_SKILLS, PLAN_AGENT_SYSTEM_PREPEND_STATIC_AFTER_SKILLS, buildPlanAgentSkillsSection } from "./constants"
 import { safeCompress, shouldCompress } from "../../shared/toon-compression"
 import { buildSystemContentWithTokenLimit } from "./token-limiter"
 
@@ -46,46 +46,68 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
   let planAgentPrepend: string
 
   if (isPlanAgent(agentName)) {
-    if (shouldCompressCategories || shouldCompressSkills) {
-      // Build compressed version of plan agent prepend
-      const parts: string[] = ["<system>"]
-      parts.push("## MANDATORY CONTEXT GATHERING PROTOCOL")
-      parts.push("")
-      parts.push("Before planning, gather context using the task tool with explore/librarian agents.")
-      parts.push("")
+    if (compressionConfig?.enabled && (shouldCompressCategories || shouldCompressSkills)) {
+      // Build compressed version of plan agent prepend with ALL mandatory sections
+      // Strategy: Use static sections, but replace skills section with TOON-formatted version
+      const parts: string[] = []
+      parts.push(PLAN_AGENT_SYSTEM_PREPEND_STATIC_BEFORE_SKILLS)
 
-      if (shouldCompressCategories && availableCategories) {
+      // Build skills section - use TOON format for compressed arrays
+      if (shouldCompressCategories && availableCategories && shouldCompressSkills && availableSkills) {
+        // Both compressed - build TOON skills section
+        parts.push("")
         parts.push("### AVAILABLE CATEGORIES (TOON format)")
-        parts.push("```toon")
+        parts.push("\n```toon")
         parts.push(safeCompress(availableCategories, compressionConfig ?? { enabled: false, threshold: 5000 }))
         parts.push("```")
-      } else if (availableCategories && availableCategories.length > 0) {
-        parts.push("### AVAILABLE CATEGORIES")
-        parts.push("")
-        const categoryRows = availableCategories.map(c => `| ${c.name} | ${c.description} |`).join("\n")
-        parts.push("| Category | Description |")
-        parts.push("|----------|-------------|")
-        parts.push(categoryRows)
-      }
-
-      if (shouldCompressSkills && availableSkills) {
         parts.push("")
         parts.push("### AVAILABLE SKILLS (TOON format)")
-        parts.push("```toon")
+        parts.push("\n```toon")
         parts.push(safeCompress(availableSkills, compressionConfig ?? { enabled: false, threshold: 5000 }))
         parts.push("```")
-      } else if (availableSkills && availableSkills.length > 0) {
+      } else if (shouldCompressCategories && availableCategories) {
+        // Only categories compressed
         parts.push("")
-        parts.push("### AVAILABLE SKILLS")
+        parts.push("### AVAILABLE CATEGORIES (TOON format)")
+        parts.push("\n```toon")
+        parts.push(safeCompress(availableCategories, compressionConfig ?? { enabled: false, threshold: 5000 }))
+        parts.push("```")
         parts.push("")
-        const skillRows = availableSkills.map(s => `| ${s.name} | ${s.description} |`).join("\n")
-        parts.push("| Skill | Description |")
-        parts.push("|-------|--------|")
-        parts.push(skillRows)
+        // Skills uncompressed - use standard rendering
+        if (availableSkills && availableSkills.length > 0) {
+          const skillRows = availableSkills.map(s => `| \`${s.name}\` | ${s.description} |`).join("\n")
+          parts.push("### AVAILABLE SKILLS (ALWAYS EVALUATE ALL)")
+          parts.push("")
+          parts.push("Skills inject specialized expertise into the delegated agent.")
+          parts.push("YOU MUST evaluate EVERY skill and justify inclusions/omissions.")
+          parts.push("")
+          parts.push("| Skill | Domain |")
+          parts.push("|-------|--------|")
+          parts.push(skillRows)
+        }
+      } else if (shouldCompressSkills && availableSkills) {
+        // Only skills compressed - categories use standard rendering
+        if (availableCategories && availableCategories.length > 0) {
+          const categoryRows = availableCategories.map(c => `| \`${c.name}\` | ${c.description || c.name} | ${c.model || ""} |`).join("\n")
+          parts.push("")
+          parts.push("### AVAILABLE CATEGORIES")
+          parts.push("")
+          parts.push("| Category | Best For | Model |")
+          parts.push("|----------|----------|-------|")
+          parts.push(categoryRows)
+        }
+        parts.push("")
+        parts.push("### AVAILABLE SKILLS (TOON format)")
+        parts.push("\n```toon")
+        parts.push(safeCompress(availableSkills, compressionConfig ?? { enabled: false, threshold: 5000 }))
+        parts.push("```")
+      } else {
+        // Fallback: use standard skills section (shouldn't reach here given condition)
+        parts.push(buildPlanAgentSkillsSection(availableCategories, availableSkills))
       }
 
       parts.push("")
-      parts.push("</system>")
+      parts.push(PLAN_AGENT_SYSTEM_PREPEND_STATIC_AFTER_SKILLS)
       planAgentPrepend = parts.join("\n")
     } else {
       planAgentPrepend = buildPlanAgentSystemPrepend(availableCategories, availableSkills)
