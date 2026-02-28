@@ -1,7 +1,7 @@
 import { dirname } from "node:path"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { TOOL_DESCRIPTION_NO_SKILLS, TOOL_DESCRIPTION_PREFIX } from "./constants"
-import type { SkillArgs, SkillInfo, SkillLoadOptions } from "./types"
+import type { SkillArgs, SkillInfo, SkillLoadOptions, ToolContextWithMetadata } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { getAllSkills, extractSkillTemplate } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
@@ -230,7 +230,8 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         .optional()
         .describe("Optional arguments or context for command invocation. Example: name='publish', user_message='patch'"),
     },
-    async execute(args: SkillArgs, ctx?: { agent?: string }) {
+    async execute(args: SkillArgs, toolContext) {
+      const ctx = toolContext as ToolContextWithMetadata
       const skills = await getSkills()
       const commands = getCommands()
 
@@ -240,9 +241,16 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       const matchedSkill = skills.find(s => s.name.toLowerCase() === requestedName.toLowerCase())
 
       if (matchedSkill) {
-        if (matchedSkill.definition.agent && (!ctx?.agent || matchedSkill.definition.agent !== ctx.agent)) {
+        if (matchedSkill.definition.agent && (!ctx.agent || matchedSkill.definition.agent !== ctx.agent)) {
           throw new Error(`Skill "${matchedSkill.name}" is restricted to agent "${matchedSkill.definition.agent}"`)
         }
+
+        await ctx.ask?.({
+          permission: "skill",
+          patterns: [matchedSkill.name],
+          always: [matchedSkill.name],
+          metadata: {},
+        })
 
         let body = await extractSkillBody(matchedSkill)
 

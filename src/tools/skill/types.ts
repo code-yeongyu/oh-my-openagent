@@ -34,3 +34,13 @@ export interface SkillLoadOptions {
   gitMasterConfig?: GitMasterConfig
   disabledSkills?: Set<string>
 }
+
+
+export type ToolContextWithMetadata = {
+  sessionID: string
+  messageID: string
+  agent: string
+  abort: AbortSignal
+  metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void | Promise<void>
+  ask?: (req: { permission: string; patterns: string[]; always: string[]; metadata: Record<string, unknown> }) => Promise<void>
+}
