@@ -3,8 +3,8 @@ import type {
   PostToolUseOutput,
   ClaudeHooksConfig,
 } from "./types"
-import { findMatchingHooks, executeHookCommand, log } from "../../shared"
-import { DEFAULT_CONFIG } from "./plugin-config"
+import { findMatchingHooks, log } from "../../shared"
+import { dispatchHook } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 
 const USER_PROMPT_SUBMIT_TAG_OPEN = "<user-prompt-submit-hook>"
@@ -80,19 +80,14 @@ export async function executeUserPromptSubmitHooks(
    for (const matcher of matchers) {
      if (!matcher.hooks || matcher.hooks.length === 0) continue
      for (const hook of matcher.hooks) {
-       if (hook.type !== "command") continue
+       if (hook.type !== "command" && hook.type !== "http") continue
 
-      if (isHookCommandDisabled("UserPromptSubmit", hook.command, extendedConfig ?? null)) {
+      if (hook.type === "command" && isHookCommandDisabled("UserPromptSubmit", hook.command, extendedConfig ?? null)) {
         log("UserPromptSubmit hook command skipped (disabled by config)", { command: hook.command })
         continue
       }
 
-      const result = await executeHookCommand(
-        hook.command,
-        JSON.stringify(stdinData),
-        ctx.cwd,
-        { forceZsh: DEFAULT_CONFIG.forceZsh, zshPath: DEFAULT_CONFIG.zshPath }
-      )
+      const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)
 
       if (result.stdout) {
         const output = result.stdout.trim()
