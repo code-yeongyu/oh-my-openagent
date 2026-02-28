@@ -174,6 +174,7 @@ export class BackgroundManager {
       fallbackChain: input.fallbackChain,
       attemptCount: 0,
       category: input.category,
+      writeOutputToFile: input.writeOutputToFile,
     }
 
     this.tasks.set(task.id, task)
