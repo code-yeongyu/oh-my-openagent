@@ -76,6 +76,7 @@ Give him a goal, not a recipe. Explores the codebase, matches your patterns, and
 <td>
 
 ### Cipher — *The Language Architect*
+<img src=".github/assets/cipher.png" width="120" align="right"/>
 
 **Claude Opus 4.6** &middot; DSL specialist
 
@@ -85,6 +86,7 @@ Grammars, parsers, type systems, code generators, metamodels. 11 composable skil
 <td>
 
 ### Niobe — *The Research Navigator*
+<img src=".github/assets/niobe.png" width="120" align="right"/>
 
 **Claude Opus 4.6** &middot; Research & technical leadership
 

@@ -76,6 +76,8 @@ Keymaker is inspired by [AmpCode's deep mode](https://ampcode.com) — autonomou
 
 ## Cipher — The Language Architect
 
+![Meet Cipher](../.github/assets/cipher.png)
+
 In The Matrix, ciphers were the encoded signals flowing through the system — the raw language underneath reality itself. **Meet the DSL engineering specialist: Cipher (Claude Opus 4.6). The Language Architect.**
 
 Cipher is the agent you call when you need to design, build, or extend domain-specific languages. He doesn't just write parsers — he thinks in grammars, type systems, and metamodels.
@@ -212,6 +214,8 @@ When Cipher tackles a DSL project, this is the internal workflow:
 ---
 
 ## Niobe — The Research Navigator
+
+![Meet Niobe](../.github/assets/niobe.png)
 
 In The Matrix, Niobe was the fearless captain of the Logos — the one who navigated impossible terrain, trusted her instincts over machines, and delivered her crew when others couldn't. **Meet the full research lifecycle and technical leadership expert: Niobe (Claude Opus 4.6). The Research Navigator & Technical Strategist.**
 
