@@ -17,6 +17,7 @@ export function interpolateEnvVars(
     return ""
   })
 }
+
 function resolveHeaders(
   hook: HookHttp
 ): Record<string, string> {
