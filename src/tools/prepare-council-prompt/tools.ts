@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto"
 import { writeFile, unlink, mkdir, readdir, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
-import { COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM, COUNCIL_INTENT_ADDENDUMS } from "../../agents/athena"
+import { COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM, COUNCIL_INTENT_ADDENDUMS, getValidCouncilIntents, type CouncilIntent } from "../../agents/athena"
 
 const CLEANUP_DELAY_MS = 30 * 60 * 1000
 const COUNCIL_TMP_DIR = ".sisyphus/tmp"
@@ -78,8 +78,8 @@ Returns the file path to reference in subsequent task() calls.`
         return `Invalid mode: "${args.mode}". Valid modes: "solo", "delegation".`
       }
 
-      const validIntents = Object.keys(COUNCIL_INTENT_ADDENDUMS)
-      if (args.intent !== undefined && !validIntents.includes(args.intent.toUpperCase())) {
+      const validIntents = getValidCouncilIntents()
+      if (args.intent !== undefined && !(validIntents as readonly string[]).includes(args.intent.toUpperCase())) {
         return `Invalid intent: "${args.intent}". Valid intents: ${validIntents.map((i) => `"${i}"`).join(", ")}.`
       }
 
@@ -95,7 +95,7 @@ Returns the file path to reference in subsequent task() calls.`
         const filePath = join(tmpDir, filename)
 
         const modeAddendum = mode === "delegation" ? COUNCIL_DELEGATION_ADDENDUM : COUNCIL_SOLO_ADDENDUM
-        const intentAddendum = resolvedIntent ? (COUNCIL_INTENT_ADDENDUMS[resolvedIntent] ?? "") : ""
+        const intentAddendum = resolvedIntent ? (COUNCIL_INTENT_ADDENDUMS[resolvedIntent as CouncilIntent] ?? "") : ""
         const content = intentAddendum
           ? `${modeAddendum}\n\n${intentAddendum}\n\n## Analysis Question\n\n${args.prompt}`
           : `${modeAddendum}\n\n## Analysis Question\n\n${args.prompt}`

@@ -1,4 +1,6 @@
-export const COUNCIL_INTENT_ADDENDUMS: Record<string, string> = {
+import type { CouncilIntent } from "./council-runtime-guidance"
+
+export const COUNCIL_INTENT_ADDENDUMS: Record<CouncilIntent, string> = {
   DIAGNOSE: `
 ## Analysis Intent: DIAGNOSE
 
@@ -63,7 +65,7 @@ You are conducting an **audit** — your goal is to find discrete issues, risks,
 - Severity determines priority: critical (blocks/breaks), high (significant risk), medium (should fix), low (nice to fix)
 - For each finding, provide the specific location (reference, section, or component where it occurs)
 - State your confidence: high (clear evidence), medium (likely but needs verification), low (suspicion, investigate further)
-- **This is a broad sweep, not a targeted trace.**.
+- **This is a broad sweep, not a targeted trace.**
 
 **Required output fields per finding:**
 - Title, Severity (critical/high/medium/low), Location, Confidence (high/medium/low)
@@ -291,7 +293,7 @@ You are **surfacing genuine viewpoints and taking a stand** — your goal is to 
   FREEFORM: `
 ## Analysis Intent: FREEFORM
 
-Respond naturally to the question below. No analytical framework is imposed.
+Respond naturally to the question below. No analytical framework is imposed (apart from the required COUNCIL_MEMBER_RESPONSE tags for extraction).
 
 Use whatever structure serves the answer best. Analyze if analysis helps. Answer directly if a direct answer is better. Be conversational if the question is conversational.
 

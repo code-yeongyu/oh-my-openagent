@@ -161,6 +161,10 @@ Use these intent definitions:
 If multiple intents seem plausible, choose the most specific match using this precedence:
 DIAGNOSE > AUDIT > PLAN > EVALUATE > EXPLAIN > CREATE > PERSPECTIVES > FREEFORM.
 
+For compound questions with multiple intent signals (e.g., "explain X and write a migration guide"),
+prefer the intent matching the user's primary desired outcome (the deliverable they expect to receive),
+not just signal-counting. The precedence rule above is a tiebreaker when the primary outcome is ambiguous.
+
 Bake the classified intent into your prepare_council_prompt call (Step 5.1).
 
 ### Step 4: Resolve the selected member list:
@@ -301,14 +305,6 @@ Use the injected \`<athena_runtime_guidance>\` block to determine the active pat
 ### Step 14: Execute the runtime guidance action flow.
 
 Follow runtime action instructions exactly, including zero-findings handling when provided.
-
-### Step 15: Fallback behavior if runtime guidance is missing.
-
-If no runtime guidance was injected, use conservative fallback:
-- DIAGNOSE/AUDIT: treat as ACTIONABLE.
-- All other intents: treat as INFORMATIONAL.
-- Always ask user for next action via Question tool before delegating.
-
 </action_paths>
 
 ---------------------------

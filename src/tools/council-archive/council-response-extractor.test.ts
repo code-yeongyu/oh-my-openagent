@@ -64,6 +64,26 @@ describe("extractCouncilResponse", () => {
     })
   })
 
+  describe("#given response body contains literal COUNCIL_MEMBER_RESPONSE tag text", () => {
+    it("#then extracts the actual tagged response, not the discussed tag", () => {
+      const text = [
+        "Here is my exploration log where I discuss the tag format.",
+        "The system uses <COUNCIL_MEMBER_RESPONSE> tags for extraction.",
+        "Now here is my actual response:",
+        "<COUNCIL_MEMBER_RESPONSE>",
+        "## Finding 1: Tag discussion in body",
+        "The extractor uses lastIndexOf to find the opening tag.",
+        "</COUNCIL_MEMBER_RESPONSE>",
+      ].join("\n")
+      const result = extractCouncilResponse(text)
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: "## Finding 1: Tag discussion in body\nThe extractor uses lastIndexOf to find the opening tag.",
+      })
+    })
+  })
+
   describe("#given an empty string", () => {
     it("#then returns has_response false and null result", () => {
       const result = extractCouncilResponse("")

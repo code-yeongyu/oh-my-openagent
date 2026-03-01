@@ -44,7 +44,6 @@ describe("Athena prompt config injection placeholders", () => {
         expect(athenaConfig.prompt).toContain("Step 12: Synthesize")
         expect(athenaConfig.prompt).toContain("Step 13: Determine follow-up path from council_finalize runtime guidance")
         expect(athenaConfig.prompt).toContain("Step 14: Execute the runtime guidance action flow")
-        expect(athenaConfig.prompt).toContain("Step 15: Fallback behavior if runtime guidance is missing")
       })
 
       it("#then omits legacy mixed step labels", () => {

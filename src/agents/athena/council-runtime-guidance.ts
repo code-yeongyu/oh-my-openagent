@@ -12,6 +12,11 @@ const VALID_INTENTS = [
 export type CouncilIntent = (typeof VALID_INTENTS)[number]
 
 const RUNTIME_GUIDANCE_BY_INTENT: Record<CouncilIntent, string> = {
+  // Delegation agent design rationale:
+  // - DIAGNOSE = single targeted fix → Hephaestus (direct implementation) / Sisyphus (orchestrated implementation)
+  // - AUDIT = multi-finding remediation → Atlas (todo-list orchestration) / Prometheus (phased planning)
+  // Other intents (PLAN, EVALUATE, EXPLAIN, CREATE, PERSPECTIVES, FREEFORM) are INFORMATIONAL
+  // and offer context-appropriate delegation options in their action paths.
   DIAGNOSE: `
 <runtime_synthesis_rules>
 Use DIAGNOSE synthesis.
@@ -234,7 +239,7 @@ Question({
     options: [
       { label: "Execute full plan (Prometheus)", description: "Hand off all phases to Prometheus for execution" },
       { label: "Execute selected phase (Prometheus)", description: "Choose one phase and execute only that phase first" },
-      { label: "Write to document", description: "Write the plan under .sisyphus/athena/notes/{council-session-name}" },
+      { label: "Write to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
       { label: "Ask follow-up", description: "Ask another planning question" },
       { label: "Done", description: "No further action needed" }
     ],
@@ -258,8 +263,8 @@ Question({
 3) Execute selected action:
 - Execute full plan (Prometheus) -> switch_agent(agent="prometheus") with full synthesized plan.
 - Execute selected phase (Prometheus) -> switch_agent(agent="prometheus") with only the selected phase plus dependencies.
-- Write to document -> write the document directly to ".sisyphus/athena/notes/{council-session-name}" and then report the exact path to the user.
-- Ask follow-up -> ask user then restart at Step 3.
+- Write to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path to the user.
+- Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
 - Done -> acknowledge and end.
 </runtime_action_paths>`,
 
@@ -282,7 +287,7 @@ Question({
     options: [
       { label: "Adopt option -> create plan (Prometheus)", description: "Turn a selected option into an execution plan" },
       { label: "Adopt option -> implement now", description: "Implement a selected option immediately" },
-      { label: "Write to document", description: "Write under .sisyphus/athena/notes/{council-session-name}" },
+      { label: "Write to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
       { label: "Ask follow-up", description: "Ask another comparison question" },
       { label: "Done", description: "No further action needed" }
     ],
@@ -321,8 +326,8 @@ Question({
 - Adopt option -> implement now + Hephaestus -> switch_agent(agent="hephaestus") with selected option.
 - Adopt option -> implement now + Sisyphus -> switch_agent(agent="sisyphus") with selected option.
 - Adopt option -> implement now + Sisyphus ultrawork -> switch_agent(agent="sisyphus") and prefix handoff context with "ultrawork ".
-- Write to document -> write directly to ".sisyphus/athena/notes/{council-session-name}" and then report the exact path.
-- Ask follow-up -> ask user then restart at Step 3.
+- Write to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path.
+- Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
 - Done -> acknowledge and end.
 </runtime_action_paths>`,
 
@@ -345,7 +350,7 @@ Question({
     header: "Explanation Next Step",
     options: [
       { label: "Convert to action plan (Prometheus)", description: "Turn insights into a phased plan" },
-      { label: "Write to document", description: "Write under .sisyphus/athena/notes/{council-session-name}" },
+      { label: "Write to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
       { label: "Ask follow-up", description: "Ask another explanatory question" },
       { label: "Done", description: "No further action needed" }
     ],
@@ -355,8 +360,8 @@ Question({
 
 2) Execute selected action:
 - Convert to action plan (Prometheus) -> switch_agent(agent="prometheus") with synthesized explanation and target outcome.
-- Write to document -> write directly to ".sisyphus/athena/notes/{council-session-name}" and then report the exact path.
-- Ask follow-up -> ask user then restart at Step 3.
+- Write to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path.
+- Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
 - Done -> acknowledge and end.
 </runtime_action_paths>`,
 
@@ -405,7 +410,7 @@ Question({
       { label: "Implement selected creation (Hephaestus)", description: "Direct implementation with Hephaestus" },
       { label: "Implement selected creation (Sisyphus)", description: "Implementation with Sisyphus" },
       { label: "Implement selected creation (Sisyphus ultrawork)", description: "Implementation with Sisyphus using ultrawork mode" },
-      { label: "Write selected creation to document", description: "Write under .sisyphus/athena/notes/{council-session-name}" },
+      { label: "Write selected creation to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
       { label: "Ask follow-up", description: "Ask another creation-focused question" },
       { label: "Done", description: "No further action needed" }
     ],
@@ -417,8 +422,8 @@ Question({
 - Implement selected creation (Hephaestus) -> switch_agent(agent="hephaestus") with only selected creation(s).
 - Implement selected creation (Sisyphus) -> switch_agent(agent="sisyphus") with only selected creation(s).
 - Implement selected creation (Sisyphus ultrawork) -> switch_agent(agent="sisyphus") and prefix handoff context with "ultrawork ", including only selected creation(s).
-- Write selected creation to document -> write directly to ".sisyphus/athena/notes/{council-session-name}" and then report the exact path.
-- Ask follow-up -> ask user then restart at Step 3.
+- Write selected creation to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path.
+- Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
 - Done -> acknowledge and end.
 </runtime_action_paths>`,
 
@@ -443,7 +448,7 @@ Question({
     options: [
       { label: "Commit to stance -> create plan (Prometheus)", description: "Turn a chosen stance into a phased plan" },
       { label: "Commit to stance -> implement now", description: "Implement based on a chosen stance immediately" },
-      { label: "Write to document", description: "Write under .sisyphus/athena/notes/{council-session-name}" },
+      { label: "Write to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
       { label: "Ask follow-up", description: "Ask another perspective question" },
       { label: "Done", description: "No further action needed" }
     ],
@@ -482,8 +487,8 @@ Question({
 - Commit to stance -> implement now + Hephaestus -> switch_agent(agent="hephaestus") with selected stance.
 - Commit to stance -> implement now + Sisyphus -> switch_agent(agent="sisyphus") with selected stance.
 - Commit to stance -> implement now + Sisyphus ultrawork -> switch_agent(agent="sisyphus") and prefix handoff context with "ultrawork ".
-- Write to document -> write directly to ".sisyphus/athena/notes/{council-session-name}" and then report the exact path.
-- Ask follow-up -> ask user then restart at Step 3.
+- Write to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path.
+- Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
 - Done -> acknowledge and end.
 </runtime_action_paths>`,
 
@@ -506,7 +511,7 @@ Question({
     options: [
       { label: "Create plan (Prometheus)", description: "Turn the result into a phased execution plan" },
       { label: "Implement now", description: "Implement directly from this result" },
-      { label: "Write to document", description: "Write under .sisyphus/athena/notes/{council-session-name}" },
+      { label: "Write to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
       { label: "Ask follow-up", description: "Ask another question" },
       { label: "Done", description: "No further action needed" }
     ],
@@ -533,8 +538,8 @@ Question({
 - Implement now + Hephaestus -> switch_agent(agent="hephaestus") with synthesized result.
 - Implement now + Sisyphus -> switch_agent(agent="sisyphus") with synthesized result.
 - Implement now + Sisyphus ultrawork -> switch_agent(agent="sisyphus") and prefix handoff context with "ultrawork ".
-- Write to document -> write directly to ".sisyphus/athena/notes/{council-session-name}" and then report the exact path.
-- Ask follow-up -> ask user then restart at Step 3.
+- Write to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path.
+- Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
 - Done -> acknowledge and end.
 </runtime_action_paths>`,
 }

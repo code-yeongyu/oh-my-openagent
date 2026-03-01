@@ -86,6 +86,10 @@ export function createCouncilMemberAgent(model: string): AgentConfig {
     "lsp_symbols",
     "lsp_diagnostics",
     "ast_grep_search",
+    // call_omo_agent is included in both solo and delegation modes.
+    // Solo mode restricts its use via prompt instruction (COUNCIL_SOLO_ADDENDUM)
+    // rather than tool-level restriction. This is intentional — tool-level
+    // restriction would require separate agent configs per mode.
     "call_omo_agent",
     "background_output",
     "background_wait",
