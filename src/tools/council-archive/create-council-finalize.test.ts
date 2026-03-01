@@ -389,4 +389,177 @@ describe("createCouncilFinalize", () => {
       expect(result).toContain("NOT_A_REAL_INTENT")
     })
   })
+
+  describe("#given path traversal attempts", () => {
+    it("#then rejects task IDs with path traversal characters", async () => {
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", "bg_valid.md"),
+        mockTaskOutput("Agent", "Valid response"),
+        "utf-8",
+      )
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["../../etc/passwd", "bg_valid", "foo/bar"], name: "traversal" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      expect(result.members).toHaveLength(3)
+      expect(result.members[0].has_response).toBe(false)
+      expect(result.members[0].error).toContain("Invalid task ID")
+      expect(result.members[1].has_response).toBe(true)
+      expect(result.members[2].has_response).toBe(false)
+      expect(result.members[2].error).toContain("Invalid task ID")
+    })
+
+    it("#then sanitizes name with path traversal characters", async () => {
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", "bg_safe.md"),
+        mockTaskOutput("Agent", "Response"),
+        "utf-8",
+      )
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["bg_safe"], name: "../../etc" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-/)
+      expect(result.archive_dir).not.toContain("..")
+    })
+
+    it("#then sanitizes name with absolute path", async () => {
+      await writeFile(join(tmpDir, ".sisyphus", "task-outputs", "bg_abs.md"), mockTaskOutput("Agent", "Response"), "utf-8")
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["bg_abs"], name: "/absolute/path" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-/)
+      expect(result.archive_dir).not.toContain("/absolute/path")
+    })
+
+    it("#then sanitizes name with dot-dot-slash in the middle", async () => {
+      await writeFile(join(tmpDir, ".sisyphus", "task-outputs", "bg_mid.md"), mockTaskOutput("Agent", "Response"), "utf-8")
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["bg_mid"], name: "foo/../bar" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-/)
+      expect(result.archive_dir).not.toContain("..")
+    })
+
+    it("#then accepts valid task IDs", async () => {
+      await writeFile(join(tmpDir, ".sisyphus", "task-outputs", "valid-id_123.md"), mockTaskOutput("Agent", "Response"), "utf-8")
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["valid-id_123"], name: "valid" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      expect(result.members).toHaveLength(1)
+      expect(result.members[0].has_response).toBe(true)
+      expect(result.members[0].error).toBeUndefined()
+    })
+
+    it("#then rejects prompt_file with absolute path outside workspace", async () => {
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", "bg_prompt.md"),
+        mockTaskOutput("Agent", "Response"),
+        "utf-8",
+      )
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["bg_prompt"], name: "prompt-test", prompt_file: "/etc/passwd" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      expect(result.archive_dir).toBeDefined()
+      const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
+      expect(metaContent).not.toContain("prompt_file:")
+    })
+
+    it("#then rejects prompt_file with relative traversal", async () => {
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", "bg_rel.md"),
+        mockTaskOutput("Agent", "Response"),
+        "utf-8",
+      )
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["bg_rel"], name: "rel-test", prompt_file: "../../etc/passwd" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      expect(result.archive_dir).toBeDefined()
+      const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
+      expect(metaContent).not.toContain("prompt_file:")
+    })
+
+    it("#then accepts valid prompt_file under .sisyphus/tmp/", async () => {
+      await mkdir(join(tmpDir, ".sisyphus", "tmp"), { recursive: true })
+      await writeFile(join(tmpDir, ".sisyphus", "tmp", "athena-council-test.md"), "Test prompt", "utf-8")
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", "bg_ok.md"),
+        mockTaskOutput("Agent", "Response"),
+        "utf-8",
+      )
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["bg_ok"], name: "valid-prompt", prompt_file: ".sisyphus/tmp/athena-council-test.md" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
+      expect(metaContent).toContain("prompt_file:")
+    })
+
+    it("#then rejects task IDs with backslash characters", async () => {
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["bg\\evil"], name: "backslash" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      expect(result.members).toHaveLength(1)
+      expect(result.members[0].has_response).toBe(false)
+      expect(result.members[0].error).toContain("Invalid task ID")
+    })
+
+    it("#then handles name that slugifies to empty string", async () => {
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", "bg_empty_name.md"),
+        mockTaskOutput("Agent", "Response"),
+        "utf-8",
+      )
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: ["bg_empty_name"], name: "///..." },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+
+      expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-unnamed-[a-f0-9]{4}$/)
+    })
+  })
 })

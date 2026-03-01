@@ -1,6 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { readFile, writeFile, mkdir, rename } from "node:fs/promises"
-import { join, isAbsolute, resolve } from "node:path"
+import { join, isAbsolute, resolve, relative } from "node:path"
 import { randomBytes } from "node:crypto"
 import { extractCouncilResponse } from "./council-response-extractor"
 import {
@@ -28,6 +28,7 @@ type CouncilFinalizeToolContext = {
   sessionID?: string
 }
 
+const TASK_ID_PATTERN = /^[a-zA-Z0-9_-]+$/
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -120,10 +121,17 @@ export function createCouncilFinalize(
 
       const base = basePath ?? process.cwd()
       const hexId = randomBytes(2).toString("hex")
-      const archiveName = `council-${args.name}-${hexId}`
+      const safeName = slugify(args.name) || "unnamed"
+      const archiveName = `council-${safeName}-${hexId}`
       const relArchiveDir = join(".sisyphus", "athena", archiveName)
       const relArchiveDirForOutput = toPosixPath(relArchiveDir)
       const absArchiveDir = join(base, relArchiveDir)
+
+      const expectedArchiveRoot = join(base, ".sisyphus", "athena")
+      const relFromArchiveRoot = relative(expectedArchiveRoot, absArchiveDir)
+      if (relFromArchiveRoot.startsWith("..") || isAbsolute(relFromArchiveRoot)) {
+        return `Security error: archive directory would escape .sisyphus/athena/`
+      }
 
       await mkdir(absArchiveDir, { recursive: true })
 
@@ -131,9 +139,49 @@ export function createCouncilFinalize(
       const metaMembers: MetaMember[] = []
 
       for (const taskId of args.task_ids) {
+        if (!TASK_ID_PATTERN.test(taskId)) {
+          members.push({
+            task_id: taskId,
+            member: "unknown",
+            has_response: false,
+            error: "Invalid task ID: contains unsafe characters",
+          })
+          metaMembers.push({
+            task_id: taskId,
+            member: "unknown",
+            member_slug: "unknown",
+            task_output_path: "",
+            archive_file: "",
+            has_response: false,
+            response_complete: false,
+          })
+          continue
+        }
+
         const relTaskOutput = join(".sisyphus", "task-outputs", `${taskId}.md`)
         const relTaskOutputForOutput = toPosixPath(relTaskOutput)
         const absTaskOutput = join(base, relTaskOutput)
+
+        const expectedTaskOutputRoot = join(base, ".sisyphus", "task-outputs")
+        const relFromTaskOutputRoot = relative(expectedTaskOutputRoot, absTaskOutput)
+        if (relFromTaskOutputRoot.startsWith("..") || isAbsolute(relFromTaskOutputRoot)) {
+          members.push({
+            task_id: taskId,
+            member: "unknown",
+            has_response: false,
+            error: "Invalid task ID: resolved path escapes task-outputs directory",
+          })
+          metaMembers.push({
+            task_id: taskId,
+            member: "unknown",
+            member_slug: "unknown",
+            task_output_path: "",
+            archive_file: "",
+            has_response: false,
+            response_complete: false,
+          })
+          continue
+        }
 
         let fileContent: string
         try {
@@ -198,12 +246,18 @@ export function createCouncilFinalize(
         try {
           const promptFilename = "council-prompt.md"
           const absPromptSrc = isAbsolute(args.prompt_file) ? args.prompt_file : resolve(base, args.prompt_file)
-          const absPromptDest = join(absArchiveDir, promptFilename)
-          await rename(absPromptSrc, absPromptDest).catch(async () => {
-            const content = await readFile(absPromptSrc, "utf-8")
-            await writeFile(absPromptDest, content, "utf-8")
-          })
-          relPromptFile = toPosixPath(join(relArchiveDir, promptFilename))
+          const expectedPromptRoot = join(base, ".sisyphus", "tmp")
+          const relFromPromptRoot = relative(expectedPromptRoot, absPromptSrc)
+          if (relFromPromptRoot.startsWith("..") || isAbsolute(relFromPromptRoot)) {
+            log("[council-finalize] Rejected prompt_file outside .sisyphus/tmp/", { promptFile: args.prompt_file })
+          } else {
+            const absPromptDest = join(absArchiveDir, promptFilename)
+            await rename(absPromptSrc, absPromptDest).catch(async () => {
+              const content = await readFile(absPromptSrc, "utf-8")
+              await writeFile(absPromptDest, content, "utf-8")
+            })
+            relPromptFile = toPosixPath(join(relArchiveDir, promptFilename))
+          }
         } catch (err) {
           log("[council-finalize] Failed to move prompt file", { promptFile: args.prompt_file, error: String(err) })
         }
