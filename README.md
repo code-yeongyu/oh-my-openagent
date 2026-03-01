@@ -98,6 +98,7 @@ Academic papers, EU proposals, systematic reviews, project management, IP exploi
 <td colspan="2">
 
 ### Sentinel — *The Security Auditor*
+<img src=".github/assets/sentinel.png" width="120" align="right"/>
 
 **Claude Opus 4.6** &middot; Read-only security specialist
 
