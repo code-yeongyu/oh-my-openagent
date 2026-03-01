@@ -1,4 +1,4 @@
-import { readFile, writeFile, rename } from "node:fs/promises"
+import { readFile, writeFile, rename, unlink } from "node:fs/promises"
 import { join, isAbsolute, resolve, relative } from "node:path"
 import { log } from "../../shared/logger"
 
@@ -24,7 +24,7 @@ export function extractAgentFromFrontmatter(content: string): string | null {
 
 export function isPathEscaping(expectedRoot: string, targetPath: string): boolean {
   const rel = relative(expectedRoot, targetPath)
-  return rel.startsWith("..") || isAbsolute(rel)
+  return rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)
 }
 
 export async function movePromptFile(
@@ -42,9 +42,11 @@ export async function movePromptFile(
       return undefined
     }
     const absPromptDest = join(absArchiveDir, promptFilename)
-    await rename(absPromptSrc, absPromptDest).catch(async () => {
+    await rename(absPromptSrc, absPromptDest).catch(async (renameErr) => {
+      log("[council-finalize] Rename failed, falling back to copy", { promptFile: promptFilePath, error: String(renameErr) })
       const content = await readFile(absPromptSrc, "utf-8")
       await writeFile(absPromptDest, content, "utf-8")
+      await unlink(absPromptSrc).catch(() => {})
     })
     return toPosixPath(join(relArchiveDir, promptFilename))
   } catch (err) {
