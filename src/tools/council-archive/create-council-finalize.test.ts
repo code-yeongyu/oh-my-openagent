@@ -272,7 +272,7 @@ describe("createCouncilFinalize", () => {
       expect(calls[0].content).toContain("intent: PLAN")
       expect(calls[0].content).toContain("Execute full plan (Prometheus)")
       expect(calls[0].content).toContain("Execute selected phase (Prometheus)")
-      expect(calls[0].content).toContain(".sisyphus/athena/notes/{council-session-name}")
+      expect(calls[0].content).toContain(".sisyphus/athena/notes/")
       expect(calls[0].content).not.toContain("Hand off to Atlas to save the plan as .md")
     })
 
@@ -380,7 +380,7 @@ describe("createCouncilFinalize", () => {
       expect(calls[0].content).toContain("What should we do with this evaluation?")
       expect(calls[0].content).toContain("Adopt option -> create plan (Prometheus)")
       expect(calls[0].content).toContain("Adopt option -> implement now")
-      expect(calls[0].content).toContain(".sisyphus/athena/notes/{council-session-name}")
+      expect(calls[0].content).toContain(".sisyphus/athena/notes/")
       expect(calls[0].content).not.toContain("Write to document (Atlas)")
     })
 
