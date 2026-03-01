@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { COUNCIL_MEMBER_PROMPT, createCouncilMemberAgent } from "./council-member-agent"
+import { COUNCIL_MEMBER_PROMPT, COUNCIL_SOLO_ADDENDUM, createCouncilMemberAgent } from "./council-member-agent"
 
 describe("COUNCIL_MEMBER_PROMPT", () => {
   describe("#given the prompt constant", () => {
@@ -40,6 +40,24 @@ describe("COUNCIL_MEMBER_PROMPT", () => {
 
       it("#then contains evidence-based (generic analysis language)", () => {
         expect(COUNCIL_MEMBER_PROMPT).toContain("evidence-based")
+      })
+    })
+  })
+})
+
+describe("COUNCIL_SOLO_ADDENDUM", () => {
+  describe("#given the solo mode addendum", () => {
+    describe("#when checking for prohibition language", () => {
+      it("#then contains call_omo_agent (prohibition)", () => {
+        expect(COUNCIL_SOLO_ADDENDUM).toContain("call_omo_agent")
+      })
+
+      it("#then contains Do NOT (prohibition language)", () => {
+        expect(COUNCIL_SOLO_ADDENDUM).toContain("Do NOT")
+      })
+
+      it("#then contains ALL exploration yourself (self-reliance instruction)", () => {
+        expect(COUNCIL_SOLO_ADDENDUM).toContain("ALL exploration yourself")
       })
     })
   })

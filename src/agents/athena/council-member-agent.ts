@@ -1,3 +1,4 @@
+import { MIN_RESPONSE_LENGTH } from "../../tools/council-archive/council-response-extractor"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
 import { createAgentToolAllowlist } from "../../shared"
@@ -37,7 +38,7 @@ Your analysis here...
 </COUNCIL_MEMBER_RESPONSE>
 
 If you do not wrap your response in <COUNCIL_MEMBER_RESPONSE> tags, your analysis will not be included in the synthesis.
-Your response inside the tags must be at least 100 characters of substantive content. Empty or trivially short responses will be treated as missing and will not count toward quorum.`
+Your response inside the tags must be at least ${MIN_RESPONSE_LENGTH} characters of substantive content. Empty or trivially short responses will be treated as missing and will not count toward quorum.`
 
 export const COUNCIL_SOLO_ADDENDUM = `
 ## Solo Analysis Mode
