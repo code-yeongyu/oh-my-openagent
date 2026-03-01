@@ -821,6 +821,7 @@ export class BackgroundManager {
       task.error = errorMsg
       task.completedAt = new Date()
       this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "error", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+      resetCouncilNudgeCount(task.id)
 
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)
@@ -1111,6 +1112,7 @@ export class BackgroundManager {
       task.error = reason
     }
     this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "cancelled", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+    resetCouncilNudgeCount(task.id)
 
     if (task.concurrencyKey) {
       this.concurrencyManager.release(task.concurrencyKey)
@@ -1483,6 +1485,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         task.status = "error"
         task.error = errorMessage
         task.completedAt = new Date()
+        resetCouncilNudgeCount(task.id)
         if (task.concurrencyKey) {
           this.concurrencyManager.release(task.concurrencyKey)
           task.concurrencyKey = undefined

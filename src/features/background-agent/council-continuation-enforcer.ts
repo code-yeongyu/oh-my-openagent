@@ -74,7 +74,6 @@ export function sendCouncilContinuationNudge(
       parts: [createInternalAgentTextPart(CONTINUATION_PROMPT)],
     },
   }).catch((error) => {
-    nudgeCountByTask.set(task.id, count)
     log("[council-continuation] Nudge prompt error:", {
       taskId: task.id,
       error: String(error),

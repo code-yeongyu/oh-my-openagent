@@ -358,6 +358,28 @@ describe("sendCouncilContinuationNudge", () => {
       resetCouncilNudgeCount(task.id)
     })
   })
+
+  describe("#given promptAsync persistently fails", () => {
+    it("#when called MAX_NUDGE_ATTEMPTS times #then counter still reaches max and next call returns false", () => {
+      //#given
+      const client = {
+        session: { promptAsync: mock(() => Promise.reject(new Error("persistent network error"))) },
+      }
+      const task = createRunningTask({ id: "task-nudge-persistent-fail" })
+      resetCouncilNudgeCount(task.id)
+
+      //#when - exhaust all 5 attempts despite every promptAsync failing
+      for (let i = 0; i < 5; i++) {
+        const result = sendCouncilContinuationNudge(client as never, task, task.sessionID!)
+        expect(result).toBe(true)
+      }
+      const resultAfterMax = sendCouncilContinuationNudge(client as never, task, task.sessionID!)
+
+      //#then - counter was not rolled back, so max was reached
+      expect(resultAfterMax).toBe(false)
+      expect(client.session.promptAsync).toHaveBeenCalledTimes(5)
+    })
+  })
 })
 
 describe("resetCouncilNudgeCount", () => {
@@ -387,6 +409,31 @@ describe("resetCouncilNudgeCount", () => {
       )
       expect(resultAfterReset).toBe(true)
       expect(clientAfterReset.session.promptAsync).toHaveBeenCalledTimes(1)
+
+      // cleanup
+      resetCouncilNudgeCount(task.id)
+    })
+  })
+
+  describe("#given nudge count exists for a task", () => {
+    it("#when resetCouncilNudgeCount is called #then memory is cleaned up and nudging restarts from zero", () => {
+      //#given
+      const client = createMockClient()
+      const task = createRunningTask({ id: "task-cleanup-test" })
+      sendCouncilContinuationNudge(client as never, task, task.sessionID!)
+      sendCouncilContinuationNudge(client as never, task, task.sessionID!)
+      sendCouncilContinuationNudge(client as never, task, task.sessionID!)
+
+      //#when
+      resetCouncilNudgeCount(task.id)
+
+      //#then - counter is cleared, all 5 nudge attempts available again
+      const freshClient = createMockClient()
+      for (let i = 0; i < 5; i++) {
+        expect(sendCouncilContinuationNudge(freshClient as never, task, task.sessionID!)).toBe(true)
+      }
+      expect(sendCouncilContinuationNudge(freshClient as never, task, task.sessionID!)).toBe(false)
+      expect(freshClient.session.promptAsync).toHaveBeenCalledTimes(5)
 
       // cleanup
       resetCouncilNudgeCount(task.id)
