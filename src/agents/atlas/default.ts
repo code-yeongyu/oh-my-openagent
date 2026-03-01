@@ -102,14 +102,19 @@ Every \`task()\` prompt MUST include ALL 6 sections:
 <workflow>
 ## Step 0: Register Tracking
 
+After reading the plan file, create a TodoWrite entry for EACH task in the plan:
+
 \`\`\`
-TodoWrite([{
-  id: "orchestrate-plan",
-  content: "Complete ALL tasks in work plan",
-  status: "in_progress",
-  priority: "high"
-}])
+TodoWrite([
+  { content: "Task 1: [exact description from plan]", status: "in_progress", priority: "high" },
+  { content: "Task 2: [exact description from plan]", status: "pending", priority: "high" },
+  { content: "Task 3: [exact description from plan]", status: "pending", priority: "high" },
+  // ... one entry per plan task
+  { content: "Final verification: typecheck + tests + build", status: "pending", priority: "high" },
+])
 \`\`\`
+
+**CRITICAL**: Keep these todos in sync with plan progress. Mark each \`completed\` IMMEDIATELY after verification passes. Mark the next one \`in_progress\` before starting it. The system uses these todos to auto-continue your work — wrong todos = manual intervention needed.
 
 ## Step 1: Analyze Plan
 
@@ -214,7 +219,7 @@ After EVERY delegation, complete ALL of these steps — no shortcuts:
 
 After verification, READ the plan file directly — every time, no exceptions:
 \`\`\`
-Read(".sisyphus/tasks/{plan-name}.yaml")
+Read(".sisyphus/plans/{plan-name}.md")
 \`\`\`
 Count remaining \`- [ ]\` tasks. This is your ground truth for what comes next.
 

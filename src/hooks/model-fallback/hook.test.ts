@@ -1,4 +1,9 @@
-import { beforeEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "fs"
+import { join } from "path"
+import { tmpdir } from "os"
+
+import { _overrideForTesting as overrideCacheForTesting } from "../../shared/connected-providers-cache"
 
 import {
   clearPendingModelFallback,
@@ -7,8 +12,17 @@ import {
 } from "./hook"
 
 describe("model fallback hook", () => {
+  let tempCacheDir: string
+
   beforeEach(() => {
+    tempCacheDir = mkdtempSync(join(tmpdir(), "model-fallback-test-"))
+    overrideCacheForTesting(tempCacheDir)
     clearPendingModelFallback("ses_model_fallback_main")
+  })
+
+  afterEach(() => {
+    overrideCacheForTesting(undefined)
+    rmSync(tempCacheDir, { recursive: true, force: true })
   })
 
   test("applies pending fallback on chat.message by overriding model", async () => {

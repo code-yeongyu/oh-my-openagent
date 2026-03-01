@@ -5,7 +5,7 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
 - \`/start-work [plan-name] [--worktree <path>]\`
   - \`plan-name\` (optional): name or partial match of the plan to start
   - \`--worktree <path>\` (optional): absolute path to an existing git worktree to work in
-    - If specified and valid: hook pre-sets worktree_path in boulder.json
+    - If specified and valid: hook pre-sets worktree_path in boulder state
     - If specified but invalid: you must run \`git worktree add <path> <branch>\` first
     - If omitted: you MUST choose or create a worktree (see Worktree Setup below)
 
@@ -13,24 +13,24 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
 
 1. **Find available plans**: Search for Prometheus-generated plan files at \`.sisyphus/plans/\`
 
-2. **Check for active boulder state**: Read \`.sisyphus/boulder.json\` if it exists
+2. **Check for active boulder state**: The hook handles this automatically via per-plan storage at \`.sisyphus/boulder/{plan-name}.json\`
 
 3. **Decision logic**:
-   - If \`.sisyphus/boulder.json\` exists AND plan is NOT complete (has unchecked boxes):
-     - **APPEND** current session to session_ids
+   - If an active boulder state exists for the plan AND plan is NOT complete (has unchecked boxes):
+     - **APPEND** current session to session_ids (hook does this automatically)
      - Continue work on existing plan
    - If no active plan OR plan is complete:
      - List available plan files
      - If ONE plan: auto-select it
      - If MULTIPLE plans: show list with timestamps, ask user to select
 
-4. **Worktree Setup** (when \`worktree_path\` not already set in boulder.json):
+4. **Worktree Setup** (when \`worktree_path\` not already set in boulder state):
    1. \`git worktree list --porcelain\` — see available worktrees
    2. Create: \`git worktree add <absolute-path> <branch-or-HEAD>\`
-   3. Update boulder.json to add \`"worktree_path": "<absolute-path>"\`
+   3. The hook will set \`worktree_path\` in the per-plan boulder state automatically
    4. All work happens inside that worktree directory
 
-5. **Create/Update boulder.json**:
+5. **Boulder state** (managed by hook at \`.sisyphus/boulder/{plan-name}.json\`):
    \`\`\`json
    {
      "active_plan": "/absolute/path/to/plan.md",
@@ -85,7 +85,7 @@ Reading plan and beginning execution...
 ## CRITICAL
 
 - The session_id is injected by the hook - use it directly
-- Always update boulder.json BEFORE starting work
-- Always set worktree_path in boulder.json before executing any tasks
+- The hook manages boulder state automatically — do NOT manually edit \`.sisyphus/boulder/*.json\` files
+- Always set worktree_path via the hook, not by manually editing boulder state
 - Read the FULL plan file before delegating any tasks
 - Follow atlas delegation protocols (7-section format)`

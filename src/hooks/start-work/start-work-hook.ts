@@ -2,13 +2,14 @@ import { statSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
 import {
   readBoulderState,
-  writeBoulderState,
-  appendSessionId,
+  writeBoulderStateForPlan,
+  appendSessionIdForPlan,
   findPrometheusPlans,
   getPlanProgress,
   createBoulderState,
   getPlanName,
-  clearBoulderState,
+  removeSessionIdForPlan,
+  findBoulderStateBySession,
 } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { updateSessionAgent } from "../../features/claude-code-session-state"
@@ -41,7 +42,7 @@ No worktree specified. Before starting work, you MUST choose or create one:
 
 1. \`git worktree list --porcelain\` — list existing worktrees
 2. Create if needed: \`git worktree add <absolute-path> <branch-or-HEAD>\`
-3. Update \`.sisyphus/boulder.json\` — add \`"worktree_path": "<absolute-path>"\`
+3. Update the boulder state — the hook manages \`.sisyphus/boulder/{plan-name}.json\` automatically, or use \`git worktree add\` and re-run \`/start-work\`
 4. Work exclusively inside that worktree directory`
 
 function resolveWorktreeContext(
@@ -78,8 +79,8 @@ export function createStartWorkHook(ctx: PluginInput) {
       log(`[${HOOK_NAME}] Processing start-work command`, { sessionID: input.sessionID })
       updateSessionAgent(input.sessionID, "atlas")
 
-      const existingState = readBoulderState(ctx.directory)
       const sessionId = input.sessionID
+      const existingState = findBoulderStateBySession(ctx.directory, sessionId) ?? readBoulderState(ctx.directory)
       const timestamp = new Date().toISOString()
 
       const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)
@@ -103,9 +104,9 @@ export function createStartWorkHook(ctx: PluginInput) {
 The requested plan "${getPlanName(matchedPlan)}" has been completed.
 All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
           } else {
-            if (existingState) clearBoulderState(ctx.directory)
+            if (existingState) removeSessionIdForPlan(ctx.directory, existingState.plan_name, sessionId)
             const newState = createBoulderState(matchedPlan, sessionId, "atlas", worktreePath)
-            writeBoulderState(ctx.directory, newState)
+            writeBoulderStateForPlan(ctx.directory, newState.plan_name, newState)
 
             contextInfo = `
 ## Auto-Selected Plan
@@ -153,16 +154,15 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
           const effectiveWorktree = worktreePath ?? existingState.worktree_path
 
           if (worktreePath !== undefined) {
-            const updatedSessions = existingState.session_ids.includes(sessionId)
-              ? existingState.session_ids
-              : [...existingState.session_ids, sessionId]
-            writeBoulderState(ctx.directory, {
-              ...existingState,
-              worktree_path: worktreePath,
-              session_ids: updatedSessions,
-            })
+            const freshState = appendSessionIdForPlan(ctx.directory, existingState.plan_name, sessionId)
+            if (freshState) {
+              writeBoulderStateForPlan(ctx.directory, existingState.plan_name, {
+                ...freshState,
+                worktree_path: worktreePath,
+              })
+            }
           } else {
-            appendSessionId(ctx.directory, sessionId)
+            appendSessionIdForPlan(ctx.directory, existingState.plan_name, sessionId)
           }
 
           const worktreeDisplay = effectiveWorktree ? `\n**Worktree**: ${effectiveWorktree}` : worktreeBlock
@@ -212,7 +212,7 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
           const planPath = incompletePlans[0]
           const progress = getPlanProgress(planPath)
           const newState = createBoulderState(planPath, sessionId, "atlas", worktreePath)
-          writeBoulderState(ctx.directory, newState)
+          writeBoulderStateForPlan(ctx.directory, newState.plan_name, newState)
 
           contextInfo += `
 

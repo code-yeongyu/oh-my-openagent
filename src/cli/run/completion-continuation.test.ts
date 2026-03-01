@@ -1,6 +1,6 @@
 import { describe, it, expect, mock, spyOn, afterEach } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, basename } from "node:path"
 import { tmpdir } from "node:os"
 import type { RunContext } from "./types"
 import { writeState as writeRalphLoopState } from "../../hooks/ralph-loop/storage"
@@ -38,15 +38,16 @@ function createMockContext(directory: string): RunContext {
 }
 
 function writeBoulderStateFile(directory: string, activePlanPath: string, sessionIDs: string[]): void {
-  const sisyphusDir = join(directory, ".sisyphus")
-  mkdirSync(sisyphusDir, { recursive: true })
+  const planName = basename(activePlanPath, ".md")
+  const boulderDir = join(directory, ".sisyphus", "boulder")
+  mkdirSync(boulderDir, { recursive: true })
   writeFileSync(
-    join(sisyphusDir, "boulder.json"),
+    join(boulderDir, `${planName}.json`),
     JSON.stringify({
       active_plan: activePlanPath,
       started_at: new Date().toISOString(),
       session_ids: sessionIDs,
-      plan_name: "test-plan",
+      plan_name: planName,
       agent: "atlas",
     }),
     "utf-8",

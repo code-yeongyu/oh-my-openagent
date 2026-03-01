@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createRalphLoopHook } from "./index"
+import { createLoopStateController } from "./loop-state-controller"
 import { readState, writeState, clearState } from "./storage"
 import type { RalphLoopState } from "./types"
 import { parseRalphLoopArguments } from "./command-arguments"
@@ -311,7 +312,7 @@ describe("ralph-loop", () => {
 
       const state = hook.getState()!
       state.iteration = 2
-      writeState(TEST_DIR, state)
+      writeState(TEST_DIR, state, undefined, state.session_id)
 
       // when - session goes idle
       await hook.event({
@@ -428,7 +429,7 @@ describe("ralph-loop", () => {
         prompt: "Build something",
         session_id: "orphaned-session-999", // This session no longer exists
       }
-      writeState(TEST_DIR, state)
+      writeState(TEST_DIR, state, undefined, state.session_id)
 
       // Mock sessionExists to return false for the orphaned session
       const hook = createRalphLoopHook(createMockPluginInput(), {
@@ -463,7 +464,7 @@ describe("ralph-loop", () => {
         prompt: "Build something",
         session_id: "active-session-123", // This session still exists
       }
-      writeState(TEST_DIR, state)
+      writeState(TEST_DIR, state, undefined, state.session_id)
 
       // Mock sessionExists to return true for the active session
       const hook = createRalphLoopHook(createMockPluginInput(), {
@@ -893,17 +894,21 @@ describe("ralph-loop", () => {
       // given - active loop in session A
       const hook = createRalphLoopHook(createMockPluginInput())
       hook.startLoop("session-A", "First task", { maxIterations: 10 })
-      expect(hook.getState()?.session_id).toBe("session-A")
-      expect(hook.getState()?.prompt).toBe("First task")
+      expect(readState(TEST_DIR, undefined, "session-A")?.session_id).toBe("session-A")
+      expect(readState(TEST_DIR, undefined, "session-A")?.prompt).toBe("First task")
 
       // when - start new loop in session B (without completing A)
       hook.startLoop("session-B", "Second task", { maxIterations: 20 })
 
-      // then - state should be overwritten with session B's loop
-      expect(hook.getState()?.session_id).toBe("session-B")
-      expect(hook.getState()?.prompt).toBe("Second task")
-      expect(hook.getState()?.max_iterations).toBe(20)
-      expect(hook.getState()?.iteration).toBe(1)
+      // then - session B should have its own independent state
+      const stateB = readState(TEST_DIR, undefined, "session-B")
+      expect(stateB?.session_id).toBe("session-B")
+      expect(stateB?.prompt).toBe("Second task")
+      expect(stateB?.max_iterations).toBe(20)
+      expect(stateB?.iteration).toBe(1)
+
+      // then - session A state should still exist independently
+      expect(readState(TEST_DIR, undefined, "session-A")?.session_id).toBe("session-A")
 
       // when - session B goes idle
       await hook.event({
@@ -916,8 +921,8 @@ describe("ralph-loop", () => {
       expect(promptCalls[0].text).toContain("Second task")
       expect(promptCalls[0].text).toContain("2/20")
 
-      // then - iteration incremented
-      expect(hook.getState()?.iteration).toBe(2)
+      // then - session B iteration incremented
+      expect(readState(TEST_DIR, undefined, "session-B")?.iteration).toBe(2)
     })
 
     test("should allow starting new loop in same session (restart)", async () => {
@@ -1143,6 +1148,110 @@ Original task: Build something`
     })
   })
 
+  describe("loop state controller fallback consistency", () => {
+    const CONTROLLER_TEST_DIR = join(tmpdir(), "ralph-loop-controller-test-" + Date.now())
+
+    beforeEach(() => {
+      if (!existsSync(CONTROLLER_TEST_DIR)) {
+        mkdirSync(CONTROLLER_TEST_DIR, { recursive: true })
+      }
+      clearState(CONTROLLER_TEST_DIR)
+    })
+
+    afterEach(() => {
+      clearState(CONTROLLER_TEST_DIR)
+      if (existsSync(CONTROLLER_TEST_DIR)) {
+        rmSync(CONTROLLER_TEST_DIR, { recursive: true, force: true })
+      }
+    })
+
+    test("getState() without sessionID should find active per-session state", () => {
+      // given - a per-session state file exists
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 1,
+        max_iterations: 100,
+        completion_promise: "DONE",
+        started_at: "2026-01-01T00:00:00Z",
+        prompt: "Test task",
+        session_id: "session-A",
+      }
+      writeState(CONTROLLER_TEST_DIR, state, undefined, "session-A")
+
+      // when - call getState without sessionID
+      const controller = createLoopStateController({
+        directory: CONTROLLER_TEST_DIR,
+        stateDir: undefined,
+        config: undefined,
+      })
+      const result = controller.getState()
+
+      // then - should return the state found via findAnyActiveRalphLoopState
+      expect(result).not.toBeNull()
+      expect(result?.session_id).toBe("session-A")
+      expect(result?.prompt).toBe("Test task")
+      expect(result?.iteration).toBe(1)
+    })
+
+    test("clear() without sessionID should clear active per-session state", () => {
+      // given - a per-session state file exists
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 2,
+        max_iterations: 100,
+        completion_promise: "DONE",
+        started_at: "2026-01-01T00:00:00Z",
+        prompt: "Test task",
+        session_id: "session-A",
+      }
+      writeState(CONTROLLER_TEST_DIR, state, undefined, "session-A")
+
+      // when - call clear without sessionID
+      const controller = createLoopStateController({
+        directory: CONTROLLER_TEST_DIR,
+        stateDir: undefined,
+        config: undefined,
+      })
+      const clearResult = controller.clear()
+
+      // then - should return true and state should be cleared
+      expect(clearResult).toBe(true)
+      const readResult = readState(CONTROLLER_TEST_DIR, undefined, "session-A")
+      expect(readResult).toBeNull()
+    })
+
+    test("incrementIteration() without sessionID should increment active per-session state", () => {
+      // given - a per-session state file exists with iteration=3
+      const state: RalphLoopState = {
+        active: true,
+        iteration: 3,
+        max_iterations: 100,
+        completion_promise: "DONE",
+        started_at: "2026-01-01T00:00:00Z",
+        prompt: "Test task",
+        session_id: "session-A",
+      }
+      writeState(CONTROLLER_TEST_DIR, state, undefined, "session-A")
+
+      // when - call incrementIteration without sessionID
+      const controller = createLoopStateController({
+        directory: CONTROLLER_TEST_DIR,
+        stateDir: undefined,
+        config: undefined,
+      })
+      const result = controller.incrementIteration()
+
+      // then - should return state with iteration=4
+      expect(result).not.toBeNull()
+      expect(result?.iteration).toBe(4)
+      expect(result?.session_id).toBe("session-A")
+
+      // then - on-disk state should also be 4
+      const onDiskState = readState(CONTROLLER_TEST_DIR, undefined, "session-A")
+      expect(onDiskState?.iteration).toBe(4)
+    })
+  })
+
   describe("API timeout protection", () => {
     test("should not hang when session.messages() throws", async () => {
       // given - API that throws (simulates timeout error)
@@ -1179,5 +1288,121 @@ Original task: Build something`
       expect(promptCalls.length).toBe(1)
       expect(apiCallCount).toBeGreaterThan(0)
     })
+  })
+})
+
+describe("setSessionID isolation", () => {
+  const TEST_DIR = join(tmpdir(), "ralph-loop-test-isolation-" + Date.now())
+
+  beforeEach(() => {
+    if (!existsSync(TEST_DIR)) {
+      mkdirSync(TEST_DIR, { recursive: true })
+    }
+    clearState(TEST_DIR)
+  })
+
+  afterEach(() => {
+    clearState(TEST_DIR)
+    if (existsSync(TEST_DIR)) {
+      rmSync(TEST_DIR, { recursive: true, force: true })
+    }
+  })
+
+  test("should not hijack another agent's state when stateDir is undefined", () => {
+    // given - two session state files exist (simulating two concurrent agents)
+    const controller = createLoopStateController({
+      directory: TEST_DIR,
+      stateDir: undefined,
+      config: undefined,
+    })
+
+    const stateA: RalphLoopState = {
+      active: true,
+      iteration: 1,
+      max_iterations: 100,
+      completion_promise: "<promise>DONE</promise>",
+      started_at: "2025-12-30T01:00:00Z",
+      prompt: "Agent A task",
+      session_id: "session-A",
+    }
+
+    const stateB: RalphLoopState = {
+      active: true,
+      iteration: 2,
+      max_iterations: 100,
+      completion_promise: "<promise>DONE</promise>",
+      started_at: "2025-12-30T01:05:00Z",
+      prompt: "Agent B task",
+      session_id: "session-B",
+    }
+
+    // Write both states to disk
+    writeState(TEST_DIR, stateA, undefined, "session-A")
+    writeState(TEST_DIR, stateB, undefined, "session-B")
+
+    // when - setSessionID is called with a new session ID
+    const result = controller.setSessionID("session-C")
+
+    // then - should return null (no legacy singleton exists)
+    expect(result).toBeNull()
+
+    // then - both original session files should be unchanged
+    const readA = readState(TEST_DIR, undefined, "session-A")
+    const readB = readState(TEST_DIR, undefined, "session-B")
+    expect(readA?.session_id).toBe("session-A")
+    expect(readB?.session_id).toBe("session-B")
+  })
+
+  test("should return null when no legacy singleton exists and stateDir is undefined", () => {
+    // given - no state files exist
+    const controller = createLoopStateController({
+      directory: TEST_DIR,
+      stateDir: undefined,
+      config: undefined,
+    })
+
+    // when - setSessionID is called
+    const result = controller.setSessionID("session-X")
+
+    // then - should return null
+    expect(result).toBeNull()
+  })
+
+  test("should correctly rebind session when legacy singleton exists", () => {
+    // given - legacy singleton state file exists
+    const controller = createLoopStateController({
+      directory: TEST_DIR,
+      stateDir: undefined,
+      config: undefined,
+    })
+
+    const legacyState: RalphLoopState = {
+      active: true,
+      iteration: 5,
+      max_iterations: 100,
+      completion_promise: "<promise>DONE</promise>",
+      started_at: "2025-12-30T01:00:00Z",
+      prompt: "Original task",
+      session_id: "old-session",
+    }
+
+    // Write to legacy singleton path
+    writeState(TEST_DIR, legacyState)
+
+    // when - setSessionID is called with new session ID
+    const result = controller.setSessionID("new-session")
+
+    // then - should return state with updated session_id
+    expect(result).not.toBeNull()
+    expect(result?.session_id).toBe("new-session")
+    expect(result?.iteration).toBe(5) // iteration preserved
+
+    // then - new session file should exist with updated session_id
+    const newSessionState = readState(TEST_DIR, undefined, "new-session")
+    expect(newSessionState?.session_id).toBe("new-session")
+
+    // then - old session file should be cleaned up
+    const oldSessionState = readState(TEST_DIR, undefined, "old-session")
+    expect(oldSessionState).toBeNull()
   })
 })

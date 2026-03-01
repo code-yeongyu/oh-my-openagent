@@ -1,4 +1,9 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "fs"
+import { join } from "path"
+import { tmpdir } from "os"
+
+import { _overrideForTesting as overrideCacheForTesting } from "../shared/connected-providers-cache"
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
@@ -6,6 +11,13 @@ import { _resetForTesting, setMainSession } from "../features/claude-code-sessio
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 
 describe("createEventHandler - model fallback", () => {
+  let tempCacheDir: string
+
+  beforeEach(() => {
+    tempCacheDir = mkdtempSync(join(tmpdir(), "event-model-fallback-test-"))
+    overrideCacheForTesting(tempCacheDir)
+  })
+
   const createHandler = (args?: { hooks?: any }) => {
     const abortCalls: string[] = []
     const promptCalls: string[] = []
@@ -47,6 +59,8 @@ describe("createEventHandler - model fallback", () => {
   }
 
   afterEach(() => {
+    overrideCacheForTesting(undefined)
+    rmSync(tempCacheDir, { recursive: true, force: true })
     _resetForTesting()
   })
 

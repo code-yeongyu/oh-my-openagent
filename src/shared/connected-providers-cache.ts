@@ -6,6 +6,15 @@ import { getOmoOpenCodeCacheDir } from "./data-path"
 const CONNECTED_PROVIDERS_CACHE_FILE = "connected-providers.json"
 const PROVIDER_MODELS_CACHE_FILE = "provider-models.json"
 
+let _testCacheDirOverride: string | undefined
+
+/**
+ * Override the cache directory for testing. Pass undefined to clear.
+ * When set, all cache reads/writes use this directory instead of the real one.
+ */
+export function _overrideForTesting(cacheDir: string | undefined): void {
+	_testCacheDirOverride = cacheDir
+}
 interface ConnectedProvidersCache {
 	connected: string[]
 	updatedAt: string
@@ -26,6 +35,7 @@ interface ProviderModelsCache {
 }
 
 function getCacheFilePath(filename: string): string {
+	if (_testCacheDirOverride !== undefined) return join(_testCacheDirOverride, filename)
 	return join(getOmoOpenCodeCacheDir(), filename)
 }
 

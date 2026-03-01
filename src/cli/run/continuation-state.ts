@@ -1,10 +1,10 @@
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { getPlanProgress, findBoulderStateBySession } from "../../features/boulder-state"
 import {
   getActiveContinuationMarkerReason,
   isContinuationMarkerActive,
   readContinuationMarker,
 } from "../../features/run-continuation-state"
-import { readState as readRalphLoopState } from "../../hooks/ralph-loop/storage"
+import { readStateForSession, findAnyActiveRalphLoopState, migrateLegacyRalphLoopState } from "../../hooks/ralph-loop/storage"
 
 export interface ContinuationState {
   hasActiveBoulder: boolean
@@ -29,19 +29,23 @@ export function getContinuationState(directory: string, sessionID: string): Cont
 }
 
 function hasActiveBoulderContinuation(directory: string, sessionID: string): boolean {
-  const boulder = readBoulderState(directory)
+  const boulder = findBoulderStateBySession(directory, sessionID)
   if (!boulder) return false
-  if (!boulder.session_ids.includes(sessionID)) return false
 
   const progress = getPlanProgress(boulder.active_plan)
   return !progress.isComplete
 }
 
 function hasActiveRalphLoopContinuation(directory: string, sessionID: string): boolean {
-  const state = readRalphLoopState(directory)
-  if (!state || !state.active) return false
+  migrateLegacyRalphLoopState(directory)
 
-  if (state.session_id && state.session_id !== sessionID) {
+  const sessionState = readStateForSession(directory, sessionID)
+  if (sessionState?.active) return true
+
+  const anyActive = findAnyActiveRalphLoopState(directory)
+  if (!anyActive || !anyActive.active) return false
+
+  if (anyActive.session_id && anyActive.session_id !== sessionID) {
     return false
   }
 

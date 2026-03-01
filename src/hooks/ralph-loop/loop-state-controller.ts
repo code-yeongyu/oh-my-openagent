@@ -4,7 +4,7 @@ import {
 	DEFAULT_MAX_ITERATIONS,
 	HOOK_NAME,
 } from "./constants"
-import { clearState, incrementIteration, readState, writeState } from "./storage"
+import { clearState, findAnyActiveRalphLoopState, findSecondActiveRalphLoopState, incrementIteration, readState, writeState } from "./storage"
 import { log } from "../../shared/logger"
 
 export function createLoopStateController(options: {
@@ -46,7 +46,7 @@ export function createLoopStateController(options: {
 				session_id: sessionID,
 			}
 
-			const success = writeState(directory, state, stateDir)
+			const success = writeState(directory, state, stateDir, stateDir ? undefined : sessionID)
 			if (success) {
 				log(`[${HOOK_NAME}] Loop started`, {
 					sessionID,
@@ -58,52 +58,88 @@ export function createLoopStateController(options: {
 		},
 
 		cancelLoop(sessionID: string): boolean {
-			const state = readState(directory, stateDir)
+			const state = readState(directory, stateDir, stateDir ? undefined : sessionID)
 			if (!state || state.session_id !== sessionID) {
 				return false
 			}
 
-			const success = clearState(directory, stateDir)
+			const success = clearState(directory, stateDir, stateDir ? undefined : sessionID)
 			if (success) {
 				log(`[${HOOK_NAME}] Loop cancelled`, { sessionID, iteration: state.iteration })
 			}
 			return success
 		},
 
-		getState(): RalphLoopState | null {
-			return readState(directory, stateDir)
+		getState(sessionID?: string): RalphLoopState | null {
+			if (stateDir) return readState(directory, stateDir)
+			if (sessionID) return readState(directory, undefined, sessionID)
+			return readState(directory) ?? findAnyActiveRalphLoopState(directory)
 		},
 
-		clear(): boolean {
-			return clearState(directory, stateDir)
+		clear(sessionID?: string): boolean {
+			if (stateDir) return clearState(directory, stateDir)
+			if (sessionID) return clearState(directory, undefined, sessionID)
+			const active = readState(directory) ?? findAnyActiveRalphLoopState(directory)
+			if (active?.session_id) return clearState(directory, undefined, active.session_id)
+			return clearState(directory)
 		},
 
-		incrementIteration(): RalphLoopState | null {
-			return incrementIteration(directory, stateDir)
+		incrementIteration(sessionID?: string): RalphLoopState | null {
+			if (stateDir) return incrementIteration(directory, stateDir)
+			if (sessionID) return incrementIteration(directory, undefined, sessionID)
+			const active = readState(directory) ?? findAnyActiveRalphLoopState(directory)
+			if (active?.session_id) return incrementIteration(directory, undefined, active.session_id)
+			return incrementIteration(directory)
 		},
 
-		setSessionID(sessionID: string): RalphLoopState | null {
-			const state = readState(directory, stateDir)
+setSessionID(sessionID: string): RalphLoopState | null {
+			let state: RalphLoopState | null = null
+
+			if (stateDir) {
+				// When stateDir is defined, read from that specific path
+				state = readState(directory, stateDir)
+			} else {
+				// When stateDir is undefined, try legacy singleton first
+				state = readState(directory)
+				if (!state) {
+					// No legacy singleton, try to find first active per-session state
+					state = findAnyActiveRalphLoopState(directory)
+					if (state && state.session_id) {
+						// Check if a second active state exists (hijack prevention)
+						const secondState = findSecondActiveRalphLoopState(directory, state.session_id)
+						if (secondState) {
+							// Multiple active states exist, abort to prevent hijacking
+							return null
+						}
+					}
+				}
+			}
+
 			if (!state) {
 				return null
 			}
 
+			const oldSessionId = state.session_id
 			state.session_id = sessionID
-			if (!writeState(directory, state, stateDir)) {
+			if (!writeState(directory, state, stateDir, stateDir ? undefined : sessionID)) {
 				return null
+			}
+
+			if (!stateDir && oldSessionId && oldSessionId !== sessionID) {
+				clearState(directory, undefined, oldSessionId)
 			}
 
 			return state
 		},
 
 		setMessageCountAtStart(sessionID: string, messageCountAtStart: number): RalphLoopState | null {
-			const state = readState(directory, stateDir)
+			const state = readState(directory, stateDir, stateDir ? undefined : sessionID)
 			if (!state || state.session_id !== sessionID) {
 				return null
 			}
 
 			state.message_count_at_start = messageCountAtStart
-			if (!writeState(directory, state, stateDir)) {
+			if (!writeState(directory, state, stateDir, stateDir ? undefined : sessionID)) {
 				return null
 			}
 
