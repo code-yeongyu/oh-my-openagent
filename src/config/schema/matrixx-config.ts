@@ -12,6 +12,7 @@ import { BuiltinCommandNameSchema } from "./commands"
 import { ExperimentalConfigSchema } from "./experimental"
 import { GitMasterConfigSchema } from "./git-master"
 import { HookNameSchema } from "./hooks"
+import { SecurityConfigSchema } from "./security"
 import { NotificationConfigSchema } from "./notification"
 import { MatrixLoopConfigSchema } from "./matrix-loop"
 import { SkillsConfigSchema } from "./skills"
@@ -50,6 +51,8 @@ export const MatrixxConfigSchema = z.object({
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   morpheus: MorpheusConfigSchema.optional(),
+  /** Security scanning, secret detection, and sensitive file guards */
+  security: SecurityConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })

@@ -18,6 +18,7 @@ export * from "./schema/skills"
 export * from "./schema/morpheus"
 export * from "./schema/morpheus-agent"
 export * from "./schema/tmux"
+export * from "./schema/security"
 export * from "./schema/websearch"
 
 export { AnyMcpNameSchema, type AnyMcpName, McpNameSchema, type McpName } from "../mcp/types"

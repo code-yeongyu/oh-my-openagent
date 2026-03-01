@@ -9,6 +9,7 @@ export {
   MorpheusAgentConfigSchema,
   ExperimentalConfigSchema,
   MatrixLoopConfigSchema,
+  SecurityConfigSchema,
   TmuxConfigSchema,
   TmuxLayoutSchema,
 } from "./schema"
@@ -25,6 +26,10 @@ export type {
   ExperimentalConfig,
   DynamicContextPruningConfig,
   MatrixLoopConfig,
+  SecurityConfig,
+  SecretScanningConfig,
+  EnvFileGuardConfig,
+  DependencyAuditConfig,
   TmuxConfig,
   TmuxLayout,
   MorpheusConfig,
