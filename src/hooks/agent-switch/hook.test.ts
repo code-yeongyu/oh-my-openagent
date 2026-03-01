@@ -21,6 +21,7 @@ describe("agent-switch hook", () => {
     const ctx = {
       client: {
         session: {
+          create: async () => ({ data: { id: "fresh-ses-1" } }),
           promptAsync: async (args: Record<string, unknown>) => {
             promptAsyncCalls.push(args)
             switched = true
@@ -51,6 +52,7 @@ describe("agent-switch hook", () => {
     const ctx = {
       client: {
         session: {
+          create: async () => ({ data: { id: "fresh-ses-2" } }),
           promptAsync: async () => {
             throw new Error("temporary failure")
           },
@@ -84,6 +86,7 @@ describe("agent-switch hook", () => {
     const ctx = {
       client: {
         session: {
+          create: async () => ({ data: { id: "fresh-ses-3" } }),
           promptAsync: async () => {
             attempts += 1
             if (attempts === 1) {
@@ -193,6 +196,7 @@ describe("agent-switch hook", () => {
     const ctx = {
       client: {
         session: {
+          create: async () => ({ data: { id: "fresh-ses-6" } }),
           promptAsync: async (args: Record<string, unknown>) => {
             promptAsyncCalls.push(args)
             switched = true
@@ -235,6 +239,7 @@ describe("agent-switch hook", () => {
     const ctx = {
       client: {
         session: {
+          create: async () => ({ data: { id: "fresh-ses-8" } }),
           promptAsync: async (args: Record<string, unknown>) => {
             promptAsyncCalls.push(args)
             switched = true
@@ -276,6 +281,7 @@ describe("agent-switch hook", () => {
     const ctx = {
       client: {
         session: {
+          create: async () => ({ data: { id: "fresh-ses-7" } }),
           promptAsync: async (args: Record<string, unknown>) => {
             promptAsyncCalls.push(args)
             switched = true
@@ -321,6 +327,7 @@ describe("agent-switch hook", () => {
     const ctx = {
       client: {
         session: {
+          create: async () => ({ data: { id: "fresh-ses-9" } }),
           promptAsync: async (args: Record<string, unknown>) => {
             promptAsyncCalls.push(args)
             switched = true
