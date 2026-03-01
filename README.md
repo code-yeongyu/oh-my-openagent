@@ -10,7 +10,7 @@
 <h1>Matrixx</h1>
 
 **Multi-model agent orchestration for [OpenCode](https://github.com/sst/opencode).**<br/>
-**11 specialized agents. 41 lifecycle hooks. 25+ tools. One plugin.**
+**12 specialized agents. 41 lifecycle hooks. 25+ tools. One plugin.**
 
 *Use your existing ChatGPT, Claude, and Gemini subscriptions. OpenCode covers them all.*
 
@@ -30,7 +30,7 @@ Matrixx turns a single agent into a **coordinated team** — each model doing wh
 
 | Problem | Matrixx Solution |
 |---------|------------------|
-| One model does everything poorly | **11 specialists** — right model for the right job |
+| One model does everything poorly | **12 specialists** — right model for the right job |
 | Agent forgets what it was doing | **Todo Continuation** — forces completion, no exceptions |
 | Slow sequential tool calls | **Parallel background agents** — 5+ running simultaneously |
 | AI-generated code looks like AI | **Comment Checker** — code indistinguishable from human-written |
@@ -105,6 +105,7 @@ Academic papers, EU proposals, systematic reviews, project management, IP exploi
 | **Smith** | Plan validation & review | GPT 5.2 |
 | **Operator** | Documentation & OSS search | GLM 4.7 |
 | **Trinity** | Blazing fast codebase grep | Grok Code Fast |
+| **Sentinel** | Security auditing & vulnerability scanning | Claude Opus 4.6 |
 | **Construct** | PDF, image & diagram analysis | Kimi K2.5 (free) |
 
 Every agent, model, temperature, and permission is fully customizable. [**Meet the full team &rarr;**](docs/agents.md)
@@ -115,10 +116,10 @@ Every agent, model, temperature, and permission is fully customizable. [**Meet t
 
 | | |
 |---|---|
-| **Agent Orchestration** | 11 agents, parallel background execution, category-based routing, session continuity |
+| **Agent Orchestration** | 12 agents, parallel background execution, category-based routing, session continuity |
 | **Developer Tools** | LSP (goto def, rename, diagnostics), AST-Grep (search & replace), Tmux terminal |
 | **41 Lifecycle Hooks** | Context injection, think mode, comment checking, todo enforcement, error recovery |
-| **27 Built-in Skills** | DSL engineering (11), research & leadership (12), browser, git, frontend |
+| **36 Built-in Skills** | DSL engineering (11), research & leadership (12), security (9), browser, git, frontend |
 | **Curated MCPs** | Exa (web search), Context7 (official docs), Grep.app (GitHub code search) |
 | **Claude Code Compat** | Full compatibility — commands, agents, skills, MCPs, hooks from `settings.json` |
 
@@ -128,7 +129,11 @@ Every agent, model, temperature, and permission is fully customizable. [**Meet t
 
 ## Security
 
-Matrixx includes built-in security enforcement hooks that protect against accidental secret exposure — no setup required.
+Matrixx includes a three-tier security layer: reactive hooks, configurable policies, and a dedicated security auditing agent.
+
+### Enforcement Hooks
+
+Built-in hooks protect against accidental secret exposure — no setup required.
 
 | Hook | What it does |
 |------|-------------|
@@ -147,6 +152,24 @@ Both hooks are **enabled by default** and run before all other hooks in the exec
 ```
 
 > **Note:** Secret scanning requires [gitleaks](https://github.com/gitleaks/gitleaks) installed in your PATH. Without it, the hook silently degrades.
+
+### Sentinel — Security Auditing Agent
+
+**Sentinel** is a read-only security specialist with 9 composable skills covering the full application security stack:
+
+| Skill | Domain |
+|-------|--------|
+| `security-core` | OWASP Top 10, CWE classification, threat modeling (STRIDE) |
+| `security-secrets` | Secret detection, credential scanning, pre-commit hooks |
+| `security-sast` | Static analysis, code vulnerability patterns, taint tracking |
+| `security-dast` | Dynamic analysis, runtime testing, fuzzing, penetration testing |
+| `security-dependencies` | CVE scanning, SBOM generation, supply chain security |
+| `security-api` | Authentication, authorization, CORS/CSRF, input validation |
+| `security-crypto` | Encryption audit, key management, TLS, password hashing |
+| `security-infra` | Container scanning, Dockerfile hardening, IaC audit, K8s security |
+| `security-review` | Structured audit reports, severity classification, remediation guidance |
+
+Sentinel never modifies code — it reports findings with CWE IDs, exact locations, and actionable remediation. Any agent can load individual security skills via `load_skills`.
 
 ---
 

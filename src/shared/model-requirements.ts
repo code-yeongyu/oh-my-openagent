@@ -109,6 +109,15 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro" },
     ],
   },
+  sentinel: {
+    fallbackChain: [
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
+      { providers: ["google-vertex-anthropic"], model: "claude-opus-4-6@default", variant: "max" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
+      { providers: ["opencode"], model: "kimi-k2.5-free" },
+      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3.1-pro" },
+    ],
+  },
 }
 
 export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {

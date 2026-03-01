@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-11 AI agents with factory functions, fallback chains, and model-specific prompt variants. Each agent has metadata (category, cost, triggers) and configurable tool restrictions.
+12 AI agents with factory functions, fallback chains, and model-specific prompt variants. Each agent has metadata (category, cost, triggers) and configurable tool restrictions.
 
 ## STRUCTURE
 ```
@@ -15,6 +15,7 @@ agents/
 ├── construct.ts        # Media analyzer (58 lines)
 ├── seraph.ts                    # Pre-planning analysis (347 lines)
 ├── smith.ts                    # Plan validator (244 lines)
+├── sentinel.ts                 # Security auditor (220 lines)
 ├── architect/                      # Master orchestrator
 │   ├── agent.ts                # Architect factory
 │   ├── default.ts              # Claude-optimized prompt
@@ -56,6 +57,7 @@ agents/
 | Smith | gpt-5.2 | 0.1 | claude-opus-4-6 → gemini-3.1-pro | EXPENSIVE |
 | Cipher | claude-opus-4-6 | 0.1 | claude-opus-4-6@default → gpt-5.2 → kimi-k2.5-free → gemini-3.1-pro | EXPENSIVE |
 | Niobe | claude-opus-4-6 | 0.15 | claude-opus-4-6@default → gpt-5.2 → kimi-k2.5-free → gemini-3.1-pro | EXPENSIVE |
+| Sentinel | claude-opus-4-6 | 0.1 | claude-opus-4-6@default → gpt-5.2 → kimi-k2.5-free → gemini-3.1-pro | EXPENSIVE |
 | Mouse | claude-sonnet-4-6 | 0.1 | (user-configurable) | EXPENSIVE |
 
 ## TOOL RESTRICTIONS
@@ -68,6 +70,7 @@ agents/
 | Construct | ALL except `read` | Vision-only |
 | Mouse | task | No delegation |
 | Architect | task, call_omo_agent | Orchestration only |
+| Sentinel | write, edit, multiedit, task, call_omo_agent | Read-only security auditing |
 
 ## THINKING / REASONING
 
@@ -78,6 +81,7 @@ agents/
 | Oracle | 32k budget tokens | reasoningEffort: "medium" |
 | Seraph | 32k budget tokens | — |
 | Smith | 32k budget tokens | reasoningEffort: "medium" |
+| Sentinel | 32k budget tokens | reasoningEffort: "medium" |
 | Mouse | 32k budget tokens | reasoningEffort: "medium" |
 
 ## HOW TO ADD
