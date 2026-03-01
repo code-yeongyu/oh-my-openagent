@@ -26,6 +26,15 @@ function mockTaskOutput(agent: string, responseBody: string, complete = true): s
   ].join("\n")
 }
 
+function extractJson(output: string): string {
+  const marker = "<athena_runtime_guidance>"
+  const idx = output.indexOf(marker)
+  if (idx === -1) return output
+  const beforeMarker = output.substring(0, idx)
+  const lastNewlines = beforeMarker.lastIndexOf("\n\n")
+  return lastNewlines === -1 ? beforeMarker.trim() : output.substring(0, lastNewlines).trim()
+}
+
 const mockCtx = {
   sessionID: "test-session",
   messageID: "test-message",
@@ -62,7 +71,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: agents.map((a) => a.id), name: "test", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.archive_dir).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{4}$/)
       expect(result.meta_file).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{4}\/meta\.yaml$/)
@@ -108,7 +117,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_001", "bg_002", "bg_003"], name: "partial", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.members).toHaveLength(3)
 
@@ -138,7 +147,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_large"], name: "large", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       const member = result.members[0]
       expect(member.has_response).toBe(true)
@@ -177,7 +186,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_empty"], name: "empty", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       const member = result.members[0]
       expect(member.has_response).toBe(false)
@@ -202,7 +211,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_alpha", "bg_beta"], name: "collision", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       const firstArchive = result.members[0].archive_file
       const secondArchive = result.members[1].archive_file
@@ -225,37 +234,19 @@ describe("createCouncilFinalize", () => {
         "utf-8",
       )
 
-      const calls: Array<{ sessionID: string; content: string; priority?: string; source: string; id: string }> = []
-      const collector = {
-        register: (sessionID: string, options: { id: string; source: string; content: string; priority?: string }) => {
-          calls.push({
-            sessionID,
-            id: options.id,
-            source: options.source,
-            content: options.content,
-            priority: options.priority,
-          })
-        },
-      }
-
-      const toolDef = createCouncilFinalize(tmpDir, { contextCollector: collector })
+      const toolDef = createCouncilFinalize(tmpDir)
       const result = await toolDef.execute(
         { task_ids: ["bg_intent"], name: "intent", intent: "PLAN" },
         mockCtx,
       )
 
-      expect(() => JSON.parse(result)).not.toThrow()
-      expect(calls).toHaveLength(1)
-      expect(calls[0].sessionID).toBe(mockCtx.sessionID)
-      expect(calls[0].id).toBe("athena-runtime-guidance")
-      expect(calls[0].source).toBe("custom")
-      expect(calls[0].priority).toBe("critical")
-      expect(calls[0].content).toContain("<athena_runtime_guidance>")
-      expect(calls[0].content).toContain("intent: PLAN")
-      expect(calls[0].content).toContain("Plan full scope (Prometheus)")
-      expect(calls[0].content).toContain("Plan selected phase (Prometheus)")
-      expect(calls[0].content).toContain(".sisyphus/athena/notes/")
-      expect(calls[0].content).not.toContain("Hand off to Atlas to save the plan as .md")
+      expect(() => JSON.parse(extractJson(result))).not.toThrow()
+      expect(result).toContain("<athena_runtime_guidance>")
+      expect(result).toContain("intent: PLAN")
+      expect(result).toContain("Plan full scope (Prometheus)")
+      expect(result).toContain("Plan selected phase (Prometheus)")
+      expect(result).toContain(".sisyphus/athena/notes/")
+      expect(result).not.toContain("Hand off to Atlas to save the plan as .md")
     })
 
     it("#then emits diagnose action options for hephaestus and sisyphus", async () => {
@@ -265,29 +256,22 @@ describe("createCouncilFinalize", () => {
         "utf-8",
       )
 
-      const calls: Array<{ content: string }> = []
-      const collector = {
-        register: (_sessionID: string, options: { content: string }) => {
-          calls.push({ content: options.content })
-        },
-      }
-
-      const toolDef = createCouncilFinalize(tmpDir, { contextCollector: collector })
+      const toolDef = createCouncilFinalize(tmpDir)
       const result = await toolDef.execute(
         { task_ids: ["bg_diagnose"], name: "diagnose", intent: "DIAGNOSE" },
         mockCtx,
       )
 
-      expect(() => JSON.parse(result)).not.toThrow()
-      expect(calls).toHaveLength(1)
-      expect(calls[0].content).toContain("Implement (Hephaestus)")
-      expect(calls[0].content).toContain("Implement (Sisyphus)")
-      expect(calls[0].content).toContain("Implement (Sisyphus ultrawork)")
-      expect(calls[0].content).toContain("switch_agent(agent=\"hephaestus\")")
-      expect(calls[0].content).toContain("switch_agent(agent=\"sisyphus\")")
-      expect(calls[0].content).toContain("prefix the handoff context with \"ultrawork \"")
-      expect(calls[0].content).not.toContain("Fix now (Atlas)")
-      expect(calls[0].content).not.toContain("Create plan (Prometheus)")
+      expect(() => JSON.parse(extractJson(result))).not.toThrow()
+      expect(result).toContain("<athena_runtime_guidance>")
+      expect(result).toContain("Implement (Hephaestus)")
+      expect(result).toContain("Implement (Sisyphus)")
+      expect(result).toContain("Implement (Sisyphus ultrawork)")
+      expect(result).toContain("switch_agent(agent=\"hephaestus\")")
+      expect(result).toContain("switch_agent(agent=\"sisyphus\")")
+      expect(result).toContain("prefix the handoff context with \"ultrawork \"")
+      expect(result).not.toContain("Fix now (Atlas)")
+      expect(result).not.toContain("Create plan (Prometheus)")
     })
 
     it("#then emits audit processing mode and batching guidance", async () => {
@@ -297,44 +281,37 @@ describe("createCouncilFinalize", () => {
         "utf-8",
       )
 
-      const calls: Array<{ content: string }> = []
-      const collector = {
-        register: (_sessionID: string, options: { content: string }) => {
-          calls.push({ content: options.content })
-        },
-      }
-
-      const toolDef = createCouncilFinalize(tmpDir, { contextCollector: collector })
+      const toolDef = createCouncilFinalize(tmpDir)
       const result = await toolDef.execute(
         { task_ids: ["bg_audit"], name: "audit", intent: "AUDIT" },
         mockCtx,
       )
 
-      expect(() => JSON.parse(result)).not.toThrow()
-      expect(calls).toHaveLength(1)
-      expect(calls[0].content).toContain("How would you like to process the findings?")
-      expect(calls[0].content).toContain("One by one")
-      expect(calls[0].content).toContain("By severity/urgency")
-      expect(calls[0].content).toContain("By quorum")
-      expect(calls[0].content).toContain("Default batch size: 3 findings per batch")
-      expect(calls[0].content).toContain("Hard cap: 5 findings")
-      expect(calls[0].content).toContain("Example Question tool call (batch of 3 findings)")
-      expect(calls[0].content).toContain("Finding #10: choose how to proceed.")
-      expect(calls[0].content).toContain("#10 Action")
-      expect(calls[0].content).toContain("Stop review")
-      expect(calls[0].content).toContain("#10:A, #11:skip")
-      expect(calls[0].content).toContain("Which findings should we act on by severity?")
-      expect(calls[0].content).toContain("All Critical (N)")
-      expect(calls[0].content).toContain("All High (N)")
-      expect(calls[0].content).toContain("All Medium (N)")
-      expect(calls[0].content).toContain("All Low (N)")
-      expect(calls[0].content).toContain("Which findings should we act on? You can also type specific finding numbers")
-      expect(calls[0].content).toContain("All Unanimous (N)")
-      expect(calls[0].content).toContain("All Majority (N)")
-      expect(calls[0].content).toContain("All Minority (N)")
-      expect(calls[0].content).toContain("All Solo (N)")
-      expect(calls[0].content).toContain("Fix now (Atlas)")
-      expect(calls[0].content).toContain("Create plan (Prometheus)")
+      expect(() => JSON.parse(extractJson(result))).not.toThrow()
+      expect(result).toContain("<athena_runtime_guidance>")
+      expect(result).toContain("How would you like to process the findings?")
+      expect(result).toContain("One by one")
+      expect(result).toContain("By severity/urgency")
+      expect(result).toContain("By quorum")
+      expect(result).toContain("Default batch size: 3 findings per batch")
+      expect(result).toContain("Hard cap: 5 findings")
+      expect(result).toContain("Example Question tool call (batch of 3 findings)")
+      expect(result).toContain("Finding #10: choose how to proceed.")
+      expect(result).toContain("#10 Action")
+      expect(result).toContain("Stop review")
+      expect(result).toContain("#10:A, #11:skip")
+      expect(result).toContain("Which findings should we act on by severity?")
+      expect(result).toContain("All Critical (N)")
+      expect(result).toContain("All High (N)")
+      expect(result).toContain("All Medium (N)")
+      expect(result).toContain("All Low (N)")
+      expect(result).toContain("Which findings should we act on? You can also type specific finding numbers")
+      expect(result).toContain("All Unanimous (N)")
+      expect(result).toContain("All Majority (N)")
+      expect(result).toContain("All Minority (N)")
+      expect(result).toContain("All Solo (N)")
+      expect(result).toContain("Fix now (Atlas)")
+      expect(result).toContain("Create plan (Prometheus)")
     })
 
     it("#then emits informational write-to-document path without atlas delegation", async () => {
@@ -344,26 +321,19 @@ describe("createCouncilFinalize", () => {
         "utf-8",
       )
 
-      const calls: Array<{ content: string }> = []
-      const collector = {
-        register: (_sessionID: string, options: { content: string }) => {
-          calls.push({ content: options.content })
-        },
-      }
-
-      const toolDef = createCouncilFinalize(tmpDir, { contextCollector: collector })
+      const toolDef = createCouncilFinalize(tmpDir)
       const result = await toolDef.execute(
         { task_ids: ["bg_eval"], name: "eval", intent: "EVALUATE" },
         mockCtx,
       )
 
-      expect(() => JSON.parse(result)).not.toThrow()
-      expect(calls).toHaveLength(1)
-      expect(calls[0].content).toContain("What should we do with this evaluation?")
-      expect(calls[0].content).toContain("Adopt option -> create plan (Prometheus)")
-      expect(calls[0].content).toContain("Adopt option -> implement now")
-      expect(calls[0].content).toContain(".sisyphus/athena/notes/")
-      expect(calls[0].content).not.toContain("Write to document (Atlas)")
+      expect(() => JSON.parse(extractJson(result))).not.toThrow()
+      expect(result).toContain("<athena_runtime_guidance>")
+      expect(result).toContain("What should we do with this evaluation?")
+      expect(result).toContain("Adopt option -> create plan (Prometheus)")
+      expect(result).toContain("Adopt option -> implement now")
+      expect(result).toContain(".sisyphus/athena/notes/")
+      expect(result).not.toContain("Write to document (Atlas)")
     })
 
     it("#then rejects invalid intent values", async () => {
@@ -391,7 +361,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["../../etc/passwd", "bg_valid", "foo/bar"], name: "traversal", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.members).toHaveLength(3)
       expect(result.members[0].has_response).toBe(false)
@@ -413,7 +383,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_safe"], name: "../../etc", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-/)
       expect(result.archive_dir).not.toContain("..")
@@ -427,7 +397,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_abs"], name: "/absolute/path", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-/)
       expect(result.archive_dir).not.toContain("/absolute/path")
@@ -441,7 +411,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_mid"], name: "foo/../bar", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-/)
       expect(result.archive_dir).not.toContain("..")
@@ -455,7 +425,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["valid-id_123"], name: "valid", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.members).toHaveLength(1)
       expect(result.members[0].has_response).toBe(true)
@@ -474,7 +444,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_prompt"], name: "prompt-test", prompt_file: "/etc/passwd", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.archive_dir).toBeDefined()
       const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
@@ -493,7 +463,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_rel"], name: "rel-test", prompt_file: "../../etc/passwd", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.archive_dir).toBeDefined()
       const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
@@ -514,7 +484,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_ok"], name: "valid-prompt", prompt_file: ".sisyphus/tmp/athena-council-test.md", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
       expect(metaContent).toContain("prompt_file:")
@@ -526,7 +496,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg\\evil"], name: "backslash", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.members).toHaveLength(1)
       expect(result.members[0].has_response).toBe(false)
@@ -545,7 +515,7 @@ describe("createCouncilFinalize", () => {
         { task_ids: ["bg_empty_name"], name: "///...", intent: "FREEFORM" },
         mockCtx,
       )
-      const result: CouncilFinalizeResult = JSON.parse(resultStr)
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
       expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-unnamed-[a-f0-9]{4}$/)
     })

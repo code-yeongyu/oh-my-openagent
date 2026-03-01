@@ -11,6 +11,14 @@ import type { BackgroundOutputManager } from "../background-task/clients"
 import { createBackgroundWait } from "../background-task/create-background-wait"
 import { resetMessageCursor } from "../../shared/session-cursor"
 
+function extractJson(output: string): string {
+  const marker = "<athena_runtime_guidance>"
+  const idx = output.indexOf(marker)
+  if (idx === -1) return output
+  const beforeMarker = output.substring(0, idx)
+  const lastNewlines = beforeMarker.lastIndexOf("\n\n")
+  return lastNewlines === -1 ? beforeMarker.trim() : output.substring(0, lastNewlines).trim()
+}
 function mockTaskOutput(agent: string, responseBody: string, complete = true): string {
   const closing = complete ? "\n</COUNCIL_MEMBER_RESPONSE>" : ""
   return [
@@ -107,7 +115,7 @@ describe("council archive integration flow", () => {
           { task_ids: agents.map((a) => a.id), name: "test", intent: "FREEFORM" },
           toolContext,
         )
-        const result: CouncilFinalizeResult = JSON.parse(resultStr)
+        const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
         expect(result.archive_dir).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{4}$/)
         expect(result.meta_file).toMatch(/meta\.yaml$/)
@@ -155,7 +163,7 @@ describe("council archive integration flow", () => {
           { task_ids: [taskId], name: "partial", intent: "FREEFORM" },
           toolContext,
         )
-        const result: CouncilFinalizeResult = JSON.parse(resultStr)
+        const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
         const member = result.members[0]
         expect(member.has_response).toBe(true)
@@ -183,7 +191,7 @@ describe("council archive integration flow", () => {
           { task_ids: ["bg_notags"], name: "notags", intent: "FREEFORM" },
           toolContext,
         )
-        const result: CouncilFinalizeResult = JSON.parse(resultStr)
+        const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
         const member = result.members[0]
         expect(member.has_response).toBe(false)
@@ -211,7 +219,7 @@ describe("council archive integration flow", () => {
           { task_ids: ["bg_first", "bg_missing", "bg_third"], name: "partial", intent: "FREEFORM" },
           toolContext,
         )
-        const result: CouncilFinalizeResult = JSON.parse(resultStr)
+        const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
         expect(result.members).toHaveLength(3)
 
@@ -244,7 +252,7 @@ describe("council archive integration flow", () => {
           { task_ids: [taskId], name: "large", intent: "FREEFORM" },
           toolContext,
         )
-        const result: CouncilFinalizeResult = JSON.parse(resultStr)
+        const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
         const member = result.members[0]
         expect(member.has_response).toBe(true)
@@ -283,7 +291,7 @@ describe("council archive integration flow", () => {
           },
           toolContext,
         )
-        const result: CouncilFinalizeResult = JSON.parse(resultStr)
+        const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
         const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
         expect(metaContent).toContain("question: |")
@@ -319,7 +327,7 @@ describe("council archive integration flow", () => {
           },
           toolContext,
         )
-        const result: CouncilFinalizeResult = JSON.parse(resultStr)
+        const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
         const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
         expect(metaContent).toContain("question: |")

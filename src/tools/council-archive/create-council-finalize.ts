@@ -11,19 +11,14 @@ import {
   resolveCouncilIntent,
   COUNCIL_DEFAULTS,
 } from "../../agents/athena"
-import { log } from "../../shared/logger"
-import type { ContextCollector } from "../../features/context-injector"
 import type { CouncilFinalizeArgs, CouncilMemberResult, CouncilFinalizeResult } from "./types"
-type RegisterContext = Pick<ContextCollector, "register">
 
 type CouncilFinalizeToolContext = {
   sessionID?: string
 }
 export function createCouncilFinalize(
   basePath?: string,
-  options?: { contextCollector?: RegisterContext }
 ): ToolDefinition {
-  const collector = options?.contextCollector
 
   return tool({
     description:
@@ -43,19 +38,6 @@ export function createCouncilFinalize(
       const resolvedIntent = resolveCouncilIntent(args.intent)
       if (!resolvedIntent) {
         return `Invalid intent: "${args.intent}". Valid intents: ${getValidCouncilIntents().join(", ")}.`
-      }
-
-      if (collector && resolvedIntent && toolContext.sessionID) {
-        collector.register(toolContext.sessionID, {
-          id: "athena-runtime-guidance",
-          source: "custom",
-          priority: "critical",
-          content: buildAthenaRuntimeGuidance(resolvedIntent),
-          metadata: {
-            intent: resolvedIntent,
-            source: "council_finalize",
-          },
-        })
       }
 
       const base = basePath ?? process.cwd()
@@ -192,7 +174,8 @@ export function createCouncilFinalize(
         members,
       }
 
-      return JSON.stringify(result, null, 2)
+      const guidance = buildAthenaRuntimeGuidance(resolvedIntent)
+      return JSON.stringify(result, null, 2) + "\n\n" + guidance
     },
   })
 }
