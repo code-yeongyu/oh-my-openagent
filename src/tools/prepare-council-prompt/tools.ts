@@ -84,15 +84,15 @@ Returns the file path to reference in subsequent task() calls.`
         return `Invalid mode: "${args.mode}". Valid modes: "solo", "delegation".`
       }
 
+      let resolvedIntent: CouncilIntent | undefined
       if (args.intent !== undefined) {
         const resolved = resolveCouncilIntent(args.intent)
         if (!resolved) {
           const validIntents = getValidCouncilIntents()
           return `Invalid intent: "${args.intent}". Valid intents: ${validIntents.map((i) => `"${i}"`).join(", ")}.`
         }
+        resolvedIntent = resolved
       }
-
-      const resolvedIntent = args.intent ? resolveCouncilIntent(args.intent) : undefined
 
       const mode = args.mode === "delegation" ? "delegation" : "solo"
 
@@ -113,7 +113,10 @@ Returns the file path to reference in subsequent task() calls.`
 
         setTimeout(() => {
           unlink(filePath).catch((err) => {
-            log("[prepare-council-prompt] Failed to clean up temp file", { filePath, error: String(err) })
+            const code = (err as NodeJS.ErrnoException).code
+            if (code !== "ENOENT") {
+              log("[prepare-council-prompt] Failed to clean up temp file", { filePath, error: String(err) })
+            }
           })
         }, CLEANUP_DELAY_MS)
 
