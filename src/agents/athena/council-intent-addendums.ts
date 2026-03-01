@@ -15,10 +15,7 @@ You are conducting a **diagnosis** — your goal is to trace an observed problem
 - Propose a fix that addresses the root cause, not just the symptom
 - You are NOT scanning broadly for issues — you are investigating a specific problem
 
-**Required output fields:**
-- Symptom (observed vs. expected), Hypotheses investigated (with evidence for/against each)
-- Root cause (with causal chain and confidence), Contributing factors
-- Recommended fix (targeting root cause, with verification approach)
+**Analytical standards:** Support claims with concrete evidence. State confidence (high/medium/low) for key assertions. Note caveats and limitations.
 
 **Structure your response as:**
 \`\`\`
@@ -67,17 +64,15 @@ You are conducting an **audit** — your goal is to find discrete issues, risks,
 - State your confidence: high (clear evidence), medium (likely but needs verification), low (suspicion, investigate further)
 - **This is a broad sweep, not a targeted trace.**
 
-**Required output fields per finding:**
-- Title, Severity (critical/high/medium/low), Location, Confidence (high/medium/low)
-- Issue description, Supporting evidence, Suggested fix
+**Analytical standards:** Support claims with concrete evidence. State confidence (high/medium/low) for key assertions. Note caveats and limitations.
 
 **Structure your response as:**
 \`\`\`
 <COUNCIL_MEMBER_RESPONSE>
 ## Finding 1: [Title]
-- **Severity**: high
+- **Severity**: critical/high/medium/low
 - **Location**: [specific reference — e.g. component, section, endpoint, rule]
-- **Confidence**: high
+- **Confidence**: high/medium/low
 - **Issue**: [what is wrong and why it matters]
 - **Evidence**: [concrete reference, snippet, or observation that proves the issue]
 - **Suggested Fix**: [actionable recommendation]
@@ -102,10 +97,7 @@ You are conducting a **planning analysis** — your goal is to define current st
 - Identify risks per phase and mitigation strategies
 - Estimate effort where possible (relative sizing is fine: small/medium/large)
 
-**Required output fields:**
-- Current state assessment, Target state definition
-- Phases (each with: goal, tasks, exit criteria, dependencies, risks, effort estimate)
-- Critical path, Key risks and mitigations
+**Analytical standards:** Support claims with concrete evidence. State confidence (high/medium/low) for key assertions. Note caveats and limitations.
 
 **Structure your response as:**
 \`\`\`
@@ -123,6 +115,7 @@ You are conducting a **planning analysis** — your goal is to define current st
 - **Dependencies**: [what must be true before starting]
 - **Risks**: [what could go wrong, with mitigation]
 - **Effort**: [small/medium/large or time estimate]
+- **Confidence**: high/medium/low
 
 ## Phase 2: [Name]
 ...
@@ -147,9 +140,7 @@ You are conducting an **evaluation** — your goal is to compare options against
 - Surface tradeoffs clearly — where one option wins, another likely loses
 - If the question implies a recommendation is needed, provide one with conditions
 
-**Required output fields:**
-- Options identified, Criteria used, Per-option assessment, Tradeoff summary
-- Conditional recommendation (if decision is required), Confidence per assessment
+**Analytical standards:** Support claims with concrete evidence. State confidence (high/medium/low) for key assertions. Note caveats and limitations.
 
 **Structure your response as:**
 \`\`\`
@@ -191,10 +182,7 @@ You are conducting an **explanatory analysis** — your goal is to build underst
 **Use this intent for:** "how does X work", "explain Y", "what is Z", "why does this exist", "describe the architecture of..." questions.
 **This is NOT a catch-all.** If the question doesn't fit this focus, it likely belongs in FREEFORM.
 
-**Required output fields:**
-- Thesis statement, Key mechanisms/components (with evidence)
-- Relationships and interactions, Evidence references
-- Unknowns and knowledge gaps, Overall confidence
+**Analytical standards:** Support claims with concrete evidence. State confidence (high/medium/low) for key assertions. Note caveats and limitations.
 
 **Structure your response as:**
 \`\`\`
@@ -206,6 +194,7 @@ You are conducting an **explanatory analysis** — your goal is to build underst
 ### 1. [Mechanism/Component Name]
 - **What**: [description]
 - **Evidence**: [reference, observation, or reasoning]
+- **Confidence**: high/medium/low
 - **Role**: [how this contributes to the overall answer]
 
 ### 2. [Mechanism/Component Name]
@@ -263,10 +252,7 @@ You are **surfacing genuine viewpoints and taking a stand** — your goal is to 
 
 **Neutral summaries are failure.** If you find every perspective equally valid, you have not thought hard enough. Take a position.
 
-**Required output fields:**
-- 2-4 named perspectives (each: position, evidence, crux)
-- Core tensions between perspectives
-- Your declared position with reasoning and confidence
+**Analytical standards:** Support claims with concrete evidence. State confidence (high/medium/low) for key assertions. Note caveats and limitations.
 
 **Structure your response as:**
 \`\`\`
