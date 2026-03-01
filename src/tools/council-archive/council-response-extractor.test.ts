@@ -275,5 +275,62 @@ describe("extractCouncilResponse", () => {
       })
     })
   })
+
+  describe("#given leading spaces before opening tag", () => {
+    it("#then recognizes the tag as structural and extracts content", () => {
+      const content = "a".repeat(100)
+      const text = `  <COUNCIL_MEMBER_RESPONSE>\n${content}\n</COUNCIL_MEMBER_RESPONSE>`
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: content,
+      })
+    })
+  })
+
+  describe("#given leading tab before opening tag", () => {
+    it("#then recognizes the tag as structural and extracts content", () => {
+      const content = "a".repeat(100)
+      const text = `\t<COUNCIL_MEMBER_RESPONSE>\n${content}\n</COUNCIL_MEMBER_RESPONSE>`
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: content,
+      })
+    })
+  })
+
+  describe("#given trailing spaces after closing tag", () => {
+    it("#then recognizes the closing tag as structural and extracts content", () => {
+      const content = "a".repeat(100)
+      const text = `<COUNCIL_MEMBER_RESPONSE>\n${content}\n</COUNCIL_MEMBER_RESPONSE>  `
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: content,
+      })
+    })
+  })
+
+  describe("#given inline opening tag (text before tag on same line)", () => {
+    it("#then rejects the inline tag and returns has_response false", () => {
+      const content = "a".repeat(100)
+      const text = `text <COUNCIL_MEMBER_RESPONSE>\n${content}\n</COUNCIL_MEMBER_RESPONSE>`
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: false,
+        response_complete: false,
+        result: null,
+      })
+    })
+  })
+
 })
 
