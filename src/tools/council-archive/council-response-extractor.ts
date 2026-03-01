@@ -45,7 +45,7 @@ function isStructuralOpen(text: string, idx: number): boolean {
 
 function isStructuralClose(text: string, idx: number): boolean {
   const afterIdx = idx + CLOSING_TAG.length
-  return afterIdx === text.length || text[afterIdx] === "\n"
+  return afterIdx === text.length || text[afterIdx] === "\n" || text[afterIdx] === "\r"
 }
 
 function findLastStructuralClose(text: string): number {

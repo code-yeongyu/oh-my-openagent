@@ -228,4 +228,52 @@ describe("extractCouncilResponse", () => {
       })
     })
   })
+
+  describe("#given CRLF line endings throughout the response", () => {
+    it("#then extracts content correctly with \\r\\n line endings", () => {
+      const content = "a".repeat(100)
+      const text = `<COUNCIL_MEMBER_RESPONSE>\r\n${content}\r\n</COUNCIL_MEMBER_RESPONSE>`
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: content,
+      })
+    })
+  })
+
+  describe("#given closing tag followed by \\r\\n", () => {
+    it("#then recognizes the closing tag as structural", () => {
+      const content = "a".repeat(100)
+      const text = `<COUNCIL_MEMBER_RESPONSE>${content}</COUNCIL_MEMBER_RESPONSE>\r\nsome trailing text`
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: content,
+      })
+    })
+  })
+
+  describe("#given mixed \\n and \\r\\n line endings", () => {
+    it("#then extracts content correctly regardless of mixed line endings", () => {
+      const longLine = "a".repeat(80)
+      const text = [
+        "<COUNCIL_MEMBER_RESPONSE>",
+        "## Finding 1: Mixed endings",
+        longLine,
+        "</COUNCIL_MEMBER_RESPONSE>",
+      ].join("\r\n")
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: `## Finding 1: Mixed endings\r\n${longLine}`,
+      })
+    })
+  })
 })
+
