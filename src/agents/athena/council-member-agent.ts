@@ -31,6 +31,11 @@ You MUST wrap your final analysis in <COUNCIL_MEMBER_RESPONSE> tags. This is how
 - Exploration logs and intermediate reasoning
 - Step-by-step search process
 
+Example:
+<COUNCIL_MEMBER_RESPONSE>
+Your analysis here...
+</COUNCIL_MEMBER_RESPONSE>
+
 If you do not wrap your response in <COUNCIL_MEMBER_RESPONSE> tags, your analysis will not be included in the synthesis.`
 
 export const COUNCIL_SOLO_ADDENDUM = `
