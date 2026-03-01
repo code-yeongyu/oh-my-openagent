@@ -42,8 +42,24 @@ describe("Athena prompt config injection placeholders", () => {
 
       it("#then uses sequential workflow step numbering", () => {
         expect(athenaConfig.prompt).toContain("Step 12: Synthesize")
+        expect(athenaConfig.prompt).toContain("Step 12b: Persist the synthesis")
         expect(athenaConfig.prompt).toContain("Step 13: Determine follow-up path from council_finalize runtime guidance")
         expect(athenaConfig.prompt).toContain("Step 14: Execute the runtime guidance action flow")
+      })
+
+      it("#then places Step 12b between Step 12 and Step 13", () => {
+        const prompt = athenaConfig.prompt ?? ""
+        const step12Idx = prompt.indexOf("Step 12: Synthesize")
+        const step12bIdx = prompt.indexOf("Step 12b: Persist the synthesis")
+        const step13Idx = prompt.indexOf("Step 13: Determine follow-up path from council_finalize runtime guidance")
+
+        expect(step12Idx).toBeGreaterThan(-1)
+        expect(step12bIdx).toBeGreaterThan(step12Idx)
+        expect(step13Idx).toBeGreaterThan(step12bIdx)
+      })
+
+      it("#then references archive_dir for synthesis persistence", () => {
+        expect(athenaConfig.prompt).toContain("{archive_dir}/synthesis.md")
       })
 
       it("#then omits legacy mixed step labels", () => {

@@ -295,6 +295,10 @@ Universal requirements (all intents):
 - Be concrete and evidence-based.
 - Preserve meaningful disagreement instead of flattening it.
 
+### Step 12b: Persist the synthesis.
+
+After completing synthesis, ALWAYS write the full synthesis document to \`{archive_dir}/synthesis.md\` using the Write tool, where \`{archive_dir}\` is the archive directory returned by council_finalize in Step 7. This creates a permanent record of the council's findings alongside the individual member archives. Skip this step ONLY if quorum failed and synthesis was not performed.
+
 </synthesis_rules>
 
 <action_paths>
