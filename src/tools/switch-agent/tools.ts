@@ -1,7 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import { setPendingSwitch } from "../../features/agent-switch"
-import { schedulePendingSwitchApply } from "../../features/agent-switch/scheduler"
-import { updateSessionAgent } from "../../features/claude-code-session-state"
+import { normalizeAgentForPrompt } from "../../shared/agent-display-names"
+import { log } from "../../shared/logger"
 import type { SwitchAgentArgs } from "./types"
 
 const DESCRIPTION =
@@ -13,17 +12,46 @@ const ALLOWED_AGENTS = new Set(["atlas", "prometheus", "sisyphus", "hephaestus"]
 
 type SessionClient = {
   session: {
-    prompt?: (input: {
-      path: { id: string }
-      body: { agent: string; parts: Array<{ type: "text"; text: string }> }
-    }) => Promise<unknown>
+    create: (input?: { body?: { parentID?: string; title?: string } }) => Promise<unknown>
     promptAsync: (input: {
       path: { id: string }
-      body: { agent: string; parts: Array<{ type: "text"; text: string }> }
+      body: { agent?: string; parts: Array<{ type: "text"; text: string }> }
     }) => Promise<unknown>
-    create?: (input?: { body?: { parentID?: string; title?: string } }) => Promise<unknown>
-    messages: (input: { path: { id: string } }) => Promise<unknown>
-    status?: () => Promise<unknown>
+  }
+}
+
+function extractSessionId(response: unknown): string | undefined {
+  if (typeof response !== "object" || response === null) {
+    return undefined
+  }
+
+  const root = response as Record<string, unknown>
+
+  if (typeof root.id === "string" && root.id.length > 0) {
+    return root.id
+  }
+
+  const data = root.data
+  if (typeof data === "object" && data !== null) {
+    const dataRecord = data as Record<string, unknown>
+    if (typeof dataRecord.id === "string" && dataRecord.id.length > 0) {
+      return dataRecord.id
+    }
+  }
+
+  return undefined
+}
+
+async function navigateTuiToSession(client: SessionClient, sessionID: string): Promise<boolean> {
+  try {
+    await (client as any)._client.post({
+      url: "/tui/select-session",
+      body: { sessionID },
+      headers: { "Content-Type": "application/json" },
+    })
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -49,14 +77,53 @@ export function createSwitchAgentTool(args: {
         return `Invalid switch target: "${args.agent}". Allowed agents: ${[...ALLOWED_AGENTS].join(", ")}`
       }
 
-      updateSessionAgent(toolContext.sessionID, agentName)
-      setPendingSwitch(toolContext.sessionID, agentName, args.context)
-      schedulePendingSwitchApply({
-        sessionID: toolContext.sessionID,
-        client,
+      const targetAgent = normalizeAgentForPrompt(agentName)
+      if (!targetAgent) {
+        return `Invalid switch target: "${args.agent}". Could not resolve agent name.`
+      }
+
+      const errors: string[] = []
+
+      const response = await client.session.create().catch((error: unknown) => {
+        errors.push(`session.create failed: ${error instanceof Error ? error.message : String(error)}`)
+        return null
       })
 
-      return `Agent switch queued. Session will switch to ${agentName} when your turn completes.`
+      if (!response) {
+        return `Failed to create handoff session. ${errors.join("; ")}`
+      }
+
+      const newSessionID = extractSessionId(response)
+      if (!newSessionID) {
+        return `Failed to extract session ID from create response: ${JSON.stringify(response)}`
+      }
+
+      const promptResult = await client.session.promptAsync({
+        path: { id: newSessionID },
+        body: {
+          agent: targetAgent,
+          parts: [{ type: "text", text: args.context }],
+        },
+      }).catch((error: unknown) => {
+        errors.push(`promptAsync failed: ${error instanceof Error ? error.message : String(error)}`)
+        return null
+      })
+
+      const tuiNavigated = await navigateTuiToSession(client, newSessionID)
+
+      log("[switch-agent] Agent switch applied via fresh session", {
+        sourceSessionID: toolContext.sessionID,
+        newSessionID,
+        agent: targetAgent,
+        tuiNavigated,
+        promptDelivered: promptResult !== null,
+      })
+
+      const parts = [`Agent switch to ${agentName} initiated. New session: ${newSessionID}`]
+      if (!promptResult) parts.push("(warning: prompt delivery failed)")
+      if (tuiNavigated) parts.push("Navigated TUI to new session.")
+      if (errors.length > 0) parts.push(`Errors: ${errors.join("; ")}`)
+      return parts.join(" ")
     },
   })
 }

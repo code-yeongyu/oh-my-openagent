@@ -2,8 +2,6 @@
 
 import { describe, test, expect, beforeEach } from "bun:test"
 import { createSwitchAgentTool } from "./tools"
-import { consumePendingSwitch, _resetForTesting as resetSwitch } from "../../features/agent-switch"
-import { getSessionAgent, _resetForTesting as resetSession } from "../../features/claude-code-session-state"
 
 describe("switch_agent tool", () => {
   const sessionID = "test-session-123"
@@ -17,40 +15,38 @@ describe("switch_agent tool", () => {
     abort: new AbortController().signal,
   }
 
+  let createdSessions: Array<{ body?: { parentID?: string; title?: string } }>
+  let promptedSessions: Array<{ path: { id: string }; body: { agent?: string; parts: Array<{ type: "text"; text: string }> } }>
+
   beforeEach(() => {
-    resetSwitch()
-    resetSession()
+    createdSessions = []
+    promptedSessions = []
   })
 
-  function createToolWithMockClient(promptImpl?: () => Promise<unknown>) {
+  function createToolWithMockClient(overrides?: {
+    createImpl?: () => Promise<unknown>
+    promptAsyncImpl?: (input: any) => Promise<unknown>
+  }) {
     const client = {
       session: {
-        promptAsync:
-          promptImpl ??
-          (async () => {
-            return undefined
-          }),
-        messages: async () => ({ data: [] }),
+        create: overrides?.createImpl ?? (async (input?: { body?: { parentID?: string; title?: string } }) => {
+          createdSessions.push(input ?? {})
+          return { data: { id: "new-session-abc" } }
+        }),
+        promptAsync: overrides?.promptAsyncImpl ?? (async (input: any) => {
+          promptedSessions.push(input)
+          return undefined
+        }),
       },
     }
 
-    return createSwitchAgentTool({
-      client: client as unknown as {
-        session: {
-          promptAsync: (input: {
-            path: { id: string }
-            body: { agent: string; parts: Array<{ type: "text"; text: string }> }
-          }) => Promise<unknown>
-          messages: (input: { path: { id: string } }) => Promise<unknown>
-        }
-      },
-    })
+    return createSwitchAgentTool({ client })
   }
 
   //#given valid atlas switch args
   //#when execute is called
-  //#then it stores pending switch and updates session agent
-  test("should queue switch to atlas", async () => {
+  //#then it creates a new session and prompts with the target agent
+  test("should create session and prompt for atlas switch", async () => {
     const tool = createToolWithMockClient()
     const result = await tool.execute(
       { agent: "atlas", context: "Fix the auth bug based on council findings" },
@@ -58,21 +54,18 @@ describe("switch_agent tool", () => {
     )
 
     expect(result).toContain("atlas")
-    expect(result).toContain("switch")
-
-    const entry = consumePendingSwitch(sessionID)
-    expect(entry).toEqual({
-      agent: "atlas",
-      context: "Fix the auth bug based on council findings",
-    })
-
-    expect(getSessionAgent(sessionID)).toBe("atlas")
+    expect(result).toContain("new-session-abc")
+    expect(createdSessions).toHaveLength(1)
+    expect(promptedSessions).toHaveLength(1)
+    expect(promptedSessions[0]!.path.id).toBe("new-session-abc")
+    expect(promptedSessions[0]!.body.agent).toContain("Atlas")
+    expect(promptedSessions[0]!.body.parts[0]!.text).toBe("Fix the auth bug based on council findings")
   })
 
   //#given valid prometheus switch args
   //#when execute is called
-  //#then it stores pending switch for prometheus
-  test("should queue switch to prometheus", async () => {
+  //#then it creates a new session and prompts with prometheus agent
+  test("should create session and prompt for prometheus switch", async () => {
     const tool = createToolWithMockClient()
     const result = await tool.execute(
       { agent: "Prometheus", context: "Create a plan for the refactoring" },
@@ -80,16 +73,14 @@ describe("switch_agent tool", () => {
     )
 
     expect(result).toContain("prometheus")
-    expect(result).toContain("switch")
-
-    const entry = consumePendingSwitch(sessionID)
-    expect(entry?.agent).toBe("prometheus")
+    expect(promptedSessions).toHaveLength(1)
+    expect(promptedSessions[0]!.body.parts[0]!.text).toBe("Create a plan for the refactoring")
   })
 
   //#given valid hephaestus switch args
   //#when execute is called
-  //#then it stores pending switch for hephaestus
-  test("should queue switch to hephaestus", async () => {
+  //#then it creates a new session for hephaestus
+  test("should create session and prompt for hephaestus switch", async () => {
     const tool = createToolWithMockClient()
     const result = await tool.execute(
       { agent: "Hephaestus", context: "Implement the selected diagnosis fix" },
@@ -97,16 +88,14 @@ describe("switch_agent tool", () => {
     )
 
     expect(result).toContain("hephaestus")
-    expect(result).toContain("switch")
-
-    const entry = consumePendingSwitch(sessionID)
-    expect(entry?.agent).toBe("hephaestus")
+    expect(createdSessions).toHaveLength(1)
+    expect(promptedSessions).toHaveLength(1)
   })
 
   //#given valid sisyphus switch args
   //#when execute is called
-  //#then it stores pending switch for sisyphus
-  test("should queue switch to sisyphus", async () => {
+  //#then it creates a new session for sisyphus
+  test("should create session and prompt for sisyphus switch", async () => {
     const tool = createToolWithMockClient()
     const result = await tool.execute(
       { agent: "Sisyphus", context: "Implement the selected diagnosis fix" },
@@ -114,15 +103,13 @@ describe("switch_agent tool", () => {
     )
 
     expect(result).toContain("sisyphus")
-    expect(result).toContain("switch")
-
-    const entry = consumePendingSwitch(sessionID)
-    expect(entry?.agent).toBe("sisyphus")
+    expect(createdSessions).toHaveLength(1)
+    expect(promptedSessions).toHaveLength(1)
   })
 
   //#given an invalid agent name
   //#when execute is called
-  //#then it returns an error
+  //#then it returns an error without creating a session
   test("should reject invalid agent names", async () => {
     const tool = createToolWithMockClient()
     const result = await tool.execute(
@@ -132,21 +119,72 @@ describe("switch_agent tool", () => {
 
     expect(result).toContain("Invalid switch target")
     expect(result).toContain("librarian")
-    expect(consumePendingSwitch(sessionID)).toBeUndefined()
+    expect(createdSessions).toHaveLength(0)
+    expect(promptedSessions).toHaveLength(0)
   })
 
   //#given agent name with different casing
   //#when execute is called
-  //#then it normalizes to lowercase
+  //#then it normalizes to lowercase and creates session
   test("should handle case-insensitive agent names", async () => {
     const tool = createToolWithMockClient()
-    await tool.execute(
+    const result = await tool.execute(
       { agent: "ATLAS", context: "Fix things" },
       toolContext
     )
 
-    const entry = consumePendingSwitch(sessionID)
-    expect(entry?.agent).toBe("atlas")
-    expect(getSessionAgent(sessionID)).toBe("atlas")
+    expect(result).toContain("atlas")
+    expect(createdSessions).toHaveLength(1)
+    expect(promptedSessions).toHaveLength(1)
+  })
+
+  //#given session.create fails
+  //#when execute is called
+  //#then it returns an error message
+  test("should handle session creation failure gracefully", async () => {
+    const tool = createToolWithMockClient({
+      createImpl: async () => { throw new Error("connection refused") },
+    })
+    const result = await tool.execute(
+      { agent: "atlas", context: "Fix things" },
+      toolContext
+    )
+
+    expect(result).toContain("Failed to create handoff session")
+    expect(result).toContain("connection refused")
+    expect(promptedSessions).toHaveLength(0)
+  })
+
+  //#given promptAsync fails
+  //#when execute is called
+  //#then it returns a warning but still reports session created
+  test("should handle prompt delivery failure gracefully", async () => {
+    const tool = createToolWithMockClient({
+      promptAsyncImpl: async () => { throw new Error("prompt failed") },
+    })
+    const result = await tool.execute(
+      { agent: "atlas", context: "Fix things" },
+      toolContext
+    )
+
+    expect(result).toContain("new-session-abc")
+    expect(result).toContain("warning: prompt delivery failed")
+    expect(createdSessions).toHaveLength(1)
+  })
+
+  //#given session.create returns response with id at root level
+  //#when execute is called
+  //#then it extracts the session ID correctly
+  test("should extract session ID from root-level response", async () => {
+    const tool = createToolWithMockClient({
+      createImpl: async () => ({ id: "direct-id-123" }),
+    })
+    const result = await tool.execute(
+      { agent: "atlas", context: "Fix things" },
+      toolContext
+    )
+
+    expect(result).toContain("direct-id-123")
+    expect(promptedSessions[0]!.path.id).toBe("direct-id-123")
   })
 })

@@ -134,7 +134,6 @@ export function createEventHandler(args: {
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
 
   const dispatchToHooks = async (input: EventInput): Promise<void> => {
-    await Promise.resolve(hooks.agentSwitchHook?.event?.(input));
     await Promise.resolve(hooks.autoUpdateChecker?.event?.(input));
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input));
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input));
