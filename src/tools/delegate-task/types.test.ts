@@ -1,4 +1,4 @@
-import { describe, expect, it, spyOn, beforeEach } from "bun:test"
+import { describe, expect, it, spyOn, beforeEach, afterEach } from "bun:test"
 import type { DelegateTaskArgs } from "./types"
 import { compressDelegateTaskArgs } from "./types"
 import * as toonCompression from "../../shared/toon-compression"
@@ -23,6 +23,10 @@ describe("delegate-task/types", () => {
 
     beforeEach(() => {
       safeCompressSpy = spyOn(toonCompression, "safeCompress")
+    })
+
+    afterEach(() => {
+      safeCompressSpy.mockRestore()
     })
 
     it("#then returns JSON string when compression is disabled", () => {

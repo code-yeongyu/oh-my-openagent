@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, beforeEach } from "bun:test"
+import { describe, expect, it, mock, beforeEach, afterAll } from "bun:test"
 import type { ParentContext } from "./executor-types"
 
 const encodeMock = mock((value: unknown) => `toon:${JSON.stringify(value)}`)
@@ -7,7 +7,14 @@ mock.module("@toon-format/toon", () => ({
   encode: encodeMock,
 }))
 
+// Store original module for restoration
+import * as originalToon from "@toon-format/toon"
+
 import { compressParentContext } from "./parent-context-resolver"
+
+afterAll(() => {
+  mock.module("@toon-format/toon", () => originalToon)
+})
 
 const enabledConfig = { enabled: true, threshold: 10 }
 const disabledConfig = { enabled: false, threshold: 10 }
