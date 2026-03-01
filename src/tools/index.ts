@@ -47,7 +47,7 @@ export {
 } from "./task"
 export { createHashlineEditTool } from "./hashline-edit"
 export { createPrepareCouncilPromptTool } from "./prepare-council-prompt"
-export { createCouncilFinalize, createCouncilRead } from "./council-archive"
+export { createCouncilFinalize } from "./council-archive"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager

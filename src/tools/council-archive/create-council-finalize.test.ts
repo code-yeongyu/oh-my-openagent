@@ -5,7 +5,6 @@ import { mkdtemp, mkdir, writeFile, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createCouncilFinalize } from "./create-council-finalize"
-import { createCouncilRead } from "./create-council-read"
 import type { CouncilFinalizeResult } from "./types"
 
 function mockTaskOutput(agent: string, responseBody: string, complete = true): string {
@@ -132,7 +131,7 @@ describe("createCouncilFinalize", () => {
   })
 
   describe("#given large response exceeding 8000 chars", () => {
-    it("#then keeps full content in archive and council_read returns full response", async () => {
+    it("#then keeps full content in archive readable via readFile", async () => {
       const largeResponse = "x".repeat(9000)
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_large.md"),
@@ -153,14 +152,9 @@ describe("createCouncilFinalize", () => {
       expect(member).not.toHaveProperty("result")
       expect(member).not.toHaveProperty("result_truncated")
 
-      const readTool = createCouncilRead(tmpDir)
-      const readResult = await readTool.execute({ file_path: member.archive_file! }, mockCtx)
-      const parsed = JSON.parse(readResult)
-
-      expect(parsed.has_response).toBe(true)
-      expect(parsed.response_complete).toBe(true)
-      expect(parsed.result).toHaveLength(9000)
-      expect(parsed.result).toBe(largeResponse)
+      const archiveContent = await readFile(join(tmpDir, member.archive_file!), "utf-8")
+      expect(archiveContent).toHaveLength(9000)
+      expect(archiveContent).toBe(largeResponse)
     })
   })
 

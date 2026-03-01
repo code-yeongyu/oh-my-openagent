@@ -5,7 +5,6 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createCouncilFinalize } from "./create-council-finalize"
-import { createCouncilRead } from "./create-council-read"
 import type { CouncilFinalizeResult } from "./types"
 import type { BackgroundTask } from "../../features/background-agent"
 import type { BackgroundOutputManager } from "../background-task/clients"
@@ -88,7 +87,7 @@ afterEach(async () => {
 describe("council archive integration flow", () => {
   describe("#given 3 council members with valid output files", () => {
     describe("#when finalize is called and then each archive is read", () => {
-      it("#then creates archive with correct structure and council_read extracts content from archives", async () => {
+      it("#then creates archive with correct structure and archives are readable", async () => {
         const agents = [
           { id: "bg_opus", agent: "Council: Claude Opus", response: "Opus deep analysis of architecture" },
           { id: "bg_gpt", agent: "Council: GPT-5", response: "GPT pragmatic code review" },
@@ -137,23 +136,13 @@ describe("council archive integration flow", () => {
           expect(archiveContent).toBe(agents[i].response)
         }
 
-        const readTool = createCouncilRead(tmpDir)
-
-        for (let i = 0; i < agents.length; i++) {
-          const readResult = await readTool.execute({ file_path: result.members[i].archive_file! }, toolContext)
-          const parsed = JSON.parse(readResult)
-
-          expect(parsed.has_response).toBe(true)
-          expect(parsed.response_complete).toBe(true)
-          expect(parsed.result).toBe(agents[i].response)
-        }
       })
     })
   })
 
   describe("#given a member with incomplete tags (no closing tag)", () => {
     describe("#when finalize is called and archive is read", () => {
-      it("#then finalize marks incomplete but council_read still returns raw archived content", async () => {
+      it("#then finalize marks incomplete but archive still contains raw content", async () => {
         const taskId = "bg_partial"
         await writeFile(
           join(tmpDir, ".sisyphus", "task-outputs", `${taskId}.md`),
@@ -176,13 +165,6 @@ describe("council archive integration flow", () => {
         const archiveContent = await readFile(join(tmpDir, member.archive_file!), "utf-8")
         expect(archiveContent).toBe("Analysis still in progress...")
 
-        const readTool = createCouncilRead(tmpDir)
-        const readResult = await readTool.execute({ file_path: member.archive_file! }, toolContext)
-        const parsed = JSON.parse(readResult)
-
-        expect(parsed.has_response).toBe(true)
-        expect(parsed.response_complete).toBe(true)
-        expect(parsed.result).toBe("Analysis still in progress...")
       })
     })
   })
@@ -248,7 +230,7 @@ describe("council archive integration flow", () => {
 
   describe("#given a very large council response exceeding 8000 chars", () => {
     describe("#when finalize is called and then archive is read", () => {
-      it("#then finalize stores full output and council_read returns full response", async () => {
+      it("#then finalize stores full output and archive contains full response", async () => {
         const largeResponse = "A".repeat(9000)
         const taskId = "bg_large"
         await writeFile(
@@ -271,13 +253,6 @@ describe("council archive integration flow", () => {
         const fullContent = await readFile(join(tmpDir, member.archive_file!), "utf-8")
         expect(fullContent).toHaveLength(9000)
 
-        const readTool = createCouncilRead(tmpDir)
-        const readResult = await readTool.execute({ file_path: member.archive_file! }, toolContext)
-        const parsed = JSON.parse(readResult)
-
-        expect(parsed.has_response).toBe(true)
-        expect(parsed.response_complete).toBe(true)
-        expect(parsed.result).toHaveLength(9000)
       })
     })
   })

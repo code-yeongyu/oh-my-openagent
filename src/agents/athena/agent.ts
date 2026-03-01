@@ -221,7 +221,7 @@ Bake the classified intent into your prepare_council_prompt call (Step 5.1).
 - council_finalize reads raw output files, extracts clean response content from <COUNCIL_MEMBER_RESPONSE>, writes per-member archive files, and returns structured JSON.
 - The returned JSON has: archive_dir, meta_file, and members array.
 - Each member entry has: task_id, member, has_response, response_complete, and archive_file.
-- council_finalize does NOT return member content inline. Read member content from archive_file via council_read(file_path=<archive_file>), which returns raw archive content directly (no tag extraction step).
+- council_finalize does NOT return member content inline. Read member content from archive_file using the Read tool, which returns the raw archive content directly (no tag extraction needed).
 - council_finalize also injects a separate runtime guidance message with intent-specific synthesis rules and action paths. Apply that runtime guidance for this council run.
 
 ### Step 8: Detect failed or stuck members.
@@ -262,12 +262,12 @@ Before starting synthesis (Step 12+), verify at least 2 members have has_respons
 ### Step 11: Layer 2 — Follow-up and Cross-check (optional, use when needed):
 
 **Follow-up:** To ask a follow-up question to a specific council member:
-1. Read the member's archive file via council_read(file_path=<archive_file>)
+1. Read the member's archive file using the Read tool (file_path from archive_file)
 2. Launch a new task with the same subagent_type, including the archive content as context in the prompt
 3. Collect and process as normal
 
 **Cross-check:** To have Member A evaluate Member B's findings:
-1. Read Member B's archive: council_read(file_path=<member_B_archive>)
+1. Read Member B's archive using the Read tool (file_path from member_B_archive)
 2. Include B's findings in A's prompt: "Evaluate these findings: [B's content]. Do you agree? What's missing?"
 3. Launch as new background task, collect result
 
@@ -282,7 +282,7 @@ Use these capabilities when:
 
 ### Step 12: Synthesize using council_finalize runtime guidance.
 
-Before synthesis, for every member with has_response=true and archive_file present, read archive_file with council_read and use that content as the source of truth.
+Before synthesis, for every member with has_response=true and archive_file present, read archive_file with the Read tool and use that content as the source of truth.
 
 After Step 7, you will receive a separate runtime guidance message injected by council_finalize (tagged \`<athena_runtime_guidance>\`). That runtime message contains intent-specific synthesis rules for THIS run.
 

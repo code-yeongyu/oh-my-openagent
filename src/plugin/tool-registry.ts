@@ -28,7 +28,7 @@ import {
   createHashlineEditTool,
   createPrepareCouncilPromptTool,
 } from "../tools"
-import { createCouncilFinalize, createCouncilRead } from "../tools/council-archive"
+import { createCouncilFinalize } from "../tools/council-archive"
 import { contextCollector } from "../features/context-injector"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
@@ -143,7 +143,6 @@ export function createToolRegistry(args: {
     ...hashlineToolsRecord,
     prepare_council_prompt: createPrepareCouncilPromptTool(ctx.directory),
     council_finalize: createCouncilFinalize(ctx.directory, { contextCollector }),
-    council_read: createCouncilRead(ctx.directory),
   }
 
   const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)
