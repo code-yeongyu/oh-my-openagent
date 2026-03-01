@@ -558,6 +558,23 @@ Auto-switches to backup models on API errors.
 | `timeout_seconds` | `30` | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation and provider retry message detection.** |
 | `notify_on_fallback` | `true` | Toast notification on model switch |
 
+#### Speeding Up Fallback (Proxy APIs)
+
+If you are using a proxy API provider, they may return different error codes (e.g., `401`, `403`, `404`) for quota exhaustion or model unavailability. To make fallback trigger instantly without waiting for long timeouts:
+
+```jsonc
+{
+  "runtime_fallback": {
+    "enabled": true,
+    // Add your proxy's specific error codes to retry_on_errors
+    "retry_on_errors": [400, 401, 403, 404, 429, 500, 502, 503, 504],
+    "max_fallback_attempts": 3,
+    "cooldown_seconds": 15, // Shorter cooldown
+    "timeout_seconds": 10   // Detect hung proxy requests faster
+  }
+}
+```
+
 Define `fallback_models` per agent or category:
 
 ```json
