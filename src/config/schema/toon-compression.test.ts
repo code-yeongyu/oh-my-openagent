@@ -80,9 +80,9 @@ describe("ToonCompressionConfigSchema", () => {
       }
     })
 
-    test("accepts threshold at minimum value (10)", () => {
+    test("accepts threshold at minimum value (1)", () => {
       // given
-      const config = { threshold: 10 }
+      const config = { threshold: 1 }
 
       // when
       const result = ToonCompressionConfigSchema.safeParse(config)
@@ -90,13 +90,13 @@ describe("ToonCompressionConfigSchema", () => {
       // then
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.data.threshold).toBe(10)
+        expect(result.data.threshold).toBe(1)
       }
     })
 
-    test("rejects threshold below minimum (9)", () => {
+    test("rejects threshold below minimum (0)", () => {
       // given
-      const config = { threshold: 9 }
+      const config = { threshold: 0 }
 
       // when
       const result = ToonCompressionConfigSchema.safeParse(config)

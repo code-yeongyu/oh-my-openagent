@@ -3847,7 +3847,7 @@
         "threshold": {
           "default": 5000,
           "type": "number",
-          "minimum": 10
+          "minimum": 1
         },
         "maxEncodingSize": {
           "type": "number",
