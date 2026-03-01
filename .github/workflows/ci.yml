@@ -60,21 +60,20 @@ jobs:
           bun test src/features/opencode-skill-loader/loader.test.ts
           bun test src/hooks/anthropic-context-window-limit-recovery/recovery-hook.test.ts
           bun test src/hooks/anthropic-context-window-limit-recovery/executor.test.ts
+          bun test src/tools/delegate-task/parent-context-resolver.test.ts
 
       - name: Run remaining tests
         run: |
           # Enumerate subdirectories/files explicitly to EXCLUDE mock-heavy files
           # that were already run in isolation above.
           # Excluded from src/cli: doctor/formatter.test.ts, doctor/format-default.test.ts
-          # Excluded from src/tools: call-omo-agent/sync-executor.test.ts, call-omo-agent/session-creator.test.ts, session-manager (all)
-          # Excluded from src/hooks/anthropic-context-window-limit-recovery: recovery-hook.test.ts, executor.test.ts
+          # Excluded from src/tools: call-omo-agent/sync-executor.test.ts, call-omo-agent/session-creator.test.ts, session-manager (all), delegate-task/parent-context-resolver.test.ts
           bun test bin script src/config src/mcp src/index.test.ts \
             src/agents src/shared \
             src/cli/run src/cli/config-manager src/cli/mcp-oauth \
             src/cli/index.test.ts src/cli/install.test.ts src/cli/model-fallback.test.ts \
             src/cli/config-manager.test.ts \
-            src/cli/doctor/runner.test.ts src/cli/doctor/checks \
-            src/tools/ast-grep src/tools/background-task src/tools/delegate-task \
+            src/tools/ast-grep src/tools/background-task src/tools/delegate-task/background-continuation.test.ts src/tools/delegate-task/background-task.test.ts src/tools/delegate-task/category-resolver.test.ts src/tools/delegate-task/metadata-await.test.ts src/tools/delegate-task/subagent-resolver.test.ts src/tools/delegate-task/sync-continuation.test.ts src/tools/delegate-task/sync-prompt-sender.test.ts src/tools/delegate-task/sync-result-fetcher.test.ts src/tools/delegate-task/sync-session-poller.test.ts src/tools/delegate-task/sync-task.test.ts src/tools/delegate-task/token-limiter.test.ts src/tools/delegate-task/tools.test.ts src/tools/delegate-task/types.test.ts src/tools/delegate-task/unstable-agent-task.test.ts \
             src/tools/glob src/tools/grep src/tools/interactive-bash \
             src/tools/look-at src/tools/lsp \
             src/tools/skill src/tools/skill-mcp src/tools/slashcommand src/tools/task \
