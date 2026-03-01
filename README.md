@@ -126,6 +126,30 @@ Every agent, model, temperature, and permission is fully customizable. [**Meet t
 
 ---
 
+## Security
+
+Matrixx includes built-in security enforcement hooks that protect against accidental secret exposure — no setup required.
+
+| Hook | What it does |
+|------|-------------|
+| **Secret Leak Guard** | Intercepts `git commit` and `git push`, runs [gitleaks](https://github.com/gitleaks/gitleaks) on staged changes, and **blocks the operation** if secrets are detected. |
+| **Env File Write Guard** | Blocks agents from writing to sensitive files (`.env`, `*.pem`, `*.key`, `credentials.json`, `id_rsa`, and 16 other patterns). |
+
+Both hooks are **enabled by default** and run before all other hooks in the execution pipeline. Configure via `matrixx.json`:
+
+```jsonc
+{
+  "security": {
+    "secret_scanning": { "enabled": true, "block_on_detection": true },
+    "env_file_guard": { "enabled": true, "allowed_paths": [".env.example"] }
+  }
+}
+```
+
+> **Note:** Secret scanning requires [gitleaks](https://github.com/gitleaks/gitleaks) installed in your PATH. Without it, the hook silently degrades.
+
+---
+
 ## Get Started
 
 **For humans** — paste this into Claude Code, AmpCode, Cursor, or any LLM agent:
