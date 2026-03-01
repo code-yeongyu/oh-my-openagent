@@ -237,8 +237,8 @@ Question({
     question: "What should we do with this plan?",
     header: "Plan Next Step",
     options: [
-      { label: "Execute full plan (Prometheus)", description: "Hand off all phases to Prometheus for execution" },
-      { label: "Execute selected phase (Prometheus)", description: "Choose one phase and execute only that phase first" },
+      { label: "Plan full scope (Prometheus)", description: "Hand off all phases to Prometheus for strategic planning. Run /start-work to execute." },
+      { label: "Plan selected phase (Prometheus)", description: "Choose one phase for Prometheus to plan. Run /start-work to execute." },
       { label: "Write to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
       { label: "Ask follow-up", description: "Ask another planning question" },
       { label: "Done", description: "No further action needed" }
@@ -247,7 +247,7 @@ Question({
   }]
 })
 
-2) If user chooses Execute selected phase (Prometheus), ask:
+2) If user chooses Plan selected phase (Prometheus), ask:
 Question({
   questions: [{
     question: "Which phase should we execute first?",
@@ -261,8 +261,8 @@ Question({
 })
 
 3) Execute selected action:
-- Execute full plan (Prometheus) -> switch_agent(agent="prometheus") with full synthesized plan.
-- Execute selected phase (Prometheus) -> switch_agent(agent="prometheus") with only the selected phase plus dependencies.
+- Plan full scope (Prometheus) -> switch_agent(agent="prometheus") with full synthesized plan framed as work to be planned.
+- Plan selected phase (Prometheus) -> switch_agent(agent="prometheus") with only the selected phase plus dependencies, framed as work to be planned.
 - Write to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path to the user.
 - Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
 - Done -> acknowledge and end.
