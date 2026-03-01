@@ -1,3 +1,5 @@
+import { WRITE_DOCUMENT_OPTION, DONE_QUESTION_TAIL, COMMON_ACTION_TAIL } from "./shared-action-paths"
+
 export const EXPLAIN_GUIDANCE = `
 <runtime_synthesis_rules>
 Use EXPLAIN synthesis.
@@ -17,17 +19,11 @@ Question({
     header: "Explanation Next Step",
     options: [
       { label: "Convert to action plan (Prometheus)", description: "Turn insights into a phased plan" },
-      { label: "Write to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
+${WRITE_DOCUMENT_OPTION},
       { label: "Ask follow-up", description: "Ask another explanatory question" },
-      { label: "Done", description: "No further action needed" }
-    ],
-    multiple: false
-  }]
-})
+${DONE_QUESTION_TAIL}
 
 2) Execute selected action:
 - Convert to action plan (Prometheus) -> switch_agent(agent="prometheus") with synthesized explanation and target outcome.
-- Write to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path.
-- Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
-- Done -> acknowledge and end.
+${COMMON_ACTION_TAIL}
 </runtime_action_paths>`

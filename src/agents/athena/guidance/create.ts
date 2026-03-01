@@ -1,3 +1,5 @@
+import { DONE_QUESTION_TAIL, ASK_FOLLOWUP_ACTION, DONE_ACTION } from "./shared-action-paths"
+
 export const CREATE_GUIDANCE = `
 <runtime_synthesis_rules>
 Use CREATE synthesis.
@@ -28,11 +30,7 @@ Question({
     header: "Next Step",
     options: [
       { label: "Ask follow-up", description: "Ask for clearer selection criteria" },
-      { label: "Done", description: "No further action needed" }
-    ],
-    multiple: false
-  }]
-})
+${DONE_QUESTION_TAIL}
 
 3) If creations are selected, ask:
 Question({
@@ -45,17 +43,13 @@ Question({
       { label: "Implement selected creation (Sisyphus ultrawork)", description: "Implementation with Sisyphus using ultrawork mode" },
       { label: "Write selected creation to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
       { label: "Ask follow-up", description: "Ask another creation-focused question" },
-      { label: "Done", description: "No further action needed" }
-    ],
-    multiple: false
-  }]
-})
+${DONE_QUESTION_TAIL}
 
 4) Execute selected action:
 - Implement selected creation (Hephaestus) -> switch_agent(agent="hephaestus") with only selected creation(s).
 - Implement selected creation (Sisyphus) -> switch_agent(agent="sisyphus") with only selected creation(s).
 - Implement selected creation (Sisyphus ultrawork) -> switch_agent(agent="sisyphus") and prefix handoff context with "ultrawork ", including only selected creation(s).
 - Write selected creation to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path.
-- Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
-- Done -> acknowledge and end.
+${ASK_FOLLOWUP_ACTION}
+${DONE_ACTION}
 </runtime_action_paths>`
