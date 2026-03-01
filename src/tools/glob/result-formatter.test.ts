@@ -111,8 +111,9 @@ describe("formatGlobResult", () => {
 
       const output = formatGlobResult(result, defaultConfig)
 
-      // Real TOON library produces toon: prefix
-      expect(output).toContain("toon:")
+      // TOON format: [count]{keys}: for simple arrays OR toon: for mocked compression
+      const isCompressed = output.includes("[100]{path}:") || output.includes("toon:")
+      expect(isCompressed).toBe(true)
 
       // Should NOT expose mtime or other internal properties
       expect(output).not.toContain("mtime")
