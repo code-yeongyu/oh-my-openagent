@@ -103,7 +103,7 @@ describe("sessionHasCouncilResponse", () => {
   })
 
   describe("#given assistant message with complete council response in longer text", () => {
-    it("#when tag appears mid-text #then should return true", async () => {
+    it("#when tag appears mid-text #then should return false (structural matching rejects inline tags)", async () => {
       //#given
       const client = createMockClient([
         {
@@ -121,7 +121,7 @@ describe("sessionHasCouncilResponse", () => {
       const result = await sessionHasCouncilResponse(client, "ses-buried-tag")
 
       //#then
-      expect(result).toBe(true)
+      expect(result).toBe(false)
     })
   })
 
