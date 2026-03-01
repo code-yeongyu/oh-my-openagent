@@ -1,3 +1,5 @@
+export const MIN_RESPONSE_LENGTH = 100
+
 export const OPENING_TAG = "<COUNCIL_MEMBER_RESPONSE>"
 export const CLOSING_TAG = "</COUNCIL_MEMBER_RESPONSE>"
 
@@ -22,5 +24,8 @@ export function extractCouncilResponse(fullText: string): CouncilResponseExtract
   }
 
   const content = fullText.slice(contentStart, closingAfterLastOpen).trim()
+  if (content.length < MIN_RESPONSE_LENGTH) {
+    return { has_response: false, response_complete: true, result: content }
+  }
   return { has_response: true, response_complete: true, result: content }
 }

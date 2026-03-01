@@ -140,13 +140,13 @@ describe("hasCouncilResponseTag", () => {
     })
   })
 
-  describe("#given assistant message contains the response tag", () => {
+  describe("#given assistant message contains a complete council response", () => {
     it("#then should return true", () => {
       //#given
       const messages = [
         {
           info: { role: "assistant" },
-          parts: [{ type: "text", text: "My analysis </COUNCIL_MEMBER_RESPONSE>" }],
+          parts: [{ type: "text", text: "<COUNCIL_MEMBER_RESPONSE>This is a comprehensive analysis of the council member findings. The investigation reveals multiple significant patterns across the entire codebase that require careful refactoring.</COUNCIL_MEMBER_RESPONSE>" }],
         },
       ]
 
@@ -170,7 +170,7 @@ describe("hasCouncilResponseTag", () => {
         },
         {
           info: { role: "assistant" },
-          parts: [{ type: "text", text: "final answer </COUNCIL_MEMBER_RESPONSE>" }],
+          parts: [{ type: "text", text: "<COUNCIL_MEMBER_RESPONSE>This is a comprehensive analysis of the council member findings. The investigation reveals multiple significant patterns across the entire codebase that require careful refactoring.</COUNCIL_MEMBER_RESPONSE>" }],
         },
       ]
 

@@ -4,12 +4,12 @@ import { extractCouncilResponse } from "./council-response-extractor"
 describe("extractCouncilResponse", () => {
   describe("#given complete COUNCIL_MEMBER_RESPONSE tags", () => {
     it("#then returns has_response true, response_complete true, and the content", () => {
-      const result = extractCouncilResponse("<COUNCIL_MEMBER_RESPONSE>analysis here</COUNCIL_MEMBER_RESPONSE>")
+      const result = extractCouncilResponse("<COUNCIL_MEMBER_RESPONSE>" + "a".repeat(100) + "</COUNCIL_MEMBER_RESPONSE>")
 
       expect(result).toEqual({
         has_response: true,
         response_complete: true,
-        result: "analysis here",
+        result: "a".repeat(100),
       })
     })
   })
@@ -39,11 +39,11 @@ describe("extractCouncilResponse", () => {
   })
 
   describe("#given empty content between tags", () => {
-    it("#then returns has_response true, response_complete true, and empty string result", () => {
+    it("#then returns has_response false, response_complete true, and empty string result", () => {
       const result = extractCouncilResponse("<COUNCIL_MEMBER_RESPONSE></COUNCIL_MEMBER_RESPONSE>")
 
       expect(result).toEqual({
-        has_response: true,
+        has_response: false,
         response_complete: true,
         result: "",
       })
@@ -53,13 +53,13 @@ describe("extractCouncilResponse", () => {
   describe("#given multiple tag pairs", () => {
     it("#then returns content from the last opening tag", () => {
       const text =
-        "<COUNCIL_MEMBER_RESPONSE>first analysis</COUNCIL_MEMBER_RESPONSE>\nSome interim text\n<COUNCIL_MEMBER_RESPONSE>final analysis</COUNCIL_MEMBER_RESPONSE>"
+        `<COUNCIL_MEMBER_RESPONSE>${"first".repeat(20)}</COUNCIL_MEMBER_RESPONSE>\nSome interim text\n<COUNCIL_MEMBER_RESPONSE>${"final".repeat(20)}</COUNCIL_MEMBER_RESPONSE>`
       const result = extractCouncilResponse(text)
 
       expect(result).toEqual({
         has_response: true,
         response_complete: true,
-        result: "final analysis",
+        result: "final".repeat(20),
       })
     })
   })
@@ -72,14 +72,14 @@ describe("extractCouncilResponse", () => {
         "Now here is my actual response:",
         "<COUNCIL_MEMBER_RESPONSE>",
         "## Finding 1: Tag discussion in body",
-        "The extractor uses lastIndexOf to find the opening tag.",
+        "The extractor uses lastIndexOf to find the opening tag, which ensures the last response is extracted.",
         "</COUNCIL_MEMBER_RESPONSE>",
       ].join("\n")
       const result = extractCouncilResponse(text)
       expect(result).toEqual({
         has_response: true,
         response_complete: true,
-        result: "## Finding 1: Tag discussion in body\nThe extractor uses lastIndexOf to find the opening tag.",
+        result: "## Finding 1: Tag discussion in body\nThe extractor uses lastIndexOf to find the opening tag, which ensures the last response is extracted.",
       })
     })
   })
@@ -97,11 +97,11 @@ describe("extractCouncilResponse", () => {
   })
 
   describe("#given whitespace-only content between tags", () => {
-    it("#then returns has_response true, response_complete true, and empty string result", () => {
+    it("#then returns has_response false, response_complete true, and empty string result", () => {
       const result = extractCouncilResponse("<COUNCIL_MEMBER_RESPONSE>   </COUNCIL_MEMBER_RESPONSE>")
 
       expect(result).toEqual({
-        has_response: true,
+        has_response: false,
         response_complete: true,
         result: "",
       })
@@ -110,13 +110,52 @@ describe("extractCouncilResponse", () => {
 
   describe("#given content with surrounding text before the opening tag", () => {
     it("#then returns only the tagged content", () => {
-      const text = "Some preamble text\n<COUNCIL_MEMBER_RESPONSE>the actual response</COUNCIL_MEMBER_RESPONSE>"
+      const text = `Some preamble text\n<COUNCIL_MEMBER_RESPONSE>${"a".repeat(100)}</COUNCIL_MEMBER_RESPONSE>`
       const result = extractCouncilResponse(text)
 
       expect(result).toEqual({
         has_response: true,
         response_complete: true,
-        result: "the actual response",
+        result: "a".repeat(100),
+      })
+    })
+  })
+
+  describe("#given 99-char content between tags (below MIN_RESPONSE_LENGTH)", () => {
+    it("#then returns has_response false, response_complete true", () => {
+      const content = "a".repeat(99)
+      const result = extractCouncilResponse(`<COUNCIL_MEMBER_RESPONSE>${content}</COUNCIL_MEMBER_RESPONSE>`)
+
+      expect(result).toEqual({
+        has_response: false,
+        response_complete: true,
+        result: content,
+      })
+    })
+  })
+
+  describe("#given 100-char content between tags (exactly MIN_RESPONSE_LENGTH)", () => {
+    it("#then returns has_response true, response_complete true", () => {
+      const content = "a".repeat(100)
+      const result = extractCouncilResponse(`<COUNCIL_MEMBER_RESPONSE>${content}</COUNCIL_MEMBER_RESPONSE>`)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: content,
+      })
+    })
+  })
+
+  describe("#given 101-char content between tags (above MIN_RESPONSE_LENGTH)", () => {
+    it("#then returns has_response true, response_complete true", () => {
+      const content = "a".repeat(101)
+      const result = extractCouncilResponse(`<COUNCIL_MEMBER_RESPONSE>${content}</COUNCIL_MEMBER_RESPONSE>`)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: content,
       })
     })
   })

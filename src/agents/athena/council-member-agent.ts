@@ -36,7 +36,8 @@ Example:
 Your analysis here...
 </COUNCIL_MEMBER_RESPONSE>
 
-If you do not wrap your response in <COUNCIL_MEMBER_RESPONSE> tags, your analysis will not be included in the synthesis.`
+If you do not wrap your response in <COUNCIL_MEMBER_RESPONSE> tags, your analysis will not be included in the synthesis.
+Your response inside the tags must be at least 100 characters of substantive content. Empty or trivially short responses will be treated as missing and will not count toward quorum.`
 
 export const COUNCIL_SOLO_ADDENDUM = `
 ## Solo Analysis Mode

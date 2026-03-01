@@ -44,9 +44,9 @@ describe("createCouncilFinalize", () => {
   describe("#given 3 members with valid output files", () => {
     it("#then creates full archive with all has_response true", async () => {
       const agents = [
-        { id: "bg_001", agent: "Council: Claude Opus", response: "Opus analysis" },
-        { id: "bg_002", agent: "Council: GPT-5", response: "GPT analysis" },
-        { id: "bg_003", agent: "Council: Gemini", response: "Gemini analysis" },
+        { id: "bg_001", agent: "Council: Claude Opus", response: "Opus analysis: This is a detailed analysis from Opus model covering the full scope of the council question." },
+        { id: "bg_002", agent: "Council: GPT-5", response: "GPT analysis: This is a detailed analysis from GPT model covering the full scope of the council question." },
+        { id: "bg_003", agent: "Council: Gemini", response: "Gemini analysis: This is a detailed analysis from Gemini model covering the full scope of the council question." },
       ]
 
       for (const a of agents) {
@@ -59,7 +59,7 @@ describe("createCouncilFinalize", () => {
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: agents.map((a) => a.id), name: "test" },
+        { task_ids: agents.map((a) => a.id), name: "test", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -73,14 +73,12 @@ describe("createCouncilFinalize", () => {
         expect(member.task_id).toBe(agents[i].id)
         expect(member.has_response).toBe(true)
         expect(member.response_complete).toBe(true)
-        expect(member).not.toHaveProperty("result")
-        expect(member).not.toHaveProperty("result_truncated")
         expect(member.error).toBeUndefined()
         expect(member.archive_file).toBeDefined()
       }
 
       const opusArchive = await readFile(join(tmpDir, result.members[0].archive_file!), "utf-8")
-      expect(opusArchive).toBe("Opus analysis")
+      expect(opusArchive).toBe("Opus analysis: This is a detailed analysis from Opus model covering the full scope of the council question.")
 
       const metaContent = await readFile(join(tmpDir, result.meta_file), "utf-8")
       expect(metaContent).toContain("archive_name: council-test-")
@@ -96,18 +94,18 @@ describe("createCouncilFinalize", () => {
     it("#then returns partial success with error for missing member", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_001.md"),
-        mockTaskOutput("Council: Claude Opus", "Opus findings"),
+        mockTaskOutput("Council: Claude Opus", "Opus findings: This is a detailed analysis from Opus model covering the full scope of the council question."),
         "utf-8",
       )
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_003.md"),
-        mockTaskOutput("Council: Gemini", "Gemini findings"),
+        mockTaskOutput("Council: Gemini", "Gemini findings: This is a detailed analysis from Gemini model covering the full scope of the council question."),
         "utf-8",
       )
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_001", "bg_002", "bg_003"], name: "partial" },
+        { task_ids: ["bg_001", "bg_002", "bg_003"], name: "partial", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -116,8 +114,6 @@ describe("createCouncilFinalize", () => {
 
       expect(result.members[0].has_response).toBe(true)
       expect(result.members[0].archive_file).toBeDefined()
-      expect(result.members[0]).not.toHaveProperty("result")
-      expect(result.members[0]).not.toHaveProperty("result_truncated")
 
       expect(result.members[1].has_response).toBe(false)
       expect(result.members[1].error).toBe("Task output file not found")
@@ -125,8 +121,6 @@ describe("createCouncilFinalize", () => {
 
       expect(result.members[2].has_response).toBe(true)
       expect(result.members[2].archive_file).toBeDefined()
-      expect(result.members[2]).not.toHaveProperty("result")
-      expect(result.members[2]).not.toHaveProperty("result_truncated")
     })
   })
 
@@ -141,7 +135,7 @@ describe("createCouncilFinalize", () => {
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_large"], name: "large" },
+        { task_ids: ["bg_large"], name: "large", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -149,8 +143,6 @@ describe("createCouncilFinalize", () => {
       const member = result.members[0]
       expect(member.has_response).toBe(true)
       expect(member.archive_file).toBeDefined()
-      expect(member).not.toHaveProperty("result")
-      expect(member).not.toHaveProperty("result_truncated")
 
       const archiveContent = await readFile(join(tmpDir, member.archive_file!), "utf-8")
       expect(archiveContent).toHaveLength(9000)
@@ -159,7 +151,7 @@ describe("createCouncilFinalize", () => {
   })
 
   describe("#given empty response between tags", () => {
-    it("#then returns has_response true with empty string result", async () => {
+    it("#then returns has_response false with empty string result", async () => {
       const emptyOutput = [
         "---",
         "task_id: bg_empty",
@@ -182,17 +174,13 @@ describe("createCouncilFinalize", () => {
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_empty"], name: "empty" },
+        { task_ids: ["bg_empty"], name: "empty", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
 
       const member = result.members[0]
-      expect(member.has_response).toBe(true)
-      expect(member.response_complete).toBe(true)
-      expect(member.archive_file).toBeDefined()
-      expect(member).not.toHaveProperty("result")
-      expect(member).not.toHaveProperty("result_truncated")
+      expect(member.has_response).toBe(false)
     })
   })
 
@@ -200,18 +188,18 @@ describe("createCouncilFinalize", () => {
     it("#then each member gets a unique archive_file keyed by task id", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_alpha.md"),
-        mockTaskOutput("Agent A+B", "First response"),
+        mockTaskOutput("Agent A+B", "First response: This is a detailed analysis from Agent A+B covering the full scope of the council question."),
         "utf-8",
       )
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_beta.md"),
-        mockTaskOutput("Agent A B", "Second response"),
+        mockTaskOutput("Agent A B", "Second response: This is a detailed analysis from Agent A B covering the full scope of the council question."),
         "utf-8",
       )
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_alpha", "bg_beta"], name: "collision" },
+        { task_ids: ["bg_alpha", "bg_beta"], name: "collision", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -233,7 +221,7 @@ describe("createCouncilFinalize", () => {
     it("#then registers critical custom context for Athena runtime guidance", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_intent.md"),
-        mockTaskOutput("Council: GPT-5", "Plan proposal"),
+        mockTaskOutput("Council: GPT-5", "Plan proposal: This is a detailed analysis from GPT model covering the full scope of the council question."),
         "utf-8",
       )
 
@@ -273,7 +261,7 @@ describe("createCouncilFinalize", () => {
     it("#then emits diagnose action options for hephaestus and sisyphus", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_diagnose.md"),
-        mockTaskOutput("Council: Claude", "Root cause found"),
+        mockTaskOutput("Council: Claude", "Root cause found: This is a detailed analysis from Claude model covering the full scope of the council question."),
         "utf-8",
       )
 
@@ -305,7 +293,7 @@ describe("createCouncilFinalize", () => {
     it("#then emits audit processing mode and batching guidance", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_audit.md"),
-        mockTaskOutput("Council: Claude", "Audit findings"),
+        mockTaskOutput("Council: Claude", "Audit findings: This is a detailed analysis from Claude model covering the full scope of the council question."),
         "utf-8",
       )
 
@@ -352,7 +340,7 @@ describe("createCouncilFinalize", () => {
     it("#then emits informational write-to-document path without atlas delegation", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_eval.md"),
-        mockTaskOutput("Council: Claude", "Option comparison"),
+        mockTaskOutput("Council: Claude", "Option comparison: This is a detailed analysis from Claude model covering the full scope of the council question."),
         "utf-8",
       )
 
@@ -394,13 +382,13 @@ describe("createCouncilFinalize", () => {
     it("#then rejects task IDs with path traversal characters", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_valid.md"),
-        mockTaskOutput("Agent", "Valid response"),
+        mockTaskOutput("Agent", "Valid response: This is a detailed analysis from Agent covering the full scope of the council question."),
         "utf-8",
       )
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["../../etc/passwd", "bg_valid", "foo/bar"], name: "traversal" },
+        { task_ids: ["../../etc/passwd", "bg_valid", "foo/bar"], name: "traversal", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -416,13 +404,13 @@ describe("createCouncilFinalize", () => {
     it("#then sanitizes name with path traversal characters", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_safe.md"),
-        mockTaskOutput("Agent", "Response"),
+        mockTaskOutput("Agent", "Response: This is a detailed analysis from Agent covering the full scope of the council question here."),
         "utf-8",
       )
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_safe"], name: "../../etc" },
+        { task_ids: ["bg_safe"], name: "../../etc", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -432,11 +420,11 @@ describe("createCouncilFinalize", () => {
     })
 
     it("#then sanitizes name with absolute path", async () => {
-      await writeFile(join(tmpDir, ".sisyphus", "task-outputs", "bg_abs.md"), mockTaskOutput("Agent", "Response"), "utf-8")
+      await writeFile(join(tmpDir, ".sisyphus", "task-outputs", "bg_abs.md"), mockTaskOutput("Agent", "Response: This is a detailed analysis from Agent covering the full scope of the council question here."), "utf-8")
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_abs"], name: "/absolute/path" },
+        { task_ids: ["bg_abs"], name: "/absolute/path", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -446,11 +434,11 @@ describe("createCouncilFinalize", () => {
     })
 
     it("#then sanitizes name with dot-dot-slash in the middle", async () => {
-      await writeFile(join(tmpDir, ".sisyphus", "task-outputs", "bg_mid.md"), mockTaskOutput("Agent", "Response"), "utf-8")
+      await writeFile(join(tmpDir, ".sisyphus", "task-outputs", "bg_mid.md"), mockTaskOutput("Agent", "Response: This is a detailed analysis from Agent covering the full scope of the council question here."), "utf-8")
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_mid"], name: "foo/../bar" },
+        { task_ids: ["bg_mid"], name: "foo/../bar", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -460,11 +448,11 @@ describe("createCouncilFinalize", () => {
     })
 
     it("#then accepts valid task IDs", async () => {
-      await writeFile(join(tmpDir, ".sisyphus", "task-outputs", "valid-id_123.md"), mockTaskOutput("Agent", "Response"), "utf-8")
+      await writeFile(join(tmpDir, ".sisyphus", "task-outputs", "valid-id_123.md"), mockTaskOutput("Agent", "Response: This is a detailed analysis from Agent covering the full scope of the council question here."), "utf-8")
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["valid-id_123"], name: "valid" },
+        { task_ids: ["valid-id_123"], name: "valid", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -477,13 +465,13 @@ describe("createCouncilFinalize", () => {
     it("#then rejects prompt_file with absolute path outside workspace", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_prompt.md"),
-        mockTaskOutput("Agent", "Response"),
+        mockTaskOutput("Agent", "Response: This is a detailed analysis from Agent covering the full scope of the council question here."),
         "utf-8",
       )
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_prompt"], name: "prompt-test", prompt_file: "/etc/passwd" },
+        { task_ids: ["bg_prompt"], name: "prompt-test", prompt_file: "/etc/passwd", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -496,13 +484,13 @@ describe("createCouncilFinalize", () => {
     it("#then rejects prompt_file with relative traversal", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_rel.md"),
-        mockTaskOutput("Agent", "Response"),
+        mockTaskOutput("Agent", "Response: This is a detailed analysis from Agent covering the full scope of the council question here."),
         "utf-8",
       )
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_rel"], name: "rel-test", prompt_file: "../../etc/passwd" },
+        { task_ids: ["bg_rel"], name: "rel-test", prompt_file: "../../etc/passwd", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -517,13 +505,13 @@ describe("createCouncilFinalize", () => {
       await writeFile(join(tmpDir, ".sisyphus", "tmp", "athena-council-test.md"), "Test prompt", "utf-8")
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_ok.md"),
-        mockTaskOutput("Agent", "Response"),
+        mockTaskOutput("Agent", "Response: This is a detailed analysis from Agent covering the full scope of the council question here."),
         "utf-8",
       )
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_ok"], name: "valid-prompt", prompt_file: ".sisyphus/tmp/athena-council-test.md" },
+        { task_ids: ["bg_ok"], name: "valid-prompt", prompt_file: ".sisyphus/tmp/athena-council-test.md", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -535,7 +523,7 @@ describe("createCouncilFinalize", () => {
     it("#then rejects task IDs with backslash characters", async () => {
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg\\evil"], name: "backslash" },
+        { task_ids: ["bg\\evil"], name: "backslash", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -548,13 +536,13 @@ describe("createCouncilFinalize", () => {
     it("#then handles name that slugifies to empty string", async () => {
       await writeFile(
         join(tmpDir, ".sisyphus", "task-outputs", "bg_empty_name.md"),
-        mockTaskOutput("Agent", "Response"),
+        mockTaskOutput("Agent", "Response: This is a detailed analysis from Agent covering the full scope of the council question here."),
         "utf-8",
       )
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_empty_name"], name: "///..." },
+        { task_ids: ["bg_empty_name"], name: "///...", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(resultStr)

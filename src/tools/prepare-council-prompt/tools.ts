@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto"
 import { writeFile, unlink, mkdir, readdir, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
-import { COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM, COUNCIL_INTENT_ADDENDUMS, getValidCouncilIntents, type CouncilIntent } from "../../agents/athena"
+import { COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM, COUNCIL_INTENT_ADDENDUMS, getValidCouncilIntents, resolveCouncilIntent, type CouncilIntent, COUNCIL_DEFAULTS } from "../../agents/athena"
 
-const CLEANUP_DELAY_MS = 30 * 60 * 1000
+const CLEANUP_DELAY_MS = COUNCIL_DEFAULTS.CLEANUP_DELAY_MS
 const COUNCIL_TMP_DIR = ".sisyphus/tmp"
 
 const COUNCIL_FILE_PREFIX = "athena-council-"
@@ -24,12 +24,18 @@ async function cleanupStaleTempFiles(directory: string): Promise<void> {
           await unlink(filePath)
           log("[prepare-council-prompt] Cleaned up stale temp file", { filePath })
         }
-      } catch {
-        // File may have been deleted between readdir and stat
+      } catch (err: unknown) {
+        const code = (err as NodeJS.ErrnoException).code
+        if (code !== "ENOENT") {
+          log("[prepare-council-prompt] Unexpected error during temp file cleanup", { filePath, error: String(err), code })
+        }
       }
     }
-  } catch {
-    // Directory may not exist yet — nothing to clean
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code !== "ENOENT") {
+      log("[prepare-council-prompt] Unexpected error reading temp directory", { directory: tmpDir, error: String(err), code })
+    }
   }
 }
 
@@ -78,12 +84,15 @@ Returns the file path to reference in subsequent task() calls.`
         return `Invalid mode: "${args.mode}". Valid modes: "solo", "delegation".`
       }
 
-      const validIntents = getValidCouncilIntents()
-      if (args.intent !== undefined && !(validIntents as readonly string[]).includes(args.intent.toUpperCase())) {
-        return `Invalid intent: "${args.intent}". Valid intents: ${validIntents.map((i) => `"${i}"`).join(", ")}.`
+      if (args.intent !== undefined) {
+        const resolved = resolveCouncilIntent(args.intent)
+        if (!resolved) {
+          const validIntents = getValidCouncilIntents()
+          return `Invalid intent: "${args.intent}". Valid intents: ${validIntents.map((i) => `"${i}"`).join(", ")}.`
+        }
       }
 
-      const resolvedIntent = args.intent?.toUpperCase()
+      const resolvedIntent = args.intent ? resolveCouncilIntent(args.intent) : undefined
 
       const mode = args.mode === "delegation" ? "delegation" : "solo"
 

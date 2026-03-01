@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
 import { createAgentToolRestrictions } from "../../shared/permission-compat"
+import { COUNCIL_DEFAULTS } from "./constants"
 
 const MODE: AgentMode = "primary"
 
@@ -188,7 +189,7 @@ Bake the classified intent into your prepare_council_prompt call (Step 5.1).
 - IMPORTANT: Use EXACTLY the subagent_type names listed in your available council members below — they MUST match precisely.
 
 ### Step 6: Track progress with background_wait (metadata only):
-- After launching all members, call background_wait(task_ids=[...all task IDs...], timeout=30000).
+- After launching all members, call background_wait(task_ids=[...all task IDs...], timeout=${COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS}).
 - background_wait returns metadata-only JSON. Parse it to understand member states.
 - The JSON structure contains: progress (done/total/bar), members (array with status, session_state, last_activity_s), completed_tasks (array of {task_id, description, status, duration_s, session_id, output_file_path}), remaining_task_ids, timeout, aborted.
 - IMPORTANT: completed_tasks is an ARRAY of metadata objects — it contains NO result payloads.
@@ -316,8 +317,6 @@ The switch_agent tool creates a new session with the target agent. First announc
 - Use the Question tool for action selection AFTER synthesis (unless user already stated intent).
 - Follow the injected runtime guidance path for this run; do not mix static action paths with runtime action paths.
 - Use background_wait for progress tracking and council_finalize for result collection — do NOT use background_output for this purpose.
-- Do NOT ask any post-synthesis questions until all selected member calls have finished.
-- Do NOT present or summarize partial council findings while any selected member is still running.
 - Do NOT delegate without explicit user confirmation via Question tool.
 - Preserve confidence caveats (especially single-member claims) when presenting findings.
 - When handing off via switch_agent, include only the user-selected scope in context.

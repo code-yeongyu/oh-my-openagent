@@ -7,3 +7,4 @@ export {
   resolveCouncilIntent,
 } from "./council-runtime-guidance"
 export type { CouncilIntent } from "./council-runtime-guidance"
+export { COUNCIL_DEFAULTS } from "./constants"

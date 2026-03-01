@@ -197,5 +197,33 @@ describe("createPrepareCouncilPromptTool", () => {
         expect(intentIdx).toBeLessThan(questionIdx)
       })
     })
+
+    describe("#when called with lowercase intent 'audit'", () => {
+      it("#then resolves correctly and produces file with AUDIT addendum", async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "council-test-"))
+        const toolDef = createPrepareCouncilPromptTool(tmpDir)
+        const result = await toolDef.execute({ prompt: "Review security", intent: "audit" }, mockContext)
+
+        expect(result).not.toContain("Invalid intent")
+        expect(result).toContain("intent: AUDIT")
+        const filePath = extractFilePath(result)
+        const content = await readFile(filePath, "utf-8")
+        expect(content).toContain("## Analysis Intent: AUDIT")
+      })
+    })
+
+    describe("#when called with mixed case intent 'Diagnose'", () => {
+      it("#then resolves correctly and produces file with DIAGNOSE addendum", async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "council-test-"))
+        const toolDef = createPrepareCouncilPromptTool(tmpDir)
+        const result = await toolDef.execute({ prompt: "Why is the API failing?", intent: "Diagnose" }, mockContext)
+
+        expect(result).not.toContain("Invalid intent")
+        expect(result).toContain("intent: DIAGNOSE")
+        const filePath = extractFilePath(result)
+        const content = await readFile(filePath, "utf-8")
+        expect(content).toContain("## Analysis Intent: DIAGNOSE")
+      })
+    })
   })
 })

@@ -1,84 +1,24 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import { readFile, writeFile, mkdir, rename } from "node:fs/promises"
-import { join, isAbsolute, resolve, relative } from "node:path"
+import { readFile, writeFile, mkdir } from "node:fs/promises"
+import { join } from "node:path"
 import { randomBytes } from "node:crypto"
 import { extractCouncilResponse } from "./council-response-extractor"
+import { TASK_ID_PATTERN, slugify, toPosixPath, extractAgentFromFrontmatter, isPathEscaping, movePromptFile } from "./council-finalize-helpers"
+import { formatMetaYaml, type MetaMember } from "./meta-yaml-formatter"
 import {
   buildAthenaRuntimeGuidance,
   getValidCouncilIntents,
   resolveCouncilIntent,
+  COUNCIL_DEFAULTS,
 } from "../../agents/athena"
 import { log } from "../../shared/logger"
 import type { ContextCollector } from "../../features/context-injector"
 import type { CouncilFinalizeArgs, CouncilMemberResult, CouncilFinalizeResult } from "./types"
-
-interface MetaMember {
-  task_id: string
-  member: string
-  member_slug: string
-  task_output_path: string
-  archive_file: string
-  has_response: boolean
-  response_complete: boolean
-}
-
 type RegisterContext = Pick<ContextCollector, "register">
 
 type CouncilFinalizeToolContext = {
   sessionID?: string
 }
-
-const TASK_ID_PATTERN = /^[a-zA-Z0-9_-]+$/
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-}
-
-function toPosixPath(pathValue: string): string {
-  return pathValue.replace(/\\/g, "/")
-}
-
-function extractAgentFromFrontmatter(content: string): string | null {
-  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/)
-  if (!fmMatch) return null
-  const agentLine = fmMatch[1].match(/^agent:\s*(.+)$/m)
-  return agentLine ? agentLine[1].trim() : null
-}
-
-function formatMetaYaml(archiveName: string, createdAt: string, members: MetaMember[], question?: string, promptFile?: string): string {
-  const lines: string[] = [
-    `archive_name: ${archiveName}`,
-    `created_at: ${createdAt}`,
-  ]
-
-  if (question) {
-    lines.push(`question: |`)
-    for (const qLine of question.split("\n")) {
-      lines.push(`  ${qLine}`)
-    }
-  }
-
-  if (promptFile) {
-    lines.push(`prompt_file: ${promptFile}`)
-  }
-
-  lines.push("members:")
-
-  for (const m of members) {
-    lines.push(`  - task_id: ${m.task_id}`)
-    lines.push(`    member: "${m.member}"`)
-    lines.push(`    member_slug: ${m.member_slug}`)
-    lines.push(`    task_output_path: ${m.task_output_path}`)
-    lines.push(`    archive_file: ${m.archive_file}`)
-    lines.push(`    has_response: ${m.has_response}`)
-    lines.push(`    response_complete: ${m.response_complete}`)
-  }
-
-  return lines.join("\n") + "\n"
-}
-
 export function createCouncilFinalize(
   basePath?: string,
   options?: { contextCollector?: RegisterContext }
@@ -95,14 +35,13 @@ export function createCouncilFinalize(
       name: tool.schema.string().describe("Council name used in the archive directory name"),
       intent: tool.schema
         .string()
-        .optional()
         .describe(`Classified question intent used for runtime Athena guidance injection. Valid intents: ${getValidCouncilIntents().join(", ")}`),
       question: tool.schema.string().optional().describe("Original user question that triggered the council"),
       prompt_file: tool.schema.string().optional().describe("Path to the council prompt temp file (will be moved into the archive)"),
     },
     async execute(args: CouncilFinalizeArgs, toolContext: CouncilFinalizeToolContext) {
       const resolvedIntent = resolveCouncilIntent(args.intent)
-      if (args.intent && !resolvedIntent) {
+      if (!resolvedIntent) {
         return `Invalid intent: "${args.intent}". Valid intents: ${getValidCouncilIntents().join(", ")}.`
       }
 
@@ -120,16 +59,14 @@ export function createCouncilFinalize(
       }
 
       const base = basePath ?? process.cwd()
-      const hexId = randomBytes(2).toString("hex")
+      const hexId = randomBytes(COUNCIL_DEFAULTS.ARCHIVE_ID_BYTES).toString("hex")
       const safeName = slugify(args.name) || "unnamed"
       const archiveName = `council-${safeName}-${hexId}`
       const relArchiveDir = join(".sisyphus", "athena", archiveName)
       const relArchiveDirForOutput = toPosixPath(relArchiveDir)
       const absArchiveDir = join(base, relArchiveDir)
 
-      const expectedArchiveRoot = join(base, ".sisyphus", "athena")
-      const relFromArchiveRoot = relative(expectedArchiveRoot, absArchiveDir)
-      if (relFromArchiveRoot.startsWith("..") || isAbsolute(relFromArchiveRoot)) {
+      if (isPathEscaping(join(base, ".sisyphus", "athena"), absArchiveDir)) {
         return `Security error: archive directory would escape .sisyphus/athena/`
       }
 
@@ -162,9 +99,7 @@ export function createCouncilFinalize(
         const relTaskOutputForOutput = toPosixPath(relTaskOutput)
         const absTaskOutput = join(base, relTaskOutput)
 
-        const expectedTaskOutputRoot = join(base, ".sisyphus", "task-outputs")
-        const relFromTaskOutputRoot = relative(expectedTaskOutputRoot, absTaskOutput)
-        if (relFromTaskOutputRoot.startsWith("..") || isAbsolute(relFromTaskOutputRoot)) {
+        if (isPathEscaping(join(base, ".sisyphus", "task-outputs"), absTaskOutput)) {
           members.push({
             task_id: taskId,
             member: "unknown",
@@ -241,27 +176,9 @@ export function createCouncilFinalize(
         })
       }
 
-      let relPromptFile: string | undefined
-      if (args.prompt_file) {
-        try {
-          const promptFilename = "council-prompt.md"
-          const absPromptSrc = isAbsolute(args.prompt_file) ? args.prompt_file : resolve(base, args.prompt_file)
-          const expectedPromptRoot = join(base, ".sisyphus", "tmp")
-          const relFromPromptRoot = relative(expectedPromptRoot, absPromptSrc)
-          if (relFromPromptRoot.startsWith("..") || isAbsolute(relFromPromptRoot)) {
-            log("[council-finalize] Rejected prompt_file outside .sisyphus/tmp/", { promptFile: args.prompt_file })
-          } else {
-            const absPromptDest = join(absArchiveDir, promptFilename)
-            await rename(absPromptSrc, absPromptDest).catch(async () => {
-              const content = await readFile(absPromptSrc, "utf-8")
-              await writeFile(absPromptDest, content, "utf-8")
-            })
-            relPromptFile = toPosixPath(join(relArchiveDir, promptFilename))
-          }
-        } catch (err) {
-          log("[council-finalize] Failed to move prompt file", { promptFile: args.prompt_file, error: String(err) })
-        }
-      }
+      const relPromptFile = args.prompt_file
+        ? await movePromptFile(args.prompt_file, base, absArchiveDir, relArchiveDir)
+        : undefined
 
       const relMetaFile = join(relArchiveDir, "meta.yaml")
       const relMetaFileForOutput = toPosixPath(relMetaFile)

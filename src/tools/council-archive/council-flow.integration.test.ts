@@ -89,9 +89,9 @@ describe("council archive integration flow", () => {
     describe("#when finalize is called and then each archive is read", () => {
       it("#then creates archive with correct structure and archives are readable", async () => {
         const agents = [
-          { id: "bg_opus", agent: "Council: Claude Opus", response: "Opus deep analysis of architecture" },
-          { id: "bg_gpt", agent: "Council: GPT-5", response: "GPT pragmatic code review" },
-          { id: "bg_gemini", agent: "Council: Gemini", response: "Gemini creative alternative approach" },
+          { id: "bg_opus", agent: "Council: Claude Opus", response: "Opus deep analysis of architecture: This is a detailed analysis from Opus model covering the full scope of the council question." },
+          { id: "bg_gpt", agent: "Council: GPT-5", response: "GPT pragmatic code review: This is a detailed analysis from GPT model covering the full scope of the council question." },
+          { id: "bg_gemini", agent: "Council: Gemini", response: "Gemini creative alternative approach: This is a detailed analysis from Gemini model covering the full scope of the council question." },
         ]
 
         for (const a of agents) {
@@ -104,7 +104,7 @@ describe("council archive integration flow", () => {
 
         const finalizeTool = createCouncilFinalize(tmpDir)
         const resultStr = await finalizeTool.execute(
-          { task_ids: agents.map((a) => a.id), name: "test" },
+          { task_ids: agents.map((a) => a.id), name: "test", intent: "FREEFORM" },
           toolContext,
         )
         const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -152,7 +152,7 @@ describe("council archive integration flow", () => {
 
         const finalizeTool = createCouncilFinalize(tmpDir)
         const resultStr = await finalizeTool.execute(
-          { task_ids: [taskId], name: "partial" },
+          { task_ids: [taskId], name: "partial", intent: "FREEFORM" },
           toolContext,
         )
         const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -180,7 +180,7 @@ describe("council archive integration flow", () => {
 
         const finalizeTool = createCouncilFinalize(tmpDir)
         const resultStr = await finalizeTool.execute(
-          { task_ids: ["bg_notags"], name: "notags" },
+          { task_ids: ["bg_notags"], name: "notags", intent: "FREEFORM" },
           toolContext,
         )
         const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -197,18 +197,18 @@ describe("council archive integration flow", () => {
       it("#then 2 members succeed and 1 has error 'Task output file not found'", async () => {
         await writeFile(
           join(tmpDir, ".sisyphus", "task-outputs", "bg_first.md"),
-          mockTaskOutput("Council: First", "First analysis"),
+          mockTaskOutput("Council: First", "First analysis: This is a detailed analysis from First model covering the full scope of the council question."),
           "utf-8",
         )
         await writeFile(
           join(tmpDir, ".sisyphus", "task-outputs", "bg_third.md"),
-          mockTaskOutput("Council: Third", "Third analysis"),
+          mockTaskOutput("Council: Third", "Third analysis: This is a detailed analysis from Third model covering the full scope of the council question."),
           "utf-8",
         )
 
         const finalizeTool = createCouncilFinalize(tmpDir)
         const resultStr = await finalizeTool.execute(
-          { task_ids: ["bg_first", "bg_missing", "bg_third"], name: "partial" },
+          { task_ids: ["bg_first", "bg_missing", "bg_third"], name: "partial", intent: "FREEFORM" },
           toolContext,
         )
         const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -241,7 +241,7 @@ describe("council archive integration flow", () => {
 
         const finalizeTool = createCouncilFinalize(tmpDir)
         const resultStr = await finalizeTool.execute(
-          { task_ids: [taskId], name: "large" },
+          { task_ids: [taskId], name: "large", intent: "FREEFORM" },
           toolContext,
         )
         const result: CouncilFinalizeResult = JSON.parse(resultStr)
@@ -263,7 +263,7 @@ describe("council archive integration flow", () => {
         const taskId = "bg_with_meta"
         await writeFile(
           join(tmpDir, ".sisyphus", "task-outputs", `${taskId}.md`),
-          mockTaskOutput("Council: Opus", "Analysis result"),
+          mockTaskOutput("Council: Opus", "Analysis result: This is a detailed analysis from Opus model covering the full scope of the council question."),
           "utf-8",
         )
 
@@ -277,6 +277,7 @@ describe("council archive integration flow", () => {
           {
             task_ids: [taskId],
             name: "meta-test",
+            intent: "FREEFORM",
             question: "What is the best architecture for this app?",
             prompt_file: promptFile,
           },
@@ -304,7 +305,7 @@ describe("council archive integration flow", () => {
         const taskId = "bg_question_only"
         await writeFile(
           join(tmpDir, ".sisyphus", "task-outputs", `${taskId}.md`),
-          mockTaskOutput("Council: GPT", "GPT analysis"),
+          mockTaskOutput("Council: GPT", "GPT analysis: This is a detailed analysis from GPT model covering the full scope of the council question."),
           "utf-8",
         )
 
@@ -313,6 +314,7 @@ describe("council archive integration flow", () => {
           {
             task_ids: [taskId],
             name: "question-only",
+            intent: "FREEFORM",
             question: "How should we handle auth?",
           },
           toolContext,

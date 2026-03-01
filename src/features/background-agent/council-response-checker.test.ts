@@ -13,13 +13,13 @@ function createMockClient(
 }
 
 describe("sessionHasCouncilResponse", () => {
-  describe("#given assistant message with closing council tag", () => {
+  describe("#given assistant message with complete council response", () => {
     it("#when tag is in text part #then should return true", async () => {
       //#given
       const client = createMockClient([
         {
           info: { role: "assistant" },
-          parts: [{ type: "text", text: "Some response</COUNCIL_MEMBER_RESPONSE>" }],
+          parts: [{ type: "text", text: "<COUNCIL_MEMBER_RESPONSE>This is a comprehensive analysis of the council member findings. The investigation reveals multiple significant patterns across the entire codebase that require careful refactoring.</COUNCIL_MEMBER_RESPONSE>" }],
         },
       ])
 
@@ -102,7 +102,7 @@ describe("sessionHasCouncilResponse", () => {
     })
   })
 
-  describe("#given assistant message with tag buried in longer text", () => {
+  describe("#given assistant message with complete council response in longer text", () => {
     it("#when tag appears mid-text #then should return true", async () => {
       //#given
       const client = createMockClient([
@@ -111,7 +111,7 @@ describe("sessionHasCouncilResponse", () => {
           parts: [
             {
               type: "text",
-              text: "Here is my analysis of the situation.\n\nLong content here.\n\n</COUNCIL_MEMBER_RESPONSE>\n\nMore text after.",
+              text: "Here is my analysis. <COUNCIL_MEMBER_RESPONSE>This is a comprehensive analysis of the council member findings. The investigation reveals multiple significant patterns across the entire codebase that require careful refactoring.</COUNCIL_MEMBER_RESPONSE> More text after.",
             },
           ],
         },

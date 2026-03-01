@@ -6,11 +6,10 @@ import {
   createInternalAgentTextPart,
 } from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { extractCouncilResponse } from "../../tools/council-archive/council-response-extractor"
 import { COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents"
 
 type OpencodeClient = PluginInput["client"]
-
-const COUNCIL_RESPONSE_TAG = "</COUNCIL_MEMBER_RESPONSE>"
 
 const CONTINUATION_PROMPT =
   "You have not yet produced your final <COUNCIL_MEMBER_RESPONSE>. Continue your analysis and wrap your findings in <COUNCIL_MEMBER_RESPONSE> tags. If you are waiting for background tasks, use background_wait to block until they complete, then produce your response."
@@ -28,17 +27,18 @@ export function resetCouncilNudgeCount(taskId: string): void {
 }
 
 export function hasCouncilResponseTag(sessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type?: string; text?: string }> }>): boolean {
-  for (let i = sessionMessages.length - 1; i >= 0; i--) {
-    const msg = sessionMessages[i]
+  const assistantTexts: string[] = []
+  for (const msg of sessionMessages) {
     if (msg.info?.role !== "assistant") continue
-    const parts = msg.parts ?? []
-    for (const part of parts) {
-      if (part.type === "text" && part.text?.includes(COUNCIL_RESPONSE_TAG)) {
-        return true
+    for (const part of msg.parts ?? []) {
+      if (part.type === "text" && part.text) {
+        assistantTexts.push(part.text)
       }
     }
   }
-  return false
+  if (assistantTexts.length === 0) return false
+  const extraction = extractCouncilResponse(assistantTexts.join("\n"))
+  return extraction.has_response && extraction.response_complete
 }
 
 export function sendCouncilContinuationNudge(
