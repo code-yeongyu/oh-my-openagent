@@ -94,6 +94,17 @@ Academic papers, EU proposals, systematic reviews, project management, IP exploi
 
 </td>
 </tr>
+<tr>
+<td colspan="2">
+
+### Sentinel — *The Security Auditor*
+
+**Claude Opus 4.6** &middot; Read-only security specialist
+
+Scans for vulnerabilities but never touches code. OWASP Top 10, SAST, DAST, dependency CVEs, secret detection, crypto audit, infrastructure hardening. 9 composable skills any agent can load.
+
+</td>
+</tr>
 </table>
 
 | Agent | Role | Model |
@@ -105,7 +116,6 @@ Academic papers, EU proposals, systematic reviews, project management, IP exploi
 | **Smith** | Plan validation & review | GPT 5.2 |
 | **Operator** | Documentation & OSS search | GLM 4.7 |
 | **Trinity** | Blazing fast codebase grep | Grok Code Fast |
-| **Sentinel** | Security auditing & vulnerability scanning | Claude Opus 4.6 |
 | **Construct** | PDF, image & diagram analysis | Kimi K2.5 (free) |
 
 Every agent, model, temperature, and permission is fully customizable. [**Meet the full team &rarr;**](docs/agents.md)
@@ -120,7 +130,7 @@ Every agent, model, temperature, and permission is fully customizable. [**Meet t
 | **Developer Tools** | LSP (goto def, rename, diagnostics), AST-Grep (search & replace), Tmux terminal |
 | **41 Lifecycle Hooks** | Context injection, think mode, comment checking, todo enforcement, error recovery |
 | **36 Built-in Skills** | DSL engineering (11), research & leadership (12), security (9), browser, git, frontend |
-| **Curated MCPs** | Exa (web search), Context7 (official docs), Grep.app (GitHub code search) |
+| **Curated MCPs** | Exa (web search), Context7 (official docs), Grep.app (GitHub code search), Document Reader (office docs) |
 | **Claude Code Compat** | Full compatibility — commands, agents, skills, MCPs, hooks from `settings.json` |
 
 [**Full feature list &rarr;**](docs/features.md) &nbsp;&middot;&nbsp; [**Configuration guide &rarr;**](docs/configurations.md) &nbsp;&middot;&nbsp; [**Architecture diagram &rarr;**](docs/agent-architecture.md)
