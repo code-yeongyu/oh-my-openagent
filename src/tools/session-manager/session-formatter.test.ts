@@ -64,8 +64,9 @@ describe("formatSearchResults", () => {
 
         const formatted = formatSearchResults(results, { enabled: true, threshold: 1000 })
 
-        // Real TOON library produces toon: prefix when compression is attempted
-        expect(formatted).toContain("toon:")
+        // TOON format produces [count]{keys}: prefix for compressed arrays
+        expect(formatted).toContain("[")
+        expect(formatted).toContain("]{")
         // Verify the data structure is preserved in the output
         expect(formatted).toContain("session_id")
         expect(formatted).toContain("ses_001")
