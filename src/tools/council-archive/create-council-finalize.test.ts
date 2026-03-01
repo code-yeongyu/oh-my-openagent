@@ -73,8 +73,8 @@ describe("createCouncilFinalize", () => {
       )
       const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
-      expect(result.archive_dir).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{4}$/)
-      expect(result.meta_file).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{4}\/meta\.yaml$/)
+      expect(result.archive_dir).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{16}$/)
+      expect(result.meta_file).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{16}\/meta\.yaml$/)
       expect(result.members).toHaveLength(3)
 
       for (let i = 0; i < agents.length; i++) {
@@ -517,7 +517,7 @@ describe("createCouncilFinalize", () => {
       )
       const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
-      expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-unnamed-[a-f0-9]{4}$/)
+      expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-unnamed-[a-f0-9]{16}$/)
     })
   })
 })

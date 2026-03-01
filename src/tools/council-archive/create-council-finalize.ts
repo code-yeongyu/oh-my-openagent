@@ -13,9 +13,6 @@ import {
 } from "../../agents/athena"
 import type { CouncilFinalizeArgs, CouncilMemberResult, CouncilFinalizeResult } from "./types"
 
-type CouncilFinalizeToolContext = {
-  sessionID?: string
-}
 export function createCouncilFinalize(
   basePath?: string,
 ): ToolDefinition {
@@ -34,7 +31,7 @@ export function createCouncilFinalize(
       question: tool.schema.string().optional().describe("Original user question that triggered the council"),
       prompt_file: tool.schema.string().optional().describe("Path to the council prompt temp file (will be moved into the archive)"),
     },
-    async execute(args: CouncilFinalizeArgs, toolContext: CouncilFinalizeToolContext) {
+    async execute(args: CouncilFinalizeArgs, toolContext) {
       const resolvedIntent = resolveCouncilIntent(args.intent)
       if (!resolvedIntent) {
         return `Invalid intent: "${args.intent}". Valid intents: ${getValidCouncilIntents().join(", ")}.`
