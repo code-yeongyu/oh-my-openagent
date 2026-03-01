@@ -17,6 +17,8 @@ export function createToolExecuteBeforeHandler(args: {
   const { ctx, hooks } = args
 
   return async (input, output): Promise<void> => {
+    await hooks.secretLeakGuard?.["tool.execute.before"]?.(input, output)
+    await hooks.envFileWriteGuard?.["tool.execute.before"]?.(input, output)
     await hooks.writeExistingFileGuard?.["tool.execute.before"]?.(input, output)
     await hooks.questionLabelTruncator?.["tool.execute.before"]?.(input, output)
     await hooks.claudeCodeHooks?.["tool.execute.before"]?.(input, output)
