@@ -590,7 +590,8 @@ Configure structured data compression for LLM contexts.
 {
   "toon_compression": {
     "enabled": false,
-    "threshold": 5000
+    "threshold": 5000,
+    "maxEncodingSize": 100000
   }
 }
 ```
@@ -599,6 +600,7 @@ Configure structured data compression for LLM contexts.
 |--------|------|---------|-------------|
 | `enabled` | boolean | `false` | Enable structured data compression |
 | `threshold` | number | `5000` | Minimum character length before compression (min: 10) |
+| `maxEncodingSize` | number | `100000` | Maximum encoded output size in characters (safety limit, min: 10240) |
 
 ### Experimental
 

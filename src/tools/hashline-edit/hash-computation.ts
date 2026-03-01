@@ -28,7 +28,6 @@ export interface HashlineStreamOptions {
   startLine?: number
   maxChunkLines?: number
   maxChunkBytes?: number
-  compression?: ToonCompressionConfig
 }
 
 function isReadableStream(value: unknown): value is ReadableStream<Uint8Array> {

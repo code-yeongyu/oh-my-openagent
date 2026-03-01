@@ -17,8 +17,8 @@ export function formatSearchResult(result: SgResult, config: ToonCompressionConf
     ...match,
     range: {
       ...match.range,
-      start: { ...match.range.start, line: match.range.start.line + 1 },
-      end: { ...match.range.end, line: match.range.end.line + 1 }
+      start: { ...match.range.start, line: match.range.start.line + 1, character: match.range.start.column + 1 },
+      end: { ...match.range.end, line: match.range.end.line + 1, character: match.range.end.column + 1 }
     }
   }))
   const compressed = safeCompress(matchesWith1IndexedLines, config)
@@ -73,8 +73,8 @@ export function formatReplaceResult(result: SgResult, isDryRun: boolean, config:
     ...match,
     range: {
       ...match.range,
-      start: { ...match.range.start, line: match.range.start.line + 1 },
-      end: { ...match.range.end, line: match.range.end.line + 1 }
+      start: { ...match.range.start, line: match.range.start.line + 1, character: match.range.start.column + 1 },
+      end: { ...match.range.end, line: match.range.end.line + 1, character: match.range.end.column + 1 }
     }
   }))
   const compressed = safeCompress(matchesWith1IndexedLines, config)
@@ -134,8 +134,8 @@ export function formatAnalyzeResult(results: AnalyzeResult[], extractedMetaVars:
     ...result,
     range: {
       ...result.range,
-      start: { ...result.range.start, line: result.range.start.line + 1 },
-      end: { ...result.range.end, line: result.range.end.line + 1 }
+      start: { ...result.range.start, line: result.range.start.line + 1, character: result.range.start.column + 1 },
+      end: { ...result.range.end, line: result.range.end.line + 1, character: result.range.end.column + 1 }
     }
   }))
   const compressed = safeCompress(resultsWith1IndexedLines, config)

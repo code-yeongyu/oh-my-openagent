@@ -44,7 +44,6 @@ export function formatGrepResult(
   }
   lines.push("")
 
-  const matchesJson = JSON.stringify(result.matches)
   const shouldUseCompression = compressionConfig.enabled && result.matches.length >= 5
 
   if (shouldUseCompression) {

@@ -33,15 +33,13 @@ export interface RunContext {
   directory: string
   abortController: AbortController
   verbose?: boolean
-  compression?: {
-    enabled: boolean
-    threshold: number
-  }
+  compression?: CompressionConfig
 }
 
 export interface CompressionConfig {
   enabled: boolean
   threshold: number
+  maxEncodingSize?: number
 }
 
 export const DEFAULT_COMPRESSION_CONFIG: CompressionConfig = {

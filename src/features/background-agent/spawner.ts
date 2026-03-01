@@ -72,7 +72,7 @@ export function preparePromptWithCompression(
     if (typeof parsed === "object" && parsed !== null) {
       const compressed = compressSessionPromptData(parsed, config)
       // If compression actually compressed it (different from original), use it
-      if (compressed !== prompt) {
+      if (compressed.startsWith("toon:") || compressed.length < prompt.length) {
         return compressed
       }
     }

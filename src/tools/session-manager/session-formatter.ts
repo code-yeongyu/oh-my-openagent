@@ -47,7 +47,14 @@ export async function formatSessionList(
 
   // Apply compression if enabled and output exceeds threshold
   if (compressionConfig?.enabled && shouldCompress(infos, compressionConfig.threshold)) {
-    return safeCompress(infos, compressionConfig)
+    const sanitizedInfos = infos.map(info => ({
+      id: info.id,
+      message_count: info.message_count,
+      first_message: info.first_message,
+      last_message: info.last_message,
+      agents_used: info.agents_used,
+    }))
+    return safeCompress(sanitizedInfos, compressionConfig)
   }
 
   return formatted

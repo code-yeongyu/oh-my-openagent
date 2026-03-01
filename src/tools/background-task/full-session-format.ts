@@ -8,6 +8,27 @@ import { safeCompress, shouldCompress } from "../../shared/toon-compression"
 import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 
 const MAX_MESSAGE_LIMIT = 100
+function buildSessionHeader(
+  task: BackgroundTask,
+  totalMessages: number,
+  returnedMessages: number,
+  hasMore: boolean,
+): string[] {
+  return [
+    "# Full Session Output",
+    "",
+    `Task ID: ${task.id}`,
+    `Description: ${task.description}`,
+    `Status: ${task.status}`,
+    `Session ID: ${task.sessionID}`,
+    `Total messages: ${totalMessages}`,
+    `Returned: ${returnedMessages}`,
+    `Has more: ${hasMore ? "true" : "false"}`,
+    "",
+    "## Messages",
+  ]
+}
+
 const THINKING_MAX_CHARS = 2000
 
 const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
@@ -114,17 +135,7 @@ export async function formatFullSession(
   const visibleMessages = limit !== undefined ? normalizedMessages.slice(0, limit) : normalizedMessages
 
   const lines: string[] = []
-  lines.push("# Full Session Output")
-  lines.push("")
-  lines.push(`Task ID: ${task.id}`)
-  lines.push(`Description: ${task.description}`)
-  lines.push(`Status: ${task.status}`)
-  lines.push(`Session ID: ${task.sessionID}`)
-  lines.push(`Total messages: ${normalizedMessages.length}`)
-  lines.push(`Returned: ${visibleMessages.length}`)
-  lines.push(`Has more: ${hasMore ? "true" : "false"}`)
-  lines.push("")
-  lines.push("## Messages")
+  lines.push(...buildSessionHeader(task, normalizedMessages.length, visibleMessages.length, hasMore))
 
   if (visibleMessages.length === 0) {
     lines.push("")
@@ -179,18 +190,7 @@ export async function formatFullSession(
 
     if (shouldCompress(messageData, compressionConfig.threshold)) {
       const compressed = safeCompress(messageData, compressionConfig)
-      const header: string[] = []
-      header.push("# Full Session Output")
-      header.push("")
-      header.push(`Task ID: ${task.id}`)
-      header.push(`Description: ${task.description}`)
-      header.push(`Status: ${task.status}`)
-      header.push(`Session ID: ${task.sessionID}`)
-      header.push(`Total messages: ${normalizedMessages.length}`)
-      header.push(`Returned: ${visibleMessages.length}`)
-      header.push(`Has more: ${hasMore ? "true" : "false"}`)
-      header.push("")
-      header.push("## Messages")
+      const header = buildSessionHeader(task, normalizedMessages.length, visibleMessages.length, hasMore)
       header.push("")
       header.push("[Compressed output]")
       header.push(compressed)

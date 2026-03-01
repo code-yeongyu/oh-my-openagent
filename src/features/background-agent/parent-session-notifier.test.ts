@@ -48,7 +48,7 @@ describe("extractTaskResultData", () => {
       expect(data.result).toBe("Task completed successfully")
     })
 
-    test("extracts duration when available", () => {
+    test("handles tasks with date fields", () => {
       const task = createMockTask({
         startedAt: new Date("2024-01-01T10:00:00Z"),
         completedAt: new Date("2024-01-01T10:05:00Z"),
@@ -58,6 +58,7 @@ describe("extractTaskResultData", () => {
 
       expect(data.taskId).toBe("bg_test123")
       expect(data.description).toBe("Test task")
+      expect(data.status).toBe("completed")
     })
   })
 
@@ -145,7 +146,7 @@ describe("compressTaskResults", () => {
         createMockTask({ id: "bg_003", description: "Third task" }),
       ]
 
-      const result = compressTaskResults(tasks, DEFAULT_CONFIG)
+      const result = compressTaskResults(tasks, { enabled: true, threshold: 1 })
 
       expect(result).toContain("bg_001")
       expect(result).toContain("bg_002")

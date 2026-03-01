@@ -21,6 +21,7 @@ function getCompressionConfig(ctx: RunContext): CompressionConfig {
     return {
       enabled: ctx.compression.enabled,
       threshold: ctx.compression.threshold,
+      maxEncodingSize: ctx.compression.maxEncodingSize,
     }
   }
   return DEFAULT_COMPRESSION_CONFIG

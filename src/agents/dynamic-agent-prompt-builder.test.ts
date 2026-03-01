@@ -11,6 +11,22 @@ import {
   type AvailableAgent,
 } from "./dynamic-agent-prompt-builder"
 
+function createLargeCategoryArray(count: number): AvailableCategory[] {
+  return Array.from({ length: count }, (_, i) => ({
+    name: `category-${i}`,
+    description: `Category ${i} description with some content to make it larger`,
+  }))
+}
+
+function createLargeSkillArray(count: number): AvailableSkill[] {
+  return Array.from({ length: count }, (_, i) => ({
+    name: `skill-${i}`,
+    description: `Skill ${i} description with some content to make it larger`,
+    location: "plugin" as const,
+  }))
+}
+
+
 describe("buildCategorySkillsDelegationGuide", () => {
   const categories: AvailableCategory[] = [
     { name: "visual-engineering", description: "Frontend, UI/UX" },
@@ -257,20 +273,7 @@ describe("buildNonClaudePlannerSection", () => {
 })
 
 describe("buildCategorySkillsDelegationGuide compression", () => {
-  function createLargeCategoryArray(count: number): AvailableCategory[] {
-    return Array.from({ length: count }, (_, i) => ({
-      name: `category-${i}`,
-      description: `Category ${i} description with some content to make it larger`,
-    }))
-  }
 
-  function createLargeSkillArray(count: number): AvailableSkill[] {
-    return Array.from({ length: count }, (_, i) => ({
-      name: `skill-${i}`,
-      description: `Skill ${i} description with some content to make it larger`,
-      location: "plugin" as const,
-    }))
-  }
 
   it("should return formatted text when compression is disabled", () => {
     //#given: large arrays with compression disabled
@@ -346,20 +349,7 @@ describe("buildUltraworkSection compression", () => {
     }))
   }
 
-  function createLargeCategoryArray(count: number): AvailableCategory[] {
-    return Array.from({ length: count }, (_, i) => ({
-      name: `category-${i}`,
-      description: `Category ${i} description with some content to make it larger`,
-    }))
-  }
 
-  function createLargeSkillArray(count: number): AvailableSkill[] {
-    return Array.from({ length: count }, (_, i) => ({
-      name: `skill-${i}`,
-      description: `Skill ${i} description with some content to make it larger`,
-      location: "plugin" as const,
-    }))
-  }
 
   it("should return formatted text when compression is disabled", () => {
     //#given: large arrays with compression disabled
