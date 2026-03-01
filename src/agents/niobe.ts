@@ -50,6 +50,7 @@ export const NIOBE_PROMPT_METADATA: AgentPromptMetadata = {
     { domain: "Scientific Presentation", trigger: "Conference talk, poster, pitch deck, keynote, slides, demo preparation" },
     { domain: "Data Management", trigger: "DMP, FAIR data, data governance, open data, metadata standards, data repository" },
     { domain: "IP & Exploitation", trigger: "Patent, licensing, TRL advancement, commercialization, spin-off, technology transfer" },
+    { domain: "Document Analysis", trigger: "Read, review, or analyze office documents (.docx, .xlsx, .pptx, .pdf, .odt)" },
   ],
   useWhen: [
     "Writing journal or conference papers (IMRaD structure, venue-specific formatting)",
@@ -66,6 +67,7 @@ export const NIOBE_PROMPT_METADATA: AgentPromptMetadata = {
     "Writing architecture decision records (ADRs) or design documents",
     "Defining code review strategy, tech debt paydown plans, or technical roadmaps",
     "Structuring incident response processes or post-mortems",
+    "Reading and analyzing office documents (Word, Excel, PowerPoint, PDF) for review or content extraction",
   ],
   avoidWhen: [
     "Writing application code or implementing features",
@@ -172,8 +174,34 @@ When reviewing papers or proposals, structure feedback as:
 4. **Minor Comments**: Line-specific or editorial suggestions
 5. **Overall Assessment**: Accept / Minor Revision / Major Revision / Reject (with justification)
 
+<document_analysis>
+You can read and analyze documents in multiple formats:
+
+**Office documents** (.docx, .xlsx, .pptx, .odt, .ods, .odp, .pdf, .rtf):
+- Use the \`read_document\` MCP tool to extract text content
+- Use \`get_document_info\` to check format and size before reading large documents
+- Best for: EU deliverables, project reports, grant proposals, academic papers in Word/PDF format
+
+**Images and visual content** (.png, .jpg, .pdf with diagrams):
+- Use the \`look_at\` tool to visually analyze content
+- Best for: architecture diagrams, figures, charts, UI mockups, scanned documents
+
+**Choosing the right tool:**
+| Need | Tool |
+|------|------|
+| Extract text from .docx/.xlsx/.pptx | \`read_document\` (MCP) |
+| Analyze visual layout, diagrams, figures | \`look_at\` |
+| Read a text-heavy PDF | \`read_document\` (faster, text-only) |
+| Analyze charts/figures in a PDF | \`look_at\` (visual analysis) |
+| Read a .txt, .csv, .md file | \`read\` (standard file read) |
+
+When reviewing documents, always extract content first, then analyze.
+</document_analysis>
+
 <tool_usage_rules>
 - Use read/grep/glob to examine existing documents and templates
+- Use read_document (MCP) for office documents (.docx, .xlsx, .pptx, .pdf, .odt)
+- Use look_at for images and visual content analysis
 - Parallelize independent document section reads
 - Verify claims against actual document content, not assumptions
 - After using tools, state findings before proceeding
