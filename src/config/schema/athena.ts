@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { COUNCIL_DEFAULTS } from "../../agents/athena/constants"
 import { parseModelString } from "../../tools/delegate-task/model-string-parser"
 
 /** Validates model string format: "provider/model-id" (e.g., "openai/gpt-5.3-codex"). */
@@ -24,8 +25,8 @@ export const CouncilConfigSchema = z.object({
   retry_on_fail: z.number().min(0).max(5).default(0),
   retry_failed_if_others_finished: z.boolean().default(false),
   cancel_retrying_on_quorum: z.boolean().default(true),
-  stuck_threshold_seconds: z.number().min(30).default(120),
-  member_max_running_seconds: z.number().min(60).default(1800),
+  stuck_threshold_seconds: z.number().min(30).default(COUNCIL_DEFAULTS.STUCK_THRESHOLD_SECONDS),
+  member_max_running_seconds: z.number().min(60).default(COUNCIL_DEFAULTS.MEMBER_MAX_RUNNING_SECONDS),
 }).strict()
 
 export type CouncilMemberConfig = z.infer<typeof CouncilMemberSchema>
