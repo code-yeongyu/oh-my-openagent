@@ -84,6 +84,75 @@ describe("extractCouncilResponse", () => {
     })
   })
 
+  describe("#given literal opening AND closing tags appear inside the actual response body", () => {
+    it("#then extracts the full structural response, not the literal mention", () => {
+      const text = [
+        "<COUNCIL_MEMBER_RESPONSE>",
+        "## Finding 1: Triplicated Tag Constants",
+        "- Evidence:",
+        '  - `council-response-extractor.ts:1-2`: `export const OPENING_TAG = "<COUNCIL_MEMBER_RESPONSE>"`, `export const CLOSING_TAG = "</COUNCIL_MEMBER_RESPONSE>"`',
+        "## Finding 2: Another issue",
+        "Some more analysis text here.",
+        "</COUNCIL_MEMBER_RESPONSE>",
+      ].join("\n")
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: [
+          "## Finding 1: Triplicated Tag Constants",
+          "- Evidence:",
+          '  - `council-response-extractor.ts:1-2`: `export const OPENING_TAG = "<COUNCIL_MEMBER_RESPONSE>"`, `export const CLOSING_TAG = "</COUNCIL_MEMBER_RESPONSE>"`',
+          "## Finding 2: Another issue",
+          "Some more analysis text here.",
+        ].join("\n"),
+      })
+    })
+  })
+
+  describe("#given multiple literal tag mentions scattered inside the response body", () => {
+    it("#then extracts the full structural response ignoring all literal mentions", () => {
+      const text = [
+        "preamble text",
+        "<COUNCIL_MEMBER_RESPONSE>",
+        "The system uses <COUNCIL_MEMBER_RESPONSE> for opening.",
+        "And </COUNCIL_MEMBER_RESPONSE> for closing.",
+        "Also mentions <COUNCIL_MEMBER_RESPONSE> again here.",
+        "Final analysis paragraph.",
+        "</COUNCIL_MEMBER_RESPONSE>",
+      ].join("\n")
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: [
+          "The system uses <COUNCIL_MEMBER_RESPONSE> for opening.",
+          "And </COUNCIL_MEMBER_RESPONSE> for closing.",
+          "Also mentions <COUNCIL_MEMBER_RESPONSE> again here.",
+          "Final analysis paragraph.",
+        ].join("\n"),
+      })
+    })
+  })
+
+  describe("#given a complete pair followed by a trailing incomplete opening tag", () => {
+    it("#then returns the incomplete trailing content as partial response", () => {
+      const text = [
+        "<COUNCIL_MEMBER_RESPONSE>first complete</COUNCIL_MEMBER_RESPONSE>",
+        "<COUNCIL_MEMBER_RESPONSE>partial trailing content",
+      ].join("\n")
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: false,
+        result: "partial trailing content",
+      })
+    })
+  })
+
   describe("#given an empty string", () => {
     it("#then returns has_response false and null result", () => {
       const result = extractCouncilResponse("")
