@@ -6,7 +6,6 @@ import {
   createInternalAgentTextPart,
 } from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { extractCouncilResponse } from "../../tools/council-archive/council-response-extractor"
 import { COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents"
 
 type OpencodeClient = PluginInput["client"]
@@ -26,20 +25,6 @@ export function resetCouncilNudgeCount(taskId: string): void {
   nudgeCountByTask.delete(taskId)
 }
 
-export function hasCouncilResponseTag(sessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type?: string; text?: string }> }>): boolean {
-  const assistantTexts: string[] = []
-  for (const msg of sessionMessages) {
-    if (msg.info?.role !== "assistant") continue
-    for (const part of msg.parts ?? []) {
-      if (part.type === "text" && part.text) {
-        assistantTexts.push(part.text)
-      }
-    }
-  }
-  if (assistantTexts.length === 0) return false
-  const extraction = extractCouncilResponse(assistantTexts.join("\n"))
-  return extraction.has_response && extraction.response_complete
-}
 
 export function sendCouncilContinuationNudge(
   client: OpencodeClient,

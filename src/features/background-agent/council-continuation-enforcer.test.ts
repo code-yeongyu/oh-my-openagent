@@ -2,10 +2,10 @@ import { describe, it, expect, mock } from "bun:test"
 
 import {
   isCouncilMemberAgent,
-  hasCouncilResponseTag,
   sendCouncilContinuationNudge,
   resetCouncilNudgeCount,
-} from "./council-continuation-enforcer"
+  } from "./council-continuation-enforcer"
+import { hasCouncilResponseTag } from "../../tools/council-archive/council-response-extractor"
 import type { BackgroundTask } from "./types"
 
 function createRunningTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {

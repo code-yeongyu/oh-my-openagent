@@ -39,6 +39,21 @@ export function extractCouncilResponse(fullText: string): CouncilResponseExtract
   return { has_response: true, response_complete: true, result: content }
 }
 
+export function hasCouncilResponseTag(sessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type?: string; text?: string }> }>): boolean {
+  const assistantTexts: string[] = []
+  for (const msg of sessionMessages) {
+    if (msg.info?.role !== "assistant") continue
+    for (const part of msg.parts ?? []) {
+      if (part.type === "text" && part.text) {
+        assistantTexts.push(part.text)
+      }
+    }
+  }
+  if (assistantTexts.length === 0) return false
+  const extraction = extractCouncilResponse(assistantTexts.join("\n"))
+  return extraction.has_response && extraction.response_complete
+}
+
 function isStructuralOpen(text: string, idx: number): boolean {
   return idx === 0 || text[idx - 1] === "\n"
 }

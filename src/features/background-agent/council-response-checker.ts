@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log, normalizeSDKResponse } from "../../shared"
-import { hasCouncilResponseTag } from "./council-continuation-enforcer"
+import { hasCouncilResponseTag } from "../../tools/council-archive/council-response-extractor"
 
 type OpencodeClient = PluginInput["client"]
 
