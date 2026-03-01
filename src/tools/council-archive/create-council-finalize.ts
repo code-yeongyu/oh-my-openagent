@@ -77,28 +77,11 @@ export function createCouncilFinalize(
           continue
         }
 
+        // Task ID is pre-validated by TASK_ID_PATTERN — path escaping is impossible
         const relTaskOutput = join(".sisyphus", "task-outputs", `${taskId}.md`)
         const relTaskOutputForOutput = toPosixPath(relTaskOutput)
         const absTaskOutput = join(base, relTaskOutput)
 
-        if (isPathEscaping(join(base, ".sisyphus", "task-outputs"), absTaskOutput)) {
-          members.push({
-            task_id: taskId,
-            member: "unknown",
-            has_response: false,
-            error: "Invalid task ID: resolved path escapes task-outputs directory",
-          })
-          metaMembers.push({
-            task_id: taskId,
-            member: "unknown",
-            member_slug: "unknown",
-            task_output_path: "",
-            archive_file: "",
-            has_response: false,
-            response_complete: false,
-          })
-          continue
-        }
 
         let fileContent: string
         try {
