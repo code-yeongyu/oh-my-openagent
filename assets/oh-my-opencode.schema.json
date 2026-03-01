@@ -3851,7 +3851,7 @@
         },
         "maxEncodingSize": {
           "type": "number",
-          "minimum": 1000
+          "minimum": 10240
         }
       },
       "required": [

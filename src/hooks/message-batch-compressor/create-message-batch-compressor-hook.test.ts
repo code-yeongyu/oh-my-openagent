@@ -32,7 +32,7 @@ describe("createMessageBatchCompressorHook", () => {
   describe("extractBatchData - timestamp preservation", () => {
     it("should include timestamp from message.info.time.created in compressed data", async () => {
       //#given a batch of messages with timestamps
-      const config = { enabled: true, threshold: 5000 }
+      const config = { enabled: true, threshold: 10 }
       const hook = createMessageBatchCompressorHook(config)
       const testTimestamp = 1706659200000
 
@@ -60,7 +60,7 @@ describe("createMessageBatchCompressorHook", () => {
 
     it("should handle messages without time field gracefully", async () => {
       //#given messages without time field
-      const config = { enabled: true, threshold: 5000 }
+      const config = { enabled: true, threshold: 10 }
       const hook = createMessageBatchCompressorHook(config)
 
       const messages: MessageWithParts[] = [
@@ -120,7 +120,7 @@ describe("createMessageBatchCompressorHook", () => {
 
     it("should NOT compress when batch size is below MIN_BATCH_SIZE", async () => {
       //#given only 4 messages (below MIN_BATCH_SIZE of 5)
-      const config = { enabled: true, threshold: 5000 }
+      const config = { enabled: true, threshold: 10 }
       const hook = createMessageBatchCompressorHook(config)
 
       const messages: MessageWithParts[] = [
@@ -143,7 +143,7 @@ describe("createMessageBatchCompressorHook", () => {
   describe("image preservation", () => {
     it("should preserve image parts during compression", async () => {
       //#given a batch of messages including image parts
-      const config = { enabled: true, threshold: 5000 }
+      const config = { enabled: true, threshold: 10 }
       const hook = createMessageBatchCompressorHook(config)
 
       const imagePart: Part = {
@@ -175,7 +175,7 @@ describe("createMessageBatchCompressorHook", () => {
 
     it("should preserve multiple image parts from different messages", async () => {
       //#given a batch with multiple images across messages
-      const config = { enabled: true, threshold: 5000 }
+      const config = { enabled: true, threshold: 10 }
       const hook = createMessageBatchCompressorHook(config)
 
       const image1: Part = {
@@ -188,11 +188,11 @@ describe("createMessageBatchCompressorHook", () => {
       } as Part
 
       const messages: MessageWithParts[] = [
-        createMockMessage({ role: "user", parts: [{ type: "text", text: "msg1" } as Part, image1] }),
-        createMockMessage({ role: "assistant", parts: [{ type: "text", text: "msg2" } as Part] }),
-        createMockMessage({ role: "user", parts: [{ type: "text", text: "msg3" } as Part] }),
-        createMockMessage({ role: "assistant", parts: [{ type: "text", text: "msg4" } as Part, image2] }),
-        createMockMessage({ role: "user", parts: [{ type: "text", text: "msg5" } as Part] }),
+        createMockMessage({ role: "user", parts: [{ type: "text", text: `msg1-${"x".repeat(120)}` } as Part, image1] }),
+        createMockMessage({ role: "assistant", parts: [{ type: "text", text: `msg2-${"x".repeat(120)}` } as Part] }),
+        createMockMessage({ role: "user", parts: [{ type: "text", text: `msg3-${"x".repeat(120)}` } as Part] }),
+        createMockMessage({ role: "assistant", parts: [{ type: "text", text: `msg4-${"x".repeat(120)}` } as Part, image2] }),
+        createMockMessage({ role: "user", parts: [{ type: "text", text: `msg5-${"x".repeat(120)}` } as Part] }),
       ]
 
       const output = { messages }

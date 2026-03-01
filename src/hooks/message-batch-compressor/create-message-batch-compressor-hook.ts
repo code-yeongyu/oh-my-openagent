@@ -3,7 +3,7 @@ import type { ToonCompressionConfig } from "../../config/schema/toon-compression
 
 import { THINKING_TYPES } from "../session-recovery/constants"
 
-import { safeCompress } from "../../shared/toon-compression"
+import { safeCompress, shouldCompress } from "../../shared/toon-compression"
 import { log } from "../../shared"
 
 type MessageWithParts = {
@@ -30,6 +30,19 @@ type ExtractedToolResult = {
   callID: string
   output: unknown
   error: unknown
+}
+
+function safeStringify(data: unknown): string {
+  try {
+    const serialized = JSON.stringify(data)
+    if (typeof serialized === "string") {
+      return serialized
+    }
+
+    return String(data)
+  } catch {
+    return String(data)
+  }
 }
 
 
@@ -124,7 +137,18 @@ export function createMessageBatchCompressorHook(
       }
 
       const { batchData, imageParts } = extractBatchData(messages)
+
+      if (!shouldCompress(batchData, config.threshold)) {
+        return
+      }
+
+      const originalPayload = safeStringify(batchData)
       const compressed = safeCompress(batchData, config)
+
+      const compressionApplied = compressed !== originalPayload
+      if (!compressionApplied) {
+        return
+      }
 
       const parts: Part[] = [{ type: "text", text: compressed } as Part, ...imageParts]
 

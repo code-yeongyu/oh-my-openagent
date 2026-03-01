@@ -1,10 +1,23 @@
 import type { GrepResult, GrepMatch, CountResult } from "./types"
-import { safeCompress } from "../../shared/toon-compression"
+import { safeCompress, shouldCompress } from "../../shared/toon-compression"
 import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 
 const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
   enabled: false,
   threshold: 5000,
+}
+
+function safeStringify(data: unknown): string {
+  try {
+    const serialized = JSON.stringify(data)
+    if (typeof serialized === "string") {
+      return serialized
+    }
+
+    return String(data)
+  } catch {
+    return String(data)
+  }
 }
 
 export function formatGrepResult(
@@ -44,13 +57,18 @@ export function formatGrepResult(
   }
   lines.push("")
 
-  const shouldUseCompression = compressionConfig.enabled && result.matches.length >= 5
+  const shouldUseCompression =
+    compressionConfig.enabled
+    && result.matches.length >= 5
+    && shouldCompress(result.matches, compressionConfig.threshold)
 
   if (shouldUseCompression) {
     const compressed = safeCompress(result.matches, compressionConfig)
-    lines.push("[Compressed matches]")
-    lines.push(compressed)
-    return lines.join("\n")
+    if (compressed !== safeStringify(result.matches)) {
+      lines.push("[Compressed matches]")
+      lines.push(compressed)
+      return lines.join("\n")
+    }
   }
 
   const byFile = new Map<string, GrepMatch[]>()
