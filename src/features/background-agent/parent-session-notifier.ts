@@ -16,14 +16,44 @@ export interface TaskResultData {
 }
 
 /**
+ * Computes duration string from start and end dates.
+ * Returns undefined if either date is missing.
+ */
+function computeDuration(startedAt?: Date, completedAt?: Date): string | undefined {
+  if (!startedAt || !completedAt) {
+    return undefined
+  }
+
+  const diffMs = completedAt.getTime() - startedAt.getTime()
+  if (diffMs < 0) {
+    return undefined
+  }
+
+  const seconds = Math.floor(diffMs / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m ${seconds % 60}s`
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`
+  }
+  return `${seconds}s`
+}
+
+/**
  * Extracts result data from a BackgroundTask for compression.
  */
 export function extractTaskResultData(task: BackgroundTask): TaskResultData {
+  const duration = computeDuration(task.startedAt, task.completedAt)
+
   return {
     taskId: task.id,
     description: task.description,
     status: task.status,
     sessionID: task.sessionID,
+    duration,
     error: task.error,
     result: task.result,
   }

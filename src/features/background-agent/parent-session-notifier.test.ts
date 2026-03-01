@@ -59,6 +59,7 @@ describe("extractTaskResultData", () => {
       expect(data.taskId).toBe("bg_test123")
       expect(data.description).toBe("Test task")
       expect(data.status).toBe("completed")
+      expect(data.duration).toBe("5m 0s")
     })
   })
 
