@@ -46,7 +46,7 @@ export async function movePromptFile(
       log("[council-finalize] Rename failed, falling back to copy", { promptFile: promptFilePath, error: String(renameErr) })
       const content = await readFile(absPromptSrc, "utf-8")
       await writeFile(absPromptDest, content, "utf-8")
-      await unlink(absPromptSrc).catch(() => {})
+      await unlink(absPromptSrc).catch((err) => { log("[council-finalize] Failed to delete prompt source file", { error: String(err) }) })
     })
     return toPosixPath(join(relArchiveDir, promptFilename))
   } catch (err) {
