@@ -7,16 +7,12 @@ import {
   sanitizeModelField,
   getClaudeConfigDir,
   getOpenCodeConfigDir,
+  discoverPluginCommandDefinitions,
 } from "../../shared"
 import { loadBuiltinCommands } from "../../features/builtin-commands"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { discoverAllSkills, type LoadedSkill, type LazyContentLoader } from "../../features/opencode-skill-loader"
-import {
-  discoverInstalledPlugins,
-  loadPluginCommands,
-  loadPluginSkillsAsCommands,
-} from "../../features/claude-code-plugin-loader"
 import type { ParsedSlashCommand } from "./types"
 
 interface CommandScope {
@@ -109,18 +105,7 @@ export interface ExecutorOptions {
 }
 
 function discoverPluginCommands(options?: ExecutorOptions): CommandInfo[] {
-  if (options?.pluginsEnabled === false) {
-    return []
-  }
-
-  const { plugins } = discoverInstalledPlugins({
-    enabledPluginsOverride: options?.enabledPluginsOverride,
-  })
-
-  const pluginDefinitions = {
-    ...loadPluginCommands(plugins),
-    ...loadPluginSkillsAsCommands(plugins),
-  }
+  const pluginDefinitions = discoverPluginCommandDefinitions(options)
 
   return Object.entries(pluginDefinitions).map(([name, definition]) => ({
     name,
@@ -216,7 +201,11 @@ async function formatCommandTemplate(cmd: CommandInfo, args: string): Promise<st
   const commandDir = cmd.path ? dirname(cmd.path) : process.cwd()
   const withFileRefs = await resolveFileReferencesInText(content, commandDir)
   const resolvedContent = await resolveCommandsInText(withFileRefs)
-  sections.push(resolvedContent.trim())
+  const resolvedArguments = args
+  const substitutedContent = resolvedContent
+    .replace(/\$\{user_message\}/g, resolvedArguments)
+    .replace(/\$ARGUMENTS/g, resolvedArguments)
+  sections.push(substitutedContent.trim())
 
   if (args) {
     sections.push("\n\n---\n")
