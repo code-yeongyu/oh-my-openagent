@@ -157,4 +157,78 @@ describe("websearch MCP provider configuration", () => {
     expect(result.url).not.toContain("exaApiKey=")
     expect(result.headers).toBeUndefined()
   })
+
+  // Tests for exa_tools configuration (VAL-MCP-001, VAL-MCP-002, VAL-MCP-003, VAL-MCP-004)
+  describe("exa_tools configuration", () => {
+    test('"all" preset loads all 8 tools', () => {
+      //#given
+      const config = { exa_tools: "all" as const }
+
+      //#when
+      const result = createWebsearchConfig(config)
+
+      //#then
+      expect(result.url).toContain("tools=web_search_exa")
+      expect(result.url).toContain("tools=get_code_context_exa")
+      expect(result.url).toContain("tools=company_research_exa")
+      expect(result.url).toContain("tools=web_search_advanced_exa")
+      expect(result.url).toContain("tools=crawling_exa")
+      expect(result.url).toContain("tools=people_search_exa")
+      expect(result.url).toContain("tools=deep_researcher_start")
+      expect(result.url).toContain("tools=deep_researcher_check")
+    })
+
+    test('"default" preset loads 3 default tools', () => {
+      //#given
+      const config = { exa_tools: "default" as const }
+
+      //#when
+      const result = createWebsearchConfig(config)
+
+      //#then
+      expect(result.url).toContain("tools=web_search_exa")
+      expect(result.url).toContain("tools=get_code_context_exa")
+      expect(result.url).toContain("tools=company_research_exa")
+      expect(result.url).not.toContain("tools=web_search_advanced_exa")
+      expect(result.url).not.toContain("tools=crawling_exa")
+    })
+
+    test("custom array selects specific tools only", () => {
+      //#given
+      const config = { exa_tools: ["web_search_exa", "crawling_exa"] as const }
+
+      //#when
+      const result = createWebsearchConfig(config)
+
+      //#then
+      expect(result.url).toContain("tools=web_search_exa")
+      expect(result.url).toContain("tools=crawling_exa")
+      expect(result.url).not.toContain("tools=get_code_context_exa")
+      expect(result.url).not.toContain("tools=company_research_exa")
+    })
+
+    test("empty/unconfigured falls back to web_search_exa (backward compatible)", () => {
+      //#given - no exa_tools config
+      const config = {}
+
+      //#when
+      const result = createWebsearchConfig(config)
+
+      //#then - should only have web_search_exa
+      expect(result.url).toContain("tools=web_search_exa")
+      expect(result.url).not.toContain("tools=get_code_context_exa")
+    })
+
+    test("empty array falls back to web_search_exa (backward compatible)", () => {
+      //#given - empty array
+      const config = { exa_tools: [] }
+
+      //#when
+      const result = createWebsearchConfig(config)
+
+      //#then - should only have web_search_exa
+      expect(result.url).toContain("tools=web_search_exa")
+      expect(result.url).not.toContain("tools=get_code_context_exa")
+    })
+  })
 })
