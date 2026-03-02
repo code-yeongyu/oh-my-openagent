@@ -106,4 +106,41 @@ describe("createChatHeadersHandler", () => {
 
     expect(output.headers["x-initiator"]).toBeUndefined()
   })
+
+  test("skips x-initiator override when model uses @ai-sdk/github-copilot", async () => {
+    const handler = createChatHeadersHandler({
+      ctx: {
+        client: {
+          session: {
+            message: async () => ({
+              data: {
+                parts: [
+                  {
+                    type: "text",
+                    text: `notification\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+                  },
+                ],
+              },
+            }),
+          },
+        },
+      } as never,
+    })
+    const output: { headers: Record<string, string> } = { headers: {} }
+
+    await handler(
+      {
+        sessionID: "ses_4",
+        provider: { id: "github-copilot" },
+        model: { api: { npm: "@ai-sdk/github-copilot" } },
+        message: {
+          id: "msg_4",
+          role: "user",
+        },
+      },
+      output,
+    )
+
+    expect(output.headers["x-initiator"]).toBeUndefined()
+  })
 })
