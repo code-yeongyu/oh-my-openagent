@@ -187,4 +187,22 @@ describe("switch_agent tool", () => {
     expect(result).toContain("direct-id-123")
     expect(promptedSessions[0]!.path.id).toBe("direct-id-123")
   })
+
+  //#given valid athena switch args
+  //#when execute is called
+  //#then it creates a new session and prompts with the athena agent
+  test("should create session and prompt for athena switch", async () => {
+    const tool = createToolWithMockClient()
+    const result = await tool.execute(
+      { agent: "athena", context: "Run council analysis on the architecture decision" },
+      toolContext
+    )
+
+    expect(result).toContain("athena")
+    expect(result).toContain("new-session-abc")
+    expect(createdSessions).toHaveLength(1)
+    expect(promptedSessions).toHaveLength(1)
+    expect(promptedSessions[0]!.path.id).toBe("new-session-abc")
+    expect(promptedSessions[0]!.body.parts[0]!.text).toBe("Run council analysis on the architecture decision")
+  })
 })

@@ -8,7 +8,7 @@ const DESCRIPTION =
   "with the provided context as its starting prompt. Use this to route work to another agent " +
   "(e.g., Atlas for fixes, Prometheus for planning). The switch executes when the current agent's turn completes."
 
-const ALLOWED_AGENTS = new Set(["atlas", "prometheus", "sisyphus", "hephaestus"])
+const ALLOWED_AGENTS = new Set(["atlas", "prometheus", "sisyphus", "hephaestus", "athena"])
 
 type SessionClient = {
   session: {
