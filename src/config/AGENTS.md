@@ -31,12 +31,14 @@ config/schema/
 ├── background-task.ts          # Concurrency limits per model/provider
 ├── babysitting.ts              # Unstable agent monitoring
 ├── dynamic-context-pruning.ts  # Context pruning settings
+├── start-work.ts              # StartWorkConfigSchema (auto_commit)
 └── internal/permission.ts      # AgentPermissionSchema
+
 ```
 
-## ROOT SCHEMA FIELDS (27)
+## ROOT SCHEMA FIELDS (28)
 
-`$schema`, `new_task_system_enabled`, `default_run_agent`, `disabled_mcps`, `disabled_agents`, `disabled_skills`, `disabled_hooks`, `disabled_commands`, `disabled_tools`, `hashline_edit`, `agents`, `categories`, `claude_code`, `sisyphus_agent`, `comment_checker`, `experimental`, `auto_update`, `skills`, `ralph_loop`, `background_task`, `notification`, `babysitting`, `git_master`, `browser_automation_engine`, `websearch`, `tmux`, `sisyphus`, `_migrations`
+`$schema`, `new_task_system_enabled`, `default_run_agent`, `disabled_mcps`, `disabled_agents`, `disabled_skills`, `disabled_hooks`, `disabled_commands`, `disabled_tools`, `hashline_edit`, `agents`, `categories`, `claude_code`, `sisyphus_agent`, `comment_checker`, `experimental`, `auto_update`, `skills`, `ralph_loop`, `background_task`, `notification`, `babysitting`, `git_master`, `browser_automation_engine`, `websearch`, `tmux`, `sisyphus`, `start_work`, `_migrations`
 
 ## AGENT OVERRIDE FIELDS (21)
 
