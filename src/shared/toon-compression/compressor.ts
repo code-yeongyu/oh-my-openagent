@@ -1,11 +1,20 @@
 import { encode } from "@toon-format/toon"
 import type { ToonCompressionConfig } from "./types"
 
+// TEMPORARY: Debug logging - remove when PR merged to upstream/dev
+import { log } from "../logger"
+
+
 const COMPRESSION_TIMEOUT_MS = 50
 const MAX_ENCODING_SIZE_BYTES = 100_000
 const MIN_COMPRESSIBLE_ARRAY_LENGTH = 5
 const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/
 const ERROR_TEXT_PATTERN = /(error|exception|stack|trace|failed|failure)/i
+
+// TEMPORARY: Debug logging helper - remove when PR merged to upstream/dev
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4)
+}
 
 type RecordValue = Record<string, unknown>
 
@@ -115,6 +124,8 @@ function encodeWithTimeout(data: unknown, maxSize?: number): string {
   const effectiveMaxSize = maxSize ?? MAX_ENCODING_SIZE_BYTES
 
   if (sizeBytes > effectiveMaxSize) {
+    // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
+    log("[toon-compression] Skipped: size exceeded", { sizeBytes, maxSize: effectiveMaxSize })
     throw new Error(
       `TOON compression skipped: payload size ${sizeBytes} exceeds max ${effectiveMaxSize}`
     )
@@ -124,7 +135,17 @@ function encodeWithTimeout(data: unknown, maxSize?: number): string {
   const compressed = encode(data)
   const duration = Date.now() - startTime
 
+  // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
+  const originalTokens = estimateTokens(payload)
+  const compressedTokens = estimateTokens(compressed)
+  const percentSaved = Math.round((1 - compressed.length / payload.length) * 100)
+  log(
+    `[toon-compression] Success: ${originalTokens} -> ${compressedTokens} tokens (${percentSaved}% saved)`,
+    { originalChars: payload.length, compressedChars: compressed.length, durationMs: duration }
+  )
   if (duration > COMPRESSION_TIMEOUT_MS) {
+    // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
+    log("[toon-compression] Failed: timeout", { durationMs: duration, timeoutMs: COMPRESSION_TIMEOUT_MS })
     throw new Error(`TOON compression timeout: ${duration}ms`)
   }
 
@@ -197,6 +218,13 @@ export function shouldCompress(data: unknown, threshold: number): boolean {
  */
 export function compressForLLM(data: unknown, config: ToonCompressionConfig): string {
   if (!config.enabled || !shouldCompress(data, config.threshold)) {
+    // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
+    const reason = !config.enabled ? "disabled" : "shouldCompress=false"
+    log("[toon-compression] Skipped: " + reason, {
+      enabled: config.enabled,
+      threshold: config.threshold,
+      dataType: Array.isArray(data) ? `array[${data.length}]` : typeof data
+    })
     return toPlainTextString(data)
   }
 
