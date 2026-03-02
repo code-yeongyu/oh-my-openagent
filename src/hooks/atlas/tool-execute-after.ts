@@ -14,9 +14,9 @@ import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 export function createToolExecuteAfterHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
-}): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput) => Promise<void> {
-  const { ctx, pendingFilePaths } = input
-
+  autoCommit: boolean
+  }): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput) => Promise<void> {
+  const { ctx, pendingFilePaths, autoCommit } = input
   return async (toolInput, toolOutput): Promise<void> => {
     // Guard against undefined output (e.g., from /review command - see issue #1035)
     if (!toolOutput) {
@@ -76,7 +76,7 @@ export function createToolExecuteAfterHandler(input: {
         // Preserve original subagent response - critical for debugging failed tasks
         const originalResponse = toolOutput.output
 
-        toolOutput.output = `
+toolOutput.output = `
 ## SUBAGENT WORK COMPLETED
 
 ${fileChanges}
@@ -88,9 +88,8 @@ ${fileChanges}
 ${originalResponse}
 
 <system-reminder>
-${buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId)}
+${buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId, autoCommit)}
 </system-reminder>`
-
         log(`[${HOOK_NAME}] Output transformed for orchestrator mode (boulder)`, {
           plan: boulderState.plan_name,
           progress: `${progress.completed}/${progress.total}`,
