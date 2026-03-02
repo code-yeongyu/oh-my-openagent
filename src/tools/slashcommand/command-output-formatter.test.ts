@@ -161,4 +161,25 @@ describe("formatLoadedCommand", () => {
       })
     })
   })
+
+  describe("#given command template includes argument placeholders", () => {
+    test("#then replaces both placeholder forms", async () => {
+      const { formatLoadedCommand } = await import("./command-output-formatter")
+      const command: CommandInfo = {
+        name: "daplug:templated",
+        metadata: {
+          name: "daplug:templated",
+          description: "Templated plugin command",
+        },
+        content: "Echo $ARGUMENTS and ${user_message}.",
+        scope: "plugin",
+      }
+
+      const output = await formatLoadedCommand(command, "ship it")
+
+      expect(output).toContain("Echo ship it and ship it.")
+      expect(output).not.toContain("$ARGUMENTS")
+      expect(output).not.toContain("${user_message}")
+    })
+  })
 })

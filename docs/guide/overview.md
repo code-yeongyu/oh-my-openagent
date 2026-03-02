@@ -68,8 +68,6 @@ User Request
 
 When Sisyphus delegates to a subagent, it doesn't pick a model name. It picks a **category** — `visual-engineering`, `ultrabrain`, `quick`, `deep`. The category automatically maps to the right model. You touch nothing.
 
-Custom agents are also first-class in this flow. When custom agents are loaded, planning context includes them, so the orchestrator can choose them proactively when appropriate, and you can call them directly on demand via `task(subagent_type="your-agent")`.
-
 For a deep dive into how agents collaborate, see the [Orchestration System Guide](./orchestration.md).
 
 ---
