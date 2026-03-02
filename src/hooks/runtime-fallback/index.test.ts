@@ -2824,13 +2824,7 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: {
-            categories: {
-              test: {
-                fallback_models: ["provider-a/model-a", "provider-b/model-b"],
-              },
-            },
-          },
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["provider-a/model-a", "provider-b/model-b"]),
         }
       )
       const sessionID = "test-race-retry-in-flight"
@@ -2876,13 +2870,7 @@ describe("runtime-fallback", () => {
       //#given
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
-        pluginConfig: {
-          categories: {
-            test: {
-              fallback_models: ["provider-a/model-a", "provider-b/model-b"],
-            },
-          },
-        },
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["provider-a/model-a", "provider-b/model-b"]),
       })
       const sessionID = "test-race-chain-advance"
       SessionCategoryRegistry.register(sessionID, "test")
@@ -2933,13 +2921,7 @@ describe("runtime-fallback", () => {
         }),
         {
           config: createMockConfig({ notify_on_fallback: false }),
-          pluginConfig: {
-            categories: {
-              test: {
-                fallback_models: ["provider-a/model-a", "provider-b/model-b"],
-              },
-            },
-          },
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["provider-a/model-a", "provider-b/model-b"]),
         }
       )
       const sessionID = "test-race-stop-awaiting"
@@ -2975,13 +2957,7 @@ describe("runtime-fallback", () => {
       //#given
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),
-        pluginConfig: {
-          categories: {
-            test: {
-              fallback_models: ["provider-a/model-a", "provider-b/model-b"],
-            },
-          },
-        },
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["provider-a/model-a", "provider-b/model-b"]),
       })
       const sessionID = "test-race-pending-persists"
       SessionCategoryRegistry.register(sessionID, "test")

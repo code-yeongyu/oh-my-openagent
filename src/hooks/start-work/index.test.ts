@@ -385,24 +385,21 @@ describe("start-work hook", () => {
   })
 
   describe("session agent management", () => {
-    test("should update session agent to Atlas when start-work command is triggered", async () => {
+    test("should pin session agent to Atlas when start-work command is triggered", async () => {
       // given
-      const updateSpy = spyOn(sessionState, "updateSessionAgent")
-      
+      const pinSpy = spyOn(sessionState, "pinSessionAgent")
       const hook = createStartWorkHook(createMockPluginInput())
       const output = {
         parts: [{ type: "text", text: "<session-context></session-context>" }],
       }
-
       // when
       await hook["chat.message"](
         { sessionID: "ses-prometheus-to-sisyphus" },
         output
       )
-
       // then
-      expect(updateSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "atlas")
-      updateSpy.mockRestore()
+      expect(pinSpy).toHaveBeenCalledWith("ses-prometheus-to-sisyphus", "atlas")
+      pinSpy.mockRestore()
     })
   })
 
