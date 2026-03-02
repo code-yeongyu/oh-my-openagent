@@ -549,3 +549,147 @@ describe("CouncilConfigSchema — resilience fields", () => {
     })
   })
 })
+
+describe("AthenaConfigSchema — non-interactive fields", () => {
+  const validCouncil = {
+    members: [
+      { model: "openai/gpt-5.3-codex", name: "council-opus" },
+      { model: "anthropic/claude-opus-4-6", name: "council-gpt" },
+    ],
+  }
+
+  describe("#given non_interactive_mode field", () => {
+    describe("#when parsed with 'delegation'", () => {
+      it("#then accepts the value", () => {
+        //#given
+        const config = { council: validCouncil, non_interactive_mode: "delegation" }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+      })
+    })
+
+    describe("#when parsed with 'solo'", () => {
+      it("#then accepts the value", () => {
+        //#given
+        const config = { council: validCouncil, non_interactive_mode: "solo" }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+      })
+    })
+
+    describe("#when parsed with an invalid value", () => {
+      it("#then rejects the value", () => {
+        //#given
+        const config = { council: validCouncil, non_interactive_mode: "invalid" }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(false)
+      })
+    })
+
+    describe("#when parsed without non_interactive_mode", () => {
+      it("#then defaults to 'delegation'", () => {
+        //#given
+        const config = { council: validCouncil }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.non_interactive_mode).toBe("delegation")
+        }
+      })
+    })
+  })
+
+  describe("#given non_interactive_members field", () => {
+    describe("#when parsed with 'all'", () => {
+      it("#then accepts the value", () => {
+        //#given
+        const config = { council: validCouncil, non_interactive_members: "all" }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+      })
+    })
+
+    describe("#when parsed with 'custom'", () => {
+      it("#then accepts the value", () => {
+        //#given
+        const config = { council: validCouncil, non_interactive_members: "custom" }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+      })
+    })
+
+    describe("#when parsed without non_interactive_members", () => {
+      it("#then defaults to 'all'", () => {
+        //#given
+        const config = { council: validCouncil }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.non_interactive_members).toBe("all")
+        }
+      })
+    })
+  })
+
+  describe("#given non_interactive_member_list field", () => {
+    describe("#when parsed with a list of member names", () => {
+      it("#then accepts the value", () => {
+        //#given
+        const config = { council: validCouncil, non_interactive_member_list: ["Council: Opus"] }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.non_interactive_member_list).toEqual(["Council: Opus"])
+        }
+      })
+    })
+
+    describe("#when parsed without non_interactive_member_list", () => {
+      it("#then is undefined (optional)", () => {
+        //#given
+        const config = { council: validCouncil }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.non_interactive_member_list).toBeUndefined()
+        }
+      })
+    })
+  })
+})
