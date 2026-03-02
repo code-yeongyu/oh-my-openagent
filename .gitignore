@@ -35,3 +35,5 @@ test-injection/
 notepad.md
 oauth-success.html
 *.bun-build
+
+.serena/
