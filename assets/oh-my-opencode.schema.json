@@ -3648,6 +3648,28 @@
                 "member_max_running_seconds"
               ],
               "additionalProperties": false
+            },
+            "non_interactive_mode": {
+              "default": "delegation",
+              "type": "string",
+              "enum": [
+                "delegation",
+                "solo"
+              ]
+            },
+            "non_interactive_members": {
+              "default": "all",
+              "type": "string",
+              "enum": [
+                "all",
+                "custom"
+              ]
+            },
+            "non_interactive_member_list": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "additionalProperties": false

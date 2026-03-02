@@ -58,6 +58,9 @@ export const AgentOverrideConfigSchema = z.object({
 
 export const AthenaOverrideConfigSchema = AgentOverrideConfigSchema.extend({
   council: AthenaConfigSchema.shape.council.optional(),
+  non_interactive_mode: AthenaConfigSchema.shape.non_interactive_mode,
+  non_interactive_members: AthenaConfigSchema.shape.non_interactive_members,
+  non_interactive_member_list: AthenaConfigSchema.shape.non_interactive_member_list,
 })
 
 export const AgentOverridesSchema = z.object({

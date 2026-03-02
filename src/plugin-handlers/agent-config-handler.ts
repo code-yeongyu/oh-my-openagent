@@ -79,10 +79,11 @@ export async function applyAgentConfig(params: {
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const athenaCouncilConfig = params.pluginConfig.agents?.athena?.council
+  const athenaConfig = params.pluginConfig.agents?.athena
   const athenaNonInteractiveConfig = {
-    non_interactive_mode: (params.pluginConfig.agents?.athena as Record<string, unknown>)?.non_interactive_mode as string | undefined,
-    non_interactive_members: (params.pluginConfig.agents?.athena as Record<string, unknown>)?.non_interactive_members as string | undefined,
-    non_interactive_member_list: (params.pluginConfig.agents?.athena as Record<string, unknown>)?.non_interactive_member_list as string[] | undefined,
+    non_interactive_mode: athenaConfig?.non_interactive_mode,
+    non_interactive_members: athenaConfig?.non_interactive_members,
+    non_interactive_member_list: athenaConfig?.non_interactive_member_list,
   }
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
