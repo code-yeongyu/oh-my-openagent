@@ -464,10 +464,10 @@ describe("prometheus-md-only", () => {
 
   describe("boulder state priority over message files (fixes #927)", () => {
     const BOULDER_DIR = join(tmpdir(), `boulder-test-${randomUUID()}`)
-    const BOULDER_FILE = join(BOULDER_DIR, ".sisyphus", "boulder.json")
+    const BOULDER_FILE = join(BOULDER_DIR, ".sisyphus", "boulder", "test-plan.json")
 
     beforeEach(() => {
-      mkdirSync(join(BOULDER_DIR, ".sisyphus"), { recursive: true })
+      mkdirSync(join(BOULDER_DIR, ".sisyphus", "boulder"), { recursive: true })
     })
 
     afterEach(() => {

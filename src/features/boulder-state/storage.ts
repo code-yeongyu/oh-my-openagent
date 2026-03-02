@@ -1,59 +1,70 @@
 /**
  * Boulder State Storage
  *
- * Handles reading/writing boulder.json for active plan tracking.
+ * Legacy-compatible wrappers that delegate to per-plan storage.
+ * New code should use per-plan-storage.ts functions directly.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
-import { dirname, join, basename } from "node:path"
+import { existsSync, readFileSync, readdirSync, statSync, unlinkSync } from "node:fs"
+import { join, basename } from "node:path"
 import type { BoulderState, PlanProgress } from "./types"
 import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
-
+import { parseBoulderJson } from "./boulder-json-parser"
+import { migrateLegacyBoulderState } from "./legacy-migration"
+import { atomicWriteJson } from "./atomic-file-ops"
+import {
+  listActiveBoulderStates,
+  writeBoulderStateForPlan,
+  appendSessionIdForPlan,
+  clearBoulderStateForPlan,
+} from "./per-plan-storage"
 export function getBoulderFilePath(directory: string): string {
   return join(directory, BOULDER_DIR, BOULDER_FILE)
 }
 
+/**
+ * Legacy-compatible read: tries per-plan states first, then migrates singleton.
+ * Returns the first active boulder state found, or null.
+ */
 export function readBoulderState(directory: string): BoulderState | null {
-  const filePath = getBoulderFilePath(directory)
-
-  if (!existsSync(filePath)) {
-    return null
+  const perPlanStates = listActiveBoulderStates(directory)
+  if (perPlanStates.length > 0) {
+    return perPlanStates[0]
   }
 
-  try {
-    const content = readFileSync(filePath, "utf-8")
-    const parsed = JSON.parse(content)
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return null
-    }
-    if (!Array.isArray(parsed.session_ids)) {
-      parsed.session_ids = []
-    }
-    return parsed as BoulderState
-  } catch {
-    return null
-  }
+  const migrated = migrateLegacyBoulderState(directory)
+  if (migrated) return migrated
+
+  return parseBoulderJson(getBoulderFilePath(directory))
 }
 
+/**
+ * Legacy-compatible write: writes to per-plan storage if plan_name is available,
+ * otherwise falls back to singleton for backward compat.
+ */
 export function writeBoulderState(directory: string, state: BoulderState): boolean {
-  const filePath = getBoulderFilePath(directory)
+  if (state.plan_name) {
+    return writeBoulderStateForPlan(directory, state.plan_name, state)
+  }
 
   try {
-    const dir = dirname(filePath)
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true })
-    }
-
-    writeFileSync(filePath, JSON.stringify(state, null, 2), "utf-8")
+    atomicWriteJson(getBoulderFilePath(directory), state)
     return true
   } catch {
     return false
   }
 }
 
+/**
+ * Legacy-compatible append: finds the state, then appends via per-plan if possible.
+ */
 export function appendSessionId(directory: string, sessionId: string): BoulderState | null {
   const state = readBoulderState(directory)
   if (!state) return null
+
+  if (state.plan_name) {
+    return appendSessionIdForPlan(directory, state.plan_name, sessionId)
+  }
 
   if (!state.session_ids?.includes(sessionId)) {
     if (!Array.isArray(state.session_ids)) {
@@ -68,12 +79,18 @@ export function appendSessionId(directory: string, sessionId: string): BoulderSt
   return state
 }
 
+/**
+ * Legacy-compatible clear: clears per-plan state if plan_name exists in current state.
+ */
 export function clearBoulderState(directory: string): boolean {
-  const filePath = getBoulderFilePath(directory)
+  const state = readBoulderState(directory)
+  if (state?.plan_name) {
+    return clearBoulderStateForPlan(directory, state.plan_name)
+  }
 
+  const filePath = getBoulderFilePath(directory)
   try {
     if (existsSync(filePath)) {
-      const { unlinkSync } = require("node:fs")
       unlinkSync(filePath)
     }
     return true
@@ -99,10 +116,7 @@ export function findPrometheusPlans(directory: string): string[] {
       .filter((f) => f.endsWith(".md"))
       .map((f) => join(plansDir, f))
       .sort((a, b) => {
-        // Sort by modification time, newest first
-        const aStat = require("node:fs").statSync(a)
-        const bStat = require("node:fs").statSync(b)
-        return bStat.mtimeMs - aStat.mtimeMs
+        return statSync(b).mtimeMs - statSync(a).mtimeMs
       })
   } catch {
     return []
@@ -162,3 +176,13 @@ export function createBoulderState(
     ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
   }
 }
+
+export { findBoulderStateBySession } from "./per-plan-storage"
+export {
+  readBoulderStateForPlan,
+  writeBoulderStateForPlan,
+  appendSessionIdForPlan,
+  removeSessionIdForPlan,
+  clearBoulderStateForPlan,
+  listActiveBoulderStates,
+} from "./per-plan-storage"

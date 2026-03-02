@@ -60,7 +60,10 @@ export function createRalphLoopHook(
 		getTranscriptPath,
 		checkSessionExists,
 		sessionRecovery,
-		loopState,
+		loopState: {
+			...loopState,
+			findAnyActiveState: () => loopState.getState(),
+		},
 	})
 
 	return {

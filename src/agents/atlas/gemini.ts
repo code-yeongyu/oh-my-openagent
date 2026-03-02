@@ -119,9 +119,18 @@ Every \`task()\` prompt MUST include ALL 6 sections:
 <workflow>
 ## Step 0: Register Tracking
 
+After reading the plan file, create a TodoWrite entry for EACH task:
+
 \`\`\`
-TodoWrite([{ id: "orchestrate-plan", content: "Complete ALL tasks in work plan", status: "in_progress", priority: "high" }])
+TodoWrite([
+  { content: "Task 1: [exact description from plan]", status: "in_progress", priority: "high" },
+  { content: "Task 2: [exact description from plan]", status: "pending", priority: "high" },
+  // ... one entry per plan task
+  { content: "Final verification: typecheck + tests + build", status: "pending", priority: "high" },
+])
 \`\`\`
+
+**Keep todos in sync.** Mark \`completed\` immediately after verification. Mark next \`in_progress\` before starting. System uses these for auto-continuation. If you create ONE generic todo instead of per-task todos, auto-continuation WILL BREAK.
 
 ## Step 1: Analyze Plan
 

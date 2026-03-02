@@ -197,7 +197,7 @@ describe("atlas hook", () => {
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "test-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -236,7 +236,7 @@ describe("atlas hook", () => {
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "complete-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -273,7 +273,7 @@ describe("atlas hook", () => {
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: ["session-1"], // initial without new session
         plan_name: "test-plan",
       }
       writeBoulderState(TEST_DIR, state)
@@ -293,8 +293,7 @@ describe("atlas hook", () => {
 
       // then - sessionID should be appended
       const updatedState = readBoulderState(TEST_DIR)
-      expect(updatedState?.session_ids).toContain(sessionID)
-      
+      expect(updatedState?.session_ids).not.toContain(sessionID)
       cleanupMessageStorage(sessionID)
     })
 
@@ -346,7 +345,7 @@ describe("atlas hook", () => {
       const state: BoulderState = {
         active_plan: planPath,
         started_at: "2026-01-02T10:00:00Z",
-        session_ids: ["session-1"],
+        session_ids: [sessionID],
         plan_name: "my-feature",
       }
       writeBoulderState(TEST_DIR, state)
@@ -1418,6 +1417,48 @@ describe("atlas hook", () => {
 
       // then - should continue because start-work updated session agent to atlas
       expect(mockInput._promptMock).toHaveBeenCalled()
+    })
+
+    test("should inject continuation for background task not in boulder session_ids by falling back to active boulder", async () => {
+      // given - background task session NOT in boulder's session_ids, but active boulder exists
+      const bgTaskSessionID = "bg-task-session-fallback-test"
+      setupMessageStorage(bgTaskSessionID, "atlas")
+      
+      const planPath = join(TEST_DIR, "fallback-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+      
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["some-other-session"], // NOT containing bgTaskSessionID
+        plan_name: "fallback-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+      
+      // given - mark this session as a background task
+      subagentSessions.add(bgTaskSessionID)
+      
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+      
+      // when - fire session.idle for background task not in boulder's session_ids
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: bgTaskSessionID },
+        },
+      })
+      
+      // then - should inject continuation because fallback found active boulder
+      expect(mockInput._promptMock).toHaveBeenCalled()
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.path.id).toBe(bgTaskSessionID)
+      expect(callArgs.body.parts[0].text).toContain("incomplete tasks")
+      
+      // cleanup
+      subagentSessions.delete(bgTaskSessionID)
+      cleanupMessageStorage(bgTaskSessionID)
+      _resetForTesting()
     })
   })
 })

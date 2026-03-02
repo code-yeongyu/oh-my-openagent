@@ -14,10 +14,11 @@ type SessionRecovery = {
 	clear: (sessionID: string) => void
 }
 type LoopStateController = {
-	getState: () => RalphLoopState | null
-	clear: () => boolean
-	incrementIteration: () => RalphLoopState | null
+	getState: (sessionID?: string) => RalphLoopState | null
+	clear: (sessionID?: string) => boolean
+	incrementIteration: (sessionID?: string) => RalphLoopState | null
 	setSessionID: (sessionID: string) => RalphLoopState | null
+	findAnyActiveState?: () => RalphLoopState | null
 }
 type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; sessionRecovery: SessionRecovery; loopState: LoopStateController }
 
@@ -48,28 +49,26 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				const state = options.loopState.getState()
+				let state = options.loopState.getState(sessionID)
 				if (!state || !state.active) {
-					return
-				}
-
-				if (state.session_id && state.session_id !== sessionID) {
-					if (options.checkSessionExists) {
-						try {
-							const exists = await options.checkSessionExists(state.session_id)
-							if (!exists) {
-								options.loopState.clear()
-								log(`[${HOOK_NAME}] Cleared orphaned state from deleted session`, {
-									orphanedSessionId: state.session_id,
-									currentSessionId: sessionID,
+					const orphanedState = options.loopState.findAnyActiveState?.()
+					if (orphanedState?.active && orphanedState.session_id && orphanedState.session_id !== sessionID) {
+						if (options.checkSessionExists) {
+							try {
+								const exists = await options.checkSessionExists(orphanedState.session_id)
+								if (!exists) {
+									options.loopState.clear(orphanedState.session_id)
+									log(`[${HOOK_NAME}] Cleared orphaned state from deleted session`, {
+										orphanedSessionId: orphanedState.session_id,
+										currentSessionId: sessionID,
+									})
+								}
+							} catch (err) {
+								log(`[${HOOK_NAME}] Failed to check session existence`, {
+									sessionId: orphanedState.session_id,
+									error: String(err),
 								})
-								return
 							}
-						} catch (err) {
-							log(`[${HOOK_NAME}] Failed to check session existence`, {
-								sessionId: state.session_id,
-								error: String(err),
-							})
 						}
 					}
 					return
@@ -96,7 +95,7 @@ export function createRalphLoopEventHandler(
 							? "transcript_file"
 							: "session_messages_api",
 					})
-					options.loopState.clear()
+					options.loopState.clear(sessionID)
 
 					const title = state.ultrawork ? "ULTRAWORK LOOP COMPLETE!" : "Ralph Loop Complete!"
 					const message = state.ultrawork ? `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)` : `Task completed after ${state.iteration} iteration(s)`
@@ -110,7 +109,7 @@ export function createRalphLoopEventHandler(
 						iteration: state.iteration,
 						max: state.max_iterations,
 					})
-					options.loopState.clear()
+					options.loopState.clear(sessionID)
 
 					await ctx.client.tui?.showToast?.({
 						body: { title: "Ralph Loop Stopped", message: `Max iterations (${state.max_iterations}) reached without completion`, variant: "warning", duration: 5000 },
@@ -118,7 +117,7 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				const newState = options.loopState.incrementIteration()
+				const newState = options.loopState.incrementIteration(sessionID)
 				if (!newState) {
 					log(`[${HOOK_NAME}] Failed to increment iteration`, { sessionID })
 					return
@@ -161,9 +160,9 @@ export function createRalphLoopEventHandler(
 		if (event.type === "session.deleted") {
 			const sessionInfo = props?.info as { id?: string } | undefined
 			if (!sessionInfo?.id) return
-			const state = options.loopState.getState()
+			const state = options.loopState.getState(sessionInfo.id)
 			if (state?.session_id === sessionInfo.id) {
-				options.loopState.clear()
+				options.loopState.clear(sessionInfo.id)
 				log(`[${HOOK_NAME}] Session deleted, loop cleared`, { sessionID: sessionInfo.id })
 			}
 			options.sessionRecovery.clear(sessionInfo.id)
@@ -176,9 +175,9 @@ export function createRalphLoopEventHandler(
 
 			if (error?.name === "MessageAbortedError") {
 				if (sessionID) {
-					const state = options.loopState.getState()
+					const state = options.loopState.getState(sessionID)
 					if (state?.session_id === sessionID) {
-						options.loopState.clear()
+						options.loopState.clear(sessionID)
 						log(`[${HOOK_NAME}] User aborted, loop cleared`, { sessionID })
 					}
 					options.sessionRecovery.clear(sessionID)

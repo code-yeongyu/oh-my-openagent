@@ -11,6 +11,9 @@ import {
   getPlanName,
   createBoulderState,
   findPrometheusPlans,
+  removeSessionIdForPlan,
+  readBoulderStateForPlan,
+  writeBoulderStateForPlan,
 } from "./storage"
 import type { BoulderState } from "./types"
 
@@ -427,6 +430,141 @@ describe("boulder-state", () => {
 
       //#then - state should not have agent field (backward compatible)
       expect(state.agent).toBeUndefined()
+    })
+  })
+
+  describe("legacy migration", () => {
+    test("should migrate legacy boulder.json when per-plan dir exists but plan-specific file doesn't", () => {
+      // given - legacy boulder.json and empty per-plan dir
+      const legacyFile = join(SISYPHUS_DIR, "boulder.json")
+      const state: BoulderState = {
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "my-plan",
+      }
+      writeFileSync(legacyFile, JSON.stringify(state))
+      mkdirSync(join(SISYPHUS_DIR, "boulder"), { recursive: true })
+
+      // when
+      const result = readBoulderState(TEST_DIR)
+
+      // then - should have migrated the state
+      expect(result).not.toBeNull()
+      expect(result?.plan_name).toBe("my-plan")
+      expect(result?.session_ids).toEqual(["session-1"])
+      // legacy file should be deleted
+      expect(existsSync(legacyFile)).toBe(false)
+    })
+
+    test("should skip migration when plan-specific file already exists", () => {
+      // given - legacy boulder.json AND existing per-plan file
+      const legacyFile = join(SISYPHUS_DIR, "boulder.json")
+      const legacyState: BoulderState = {
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["session-1"],
+        plan_name: "my-plan",
+      }
+      writeFileSync(legacyFile, JSON.stringify(legacyState))
+
+      // Create per-plan file with different content
+      const perPlanDir = join(SISYPHUS_DIR, "boulder")
+      mkdirSync(perPlanDir, { recursive: true })
+      const perPlanFile = join(perPlanDir, "my-plan.json")
+      const perPlanState: BoulderState = {
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-03T10:00:00Z",
+        session_ids: ["session-2"],
+        plan_name: "my-plan",
+      }
+      writeFileSync(perPlanFile, JSON.stringify(perPlanState))
+
+      // when
+      const result = readBoulderState(TEST_DIR)
+
+      // then - should return per-plan state, not legacy
+      expect(result).not.toBeNull()
+      expect(result?.session_ids).toEqual(["session-2"])
+      expect(result?.started_at).toBe("2026-01-03T10:00:00Z")
+      // legacy file should still exist (migration skipped)
+      expect(existsSync(legacyFile)).toBe(true)
+    })
+  })
+
+  describe("removeSessionIdForPlan", () => {
+    test("should remove only the specified session ID", () => {
+      // given - per-plan state with multiple sessions
+      const planName = "test-plan"
+      const state: BoulderState = {
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["sess-1", "sess-2", "sess-3"],
+        plan_name: planName,
+      }
+      writeBoulderStateForPlan(TEST_DIR, planName, state)
+
+      // when
+      const result = removeSessionIdForPlan(TEST_DIR, planName, "sess-2")
+
+      // then - only sess-2 should be removed
+      expect(result).not.toBeNull()
+      expect(result?.session_ids).toEqual(["sess-1", "sess-3"])
+      // verify file was updated
+      const readBack = readBoulderStateForPlan(TEST_DIR, planName)
+      expect(readBack?.session_ids).toEqual(["sess-1", "sess-3"])
+    })
+
+    test("should be a no-op when session ID not in array", () => {
+      // given - per-plan state without the session ID
+      const planName = "test-plan"
+      const state: BoulderState = {
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["sess-1", "sess-2"],
+        plan_name: planName,
+      }
+      writeBoulderStateForPlan(TEST_DIR, planName, state)
+
+      // when
+      const result = removeSessionIdForPlan(TEST_DIR, planName, "sess-999")
+
+      // then - state should be unchanged
+      expect(result).not.toBeNull()
+      expect(result?.session_ids).toEqual(["sess-1", "sess-2"])
+    })
+
+    test("should keep state file even when session_ids becomes empty", () => {
+      // given - per-plan state with single session
+      const planName = "test-plan"
+      const state: BoulderState = {
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: ["sess-1"],
+        plan_name: planName,
+      }
+      writeBoulderStateForPlan(TEST_DIR, planName, state)
+
+      // when
+      const result = removeSessionIdForPlan(TEST_DIR, planName, "sess-1")
+
+      // then - state file should still exist with empty session_ids
+      expect(result).not.toBeNull()
+      expect(result?.session_ids).toEqual([])
+      const readBack = readBoulderStateForPlan(TEST_DIR, planName)
+      expect(readBack).not.toBeNull()
+      expect(readBack?.session_ids).toEqual([])
+    })
+
+    test("should return null when state doesn't exist", () => {
+      // given - no per-plan state
+      const planName = "nonexistent-plan"
+
+      // when
+      const result = removeSessionIdForPlan(TEST_DIR, planName, "sess-1")
+
+      // then
+      expect(result).toBeNull()
     })
   })
 })
