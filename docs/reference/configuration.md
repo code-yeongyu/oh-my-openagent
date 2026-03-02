@@ -11,6 +11,7 @@ Complete reference for `oh-my-opencode.jsonc` configuration. This document cover
   - [Quick Start Example](#quick-start-example)
 - [Core Concepts](#core-concepts)
   - [Agents](#agents)
+  - [Custom Agents (`custom_agents`)](#custom-agents-custom_agents)
   - [Categories](#categories)
   - [Model Resolution](#model-resolution)
 - [Task System](#task-system)
@@ -130,6 +131,8 @@ Here's a practical starting configuration:
 
 Override built-in agent settings. Available agents: `sisyphus`, `hephaestus`, `prometheus`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`.
 
+`agents` is intentionally strict and only accepts built-in agent keys. Use `custom_agents` for user-defined agents.
+
 ```json
 {
   "agents": {
@@ -199,6 +202,64 @@ Control what tools an agent can use:
 | `webfetch` | `ask` / `allow` / `deny` |
 | `doom_loop` | `ask` / `allow` / `deny` |
 | `external_directory` | `ask` / `allow` / `deny` |
+
+### Custom Agents (`custom_agents`)
+
+Use `custom_agents` to configure user-defined agents without mixing them into built-in `agents` overrides.
+
+What this gives you:
+
+- **Clean separation**: built-ins stay in `agents`, user-defined entries stay in `custom_agents`.
+- **Safer config**: keys in `custom_agents` cannot reuse built-in names.
+- **First-class orchestration**: loaded custom agents are visible to planner/orchestrator context, so they can be selected proactively during planning and invoked on demand via `task(subagent_type=...)`.
+- **Full model controls** for custom agents: `model`, `variant`, `temperature`, `top_p`, `reasoningEffort`, `thinking`, etc.
+
+Important behavior:
+
+- `custom_agents` **overrides existing custom agents** loaded at runtime (for example from Claude Code/OpenCode agent sources).
+- `custom_agents` does **not** create an agent from thin air by itself; the target custom agent must be present in runtime-loaded agent configs.
+
+Example:
+
+```jsonc
+{
+  "custom_agents": {
+    "translator": {
+      "model": "openai/gpt-5.3-codex",
+      "variant": "high",
+      "temperature": 0.2,
+      "prompt_append": "Keep locale placeholders and ICU tokens exactly unchanged."
+    },
+    "reviewer-fast": {
+      "model": "anthropic/claude-haiku-4-5",
+      "temperature": 0,
+      "thinking": {
+        "type": "enabled",
+        "budgetTokens": 20000
+      }
+    }
+  }
+}
+```
+
+On-demand invocation through task delegation:
+
+```ts
+task(
+  {
+    subagent_type: "translator",
+    load_skills: [],
+    description: "Translate release notes",
+    prompt: "Translate docs/CHANGELOG.md into Korean while preserving markdown structure.",
+    run_in_background: false,
+  },
+)
+```
+
+Migration note:
+
+- If you previously put custom entries under `agents.*`, move them to `custom_agents.*`.
+- Unknown built-in keys under `agents` are reported with migration hints.
 
 ### Categories
 
