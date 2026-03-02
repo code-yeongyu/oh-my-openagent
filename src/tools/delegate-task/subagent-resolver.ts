@@ -15,9 +15,7 @@ export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
-  categoryExamples: string,
-  inheritedModel?: string,
-  systemDefaultModel?: string,
+  categoryExamples: string
 ): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
   const { client, agentOverrides } = executorCtx
 
@@ -125,16 +123,6 @@ Create the work plan directly - that's your job as the planning agent.`,
 
     if (!categoryModel && matchedAgent.model) {
       categoryModel = matchedAgent.model
-    }
-
-    if (!categoryModel) {
-      const fallbackModel = inheritedModel ?? systemDefaultModel
-      if (fallbackModel) {
-        const parsedFallback = parseModelString(fallbackModel)
-        if (parsedFallback) {
-          categoryModel = parsedFallback
-        }
-      }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
