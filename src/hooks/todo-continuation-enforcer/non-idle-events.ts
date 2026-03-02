@@ -25,7 +25,11 @@ export function handleNonIdleEvent(args: {
           return
         }
       }
-      if (state) state.abortDetectedAt = undefined
+      if (state) {
+        state.abortDetectedAt = undefined
+        state.noProgressCount = 0
+        state.lastIncompleteFingerprint = null
+      }
       sessionStateStore.cancelCountdown(sessionID)
       return
     }

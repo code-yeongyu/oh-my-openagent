@@ -47,6 +47,8 @@ export function createSessionStateStore(): SessionStateStore {
 
     const state: SessionState = {
       consecutiveFailures: 0,
+      noProgressCount: 0,
+      lastIncompleteFingerprint: null,
     }
     sessions.set(sessionID, { state, lastAccessedAt: Date.now() })
     return state
