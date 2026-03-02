@@ -33,7 +33,7 @@ resolveModel(input)
   4. System default: Ultimate fallback
 ```
 
-Key files: `model-resolver.ts` (entry), `model-resolution-pipeline.ts` (orchestration), `model-requirements.ts` (fallback chains), `model-name-matcher.ts` (fuzzy matching).
+Key files: `model-resolver.ts` (entry), `model-resolution-pipeline.ts` (orchestration), `model-requirements.ts` (fallback chains), `model-availability.ts` (fuzzy matching).
 
 ## MIGRATION SYSTEM
 

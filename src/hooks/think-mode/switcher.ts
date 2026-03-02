@@ -16,6 +16,8 @@
  * inconsistencies defensively while maintaining backwards compatibility.
  */
 
+import { normalizeModelID } from "../../shared"
+
 /**
  * Extracts provider-specific prefix from model ID (if present).
  * Custom providers may use prefixes for routing (e.g., vertex_ai/, openai/).
@@ -35,24 +37,6 @@ function extractModelPrefix(modelID: string): { prefix: string; base: string } {
     base: modelID.slice(slashIndex + 1),
   }
 }
-
-/**
- * Normalizes model IDs to use consistent hyphen formatting.
- * GitHub Copilot may use dots (claude-opus-4.6) but our maps use hyphens (claude-opus-4-6).
- * This ensures lookups work regardless of format.
- *
- * @example
- * normalizeModelID("claude-opus-4.6") // "claude-opus-4-6"
- * normalizeModelID("gemini-3.5-pro") // "gemini-3-5-pro"
- * normalizeModelID("gpt-5.2") // "gpt-5-2"
- * normalizeModelID("vertex_ai/claude-opus-4.6") // "vertex_ai/claude-opus-4-6"
- */
-function normalizeModelID(modelID: string): string {
-  // Replace dots with hyphens when followed by a digit
-  // This handles version numbers like 4.5 → 4-5, 5.2 → 5-2
-  return modelID.replace(/\.(\d+)/g, "-$1")
-}
-
 
 
 // Maps model IDs to their "high reasoning" variant (internal convention)
