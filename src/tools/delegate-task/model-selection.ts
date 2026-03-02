@@ -1,11 +1,8 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
+import { normalizeModel } from "../../shared/model-normalization"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 
-function normalizeModel(model?: string): string | undefined {
-  const trimmed = model?.trim()
-  return trimmed || undefined
-}
 
 export function resolveModelForDelegateTask(input: {
   userModel?: string
