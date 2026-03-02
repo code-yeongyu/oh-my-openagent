@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
-import { createAthenaAgent } from "./agent"
+import { ATHENA_PROMPT_METADATA, createAthenaAgent } from "./agent"
 
 describe("Athena prompt config injection placeholders", () => {
   const athenaConfig = createAthenaAgent("anthropic/claude-opus-4-6")
@@ -127,6 +127,35 @@ describe("Athena prompt config injection placeholders", () => {
         expect(athenaConfig.prompt).toContain("intent=\"{intent from Step 3}\"")
         expect(athenaConfig.prompt).toContain("runtime guidance message injected by council_finalize")
         expect(athenaConfig.prompt).toContain("<athena_runtime_guidance>")
+      })
+    })
+  })
+})
+
+describe("Athena prompt metadata", () => {
+  describe("#given ATHENA_PROMPT_METADATA", () => {
+    describe("#when checking triggers", () => {
+      it("#then includes a Non-interactive council trigger", () => {
+        const hasNonInteractiveTrigger = ATHENA_PROMPT_METADATA.triggers.some((t) =>
+          t.domain.includes("Non-interactive"),
+        )
+        expect(hasNonInteractiveTrigger).toBe(true)
+      })
+    })
+
+    describe("#when checking useWhen entries", () => {
+      it("#then includes an entry mentioning oh-my-opencode run", () => {
+        const hasCLIEntry = ATHENA_PROMPT_METADATA.useWhen.some((entry) =>
+          entry.includes("oh-my-opencode run"),
+        )
+        expect(hasCLIEntry).toBe(true)
+      })
+
+      it("#then includes an entry mentioning structured council output", () => {
+        const hasStructuredEntry = ATHENA_PROMPT_METADATA.useWhen.some((entry) =>
+          entry.includes("structured") || entry.includes("agent-to-agent"),
+        )
+        expect(hasStructuredEntry).toBe(true)
       })
     })
   })
