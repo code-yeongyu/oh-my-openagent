@@ -1,15 +1,15 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { basename, join } from "path"
-import { parseFrontmatter, sanitizeModelField, getOpenCodeConfigDir } from "../../shared"
+import {
+  parseFrontmatter,
+  sanitizeModelField,
+  getOpenCodeConfigDir,
+  discoverPluginCommandDefinitions,
+} from "../../shared"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import { loadBuiltinCommands } from "../../features/builtin-commands"
-import {
-  discoverInstalledPlugins,
-  loadPluginCommands,
-  loadPluginSkillsAsCommands,
-} from "../../features/claude-code-plugin-loader"
 import type { CommandInfo, CommandMetadata, CommandScope } from "./types"
 
 export interface CommandDiscoveryOptions {
@@ -59,18 +59,7 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
 }
 
 function discoverPluginCommands(options?: CommandDiscoveryOptions): CommandInfo[] {
-  if (options?.pluginsEnabled === false) {
-    return []
-  }
-
-  const { plugins } = discoverInstalledPlugins({
-    enabledPluginsOverride: options?.enabledPluginsOverride,
-  })
-
-  const pluginDefinitions = {
-    ...loadPluginCommands(plugins),
-    ...loadPluginSkillsAsCommands(plugins),
-  }
+  const pluginDefinitions = discoverPluginCommandDefinitions(options)
 
   return Object.entries(pluginDefinitions).map(([name, definition]) => ({
     name,

@@ -49,7 +49,9 @@ export async function formatLoadedCommand(
 
   let finalContent = resolvedContent.trim()
   if (userMessage) {
-    finalContent = finalContent.replace(/\$\{user_message\}/g, userMessage)
+    finalContent = finalContent
+      .replace(/\$\{user_message\}/g, userMessage)
+      .replace(/\$ARGUMENTS/g, userMessage)
   }
 
   sections.push(finalContent)
