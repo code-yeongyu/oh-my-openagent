@@ -65,7 +65,7 @@ export function createManagers(args: {
 
   initTaskToastManager(ctx.client)
 
-  const skillMcpManager = new SkillMcpManager()
+  const skillMcpManager = new SkillMcpManager(pluginConfig.toon_compression)
 
   const configHandler = createConfigHandler({
     ctx: { directory: ctx.directory, client: ctx.client },
