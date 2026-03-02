@@ -38,7 +38,7 @@ function detectCrossplanDeps(
       const current = sorted[i]
       const prior = sorted[i - 1]
       const deps = extraDeps.get(current) ?? []
-      if (!deps.includes(prior)) deps.push(prior)
+      if (prior !== current && !deps.includes(prior)) deps.push(prior)
       extraDeps.set(current, deps)
     }
   }

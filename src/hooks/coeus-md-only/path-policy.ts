@@ -1,4 +1,5 @@
-import { relative, resolve, isAbsolute } from "node:path"
+import { realpathSync } from "node:fs"
+import { relative, resolve, isAbsolute, dirname, basename, join } from "node:path"
 
 import { ALLOWED_EXTENSIONS, BLOCKED_FILES } from "./constants"
 
@@ -8,6 +9,18 @@ export function isAllowedFile(filePath: string, workspaceRoot: string): boolean 
 
   if (rel.startsWith("..") || isAbsolute(rel)) {
     return false
+  }
+
+  // Resolve symlinks in parent directory (file may not exist yet — can't realpathSync the file itself)
+  try {
+    const realDir = realpathSync(dirname(resolved))
+    const realResolved = join(realDir, basename(resolved))
+    const realRel = relative(workspaceRoot, realResolved)
+    if (realRel.startsWith("..") || isAbsolute(realRel)) {
+      return false
+    }
+  } catch {
+    // Directory doesn't exist yet — symlinks can't exist here, lexical check suffices
   }
 
   if (!/\.sisyphus[/\\]/i.test(rel)) {

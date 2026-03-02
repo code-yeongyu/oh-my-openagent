@@ -183,4 +183,39 @@ describe("mergeSubPlans", () => {
     expect(result.title).toBeTruthy()
     expect(result.context).toBeTruthy()
   })
+
+  //#given task with duplicate files_touched
+  //#when merging
+  //#then task must not create self-dependency and must appear in waves
+  it("task with duplicate files_touched should not create self-dependency", () => {
+    // given
+    const subPlans: SubPlan[] = [
+      {
+        domain: "auth",
+        domain_description: "auth domain",
+        tasks: [
+          {
+            id: "T1",
+            title: "Task with duplicate files",
+            description: "test task",
+            category: "quick",
+            skills: [],
+            files_touched: ["file.ts", "file.ts"],
+            depends_on: [],
+            acceptance_criteria: ["done"],
+          },
+        ],
+        wave_assignments: {},
+        constraints_acknowledged: true,
+        source_sub_planner: "sub-prometheus",
+      },
+    ]
+
+    // when
+    const result = mergeSubPlans(subPlans, "test constraints")
+
+    // then — task must appear in waves (not silently dropped)
+    expect(result.waves.length).toBeGreaterThan(0)
+    expect(result.waves.flatMap((w) => w.task_ids)).toContain("auth-T1")
+  })
 })

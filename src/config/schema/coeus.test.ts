@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { CouesConfigSchema } from "./coeus"
+import { CoeusConfigSchema } from "./coeus"
 
-describe("CouesConfigSchema", () => {
+describe("CoeusConfigSchema", () => {
   test("should accept valid config with all fields", () => {
     // given
     const config = {
@@ -14,7 +14,7 @@ describe("CouesConfigSchema", () => {
     }
 
     // when
-    const result = CouesConfigSchema.safeParse(config)
+    const result = CoeusConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -33,7 +33,7 @@ describe("CouesConfigSchema", () => {
     const config = {}
 
     // when
-    const result = CouesConfigSchema.safeParse(config)
+    const result = CoeusConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -53,7 +53,7 @@ describe("CouesConfigSchema", () => {
     }
 
     // when
-    const result = CouesConfigSchema.safeParse(config)
+    const result = CoeusConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(false)
@@ -66,7 +66,7 @@ describe("CouesConfigSchema", () => {
     }
 
     // when
-    const result = CouesConfigSchema.safeParse(config)
+    const result = CoeusConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(false)
@@ -79,7 +79,7 @@ describe("CouesConfigSchema", () => {
     }
 
     // when
-    const result = CouesConfigSchema.safeParse(config)
+    const result = CoeusConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(false)
@@ -92,7 +92,7 @@ describe("CouesConfigSchema", () => {
     }
 
     // when
-    const result = CouesConfigSchema.safeParse(config)
+    const result = CoeusConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(false)
@@ -104,7 +104,7 @@ describe("CouesConfigSchema", () => {
 
     // when/then
     for (const strategy of strategies) {
-      const result = CouesConfigSchema.safeParse({
+      const result = CoeusConfigSchema.safeParse({
         decomposition_strategy: strategy,
       })
       expect(result.success).toBe(true)
@@ -118,7 +118,7 @@ describe("CouesConfigSchema", () => {
     }
 
     // when
-    const result = CouesConfigSchema.safeParse(config)
+    const result = CoeusConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(false)
@@ -131,7 +131,7 @@ describe("CouesConfigSchema", () => {
     }
 
     // when
-    const result = CouesConfigSchema.safeParse(config)
+    const result = CoeusConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)
@@ -145,7 +145,7 @@ describe("CouesConfigSchema", () => {
     const config = {}
 
     // when
-    const result = CouesConfigSchema.safeParse(config)
+    const result = CoeusConfigSchema.safeParse(config)
 
     // then
     expect(result.success).toBe(true)

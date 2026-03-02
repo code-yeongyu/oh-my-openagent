@@ -106,6 +106,9 @@ Your output MUST be a JSON object matching this exact schema:
 const subPrometheusRestrictions = createAgentToolRestrictions([
   "write",
   "edit",
+  "apply_patch",
+  "task",
+  "call_omo_agent",
 ])
 
 export function createSubPrometheusAgent(model: string): AgentConfig {

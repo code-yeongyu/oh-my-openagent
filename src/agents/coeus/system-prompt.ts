@@ -36,6 +36,7 @@ ComplexityScore {
   concern_count: number
   file_count_estimate: number
   cross_domain: boolean
+  interdependency: number
   reasoning: string
 }
 \`\`\`
@@ -94,8 +95,10 @@ For each identified domain, spawn a Sub-Prometheus via \`task\`:
 
 \`\`\`
 task(
-  agent="sub-prometheus",
-  prompt="[Domain]: [specific requirements]\\n\\nGlobal Constraints:\\n[constraints from Phase 3]\\n\\nScope: [exact boundaries]\\nMust NOT: [explicit exclusions]",
+  subagent_type="sub-prometheus",
+  load_skills=[],
+  description="[Domain] sub-plan generation",
+  prompt="[Domain]: [specific requirements]\n\nGlobal Constraints:\n[constraints from Phase 3]\n\nScope: [exact boundaries]\nMust NOT: [explicit exclusions]",
   run_in_background=true
 )
 \`\`\`
