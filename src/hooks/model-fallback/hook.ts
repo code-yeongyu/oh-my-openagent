@@ -3,6 +3,7 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { readConnectedProvidersCache, readProviderModelsCache } from "../../shared/connected-providers-cache"
 import { selectFallbackProvider } from "../../shared/model-error-classifier"
+import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { log } from "../../shared/logger"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ChatMessageInput, ChatMessageHandlerOutput } from "../../plugin/chat-message"
@@ -145,7 +146,7 @@ export function getNextFallback(
 
     return {
       providerID,
-      modelID: fallback.model,
+      modelID: transformModelForProvider(providerID, fallback.model),
       variant: fallback.variant,
     }
   }

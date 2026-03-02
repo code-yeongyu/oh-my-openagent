@@ -3,6 +3,7 @@ import * as connectedProvidersCache from "./connected-providers-cache"
 import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
+import { normalizeModel } from "./model-normalization"
 
 export type ModelResolutionRequest = {
   intent?: {
@@ -33,12 +34,9 @@ export type ModelResolutionResult = {
   variant?: string
   attempted?: string[]
   reason?: string
+  explicitUserConfig?: boolean
 }
 
-function normalizeModel(model?: string): string | undefined {
-  const trimmed = model?.trim()
-  return trimmed || undefined
-}
 
 export function resolveModelPipeline(
   request: ModelResolutionRequest,
@@ -58,7 +56,7 @@ export function resolveModelPipeline(
   const normalizedUserModel = normalizeModel(intent?.userModel)
   if (normalizedUserModel) {
     log("Model resolved via config override", { model: normalizedUserModel })
-    return { model: normalizedUserModel, provenance: "override" }
+    return { model: normalizedUserModel, provenance: "override", explicitUserConfig: true }
   }
 
   const normalizedCategoryDefault = normalizeModel(intent?.categoryDefaultModel)

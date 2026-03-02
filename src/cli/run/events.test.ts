@@ -318,14 +318,8 @@ describe("event handling", () => {
     // given
     const ctx = createMockContext("my-session")
     const state: EventState = {
+      ...createEventState(),
       mainSessionIdle: true,
-      mainSessionError: false,
-      lastError: null,
-      lastOutput: "",
-      lastPartText: "",
-      currentTool: null,
-      hasReceivedMeaningfulWork: false,
-      messageCount: 0,
     }
 
     const payload: EventPayload = {

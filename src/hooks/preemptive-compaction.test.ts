@@ -414,4 +414,157 @@ describe("preemptive-compaction", () => {
       restoreTimeouts()
     }
   })
+
+  // #given first compaction succeeded and context grew again
+  // #when tool.execute.after runs after new high-token message
+  // #then should trigger compaction again (re-compaction)
+  it("should allow re-compaction when context grows after successful compaction", async () => {
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
+    const sessionID = "ses_recompact"
+
+    // given - first compaction cycle
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
+
+    // when - new message with high tokens (context grew after compaction)
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "anthropic",
+            modelID: "claude-sonnet-4-6",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_2" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    // then - summarize should fire again
+    expect(ctx.client.session.summarize).toHaveBeenCalledTimes(2)
+  })
+
+  // #given modelContextLimitsCache has model-specific limit (256k)
+  // #when tokens are above default 78% of 200k but below 78% of 256k
+  // #then should NOT trigger compaction
+  it("should use model-specific context limit from modelContextLimitsCache", async () => {
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("opencode/kimi-k2.5-free", 262144)
+
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never, {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+    const sessionID = "ses_kimi_limit"
+
+    // 180k total tokens — above 78% of 200k (156k) but below 78% of 256k (204k)
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "opencode",
+            modelID: "kimi-k2.5-free",
+            finish: true,
+            tokens: {
+              input: 170000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).not.toHaveBeenCalled()
+  })
+
+  // #given modelContextLimitsCache has model-specific limit (256k)
+  // #when tokens exceed 78% of model-specific limit
+  // #then should trigger compaction
+  it("should trigger compaction at model-specific threshold", async () => {
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("opencode/kimi-k2.5-free", 262144)
+
+    const hook = createPreemptiveCompactionHook(ctx as never, {} as never, {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+    const sessionID = "ses_kimi_trigger"
+
+    // 210k total — above 78% of 256k (≈204k)
+    await hook.event({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            role: "assistant",
+            sessionID,
+            providerID: "opencode",
+            modelID: "kimi-k2.5-free",
+            finish: true,
+            tokens: {
+              input: 200000,
+              output: 0,
+              reasoning: 0,
+              cache: { read: 10000, write: 0 },
+            },
+          },
+        },
+      },
+    })
+
+    await hook["tool.execute.after"](
+      { tool: "bash", sessionID, callID: "call_1" },
+      { title: "", output: "test", metadata: null }
+    )
+
+    expect(ctx.client.session.summarize).toHaveBeenCalled()
+  })
 })

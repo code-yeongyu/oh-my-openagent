@@ -68,6 +68,7 @@ export interface DelegateTaskToolOptions {
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
+  syncPollTimeoutMs?: number
 }
 
 export interface BuildSystemContentInput {

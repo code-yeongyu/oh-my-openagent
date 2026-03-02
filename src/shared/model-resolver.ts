@@ -1,4 +1,5 @@
 import type { FallbackEntry } from "./model-requirements"
+import { normalizeModel } from "./model-normalization"
 import { resolveModelPipeline } from "./model-resolution-pipeline"
 
 export type ModelResolutionInput = {
@@ -29,10 +30,6 @@ export type ExtendedModelResolutionInput = {
 	systemDefaultModel?: string
 }
 
-function normalizeModel(model?: string): string | undefined {
-	const trimmed = model?.trim()
-	return trimmed || undefined
-}
 
 export function resolveModel(input: ModelResolutionInput): string | undefined {
 	return (
