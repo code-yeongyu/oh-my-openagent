@@ -21,6 +21,12 @@ const scopePriority: Record<string, number> = {
   builtin: 1,
 }
 
+const skillToolCacheResetters = new Set<() => void>()
+
+export function clearSkillToolCaches(): void {
+  for (const reset of skillToolCacheResetters) reset()
+}
+
 function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
   return {
     name: skill.name,
@@ -186,6 +192,10 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   let cachedSkills: LoadedSkill[] | null = null
   let cachedCommands: CommandInfo[] | null = options.commands ?? null
   let cachedDescription: string | null = null
+  const resetCaches = (): void => {
+    cachedDescription = null
+  }
+  skillToolCacheResetters.add(resetCaches)
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     if (options.skills) return options.skills

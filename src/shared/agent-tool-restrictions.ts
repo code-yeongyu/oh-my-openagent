@@ -9,6 +9,7 @@ const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   edit: false,
   task: false,
   call_omo_agent: false,
+  skill_manage: false,
 }
 
 const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {

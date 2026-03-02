@@ -12,6 +12,7 @@ import {
   createCallOmoAgent,
   createLookAt,
   createSkillMcpTool,
+  createSkillManageTool,
   createSkillTool,
   createGrepTools,
   createGlobTools,
@@ -108,6 +109,7 @@ export function createToolRegistry(args: {
   })
 
   const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false
+  const skillManageTool = createSkillManageTool(ctx)
   const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
     ? {
         task_create: createTaskCreateTool(pluginConfig, ctx),
@@ -134,6 +136,7 @@ export function createToolRegistry(args: {
     task: delegateTask,
     skill_mcp: skillMcpTool,
     skill: skillTool,
+    skill_manage: skillManageTool,
     interactive_bash,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
