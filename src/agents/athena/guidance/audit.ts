@@ -1,3 +1,5 @@
+import { FOLLOWUP_OR_DONE_QUESTION_BODY } from "./shared-action-paths"
+
 export const AUDIT_GUIDANCE = `
 <runtime_synthesis_rules>
 Use AUDIT synthesis.
@@ -126,14 +128,7 @@ Question({
 Question({
   questions: [{
     question: "No findings were selected for action. What should we do next?",
-    header: "Next Step",
-    options: [
-      { label: "Ask follow-up", description: "Ask a clarifying question and run another council pass" },
-      { label: "Done", description: "No further action needed" }
-    ],
-    multiple: false
-  }]
-})
+${FOLLOWUP_OR_DONE_QUESTION_BODY}
 
 5) If selected findings exist, ask what action to take on the selected findings:
 Question({

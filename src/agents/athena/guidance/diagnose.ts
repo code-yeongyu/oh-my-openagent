@@ -1,3 +1,5 @@
+import { FOLLOWUP_OR_DONE_QUESTION_BODY } from "./shared-action-paths"
+
 export const DIAGNOSE_GUIDANCE = `
 <runtime_synthesis_rules>
 Use DIAGNOSE synthesis.
@@ -15,14 +17,7 @@ Path type: ACTIONABLE.
 Question({
   questions: [{
     question: "No actionable findings were identified. What should we do next?",
-    header: "Next Step",
-    options: [
-      { label: "Ask follow-up", description: "Ask a clarifying question and run another council pass" },
-      { label: "Done", description: "No further action needed" }
-    ],
-    multiple: false
-  }]
-})
+${FOLLOWUP_OR_DONE_QUESTION_BODY}
 
 3) If an actionable fix candidate exists, ask action directly (no findings multi-select):
 Question({

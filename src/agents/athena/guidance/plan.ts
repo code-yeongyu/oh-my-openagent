@@ -1,3 +1,5 @@
+import { WRITE_DOCUMENT_OPTION, DONE_QUESTION_TAIL, ASK_FOLLOWUP_ACTION, DONE_ACTION } from "./shared-action-paths"
+
 export const PLAN_GUIDANCE = `
 <runtime_synthesis_rules>
 Use PLAN synthesis.
@@ -18,14 +20,9 @@ Question({
     options: [
       { label: "Plan full scope (Prometheus)", description: "Hand off all phases to Prometheus for strategic planning. Run /start-work to execute." },
       { label: "Plan selected phase (Prometheus)", description: "Choose one phase for Prometheus to plan. Run /start-work to execute." },
-      { label: "Write to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
+${WRITE_DOCUMENT_OPTION},
       { label: "Ask follow-up", description: "Ask another planning question" },
-      { label: "Cross-check with council", description: "Launch a new council session with this synthesis as context" },
-      { label: "Done", description: "No further action needed" }
-    ],
-    multiple: false
-  }]
-})
+${DONE_QUESTION_TAIL}
 
 2) If user chooses Plan selected phase (Prometheus), ask:
 Question({
@@ -44,7 +41,6 @@ Question({
 - Plan full scope (Prometheus) -> switch_agent(agent="prometheus") with full synthesized plan framed as work to be planned.
 - Plan selected phase (Prometheus) -> switch_agent(agent="prometheus") with only the selected phase plus dependencies, framed as work to be planned.
 - Write to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path to the user.
-- Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
-- Cross-check with council -> launch a new council session with the current synthesis as context. Restart from Step 2 (council setup) with the synthesis included in the prompt.
-- Done -> acknowledge and end.
+${ASK_FOLLOWUP_ACTION}
+${DONE_ACTION}
 </runtime_action_paths>`

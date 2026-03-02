@@ -73,8 +73,8 @@ describe("createCouncilFinalize", () => {
       )
       const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
-      expect(result.archive_dir).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{4}$/)
-      expect(result.meta_file).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{4}\/meta\.yaml$/)
+      expect(result.archive_dir).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{16}$/)
+      expect(result.meta_file).toMatch(/\.sisyphus\/athena\/council-test-[a-f0-9]{16}\/meta\.yaml$/)
       expect(result.members).toHaveLength(3)
 
       for (let i = 0; i < agents.length; i++) {
@@ -295,8 +295,8 @@ describe("createCouncilFinalize", () => {
       expect(result).toContain("By quorum")
       expect(result).toContain("Default batch size: 3 findings per batch")
       expect(result).toContain("Hard cap: 5 findings")
-      expect(result).toContain("Example Question tool call (batch of 3 findings)")
-      expect(result).toContain("Finding #10: choose how to proceed.")
+      expect(result).toContain("Example Question tool call (batch of 3 findings")
+      expect(result).toContain("Finding #10: SQL injection in user search")
       expect(result).toContain("#10 Action")
       expect(result).toContain("Stop review")
       expect(result).toContain("#10:A, #11:skip")
@@ -517,7 +517,7 @@ describe("createCouncilFinalize", () => {
       )
       const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
 
-      expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-unnamed-[a-f0-9]{4}$/)
+      expect(result.archive_dir).toMatch(/^\.sisyphus\/athena\/council-unnamed-[a-f0-9]{16}$/)
     })
   })
 })

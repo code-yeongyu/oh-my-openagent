@@ -39,13 +39,36 @@ export function extractCouncilResponse(fullText: string): CouncilResponseExtract
   return { has_response: true, response_complete: true, result: content }
 }
 
+export function hasCouncilResponseTag(sessionMessages: Array<{ info?: { role?: string }; parts?: Array<{ type?: string; text?: string }> }>): boolean {
+  const assistantTexts: string[] = []
+  for (const msg of sessionMessages) {
+    if (msg.info?.role !== "assistant") continue
+    for (const part of msg.parts ?? []) {
+      if (part.type === "text" && part.text) {
+        assistantTexts.push(part.text)
+      }
+    }
+  }
+  if (assistantTexts.length === 0) return false
+  const extraction = extractCouncilResponse(assistantTexts.join("\n"))
+  return extraction.has_response && extraction.response_complete
+}
+
 function isStructuralOpen(text: string, idx: number): boolean {
-  return idx === 0 || text[idx - 1] === "\n"
+  if (idx === 0) return true
+  const prevNewline = text.lastIndexOf("\n", idx - 1)
+  const lineStart = prevNewline === -1 ? 0 : prevNewline + 1
+  const between = text.slice(lineStart, idx)
+  return between.split("").every((ch) => ch === " " || ch === "\t")
 }
 
 function isStructuralClose(text: string, idx: number): boolean {
   const afterIdx = idx + CLOSING_TAG.length
-  return afterIdx === text.length || text[afterIdx] === "\n" || text[afterIdx] === "\r"
+  if (afterIdx === text.length) return true
+  const nextNewline = text.indexOf("\n", afterIdx)
+  const lineEnd = nextNewline === -1 ? text.length : nextNewline
+  const between = text.slice(afterIdx, lineEnd)
+  return between.split("").every((ch) => ch === " " || ch === "\t" || ch === "\r")
 }
 
 function findLastStructuralClose(text: string): number {
