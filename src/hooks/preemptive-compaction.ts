@@ -13,6 +13,7 @@ const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
 
 type ModelCacheStateLike = {
   anthropicContext1MEnabled: boolean
+  modelContextLimitsCache?: Map<string, number>
 }
 
 function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
@@ -109,10 +110,12 @@ export function createPreemptiveCompactionHook(
     const cached = parseCachedState(cachedRaw)
     if (!cached) return
 
-    const actualLimit =
-      isAnthropicProvider(cached.providerID)
-        ? getAnthropicActualLimit(modelCacheState)
-        : DEFAULT_ACTUAL_LIMIT
+    const modelSpecificLimit = !isAnthropicProvider(cached.providerID)
+      ? modelCacheState?.modelContextLimitsCache?.get(`${cached.providerID}/${cached.modelID}`)
+      : undefined
+    const actualLimit = isAnthropicProvider(cached.providerID)
+      ? getAnthropicActualLimit(modelCacheState)
+      : modelSpecificLimit ?? DEFAULT_ACTUAL_LIMIT
 
     const lastTokens = cached.tokens
     const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
@@ -184,6 +187,7 @@ export function createPreemptiveCompactionHook(
       }
       const compressed = safeCompress(state, compressionConfig)
       tokenCache.set(info.sessionID, compressed)
+      compactedSessions.delete(info.sessionID)
     }
   }
 

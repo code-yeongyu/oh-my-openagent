@@ -35,4 +35,8 @@ export interface SkillLoadOptions {
   disabledSkills?: Set<string>
   /** TOON compression config for MCP tool schemas (default: { enabled: false, threshold: 5000 }) */
   toonCompression?: ToonCompressionConfig
+  /** Include Claude marketplace plugin commands in discovery (default: true) */
+  pluginsEnabled?: boolean
+  /** Override plugin enablement from Claude settings by plugin key */
+  enabledPluginsOverride?: Record<string, boolean>
 }

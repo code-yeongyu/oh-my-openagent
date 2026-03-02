@@ -1,3 +1,4 @@
+import { initConfigContext } from "./cli/config-manager/config-context"
 import type { Plugin } from "@opencode-ai/plugin"
 
 import type { HookName } from "./config"
@@ -14,6 +15,8 @@ import { injectServerAuthIntoClient, log } from "./shared"
 import { startTmuxCheck } from "./tools"
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
+  // Initialize config context for plugin runtime (prevents warnings from hooks)
+  initConfigContext("opencode", null)
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   })

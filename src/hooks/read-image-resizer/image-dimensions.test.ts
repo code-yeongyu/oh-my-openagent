@@ -28,6 +28,13 @@ function createGifDataUrl(width: number, height: number): string {
   return `data:image/gif;base64,${buf.toString("base64")}`
 }
 
+function createLargePngDataUrl(width: number, height: number, extraBase64Chars: number): string {
+  const baseDataUrl = createPngDataUrl(width, height)
+  const base64Data = baseDataUrl.slice(baseDataUrl.indexOf(",") + 1)
+  const paddedBase64 = `${base64Data}${"A".repeat(extraBase64Chars)}`
+  return `data:image/png;base64,${paddedBase64}`
+}
+
 describe("parseImageDimensions", () => {
   it("parses PNG 1x1 dimensions", () => {
     //#given
@@ -49,6 +56,17 @@ describe("parseImageDimensions", () => {
 
     //#then
     expect(result).toEqual({ width: 3000, height: 2000 })
+  })
+
+  it("parses PNG dimensions from a very large base64 payload", () => {
+    //#given
+    const dataUrl = createLargePngDataUrl(4096, 2160, 10 * 1024 * 1024)
+
+    //#when
+    const result = parseImageDimensions(dataUrl, "image/png")
+
+    //#then
+    expect(result).toEqual({ width: 4096, height: 2160 })
   })
 
   it("parses GIF 1x1 dimensions", () => {

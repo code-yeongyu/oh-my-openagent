@@ -134,7 +134,7 @@ Everything below, every feature, every optimization, you don't need to know it. 
 
 Even only with following subscriptions, ultrawork will work well (this project is not affiliated, this is just personal recommendation):
 - [ChatGPT Subscription ($20)](https://chatgpt.com/)
-- [Kimi Code Subscription ($0.99) (*only this month)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
+- [Kimi Code Subscription ($0.99) (*only this month)](https://www.kimi.com/kimiplus/sale)
 - [GLM Coding Plan ($10)](https://z.ai/subscribe)
 - If you are eligible for pay-per-token, using kimi and gemini models won't cost you that much.
 

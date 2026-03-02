@@ -52,12 +52,12 @@ export async function executePreCompactHooks(
      for (const hook of matcher.hooks) {
        if (hook.type !== "command" && hook.type !== "http") continue
 
-       if (hook.type === "command" && isHookCommandDisabled("PreCompact", hook.command, extendedConfig ?? null)) {
-        log("PreCompact hook command skipped (disabled by config)", { command: hook.command })
+      const hookName = getHookIdentifier(hook)
+      if (isHookCommandDisabled("PreCompact", hookName, extendedConfig ?? null)) {
+        log("PreCompact hook command skipped (disabled by config)", { command: hookName })
         continue
       }
 
-      const hookName = getHookIdentifier(hook)
       if (!firstHookName) firstHookName = hookName
 
       const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)

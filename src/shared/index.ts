@@ -34,6 +34,7 @@ export * from "./system-directive"
 export * from "./agent-tool-restrictions"
 export * from "./model-requirements"
 export * from "./model-resolver"
+export { normalizeModel, normalizeModelID } from "./model-normalization"
 export { normalizeFallbackModels } from "./model-resolver"
 export { resolveModelPipeline } from "./model-resolution-pipeline"
 export type {

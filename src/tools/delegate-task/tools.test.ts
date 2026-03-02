@@ -1357,29 +1357,58 @@ describe("sisyphus-task", () => {
       return { data: {} }
     })
 
+    const baseTime = Date.now()
+    const initialMessages = [
+      {
+        info: {
+          id: "msg_001",
+          role: "user",
+          agent: "sisyphus-junior",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+          variant: "max",
+          time: { created: baseTime },
+        },
+        parts: [{ type: "text", text: "previous message" }],
+      },
+      {
+        info: { id: "msg_002", role: "assistant", time: { created: baseTime + 1 }, finish: "end_turn" },
+        parts: [{ type: "text", text: "Completed." }],
+      },
+    ]
+
+    const messagesCallCounts: Record<string, number> = {}
+
     const mockClient = {
       session: {
         prompt: promptMock,
         promptAsync: promptMock,
-        messages: async () => ({
-          data: [
-            {
-              info: {
-                id: "msg_001",
-                role: "user",
-                agent: "sisyphus-junior",
-                model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
-                variant: "max",
-                time: { created: Date.now() },
+        messages: async (input: any) => {
+          const sessionID = input?.path?.id
+          if (typeof sessionID !== "string") {
+            return { data: [] }
+          }
+
+          const callCount = (messagesCallCounts[sessionID] ?? 0) + 1
+          messagesCallCounts[sessionID] = callCount
+
+          if (sessionID !== "ses_var_test") {
+            return { data: [] }
+          }
+
+          if (callCount === 1) {
+            return { data: initialMessages }
+          }
+
+          return {
+            data: [
+              ...initialMessages,
+              {
+                info: { id: "msg_003", role: "assistant", time: { created: baseTime + 2 }, finish: "end_turn" },
+                parts: [{ type: "text", text: "Continued." }],
               },
-              parts: [{ type: "text", text: "previous message" }],
-            },
-            {
-              info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
-              parts: [{ type: "text", text: "Completed." }],
-            },
-          ],
-        }),
+            ],
+          }
+        },
         status: async () => ({ data: { "ses_var_test": { type: "idle" } } }),
       },
       config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },

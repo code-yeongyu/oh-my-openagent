@@ -26,7 +26,7 @@ export async function executeSyncTask(
   deps: SyncTaskDeps = syncTaskDeps,
   compressionConfig?: ToonCompressionConfig
 ): Promise<string> {
-  const { client, directory, onSyncSessionCreated } = executorCtx
+  const { client, directory, onSyncSessionCreated, syncPollTimeoutMs } = executorCtx
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
@@ -120,7 +120,7 @@ export async function executeSyncTask(
         agentToUse,
         toastManager,
         taskId,
-      })
+      }, syncPollTimeoutMs)
       if (pollError) {
         return pollError
       }

@@ -2,7 +2,7 @@ import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import { isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
-import { parseModelString } from "./model-string-parser"
+import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { getAgentDisplayName, getAgentConfigKey } from "../../shared/agent-display-names"
 import { normalizeSDKResponse } from "../../shared"
@@ -15,7 +15,9 @@ export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
-  categoryExamples: string
+  categoryExamples: string,
+  inheritedModel?: string,
+  systemDefaultModel?: string,
 ): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
   const { client, agentOverrides } = executorCtx
 
@@ -99,8 +101,9 @@ Create the work plan directly - that's your job as the planning agent.`,
     if (agentOverride?.model || agentRequirement || matchedAgent.model) {
       const availableModels = await getAvailableModelsForDelegateTask(client)
 
-      const matchedAgentModelStr = matchedAgent.model
-        ? `${matchedAgent.model.providerID}/${matchedAgent.model.modelID}`
+      const normalizedMatchedModel = normalizeModelFormat(matchedAgent.model as Parameters<typeof normalizeModelFormat>[0])
+      const matchedAgentModelStr = normalizedMatchedModel
+        ? `${normalizedMatchedModel.providerID}/${normalizedMatchedModel.modelID}`
         : undefined
 
       const resolution = resolveModelForDelegateTask({
@@ -112,16 +115,26 @@ Create the work plan directly - that's your job as the planning agent.`,
       })
 
       if (resolution) {
-        const parsed = parseModelString(resolution.model)
-        if (parsed) {
+        const normalized = normalizeModelFormat(resolution.model)
+        if (normalized) {
           const variantToUse = agentOverride?.variant ?? resolution.variant
-          categoryModel = variantToUse ? { ...parsed, variant: variantToUse } : parsed
+          categoryModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
         }
       }
     }
 
     if (!categoryModel && matchedAgent.model) {
       categoryModel = matchedAgent.model
+    }
+
+    if (!categoryModel) {
+      const fallbackModel = inheritedModel ?? systemDefaultModel
+      if (fallbackModel) {
+        const parsedFallback = parseModelString(fallbackModel)
+        if (parsedFallback) {
+          categoryModel = parsedFallback
+        }
+      }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)

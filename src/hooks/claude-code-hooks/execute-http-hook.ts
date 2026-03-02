@@ -2,6 +2,7 @@ import type { HookHttp } from "./types"
 import type { CommandResult } from "../../shared/command-executor/execute-hook-command"
 
 const DEFAULT_HTTP_HOOK_TIMEOUT_S = 30
+const ALLOWED_SCHEMES = new Set(["http:", "https:"])
 
 export function interpolateEnvVars(
   value: string,
@@ -39,6 +40,18 @@ export async function executeHttpHook(
   hook: HookHttp,
   stdin: string
 ): Promise<CommandResult> {
+  try {
+    const parsed = new URL(hook.url)
+    if (!ALLOWED_SCHEMES.has(parsed.protocol)) {
+      return {
+        exitCode: 1,
+        stderr: `HTTP hook URL scheme "${parsed.protocol}" is not allowed. Only http: and https: are permitted.`,
+      }
+    }
+  } catch {
+    return { exitCode: 1, stderr: `HTTP hook URL is invalid: ${hook.url}` }
+  }
+
   const timeoutS = hook.timeout ?? DEFAULT_HTTP_HOOK_TIMEOUT_S
   const headers = resolveHeaders(hook)
 
