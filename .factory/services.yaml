@@ -1,0 +1,8 @@
+commands:
+  install: bun install
+  typecheck: bun run typecheck
+  build: bun run build
+  test: bun test
+  lint: bun run lint
+
+services: {}
