@@ -8,3 +8,5 @@ export {
 } from "./council-runtime-guidance"
 export type { CouncilIntent } from "./council-runtime-guidance"
 export { COUNCIL_DEFAULTS } from "./constants"
+export { ATHENA_INTERACTIVE_PROMPT } from "./interactive-prompt"
+export { ATHENA_NON_INTERACTIVE_PROMPT } from "./non-interactive-prompt"
