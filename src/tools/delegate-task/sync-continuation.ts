@@ -18,7 +18,7 @@ export async function executeSyncContinuation(
   executorCtx: ExecutorContext,
   deps: SyncContinuationDeps = syncContinuationDeps
 ): Promise<string> {
-  const { client } = executorCtx
+  const { client, syncPollTimeoutMs } = executorCtx
   const toastManager = getTaskToastManager()
   const taskId = `resume_sync_${args.session_id!.slice(0, 8)}`
   const startTime = new Date()
@@ -112,7 +112,7 @@ export async function executeSyncContinuation(
         toastManager,
         taskId,
         anchorMessageCount,
-      })
+      }, syncPollTimeoutMs)
       if (pollError) {
         return pollError
       }
