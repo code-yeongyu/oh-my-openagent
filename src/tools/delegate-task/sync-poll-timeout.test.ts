@@ -1,6 +1,6 @@
 declare const require: (name: string) => any
 const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
-import { __setTimingConfig, __resetTimingConfig, DEFAULT_SYNC_POLL_TIMEOUT_MS } from "./timing"
+import { __setTimingConfig, __resetTimingConfig, getTimingConfig } from "./timing"
 
 function createMockCtx(aborted = false) {
   const controller = new AbortController()
@@ -78,8 +78,7 @@ describe("syncPollTimeoutMs threading", () => {
       test("#then default timeout constant is used", async () => {
         const { pollSyncSession } = require("./sync-session-poller")
         const mockClient = createNeverCompleteClient("ses_default")
-
-        expect(DEFAULT_SYNC_POLL_TIMEOUT_MS).toBe(600_000)
+        const { MAX_POLL_TIME_MS } = getTimingConfig()
 
         await withMockedDateNow(300_000, async () => {
           const result = await pollSyncSession(createMockCtx(), mockClient, {
@@ -89,7 +88,25 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           })
 
-          expect(result).toBe(`Poll timeout reached after ${DEFAULT_SYNC_POLL_TIMEOUT_MS}ms for session ses_default`)
+          expect(result).toBe(`Poll timeout reached after ${MAX_POLL_TIME_MS}ms for session ses_default`)
+        })
+      })
+
+      test("#then MAX_POLL_TIME_MS override is respected for backward compatibility", async () => {
+        const { pollSyncSession } = require("./sync-session-poller")
+        const mockClient = createNeverCompleteClient("ses_legacy")
+
+        __setTimingConfig({ MAX_POLL_TIME_MS: 120_000 })
+
+        await withMockedDateNow(60_000, async () => {
+          const result = await pollSyncSession(createMockCtx(), mockClient, {
+            sessionID: "ses_legacy",
+            agentToUse: "test-agent",
+            toastManager: null,
+            taskId: undefined,
+          })
+
+          expect(result).toBe("Poll timeout reached after 120000ms for session ses_legacy")
         })
       })
     })
@@ -169,7 +186,7 @@ describe("syncPollTimeoutMs threading", () => {
         )
 
         expect(statusCallCount).toBe(0)
-        expect(result).toContain("SUPERVISED TASK COMPLETED SUCCESSFULLY")
+        expect(result).toContain("SUPERVISED TASK TIMED OUT")
       })
     })
   })

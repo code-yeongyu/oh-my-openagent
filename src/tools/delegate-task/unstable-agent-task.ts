@@ -79,6 +79,7 @@ export async function executeUnstableAgentTask(
     let lastMsgCount = 0
     let stablePolls = 0
     let terminalStatus: { status: string; error?: string } | undefined
+    let completedDuringMonitoring = false
 
     while (Date.now() - pollStart < (syncPollTimeoutMs ?? DEFAULT_SYNC_POLL_TIMEOUT_MS)) {
       if (ctx.abort?.aborted) {
@@ -113,7 +114,10 @@ export async function executeUnstableAgentTask(
 
       if (currentMsgCount === lastMsgCount) {
         stablePolls++
-        if (stablePolls >= timingCfg.STABILITY_POLLS_REQUIRED) break
+        if (stablePolls >= timingCfg.STABILITY_POLLS_REQUIRED) {
+          completedDuringMonitoring = true
+          break
+        }
       } else {
         stablePolls = 0
         lastMsgCount = currentMsgCount
@@ -132,6 +136,25 @@ Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
 Model: ${actualModel}
 
 The task session may contain partial results.
+
+<task_metadata>
+session_id: ${sessionID}
+</task_metadata>`
+    }
+
+    if (!completedDuringMonitoring) {
+      const duration = formatDuration(startTime)
+      const timeoutBudgetMs = syncPollTimeoutMs ?? DEFAULT_SYNC_POLL_TIMEOUT_MS
+      return `SUPERVISED TASK TIMED OUT
+
+Task did not reach a stable completion signal within the monitored timeout budget.
+Timeout budget: ${timeoutBudgetMs}ms
+
+Duration: ${duration}
+Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
+Model: ${actualModel}
+
+The task session may still contain partial results.
 
 <task_metadata>
 session_id: ${sessionID}
