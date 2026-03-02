@@ -14,6 +14,7 @@ import type { CommandFrontmatter } from "../../features/claude-code-command-load
 import { isMarkdownFile } from "../../shared/file-utils"
 import { discoverAllSkills, type LoadedSkill, type LazyContentLoader } from "../../features/opencode-skill-loader"
 import type { ParsedSlashCommand } from "./types"
+import { handleSkillCommand } from "./skill-command"
 
 interface CommandScope {
   type: "user" | "project" | "opencode" | "opencode-project" | "skill" | "builtin" | "plugin"
@@ -223,6 +224,10 @@ export interface ExecuteResult {
 }
 
 export async function executeSlashCommand(parsed: ParsedSlashCommand, options?: ExecutorOptions): Promise<ExecuteResult> {
+  if (parsed.command === "skill") {
+    return handleSkillCommand(parsed.args, options)
+  }
+
   const command = await findCommand(parsed.command, options)
 
   if (!command) {
