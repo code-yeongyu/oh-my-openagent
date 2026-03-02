@@ -4,7 +4,7 @@ import { MIN_OPENCODE_VERSION, CHECK_IDS, CHECK_NAMES } from "../constants"
 import type { CheckResult, DoctorIssue, SystemInfo } from "../types"
 import { findOpenCodeBinary, getOpenCodeVersion, compareVersions } from "./system-binary"
 import { getPluginInfo } from "./system-plugin"
-import { getLatestPluginVersion, getLoadedPluginVersion } from "./system-loaded-version"
+import { getLatestPluginVersion, getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
 import { parseJsonc } from "../../../shared"
 
 function isConfigValid(configPath: string | null): boolean {
@@ -54,6 +54,7 @@ export async function checkSystem(): Promise<CheckResult> {
   const [systemInfo, pluginInfo] = await Promise.all([gatherSystemInfo(), Promise.resolve(getPluginInfo())])
   const loadedInfo = getLoadedPluginVersion()
   const latestVersion = await getLatestPluginVersion(systemInfo.loadedVersion)
+  const installTag = getSuggestedInstallTag(systemInfo.loadedVersion)
   const issues: DoctorIssue[] = []
 
   if (!systemInfo.opencodePath) {
@@ -93,7 +94,7 @@ export async function checkSystem(): Promise<CheckResult> {
     issues.push({
       title: "Loaded plugin version mismatch",
       description: `Cache expects ${loadedInfo.expectedVersion} but loaded ${loadedInfo.loadedVersion}.`,
-      fix: `Reinstall: cd ${loadedInfo.cacheDir} && bun install`,
+      fix: `Reinstall: cd "${loadedInfo.cacheDir}" && bun install`,
       severity: "warning",
       affects: ["plugin loading"],
     })
@@ -107,7 +108,7 @@ export async function checkSystem(): Promise<CheckResult> {
     issues.push({
       title: "Loaded plugin is outdated",
       description: `Loaded ${systemInfo.loadedVersion}, latest ${latestVersion}.`,
-      fix: `Update: cd ${loadedInfo.cacheDir} && bun add oh-my-opencode@latest`,
+      fix: `Update: cd "${loadedInfo.cacheDir}" && bun add oh-my-opencode@${installTag}`,
       severity: "warning",
       affects: ["plugin features"],
     })
