@@ -1,0 +1,1 @@
+export { createCompactionSkillInjector } from "./hook"
