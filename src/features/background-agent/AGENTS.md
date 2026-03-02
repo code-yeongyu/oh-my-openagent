@@ -1,10 +1,10 @@
 # src/features/background-agent/ — Core Orchestration Engine
 
-**Generated:** 2026-02-24
+**Generated:** 2026-03-02
 
 ## OVERVIEW
 
-39 files (~10k LOC). Manages async task lifecycle: launch → queue → run → poll → complete/error. Concurrency limited per model/provider (default 5). Central to multi-agent orchestration.
+30 files (~10k LOC). Manages async task lifecycle: launch → queue → run → poll → complete/error. Concurrency limited per model/provider (default 5). Central to multi-agent orchestration.
 
 ## TASK LIFECYCLE
 

@@ -34,7 +34,7 @@ FILE CREATION:
   CRITICAL: only unanchored append/prepend can create a missing file.
 
 OPERATION CHOICE:
-  replace with pos only -> replace one line at pos (MOST COMMON for single-line edits)
+  replace with pos only -> replace one line at pos
   replace with pos+end -> replace ENTIRE range pos..end as a block (ranges MUST NOT overlap across edits)
   append with pos/end anchor -> insert after that anchor
   prepend with pos/end anchor -> insert before that anchor

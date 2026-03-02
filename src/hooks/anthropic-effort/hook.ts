@@ -1,10 +1,6 @@
-import { log } from "../../shared"
+import { log, normalizeModelID } from "../../shared"
 
 const OPUS_4_6_PATTERN = /claude-opus-4[-.]6/i
-
-function normalizeModelID(modelID: string): string {
-  return modelID.replace(/\.(\d+)/g, "-$1")
-}
 
 function isClaudeProvider(providerID: string, modelID: string): boolean {
   if (["anthropic", "google-vertex-anthropic", "opencode"].includes(providerID)) return true

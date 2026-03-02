@@ -1,3 +1,4 @@
+import { resolve } from "node:path"
 import { spawn } from "bun"
 import {
   resolveGrepCli,
@@ -119,10 +120,9 @@ async function runRgFilesInternal(
 
   if (isRg) {
     const args = buildRgArgs(options)
-    const paths = options.paths?.length ? options.paths : ["."]
-    args.push(...paths)
+    cwd = options.paths?.[0] || "."
+    args.push(".")
     command = [cli.path, ...args]
-    cwd = undefined
   } else if (isWindows) {
     command = buildPowerShellCommand(options)
     cwd = undefined
@@ -177,7 +177,7 @@ async function runRgFilesInternal(
 
       let filePath: string
       if (isRg) {
-        filePath = line
+        filePath = cwd ? resolve(cwd, line) : line
       } else if (isWindows) {
         filePath = line.trim()
       } else {

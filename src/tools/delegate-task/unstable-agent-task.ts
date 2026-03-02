@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
-import { getTimingConfig } from "./timing"
+import { DEFAULT_SYNC_POLL_TIMEOUT_MS, getTimingConfig } from "./timing"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
@@ -17,7 +17,7 @@ export async function executeUnstableAgentTask(
   systemContent: string | undefined,
   actualModel: string | undefined
 ): Promise<string> {
-  const { manager, client } = executorCtx
+  const { manager, client, syncPollTimeoutMs } = executorCtx
 
   try {
     const task = await manager.launch({
@@ -80,7 +80,7 @@ export async function executeUnstableAgentTask(
     let stablePolls = 0
     let terminalStatus: { status: string; error?: string } | undefined
 
-    while (Date.now() - pollStart < timingCfg.MAX_POLL_TIME_MS) {
+    while (Date.now() - pollStart < (syncPollTimeoutMs ?? DEFAULT_SYNC_POLL_TIMEOUT_MS)) {
       if (ctx.abort?.aborted) {
         return `Task aborted (was running in background mode).\n\nSession ID: ${sessionID}`
       }

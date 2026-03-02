@@ -6,6 +6,8 @@ import {
   buildGeminiDelegationOverride,
   buildGeminiVerificationOverride,
   buildGeminiIntentGateEnforcement,
+  buildGeminiToolGuide,
+  buildGeminiToolCallExamples,
 } from "./sisyphus-gemini-overlays";
 
 const MODE: AgentMode = "all";
@@ -32,6 +34,7 @@ import {
   buildHardBlocksSection,
   buildAntiPatternsSection,
   buildDeepParallelSection,
+  buildNonClaudePlannerSection,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder";
 
@@ -170,6 +173,7 @@ function buildDynamicSisyphusPrompt(
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const deepParallelSection = buildDeepParallelSection(model, availableCategories);
+  const nonClaudePlannerSection = buildNonClaudePlannerSection(model);
   const taskManagementSection = buildTaskManagementSection(useTaskSystem);
   const todoHookNote = useTaskSystem
     ? "YOUR TASK CREATION WOULD BE TRACKED BY HOOK([SYSTEM REMINDER - TASK CONTINUATION])"
@@ -329,7 +333,7 @@ task(subagent_type="explore", run_in_background=true, load_skills=[], descriptio
 // Reference Grep (external)
 task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find JWT security docs", prompt="I'm implementing JWT auth and need current security best practices to choose token storage (httpOnly cookies vs localStorage) and set expiration policy. Find: OWASP auth guidelines, recommended token lifetimes, refresh token rotation strategies, common JWT vulnerabilities. Skip 'what is JWT' tutorials — production security guidance only.")
 task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find Express auth patterns", prompt="I'm building Express auth middleware and need production-quality patterns to structure my middleware chain. Find how established Express apps (1000+ stars) handle: middleware ordering, token refresh, role-based access control, auth error propagation. Skip basic tutorials — I need battle-tested patterns with proper error handling.")
-// Continue working immediately. Collect with background_output when needed.
+// Continue working immediately. System notifies on completion — collect with background_output then.
 
 // WRONG: Sequential or blocking
 result = task(..., run_in_background=false)  // Never wait synchronously for explore/librarian
@@ -337,10 +341,10 @@ result = task(..., run_in_background=false)  // Never wait synchronously for exp
 
 ### Background Result Collection:
 1. Launch parallel agents \u2192 receive task_ids
-2. Continue immediate work (explore, librarian results)
-3. When results needed: \`background_output(task_id="...")\`
-4. **If Oracle is running**: STOP all other output. Follow Oracle Completion Protocol in <Oracle_Usage>.
-5. Cleanup: Cancel disposable tasks (explore, librarian) individually via \`background_cancel(taskId="...")\`. Never use \`background_cancel(all=true)\`.
+2. Continue immediate work
+3. System sends \`<system-reminder>\` on each task completion — then call \`background_output(task_id="...")\`
+4. Need results not yet ready? **End your response.** The notification will trigger your next turn.
+5. Cleanup: Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
 
 ### Search Stop Conditions
 
@@ -363,6 +367,8 @@ STOP searching when:
 3. Mark \`completed\` as soon as done (don't batch) - OBSESSIVELY TRACK YOUR WORK USING TODO TOOLS
 
 ${categorySkillsGuide}
+
+${nonClaudePlannerSection}
 
 ${deepParallelSection}
 
@@ -477,9 +483,8 @@ If verification fails:
 3. Report: "Done. Note: found N pre-existing lint errors unrelated to my changes."
 
 ### Before Delivering Final Answer:
-- **If Oracle is running**: STOP. Follow Oracle Completion Protocol in <Oracle_Usage>. Do NOT deliver any answer.
-- Cancel disposable background tasks (explore, librarian) individually via \`background_cancel(taskId="...")\`.
-- **Never use \`background_cancel(all=true)\`.**
+- If Oracle is running: **end your response** and wait for the completion notification first.
+- Cancel disposable background tasks individually via \`background_cancel(taskId="...")\`.
 </Behavior_Instructions>
 
 ${oracleSection}
@@ -565,12 +570,25 @@ export function createSisyphusAgent(
     : buildDynamicSisyphusPrompt(model, [], tools, skills, categories, useTaskSystem);
 
   if (isGeminiModel(model)) {
+    // 1. Intent gate + tool mandate — early in prompt (after intent verbalization)
     prompt = prompt.replace(
       "</intent_verbalization>",
       `</intent_verbalization>\n\n${buildGeminiIntentGateEnforcement()}\n\n${buildGeminiToolMandate()}`
     );
-    prompt += "\n" + buildGeminiDelegationOverride();
-    prompt += "\n" + buildGeminiVerificationOverride();
+
+    // 2. Tool guide + examples — after tool_usage_rules (where tools are discussed)
+    prompt = prompt.replace(
+      "</tool_usage_rules>",
+      `</tool_usage_rules>\n\n${buildGeminiToolGuide()}\n\n${buildGeminiToolCallExamples()}`
+    );
+
+    // 3. Delegation + verification overrides — before Constraints (NOT at prompt end)
+    //    Gemini suffers from lost-in-the-middle: content at prompt end gets weaker attention.
+    //    Placing these before <Constraints> ensures they're in a high-attention zone.
+    prompt = prompt.replace(
+      "<Constraints>",
+      `${buildGeminiDelegationOverride()}\n\n${buildGeminiVerificationOverride()}\n\n<Constraints>`
+    );
   }
 
   const permission = {

@@ -464,7 +464,7 @@ describe("skill tool - ordering and priority", () => {
     const tool = createSkillTool({ skills, commands })
 
     //#then: should include priority info
-    expect(tool.description).toContain("Priority: project > user > opencode > builtin")
+    expect(tool.description).toContain("Priority: project > user > opencode > builtin/plugin")
     expect(tool.description).toContain("Skills listed before commands")
   })
 

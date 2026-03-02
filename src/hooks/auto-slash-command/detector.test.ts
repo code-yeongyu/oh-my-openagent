@@ -102,6 +102,19 @@ After`
       expect(result?.args).toBe("project")
     })
 
+    it("should parse namespaced marketplace commands", () => {
+      // given a namespaced command
+      const text = "/daplug:run-prompt build bridge"
+
+      // when parsing
+      const result = parseSlashCommand(text)
+
+      // then should keep full namespaced command
+      expect(result).not.toBeNull()
+      expect(result?.command).toBe("daplug:run-prompt")
+      expect(result?.args).toBe("build bridge")
+    })
+
     it("should return null for non-slash text", () => {
       // given text without slash
       const text = "regular text"
