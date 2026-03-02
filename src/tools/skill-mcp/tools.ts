@@ -1,5 +1,5 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import { SKILL_MCP_DESCRIPTION } from "./constants"
+import { BUILTIN_MCP_TOOL_HINTS, SKILL_MCP_DESCRIPTION } from "./constants"
 import type { SkillMcpArgs } from "./types"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
@@ -71,6 +71,16 @@ function formatAvailableMcps(skills: LoadedSkill[]): string {
   return mcps.length > 0 ? mcps.join("\n") : "  (none found)"
 }
 
+function formatBuiltinMcpHint(mcpName: string): string | null {
+  const nativeTools = BUILTIN_MCP_TOOL_HINTS[mcpName]
+  if (!nativeTools) return null
+  return (
+    `"${mcpName}" is a builtin MCP, not a skill MCP.\n` +
+    `Use the native tools directly:\n` +
+    nativeTools.map((toolName) => `  - ${toolName}`).join("\n")
+  )
+}
+
 function parseArguments(argsJson: string | Record<string, unknown> | undefined): Record<string, unknown> {
   if (!argsJson) return {}
   if (typeof argsJson === "object" && argsJson !== null) {
@@ -132,6 +142,11 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
       const found = findMcpServer(args.mcp_name, skills)
 
       if (!found) {
+        const builtinHint = formatBuiltinMcpHint(args.mcp_name)
+        if (builtinHint) {
+          throw new Error(builtinHint)
+        }
+
         throw new Error(
           `MCP server "${args.mcp_name}" not found.\n\n` +
             `Available MCP servers in loaded skills:\n` +
