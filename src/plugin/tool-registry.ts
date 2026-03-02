@@ -47,7 +47,7 @@ export function createToolRegistry(args: {
 }): ToolRegistryResult {
   const { ctx, pluginConfig, managers, skillContext, availableCategories } = args
 
-  const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
+  const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client, pluginConfig.toon_compression)
   const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
@@ -125,9 +125,9 @@ export function createToolRegistry(args: {
 
   const allTools: Record<string, ToolDefinition> = {
     ...builtinTools,
-    ...createGrepTools(ctx),
-    ...createGlobTools(ctx),
-    ...createAstGrepTools(ctx),
+    ...createGrepTools(ctx, { compressionConfig: pluginConfig.toon_compression }),
+    ...createGlobTools(ctx, { compressionConfig: pluginConfig.toon_compression }),
+    ...createAstGrepTools(ctx, { compressionConfig: pluginConfig.toon_compression }),
     ...createSessionManagerTools(ctx),
     ...backgroundTools,
     call_omo_agent: callOmoAgent,

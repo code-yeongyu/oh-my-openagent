@@ -8,10 +8,12 @@ import { delay } from "./delay"
 import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
 
 type ToolContextWithMetadata = {
   sessionID: string
@@ -41,7 +43,12 @@ function appendTimeoutNote(output: string, timeoutMs: number): string {
   return `${output}\n\n> **Timed out waiting** after ${timeoutMs}ms. Task is still running; showing latest available output.`
 }
 
-export function createBackgroundOutput(manager: BackgroundOutputManager, client: BackgroundOutputClient): ToolDefinition {
+export interface CreateBackgroundOutputOptions {
+  compressionConfig?: ToonCompressionConfig
+}
+
+export function createBackgroundOutput(manager: BackgroundOutputManager, client: BackgroundOutputClient, options?: CreateBackgroundOutputOptions): ToolDefinition {
+  const compressionConfig = options?.compressionConfig ?? DEFAULT_COMPRESSION_CONFIG
   return tool({
     description: BACKGROUND_OUTPUT_DESCRIPTION,
     args: {
@@ -133,13 +140,14 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             sinceMessageId: args.since_message_id,
             includeToolResults,
             thinkingMaxChars: args.thinking_max_chars,
+            compressionConfig,
           })
 
           return didTimeoutWhileActive ? appendTimeoutNote(output, timeoutMs) : output
         }
 
         if (resolvedTask.status === "completed") {
-          return await formatTaskResult(resolvedTask, client)
+          return await formatTaskResult(resolvedTask, client, { compressionConfig })
         }
 
         if (resolvedTask.status === "error" || resolvedTask.status === "cancelled" || resolvedTask.status === "interrupt") {

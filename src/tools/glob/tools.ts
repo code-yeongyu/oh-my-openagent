@@ -4,8 +4,16 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRgFiles } from "./cli"
 import { resolveGrepCliWithAutoInstall } from "./constants"
 import { formatGlobResult } from "./result-formatter"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
-export function createGlobTools(ctx: PluginInput): Record<string, ToolDefinition> {
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
+
+export interface CreateGlobToolsOptions {
+  compressionConfig?: ToonCompressionConfig
+}
+
+export function createGlobTools(ctx: PluginInput, options?: CreateGlobToolsOptions): Record<string, ToolDefinition> {
+  const compressionConfig = options?.compressionConfig ?? DEFAULT_COMPRESSION_CONFIG
   const glob: ToolDefinition = tool({
     description:
       "Fast file pattern matching tool with safety limits (60s timeout, 100 file limit). " +
@@ -38,7 +46,7 @@ export function createGlobTools(ctx: PluginInput): Record<string, ToolDefinition
           cli
         )
 
-        return formatGlobResult(result)
+        return formatGlobResult(result, compressionConfig)
       } catch (e) {
         return `Error: ${e instanceof Error ? e.message : String(e)}`
       }

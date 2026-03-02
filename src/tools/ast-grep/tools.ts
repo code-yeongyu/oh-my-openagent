@@ -4,6 +4,9 @@ import { CLI_LANGUAGES } from "./constants"
 import { runSg } from "./cli"
 import { formatSearchResult, formatReplaceResult } from "./result-formatter"
 import type { CliLanguage } from "./types"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
+
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
 
 async function showOutputToUser(context: unknown, output: string): Promise<void> {
   const ctx = context as {
@@ -35,7 +38,12 @@ function getEmptyResultHint(pattern: string, lang: CliLanguage): string | null {
   return null
 }
 
-export function createAstGrepTools(ctx: PluginInput): Record<string, ToolDefinition> {
+export interface CreateAstGrepToolsOptions {
+  compressionConfig?: ToonCompressionConfig
+}
+
+export function createAstGrepTools(ctx: PluginInput, options?: CreateAstGrepToolsOptions): Record<string, ToolDefinition> {
+  const compressionConfig = options?.compressionConfig ?? DEFAULT_COMPRESSION_CONFIG
   const ast_grep_search: ToolDefinition = tool({
     description:
       "Search code patterns across filesystem using AST-aware matching. Supports 25 languages. " +
@@ -60,7 +68,7 @@ export function createAstGrepTools(ctx: PluginInput): Record<string, ToolDefinit
           context: args.context,
         })
 
-        let output = formatSearchResult(result)
+        let output = formatSearchResult(result, compressionConfig)
 
         if (result.matches.length === 0 && !result.error) {
           const hint = getEmptyResultHint(args.pattern, args.lang as CliLanguage)
@@ -102,7 +110,7 @@ export function createAstGrepTools(ctx: PluginInput): Record<string, ToolDefinit
           globs: args.globs,
           updateAll: args.dryRun === false,
         })
-        const output = formatReplaceResult(result, args.dryRun !== false)
+        const output = formatReplaceResult(result, args.dryRun !== false, compressionConfig)
         await showOutputToUser(context, output)
         return output
       } catch (e) {

@@ -7,6 +7,7 @@ import {
   lsp_rename,
   lspManager,
 } from "./lsp"
+import type { ToonCompressionConfig } from "../shared/toon-compression"
 
 export { lspManager }
 
@@ -45,11 +46,11 @@ export {
 } from "./task"
 export { createHashlineEditTool } from "./hashline-edit"
 
-export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
+export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient, compressionConfig?: ToonCompressionConfig): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager
   const cancelClient: BackgroundCancelClient = client
   return {
-    background_output: createBackgroundOutput(outputManager, client),
+    background_output: createBackgroundOutput(outputManager, client, { compressionConfig }),
     background_cancel: createBackgroundCancel(manager, cancelClient),
   }
 }

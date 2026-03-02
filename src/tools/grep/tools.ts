@@ -3,8 +3,16 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRg, runRgCount } from "./cli"
 import { formatGrepResult, formatCountResult } from "./result-formatter"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
-export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition> {
+const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
+
+export interface CreateGrepToolsOptions {
+  compressionConfig?: ToonCompressionConfig
+}
+
+export function createGrepTools(ctx: PluginInput, options?: CreateGrepToolsOptions): Record<string, ToolDefinition> {
+  const compressionConfig = options?.compressionConfig ?? DEFAULT_COMPRESSION_CONFIG
   const grep: ToolDefinition = tool({
     description:
       "Fast content search tool with safety limits (60s timeout, 256KB output). " +
@@ -62,7 +70,7 @@ export function createGrepTools(ctx: PluginInput): Record<string, ToolDefinition
           headLimit,
         })
 
-        return formatGrepResult(result)
+        return formatGrepResult(result, compressionConfig)
       } catch (e) {
         return `Error: ${e instanceof Error ? e.message : String(e)}`
       }
