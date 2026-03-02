@@ -18,6 +18,26 @@ mock.module("node:child_process", () => ({
 
 const { convertImageToJpeg, cleanupConvertedImage } = await import("./image-converter")
 
+function writeConvertedOutput(command: string, args: string[]): void {
+  if (command === "sips") {
+    const outIndex = args.indexOf("--out")
+    const outputPath = outIndex >= 0 ? args[outIndex + 1] : undefined
+    if (outputPath) {
+      writeFileSync(outputPath, "jpeg")
+    }
+    return
+  }
+
+  if (command === "convert") {
+    writeFileSync(args[2], "jpeg")
+    return
+  }
+
+  if (command === "magick") {
+    writeFileSync(args[2], "jpeg")
+  }
+}
+
 function withMockPlatform<TValue>(platform: NodeJS.Platform, run: () => TValue): TValue {
   const originalPlatform = process.platform
   Object.defineProperty(process, "platform", {
@@ -47,13 +67,7 @@ describe("image-converter command execution safety", () => {
     writeFileSync(inputPath, "fake-heic-data")
 
     execFileSyncMock.mockImplementation((command: string, args: string[]) => {
-      if (command === "sips") {
-        const outIndex = args.indexOf("--out")
-        const outputPath = outIndex >= 0 ? args[outIndex + 1] : undefined
-        if (outputPath) writeFileSync(outputPath, "jpeg")
-      } else if (command === "convert") {
-        writeFileSync(args[1], "jpeg")
-      }
+      writeConvertedOutput(command, args)
       return ""
     })
 
@@ -65,9 +79,10 @@ describe("image-converter command execution safety", () => {
     const [firstCommand, firstArgs] = execFileSyncMock.mock.calls[0] as [string, string[]]
     expect(typeof firstCommand).toBe("string")
     expect(Array.isArray(firstArgs)).toBe(true)
+    expect(["sips", "convert", "magick"]).toContain(firstCommand)
     expect(firstArgs).toContain("--")
-    expect(firstArgs.indexOf("--") < firstArgs.indexOf(inputPath)).toBe(true)
     expect(firstArgs).toContain(inputPath)
+    expect(firstArgs.indexOf("--") < firstArgs.indexOf(inputPath)).toBe(true)
     expect(firstArgs.join(" ")).not.toContain(`\"${inputPath}\"`)
 
     expect(existsSync(outputPath)).toBe(true)
@@ -83,11 +98,7 @@ describe("image-converter command execution safety", () => {
     writeFileSync(inputPath, "fake-heic-data")
 
     execFileSyncMock.mockImplementation((command: string, args: string[]) => {
-      if (command === "sips") {
-        const outIndex = args.indexOf("--out")
-        const outputPath = outIndex >= 0 ? args[outIndex + 1] : undefined
-        if (outputPath) writeFileSync(outputPath, "jpeg")
-      }
+      writeConvertedOutput(command, args)
       return ""
     })
 
@@ -137,11 +148,7 @@ describe("image-converter command execution safety", () => {
     writeFileSync(inputPath, "fake-heic-data")
 
     execFileSyncMock.mockImplementation((command: string, args: string[]) => {
-      if (command === "sips") {
-        const outIndex = args.indexOf("--out")
-        const outputPath = outIndex >= 0 ? args[outIndex + 1] : undefined
-        if (outputPath) writeFileSync(outputPath, "jpeg")
-      }
+      writeConvertedOutput(command, args)
       return ""
     })
 
