@@ -79,12 +79,12 @@ export async function executePreToolUseHooks(
      for (const hook of matcher.hooks) {
        if (hook.type !== "command" && hook.type !== "http") continue
 
-       if (hook.type === "command" && isHookCommandDisabled("PreToolUse", hook.command, extendedConfig ?? null)) {
-        log("PreToolUse hook command skipped (disabled by config)", { command: hook.command, toolName: ctx.toolName })
+      const hookName = getHookIdentifier(hook)
+      if (isHookCommandDisabled("PreToolUse", hookName, extendedConfig ?? null)) {
+        log("PreToolUse hook command skipped (disabled by config)", { command: hookName, toolName: ctx.toolName })
         continue
       }
 
-      const hookName = getHookIdentifier(hook)
       if (!firstHookName) firstHookName = hookName
 
       const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)
