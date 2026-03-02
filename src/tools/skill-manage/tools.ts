@@ -90,10 +90,11 @@ export function createSkillManageTool(ctx: PluginInput): ToolDefinition {
   return tool({
     description: "Manage skills: create, edit, delete, list, and read skill files",
     args: {
-      op: tool.schema.enum(["create", "edit", "delete", "list", "read"]).describe("Operation to perform"),
+      op: tool.schema.enum(["create", "edit", "delete", "list", "read", "search"]).describe("Operation to perform"),
       name: tool.schema.string().optional().describe("Skill name (kebab-case)"),
       content: tool.schema.string().optional().describe("Full skill markdown content for create/edit"),
       scope: tool.schema.enum(["project", "user"]).optional().describe("Target scope for mutations"),
+      query: tool.schema.string().optional().describe("Search query for filtering skills by name or description"),
     },
     async execute(args: SkillManageInput): Promise<string> {
       if (args.op === "list") {
@@ -101,6 +102,26 @@ export function createSkillManageTool(ctx: PluginInput): ToolDefinition {
         return serialize({
           op: "list",
           skills: skills.map((skill) => ({
+            name: skill.name,
+            scope: skill.scope,
+            path: skill.path,
+            description: skill.definition.description || "",
+          })),
+        })
+      }
+
+      if (args.op === "search") {
+        const q = (args as { op: "search"; query: string }).query.toLowerCase()
+        const skills = await getAllSkills({ directory: ctx.directory })
+        const matched = skills.filter(
+          (skill) =>
+            skill.name.toLowerCase().includes(q) ||
+            (skill.definition.description ?? "").toLowerCase().includes(q),
+        )
+        return serialize({
+          op: "search",
+          query: (args as { op: "search"; query: string }).query,
+          skills: matched.map((skill) => ({
             name: skill.name,
             scope: skill.scope,
             path: skill.path,

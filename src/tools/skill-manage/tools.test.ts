@@ -139,6 +139,46 @@ describe("skill_manage tool", () => {
     })
   })
 
+  describe("#given search operation", () => {
+    it("#when query matches skill name #then returns matching skills", async () => {
+      const tool = createSkillManageTool(createPluginContext(tempDir))
+      await tool.execute({ op: "create", scope: "project", name: "xqzauth-flow", content: content("handles xqzauthentication") })
+      await tool.execute({ op: "create", scope: "project", name: "deploy-script", content: content("deploys the app") })
+
+      const raw = await tool.execute({ op: "search", query: "xqzauth" } as never)
+      const result = parseResult(raw)
+
+      expect(result.op).toBe("search")
+      const skills = (result as { op: "search"; query: string; skills: unknown[] }).skills
+      expect(skills).toHaveLength(1)
+      expect((skills[0] as { name: string }).name).toBe("xqzauth-flow")
+    })
+
+    it("#when query matches description #then returns matching skills", async () => {
+      const tool = createSkillManageTool(createPluginContext(tempDir))
+      await tool.execute({ op: "create", scope: "project", name: "infra-tool", content: content("deploys zqxkubernetes clusters") })
+      await tool.execute({ op: "create", scope: "project", name: "ui-helper", content: content("builds react components") })
+
+      const raw = await tool.execute({ op: "search", query: "zqxkubernetes" } as never)
+      const result = parseResult(raw)
+
+      const skills = (result as { op: "search"; query: string; skills: unknown[] }).skills
+      expect(skills).toHaveLength(1)
+      expect((skills[0] as { name: string }).name).toBe("infra-tool")
+    })
+
+    it("#when query matches nothing #then returns empty list", async () => {
+      const tool = createSkillManageTool(createPluginContext(tempDir))
+      await tool.execute({ op: "create", scope: "project", name: "some-skill", content: content("does something") })
+
+      const raw = await tool.execute({ op: "search", query: "xyznotfound" } as never)
+      const result = parseResult(raw)
+
+      const skills = (result as { op: "search"; query: string; skills: unknown[] }).skills
+      expect(skills).toHaveLength(0)
+    })
+  })
+
   describe("#given mutation operations", () => {
     it("#when writes succeed #then clears discovery and skill tool caches", async () => {
       const clearDiscoverySpy = spyOn(skillDiscovery, "clearSkillCache")
