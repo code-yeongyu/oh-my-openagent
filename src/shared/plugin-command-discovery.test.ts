@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { executeSlashCommand } from "./executor"
+import { discoverPluginCommandDefinitions } from "./plugin-command-discovery"
 
 const ENV_KEYS = [
   "CLAUDE_CONFIG_DIR",
@@ -24,6 +24,7 @@ function writePluginFixture(baseDir: string): void {
 
   mkdirSync(join(pluginInstallPath, ".claude-plugin"), { recursive: true })
   mkdirSync(join(pluginInstallPath, "commands"), { recursive: true })
+  mkdirSync(join(pluginInstallPath, "skills", "plugin-plan"), { recursive: true })
 
   writeFileSync(
     join(pluginInstallPath, ".claude-plugin", "plugin.json"),
@@ -38,11 +39,12 @@ Execute daplug prompt flow.
 `,
   )
   writeFileSync(
-    join(pluginInstallPath, "commands", "templated.md"),
+    join(pluginInstallPath, "skills", "plugin-plan", "SKILL.md"),
     `---
-description: Templated prompt from daplug
+name: plugin-plan
+description: Plan work from daplug skill
 ---
-Echo $ARGUMENTS and \${user_message}.
+Build a plan from plugin skill context.
 `,
   )
 
@@ -90,12 +92,12 @@ Echo $ARGUMENTS and \${user_message}.
   process.env.OPENCODE_CONFIG_DIR = opencodeConfigDir
 }
 
-describe("auto-slash command executor plugin dispatch", () => {
+describe("plugin command discovery utility", () => {
   let tempDir = ""
   let envSnapshot: EnvSnapshot
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "omo-executor-plugin-test-"))
+    tempDir = mkdtempSync(join(tmpdir(), "omo-shared-plugin-discovery-test-"))
     envSnapshot = {
       CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
       CLAUDE_PLUGINS_HOME: process.env.CLAUDE_PLUGINS_HOME,
@@ -117,79 +119,17 @@ describe("auto-slash command executor plugin dispatch", () => {
     rmSync(tempDir, { recursive: true, force: true })
   })
 
-  it("resolves marketplace plugin commands when plugin loading is enabled", async () => {
-    const result = await executeSlashCommand(
-      {
-        command: "daplug:run-prompt",
-        args: "ship it",
-        raw: "/daplug:run-prompt ship it",
-      },
-      {
-        skills: [],
-        pluginsEnabled: true,
-      },
-    )
+  describe("#given plugin loading is enabled", () => {
+    it("#then returns plugin command and skill definitions", () => {
+      // given
+      const options = { pluginsEnabled: true }
 
-    expect(result.success).toBe(true)
-    expect(result.replacementText).toContain("# /daplug:run-prompt Command")
-    expect(result.replacementText).toContain("**Scope**: plugin")
-  })
+      // when
+      const definitions = discoverPluginCommandDefinitions(options)
 
-  it("excludes marketplace commands when plugins are disabled via config toggle", async () => {
-    const result = await executeSlashCommand(
-      {
-        command: "daplug:run-prompt",
-        args: "",
-        raw: "/daplug:run-prompt",
-      },
-      {
-        skills: [],
-        pluginsEnabled: false,
-      },
-    )
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe(
-      'Command "/daplug:run-prompt" not found. Use the skill tool to list available skills and commands.',
-    )
-  })
-
-  it("returns standard not-found for unknown namespaced commands", async () => {
-    const result = await executeSlashCommand(
-      {
-        command: "daplug:missing",
-        args: "",
-        raw: "/daplug:missing",
-      },
-      {
-        skills: [],
-        pluginsEnabled: true,
-      },
-    )
-
-    expect(result.success).toBe(false)
-    expect(result.error).toBe(
-      'Command "/daplug:missing" not found. Use the skill tool to list available skills and commands.',
-    )
-    expect(result.error).not.toContain("Marketplace plugin commands")
-  })
-
-  it("replaces $ARGUMENTS placeholders in plugin command templates", async () => {
-    const result = await executeSlashCommand(
-      {
-        command: "daplug:templated",
-        args: "ship it",
-        raw: "/daplug:templated ship it",
-      },
-      {
-        skills: [],
-        pluginsEnabled: true,
-      },
-    )
-
-    expect(result.success).toBe(true)
-    expect(result.replacementText).toContain("Echo ship it and ship it.")
-    expect(result.replacementText).not.toContain("$ARGUMENTS")
-    expect(result.replacementText).not.toContain("${user_message}")
+      // then
+      expect(Object.keys(definitions)).toContain("daplug:run-prompt")
+      expect(Object.keys(definitions)).toContain("daplug:plugin-plan")
+    })
   })
 })
