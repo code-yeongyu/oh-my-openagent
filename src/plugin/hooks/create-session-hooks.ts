@@ -1,6 +1,7 @@
 import type { OhMyOpenCodeConfig, HookName } from "../../config"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
+import type { HookCadenceTracker } from "../hook-cadence-tracker"
 
 import {
   createContextWindowMonitorHook,
@@ -35,6 +36,7 @@ import {
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
+import { wrapHookWithCadence } from "../wrap-hook-with-cadence"
 
 export type SessionHooks = {
   contextWindowMonitor: ReturnType<typeof createContextWindowMonitorHook> | null
@@ -68,8 +70,9 @@ export function createSessionHooks(args: {
   modelCacheState: ModelCacheState
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
+  cadenceTracker: HookCadenceTracker
 }): SessionHooks {
-  const { ctx, pluginConfig, modelCacheState, isHookEnabled, safeHookEnabled } = args
+  const { ctx, pluginConfig, modelCacheState, isHookEnabled, safeHookEnabled, cadenceTracker } = args
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
     safeCreateHook(hookName, factory, { enabled: safeHookEnabled })
 
@@ -175,7 +178,7 @@ export function createSessionHooks(args: {
 
   const anthropicContextWindowLimitRecovery = isHookEnabled("anthropic-context-window-limit-recovery")
     ? safeHook("anthropic-context-window-limit-recovery", () =>
-        createAnthropicContextWindowLimitRecoveryHook(ctx, { experimental: pluginConfig.experimental, pluginConfig }))
+        wrapHookWithCadence("anthropic-context-window-limit-recovery", createAnthropicContextWindowLimitRecoveryHook(ctx, { experimental: pluginConfig.experimental, pluginConfig }), cadenceTracker))
     : null
 
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
@@ -188,7 +191,8 @@ export function createSessionHooks(args: {
     : null
 
   const agentUsageReminder = isHookEnabled("agent-usage-reminder")
-    ? safeHook("agent-usage-reminder", () => createAgentUsageReminderHook(ctx))
+    ? safeHook("agent-usage-reminder", () => 
+        wrapHookWithCadence("agent-usage-reminder", createAgentUsageReminderHook(ctx), cadenceTracker))
     : null
 
   const nonInteractiveEnv = isHookEnabled("non-interactive-env")
@@ -208,15 +212,18 @@ export function createSessionHooks(args: {
     : null
 
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
-    ? safeHook("edit-error-recovery", () => createEditErrorRecoveryHook(ctx))
+    ? safeHook("edit-error-recovery", () =>
+        wrapHookWithCadence("edit-error-recovery", createEditErrorRecoveryHook(ctx), cadenceTracker))
     : null
 
   const delegateTaskRetry = isHookEnabled("delegate-task-retry")
-    ? safeHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx))
+    ? safeHook("delegate-task-retry", () =>
+        wrapHookWithCadence("delegate-task-retry", createDelegateTaskRetryHook(ctx), cadenceTracker))
     : null
 
   const startWork = isHookEnabled("start-work")
-    ? safeHook("start-work", () => createStartWorkHook(ctx))
+    ? safeHook("start-work", () =>
+        wrapHookWithCadence("start-work", createStartWorkHook(ctx), cadenceTracker))
     : null
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
@@ -224,7 +231,8 @@ export function createSessionHooks(args: {
     : null
 
   const sisyphusJuniorNotepad = isHookEnabled("sisyphus-junior-notepad")
-    ? safeHook("sisyphus-junior-notepad", () => createSisyphusJuniorNotepadHook(ctx))
+    ? safeHook("sisyphus-junior-notepad", () =>
+        wrapHookWithCadence("sisyphus-junior-notepad", createSisyphusJuniorNotepadHook(ctx), cadenceTracker))
     : null
 
   const noSisyphusGpt = isHookEnabled("no-sisyphus-gpt")
@@ -246,7 +254,8 @@ export function createSessionHooks(args: {
     : null
 
   const anthropicEffort = isHookEnabled("anthropic-effort")
-    ? safeHook("anthropic-effort", () => createAnthropicEffortHook())
+    ? safeHook("anthropic-effort", () =>
+        wrapHookWithCadence("anthropic-effort", createAnthropicEffortHook(), cadenceTracker))
     : null
 
   const runtimeFallbackConfig =

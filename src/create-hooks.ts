@@ -8,6 +8,7 @@ import type { ModelCacheState } from "./plugin-state"
 import { createCoreHooks } from "./plugin/hooks/create-core-hooks"
 import { createContinuationHooks } from "./plugin/hooks/create-continuation-hooks"
 import { createSkillHooks } from "./plugin/hooks/create-skill-hooks"
+import { HookCadenceTracker } from "./plugin/hook-cadence-tracker"
 
 export type CreatedHooks = ReturnType<typeof createHooks>
 
@@ -32,12 +33,16 @@ export function createHooks(args: {
     availableSkills,
   } = args
 
+  // Initialize cadence tracker with config
+  const cadenceTracker = new HookCadenceTracker(pluginConfig.hook_cadence)
+
   const core = createCoreHooks({
     ctx,
     pluginConfig,
     modelCacheState,
     isHookEnabled,
     safeHookEnabled,
+    cadenceTracker,
   })
 
   const continuation = createContinuationHooks({
@@ -47,6 +52,7 @@ export function createHooks(args: {
     safeHookEnabled,
     backgroundManager,
     sessionRecovery: core.sessionRecovery,
+    cadenceTracker,
   })
 
   const skill = createSkillHooks({
@@ -55,6 +61,7 @@ export function createHooks(args: {
     safeHookEnabled,
     mergedSkills,
     availableSkills,
+    cadenceTracker,
   })
 
   return {

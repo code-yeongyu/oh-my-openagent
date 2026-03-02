@@ -1,6 +1,7 @@
 import type { HookName, OhMyOpenCodeConfig } from "../../config"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
+import type { HookCadenceTracker } from "../hook-cadence-tracker"
 
 import {
   createCommentCheckerHooks,
@@ -22,6 +23,7 @@ import {
   OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
+import { wrapHookWithCadence } from "../wrap-hook-with-cadence"
 
 export type ToolGuardHooks = {
   commentChecker: ReturnType<typeof createCommentCheckerHooks> | null
@@ -43,8 +45,9 @@ export function createToolGuardHooks(args: {
   modelCacheState: ModelCacheState
   isHookEnabled: (hookName: HookName) => boolean
   safeHookEnabled: boolean
+  cadenceTracker: HookCadenceTracker
 }): ToolGuardHooks {
-  const { ctx, pluginConfig, modelCacheState, isHookEnabled, safeHookEnabled } = args
+  const { ctx, pluginConfig, modelCacheState, isHookEnabled, safeHookEnabled, cadenceTracker } = args
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
     safeCreateHook(hookName, factory, { enabled: safeHookEnabled })
 
@@ -72,13 +75,13 @@ export function createToolGuardHooks(args: {
       })
     } else {
       directoryAgentsInjector = safeHook("directory-agents-injector", () =>
-        createDirectoryAgentsInjectorHook(ctx, modelCacheState))
+        wrapHookWithCadence("directory-agents-injector", createDirectoryAgentsInjectorHook(ctx, modelCacheState), cadenceTracker))
     }
   }
 
   const directoryReadmeInjector = isHookEnabled("directory-readme-injector")
     ? safeHook("directory-readme-injector", () =>
-        createDirectoryReadmeInjectorHook(ctx, modelCacheState))
+        wrapHookWithCadence("directory-readme-injector", createDirectoryReadmeInjectorHook(ctx, modelCacheState), cadenceTracker))
     : null
 
   const emptyTaskResponseDetector = isHookEnabled("empty-task-response-detector")
@@ -87,7 +90,7 @@ export function createToolGuardHooks(args: {
 
   const rulesInjector = isHookEnabled("rules-injector")
     ? safeHook("rules-injector", () =>
-        createRulesInjectorHook(ctx, modelCacheState))
+        wrapHookWithCadence("rules-injector", createRulesInjectorHook(ctx, modelCacheState), cadenceTracker))
     : null
 
   const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")

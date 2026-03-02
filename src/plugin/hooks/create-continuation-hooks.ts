@@ -1,6 +1,7 @@
 import type { HookName, OhMyOpenCodeConfig } from "../../config"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginContext } from "../types"
+import type { HookCadenceTracker } from "../hook-cadence-tracker"
 
 import {
   createTodoContinuationEnforcer,
@@ -12,6 +13,7 @@ import {
 } from "../../hooks"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { createUnstableAgentBabysitter } from "../unstable-agent-babysitter"
+import { wrapHookWithCadence } from "../wrap-hook-with-cadence"
 
 export type ContinuationHooks = {
   stopContinuationGuard: ReturnType<typeof createStopContinuationGuardHook> | null
@@ -35,6 +37,7 @@ export function createContinuationHooks(args: {
   safeHookEnabled: boolean
   backgroundManager: BackgroundManager
   sessionRecovery: SessionRecovery
+  cadenceTracker: HookCadenceTracker
 }): ContinuationHooks {
   const {
     ctx,
@@ -43,6 +46,7 @@ export function createContinuationHooks(args: {
     safeHookEnabled,
     backgroundManager,
     sessionRecovery,
+    cadenceTracker,
   } = args
 
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
@@ -105,13 +109,13 @@ export function createContinuationHooks(args: {
 
   const atlasHook = isHookEnabled("atlas")
     ? safeHook("atlas", () =>
-        createAtlasHook(ctx, {
+        wrapHookWithCadence("atlas", createAtlasHook(ctx, {
           directory: ctx.directory,
           backgroundManager,
           isContinuationStopped: (sessionID: string) =>
             stopContinuationGuard?.isStopped(sessionID) ?? false,
           agentOverrides: pluginConfig.agents,
-        }))
+        }), cadenceTracker))
     : null
 
   return {
