@@ -1,6 +1,6 @@
 import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
-import { getTimingConfig } from "./timing"
+import { DEFAULT_SYNC_POLL_TIMEOUT_MS, getTimingConfig } from "./timing"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
 
@@ -32,10 +32,11 @@ export async function pollSyncSession(
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
     anchorMessageCount?: number
-  }
+  },
+  timeoutMs?: number
 ): Promise<string | null> {
   const syncTiming = getTimingConfig()
-  const maxPollTimeMs = Math.max(syncTiming.MAX_POLL_TIME_MS, 50)
+  const maxPollTimeMs = Math.max(timeoutMs ?? DEFAULT_SYNC_POLL_TIMEOUT_MS, 50)
   const pollStart = Date.now()
   let pollCount = 0
   let timedOut = false

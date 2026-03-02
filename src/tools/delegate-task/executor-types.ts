@@ -12,6 +12,7 @@ export interface ExecutorContext {
   browserProvider?: BrowserAutomationProvider
   agentOverrides?: AgentOverrides
   onSyncSessionCreated?: (event: { sessionID: string; parentID: string; title: string }) => Promise<void>
+  syncPollTimeoutMs?: number
 }
 
 export interface ParentContext {
