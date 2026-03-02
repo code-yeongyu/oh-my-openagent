@@ -4,7 +4,6 @@ import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
 import { AGENT_NAME_MAP } from "../shared/migration";
 import { getAgentDisplayName } from "../shared/agent-display-names";
-import { mergeCategories } from "../shared/merge-categories";
 import {
   discoverConfigSourceSkills,
   discoverOpencodeGlobalSkills,
@@ -18,13 +17,6 @@ import { reorderAgentsByPriority } from "./agent-priority-order";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
-import {
-  applyCustomAgentOverrides,
-  collectCustomAgentSummariesFromRecord,
-  mergeCustomAgentSummaries,
-  collectKnownCustomAgentNames,
-  filterSummariesByKnownNames,
-} from "./custom-agent-utils";
 
 type AgentConfigRecord = Record<string, Record<string, unknown> | undefined> & {
   build?: Record<string, unknown>;
@@ -82,18 +74,25 @@ export async function applyAgentConfig(params: {
   const browserProvider =
     params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
   const currentModel = params.config.model as string | undefined;
-  const disabledAgentNames = new Set(
-    (migratedDisabledAgents ?? []).map((agent) => agent.toLowerCase()),
-  );
-  const filterDisabledAgents = (agents: Record<string, unknown>) =>
-    Object.fromEntries(
-      Object.entries(agents).filter(
-        ([name]) => !disabledAgentNames.has(name.toLowerCase()),
-      ),
-    );
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
+
+  const builtinAgents = await createBuiltinAgents(
+    migratedDisabledAgents,
+    params.pluginConfig.agents,
+    params.ctx.directory,
+    currentModel,
+    params.pluginConfig.categories,
+    params.pluginConfig.git_master,
+    allDiscoveredSkills,
+    params.ctx.client,
+    browserProvider,
+    currentModel,
+    disabledSkills,
+    useTaskSystem,
+    disableOmoEnv,
+  );
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
   const userAgents = includeClaudeAgents ? loadUserAgents() : {};
@@ -107,49 +106,15 @@ export async function applyAgentConfig(params: {
     ]),
   );
 
-  const configAgent = params.config.agent as AgentConfigRecord | undefined;
-  const filteredUserAgents = filterDisabledAgents(userAgents as Record<string, unknown>);
-  const filteredProjectAgents = filterDisabledAgents(projectAgents as Record<string, unknown>);
-  const filteredPluginAgents = filterDisabledAgents(pluginAgents as Record<string, unknown>);
-  const filteredConfigAgentsForSummary = filterDisabledAgents(
-    (configAgent as Record<string, unknown> | undefined) ?? {},
+  const disabledAgentNames = new Set(
+    (migratedDisabledAgents ?? []).map(a => a.toLowerCase())
   );
-  const mergedCategories = mergeCategories(params.pluginConfig.categories)
-  const knownCustomAgentNames = collectKnownCustomAgentNames(
-    filteredUserAgents,
-    filteredProjectAgents,
-    filteredPluginAgents,
-    filteredConfigAgentsForSummary,
-  )
 
-  const customAgentSummaries = mergeCustomAgentSummaries(
-    collectCustomAgentSummariesFromRecord(filteredUserAgents),
-    collectCustomAgentSummariesFromRecord(filteredProjectAgents),
-    collectCustomAgentSummariesFromRecord(filteredPluginAgents),
-    collectCustomAgentSummariesFromRecord(filteredConfigAgentsForSummary),
-    filterSummariesByKnownNames(
-      collectCustomAgentSummariesFromRecord(
-        params.pluginConfig.custom_agents as Record<string, unknown> | undefined,
-      ),
-      knownCustomAgentNames,
-    ),
-  )
+  const filterDisabledAgents = (agents: Record<string, unknown>) =>
+    Object.fromEntries(
+      Object.entries(agents).filter(([name]) => !disabledAgentNames.has(name.toLowerCase()))
+    );
 
-  const builtinAgents = await createBuiltinAgents(
-    migratedDisabledAgents,
-    params.pluginConfig.agents,
-    params.ctx.directory,
-    currentModel,
-    params.pluginConfig.categories,
-    params.pluginConfig.git_master,
-    allDiscoveredSkills,
-    customAgentSummaries,
-    browserProvider,
-    currentModel,
-    disabledSkills,
-    useTaskSystem,
-    disableOmoEnv,
-  );
   const isSisyphusEnabled = params.pluginConfig.sisyphus_agent?.disabled !== true;
   const builderEnabled =
     params.pluginConfig.sisyphus_agent?.default_builder_enabled ?? false;
@@ -157,6 +122,8 @@ export async function applyAgentConfig(params: {
   const replacePlan = params.pluginConfig.sisyphus_agent?.replace_plan ?? true;
   const shouldDemotePlan = plannerEnabled && replacePlan;
   const configuredDefaultAgent = getConfiguredDefaultAgent(params.config);
+
+  const configAgent = params.config.agent as AgentConfigRecord | undefined;
 
   if (isSisyphusEnabled && builtinAgents.sisyphus) {
     if (configuredDefaultAgent) {
@@ -201,7 +168,6 @@ export async function applyAgentConfig(params: {
         pluginPrometheusOverride: prometheusOverride,
         userCategories: params.pluginConfig.categories,
         currentModel,
-        customAgentSummaries,
       });
     }
 
@@ -237,9 +203,9 @@ export async function applyAgentConfig(params: {
       ...Object.fromEntries(
         Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus"),
       ),
-      ...filteredUserAgents,
-      ...filteredProjectAgents,
-      ...filteredPluginAgents,
+      ...filterDisabledAgents(userAgents),
+      ...filterDisabledAgents(projectAgents),
+      ...filterDisabledAgents(pluginAgents),
       ...filteredConfigAgents,
       build: { ...migratedBuild, mode: "subagent", hidden: true },
       ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
@@ -247,29 +213,11 @@ export async function applyAgentConfig(params: {
   } else {
     params.config.agent = {
       ...builtinAgents,
-      ...filteredUserAgents,
-      ...filteredProjectAgents,
-      ...filteredPluginAgents,
+      ...filterDisabledAgents(userAgents),
+      ...filterDisabledAgents(projectAgents),
+      ...filterDisabledAgents(pluginAgents),
       ...configAgent,
     };
-  }
-
-  if (params.config.agent) {
-    const builtinOverrideKeys = new Set([
-      ...Object.keys(builtinAgents).map((key) => key.toLowerCase()),
-      "build",
-      "plan",
-      "sisyphus-junior",
-      "opencode-builder",
-    ])
-
-    applyCustomAgentOverrides({
-      mergedAgents: params.config.agent as Record<string, unknown>,
-      userOverrides: params.pluginConfig.custom_agents,
-      builtinOverrideKeys,
-      mergedCategories,
-      directory: params.ctx.directory,
-    })
   }
 
   if (params.config.agent) {

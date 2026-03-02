@@ -1,25 +1,11 @@
 export {
   OhMyOpenCodeConfigSchema,
-  AgentOverrideConfigSchema,
-  AgentOverridesSchema,
-  CustomAgentOverridesSchema,
-  McpNameSchema,
-  AgentNameSchema,
-  OverridableAgentNameSchema,
-  HookNameSchema,
-  BuiltinCommandNameSchema,
-  SisyphusAgentConfigSchema,
-  ExperimentalConfigSchema,
-  RalphLoopConfigSchema,
-  TmuxConfigSchema,
-  TmuxLayoutSchema,
 } from "./schema"
 
 export type {
   OhMyOpenCodeConfig,
   AgentOverrideConfig,
   AgentOverrides,
-  CustomAgentOverrides,
   McpName,
   AgentName,
   HookName,

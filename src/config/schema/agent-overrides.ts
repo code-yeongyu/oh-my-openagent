@@ -1,6 +1,5 @@
 import { z } from "zod"
 import { FallbackModelsSchema } from "./fallback-models"
-import { OverridableAgentNameSchema } from "./agent-names"
 import { AgentPermissionSchema } from "./internal/permission"
 
 export const AgentOverrideConfigSchema = z.object({
@@ -56,7 +55,7 @@ export const AgentOverrideConfigSchema = z.object({
     .optional(),
 })
 
-const BuiltinAgentOverridesSchema = z.object({
+export const AgentOverridesSchema = z.object({
   build: AgentOverrideConfigSchema.optional(),
   plan: AgentOverrideConfigSchema.optional(),
   sisyphus: AgentOverrideConfigSchema.optional(),
@@ -73,57 +72,7 @@ const BuiltinAgentOverridesSchema = z.object({
   explore: AgentOverrideConfigSchema.optional(),
   "multimodal-looker": AgentOverrideConfigSchema.optional(),
   atlas: AgentOverrideConfigSchema.optional(),
-}).strict()
-
-export const AgentOverridesSchema = BuiltinAgentOverridesSchema
-
-const RESERVED_CUSTOM_AGENT_NAMES = OverridableAgentNameSchema.options
-const RESERVED_CUSTOM_AGENT_NAME_SET = new Set(
-  RESERVED_CUSTOM_AGENT_NAMES.map((name) => name.toLowerCase()),
-)
-function escapeRegexLiteral(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
-function toCaseInsensitiveLiteralPattern(value: string): string {
-  return value
-    .split("")
-    .map((char) => {
-      if (/^[A-Za-z]$/.test(char)) {
-        const lower = char.toLowerCase()
-        const upper = char.toUpperCase()
-        return `[${lower}${upper}]`
-      }
-
-      return escapeRegexLiteral(char)
-    })
-    .join("")
-}
-
-const RESERVED_CUSTOM_AGENT_NAME_PATTERN = new RegExp(
-  `^(?!(?:${RESERVED_CUSTOM_AGENT_NAMES.map(toCaseInsensitiveLiteralPattern).join("|")})$).+`,
-)
-
-export const CustomAgentOverridesSchema = z
-  .record(
-    z.string().regex(
-      RESERVED_CUSTOM_AGENT_NAME_PATTERN,
-      "custom_agents key cannot reuse built-in agent override name",
-    ),
-    AgentOverrideConfigSchema,
-  )
-  .superRefine((value, ctx) => {
-    for (const key of Object.keys(value)) {
-      if (RESERVED_CUSTOM_AGENT_NAME_SET.has(key.toLowerCase())) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [key],
-          message: "custom_agents key cannot reuse built-in agent override name",
-        })
-      }
-    }
-  })
+})
 
 export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>
 export type AgentOverrides = z.infer<typeof AgentOverridesSchema>
-export type CustomAgentOverrides = z.infer<typeof CustomAgentOverridesSchema>

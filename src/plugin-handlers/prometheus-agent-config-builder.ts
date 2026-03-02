@@ -1,7 +1,6 @@
 import type { CategoryConfig } from "../config/schema";
 import { PROMETHEUS_PERMISSION, getPrometheusPrompt } from "../agents/prometheus";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
-import { parseRegisteredAgentSummaries } from "../agents/custom-agent-summaries";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import {
   fetchAvailableModels,
@@ -28,7 +27,6 @@ export async function buildPrometheusAgentConfig(params: {
   pluginPrometheusOverride: PrometheusOverride | undefined;
   userCategories: Record<string, CategoryConfig> | undefined;
   currentModel: string | undefined;
-  customAgentSummaries?: unknown;
 }): Promise<Record<string, unknown>> {
   const categoryConfig = params.pluginPrometheusOverride?.category
     ? resolveCategoryConfig(params.pluginPrometheusOverride.category, params.userCategories)
@@ -67,18 +65,11 @@ export async function buildPrometheusAgentConfig(params: {
   const maxTokensToUse =
     params.pluginPrometheusOverride?.maxTokens ?? categoryConfig?.maxTokens;
 
-  const customAgentCatalog = parseRegisteredAgentSummaries(params.customAgentSummaries)
-  const customAgentBlock = customAgentCatalog.length > 0
-    ? `\n\n<custom_agent_catalog>\nAvailable custom agents for planning/delegation:\n${customAgentCatalog
-      .map((agent) => `- ${agent.name}: ${agent.description || "No description provided"}`)
-      .join("\n")}\n</custom_agent_catalog>`
-    : ""
-
   const base: Record<string, unknown> = {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",
-    prompt: getPrometheusPrompt(resolvedModel) + customAgentBlock,
+    prompt: getPrometheusPrompt(resolvedModel),
     permission: PROMETHEUS_PERMISSION,
     description: `${(params.configAgentPlan?.description as string) ?? "Plan agent"} (Prometheus - OhMyOpenCode)`,
     color: (params.configAgentPlan?.color as string) ?? "#FF5722",
@@ -102,13 +93,6 @@ export async function buildPrometheusAgentConfig(params: {
   const merged = { ...base, ...restOverride };
   if (prompt_append && typeof merged.prompt === "string") {
     merged.prompt = merged.prompt + "\n" + resolvePromptAppend(prompt_append);
-  }
-  if (
-    customAgentBlock
-    && typeof merged.prompt === "string"
-    && !merged.prompt.includes("<custom_agent_catalog>")
-  ) {
-    merged.prompt = merged.prompt + customAgentBlock;
   }
   return merged;
 }
