@@ -71,6 +71,8 @@ export interface DelegateTaskToolOptions {
   agentOverrides?: AgentOverrides
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
+  /** TOON compression config for prompt compression in subagent tasks */
+  compressionConfig?: ToonCompressionConfig
 }
 
 export interface BuildSystemContentInput {

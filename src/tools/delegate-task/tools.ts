@@ -156,7 +156,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
       if (args.session_id) {
         if (runInBackground) {
-          return executeBackgroundContinuation(args, ctx, options, parentContext)
+          return executeBackgroundContinuation(args, ctx, options, parentContext, options.compressionConfig)
         }
         return executeSyncContinuation(args, ctx, options)
       }
@@ -247,10 +247,10 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       })
 
       if (runInBackground) {
-        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
+        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain, options.compressionConfig)
       }
 
-      return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)
+      return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain, undefined, options.compressionConfig)
     },
   })
 }
