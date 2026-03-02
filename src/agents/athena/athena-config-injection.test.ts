@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 import { ATHENA_PROMPT_METADATA, createAthenaAgent } from "./agent"
+import { ATHENA_JUNIOR_PROMPT_METADATA } from "./athena-junior-agent"
 import { ATHENA_NON_INTERACTIVE_PROMPT } from "./non-interactive-prompt"
 
 describe("Athena prompt config injection placeholders", () => {
@@ -136,8 +137,46 @@ describe("Athena prompt config injection placeholders", () => {
 describe("Athena prompt metadata", () => {
   describe("#given ATHENA_PROMPT_METADATA", () => {
     describe("#when checking triggers", () => {
-      it("#then includes a Non-interactive council trigger", () => {
+      it("#then does NOT include a Non-interactive council trigger", () => {
         const hasNonInteractiveTrigger = ATHENA_PROMPT_METADATA.triggers.some((t) =>
+          t.domain.includes("Non-interactive"),
+        )
+        expect(hasNonInteractiveTrigger).toBe(false)
+      })
+    })
+
+    describe("#when checking useWhen entries", () => {
+      it("#then does NOT include an entry mentioning oh-my-opencode run", () => {
+        const hasCLIEntry = ATHENA_PROMPT_METADATA.useWhen.some((entry) =>
+          entry.includes("oh-my-opencode run"),
+        )
+        expect(hasCLIEntry).toBe(false)
+      })
+
+      it("#then does NOT include an entry mentioning structured council output", () => {
+        const hasStructuredEntry = ATHENA_PROMPT_METADATA.useWhen.some((entry) =>
+          entry.includes("structured") || entry.includes("agent-to-agent"),
+        )
+        expect(hasStructuredEntry).toBe(false)
+      })
+    })
+
+    describe("#when checking avoidWhen entries", () => {
+      it("#then includes an entry referencing athena-junior", () => {
+        const hasAthenaJuniorRef = ATHENA_PROMPT_METADATA.avoidWhen?.some((entry) =>
+          entry.includes("athena-junior"),
+        )
+        expect(hasAthenaJuniorRef).toBe(true)
+      })
+    })
+  })
+})
+
+describe("Athena-Junior prompt metadata", () => {
+  describe("#given ATHENA_JUNIOR_PROMPT_METADATA", () => {
+    describe("#when checking triggers", () => {
+      it("#then includes a Non-interactive council trigger", () => {
+        const hasNonInteractiveTrigger = ATHENA_JUNIOR_PROMPT_METADATA.triggers.some((t) =>
           t.domain.includes("Non-interactive"),
         )
         expect(hasNonInteractiveTrigger).toBe(true)
@@ -146,14 +185,14 @@ describe("Athena prompt metadata", () => {
 
     describe("#when checking useWhen entries", () => {
       it("#then includes an entry mentioning oh-my-opencode run", () => {
-        const hasCLIEntry = ATHENA_PROMPT_METADATA.useWhen.some((entry) =>
+        const hasCLIEntry = ATHENA_JUNIOR_PROMPT_METADATA.useWhen.some((entry) =>
           entry.includes("oh-my-opencode run"),
         )
         expect(hasCLIEntry).toBe(true)
       })
 
-      it("#then includes an entry mentioning structured council output", () => {
-        const hasStructuredEntry = ATHENA_PROMPT_METADATA.useWhen.some((entry) =>
+      it("#then includes an entry mentioning structured or agent-to-agent", () => {
+        const hasStructuredEntry = ATHENA_JUNIOR_PROMPT_METADATA.useWhen.some((entry) =>
           entry.includes("structured") || entry.includes("agent-to-agent"),
         )
         expect(hasStructuredEntry).toBe(true)

@@ -99,6 +99,7 @@ export type BuiltinAgentName =
   | "momus"
   | "atlas"
   | "athena"
+  | "athena-junior"
   | "council-member"
 
 export type OverridableAgentName =

@@ -4,6 +4,7 @@ export interface CouncilFinalizeArgs {
   intent: string
   question?: string
   prompt_file?: string
+  mode?: string
 }
 
 export interface CouncilMemberResult {

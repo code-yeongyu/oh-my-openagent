@@ -72,7 +72,7 @@ Launch ALL members before collecting results. Track every task_id.
 - Repeat until ALL members reach terminal state.
 
 ### Step 6: Collect results with council_finalize.
-- Call: council_finalize(task_ids=[...], name="{topic-slug}", intent="{intent}", question="{original question}", prompt_file="{path from Step 4.1}")
+- Call: council_finalize(task_ids=[...], name="{topic-slug}", intent="{intent}", question="{original question}", prompt_file="{path from Step 4.1}", mode="non-interactive")
 - council_finalize extracts responses, writes archives, returns structured JSON with archive_dir and members array.
 - Read each member's archive_file using Read tool for synthesis input.
 

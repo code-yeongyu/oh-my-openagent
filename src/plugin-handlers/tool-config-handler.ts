@@ -113,6 +113,16 @@ export function applyToolConfig(params: {
       question: questionPermission,
     };
   }
+  const athenaJunior = agentByKey(params.agentResult, "athena-junior");
+  if (athenaJunior) {
+    athenaJunior.permission = {
+      ...athenaJunior.permission,
+      task: "allow",
+      prepare_council_prompt: "allow",
+      council_finalize: "allow",
+      question: "deny",
+    };
+  }
 
   params.config.permission = {
     ...(params.config.permission as Record<string, unknown>),

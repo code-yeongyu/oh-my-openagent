@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { resolveCouncilIntent, buildAthenaRuntimeGuidance, getValidCouncilIntents } from "./council-runtime-guidance"
+import { resolveCouncilIntent, buildAthenaRuntimeGuidance, getValidCouncilIntents, type CouncilGuidanceMode } from "./council-runtime-guidance"
 
 describe("council-runtime-guidance", () => {
   describe("resolveCouncilIntent", () => {
@@ -116,7 +116,7 @@ describe("council-runtime-guidance", () => {
         })
       })
 
-      describe("#when building guidance for each intent", () => {
+      describe("#when building guidance for each intent in interactive mode (default)", () => {
         const allIntents = ["DIAGNOSE", "AUDIT", "PLAN", "EVALUATE", "EXPLAIN", "CREATE", "PERSPECTIVES", "FREEFORM"] as const
 
         for (const intent of allIntents) {
@@ -125,7 +125,7 @@ describe("council-runtime-guidance", () => {
             expect(result).toContain("runtime_synthesis_rules")
           })
 
-          it(`#then ${intent} guidance contains runtime_action_paths`, () => {
+          it(`#then ${intent} guidance contains runtime_action_paths in interactive mode`, () => {
             const result = buildAthenaRuntimeGuidance(intent)
             expect(result).toContain("runtime_action_paths")
           })
@@ -135,6 +135,62 @@ describe("council-runtime-guidance", () => {
             expect(result).toContain("source: council_finalize")
           })
         }
+      })
+    })
+  })
+
+  describe("#given non-interactive mode", () => {
+    const allIntents = ["DIAGNOSE", "AUDIT", "PLAN", "EVALUATE", "EXPLAIN", "CREATE", "PERSPECTIVES", "FREEFORM"] as const
+
+    describe("#when building guidance with non-interactive mode", () => {
+      for (const intent of allIntents) {
+        it(`#then ${intent} guidance contains runtime_synthesis_rules`, () => {
+          const result = buildAthenaRuntimeGuidance(intent, "non-interactive")
+          expect(result).toContain("runtime_synthesis_rules")
+        })
+
+        it(`#then ${intent} guidance does NOT contain runtime_action_paths`, () => {
+          const result = buildAthenaRuntimeGuidance(intent, "non-interactive")
+          expect(result).not.toContain("runtime_action_paths")
+        })
+
+        it(`#then ${intent} guidance contains mode: non-interactive`, () => {
+          const result = buildAthenaRuntimeGuidance(intent, "non-interactive")
+          expect(result).toContain("mode: non-interactive")
+        })
+
+        it(`#then ${intent} guidance contains source: council_finalize`, () => {
+          const result = buildAthenaRuntimeGuidance(intent, "non-interactive")
+          expect(result).toContain("source: council_finalize")
+        })
+      }
+    })
+
+    describe("#when building guidance with explicit interactive mode", () => {
+      for (const intent of allIntents) {
+        it(`#then ${intent} guidance contains both synthesis_rules and action_paths`, () => {
+          const result = buildAthenaRuntimeGuidance(intent, "interactive")
+          expect(result).toContain("runtime_synthesis_rules")
+          expect(result).toContain("runtime_action_paths")
+        })
+
+        it(`#then ${intent} guidance contains mode: interactive`, () => {
+          const result = buildAthenaRuntimeGuidance(intent, "interactive")
+          expect(result).toContain("mode: interactive")
+        })
+      }
+    })
+  })
+
+  describe("CouncilGuidanceMode type", () => {
+    describe("#given the type is imported", () => {
+      describe("#when used as a type annotation", () => {
+        it("#then accepts interactive and non-interactive values", () => {
+          const interactive: CouncilGuidanceMode = "interactive"
+          const nonInteractive: CouncilGuidanceMode = "non-interactive"
+          expect(interactive).toBe("interactive")
+          expect(nonInteractive).toBe("non-interactive")
+        })
       })
     })
   })

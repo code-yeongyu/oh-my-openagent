@@ -11,6 +11,7 @@ import {
   resolveCouncilIntent,
   COUNCIL_DEFAULTS,
 } from "../../agents/athena"
+import type { CouncilGuidanceMode } from "../../agents/athena"
 import type { CouncilFinalizeArgs, CouncilMemberResult, CouncilFinalizeResult } from "./types"
 
 export function createCouncilFinalize(
@@ -30,6 +31,10 @@ export function createCouncilFinalize(
         .describe(`Classified question intent used for runtime Athena guidance injection. Valid intents: ${getValidCouncilIntents().join(", ")}`),
       question: tool.schema.string().optional().describe("Original user question that triggered the council"),
       prompt_file: tool.schema.string().optional().describe("Path to the council prompt temp file (will be moved into the archive)"),
+      mode: tool.schema
+        .string()
+        .optional()
+        .describe('Council guidance mode: "interactive" (default) includes action paths with Question tool, "non-interactive" strips action paths for programmatic use'),
     },
     async execute(args: CouncilFinalizeArgs, toolContext) {
       const resolvedIntent = resolveCouncilIntent(args.intent)
@@ -154,7 +159,8 @@ export function createCouncilFinalize(
         members,
       }
 
-      const guidance = buildAthenaRuntimeGuidance(resolvedIntent)
+      const resolvedMode = (args.mode === "non-interactive" ? "non-interactive" : "interactive") as CouncilGuidanceMode
+      const guidance = buildAthenaRuntimeGuidance(resolvedIntent, resolvedMode)
       return JSON.stringify(result, null, 2) + "\n\n" + guidance
     },
   })

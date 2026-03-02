@@ -12,7 +12,7 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
-import { createAthenaAgent, ATHENA_PROMPT_METADATA, COUNCIL_DEFAULTS } from "./athena"
+import { createAthenaAgent, ATHENA_PROMPT_METADATA, createAthenaJuniorAgent, ATHENA_JUNIOR_PROMPT_METADATA, COUNCIL_DEFAULTS } from "./athena"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -44,6 +44,7 @@ const agentSources: Partial<Record<BuiltinAgentName, AgentSource>> = {
   metis: createMetisAgent,
   momus: createMomusAgent,
   athena: createAthenaAgent,
+  "athena-junior": createAthenaJuniorAgent,
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
@@ -61,6 +62,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,
   athena: ATHENA_PROMPT_METADATA,
+  "athena-junior": ATHENA_JUNIOR_PROMPT_METADATA,
   atlas: atlasPromptMetadata,
 }
 
@@ -206,7 +208,7 @@ export async function createBuiltinAgents(
     result["atlas"] = atlasConfig
   }
 
-  if (councilConfig?.members && councilConfig.members.length >= 2 && result["athena"]) {
+  if (councilConfig?.members && councilConfig.members.length >= 2 && (result["athena"] || result["athena-junior"])) {
     const { agents: councilAgents, registeredKeys, skippedMembers } = registerCouncilMemberAgents(councilConfig)
     for (const [key, config] of Object.entries(councilAgents)) {
       result[key] = config
@@ -227,31 +229,53 @@ export async function createBuiltinAgents(
       const cancelOnQuorum = councilConfig.cancel_retrying_on_quorum ?? true
       const stuckThreshold = councilConfig.stuck_threshold_seconds ?? COUNCIL_DEFAULTS.STUCK_THRESHOLD_SECONDS
       const memberMaxRunning = councilConfig.member_max_running_seconds ?? COUNCIL_DEFAULTS.MEMBER_MAX_RUNNING_SECONDS
+      const resilienceConfig = `\n\n## Council Resilience Config\n- retry_on_fail: ${retryOnFail}\n- retry_failed_if_others_finished: ${retryIfFinished}\n- cancel_retrying_on_quorum: ${cancelOnQuorum}\n- stuck_threshold_seconds: ${stuckThreshold}\n- member_max_running_seconds: ${memberMaxRunning}`
 
-      let athenaPrompt = (result["athena"].prompt ?? "") + councilTaskInstructions
-      athenaPrompt = athenaPrompt
-        .replace(/\{RETRY_ON_FAIL\}/g, String(retryOnFail))
-        .replace(/\{RETRY_FAILED_IF_OTHERS_FINISHED\}/g, String(retryIfFinished))
-        .replace(/\{CANCEL_RETRYING_ON_QUORUM\}/g, String(cancelOnQuorum))
-        .replace(/\{STUCK_THRESHOLD_SECONDS\}/g, String(stuckThreshold))
-        .replace(/\{MEMBER_MAX_RUNNING_SECONDS\}/g, String(memberMaxRunning))
-        .replace(/\{NON_INTERACTIVE_MODE\}/g, athenaNonInteractiveConfig?.non_interactive_mode ?? "delegation")
-        .replace(/\{NON_INTERACTIVE_MEMBERS\}/g, athenaNonInteractiveConfig?.non_interactive_members ?? "all")
-        .replace(/\{NON_INTERACTIVE_MEMBER_LIST\}/g, JSON.stringify(athenaNonInteractiveConfig?.non_interactive_member_list ?? []))
-        .replace(/\{BACKGROUND_WAIT_TIMEOUT_MS\}/g, String(COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS))
-      athenaPrompt += `\n\n## Council Resilience Config\n- retry_on_fail: ${retryOnFail}\n- retry_failed_if_others_finished: ${retryIfFinished}\n- cancel_retrying_on_quorum: ${cancelOnQuorum}\n- stuck_threshold_seconds: ${stuckThreshold}\n- member_max_running_seconds: ${memberMaxRunning}`
+      if (result["athena"]) {
+        let athenaPrompt = (result["athena"].prompt ?? "") + councilTaskInstructions
+        athenaPrompt = athenaPrompt
+          .replace(/\{RETRY_ON_FAIL\}/g, String(retryOnFail))
+          .replace(/\{RETRY_FAILED_IF_OTHERS_FINISHED\}/g, String(retryIfFinished))
+          .replace(/\{CANCEL_RETRYING_ON_QUORUM\}/g, String(cancelOnQuorum))
+          .replace(/\{STUCK_THRESHOLD_SECONDS\}/g, String(stuckThreshold))
+          .replace(/\{MEMBER_MAX_RUNNING_SECONDS\}/g, String(memberMaxRunning))
+          .replace(/\{BACKGROUND_WAIT_TIMEOUT_MS\}/g, String(COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS))
+        athenaPrompt += resilienceConfig
+        result["athena"] = { ...result["athena"], prompt: athenaPrompt }
+      }
 
-      result["athena"] = {
-        ...result["athena"],
-        prompt: athenaPrompt,
+      if (result["athena-junior"]) {
+        let athenaJuniorPrompt = (result["athena-junior"].prompt ?? "") + councilTaskInstructions
+        athenaJuniorPrompt = athenaJuniorPrompt
+          .replace(/\{RETRY_ON_FAIL\}/g, String(retryOnFail))
+          .replace(/\{RETRY_FAILED_IF_OTHERS_FINISHED\}/g, String(retryIfFinished))
+          .replace(/\{CANCEL_RETRYING_ON_QUORUM\}/g, String(cancelOnQuorum))
+          .replace(/\{STUCK_THRESHOLD_SECONDS\}/g, String(stuckThreshold))
+          .replace(/\{MEMBER_MAX_RUNNING_SECONDS\}/g, String(memberMaxRunning))
+          .replace(/\{NON_INTERACTIVE_MODE\}/g, athenaNonInteractiveConfig?.non_interactive_mode ?? "delegation")
+          .replace(/\{NON_INTERACTIVE_MEMBERS\}/g, athenaNonInteractiveConfig?.non_interactive_members ?? "all")
+          .replace(/\{NON_INTERACTIVE_MEMBER_LIST\}/g, JSON.stringify(athenaNonInteractiveConfig?.non_interactive_member_list ?? []))
+          .replace(/\{BACKGROUND_WAIT_TIMEOUT_MS\}/g, String(COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS))
+        athenaJuniorPrompt += resilienceConfig
+        result["athena-junior"] = { ...result["athena-junior"], prompt: athenaJuniorPrompt }
       }
     } else {
-      result["athena"] = applyMissingCouncilGuard(result["athena"], skippedMembers)
+      if (result["athena"]) {
+        result["athena"] = applyMissingCouncilGuard(result["athena"], skippedMembers)
+      }
+      if (result["athena-junior"]) {
+        result["athena-junior"] = applyMissingCouncilGuard(result["athena-junior"], skippedMembers)
+      }
     }
-  } else if (councilConfig?.members && councilConfig.members.length >= 2 && !result["athena"]) {
-    log("[builtin-agents] Skipping council member registration — Athena is disabled")
-  } else if (result["athena"]) {
-    result["athena"] = applyMissingCouncilGuard(result["athena"])
+  } else if (councilConfig?.members && councilConfig.members.length >= 2) {
+    log("[builtin-agents] Skipping council member registration — Athena and Athena-Junior are disabled")
+  } else {
+    if (result["athena"]) {
+      result["athena"] = applyMissingCouncilGuard(result["athena"])
+    }
+    if (result["athena-junior"]) {
+      result["athena-junior"] = applyMissingCouncilGuard(result["athena-junior"])
+    }
   }
 
   return result

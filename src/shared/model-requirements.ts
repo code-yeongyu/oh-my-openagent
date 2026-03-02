@@ -100,6 +100,16 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "high" },
     ],
   },
+  "athena-junior": {
+    fallbackChain: [
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-opus-4-6", variant: "max" },
+      { providers: ["opencode"], model: "kimi-k2.5-free" },
+      { providers: ["zai-coding-plan"], model: "glm-4.7" },
+      { providers: ["opencode"], model: "glm-4.7-free" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2", variant: "high" },
+      { providers: ["google", "github-copilot", "opencode"], model: "gemini-3-pro", variant: "high" },
+    ],
+  },
   "council-member": {
     fallbackChain: [
       { providers: ["opencode"], model: "gpt-5-nano" },

@@ -50,12 +50,25 @@ export function resolveCouncilIntent(intent?: string): CouncilIntent | null {
     : null
 }
 
-export function buildAthenaRuntimeGuidance(intent: CouncilIntent): string {
+export type CouncilGuidanceMode = "interactive" | "non-interactive"
+
+export function buildAthenaRuntimeGuidance(intent: CouncilIntent, mode: CouncilGuidanceMode = "interactive"): string {
+  let guidanceContent = RUNTIME_GUIDANCE_BY_INTENT[intent].trim()
+
+  if (mode === "non-interactive") {
+    guidanceContent = stripActionPaths(guidanceContent)
+  }
+
   return [
     "<athena_runtime_guidance>",
     "source: council_finalize",
     `intent: ${intent}`,
-    RUNTIME_GUIDANCE_BY_INTENT[intent].trim(),
+    `mode: ${mode}`,
+    guidanceContent,
     "</athena_runtime_guidance>",
   ].join("\n\n")
+}
+
+function stripActionPaths(guidance: string): string {
+  return guidance.replace(/<runtime_action_paths>[\s\S]*?<\/runtime_action_paths>/g, "").trim()
 }
