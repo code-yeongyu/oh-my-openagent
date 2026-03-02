@@ -31,7 +31,7 @@ describe("createHashlineEditTool", () => {
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
-  it("applies set_line with LINE#ID anchor", async () => {
+  it("applies replace with single LINE#ID anchor", async () => {
     //#given
     const filePath = path.join(tempDir, "test.txt")
     fs.writeFileSync(filePath, "line1\nline2\nline3")
@@ -41,19 +41,17 @@ describe("createHashlineEditTool", () => {
     const result = await tool.execute(
       {
         filePath,
-        edits: [{ type: "set_line", line: `2#${hash}`, text: "modified line2" }],
+        edits: [{ op: "replace", pos: `2#${hash}`, lines: "modified line2" }],
       },
       createMockContext(),
     )
 
     //#then
     expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nmodified line2\nline3")
-    expect(result).toContain("Successfully")
-    expect(result).toContain("Updated file (LINE#ID:content)")
-    expect(result).toMatch(/2#[ZPMQVRWSNKTXJBYH]{2}:modified line2/)
+    expect(result).toBe(`Updated ${filePath}`)
   })
 
-  it("applies replace_lines and insert_after", async () => {
+  it("applies ranged replace and anchored append", async () => {
     //#given
     const filePath = path.join(tempDir, "test.txt")
     fs.writeFileSync(filePath, "line1\nline2\nline3\nline4")
@@ -67,15 +65,15 @@ describe("createHashlineEditTool", () => {
         filePath,
         edits: [
           {
-            type: "replace_lines",
-            start_line: `2#${line2Hash}`,
-            end_line: `3#${line3Hash}`,
-            text: "replaced",
+            op: "replace",
+            pos: `2#${line2Hash}`,
+            end: `3#${line3Hash}`,
+            lines: "replaced",
           },
           {
-            type: "insert_after",
-            line: `4#${line4Hash}`,
-            text: "inserted",
+            op: "append",
+            pos: `4#${line4Hash}`,
+            lines: "inserted",
           },
         ],
       },
@@ -95,7 +93,7 @@ describe("createHashlineEditTool", () => {
     const result = await tool.execute(
       {
         filePath,
-        edits: [{ type: "set_line", line: "1#ZZ", text: "new" }],
+        edits: [{ op: "replace", pos: "1#ZZ", lines: "new" }],
       },
       createMockContext(),
     )
@@ -103,6 +101,25 @@ describe("createHashlineEditTool", () => {
     //#then
     expect(result).toContain("Error")
     expect(result).toContain(">>>")
+  })
+
+  it("does not classify invalid pos format as hash mismatch", async () => {
+    //#given
+    const filePath = path.join(tempDir, "invalid-format.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ op: "replace", pos: "42", lines: "updated" }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toContain("Error")
+    expect(result.toLowerCase()).not.toContain("hash mismatch")
   })
 
   it("preserves literal backslash-n and supports string[] payload", async () => {
@@ -115,7 +132,7 @@ describe("createHashlineEditTool", () => {
     await tool.execute(
       {
         filePath,
-        edits: [{ type: "set_line", line: `1#${line1Hash}`, text: "join(\\n)" }],
+        edits: [{ op: "replace", pos: `1#${line1Hash}`, lines: "join(\\n)" }],
       },
       createMockContext(),
     )
@@ -123,7 +140,7 @@ describe("createHashlineEditTool", () => {
     await tool.execute(
       {
         filePath,
-        edits: [{ type: "insert_after", line: `1#${computeLineHash(1, "join(\\n)")}`, text: ["a", "b"] }],
+        edits: [{ op: "append", pos: `1#${computeLineHash(1, "join(\\n)")}`, lines: ["a", "b"] }],
       },
       createMockContext(),
     )
@@ -132,12 +149,11 @@ describe("createHashlineEditTool", () => {
     expect(fs.readFileSync(filePath, "utf-8")).toBe("join(\\n)\na\nb\nline2")
   })
 
-  it("supports insert_before and insert_between", async () => {
+  it("supports anchored prepend and anchored append", async () => {
     //#given
     const filePath = path.join(tempDir, "test.txt")
     fs.writeFileSync(filePath, "line1\nline2\nline3")
     const line1 = computeLineHash(1, "line1")
-    const line2 = computeLineHash(2, "line2")
     const line3 = computeLineHash(3, "line3")
 
     //#when
@@ -145,8 +161,8 @@ describe("createHashlineEditTool", () => {
       {
         filePath,
         edits: [
-          { type: "insert_before", line: `3#${line3}`, text: ["before3"] },
-          { type: "insert_between", after_line: `1#${line1}`, before_line: `2#${line2}`, text: ["between"] },
+          { op: "prepend", pos: `3#${line3}`, lines: ["before3"] },
+          { op: "append", pos: `1#${line1}`, lines: ["between"] },
         ],
       },
       createMockContext(),
@@ -166,7 +182,7 @@ describe("createHashlineEditTool", () => {
     const result = await tool.execute(
       {
         filePath,
-        edits: [{ type: "insert_after", line: `1#${line1}`, text: [] }],
+        edits: [{ op: "append", pos: `1#${line1}`, lines: [] }],
       },
       createMockContext(),
     )
@@ -184,11 +200,11 @@ describe("createHashlineEditTool", () => {
     const line2 = computeLineHash(2, "line2")
 
     //#when
-    await tool.execute(
+    const result = await tool.execute(
       {
         filePath,
         rename: renamedPath,
-        edits: [{ type: "set_line", line: `2#${line2}`, text: "line2-updated" }],
+        edits: [{ op: "replace", pos: `2#${line2}`, lines: "line2-updated" }],
       },
       createMockContext(),
     )
@@ -196,6 +212,7 @@ describe("createHashlineEditTool", () => {
     //#then
     expect(fs.existsSync(filePath)).toBe(false)
     expect(fs.readFileSync(renamedPath, "utf-8")).toBe("line1\nline2-updated")
+    expect(result).toBe(`Moved ${filePath} to ${renamedPath}`)
   })
 
   it("supports file delete mode", async () => {
@@ -227,8 +244,8 @@ describe("createHashlineEditTool", () => {
       {
         filePath,
         edits: [
-          { type: "append", text: ["line2"] },
-          { type: "prepend", text: ["line1"] },
+          { op: "append", lines: ["line2"] },
+          { op: "prepend", lines: ["line1"] },
         ],
       },
       createMockContext(),
@@ -237,7 +254,46 @@ describe("createHashlineEditTool", () => {
     //#then
     expect(fs.existsSync(filePath)).toBe(true)
     expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nline2")
-    expect(result).toContain("Successfully applied 2 edit(s)")
+    expect(result).toBe(`Updated ${filePath}`)
+  })
+
+  it("accepts replace with one anchor", async () => {
+    //#given
+    const filePath = path.join(tempDir, "degrade.txt")
+    fs.writeFileSync(filePath, "line1\nline2\nline3")
+    const line2Hash = computeLineHash(2, "line2")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ op: "replace", pos: `2#${line2Hash}`, lines: ["line2-updated"] }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\nline2-updated\nline3")
+    expect(result).toBe(`Updated ${filePath}`)
+  })
+
+  it("accepts anchored append using end alias", async () => {
+    //#given
+    const filePath = path.join(tempDir, "alias.txt")
+    fs.writeFileSync(filePath, "line1\nline2")
+    const line1Hash = computeLineHash(1, "line1")
+
+    //#when
+    await tool.execute(
+      {
+        filePath,
+        edits: [{ op: "append", end: `1#${line1Hash}`, lines: ["inserted"] }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("line1\ninserted\nline2")
   })
 
   it("preserves BOM and CRLF through hashline_edit", async () => {
@@ -251,7 +307,7 @@ describe("createHashlineEditTool", () => {
     await tool.execute(
       {
         filePath,
-        edits: [{ type: "set_line", line: `2#${line2Hash}`, text: "line2-updated" }],
+        edits: [{ op: "replace", pos: `2#${line2Hash}`, lines: "line2-updated" }],
       },
       createMockContext(),
     )
@@ -284,5 +340,82 @@ describe("createHashlineEditTool", () => {
 
     //#then
     expect(envelope.lineEnding).toBe("\r\n")
+  })
+
+  it("rejects delete=true with non-empty edits before normalization", async () => {
+    //#given
+    const filePath = path.join(tempDir, "delete-reject.txt")
+    fs.writeFileSync(filePath, "line1")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        delete: true,
+        edits: [{ op: "replace", pos: "1#ZZ", lines: "bad" }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toContain("delete mode requires edits to be an empty array")
+    expect(fs.existsSync(filePath)).toBe(true)
+  })
+
+  it("rejects delete=true combined with rename", async () => {
+    //#given
+    const filePath = path.join(tempDir, "delete-rename.txt")
+    fs.writeFileSync(filePath, "line1")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        delete: true,
+        rename: path.join(tempDir, "new-name.txt"),
+        edits: [],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toContain("delete and rename cannot be used together")
+    expect(fs.existsSync(filePath)).toBe(true)
+  })
+
+  it("rejects missing file creation with anchored append", async () => {
+    //#given
+    const filePath = path.join(tempDir, "nonexistent.txt")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ op: "append", pos: "1#ZZ", lines: ["bad"] }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(result).toContain("File not found")
+  })
+
+  it("allows missing file creation with unanchored append", async () => {
+    //#given
+    const filePath = path.join(tempDir, "newfile.txt")
+
+    //#when
+    const result = await tool.execute(
+      {
+        filePath,
+        edits: [{ op: "append", lines: ["created"] }],
+      },
+      createMockContext(),
+    )
+
+    //#then
+    expect(fs.existsSync(filePath)).toBe(true)
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("created")
+    expect(result).toBe(`Updated ${filePath}`)
   })
 })

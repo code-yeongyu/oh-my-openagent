@@ -1,6 +1,6 @@
 # src/features/ — 19 Feature Modules
 
-**Generated:** 2026-02-21
+**Generated:** 2026-03-02
 
 ## OVERVIEW
 

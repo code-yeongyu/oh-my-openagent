@@ -15,6 +15,7 @@ export function stripMergeOperatorChars(text: string): string {
 }
 
 function leadingWhitespace(text: string): string {
+  if (!text) return ""
   const match = text.match(/^\s*/)
   return match ? match[0] : ""
 }
@@ -36,7 +37,9 @@ export function restoreOldWrappedLines(originalLines: string[], replacementLines
   const candidates: { start: number; len: number; replacement: string; canonical: string }[] = []
   for (let start = 0; start < replacementLines.length; start += 1) {
     for (let len = 2; len <= 10 && start + len <= replacementLines.length; len += 1) {
-      const canonicalSpan = stripAllWhitespace(replacementLines.slice(start, start + len).join(""))
+      const span = replacementLines.slice(start, start + len)
+      if (span.some((line) => line.trim().length === 0)) continue
+      const canonicalSpan = stripAllWhitespace(span.join(""))
       const original = canonicalToOriginal.get(canonicalSpan)
       if (original && original.count === 1 && canonicalSpan.length >= 6) {
         candidates.push({ start, len, replacement: original.line, canonical: canonicalSpan })
@@ -159,6 +162,7 @@ export function restoreIndentForPairedReplacement(
     if (leadingWhitespace(line).length > 0) return line
     const indent = leadingWhitespace(originalLines[idx])
     if (indent.length === 0) return line
+    if (originalLines[idx].trim() === line.trim()) return line
     return `${indent}${line}`
   })
 }

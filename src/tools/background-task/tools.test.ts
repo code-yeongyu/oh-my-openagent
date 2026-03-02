@@ -339,6 +339,48 @@ describe("background_output full_session", () => {
   })
 })
 
+
+describe("background_output blocking", () => {
+  test("block=true waits for task completion even with default full_session=true", async () => {
+    // #given a task that transitions running → completed after 2 polls
+    let pollCount = 0
+    const task = createTask({ status: "running" })
+    const manager: BackgroundOutputManager = {
+      getTask: (id: string) => {
+        if (id !== task.id) return undefined
+        pollCount++
+        if (pollCount >= 3) {
+          task.status = "completed"
+        }
+        return task
+      },
+    }
+    const client = createMockClient({
+      "ses-1": [
+        {
+          id: "m1",
+          info: { role: "assistant", time: "2026-01-01T00:00:00Z" },
+          parts: [{ type: "text", text: "completed result" }],
+        },
+      ],
+    })
+    const tool = createBackgroundOutput(manager, client)
+
+    // #when block=true, full_session not specified (defaults to true)
+    const output = await tool.execute({
+      task_id: "task-1",
+      block: true,
+      timeout: 10000,
+    }, mockContext)
+
+    // #then should have waited and returned full session output
+    expect(task.status).toBe("completed")
+    expect(pollCount).toBeGreaterThanOrEqual(3)
+    expect(output).toContain("# Full Session Output")
+    expect(output).toContain("completed result")
+  })
+})
+
 describe("background_cancel", () => {
   test("cancels a running task via manager", async () => {
     // #given

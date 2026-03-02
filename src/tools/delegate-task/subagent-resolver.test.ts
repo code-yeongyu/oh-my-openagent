@@ -4,6 +4,7 @@ import { resolveSubagentExecution } from "./subagent-resolver"
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import * as logger from "../../shared/logger"
+import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 
 function createBaseArgs(overrides?: Partial<DelegateTaskArgs>): DelegateTaskArgs {
   return {
@@ -78,5 +79,26 @@ describe("resolveSubagentExecution", () => {
       parentAgent: "sisyphus",
       error: "network timeout",
     })
+  })
+
+  test("normalizes matched agent model string before returning categoryModel", async () => {
+    //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { openai: ["grok-3"] },
+      connected: ["openai"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
+    const args = createBaseArgs({ subagent_type: "oracle" })
+    const executorCtx = createExecutorContext(async () => ([
+      { name: "oracle", mode: "subagent", model: "openai/gpt-5.3-codex" },
+    ]))
+
+    //#when
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+
+    //#then
+    expect(result.error).toBeUndefined()
+    expect(result.categoryModel).toEqual({ providerID: "openai", modelID: "gpt-5.3-codex" })
+    cacheSpy.mockRestore()
   })
 })

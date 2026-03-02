@@ -68,11 +68,17 @@ export interface DelegateTaskToolOptions {
   availableSkills?: AvailableSkill[]
   agentOverrides?: AgentOverrides
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
+  syncPollTimeoutMs?: number
 }
 
 export interface BuildSystemContentInput {
   skillContent?: string
+  skillContents?: string[]
   categoryPromptAppend?: string
+  agentsContext?: string
+  planAgentPrepend?: string
+  maxPromptTokens?: number
+  model?: { providerID: string; modelID: string; variant?: string }
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]

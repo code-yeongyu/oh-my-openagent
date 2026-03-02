@@ -1,4 +1,5 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
+import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 import { BLOCKED_TMUX_SUBCOMMANDS, DEFAULT_TIMEOUT_MS, INTERACTIVE_BASH_DESCRIPTION } from "./constants"
 import { getCachedTmuxPath } from "./tmux-path-resolver"
 
@@ -89,7 +90,7 @@ tmux capture-pane -p -t ${sessionName} -S -1000
 The Bash tool can execute these commands directly. Do NOT retry with interactive_bash.`
       }
 
-      const proc = Bun.spawn([tmuxPath, ...parts], {
+      const proc = spawnWithWindowsHide([tmuxPath, ...parts], {
         stdout: "pipe",
         stderr: "pipe",
       })

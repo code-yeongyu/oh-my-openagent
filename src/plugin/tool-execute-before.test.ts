@@ -1,5 +1,6 @@
 const { describe, expect, test } = require("bun:test")
 const { createToolExecuteBeforeHandler } = require("./tool-execute-before")
+const { createToolRegistry } = require("./tool-registry")
 
 describe("createToolExecuteBeforeHandler", () => {
   test("does not execute subagent question blocker hook for question tool", async () => {
@@ -215,6 +216,56 @@ describe("createToolExecuteBeforeHandler", () => {
 
       //#then
       expect(output.args.subagent_type).toBe("oracle")
+    })
+  })
+})
+
+describe("createToolRegistry", () => {
+  function createRegistryInput(overrides = {}) {
+    return {
+      ctx: {
+        directory: process.cwd(),
+        client: {},
+      },
+      pluginConfig: {
+        ...overrides,
+      },
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      },
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+    }
+  }
+
+  describe("#given hashline_edit is undefined", () => {
+    describe("#when creating tool registry", () => {
+      test("#then should not register edit tool", () => {
+        const result = createToolRegistry(createRegistryInput())
+
+        expect(result.filteredTools.edit).toBeUndefined()
+      })
+    })
+  })
+
+  describe("#given hashline_edit is true", () => {
+    describe("#when creating tool registry", () => {
+      test("#then should register edit tool", () => {
+        const result = createToolRegistry(
+          createRegistryInput({
+            hashline_edit: true,
+          }),
+        )
+
+        expect(result.filteredTools.edit).toBeDefined()
+      })
     })
   })
 })

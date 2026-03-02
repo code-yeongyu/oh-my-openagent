@@ -3,6 +3,7 @@ import * as connectedProvidersCache from "./connected-providers-cache"
 import { fuzzyMatchModel } from "./model-availability"
 import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
+import { normalizeModel } from "./model-normalization"
 
 export type ModelResolutionRequest = {
   intent?: {
@@ -35,10 +36,6 @@ export type ModelResolutionResult = {
   reason?: string
 }
 
-function normalizeModel(model?: string): string | undefined {
-  const trimmed = model?.trim()
-  return trimmed || undefined
-}
 
 export function resolveModelPipeline(
   request: ModelResolutionRequest,

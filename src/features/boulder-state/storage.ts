@@ -121,8 +121,8 @@ export function getPlanProgress(planPath: string): PlanProgress {
     const content = readFileSync(planPath, "utf-8")
     
     // Match markdown checkboxes: - [ ] or - [x] or - [X]
-    const uncheckedMatches = content.match(/^[-*]\s*\[\s*\]/gm) || []
-    const checkedMatches = content.match(/^[-*]\s*\[[xX]\]/gm) || []
+    const uncheckedMatches = content.match(/^\s*[-*]\s*\[\s*\]/gm) || []
+    const checkedMatches = content.match(/^\s*[-*]\s*\[[xX]\]/gm) || []
 
     const total = uncheckedMatches.length + checkedMatches.length
     const completed = checkedMatches.length
@@ -150,7 +150,8 @@ export function getPlanName(planPath: string): string {
 export function createBoulderState(
   planPath: string,
   sessionId: string,
-  agent?: string
+  agent?: string,
+  worktreePath?: string,
 ): BoulderState {
   return {
     active_plan: planPath,
@@ -158,5 +159,6 @@ export function createBoulderState(
     session_ids: [sessionId],
     plan_name: getPlanName(planPath),
     ...(agent !== undefined ? { agent } : {}),
+    ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
   }
 }

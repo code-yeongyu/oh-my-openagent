@@ -35,15 +35,15 @@ jobs:
   # - Uploads compressed artifacts for the publish job
   # =============================================================================
   build:
-    runs-on: ${{ matrix.platform == 'windows-x64' && 'windows-latest' || 'ubuntu-latest' }}
+    runs-on: ${{ startsWith(matrix.platform, 'windows-') && 'windows-latest' || 'ubuntu-latest' }}
     defaults:
       run:
         shell: bash
     strategy:
       fail-fast: false
-      max-parallel: 7
+      max-parallel: 11
       matrix:
-        platform: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, windows-x64]
+        platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline]
     steps:
       - uses: actions/checkout@v4
 
@@ -82,6 +82,52 @@ jobs:
           cd packages/${{ matrix.platform }}
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
+      - name: Pre-download baseline compile target
+        if: steps.check.outputs.skip != 'true' && endsWith(matrix.platform, '-baseline')
+        shell: bash
+        run: |
+          BUN_VERSION=$(bun --version)
+          PLATFORM="${{ matrix.platform }}"
+          PKG_NAME="bun-${PLATFORM}"
+          CACHE_DIR=$(bun pm cache)
+          CACHE_DEST="${CACHE_DIR}/${PKG_NAME}-v${BUN_VERSION}"
+          
+          if [[ -f "$CACHE_DEST" ]]; then
+            echo "✓ Compile target already cached at ${CACHE_DEST}"
+            exit 0
+          fi
+          
+          echo "Pre-downloading ${PKG_NAME} v${BUN_VERSION} to ${CACHE_DEST}"
+          TARBALL_URL="https://registry.npmjs.org/@oven/bun-${PLATFORM}/-/bun-${PLATFORM}-${BUN_VERSION}.tgz"
+          echo "URL: ${TARBALL_URL}"
+          
+          mkdir -p "$(dirname "$CACHE_DEST")"
+          TMP_DIR=$(mktemp -d)
+          
+          # Download and extract the bun binary from npm tarball
+          curl -fsSL --retry 5 --retry-delay 5 "${TARBALL_URL}" | tar -xzf - -C "${TMP_DIR}"
+          
+          if [[ "$PLATFORM" == windows-* ]]; then
+            BIN_NAME="bun.exe"
+          else
+            BIN_NAME="bun"
+          fi
+          
+          # npm tarball has package/bin/bun structure
+          if [[ -f "${TMP_DIR}/package/bin/${BIN_NAME}" ]]; then
+            cp "${TMP_DIR}/package/bin/${BIN_NAME}" "${CACHE_DEST}"
+          elif [[ -f "${TMP_DIR}/package/${BIN_NAME}" ]]; then
+            cp "${TMP_DIR}/package/${BIN_NAME}" "${CACHE_DEST}"
+          else
+            echo "Could not find ${BIN_NAME} in tarball, listing contents:"
+            find "${TMP_DIR}" -type f
+            exit 1
+          fi
+          
+          chmod +x "${CACHE_DEST}" 2>/dev/null || true
+          echo "✓ Pre-downloaded to ${CACHE_DEST}"
+          ls -lh "${CACHE_DEST}"
+
       - name: Build binary
         if: steps.check.outputs.skip != 'true'
         uses: nick-fields/retry@v3
@@ -95,14 +141,18 @@ jobs:
             case "$PLATFORM" in
               darwin-arm64) TARGET="bun-darwin-arm64" ;;
               darwin-x64) TARGET="bun-darwin-x64" ;;
+              darwin-x64-baseline) TARGET="bun-darwin-x64-baseline" ;;
               linux-x64) TARGET="bun-linux-x64" ;;
+              linux-x64-baseline) TARGET="bun-linux-x64-baseline" ;;
               linux-arm64) TARGET="bun-linux-arm64" ;;
               linux-x64-musl) TARGET="bun-linux-x64-musl" ;;
+              linux-x64-musl-baseline) TARGET="bun-linux-x64-musl-baseline" ;;
               linux-arm64-musl) TARGET="bun-linux-arm64-musl" ;;
               windows-x64) TARGET="bun-windows-x64" ;;
+              windows-x64-baseline) TARGET="bun-windows-x64-baseline" ;;
             esac
             
-            if [ "$PLATFORM" = "windows-x64" ]; then
+            if [[ "$PLATFORM" == windows-* ]]; then
               OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode.exe"
             else
               OUTPUT="packages/${PLATFORM}/bin/oh-my-opencode"
@@ -119,7 +169,7 @@ jobs:
           PLATFORM="${{ matrix.platform }}"
           cd packages/${PLATFORM}
           
-          if [ "$PLATFORM" = "windows-x64" ]; then
+          if [[ "$PLATFORM" == windows-* ]]; then
             # Windows: use 7z (pre-installed on windows-latest)
             7z a -tzip ../../binary-${PLATFORM}.zip bin/ package.json
           else
@@ -150,12 +200,13 @@ jobs:
   # =============================================================================
   publish:
     needs: build
+    if: always() && !cancelled()
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        platform: [darwin-arm64, darwin-x64, linux-x64, linux-arm64, linux-x64-musl, linux-arm64-musl, windows-x64]
+        platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline]
     steps:
       - name: Check if already published
         id: check
@@ -172,19 +223,21 @@ jobs:
           fi
 
       - name: Download artifact
+        id: download
         if: steps.check.outputs.skip != 'true'
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: binary-${{ matrix.platform }}
           path: .
 
       - name: Extract artifact
-        if: steps.check.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true' && steps.download.outcome == 'success'
         run: |
           PLATFORM="${{ matrix.platform }}"
           mkdir -p packages/${PLATFORM}
           
-          if [ "$PLATFORM" = "windows-x64" ]; then
+          if [[ "$PLATFORM" == windows-* ]]; then
             unzip binary-${PLATFORM}.zip -d packages/${PLATFORM}/
           else
             tar -xzvf binary-${PLATFORM}.tar.gz -C packages/${PLATFORM}/
@@ -195,13 +248,13 @@ jobs:
           ls -la packages/${PLATFORM}/bin/
 
       - uses: actions/setup-node@v4
-        if: steps.check.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true' && steps.download.outcome == 'success'
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Publish ${{ matrix.platform }}
-        if: steps.check.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true' && steps.download.outcome == 'success'
         run: |
           cd packages/${{ matrix.platform }}
           

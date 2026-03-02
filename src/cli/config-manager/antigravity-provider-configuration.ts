@@ -4,10 +4,10 @@
  * IMPORTANT: Model names MUST use `antigravity-` prefix for stability.
  *
  * Since opencode-antigravity-auth v1.3.0, models use a variant system:
- * - `antigravity-gemini-3-pro` with variants: low, high
+ * - `antigravity-gemini-3.1-pro` with variants: low, high
  * - `antigravity-gemini-3-flash` with variants: minimal, low, medium, high
  *
- * Legacy tier-suffixed names (e.g., `antigravity-gemini-3-pro-high`) still work
+ * Legacy tier-suffixed names (e.g., `antigravity-gemini-3.1-pro-high`) still work
  * but variants are the recommended approach.
  *
  * @see https://github.com/NoeFabris/opencode-antigravity-auth#models
@@ -16,7 +16,7 @@ export const ANTIGRAVITY_PROVIDER_CONFIG = {
   google: {
     name: "Google",
     models: {
-      "antigravity-gemini-3-pro": {
+      "antigravity-gemini-3.1-pro": {
         name: "Gemini 3 Pro (Antigravity)",
         limit: { context: 1048576, output: 65535 },
         modalities: { input: ["text", "image", "pdf"], output: ["text"] },

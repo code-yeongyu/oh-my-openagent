@@ -22,11 +22,15 @@ const sessionProcessedCommandExecutions = new Set<string>()
 
 export interface AutoSlashCommandHookOptions {
   skills?: LoadedSkill[]
+  pluginsEnabled?: boolean
+  enabledPluginsOverride?: Record<string, boolean>
 }
 
 export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions) {
   const executorOptions: ExecutorOptions = {
     skills: options?.skills,
+    pluginsEnabled: options?.pluginsEnabled,
+    enabledPluginsOverride: options?.enabledPluginsOverride,
   }
 
   return {

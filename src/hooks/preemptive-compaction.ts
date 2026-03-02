@@ -3,9 +3,11 @@ import type { OhMyOpenCodeConfig } from "../config"
 
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
 const DEFAULT_ACTUAL_LIMIT = 200_000
+const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
 
 type ModelCacheStateLike = {
   anthropicContext1MEnabled: boolean
+  modelContextLimitsCache?: Map<string, number>
 }
 
 function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
@@ -29,6 +31,26 @@ interface CachedCompactionState {
   providerID: string
   modelID: string
   tokens: TokenInfo
+}
+
+function withTimeout<TValue>(
+  promise: Promise<TValue>,
+  timeoutMs: number,
+  errorMessage: string,
+): Promise<TValue> {
+  let timeoutID: ReturnType<typeof setTimeout> | undefined
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutID = setTimeout(() => {
+      reject(new Error(errorMessage))
+    }, timeoutMs)
+  })
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutID !== undefined) {
+      clearTimeout(timeoutID)
+    }
+  })
 }
 
 function isAnthropicProvider(providerID: string): boolean {
@@ -70,10 +92,12 @@ export function createPreemptiveCompactionHook(
     const cached = tokenCache.get(sessionID)
     if (!cached) return
 
-    const actualLimit =
-      isAnthropicProvider(cached.providerID)
-        ? getAnthropicActualLimit(modelCacheState)
-        : DEFAULT_ACTUAL_LIMIT
+    const modelSpecificLimit = !isAnthropicProvider(cached.providerID)
+      ? modelCacheState?.modelContextLimitsCache?.get(`${cached.providerID}/${cached.modelID}`)
+      : undefined
+    const actualLimit = isAnthropicProvider(cached.providerID)
+      ? getAnthropicActualLimit(modelCacheState)
+      : modelSpecificLimit ?? DEFAULT_ACTUAL_LIMIT
 
     const lastTokens = cached.tokens
     const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
@@ -94,11 +118,15 @@ export function createPreemptiveCompactionHook(
         modelID
       )
 
-      await ctx.client.session.summarize({
-        path: { id: sessionID },
-        body: { providerID: targetProviderID, modelID: targetModelID, auto: true } as never,
-        query: { directory: ctx.directory },
-      })
+      await withTimeout(
+        ctx.client.session.summarize({
+          path: { id: sessionID },
+          body: { providerID: targetProviderID, modelID: targetModelID, auto: true } as never,
+          query: { directory: ctx.directory },
+        }),
+        PREEMPTIVE_COMPACTION_TIMEOUT_MS,
+        `Compaction summarize timed out after ${PREEMPTIVE_COMPACTION_TIMEOUT_MS}ms`,
+      )
 
       compactedSessions.add(sessionID)
     } catch (error) {
@@ -139,6 +167,7 @@ export function createPreemptiveCompactionHook(
         modelID: info.modelID ?? "",
         tokens: info.tokens,
       })
+      compactedSessions.delete(info.sessionID)
     }
   }
 

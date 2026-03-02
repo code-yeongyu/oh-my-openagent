@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "$id": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
   "title": "Oh My OpenCode Configuration",
   "description": "Configuration schema for oh-my-opencode plugin",
   "type": "object",
@@ -24,19 +24,7 @@
     "disabled_agents": {
       "type": "array",
       "items": {
-        "type": "string",
-        "enum": [
-          "sisyphus",
-          "hephaestus",
-          "prometheus",
-          "oracle",
-          "librarian",
-          "explore",
-          "multimodal-looker",
-          "metis",
-          "momus",
-          "atlas"
-        ]
+        "type": "string"
       }
     },
     "disabled_skills": {
@@ -960,6 +948,9 @@
                 }
               },
               "additionalProperties": false
+            },
+            "allow_non_gpt_model": {
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -3248,6 +3239,11 @@
           "prompt_append": {
             "type": "string"
           },
+          "max_prompt_tokens": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
           "is_unstable_agent": {
             "type": "boolean"
           },
@@ -3689,6 +3685,10 @@
         "messageStalenessTimeoutMs": {
           "type": "number",
           "minimum": 60000
+        },
+        "syncPollTimeoutMs": {
+          "type": "number",
+          "minimum": 60000
         }
       },
       "additionalProperties": false
@@ -3839,6 +3839,19 @@
           "additionalProperties": false
         }
       },
+      "additionalProperties": false
+    },
+    "start_work": {
+      "type": "object",
+      "properties": {
+        "auto_commit": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "auto_commit"
+      ],
       "additionalProperties": false
     },
     "_migrations": {

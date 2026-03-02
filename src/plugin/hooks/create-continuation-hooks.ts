@@ -49,7 +49,10 @@ export function createContinuationHooks(args: {
     safeCreateHook(hookName, factory, { enabled: safeHookEnabled })
 
   const stopContinuationGuard = isHookEnabled("stop-continuation-guard")
-    ? safeHook("stop-continuation-guard", () => createStopContinuationGuardHook(ctx))
+    ? safeHook("stop-continuation-guard", () =>
+        createStopContinuationGuardHook(ctx, {
+          backgroundManager,
+        }))
     : null
 
   const compactionContextInjector = isHookEnabled("compaction-context-injector")
@@ -108,6 +111,7 @@ export function createContinuationHooks(args: {
           isContinuationStopped: (sessionID: string) =>
             stopContinuationGuard?.isStopped(sessionID) ?? false,
           agentOverrides: pluginConfig.agents,
+          autoCommit: pluginConfig.start_work?.auto_commit,
         }))
     : null
 

@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
-import { subagentSessions } from "../../features/claude-code-session-state"
+import { getSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { HOOK_NAME } from "./hook-name"
@@ -10,6 +10,7 @@ import { getLastAgentFromSession } from "./session-last-agent"
 import type { AtlasHookOptions, SessionState } from "./types"
 
 const CONTINUATION_COOLDOWN_MS = 5000
+const FAILURE_BACKOFF_MS = 5 * 60 * 1000
 
 export function createAtlasEventHandler(input: {
   ctx: PluginInput
@@ -53,6 +54,7 @@ export function createAtlasEventHandler(input: {
       }
 
       const state = getState(sessionID)
+      const now = Date.now()
 
       if (state.lastEventWasAbortError) {
         state.lastEventWasAbortError = false
@@ -61,11 +63,18 @@ export function createAtlasEventHandler(input: {
       }
 
       if (state.promptFailureCount >= 2) {
-        log(`[${HOOK_NAME}] Skipped: continuation disabled after repeated prompt failures`, {
-          sessionID,
-          promptFailureCount: state.promptFailureCount,
-        })
-        return
+        const timeSinceLastFailure = state.lastFailureAt !== undefined ? now - state.lastFailureAt : Number.POSITIVE_INFINITY
+        if (timeSinceLastFailure < FAILURE_BACKOFF_MS) {
+          log(`[${HOOK_NAME}] Skipped: continuation in backoff after repeated failures`, {
+            sessionID,
+            promptFailureCount: state.promptFailureCount,
+            backoffRemaining: FAILURE_BACKOFF_MS - timeSinceLastFailure,
+          })
+          return
+        }
+
+        state.promptFailureCount = 0
+        state.lastFailureAt = undefined
       }
 
       const backgroundManager = options?.backgroundManager
@@ -88,21 +97,21 @@ export function createAtlasEventHandler(input: {
         return
       }
 
+      const sessionAgent = getSessionAgent(sessionID)
       const lastAgent = await getLastAgentFromSession(sessionID, ctx.client)
-      const lastAgentKey = getAgentConfigKey(lastAgent ?? "")
+      const effectiveAgent = sessionAgent ?? lastAgent
+      const lastAgentKey = getAgentConfigKey(effectiveAgent ?? "")
       const requiredAgent = getAgentConfigKey(boulderState.agent ?? "atlas")
       const lastAgentMatchesRequired = lastAgentKey === requiredAgent
-      const boulderAgentWasNotExplicitlySet = boulderState.agent === undefined
       const boulderAgentDefaultsToAtlas = requiredAgent === "atlas"
       const lastAgentIsSisyphus = lastAgentKey === "sisyphus"
-      const allowSisyphusWhenDefaultAtlas = boulderAgentWasNotExplicitlySet && boulderAgentDefaultsToAtlas && lastAgentIsSisyphus
-      const agentMatches = lastAgentMatchesRequired || allowSisyphusWhenDefaultAtlas
+      const allowSisyphusForAtlasBoulder = boulderAgentDefaultsToAtlas && lastAgentIsSisyphus
+      const agentMatches = lastAgentMatchesRequired || allowSisyphusForAtlasBoulder
       if (!agentMatches) {
         log(`[${HOOK_NAME}] Skipped: last agent does not match boulder agent`, {
           sessionID,
-          lastAgent: lastAgent ?? "unknown",
+          lastAgent: effectiveAgent ?? "unknown",
           requiredAgent,
-          boulderAgentExplicitlySet: boulderState.agent !== undefined,
         })
         return
       }
@@ -113,7 +122,6 @@ export function createAtlasEventHandler(input: {
         return
       }
 
-      const now = Date.now()
       if (state.lastContinuationInjectedAt && now - state.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS) {
         log(`[${HOOK_NAME}] Skipped: continuation cooldown active`, {
           sessionID,
@@ -132,6 +140,7 @@ export function createAtlasEventHandler(input: {
           remaining,
           total: progress.total,
           agent: boulderState.agent,
+          worktreePath: boulderState.worktree_path,
           backgroundManager,
           sessionState: state,
         })

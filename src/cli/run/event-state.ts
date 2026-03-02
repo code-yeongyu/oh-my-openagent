@@ -7,6 +7,8 @@ export interface EventState {
   currentTool: string | null
   /** Set to true when the main session has produced meaningful work (text, tool call, or tool result) */
   hasReceivedMeaningfulWork: boolean
+  /** Timestamp of the last received event (for watchdog detection) */
+  lastEventTimestamp: number
   /** Count of assistant messages for the main session */
   messageCount: number
   /** Current agent name from the latest assistant message */
@@ -54,6 +56,7 @@ export function createEventState(): EventState {
     lastPartText: "",
     currentTool: null,
     hasReceivedMeaningfulWork: false,
+    lastEventTimestamp: Date.now(),
     messageCount: 0,
     currentAgent: null,
     currentModel: null,

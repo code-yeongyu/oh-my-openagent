@@ -4,6 +4,7 @@ import { createLibrarianAgent } from "./librarian"
 import { createExploreAgent } from "./explore"
 import { createMomusAgent } from "./momus"
 import { createMetisAgent } from "./metis"
+import { createAtlasAgent } from "./atlas"
 
 const TEST_MODEL = "anthropic/claude-sonnet-4-5"
 
@@ -94,6 +95,20 @@ describe("read-only agent tool restrictions", () => {
       for (const tool of FILE_WRITE_TOOLS) {
         expect(permission[tool]).toBe("deny")
       }
+    })
+  })
+
+  describe("Atlas", () => {
+    test("allows delegation tools for orchestration", () => {
+      // given
+      const agent = createAtlasAgent({ model: TEST_MODEL })
+
+      // when
+      const permission = (agent.permission ?? {}) as Record<string, string>
+
+      // then
+      expect(permission["task"]).toBeUndefined()
+      expect(permission["call_omo_agent"]).toBeUndefined()
     })
   })
 })

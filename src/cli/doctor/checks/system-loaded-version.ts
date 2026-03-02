@@ -77,3 +77,7 @@ export async function getLatestPluginVersion(currentVersion: string | null): Pro
   const channel = extractChannel(currentVersion)
   return getLatestVersion(channel)
 }
+
+export function getSuggestedInstallTag(currentVersion: string | null): string {
+  return extractChannel(currentVersion)
+}

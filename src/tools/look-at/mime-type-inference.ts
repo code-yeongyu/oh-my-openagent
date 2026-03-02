@@ -8,12 +8,18 @@ export function inferMimeTypeFromBase64(base64Data: string): string {
 
   try {
     const cleanData = base64Data.replace(/^data:[^;]+;base64,/, "")
-    const header = atob(cleanData.slice(0, 16))
+    const header = Buffer.from(cleanData.slice(0, 256), "base64").toString("binary")
 
     if (header.startsWith("\x89PNG")) return "image/png"
     if (header.startsWith("\xFF\xD8\xFF")) return "image/jpeg"
     if (header.startsWith("GIF8")) return "image/gif"
     if (header.startsWith("RIFF") && header.includes("WEBP")) return "image/webp"
+    if (header.includes("ftypheic") || header.includes("ftypheix") || header.includes("ftyphevc") || header.includes("ftyphevx")) {
+      return "image/heic"
+    }
+    if (header.includes("ftypheif") || header.includes("ftypmif1") || header.includes("ftypmsf1")) {
+      return "image/heif"
+    }
     if (header.startsWith("%PDF")) return "application/pdf"
   } catch {
     // invalid base64 - fall through
@@ -29,8 +35,25 @@ export function inferMimeTypeFromFilePath(filePath: string): string {
     ".jpeg": "image/jpeg",
     ".png": "image/png",
     ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".bmp": "image/bmp",
+    ".tiff": "image/tiff",
+    ".tif": "image/tiff",
     ".heic": "image/heic",
     ".heif": "image/heif",
+    ".cr2": "image/x-canon-cr2",
+    ".crw": "image/x-canon-crw",
+    ".nef": "image/x-nikon-nef",
+    ".nrw": "image/x-nikon-nrw",
+    ".arw": "image/x-sony-arw",
+    ".sr2": "image/x-sony-sr2",
+    ".srf": "image/x-sony-srf",
+    ".pef": "image/x-pentax-pef",
+    ".orf": "image/x-olympus-orf",
+    ".raw": "image/x-panasonic-raw",
+    ".raf": "image/x-fuji-raf",
+    ".dng": "image/x-adobe-dng",
+    ".psd": "image/vnd.adobe.photoshop",
     ".mp4": "video/mp4",
     ".mpeg": "video/mpeg",
     ".mpg": "video/mpeg",
