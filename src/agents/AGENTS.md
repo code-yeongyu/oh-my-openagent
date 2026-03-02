@@ -1,4 +1,4 @@
-# src/agents/ — 13 Agent Definitions
+# src/agents/ - 14 Agent Definitions
 
 **Generated:** 2026-02-24
 
@@ -19,8 +19,9 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | **Metis** | claude-opus-4-6 | **0.3** | subagent | kimi-k2.5 → gpt-5.2 → gemini-3-pro | Pre-planning consultant |
 | **Momus** | gpt-5.2 | 0.1 | subagent | claude-opus-4-6 → gemini-3-pro | Plan reviewer |
 | **Atlas** | claude-sonnet-4-6 | 0.1 | primary | kimi-k2.5 → gpt-5.2 → gemini-3-pro | Todo-list orchestrator |
-| **Prometheus** | claude-opus-4-6 | 0.1 | — | kimi-k2.5 → gpt-5.2 → gemini-3-pro | Strategic planner (internal) |
-| **Athena** | claude-opus-4-6 | 0.1 | primary | kimi-k2.5 → glm-4.7 → gpt-5.2 → gemini-3-pro | Multi-model council orchestrator |
+| **Prometheus** | claude-opus-4-6 | 0.1 | N/A | kimi-k2.5 → gpt-5.2 → gemini-3-pro | Strategic planner (internal) |
+| **Athena** | claude-opus-4-6 | 0.1 | primary | kimi-k2.5 → glm-4.7 → gpt-5.2 → gemini-3-pro | Interactive council orchestrator |
+| **Athena-Junior** | claude-opus-4-6 | 0.1 | subagent | kimi-k2.5 → glm-4.7 → gpt-5.2 → gemini-3-pro | Non-interactive council orchestrator |
 | **Council-Member** | gpt-5-nano | 0.1 | subagent | NONE | Independent council analyst |
 | **Sisyphus-Junior** | claude-sonnet-4-6 | 0.1 | all | user-configurable | Category-spawned executor |
 
@@ -34,6 +35,8 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | Multimodal-Looker | ALL except read |
 | Atlas | task, call_omo_agent |
 | Momus | write, edit, task |
+| Athena | call_omo_agent |
+| Athena-Junior | call_omo_agent, question |
 | Council-Member | ALL except read, grep, glob, lsp_*, ast_grep_search (allow-list) |
 
 ## STRUCTURE
@@ -50,7 +53,8 @@ agents/
 ├── momus.ts               # Plan review
 ├── atlas/agent.ts         # Todo orchestrator
 ├── athena/                # Multi-model council orchestrator
-│   ├── agent.ts           # Athena agent factory + system prompt
+│   ├── agent.ts           # Athena (interactive) agent factory
+│   ├── athena-junior-agent.ts  # Athena-Junior (non-interactive) agent factory
 │   └── council-member-agent.ts  # Council member agent factory
 ├── types.ts               # AgentFactory, AgentMode
 ├── agent-builder.ts       # buildAgent() composition

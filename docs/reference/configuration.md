@@ -128,7 +128,7 @@ Here's a practical starting configuration:
 
 ### Agents
 
-Override built-in agent settings. Available agents: `sisyphus`, `hephaestus`, `prometheus`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`.
+Override built-in agent settings. Available agents: `sisyphus`, `hephaestus`, `prometheus`, `athena-junior`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`.
 
 ```json
 {
@@ -220,6 +220,39 @@ Athena requires at least 2 council members. Each member runs an independent anal
 
 Minimum 2 members are required. The installer (`bunx oh-my-opencode install`) auto-configures council members based on your available providers.
 
+#### Non-Interactive Council (Athena-Junior)
+
+Athena-Junior is the non-interactive variant of Athena, used for programmatic council invocation via `call_omo_agent` or CLI `oh-my-opencode run`. It returns structured `<athena_council_result>` JSON without user interaction (no Question tool).
+
+Configure non-interactive behavior under `agents.athena`:
+
+```jsonc
+{
+  "agents": {
+    "athena": {
+      "council": {
+        "members": [
+          { "model": "anthropic/claude-opus-4-6", "name": "Claude" },
+          { "model": "openai/gpt-5.2", "name": "GPT" }
+        ]
+      },
+      // Non-interactive settings (used by athena-junior)
+      "non_interactive_mode": "delegation",
+      "non_interactive_members": "all",
+      "non_interactive_member_list": ["Council: Claude", "Council: GPT"]
+    }
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `non_interactive_mode` | `"delegation"` \| `"solo"` | `"delegation"` | How council members analyze in non-interactive mode. `delegation` = members delegate to subagents (faster), `solo` = members explore themselves (more thorough). |
+| `non_interactive_members` | `"all"` \| `"custom"` | `"all"` | Which members to use. `all` = use all configured council members, `custom` = use only those in `non_interactive_member_list`. |
+| `non_interactive_member_list` | string[] | - | Specific member names when `non_interactive_members` is `"custom"`. Must match names from `council.members`. |
+
+These settings are injected into Athena-Junior's prompt at runtime. The interactive Athena agent asks users these questions via the Question tool instead.
+
 ### Permission Options
 
 Control what tools an agent can use:
@@ -250,7 +283,7 @@ Control what tools an agent can use:
 
 Domain-specific model delegation used by the `task()` tool. When Sisyphus delegates work, it picks a category, not a model name.
 
-Available agents: `sisyphus`, `hephaestus`, `prometheus`, `athena`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`
+Available agents: `sisyphus`, `hephaestus`, `prometheus`, `athena`, `athena-junior`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`
 
 #### Built-in Categories
 
@@ -309,6 +342,8 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | **Metis** | `claude-opus-4-6` | anthropic → kimi-for-coding → opencode → openai → google |
 | **Momus** | `gpt-5.2` | openai → anthropic → google (via github-copilot/opencode) |
 | **Atlas** | `k2p5` | kimi-for-coding → opencode → anthropic → openai → google |
+| **Athena** | `claude-opus-4-6` | anthropic → kimi-for-coding → zai-coding-plan → openai → google |
+| **Athena-Junior** | `claude-opus-4-6` | anthropic → kimi-for-coding → zai-coding-plan → openai → google |
 
 #### Category Provider Chains
 
