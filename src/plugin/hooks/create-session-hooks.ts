@@ -25,8 +25,12 @@ import {
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
+  createTtsrHook,
+  type TtsrHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
+import { createAbortRetryHandler } from "../../hooks/ttsr/abort-retry-handler"
+import { discoverTtsrRules } from "../../hooks/ttsr/rule-discovery"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -60,6 +64,7 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
+  ttsrHook: TtsrHook | null
 }
 
 export function createSessionHooks(args: {
@@ -261,6 +266,47 @@ export function createSessionHooks(args: {
           pluginConfig,
         }))
     : null
+
+  const ttsrHook: TtsrHook | null = (() => {
+    if (!isHookEnabled("ttsr")) return null
+    const ttsrConfig = pluginConfig.ttsr
+    if (!ttsrConfig?.enabled) return null
+    return safeHook("ttsr", () => {
+      const abortRetryHandler = createAbortRetryHandler({
+        abort: async (sessionID) => {
+          await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+        },
+        promptAsync: async (sessionID, content) => {
+          await ctx.client.session
+            .prompt({
+              path: { id: sessionID },
+              body: { parts: [{ type: "text", text: content }] },
+              query: { directory: ctx.directory },
+            })
+            .catch(() => {})
+        },
+      })
+      const rules: import("../../features/ttsr/types").TtsrRule[] = []
+      discoverTtsrRules(ctx.directory).then((discovered) => {
+        rules.push(...discovered)
+      }).catch(() => {})
+      const settings: import("../../features/ttsr/types").TtsrSettings = {
+        enabled: ttsrConfig.enabled ?? true,
+        contextMode: ttsrConfig.contextMode ?? "discard",
+        interruptMode: ttsrConfig.interruptMode ?? "abort-retry",
+        repeatMode: ttsrConfig.repeatMode ?? "once",
+        repeatGap: ttsrConfig.repeatGap ?? 3,
+        maxRetriesPerRule: ttsrConfig.maxRetriesPerRule ?? 3,
+      }
+      return createTtsrHook({
+        settings,
+        rules,
+        onMatch: async (sessionID, matchedRules) => {
+          await abortRetryHandler.handleMatches(sessionID, matchedRules, settings)
+        },
+      })
+    })
+  })()
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -285,5 +331,6 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     anthropicEffort,
     runtimeFallback,
+    ttsrHook,
   }
 }
