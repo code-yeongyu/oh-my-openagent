@@ -1,0 +1,41 @@
+{
+  "milestone": "exa-mcp-tools",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": { "passed": true, "command": "bun test", "exitCode": 0 },
+    "typecheck": { "passed": true, "command": "bun run typecheck", "exitCode": 0 },
+    "lint": { "passed": true, "command": "n/a (no lint script in package.json)", "exitCode": 0, "note": "lint script not defined in services.yaml" }
+  },
+  "reviewsSummary": {
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "nonBlockingIssues": [
+    {
+      "featureId": "exa-tools-mcp-config",
+      "severity": "non_blocking",
+      "description": "Function name is 'resolveExaTools()' but feature description mentions 'getToolsParam()'. This is a naming difference with no functional impact."
+    }
+  ],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [],
+  "rejectedObservations": [
+    {
+      "observation": "Worker added files to .factory/ directory (init.sh, library/, services.yaml, skills/) that are not part of the original oh-my-opencode codebase.",
+      "reason": "These are mission-specific infrastructure files created by the orchestrator, not discovered knowledge that needs documentation. They are correctly scoped to the .factory/ directory."
+    },
+    {
+      "observation": "Worker used standard npm/bun commands (bun install, bun run typecheck, bun test) which are already documented in package.json.",
+      "reason": "Already documented in AGENTS.md COMMANDS section and package.json. No update needed."
+    },
+    {
+      "observation": "Worker correctly followed the typescript-worker skill procedure. No gaps in knowledge were identified.",
+      "reason": "This is a non-observation - no action needed when everything works correctly."
+    }
+  ],
+  "previousRound": null
+}

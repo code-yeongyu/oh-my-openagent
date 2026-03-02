@@ -1,0 +1,31 @@
+{
+  "featureId": "exa-tools-schema",
+  "reviewedAt": "2026-03-03T00:00:00.000Z",
+  "commitId": "d4055736",
+  "transcriptSkeletonReviewed": true,
+  "diffReviewed": true,
+  "status": "pass",
+  "codeReview": {
+    "summary": "Implementation fully covers all requirements. ExaToolSchema enum contains all 8 Exa tools (web_search_exa, get_code_context_exa, company_research_exa, web_search_advanced_exa, crawling_exa, people_search_exa, deep_researcher_start, deep_researcher_check). The exa_tools config field accepts string[] | 'all' | 'default' union type with backward compatible default. TypeScript types (ExaTool, WebsearchConfig) are exported alongside schemas. JSDoc comments document the config option thoroughly.",
+    "issues": []
+  },
+  "sharedStateObservations": [
+    {
+      "area": "conventions",
+      "observation": "Worker added files to .factory/ directory (init.sh, library/, services.yaml, skills/) that are not part of the original oh-my-opencode codebase. These appear to be mission-specific setup files.",
+      "evidence": "Commit shows .factory/init.sh, .factory/library/architecture.md, .factory/library/user-testing.md, .factory/services.yaml, .factory/skills/typescript-worker/SKILL.md were added"
+    },
+    {
+      "area": "services",
+      "observation": "Worker used standard npm/bun commands (bun install, bun run typecheck, bun test) which are already documented in package.json. No additional services were needed.",
+      "evidence": "Transcript shows: bun install, bun run typecheck, bun test src/mcp/websearch.test.ts"
+    },
+    {
+      "area": "knowledge",
+      "observation": "Worker correctly followed the typescript-worker skill procedure. No gaps in knowledge were identified - worker was able to implement the feature following project conventions for Zod v4 schemas.",
+      "evidence": "skillFeedback.followedProcedure: true, no deviations noted in handoff"
+    }
+  ],
+  "addressesFailureFrom": null,
+  "summary": "Feature implementation passes review. All 4 expected behaviors verified: (1) ExaToolSchema enum contains all 8 Exa tools, (2) exa_tools field accepts string[] | 'all' | 'default' union type, (3) TypeScript types exported alongside schemas, (4) JSDoc comments document the config option. Typecheck passes (only pre-existing bun-types error), all 15 tests pass including 5 new exa_tools tests, and backward compatibility is maintained with default falling back to web_search_exa."
+}
