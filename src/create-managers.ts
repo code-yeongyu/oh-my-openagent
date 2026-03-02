@@ -33,6 +33,7 @@ export function createManagers(args: {
     pluginConfig.background_task,
     {
       tmuxConfig,
+      toonCompressionConfig: pluginConfig.toon_compression,
 		onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
 			log("[index] onSubagentSessionCreated callback received", {
 				sessionID: event.sessionID,
