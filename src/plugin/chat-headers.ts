@@ -123,6 +123,17 @@ export function createChatHeadersHandler(args: { ctx: PluginContext }): (input: 
     if (!isChatHeadersOutput(output)) return
 
     if (!isCopilotProvider(normalizedInput.provider.id)) return
+
+    // Do not override x-initiator when @ai-sdk/github-copilot is active.
+    // OpenCode's copilot fetch wrapper already sets x-initiator based on
+    // the actual request body content. Overriding it here causes a mismatch
+    // that the Copilot API rejects with "invalid initiator".
+    const model = isRecord(input) && isRecord((input as Record<string, unknown>).model)
+      ? (input as Record<string, unknown>).model as Record<string, unknown>
+      : undefined
+    const api = model && isRecord(model.api) ? model.api as Record<string, unknown> : undefined
+    if (api?.npm === "@ai-sdk/github-copilot") return
+
     if (!(await isOmoInternalMessage(normalizedInput, ctx.client))) return
 
     output.headers["x-initiator"] = "agent"
