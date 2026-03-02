@@ -573,13 +573,13 @@ Define `fallback_models` per agent or category:
 
 ### Hashline Edit
 
-Replaces the built-in `Edit` tool with a hash-anchored version using `LINE#ID` references to prevent stale-line edits. Enabled by default.
+Replaces the built-in `Edit` tool with a hash-anchored version using `LINE#ID` references to prevent stale-line edits. Disabled by default.
 
 ```json
-{ "hashline_edit": false }
+{ "hashline_edit": true }
 ```
 
-When enabled, two companion hooks are active: `hashline-read-enhancer` (annotates Read output) and `hashline-edit-diff-enhancer` (shows diffs). Disable them individually via `disabled_hooks`.
+When enabled, two companion hooks are active: `hashline-read-enhancer` (annotates Read output) and `hashline-edit-diff-enhancer` (shows diffs). Opt-in by setting `hashline_edit: true`. Disable the companion hooks individually via `disabled_hooks` if needed.
 
 ### Experimental
 
