@@ -16,6 +16,7 @@ const scopePriority: Record<string, number> = {
   user: 3,
   opencode: 2,
   "opencode-project": 2,
+  plugin: 1,
   config: 1,
   builtin: 1,
 }
@@ -89,7 +90,7 @@ function formatCombinedDescription(skills: SkillInfo[], commands: CommandInfo[])
   }
 
   if (allItems.length > 0) {
-    lines.push(`\n<available_items>\nPriority: project > user > opencode > builtin | Skills listed before commands\nInvoke via: skill(name="item-name") — omit leading slash for commands.\n${allItems.join("\n")}\n</available_items>`)
+    lines.push(`\n<available_items>\nPriority: project > user > opencode > builtin/plugin | Skills listed before commands\nInvoke via: skill(name="item-name") — omit leading slash for commands.\n${allItems.join("\n")}\n</available_items>`)
   }
 
   return TOOL_DESCRIPTION_PREFIX + lines.join("")
@@ -195,7 +196,10 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
 
   const getCommands = (): CommandInfo[] => {
     if (cachedCommands) return cachedCommands
-    cachedCommands = discoverCommandsSync()
+    cachedCommands = discoverCommandsSync(undefined, {
+      pluginsEnabled: options.pluginsEnabled,
+      enabledPluginsOverride: options.enabledPluginsOverride,
+    })
     return cachedCommands
   }
 
