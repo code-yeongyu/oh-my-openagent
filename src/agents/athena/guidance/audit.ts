@@ -140,6 +140,7 @@ Question({
     options: [
       { label: "Fix now (Atlas)", description: "Hand off to Atlas for direct implementation" },
       { label: "Create plan (Prometheus)", description: "Hand off to Prometheus for planning and phased execution" },
+      { label: "Cross-check with council", description: "Launch a new council session with this synthesis as context" },
       { label: "No action", description: "Review only - no delegation" }
     ],
     multiple: false
@@ -149,5 +150,6 @@ Question({
 6) Execute selected action:
 - Fix now (Atlas) -> switch_agent(agent="atlas") with ONLY selected findings
 - Create plan (Prometheus) -> switch_agent(agent="prometheus") with ONLY selected findings
+- Cross-check with council -> launch a new council session with the current synthesis as context. Restart from Step 2 (council setup) with the synthesis included in the prompt.
 - No action -> acknowledge and end
 </runtime_action_paths>`

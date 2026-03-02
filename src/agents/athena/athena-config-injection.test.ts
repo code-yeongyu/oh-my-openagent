@@ -77,11 +77,11 @@ describe("Athena prompt config injection placeholders", () => {
         expect(athenaConfig.prompt).toContain("<constraints>")
       })
 
-      it("#then places council setup after step 1 and removes first-action wording", () => {
+      it("#then places council setup after step 1 routing and removes first-action wording", () => {
         const prompt = athenaConfig.prompt ?? ""
         expect(prompt).not.toContain("CRITICAL: Council Setup (Your First Action)")
 
-        const step1Index = prompt.indexOf("Step 1: Understand the question and decide the route.")
+        const step1Index = prompt.indexOf("Step 1: Route the message.")
         const step2Index = prompt.indexOf("Step 2: Council setup (default flow before launch).")
 
         expect(step1Index).toBeGreaterThan(-1)
@@ -94,25 +94,29 @@ describe("Athena prompt config injection placeholders", () => {
         expect(prompt).not.toContain("Classification disambiguation rule:")
       })
 
-      it("#then requires question tool routing in self-answerable path", () => {
-        expect(athenaConfig.prompt).toContain("Athena MUST ask the user to choose direct answer vs council using the Question tool")
-        expect(athenaConfig.prompt).toContain("header: \"Routing\"")
-        expect(athenaConfig.prompt).toContain("label: \"Answer directly\"")
-        expect(athenaConfig.prompt).toContain("label: \"Consult council\"")
+      it("#then uses two-phase routing with 6 categories and pre-checks", () => {
+        const prompt = athenaConfig.prompt ?? ""
+        expect(prompt).toContain("FIRST INTERACTION")
+        expect(prompt).toContain("SUBSEQUENT INTERACTIONS")
+        expect(prompt).toContain("Pre-checks (override all categories)")
+        expect(prompt).toContain("Council-worthy & clear")
+        expect(prompt).toContain("Simple/factual")
+        expect(prompt).toContain("Wrong-agent")
       })
 
-      it("#then requires question tool clarifications in ambiguous council path", () => {
-        expect(athenaConfig.prompt).toContain("Use the Question tool (not open-ended free text) for 1-2 targeted clarifications")
-        expect(athenaConfig.prompt).toContain("Formulate the questions and options dynamically")
-        expect(athenaConfig.prompt).not.toContain("header: \"Output Type\"")
-        expect(athenaConfig.prompt).not.toContain("header: \"Scope\"")
+      it("#then uses targeted Question tool for ambiguous routing", () => {
+        const prompt = athenaConfig.prompt ?? ""
+        expect(prompt).toContain("Clarify with targeted Question tool")
+        expect(prompt).not.toContain("header: \"Output Type\"")
+        expect(prompt).not.toContain("header: \"Scope\"")
       })
 
       it("#then keeps intent classification anchored to step 3 wording", () => {
-        expect(athenaConfig.prompt).toContain("Step 3: Classify the question intent by primary objective.")
-        expect(athenaConfig.prompt).toContain("Then proceed to Step 2.")
-        expect(athenaConfig.prompt).not.toContain("Then classify intent and proceed to Step 2.")
-        expect(athenaConfig.prompt).not.toContain("Classify intent immediately and proceed to Step 2.")
+        const prompt = athenaConfig.prompt ?? ""
+        expect(prompt).toContain("Step 3: Classify the question intent by primary objective.")
+        expect(prompt).toContain("Proceed directly to Step 2")
+        expect(prompt).not.toContain("Then classify intent and proceed to Step 2.")
+        expect(prompt).not.toContain("Classify intent immediately and proceed to Step 2.")
       })
 
       it("#then excludes non-interactive mode branch from runtime prompt", () => {

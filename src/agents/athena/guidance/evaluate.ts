@@ -19,7 +19,7 @@ Question({
       { label: "Adopt option -> implement now", description: "Implement a selected option immediately" },
       { label: "Write to document", description: "Save to .sisyphus/athena/notes/ (named after this council session)" },
       { label: "Ask follow-up", description: "Ask another comparison question" },
-      { label: "Done", description: "No further action needed" }
+      { label: "Cross-check with council", description: "Launch a new council session with this synthesis as context" },
     ],
     multiple: false
   }]
@@ -58,5 +58,5 @@ Question({
 - Adopt option -> implement now + Sisyphus ultrawork -> switch_agent(agent="sisyphus") and prefix handoff context with "ultrawork ".
 - Write to document -> write the document to the ".sisyphus/athena/notes/" directory using the council session name from the council_finalize archive_dir, then report the exact path.
 - Ask follow-up -> ask user then restart the council workflow from Step 3 (intent classification).
-- Done -> acknowledge and end.
+- Cross-check with council -> launch a new council session with the current synthesis as context. Restart from Step 2 (council setup) with the synthesis included in the prompt.
 </runtime_action_paths>`
