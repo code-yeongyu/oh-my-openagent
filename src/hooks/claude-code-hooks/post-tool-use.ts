@@ -96,12 +96,12 @@ export async function executePostToolUseHooks(
        for (const hook of matcher.hooks) {
          if (hook.type !== "command" && hook.type !== "http") continue
 
-         if (hook.type === "command" && isHookCommandDisabled("PostToolUse", hook.command, extendedConfig ?? null)) {
-          log("PostToolUse hook command skipped (disabled by config)", { command: hook.command, toolName: ctx.toolName })
+        const hookName = getHookIdentifier(hook)
+        if (isHookCommandDisabled("PostToolUse", hookName, extendedConfig ?? null)) {
+          log("PostToolUse hook command skipped (disabled by config)", { command: hookName, toolName: ctx.toolName })
           continue
         }
 
-        const hookName = getHookIdentifier(hook)
         if (!firstHookName) firstHookName = hookName
 
         const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)
