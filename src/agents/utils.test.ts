@@ -242,28 +242,14 @@ describe("createBuiltinAgents with model overrides", () => {
   test("createBuiltinAgents excludes disabled skills from availableSkills", async () => {
     // #given
     const disabledSkills = new Set(["playwright"])
-    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
-    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set([
-        "anthropic/claude-opus-4-6",
-        "opencode/kimi-k2.5-free",
-        "zai-coding-plan/glm-5",
-        "opencode/big-pickle",
-      ])
-    )
 
-    try {
-      // #when
-      const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined, undefined, disabledSkills)
+    // #when
+    const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], undefined, undefined, undefined, disabledSkills)
 
-      // #then
-      expect(agents.sisyphus.prompt).not.toContain("playwright")
-      expect(agents.sisyphus.prompt).toContain("frontend-ui-ux")
-      expect(agents.sisyphus.prompt).toContain("git-master")
-    } finally {
-      cacheSpy.mockRestore()
-      fetchSpy.mockRestore()
-    }
+    // #then
+    expect(agents.sisyphus.prompt).not.toContain("playwright")
+    expect(agents.sisyphus.prompt).toContain("frontend-ui-ux")
+    expect(agents.sisyphus.prompt).toContain("git-master")
   })
 
   test("includes custom agents in orchestrator prompts when provided via config", async () => {
