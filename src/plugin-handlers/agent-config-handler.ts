@@ -79,6 +79,11 @@ export async function applyAgentConfig(params: {
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
   const athenaCouncilConfig = params.pluginConfig.agents?.athena?.council
+  const athenaNonInteractiveConfig = {
+    non_interactive_mode: (params.pluginConfig.agents?.athena as Record<string, unknown>)?.non_interactive_mode as string | undefined,
+    non_interactive_members: (params.pluginConfig.agents?.athena as Record<string, unknown>)?.non_interactive_members as string | undefined,
+    non_interactive_member_list: (params.pluginConfig.agents?.athena as Record<string, unknown>)?.non_interactive_member_list as string[] | undefined,
+  }
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
     params.pluginConfig.agents,
@@ -94,6 +99,7 @@ export async function applyAgentConfig(params: {
     useTaskSystem,
     athenaCouncilConfig,
     disableOmoEnv,
+    athenaNonInteractiveConfig,
   );
 
   const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;

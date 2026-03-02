@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 import { ATHENA_PROMPT_METADATA, createAthenaAgent } from "./agent"
+import { ATHENA_NON_INTERACTIVE_PROMPT } from "./non-interactive-prompt"
 
 describe("Athena prompt config injection placeholders", () => {
   const athenaConfig = createAthenaAgent("anthropic/claude-opus-4-6")
@@ -156,6 +157,28 @@ describe("Athena prompt metadata", () => {
           entry.includes("structured") || entry.includes("agent-to-agent"),
         )
         expect(hasStructuredEntry).toBe(true)
+      })
+    })
+  })
+})
+
+describe("Non-interactive prompt config injection placeholders", () => {
+  describe("#given the non-interactive prompt", () => {
+    describe("#when checking for config placeholders", () => {
+      it("#then contains {NON_INTERACTIVE_MODE} placeholder", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{NON_INTERACTIVE_MODE}")
+      })
+
+      it("#then contains {NON_INTERACTIVE_MEMBERS} placeholder", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{NON_INTERACTIVE_MEMBERS}")
+      })
+
+      it("#then contains {NON_INTERACTIVE_MEMBER_LIST} placeholder", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{NON_INTERACTIVE_MEMBER_LIST}")
+      })
+
+      it("#then contains {BACKGROUND_WAIT_TIMEOUT_MS} placeholder", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{BACKGROUND_WAIT_TIMEOUT_MS}")
       })
     })
   })

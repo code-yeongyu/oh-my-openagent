@@ -78,7 +78,12 @@ export async function createBuiltinAgents(
   disabledSkills?: Set<string>,
   useTaskSystem = false,
   councilConfig?: CouncilConfig,
-  disableOmoEnv = false
+  disableOmoEnv = false,
+  athenaNonInteractiveConfig?: {
+    non_interactive_mode?: string
+    non_interactive_members?: string
+    non_interactive_member_list?: string[]
+  },
 ): Promise<Record<string, AgentConfig>> {
 
   const connectedProviders = readConnectedProvidersCache()
@@ -230,6 +235,10 @@ export async function createBuiltinAgents(
         .replace(/\{CANCEL_RETRYING_ON_QUORUM\}/g, String(cancelOnQuorum))
         .replace(/\{STUCK_THRESHOLD_SECONDS\}/g, String(stuckThreshold))
         .replace(/\{MEMBER_MAX_RUNNING_SECONDS\}/g, String(memberMaxRunning))
+        .replace(/\{NON_INTERACTIVE_MODE\}/g, athenaNonInteractiveConfig?.non_interactive_mode ?? "delegation")
+        .replace(/\{NON_INTERACTIVE_MEMBERS\}/g, athenaNonInteractiveConfig?.non_interactive_members ?? "all")
+        .replace(/\{NON_INTERACTIVE_MEMBER_LIST\}/g, JSON.stringify(athenaNonInteractiveConfig?.non_interactive_member_list ?? []))
+        .replace(/\{BACKGROUND_WAIT_TIMEOUT_MS\}/g, String(COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS))
       athenaPrompt += `\n\n## Council Resilience Config\n- retry_on_fail: ${retryOnFail}\n- retry_failed_if_others_finished: ${retryIfFinished}\n- cancel_retrying_on_quorum: ${cancelOnQuorum}\n- stuck_threshold_seconds: ${stuckThreshold}\n- member_max_running_seconds: ${memberMaxRunning}`
 
       result["athena"] = {
