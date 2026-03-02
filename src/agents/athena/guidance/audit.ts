@@ -27,22 +27,25 @@ Question({
 3) Branch by processing mode.
 
 Mode: One by one
+- Per-finding fix options MUST be derived from the synthesis's fix directions / suggested fixes.
+- Each option represents a remediation APPROACH (e.g., "Add input validation", "Refactor to use parameterized queries"), NOT an execution agent.
+- NEVER use agent names (Atlas, Prometheus, Hephaestus, Sisyphus) as per-finding option labels — those belong ONLY to Step 5 (execution method).
+- Handle variable fix counts per finding:
+  - If a finding has NO fix suggestion from synthesis -> show only Skip / Defer / Stop review.
+  - If a finding has exactly ONE fix suggestion -> show that fix + Skip / Defer / Stop review.
+  - If a finding has MULTIPLE fix suggestions -> show each as a labeled option + Skip / Defer / Stop review.
 - Process findings in batches using ONE Question call per batch.
 - Default batch size: 3 findings per batch.
 - Hard cap: 5 findings only when findings are short and options are limited.
-- For each finding in the batch, provide dynamic options from synthesis (for example A/B/C fix options) plus:
-  - Skip
-  - Defer
-  - Stop review
-- Example Question tool call (batch of 3 findings):
+- Example Question tool call (batch of 3 findings — showing all 3 cases):
 Question({
   questions: [
     {
-      question: "Finding #10: choose how to proceed.",
+      question: "Finding #10: SQL injection in user search — choose how to proceed.",
       header: "#10 Action",
       options: [
-        { label: "Option A", description: "Apply fix option A from synthesis" },
-        { label: "Option B", description: "Apply fix option B from synthesis" },
+        { label: "Add input validation", description: "Pattern-based sanitization at the controller layer (from synthesis)" },
+        { label: "Use parameterized queries", description: "Refactor raw SQL to prepared statements (from synthesis)" },
         { label: "Skip", description: "Do not act on this finding now" },
         { label: "Defer", description: "Keep for later" },
         { label: "Stop review", description: "End one-by-one processing" }
@@ -50,11 +53,10 @@ Question({
       multiple: false
     },
     {
-      question: "Finding #11: choose how to proceed.",
+      question: "Finding #11: Missing rate limiter on /api/auth — choose how to proceed.",
       header: "#11 Action",
       options: [
-        { label: "Option A", description: "Apply fix option A from synthesis" },
-        { label: "Option C", description: "Apply fix option C from synthesis" },
+        { label: "Add rate limiting middleware", description: "Express-rate-limit on auth endpoints (from synthesis)" },
         { label: "Skip", description: "Do not act on this finding now" },
         { label: "Defer", description: "Keep for later" },
         { label: "Stop review", description: "End one-by-one processing" }
@@ -62,10 +64,9 @@ Question({
       multiple: false
     },
     {
-      question: "Finding #12: choose how to proceed.",
+      question: "Finding #12: Outdated dependency detected (low confidence) — choose how to proceed.",
       header: "#12 Action",
       options: [
-        { label: "Option B", description: "Apply fix option B from synthesis" },
         { label: "Skip", description: "Do not act on this finding now" },
         { label: "Defer", description: "Keep for later" },
         { label: "Stop review", description: "End one-by-one processing" }
@@ -74,7 +75,9 @@ Question({
     }
   ]
 })
-- Keep free-form answers enabled (user may type custom choices like "#10:A, #11:skip"). Parse them.
+- IMPORTANT: The labels above ("Add input validation", "Use parameterized queries", etc.) are EXAMPLES. Use the ACTUAL fix approaches from your synthesis.
+- Anti-pattern: Do NOT use "Fix now (Atlas)" or "Create plan (Prometheus)" as per-finding options. Those are execution methods and belong ONLY in Step 5.
+- Keep free-form answers enabled (user may type custom choices like "#10:A, #11:skip"). Parse them. Use stable short IDs (e.g., first letter of each fix label) so free-form input remains parseable even with descriptive labels.
 - Continue batch-by-batch until user stops or all findings are processed.
 
 Mode: By severity/urgency
