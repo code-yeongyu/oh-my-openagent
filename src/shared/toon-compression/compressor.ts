@@ -176,33 +176,79 @@ export function isUniformArray(arr: unknown[]): boolean {
   return true
 }
 
-export function shouldCompress(data: unknown, threshold: number): boolean {
-  if (!Number.isFinite(threshold) || threshold <= 0) {
-    return false
+export type CompressionEvaluation = {
+  decision: boolean
+  conditions: {
+    validThreshold: boolean
+    notNullOrUndefined: boolean
+    notBinaryLike: boolean
+    notErrorLike: boolean
+    aboveThreshold: boolean
+    isArray: boolean
+    arrayLongEnough: boolean
+    isUniformArray: boolean
   }
+  blockingReason?: string
+}
+
+export function evaluateCompressionConditions(data: unknown, threshold: number): CompressionEvaluation {
+  const conditions: CompressionEvaluation["conditions"] = {
+    validThreshold: false,
+    notNullOrUndefined: false,
+    notBinaryLike: false,
+    notErrorLike: false,
+    aboveThreshold: false,
+    isArray: false,
+    arrayLongEnough: false,
+    isUniformArray: false
+  }
+
+  if (!Number.isFinite(threshold) || threshold <= 0) {
+    return { decision: false, conditions, blockingReason: "Invalid threshold" }
+  }
+  conditions.validThreshold = true
 
   if (data === null || data === undefined) {
-    return false
+    return { decision: false, conditions, blockingReason: "Data is null or undefined" }
   }
+  conditions.notNullOrUndefined = true
 
-  if (isBinaryLikeData(data) || isErrorLikeData(data)) {
-    return false
+  if (isBinaryLikeData(data)) {
+    return { decision: false, conditions, blockingReason: "Data is binary-like" }
   }
+  conditions.notBinaryLike = true
+
+  if (isErrorLikeData(data)) {
+    return { decision: false, conditions, blockingReason: "Data is error-like" }
+  }
+  conditions.notErrorLike = true
 
   const payload = toPlainTextString(data)
   if (payload.length <= threshold) {
-    return false
+    return { decision: false, conditions, blockingReason: "Payload below threshold" }
   }
+  conditions.aboveThreshold = true
 
   if (!Array.isArray(data)) {
-    return false
+    return { decision: false, conditions, blockingReason: "Data is not an array" }
   }
+  conditions.isArray = true
 
   if (data.length < MIN_COMPRESSIBLE_ARRAY_LENGTH) {
-    return false
+    return { decision: false, conditions, blockingReason: "Array too short" }
   }
+  conditions.arrayLongEnough = true
 
-  return isUniformArray(data)
+  if (!isUniformArray(data)) {
+    return { decision: false, conditions, blockingReason: "Array is not uniform" }
+  }
+  conditions.isUniformArray = true
+
+  return { decision: true, conditions }
+}
+
+export function shouldCompress(data: unknown, threshold: number): boolean {
+  return evaluateCompressionConditions(data, threshold).decision
 }
 
 /**
@@ -217,14 +263,19 @@ export function shouldCompress(data: unknown, threshold: number): boolean {
  * @returns TOON-compressed string or minified JSON
  */
 export function compressForLLM(data: unknown, config: ToonCompressionConfig): string {
-  if (!config.enabled || !shouldCompress(data, config.threshold)) {
+  if (!config.enabled) {
     // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
-    const reason = !config.enabled ? "disabled" : "shouldCompress=false"
-    log("[toon-compression] Skipped: " + reason, {
-      enabled: config.enabled,
-      threshold: config.threshold,
-      dataType: Array.isArray(data) ? `array[${data.length}]` : typeof data
-    })
+    log("[toon-compression] trigger: disabled → SKIP (compression disabled)")
+    return toPlainTextString(data)
+  }
+
+  const evaluation = evaluateCompressionConditions(data, config.threshold)
+  const { decision, conditions, blockingReason } = evaluation
+
+  // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
+  log(`[toon-compression] trigger: validThreshold=${conditions.validThreshold}, notNull=${conditions.notNullOrUndefined}, notBinary=${conditions.notBinaryLike}, notError=${conditions.notErrorLike}, aboveThreshold=${conditions.aboveThreshold}, isArray=${conditions.isArray}, arrayLongEnough=${conditions.arrayLongEnough}, isUniform=${conditions.isUniformArray} → ${decision ? 'COMPRESS' : 'SKIP'} (${blockingReason || 'eligible'})`)
+
+  if (!decision) {
     return toPlainTextString(data)
   }
 

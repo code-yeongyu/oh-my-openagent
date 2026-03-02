@@ -3,7 +3,7 @@ import type { ToonCompressionConfig } from "../../config/schema/toon-compression
 
 import { THINKING_TYPES } from "../session-recovery/constants"
 
-import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import { safeCompress, evaluateCompressionConditions } from "../../shared/toon-compression"
 import { log } from "../../shared"
 
 type MessageWithParts = {
@@ -138,7 +138,13 @@ export function createMessageBatchCompressorHook(
 
       const { batchData, imageParts } = extractBatchData(messages)
 
-      if (!shouldCompress(batchData, config.threshold)) {
+      const evaluation = evaluateCompressionConditions(batchData, config.threshold)
+
+      // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
+      const c = evaluation.conditions
+      log(`[message-batch-compressor] trigger: validThreshold=${c.validThreshold}, notNull=${c.notNullOrUndefined}, notBinary=${c.notBinaryLike}, notError=${c.notErrorLike}, aboveThreshold=${c.aboveThreshold}, isArray=${c.isArray}, arrayLongEnough=${c.arrayLongEnough}, isUniform=${c.isUniformArray} → ${evaluation.decision ? 'COMPRESS' : 'SKIP'} (${evaluation.blockingReason || 'eligible batch'})`)
+
+      if (!evaluation.decision) {
         return
       }
 
