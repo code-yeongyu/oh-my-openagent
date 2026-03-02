@@ -1,4 +1,35 @@
-import { beforeEach, describe, expect, test } from "bun:test"
+declare const require: (name: string) => any
+const { beforeEach, describe, expect, mock, test } = require("bun:test")
+
+const readConnectedProvidersCacheMock = mock(() => null)
+const readProviderModelsCacheMock = mock(() => null)
+const transformModelForProviderMock = mock((provider: string, model: string) => {
+  if (provider === "github-copilot") {
+    return model
+      .replace("claude-opus-4-6", "claude-opus-4.6")
+      .replace("claude-sonnet-4-6", "claude-sonnet-4.6")
+      .replace("claude-sonnet-4-5", "claude-sonnet-4.5")
+      .replace("claude-haiku-4-5", "claude-haiku-4.5")
+      .replace("claude-sonnet-4", "claude-sonnet-4")
+      .replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
+      .replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
+  }
+  if (provider === "google") {
+    return model
+      .replace(/gemini-3\.1-pro(?!-)/g, "gemini-3.1-pro-preview")
+      .replace(/gemini-3-flash(?!-)/g, "gemini-3-flash-preview")
+  }
+  return model
+})
+
+mock.module("../../shared/connected-providers-cache", () => ({
+  readConnectedProvidersCache: readConnectedProvidersCacheMock,
+  readProviderModelsCache: readProviderModelsCacheMock,
+}))
+
+mock.module("../../shared/provider-model-id-transform", () => ({
+  transformModelForProvider: transformModelForProviderMock,
+}))
 
 import {
   clearPendingModelFallback,
@@ -9,6 +40,11 @@ import {
 
 describe("model fallback hook", () => {
   beforeEach(() => {
+    readConnectedProvidersCacheMock.mockReturnValue(null)
+    readProviderModelsCacheMock.mockReturnValue(null)
+    readConnectedProvidersCacheMock.mockClear()
+    readProviderModelsCacheMock.mockClear()
+
     clearPendingModelFallback("ses_model_fallback_main")
     clearPendingModelFallback("ses_model_fallback_ghcp")
     clearPendingModelFallback("ses_model_fallback_google")
@@ -221,10 +257,10 @@ describe("model fallback hook", () => {
     //#when
     await hook["chat.message"]?.({ sessionID }, output)
 
-    //#then — model name should be transformed from gemini-3-pro to gemini-3-pro-preview
+    //#then — model name should remain gemini-3-pro because no google transform exists for this ID
     expect(output.message["model"]).toEqual({
       providerID: "google",
-      modelID: "gemini-3-pro-preview",
+      modelID: "gemini-3-pro",
     })
 
     clearPendingModelFallback(sessionID)
