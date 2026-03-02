@@ -197,7 +197,7 @@ describe("findFirstMessageWithAgentFromSDK", () => {
 describe("generateMessageId", () => {
   it("returns deterministic sequential IDs with fixed format", () => {
     // given
-    const format = /^msg_\d{12}$/
+    const format = /^msg_[0-9a-f]{8}_\d{6}$/
 
     // when
     const firstId = generateMessageId()
@@ -206,14 +206,15 @@ describe("generateMessageId", () => {
     // then
     expect(firstId).toMatch(format)
     expect(secondId).toMatch(format)
-    expect(Number(secondId.slice(4))).toBe(Number(firstId.slice(4)) + 1)
+    expect(secondId.split("_")[1]).toBe(firstId.split("_")[1])
+    expect(Number(secondId.split("_")[2])).toBe(Number(firstId.split("_")[2]) + 1)
   })
 })
 
 describe("generatePartId", () => {
   it("returns deterministic sequential IDs with fixed format", () => {
     // given
-    const format = /^prt_\d{12}$/
+    const format = /^prt_[0-9a-f]{8}_\d{6}$/
 
     // when
     const firstId = generatePartId()
@@ -222,7 +223,8 @@ describe("generatePartId", () => {
     // then
     expect(firstId).toMatch(format)
     expect(secondId).toMatch(format)
-    expect(Number(secondId.slice(4))).toBe(Number(firstId.slice(4)) + 1)
+    expect(secondId.split("_")[1]).toBe(firstId.split("_")[1])
+    expect(Number(secondId.split("_")[2])).toBe(Number(firstId.split("_")[2]) + 1)
   })
 })
 

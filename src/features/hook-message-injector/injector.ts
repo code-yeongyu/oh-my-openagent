@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { MESSAGE_STORAGE, PART_STORAGE } from "./constants"
@@ -29,6 +30,7 @@ interface SDKMessage {
   }
 }
 
+const processPrefix = randomBytes(4).toString("hex")
 let messageCounter = 0
 let partCounter = 0
 
@@ -208,11 +210,11 @@ export function findFirstMessageWithAgent(messageDir: string): string | null {
 }
 
 export function generateMessageId(): string {
-  return `msg_${String(++messageCounter).padStart(12, "0")}`
+  return `msg_${processPrefix}_${String(++messageCounter).padStart(6, "0")}`
 }
 
 export function generatePartId(): string {
-  return `prt_${String(++partCounter).padStart(12, "0")}`
+  return `prt_${processPrefix}_${String(++partCounter).padStart(6, "0")}`
 }
 
 function getOrCreateMessageDir(sessionID: string): string {
