@@ -136,6 +136,8 @@ export async function pollForCompletion(
           return 1
         }
       }
+    } else if (mainSessionStatus === "busy" || mainSessionStatus === "idle") {
+      retryStatusStartTimestamp = null
     }
 
     if (!eventState.mainSessionIdle) {
