@@ -18,9 +18,9 @@ function stringifyFallback(data: unknown): string {
   }
 }
 
-export function safeCompress(data: unknown, config: ToonCompressionConfig): string {
+export function safeCompress(data: unknown, config: ToonCompressionConfig, useCase: string): string {
   try {
-    return compressForLLM(data, config)
+    return compressForLLM(data, config, useCase)
   } catch {
     return stringifyFallback(data)
   }

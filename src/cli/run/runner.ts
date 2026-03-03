@@ -25,7 +25,7 @@ export function compressCliMessage(
   message: string,
   config: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
 ): string {
-  return safeCompress(message, config)
+  return safeCompress(message, config, "cli-runner")
 }
 
 export async function waitForEventProcessorShutdown(

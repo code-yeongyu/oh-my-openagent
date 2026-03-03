@@ -98,7 +98,7 @@ export async function truncateToolOutputsByCallId(
         if (compressionConfig.enabled) {
           const parsed = tryParseJson(part.state.output)
           if (parsed !== null) {
-            part.state.output = safeCompress(parsed, compressionConfig)
+            part.state.output = safeCompress(parsed, compressionConfig, "pruning-truncation")
             writeFileSync(partPath, JSON.stringify(part, null, 2))
           }
         }
@@ -147,7 +147,7 @@ async function truncateToolOutputsByCallIdFromSDK(
         if (compressionConfig.enabled) {
           const parsed = tryParseJson(part.state.output)
           if (parsed !== null) {
-            part.state.output = safeCompress(parsed, compressionConfig)
+            part.state.output = safeCompress(parsed, compressionConfig, "pruning-truncation")
           }
         }
 

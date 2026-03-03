@@ -18,7 +18,7 @@ export function compressSkillContent(
 	content: string,
 	config: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG
 ): string {
-	return safeCompress(content, config)
+	return safeCompress(content, config, "skill-content-resolver")
 }
 
 /**
@@ -37,7 +37,7 @@ export function compressSkillTemplates(
 		name,
 		template,
 	}))
-	return safeCompress(skillArray, config)
+	return safeCompress(skillArray, config, "skill-content-resolver")
 }
 
 /**
@@ -61,5 +61,5 @@ export function compressSkillInjection(
 		content: template,
 		...(metadata && { meta: metadata }),
 	}
-	return safeCompress(injectionData, config)
+	return safeCompress(injectionData, config, "skill-content-resolver")
 }

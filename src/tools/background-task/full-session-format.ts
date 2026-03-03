@@ -189,7 +189,7 @@ export async function formatFullSession(
     }))
 
     if (shouldCompress(messageData, compressionConfig.threshold)) {
-      const compressed = safeCompress(messageData, compressionConfig)
+      const compressed = safeCompress(messageData, compressionConfig, "background-session-format")
       const header = buildSessionHeader(task, normalizedMessages.length, visibleMessages.length, hasMore)
       header.push("")
       header.push("[Compressed output]")

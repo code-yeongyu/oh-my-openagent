@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 
 const encodeMock = mock((value: unknown) => `toon:${JSON.stringify(value)}`)
+const logMock = mock(() => {})
 
 mock.module("@toon-format/toon", () => ({
   encode: encodeMock,
+}))
+
+mock.module("../logger", () => ({
+  log: logMock,
 }))
 
 import { compressForLLM, isUniformArray, shouldCompress } from "./compressor"
@@ -24,6 +29,7 @@ describe("toon-compression/compressor", () => {
   beforeEach(() => {
     encodeMock.mockReset()
     encodeMock.mockImplementation((value: unknown) => `toon:${JSON.stringify(value)}`)
+    logMock.mockReset()
   })
 
   describe("#given isUniformArray", () => {
@@ -81,7 +87,7 @@ describe("toon-compression/compressor", () => {
   describe("#given compressForLLM", () => {
     it("#then returns non-compressed payload when disabled", () => {
       const rows = createUniformRows(8)
-      const result = compressForLLM(rows, disabledConfig)
+      const result = compressForLLM(rows, disabledConfig, "test-disabled")
 
       expect(result).toBe(JSON.stringify(rows))
       expect(encodeMock).not.toHaveBeenCalled()
@@ -89,7 +95,7 @@ describe("toon-compression/compressor", () => {
 
     it("#then returns non-compressed payload when shouldCompress is false", () => {
       const shortRows = createUniformRows(4)
-      const result = compressForLLM(shortRows, enabledConfig)
+      const result = compressForLLM(shortRows, enabledConfig, "test-short")
 
       expect(result).toBe(JSON.stringify(shortRows))
       expect(encodeMock).not.toHaveBeenCalled()
@@ -97,10 +103,21 @@ describe("toon-compression/compressor", () => {
 
     it("#then compresses large uniform arrays", () => {
       const rows = createUniformRows(8)
-      const result = compressForLLM(rows, { enabled: true, threshold: 10 })
+      const result = compressForLLM(rows, { enabled: true, threshold: 10 }, "test-compress")
 
       expect(result).toBe(`toon:${JSON.stringify(rows)}`)
       expect(encodeMock).toHaveBeenCalledTimes(1)
+    })
+
+    it("#then logs useCase in trigger message", () => {
+      const rows = createUniformRows(8)
+      compressForLLM(rows, { enabled: true, threshold: 10 }, "my-custom-use-case")
+
+      expect(logMock).toHaveBeenCalled()
+      const logCall = logMock.mock.calls.find((call) =>
+        typeof call[0] === "string" && call[0].includes("[my-custom-use-case]")
+      )
+      expect(logCall).toBeDefined()
     })
   })
 
@@ -111,7 +128,7 @@ describe("toon-compression/compressor", () => {
         throw new Error("encoder failure")
       })
 
-      const result = safeCompress(rows, { enabled: true, threshold: 10 })
+      const result = safeCompress(rows, { enabled: true, threshold: 10 }, "test-fallback")
       expect(result).toBe(JSON.stringify(rows))
     })
 
@@ -122,7 +139,7 @@ describe("toon-compression/compressor", () => {
       nowSpy.mockReturnValueOnce(100)
       nowSpy.mockReturnValueOnce(170)
 
-      const result = safeCompress(rows, { enabled: true, threshold: 10 })
+      const result = safeCompress(rows, { enabled: true, threshold: 10 }, "test-timeout")
       expect(result).toBe(JSON.stringify(rows))
 
       nowSpy.mockRestore()
@@ -130,7 +147,7 @@ describe("toon-compression/compressor", () => {
 
     it("#then keeps plain error text uncompressed", () => {
       const message = "Error: unable to parse response"
-      const result = safeCompress(message, enabledConfig)
+      const result = safeCompress(message, enabledConfig, "test-error-text")
 
       expect(result).toBe(message)
       expect(encodeMock).not.toHaveBeenCalled()

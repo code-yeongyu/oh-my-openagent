@@ -46,7 +46,7 @@ export function createHashlineEditTool(): ToolDefinition {
       const result = await executeHashlineEditTool(args, context)
       const config = DEFAULT_COMPRESSION_CONFIG
       if (config.enabled && shouldCompress(result, config.threshold)) {
-        return safeCompress(result, config)
+        return safeCompress(result, config, "hashline-edit")
       }
       return result
     },

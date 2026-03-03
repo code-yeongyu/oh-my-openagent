@@ -40,7 +40,7 @@ export class SkillMcpManager {
     if (!this.compressionConfig.enabled) {
       return data
     }
-    return safeCompress(data, this.compressionConfig)
+    return safeCompress(data, this.compressionConfig, "skill-mcp-manager")
   }
 
 

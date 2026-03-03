@@ -21,7 +21,7 @@ export function formatSearchResult(result: SgResult, config: ToonCompressionConf
       end: { ...match.range.end, line: match.range.end.line + 1, character: match.range.end.column + 1 }
     }
   }))
-  const compressed = safeCompress(matchesWith1IndexedLines, config)
+  const compressed = safeCompress(matchesWith1IndexedLines, config, "ast-grep-search")
   if (compressed.startsWith("toon:")) {
     const lines: string[] = []
     if (result.truncated) {
@@ -77,7 +77,7 @@ export function formatReplaceResult(result: SgResult, isDryRun: boolean, config:
       end: { ...match.range.end, line: match.range.end.line + 1, character: match.range.end.column + 1 }
     }
   }))
-  const compressed = safeCompress(matchesWith1IndexedLines, config)
+  const compressed = safeCompress(matchesWith1IndexedLines, config, "ast-grep-replace")
   if (compressed.startsWith("toon:")) {
     const prefix = isDryRun ? "[DRY RUN] " : ""
     const lines: string[] = []
@@ -138,7 +138,7 @@ export function formatAnalyzeResult(results: AnalyzeResult[], extractedMetaVars:
       end: { ...result.range.end, line: result.range.end.line + 1, character: result.range.end.column + 1 }
     }
   }))
-  const compressed = safeCompress(resultsWith1IndexedLines, config)
+  const compressed = safeCompress(resultsWith1IndexedLines, config, "ast-grep-analyze")
   if (compressed.startsWith("toon:")) {
     const lines: string[] = [`Found ${results.length} match(es):\n`]
     lines.push(compressed)

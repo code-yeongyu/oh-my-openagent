@@ -149,7 +149,7 @@ export function createMessageBatchCompressorHook(
       }
 
       const originalPayload = safeStringify(batchData)
-      const compressed = safeCompress(batchData, config)
+      const compressed = safeCompress(batchData, config, "message-batch-compressor")
 
       const compressionApplied = compressed !== originalPayload
       if (!compressionApplied) {

@@ -37,7 +37,7 @@ Returns null if the task does not exist or the file is invalid.`,
         const task = readJsonSafe(taskPath, TaskObjectSchema)
         const compressionConfig = config.toon_compression ?? { enabled: false, threshold: 5000 }
 
-        return safeCompress({ task: task ?? null }, compressionConfig)
+        return safeCompress({ task: task ?? null }, compressionConfig, "task-get")
       } catch (error) {
         if (error instanceof Error && error.message.includes("validation")) {
           return JSON.stringify({ error: "invalid_arguments" })

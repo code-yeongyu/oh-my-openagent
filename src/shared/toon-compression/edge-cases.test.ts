@@ -27,7 +27,7 @@ describe("toon-compression/edge-cases", () => {
     })
 
     it("#then safeCompress returns empty array JSON", () => {
-      const result = safeCompress([], enabledConfig)
+      const result = safeCompress([], enabledConfig, "test-edge-cases")
       expect(result).toBe("[]")
       expect(encodeMock).not.toHaveBeenCalled()
     })
@@ -44,7 +44,7 @@ describe("toon-compression/edge-cases", () => {
 
     it("#then safeCompress returns JSON without compression", () => {
       const single = [{ id: 1, name: "only" }]
-      const result = safeCompress(single, enabledConfig)
+      const result = safeCompress(single, enabledConfig, "test-edge-cases")
       expect(result).toBe(JSON.stringify(single))
       expect(encodeMock).not.toHaveBeenCalled()
     })
@@ -68,7 +68,7 @@ describe("toon-compression/edge-cases", () => {
 
     it("#then safeCompress falls back to JSON for array with null", () => {
       const mixed = [{ id: 1 }, null, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }]
-      const result = safeCompress(mixed, enabledConfig)
+      const result = safeCompress(mixed, enabledConfig, "test-edge-cases")
       expect(result).toBe(JSON.stringify(mixed))
     })
   })
@@ -86,7 +86,7 @@ describe("toon-compression/edge-cases", () => {
 
     it("#then safeCompress returns JSON without compression", () => {
       const mixed = [{ a: 1 }, "string", 42, { a: 2 }, { a: 3 }, { a: 4 }, { a: 5 }]
-      const result = safeCompress(mixed, enabledConfig)
+      const result = safeCompress(mixed, enabledConfig, "test-edge-cases")
       expect(result).toBe(JSON.stringify(mixed))
       expect(encodeMock).not.toHaveBeenCalled()
     })
@@ -97,7 +97,7 @@ describe("toon-compression/edge-cases", () => {
       const circular: { self?: unknown } = {}
       circular.self = circular
 
-      const result = safeCompress(circular, enabledConfig)
+      const result = safeCompress(circular, enabledConfig, "test-edge-cases")
       expect(result).toBe("[object Object]")
       expect(encodeMock).not.toHaveBeenCalled()
     })
@@ -107,7 +107,7 @@ describe("toon-compression/edge-cases", () => {
       item.ref = item
 
       const items = [item, { id: 2, ref: null }, { id: 3, ref: null }, { id: 4, ref: null }, { id: 5, ref: null }]
-      const result = safeCompress(items, enabledConfig)
+      const result = safeCompress(items, enabledConfig, "test-edge-cases")
 
       // JSON.stringify throws on circular, so fallback to String()
       expect(result).toBe(String(items))
@@ -131,7 +131,7 @@ describe("toon-compression/edge-cases", () => {
         value: i * 2,
       }))
 
-      const result = safeCompress(large, { enabled: true, threshold: 10 })
+      const result = safeCompress(large, { enabled: true, threshold: 10 }, "test-edge-cases")
       expect(result).toContain("toon:")
       expect(encodeMock).toHaveBeenCalledTimes(1)
     })
@@ -144,7 +144,7 @@ describe("toon-compression/edge-cases", () => {
       nowSpy.mockReturnValueOnce(100) // start
       nowSpy.mockReturnValueOnce(200) // end - 100ms > 50ms timeout
 
-      const result = safeCompress(large, { enabled: true, threshold: 10 })
+      const result = safeCompress(large, { enabled: true, threshold: 10 }, "test-edge-cases")
       expect(result).toBe(JSON.stringify(large))
 
       nowSpy.mockRestore()
@@ -188,7 +188,7 @@ describe("toon-compression/edge-cases", () => {
         { id: 6, label: "русский" },
       ]
 
-      const result = safeCompress(items, { enabled: true, threshold: 10 })
+      const result = safeCompress(items, { enabled: true, threshold: 10 }, "test-edge-cases")
       expect(result).toContain("日本語")
       expect(result).toContain("中文")
       expect(result).toContain("한국어")
@@ -204,7 +204,7 @@ describe("toon-compression/edge-cases", () => {
         { id: 6, icon: "❤️" },
       ]
 
-      const result = safeCompress(items, { enabled: true, threshold: 10 })
+      const result = safeCompress(items, { enabled: true, threshold: 10 }, "test-edge-cases")
       expect(result).toContain("🎉")
       expect(result).toContain("🚀")
     })
@@ -240,7 +240,7 @@ describe("toon-compression/edge-cases", () => {
       sparse[5] = { id: 2 }
       sparse[10] = { id: 3 }
 
-      const result = safeCompress(sparse, enabledConfig)
+      const result = safeCompress(sparse, enabledConfig, "test-edge-cases")
       // JSON.stringify converts sparse to array with nulls
       expect(result).toContain("null")
     })
@@ -252,7 +252,7 @@ describe("toon-compression/edge-cases", () => {
       const nullProto: { self?: unknown } = Object.create(null)
       nullProto.self = nullProto
 
-      const result = safeCompress(nullProto, enabledConfig)
+      const result = safeCompress(nullProto, enabledConfig, "test-edge-cases")
       expect(result).toBe("[unserializable]")
     })
 
@@ -265,7 +265,7 @@ describe("toon-compression/edge-cases", () => {
       }
       throwing.self = throwing
 
-      const result = safeCompress(throwing, enabledConfig)
+      const result = safeCompress(throwing, enabledConfig, "test-edge-cases")
       expect(result).toBe("[unserializable]")
     })
   })

@@ -21,7 +21,7 @@ export async function executeBackgroundContinuation(
   const { manager } = executorCtx
 
   try {
-    const compressedPrompt = safeCompress(args.prompt, compressionConfig)
+    const compressedPrompt = safeCompress(args.prompt, compressionConfig, "delegate-background-continuation")
     const task = await manager.resume({
       sessionId: args.session_id!,
       prompt: compressedPrompt,

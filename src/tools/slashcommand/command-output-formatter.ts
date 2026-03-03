@@ -80,7 +80,7 @@ export function formatCommandList(
 
   // Apply compression if enabled and output exceeds threshold
   if (compressionConfig?.enabled && shouldCompress(items, compressionConfig.threshold)) {
-    return safeCompress(items, compressionConfig)
+    return safeCompress(items, compressionConfig, "slashcommand-output")
   }
 
   return formatted

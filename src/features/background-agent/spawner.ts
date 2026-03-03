@@ -49,7 +49,7 @@ export function compressSessionPromptData(
   config?: ToonCompressionConfig
 ): string {
   const effectiveConfig = config ?? DEFAULT_TOON_CONFIG
-  return safeCompress(data, effectiveConfig)
+  return safeCompress(data, effectiveConfig, "background-agent-spawner")
 }
 
 /**

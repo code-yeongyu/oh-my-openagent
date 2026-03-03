@@ -180,12 +180,12 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
       switch (operation.type) {
         case "tool": {
           const result = await manager.callTool(info, context, operation.name, parsedArgs)
-          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG)
+          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG, "skill-mcp-tool")
           break
         }
         case "resource": {
           const result = await manager.readResource(info, context, operation.name)
-          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG)
+          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG, "skill-mcp-resource")
           break
         }
         case "prompt": {
@@ -194,7 +194,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
             stringArgs[key] = String(value)
           }
           const result = await manager.getPrompt(info, context, operation.name, stringArgs)
-          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG)
+          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG, "skill-mcp-prompt")
           break
         }
       }

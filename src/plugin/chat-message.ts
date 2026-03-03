@@ -160,7 +160,7 @@ export function createChatMessageHandler(args: {
     // Compress large parts arrays for efficient storage/transmission
     const compressionConfig = pluginConfig.toon_compression ?? { enabled: false, threshold: 5000 }
     if (compressionConfig.enabled && shouldCompress(output.parts, compressionConfig.threshold)) {
-      output.message["_compressedParts"] = safeCompress(output.parts, compressionConfig)
+      output.message["_compressedParts"] = safeCompress(output.parts, compressionConfig, "chat-message")
     }
   }
 }

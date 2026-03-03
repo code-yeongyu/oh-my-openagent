@@ -75,7 +75,7 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
       }
       
       const compressionConfig = config.toon_compression ?? { enabled: false, threshold: 5000 }
-      return safeCompress(result, compressionConfig)
+      return safeCompress(result, compressionConfig, "task-list")
     },
   })
 }

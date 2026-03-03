@@ -35,7 +35,7 @@ function compressPayloadData(
   if (isErrorResponse) {
     return JSON.stringify(data)
   }
-  return safeCompress(data, config)
+  return safeCompress(data, config, "cli-event-stream")
 }
 
 export function compressEventData(
@@ -51,7 +51,7 @@ export function compressEventData(
   if (isErrorResponse) {
     return JSON.stringify(data)
   }
-  return safeCompress(data, config)
+  return safeCompress(data, config, "cli-event-stream")
 }
 
 export function compressEventPayload(

@@ -24,7 +24,7 @@ const rows = Array.from({ length: 12 }, (_, i) => ({ id: i, name: `item-${i}`, v
 describe("toon compression phase 3 integration", () => {
   test("tasks 39-43: manager, pruning, hash-computation, event-stream, truncator paths", async () => {
     expect(shouldCompress(rows, 100)).toBe(true)
-    expect(safeCompress(rows, on)).toMatch(toon)
+    expect(safeCompress(rows, on, "test-phase3")).toMatch(toon)
 
     const managerOn = new SkillMcpManager(on)
     const managerOff = new SkillMcpManager(off)

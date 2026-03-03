@@ -59,7 +59,7 @@ export function createToolOutputTruncatorHook(ctx: PluginInput, options?: ToolOu
       if (compressionConfig?.enabled) {
         const parsed = tryParseJson(output.output)
         if (parsed !== null) {
-          output.output = safeCompress(parsed, compressionConfig)
+          output.output = safeCompress(parsed, compressionConfig, "tool-output-truncator")
         }
       }
 

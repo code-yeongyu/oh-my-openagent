@@ -139,7 +139,7 @@ async function handleUpdate(
       await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
 
       const compressionConfig = config.toon_compression ?? { enabled: false, threshold: 5000 };
-      return safeCompress({ task: validatedTask }, compressionConfig);
+      return safeCompress({ task: validatedTask }, compressionConfig, "task-update");
     } finally {
       lock.release();
     }

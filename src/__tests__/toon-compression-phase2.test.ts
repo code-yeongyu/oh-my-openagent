@@ -114,7 +114,7 @@ describe("toon compression phase 2 integration", () => {
 
   test("tasks 25-28, 35-37: executor/cli/skill/dynamic/task-tools integration", async () => {
     expect(shouldCompress(rows, 100)).toBe(true)
-    expect(safeCompress(rows, on)).toMatch(toon)
+    expect(safeCompress(rows, on, "test-phase2")).toMatch(toon)
     expect(compressCliMessage(promptJson, off)).toBe(promptJson)
 
     const out = await executeSync({ description: "d", prompt: promptJson, subagent_type: "explore", run_in_background: false } as never, { sessionID: "s", messageID: "m", agent: "a", abort: new AbortController().signal } as never, { client: { session: { promptAsync: async () => {} } } } as never, {

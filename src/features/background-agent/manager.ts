@@ -158,7 +158,7 @@ export class BackgroundManager {
     try {
       const parsed = JSON.parse(prompt)
       if (typeof parsed === "object" && parsed !== null) {
-        return safeCompress(parsed, config)
+        return safeCompress(parsed, config, "background-agent-manager")
       }
     } catch {
       // Not valid JSON, return as-is

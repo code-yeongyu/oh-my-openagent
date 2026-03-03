@@ -63,7 +63,7 @@ export function formatGrepResult(
     && shouldCompress(result.matches, compressionConfig.threshold)
 
   if (shouldUseCompression) {
-    const compressed = safeCompress(result.matches, compressionConfig)
+    const compressed = safeCompress(result.matches, compressionConfig, "grep-result")
     if (compressed !== safeStringify(result.matches)) {
       lines.push("[Compressed matches]")
       lines.push(compressed)

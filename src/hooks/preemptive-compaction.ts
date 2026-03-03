@@ -185,7 +185,7 @@ export function createPreemptiveCompactionHook(
         modelID: info.modelID ?? "",
         tokens: info.tokens,
       }
-      const compressed = safeCompress(state, compressionConfig)
+      const compressed = safeCompress(state, compressionConfig, "preemptive-compaction")
       tokenCache.set(info.sessionID, compressed)
       compactedSessions.delete(info.sessionID)
     }

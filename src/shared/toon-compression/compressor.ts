@@ -118,14 +118,14 @@ function estimateEncodingTime(data: unknown): number {
   return sizeBytes / 2000
 }
 
-function encodeWithTimeout(data: unknown, maxSize?: number): string {
+function encodeWithTimeout(data: unknown, maxSize: number | undefined, useCase: string): string {
   const payload = stableJsonStringify(data)
   const sizeBytes = payload.length
   const effectiveMaxSize = maxSize ?? MAX_ENCODING_SIZE_BYTES
 
   if (sizeBytes > effectiveMaxSize) {
     // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
-    log("[toon-compression] Skipped: size exceeded", { sizeBytes, maxSize: effectiveMaxSize })
+    log(`[toon-compression] [${useCase}] Skipped: size exceeded`, { sizeBytes, maxSize: effectiveMaxSize })
     throw new Error(
       `TOON compression skipped: payload size ${sizeBytes} exceeds max ${effectiveMaxSize}`
     )
@@ -140,12 +140,12 @@ function encodeWithTimeout(data: unknown, maxSize?: number): string {
   const compressedTokens = estimateTokens(compressed)
   const percentSaved = Math.round((1 - compressed.length / payload.length) * 100)
   log(
-    `[toon-compression] Success: ${originalTokens} -> ${compressedTokens} tokens (${percentSaved}% saved)`,
+    `[toon-compression] [${useCase}] Success: ${originalTokens} -> ${compressedTokens} tokens (${percentSaved}% saved)`,
     { originalChars: payload.length, compressedChars: compressed.length, durationMs: duration }
   )
   if (duration > COMPRESSION_TIMEOUT_MS) {
     // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
-    log("[toon-compression] Failed: timeout", { durationMs: duration, timeoutMs: COMPRESSION_TIMEOUT_MS })
+    log(`[toon-compression] [${useCase}] Failed: timeout`, { durationMs: duration, timeoutMs: COMPRESSION_TIMEOUT_MS })
     throw new Error(`TOON compression timeout: ${duration}ms`)
   }
 
@@ -260,12 +260,14 @@ export function shouldCompress(data: unknown, threshold: number): boolean {
  *
  * @param data - The data to compress or stringify
  * @param config - Compression configuration
+ * @param useCase - Identifier for the compression use case (e.g., "task-list", "lsp-references")
+ *                  Used for logging and debugging
  * @returns TOON-compressed string or minified JSON
  */
-export function compressForLLM(data: unknown, config: ToonCompressionConfig): string {
+export function compressForLLM(data: unknown, config: ToonCompressionConfig, useCase: string): string {
   if (!config.enabled) {
     // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
-    log("[toon-compression] trigger: disabled → SKIP (compression disabled)")
+    log(`[toon-compression] [${useCase}] trigger: disabled → SKIP (compression disabled)`)
     return toPlainTextString(data)
   }
 
@@ -273,14 +275,14 @@ export function compressForLLM(data: unknown, config: ToonCompressionConfig): st
   const { decision, conditions, blockingReason } = evaluation
 
   // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
-  log(`[toon-compression] trigger: validThreshold=${conditions.validThreshold}, notNull=${conditions.notNullOrUndefined}, notBinary=${conditions.notBinaryLike}, notError=${conditions.notErrorLike}, aboveThreshold=${conditions.aboveThreshold}, isArray=${conditions.isArray}, arrayLongEnough=${conditions.arrayLongEnough}, isUniform=${conditions.isUniformArray} → ${decision ? 'COMPRESS' : 'SKIP'} (${blockingReason || 'eligible'})`)
+  log(`[toon-compression] [${useCase}] trigger: validThreshold=${conditions.validThreshold}, notNull=${conditions.notNullOrUndefined}, notBinary=${conditions.notBinaryLike}, notError=${conditions.notErrorLike}, aboveThreshold=${conditions.aboveThreshold}, isArray=${conditions.isArray}, arrayLongEnough=${conditions.arrayLongEnough}, isUniform=${conditions.isUniformArray} → ${decision ? 'COMPRESS' : 'SKIP'} (${blockingReason || 'eligible'})`)
 
   if (!decision) {
     return toPlainTextString(data)
   }
 
   try {
-    return encodeWithTimeout(data, config.maxEncodingSize)
+    return encodeWithTimeout(data, config.maxEncodingSize, useCase)
   } catch (error) {
     console.warn("[toon-compression] Compression failed, falling back to plain text:", error)
     return toPlainTextString(data)

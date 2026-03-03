@@ -74,7 +74,7 @@ function tryCompress(
 		if (parsed === null) {
 			return output;
 		}
-		return safeCompress(parsed, config);
+		return safeCompress(parsed, config, "dynamic-truncator");
 	} catch {
 		return output;
 	}

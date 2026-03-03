@@ -91,7 +91,7 @@ describe("messages-transform compression", () => {
             }))
 
             const { safeCompress } = await import("../shared/toon-compression")
-            const compressed = safeCompress(batchData, enabledConfig)
+            const compressed = safeCompress(batchData, enabledConfig, "test-messages-transform")
 
             output.messages = [{
               info: { id: "compressed-batch", role: "assistant" } as Message,

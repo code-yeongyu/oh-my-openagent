@@ -193,7 +193,7 @@ export function buildCategorySkillsDelegationGuide(
       })),
     ]
     if (shouldCompress(combinedData, compressionConfig.threshold)) {
-      const compressed = safeCompress(combinedData, compressionConfig)
+      const compressed = safeCompress(combinedData, compressionConfig, "agent-prompt-builder")
       return `[Compressed categories/skills data]\n${compressed}`
     }
   }
@@ -418,7 +418,7 @@ export function buildUltraworkSection(
       })),
     ]
     if (shouldCompress(combinedData, compressionConfig.threshold)) {
-      const compressed = safeCompress(combinedData, compressionConfig)
+      const compressed = safeCompress(combinedData, compressionConfig, "agent-prompt-builder")
       return `[Compressed ultrawork data]\n${compressed}`
     }
   }

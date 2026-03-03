@@ -29,7 +29,7 @@ describe("toon compression phase 1 integration", () => {
   test("meets compression ratio target >=30% for large uniform arrays", () => {
     const ratioData = Array.from({ length: 200 }, () => ({ category: "tool", state: "ok", tag: "phase1" }))
     const raw = JSON.stringify(ratioData)
-    const compressed = safeCompress(ratioData, on)
+    const compressed = safeCompress(ratioData, on, "test-phase1")
     expect((raw.length - compressed.length) / raw.length).toBeGreaterThanOrEqual(0.3)
   })
 
