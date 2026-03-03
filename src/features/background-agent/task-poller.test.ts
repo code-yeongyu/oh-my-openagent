@@ -422,4 +422,104 @@ describe("pruneStaleTasksAndNotifications", () => {
     //#then
     expect(pruned).toContain("old-task")
   })
+
+  it("should NOT prune athena-junior tasks that exceeded TTL", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const athenaJuniorTask: BackgroundTask = {
+      id: "athena-junior-task",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      description: "council session",
+      prompt: "run council",
+      agent: "athena-junior",
+      status: "running",
+      startedAt: new Date(Date.now() - 60 * 60 * 1000), // 60 minutes — well past TTL
+    }
+    tasks.set("athena-junior-task", athenaJuniorTask)
+
+    const pruned: string[] = []
+    const notifications = new Map<string, BackgroundTask[]>()
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).not.toContain("athena-junior-task")
+    expect(athenaJuniorTask.status).toBe("running")
+  })
+
+  it("should NOT prune athena-junior regardless of case", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const task: BackgroundTask = {
+      id: "aj-case-test",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      description: "council",
+      prompt: "run",
+      agent: "Athena-Junior",
+      status: "running",
+      startedAt: new Date(Date.now() - 45 * 60 * 1000),
+    }
+    tasks.set("aj-case-test", task)
+
+    const pruned: string[] = []
+    const notifications = new Map<string, BackgroundTask[]>()
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then — case-insensitive match
+    expect(pruned).not.toContain("aj-case-test")
+  })
+
+  it("should still prune non-exempt agents that exceeded TTL alongside exempt ones", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const athenaTask: BackgroundTask = {
+      id: "exempt-task",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      description: "council",
+      prompt: "run",
+      agent: "athena-junior",
+      status: "running",
+      startedAt: new Date(Date.now() - 45 * 60 * 1000),
+    }
+    const exploreTask: BackgroundTask = {
+      id: "non-exempt-task",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      description: "search",
+      prompt: "find",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(Date.now() - 45 * 60 * 1000),
+    }
+    tasks.set("exempt-task", athenaTask)
+    tasks.set("non-exempt-task", exploreTask)
+
+    const pruned: string[] = []
+    const notifications = new Map<string, BackgroundTask[]>()
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then — only explore gets pruned
+    expect(pruned).not.toContain("exempt-task")
+    expect(pruned).toContain("non-exempt-task")
+  })
 })

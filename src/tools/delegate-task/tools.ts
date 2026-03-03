@@ -236,6 +236,17 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         fallbackChain = resolution.fallbackChain
       }
 
+      // Athena-junior council sessions are long-running (members do deep work).
+      // Force background to avoid the 10-minute sync poll timeout.
+      const isAthenaJunior = agentToUse.toLowerCase() === "athena-junior"
+      if (isAthenaJunior && !runInBackground) {
+        log("[task] Forcing athena-junior to background — council sessions exceed sync poll timeout", {
+          originalRunInBackground: args.run_in_background,
+          agentToUse,
+        })
+      }
+      const effectiveRunInBackground = runInBackground || isAthenaJunior
+
       const systemContent = buildSystemContent({
         skillContent,
         skillContents,
@@ -247,7 +258,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         availableSkills,
       })
 
-      if (runInBackground) {
+      if (effectiveRunInBackground) {
         return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
       }
 

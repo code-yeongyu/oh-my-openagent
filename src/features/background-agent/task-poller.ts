@@ -12,6 +12,8 @@ import {
   TASK_TTL_MS,
 } from "./constants"
 
+const TTL_EXEMPT_AGENTS = new Set(["athena-junior"])
+
 export function pruneStaleTasksAndNotifications(args: {
   tasks: Map<string, BackgroundTask>
   notifications: Map<string, BackgroundTask[]>
@@ -28,6 +30,11 @@ export function pruneStaleTasksAndNotifications(args: {
     if (!timestamp) continue
 
     const age = now - timestamp
+
+    // Athena-junior runs council sessions that can exceed the standard TTL.
+    // Council members are their own background tasks with their own TTLs.
+    if (TTL_EXEMPT_AGENTS.has(task.agent.toLowerCase())) continue
+
     if (age <= TASK_TTL_MS) continue
 
     const errorMessage = task.status === "pending"

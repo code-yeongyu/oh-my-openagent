@@ -690,6 +690,126 @@ describe("sisyphus-task", () => {
     })
   })
 
+  describe("athena-junior forced background execution", () => {
+    test("athena-junior with run_in_background=false is forced to background", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+
+      const tasks = new Map<string, { id: string; sessionID?: string; status: string; description: string; agent: string }>()
+      const mockManager = {
+        getTask: (id: string) => tasks.get(id),
+        launch: async () => {
+          const task = { id: "bg_athena", status: "pending", description: "Council session", agent: "athena-junior" }
+          tasks.set(task.id, task)
+          setTimeout(() => {
+            tasks.set(task.id, { ...task, status: "running", sessionID: "ses_athena" })
+          }, 20)
+          return task
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "athena-junior", mode: "subagent" }] }) },
+        config: { get: async () => ({}) },
+        session: {
+          create: async () => ({ data: { id: "ses_athena" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      //#when — explicitly requesting sync execution
+      const result = await tool.execute(
+        {
+          description: "Run council",
+          prompt: "Launch council for analysis",
+          subagent_type: "athena-junior",
+          run_in_background: false,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      //#then — should be forced to background despite run_in_background=false
+      expect(String(result)).toContain("Background task launched")
+    }, { timeout: 10000 })
+
+    test("athena-junior with run_in_background=true still runs in background normally", async () => {
+      //#given
+      const { createDelegateTask } = require("./tools")
+
+      const tasks = new Map<string, { id: string; sessionID?: string; status: string; description: string; agent: string }>()
+      const mockManager = {
+        getTask: (id: string) => tasks.get(id),
+        launch: async () => {
+          const task = { id: "bg_athena_bg", status: "pending", description: "Council session", agent: "athena-junior" }
+          tasks.set(task.id, task)
+          setTimeout(() => {
+            tasks.set(task.id, { ...task, status: "running", sessionID: "ses_athena_bg" })
+          }, 20)
+          return task
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [{ name: "athena-junior", mode: "subagent" }] }) },
+        config: { get: async () => ({}) },
+        session: {
+          create: async () => ({ data: { id: "ses_athena_bg" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
+        availableModelsOverride: createTestAvailableModels(),
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      //#when — explicitly requesting background (normal path)
+      const result = await tool.execute(
+        {
+          description: "Run council bg",
+          prompt: "Launch council for analysis",
+          subagent_type: "athena-junior",
+          run_in_background: true,
+          load_skills: [],
+        },
+        toolContext
+      )
+
+      //#then — should still be background
+      expect(String(result)).toContain("Background task launched")
+    }, { timeout: 10000 })
+  })
+
   describe("resolveCategoryConfig", () => {
     test("returns null for unknown category without user config", () => {
       // given
