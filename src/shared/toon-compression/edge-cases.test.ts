@@ -7,6 +7,7 @@ mock.module("@toon-format/toon", () => ({
 }))
 
 import { isUniformArray, shouldCompress } from "./compressor"
+import { resetGlobalCompressionConfig, setGlobalCompressionConfig } from "./config-store"
 import { safeCompress } from "./fallback"
 
 const enabledConfig = { enabled: true, threshold: 100 }
@@ -15,6 +16,7 @@ describe("toon-compression/edge-cases", () => {
   beforeEach(() => {
     encodeMock.mockReset()
     encodeMock.mockImplementation((value: unknown) => `toon:${JSON.stringify(value)}`)
+    resetGlobalCompressionConfig()
   })
 
   describe("#given empty array", () => {
@@ -27,7 +29,8 @@ describe("toon-compression/edge-cases", () => {
     })
 
     it("#then safeCompress returns empty array JSON", () => {
-      const result = safeCompress([], enabledConfig, "test-edge-cases")
+      setGlobalCompressionConfig(enabledConfig)
+      const result = safeCompress([], "test-edge-cases")
       expect(result).toBe("[]")
       expect(encodeMock).not.toHaveBeenCalled()
     })
@@ -43,8 +46,9 @@ describe("toon-compression/edge-cases", () => {
     })
 
     it("#then safeCompress returns JSON without compression", () => {
+      setGlobalCompressionConfig(enabledConfig)
       const single = [{ id: 1, name: "only" }]
-      const result = safeCompress(single, enabledConfig, "test-edge-cases")
+      const result = safeCompress(single, "test-edge-cases")
       expect(result).toBe(JSON.stringify(single))
       expect(encodeMock).not.toHaveBeenCalled()
     })
@@ -67,8 +71,9 @@ describe("toon-compression/edge-cases", () => {
     })
 
     it("#then safeCompress falls back to JSON for array with null", () => {
+      setGlobalCompressionConfig(enabledConfig)
       const mixed = [{ id: 1 }, null, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }]
-      const result = safeCompress(mixed, enabledConfig, "test-edge-cases")
+      const result = safeCompress(mixed, "test-edge-cases")
       expect(result).toBe(JSON.stringify(mixed))
     })
   })
@@ -85,8 +90,9 @@ describe("toon-compression/edge-cases", () => {
     })
 
     it("#then safeCompress returns JSON without compression", () => {
+      setGlobalCompressionConfig(enabledConfig)
       const mixed = [{ a: 1 }, "string", 42, { a: 2 }, { a: 3 }, { a: 4 }, { a: 5 }]
-      const result = safeCompress(mixed, enabledConfig, "test-edge-cases")
+      const result = safeCompress(mixed, "test-edge-cases")
       expect(result).toBe(JSON.stringify(mixed))
       expect(encodeMock).not.toHaveBeenCalled()
     })
@@ -94,20 +100,22 @@ describe("toon-compression/edge-cases", () => {
 
   describe("#given circular reference", () => {
     it("#then safeCompress falls back to String() representation", () => {
+      setGlobalCompressionConfig(enabledConfig)
       const circular: { self?: unknown } = {}
       circular.self = circular
 
-      const result = safeCompress(circular, enabledConfig, "test-edge-cases")
+      const result = safeCompress(circular, "test-edge-cases")
       expect(result).toBe("[object Object]")
       expect(encodeMock).not.toHaveBeenCalled()
     })
 
     it("#then safeCompress handles circular in array gracefully", () => {
+      setGlobalCompressionConfig(enabledConfig)
       const item: { id: number; ref?: unknown } = { id: 1 }
       item.ref = item
 
       const items = [item, { id: 2, ref: null }, { id: 3, ref: null }, { id: 4, ref: null }, { id: 5, ref: null }]
-      const result = safeCompress(items, enabledConfig, "test-edge-cases")
+      const result = safeCompress(items, "test-edge-cases")
 
       // JSON.stringify throws on circular, so fallback to String()
       expect(result).toBe(String(items))
@@ -126,17 +134,19 @@ describe("toon-compression/edge-cases", () => {
     })
 
     it("#then safeCompress compresses large uniform array", () => {
+      setGlobalCompressionConfig({ enabled: true, threshold: 10 })
       const large = Array.from({ length: 100 }, (_, i) => ({
         id: i,
         value: i * 2,
       }))
 
-      const result = safeCompress(large, { enabled: true, threshold: 10 }, "test-edge-cases")
+      const result = safeCompress(large, "test-edge-cases")
       expect(result).toContain("toon:")
       expect(encodeMock).toHaveBeenCalledTimes(1)
     })
 
     it("#then timeout triggers fallback when compression too slow", () => {
+      setGlobalCompressionConfig({ enabled: true, threshold: 10 })
       const large = Array.from({ length: 100 }, (_, i) => ({ id: i, value: i }))
 
       // Make Date.now return values that exceed timeout (50ms)
@@ -144,7 +154,7 @@ describe("toon-compression/edge-cases", () => {
       nowSpy.mockReturnValueOnce(100) // start
       nowSpy.mockReturnValueOnce(200) // end - 100ms > 50ms timeout
 
-      const result = safeCompress(large, { enabled: true, threshold: 10 }, "test-edge-cases")
+      const result = safeCompress(large, "test-edge-cases")
       expect(result).toBe(JSON.stringify(large))
 
       nowSpy.mockRestore()
@@ -179,6 +189,7 @@ describe("toon-compression/edge-cases", () => {
     })
 
     it("#then safeCompress preserves unicode in output", () => {
+      setGlobalCompressionConfig({ enabled: true, threshold: 10 })
       const items = [
         { id: 1, label: "日本語" },
         { id: 2, label: "中文" },
@@ -188,13 +199,14 @@ describe("toon-compression/edge-cases", () => {
         { id: 6, label: "русский" },
       ]
 
-      const result = safeCompress(items, { enabled: true, threshold: 10 }, "test-edge-cases")
+      const result = safeCompress(items, "test-edge-cases")
       expect(result).toContain("日本語")
       expect(result).toContain("中文")
       expect(result).toContain("한국어")
     })
 
     it("#then safeCompress preserves emoji in output", () => {
+      setGlobalCompressionConfig({ enabled: true, threshold: 10 })
       const items = [
         { id: 1, icon: "🎉" },
         { id: 2, icon: "🚀" },
@@ -204,7 +216,7 @@ describe("toon-compression/edge-cases", () => {
         { id: 6, icon: "❤️" },
       ]
 
-      const result = safeCompress(items, { enabled: true, threshold: 10 }, "test-edge-cases")
+      const result = safeCompress(items, "test-edge-cases")
       expect(result).toContain("🎉")
       expect(result).toContain("🚀")
     })
@@ -235,12 +247,13 @@ describe("toon-compression/edge-cases", () => {
     })
 
     it("#then safeCompress handles sparse array with JSON fallback", () => {
+      setGlobalCompressionConfig(enabledConfig)
       const sparse: Array<{ id: number } | undefined> = []
       sparse[0] = { id: 1 }
       sparse[5] = { id: 2 }
       sparse[10] = { id: 3 }
 
-      const result = safeCompress(sparse, enabledConfig, "test-edge-cases")
+      const result = safeCompress(sparse, "test-edge-cases")
       // JSON.stringify converts sparse to array with nulls
       expect(result).toContain("null")
     })
@@ -248,15 +261,17 @@ describe("toon-compression/edge-cases", () => {
 
   describe("#given unstringifiable objects", () => {
     it("#then safeCompress returns [unserializable] for circular Object.create(null)", () => {
+      setGlobalCompressionConfig(enabledConfig)
       // Object.create(null) has no toString, and circular ref makes JSON.stringify throw
       const nullProto: { self?: unknown } = Object.create(null)
       nullProto.self = nullProto
 
-      const result = safeCompress(nullProto, enabledConfig, "test-edge-cases")
+      const result = safeCompress(nullProto, "test-edge-cases")
       expect(result).toBe("[unserializable]")
     })
 
     it("#then safeCompress returns [unserializable] for circular object with throwing toString", () => {
+      setGlobalCompressionConfig(enabledConfig)
       // Circular ref makes JSON.stringify throw, throwing toString makes String() throw
       const throwing: { self?: unknown; toString(): string } = {
         toString() {
@@ -265,7 +280,7 @@ describe("toon-compression/edge-cases", () => {
       }
       throwing.self = throwing
 
-      const result = safeCompress(throwing, enabledConfig, "test-edge-cases")
+      const result = safeCompress(throwing, "test-edge-cases")
       expect(result).toBe("[unserializable]")
     })
   })

@@ -12,6 +12,7 @@ import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log } from "./shared"
+import { setGlobalCompressionConfig } from "./shared/toon-compression/config-store"
 import { startTmuxCheck } from "./tools"
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
@@ -41,6 +42,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   }
 
   const modelCacheState = createModelCacheState()
+
+  setGlobalCompressionConfig(pluginConfig.toon_compression ?? { enabled: false, threshold: 5000 })
 
   const managers = createManagers({
     ctx,

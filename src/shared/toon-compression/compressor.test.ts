@@ -12,6 +12,7 @@ mock.module("../logger", () => ({
 }))
 
 import { compressForLLM, isUniformArray, shouldCompress } from "./compressor"
+import { resetGlobalCompressionConfig, setGlobalCompressionConfig } from "./config-store"
 import { safeCompress } from "./fallback"
 
 const enabledConfig = { enabled: true, threshold: 100 }
@@ -30,6 +31,7 @@ describe("toon-compression/compressor", () => {
     encodeMock.mockReset()
     encodeMock.mockImplementation((value: unknown) => `toon:${JSON.stringify(value)}`)
     logMock.mockReset()
+    resetGlobalCompressionConfig()
   })
 
   describe("#given isUniformArray", () => {
@@ -123,31 +125,34 @@ describe("toon-compression/compressor", () => {
 
   describe("#given safeCompress", () => {
     it("#then falls back to JSON when encode throws", () => {
+      setGlobalCompressionConfig({ enabled: true, threshold: 10 })
       const rows = createUniformRows(8)
       encodeMock.mockImplementation(() => {
         throw new Error("encoder failure")
       })
 
-      const result = safeCompress(rows, { enabled: true, threshold: 10 }, "test-fallback")
+      const result = safeCompress(rows, "test-fallback")
       expect(result).toBe(JSON.stringify(rows))
     })
 
     it("#then falls back to JSON when compression exceeds timeout", () => {
+      setGlobalCompressionConfig({ enabled: true, threshold: 10 })
       const rows = createUniformRows(8)
       const nowSpy = spyOn(Date, "now")
 
       nowSpy.mockReturnValueOnce(100)
       nowSpy.mockReturnValueOnce(170)
 
-      const result = safeCompress(rows, { enabled: true, threshold: 10 }, "test-timeout")
+      const result = safeCompress(rows, "test-timeout")
       expect(result).toBe(JSON.stringify(rows))
 
       nowSpy.mockRestore()
     })
 
     it("#then keeps plain error text uncompressed", () => {
+      setGlobalCompressionConfig(enabledConfig)
       const message = "Error: unable to parse response"
-      const result = safeCompress(message, enabledConfig, "test-error-text")
+      const result = safeCompress(message, "test-error-text")
 
       expect(result).toBe(message)
       expect(encodeMock).not.toHaveBeenCalled()

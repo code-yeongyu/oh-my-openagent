@@ -3,11 +3,14 @@ import { beforeEach, describe, expect, it } from "bun:test"
 import {
   DEFAULT_COMPRESSION_CONFIG,
   getGlobalCompressionConfig,
+  resetGlobalCompressionConfig,
   setGlobalCompressionConfig,
 } from "./config-store"
 
 describe("toon-compression/config-store", () => {
-  beforeEach(() => {})
+  beforeEach(() => {
+    resetGlobalCompressionConfig()
+  })
 
   describe("#given DEFAULT_COMPRESSION_CONFIG", () => {
     it("#then has correct default values", () => {

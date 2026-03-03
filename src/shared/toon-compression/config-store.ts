@@ -14,3 +14,7 @@ export function setGlobalCompressionConfig(config: ToonCompressionConfig): void 
 export function getGlobalCompressionConfig(): ToonCompressionConfig {
   return globalConfig ?? DEFAULT_COMPRESSION_CONFIG
 }
+
+export function resetGlobalCompressionConfig(): void {
+  globalConfig = undefined
+}
