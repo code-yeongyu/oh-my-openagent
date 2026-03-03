@@ -8,7 +8,12 @@ export function createSystemTransformHandler(skills: LoadedSkill[]): (
   input: { sessionID: string },
   output: { system: string[] },
 ) => Promise<void> {
-  return async (_input, output): Promise<void> => {
+  const injectedSessions = new Set<string>()
+
+  return async (input, output): Promise<void> => {
+    if (injectedSessions.has(input.sessionID)) return
+    injectedSessions.add(input.sessionID)
+
     try {
       const index = buildSkillIndex(skills, "enforcement")
       output.system.push(index)
