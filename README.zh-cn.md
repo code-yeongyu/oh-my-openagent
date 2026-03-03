@@ -1,14 +1,3 @@
-> [!WARNING]
-> **安全警告：注意假冒网站**
->
-> **ohmyopencode.com 与本项目没有任何关系。** 我们不运营也不认可该网站。
->
-> OhMyOpenCode 是**免费且开源的**。**不要**从自称“官方”的第三方网站下载安装程序或输入付款信息。
->
-> 假冒网站隐藏在付费墙后，我们**无法验证它分发的内容**。将其所有下载视为**潜在危险**。
->
-> ✅ 官方下载地址：https://github.com/code-yeongyu/oh-my-opencode/releases
-
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
@@ -136,23 +125,23 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 - [GLM Coding 套餐 ($10)](https://z.ai/subscribe)
 - 如果你能使用按 token 计费的方式，用 kimi 和 gemini 模型花不了多少钱。
 
-|       | 特性                      | 功能说明                                                                                                                        |
-| :---: | :--------------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
-|   🤖   | **自律军团 (Discipline Agents)** | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                       |
-|   ⚡   | **`ultrawork` / `ulw`**      | 一键触发，所有智能体出动。任务完成前绝不罢休。                                                                           |
-|   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)**                 | 真正行动前，先分析用户的真实意图。彻底告别被字面意思误导的 AI 废话。                                         |
-|   🔗   | **基于哈希的编辑工具**  | 每次修改都通过 `LINE#ID` 内容哈希验证、0% 错误修改。灵感来自 [oh-my-pi](https://github.com/can1357/oh-my-pi)。[马具问题 →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
-|   🛠️   | **LSP + AST-Grep**           | 工作区级别的重命名、构建前诊断、基于 AST 的重写。为 Agent 提供 IDE 级别的精度。                                              |
-|   🧠   | **后台智能体**        | 同时发射 5+ 个专家并行工作。保持上下文干净，随时获取成果。                                                            |
-|   📚   | **内置 MCP**            | Exa (网络搜索)、Context7 (官方文档)、Grep.app (GitHub 源码搜索)。默认开启。                                                    |
-|   🔁   | **Ralph Loop / `/ulw-loop`** | 自我引用闭环。达不到 100% 完成度绝不停止。                                                                                |
-|   ✅   | **Todo 强制执行**            | Agent 想要摸鱼？系统直接揪着领子拽回来。你的任务，必须完成。                                                                 |
-|   💬   | **注释审查员**          | 剔除带有浓烈 AI 味的冗余注释。写出的代码就像老练的高级工程师写的。                                                                          |
-|   🖥️   | **Tmux 集成**         | 完整的交互式终端支持。跑 REPL、用调试器、用 TUI 工具，全都在实时会话中完成。                                                                        |
-|   🔌   | **Claude Code 兼容**   | 你现有的 Hooks、命令、技能、MCP 和插件？全都能无缝迁移过来。                                                                     |
-|   🎯   | **技能内嵌 MCP**      | 技能自带其所需的 MCP 服务器。按需开启，不会撑爆你的上下文窗口。                                                                               |
-|   📋   | **Prometheus 规划师**       | 动手写代码前，先通过访谈模式做好战略规划。                                                                             |
-|   🔍   | **`/init-deep`**             | 在整个项目目录层级中自动生成 `AGENTS.md`。不仅省 Token，还能大幅提升 Agent 理解力。 |
+|       | 特性                                                            | 功能说明                                                                                                                                                                        |
+| :---: | :-------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+|   🤖   | **自律军团 (Discipline Agents)**                                | Sisyphus 负责调度 Hephaestus、Oracle、Librarian 和 Explore。一支完整的 AI 开发团队并行工作。                                                                                    |
+|   ⚡   | **`ultrawork` / `ulw`**                                         | 一键触发，所有智能体出动。任务完成前绝不罢休。                                                                                                                                  |
+|   🚪   | **[IntentGate 意图门](https://factory.ai/news/terminal-bench)** | 真正行动前，先分析用户的真实意图。彻底告别被字面意思误导的 AI 废话。                                                                                                            |
+|   🔗   | **基于哈希的编辑工具**                                          | 每次修改都通过 `LINE#ID` 内容哈希验证、0% 错误修改。灵感来自 [oh-my-pi](https://github.com/can1357/oh-my-pi)。[马具问题 →](https://blog.can.ac/2026/02/12/the-harness-problem/) |
+|   🛠️   | **LSP + AST-Grep**                                              | 工作区级别的重命名、构建前诊断、基于 AST 的重写。为 Agent 提供 IDE 级别的精度。                                                                                                 |
+|   🧠   | **后台智能体**                                                  | 同时发射 5+ 个专家并行工作。保持上下文干净，随时获取成果。                                                                                                                      |
+|   📚   | **内置 MCP**                                                    | Exa (网络搜索)、Context7 (官方文档)、Grep.app (GitHub 源码搜索)。默认开启。                                                                                                     |
+|   🔁   | **Ralph Loop / `/ulw-loop`**                                    | 自我引用闭环。达不到 100% 完成度绝不停止。                                                                                                                                      |
+|   ✅   | **Todo 强制执行**                                               | Agent 想要摸鱼？系统直接揪着领子拽回来。你的任务，必须完成。                                                                                                                    |
+|   💬   | **注释审查员**                                                  | 剔除带有浓烈 AI 味的冗余注释。写出的代码就像老练的高级工程师写的。                                                                                                              |
+|   🖥️   | **Tmux 集成**                                                   | 完整的交互式终端支持。跑 REPL、用调试器、用 TUI 工具，全都在实时会话中完成。                                                                                                    |
+|   🔌   | **Claude Code 兼容**                                            | 你现有的 Hooks、命令、技能、MCP 和插件？全都能无缝迁移过来。                                                                                                                    |
+|   🎯   | **技能内嵌 MCP**                                                | 技能自带其所需的 MCP 服务器。按需开启，不会撑爆你的上下文窗口。                                                                                                                 |
+|   📋   | **Prometheus 规划师**                                           | 动手写代码前，先通过访谈模式做好战略规划。                                                                                                                                      |
+|   🔍   | **`/init-deep`**                                                | 在整个项目目录层级中自动生成 `AGENTS.md`。不仅省 Token，还能大幅提升 Agent 理解力。                                                                                             |
 
 ### 自律军团 (Discipline Agents)
 
@@ -177,11 +166,11 @@ Read this and tell me why it's not just another boilerplate: https://raw.githubu
 
 当 Sisyphus 把任务分配给子智能体时，他选择的不是具体的模型，而是 **类别 (Category)**。系统会自动将类别映射到最合适的模型：
 
-| 类别             | 作用领域                      |
-| :------------------- | :--------------------------------- |
-| `visual-engineering` | 前端、UI/UX、设计            |
-| `deep`               | 深度自主调研与执行    |
-| `quick`              | 单文件修改、修错字         |
+| 类别                 | 作用领域               |
+| :------------------- | :--------------------- |
+| `visual-engineering` | 前端、UI/UX、设计      |
+| `deep`               | 深度自主调研与执行     |
+| `quick`              | 单文件修改、修错字     |
 | `ultrabrain`         | 复杂硬核逻辑、架构决策 |
 
 智能体只需要说明要做什么类型的工作，框架就会挑选出最合适的模型去干。你完全不需要操心。
