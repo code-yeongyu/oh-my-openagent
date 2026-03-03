@@ -1,10 +1,8 @@
-import { describe, expect, mock, test } from "bun:test"
-import type { ToonCompressionConfig } from "../../shared/toon-compression"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { setGlobalCompressionConfig, resetGlobalCompressionConfig } from "../../shared/toon-compression/config-store"
 
-// Mock @toon-format/toon at module level
 mock.module("@toon-format/toon", () => ({
 	encode: mock((data: unknown) => {
-		// Simple mock that returns a TOON-like format for arrays
 		if (Array.isArray(data) && data.length > 0) {
 			const keys = Object.keys(data[0]).sort()
 			return `[${data.length}]{${keys.join(",")}}:${JSON.stringify(data)}`
@@ -13,46 +11,35 @@ mock.module("@toon-format/toon", () => ({
 	}),
 }))
 
-// Import after mock is set up
 import {
 	compressSkillContent,
 	compressSkillInjection,
 	compressSkillTemplates,
 } from "./skill-content-resolver"
 
-const ENABLED_CONFIG: ToonCompressionConfig = {
-	enabled: true,
-	threshold: 100,
-}
-
-const DISABLED_CONFIG: ToonCompressionConfig = {
-	enabled: false,
-	threshold: 100,
-}
-
 describe("skill-content-resolver", () => {
+	beforeEach(() => {
+		setGlobalCompressionConfig({ enabled: true, threshold: 100 })
+	})
+
+	afterEach(() => {
+		resetGlobalCompressionConfig()
+	})
+
 	describe("#given compressSkillContent", () => {
-		describe("#when compression is disabled", () => {
+		describe("#when given string content", () => {
 			test("#then returns original string content", () => {
 				const content = "This is skill content"
-				const result = compressSkillContent(content, DISABLED_CONFIG)
-				// safeCompress returns raw string for string input (not JSON.stringify'd)
+				const result = compressSkillContent(content)
 				expect(result).toBe(content)
 			})
 		})
 
-		describe("#when compression is enabled", () => {
+		describe("#when given long string content", () => {
 			test("#then returns original string (strings not compressed)", () => {
 				const content = "A".repeat(200)
-				const result = compressSkillContent(content, ENABLED_CONFIG)
-				// String content is returned as-is (compression only works on uniform arrays)
-				expect(result).toBe(content)
-			})
-
-			test("#then uses default config when not provided", () => {
-				const content = "Simple content"
 				const result = compressSkillContent(content)
-				expect(typeof result).toBe("string")
+				expect(result).toBe(content)
 			})
 		})
 	})
@@ -61,7 +48,7 @@ describe("skill-content-resolver", () => {
 		describe("#when given empty map", () => {
 			test("#then returns empty array JSON", () => {
 				const skills = new Map<string, string>()
-				const result = compressSkillTemplates(skills, ENABLED_CONFIG)
+				const result = compressSkillTemplates(skills)
 				expect(result).toBe("[]")
 			})
 		})
@@ -69,7 +56,7 @@ describe("skill-content-resolver", () => {
 		describe("#when given map with single skill", () => {
 			test("#then returns array with one item", () => {
 				const skills = new Map([["git-master", "Git skill template"]])
-				const result = compressSkillTemplates(skills, ENABLED_CONFIG)
+				const result = compressSkillTemplates(skills)
 				expect(result).toContain("git-master")
 				expect(result).toContain("Git skill template")
 			})
@@ -85,19 +72,8 @@ describe("skill-content-resolver", () => {
 					["skill-e", "Template E content"],
 					["skill-f", "Template F content"],
 				])
-				const result = compressSkillTemplates(skills, ENABLED_CONFIG)
-				// Should contain TOON-like format for uniform array
+				const result = compressSkillTemplates(skills)
 				expect(result).toContain("[6]")
-			})
-
-			test("#then returns compact JSON when compression disabled", () => {
-				const skills = new Map([
-					["skill-a", "Template A"],
-					["skill-b", "Template B"],
-				])
-				const result = compressSkillTemplates(skills, DISABLED_CONFIG)
-				expect(result).toContain("skill-a")
-				expect(result).toContain("skill-b")
 			})
 		})
 	})
@@ -105,7 +81,7 @@ describe("skill-content-resolver", () => {
 	describe("#given compressSkillInjection", () => {
 		describe("#when given skill name and template only", () => {
 			test("#then returns structured injection data", () => {
-				const result = compressSkillInjection("playwright", "Browser automation skill", undefined, ENABLED_CONFIG)
+				const result = compressSkillInjection("playwright", "Browser automation skill")
 				expect(result).toContain("playwright")
 				expect(result).toContain("Browser automation skill")
 				expect(result).toContain("skill")
@@ -119,8 +95,7 @@ describe("skill-content-resolver", () => {
 				const result = compressSkillInjection(
 					"git-master",
 					"Git skill",
-					metadata,
-					ENABLED_CONFIG
+					metadata
 				)
 				expect(result).toContain("meta")
 				expect(result).toContain("/path/to/skill")
@@ -128,21 +103,8 @@ describe("skill-content-resolver", () => {
 			})
 		})
 
-		describe("#when compression is disabled", () => {
-			test("#then returns JSON object without TOON compression", () => {
-				const result = compressSkillInjection(
-					"test-skill",
-					"Test template",
-					undefined,
-					DISABLED_CONFIG
-				)
-				expect(result).toContain("test-skill")
-				expect(result).toContain("Test template")
-			})
-		})
-
 		describe("#when using default config", () => {
-			test("#then uses disabled compression by default", () => {
+			test("#then returns JSON object", () => {
 				const result = compressSkillInjection("skill", "template")
 				expect(typeof result).toBe("string")
 				expect(result).toContain("skill")

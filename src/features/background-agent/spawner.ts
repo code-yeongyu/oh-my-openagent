@@ -74,7 +74,7 @@ export async function startTask(
   ctx: SpawnerContext
 ): Promise<void> {
   const { task, input } = item
-  const { client, directory, concurrencyManager, tmuxEnabled, onSubagentSessionCreated, onTaskError, toonCompressionConfig } = ctx
+  const { client, directory, concurrencyManager, tmuxEnabled, onSubagentSessionCreated, onTaskError } = ctx
 
   log("[background-agent] Starting task:", {
     taskId: task.id,
@@ -168,8 +168,8 @@ export async function startTask(
     : undefined
   const launchVariant = input.model?.variant
 
-  // Apply compression to prompt if config is provided
-  const compressedPrompt = preparePromptWithCompression(input.prompt, toonCompressionConfig)
+  // Apply compression to prompt
+  const compressedPrompt = preparePromptWithCompression(input.prompt)
 
   promptWithModelSuggestionRetry(client, {
     path: { id: sessionID },
@@ -195,9 +195,9 @@ export async function startTask(
 export async function resumeTask(
   task: BackgroundTask,
   input: ResumeInput,
-  ctx: Pick<SpawnerContext, "client" | "concurrencyManager" | "onTaskError" | "toonCompressionConfig">
+  ctx: Pick<SpawnerContext, "client" | "concurrencyManager" | "onTaskError">
 ): Promise<void> {
-  const { client, concurrencyManager, onTaskError, toonCompressionConfig } = ctx
+  const { client, concurrencyManager, onTaskError } = ctx
 
   if (!task.sessionID) {
     throw new Error(`Task has no sessionID: ${task.id}`)
@@ -256,8 +256,8 @@ export async function resumeTask(
     : undefined
   const resumeVariant = task.model?.variant
 
-  // Apply compression to prompt if config is provided
-  const compressedPrompt = preparePromptWithCompression(input.prompt, toonCompressionConfig)
+  // Apply compression to prompt
+  const compressedPrompt = preparePromptWithCompression(input.prompt)
 
   client.session.promptAsync({
     path: { id: task.sessionID },

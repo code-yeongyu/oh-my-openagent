@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 
 import type { Message, Part } from "@opencode-ai/sdk"
 import type { CreatedHooks } from "./create-hooks"
-import type { ToonCompressionConfig } from "../config/schema/toon-compression"
+import { setGlobalCompressionConfig, resetGlobalCompressionConfig } from "../shared/toon-compression/config-store"
 
 const encodeMock = mock((value: unknown) => `toon:${JSON.stringify(value)}`)
 
@@ -54,18 +54,19 @@ describe("messages-transform compression", () => {
     encodeMock.mockImplementation((value: unknown) => `toon:${JSON.stringify(value)}`)
   })
 
+  afterEach(() => {
+    resetGlobalCompressionConfig()
+  })
+
   describe("#given compression disabled", () => {
     test("#then passes messages through unchanged", async () => {
-      //#given
       const hooks = createMockHooks()
       const handler = createMessagesTransformHandler({ hooks })
       const messages = createUniformMessages(6)
       const output = { messages }
 
-      //#when
       await handler({}, output)
 
-      //#then - messages should remain unchanged (no compression applied in handler)
       expect(output.messages.length).toBe(6)
       expect(output.messages[0].parts[0]).toEqual({ type: "text", text: expect.any(String) })
     })
@@ -73,8 +74,8 @@ describe("messages-transform compression", () => {
 
   describe("#given compression enabled with eligible batch", () => {
     test("#then compresses uniform message array when threshold met", async () => {
-      //#given - create a hooks with compression hook
-      const enabledConfig: ToonCompressionConfig = { enabled: true, threshold: 100 }
+      setGlobalCompressionConfig({ enabled: true, threshold: 100 })
+
       const hooks: CreatedHooks = {
         contextInjectorMessagesTransform: {
           "experimental.chat.messages.transform": async () => {},
@@ -91,7 +92,7 @@ describe("messages-transform compression", () => {
             }))
 
             const { safeCompress } = await import("../shared/toon-compression")
-            const compressed = safeCompress(batchData, enabledConfig, "test-messages-transform")
+            const compressed = safeCompress(batchData, "test-messages-transform")
 
             output.messages = [{
               info: { id: "compressed-batch", role: "assistant" } as Message,
@@ -105,10 +106,8 @@ describe("messages-transform compression", () => {
       const messages = createUniformMessages(6)
       const output = { messages }
 
-      //#when
       await handler({}, output)
 
-      //#then - should be compressed to single message
       expect(output.messages.length).toBe(1)
       expect(encodeMock).toHaveBeenCalled()
     })
@@ -116,16 +115,13 @@ describe("messages-transform compression", () => {
 
   describe("#given small message batch below threshold", () => {
     test("#then does not compress when message count too small", async () => {
-      //#given
       const hooks = createMockHooks()
       const handler = createMessagesTransformHandler({ hooks })
       const messages = [createMockMessage("user", "hello"), createMockMessage("assistant", "hi")]
       const output = { messages }
 
-      //#when
       await handler({}, output)
 
-      //#then - messages unchanged
       expect(output.messages.length).toBe(2)
     })
   })
