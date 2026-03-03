@@ -1,10 +1,10 @@
 # oh-my-opencode — OpenCode Plugin
 
-**Generated:** 2026-02-24 | **Commit:** fcb90d92 | **Branch:** dev
+**Generated:** 2026-03-02 | **Commit:** 1c2caa09 | **Branch:** dev
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 46 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1208 TypeScript files, 143k LOC.
+OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 46 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1243 TypeScript files, 155k LOC.
 
 ## STRUCTURE
 
@@ -14,16 +14,16 @@ oh-my-opencode/
 │   ├── index.ts              # Plugin entry: loadConfig → createManagers → createTools → createHooks → createPluginInterface
 │   ├── plugin-config.ts      # JSONC multi-level config: user → project → defaults (Zod v4)
 │   ├── agents/               # 11 agents (Sisyphus, Hephaestus, Oracle, Librarian, Explore, Atlas, Prometheus, Metis, Momus, Multimodal-Looker, Sisyphus-Junior)
-| `hooks/`                # 46 hooks across 39 directories + 6 standalone files
+│   ├── hooks/                # 46 hooks across 45 directories + 11 standalone files
 │   ├── tools/                # 26 tools across 15 directories
 │   ├── features/             # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
-│   ├── shared/               # 100+ utility files in 13 categories
-│   ├── config/               # Zod v4 schema system (22+ files)
+│   ├── shared/               # 95+ utility files in 13 categories
+│   ├── config/               # Zod v4 schema system (24 files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth (Commander.js)
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
 │   ├── plugin/               # 8 OpenCode hook handlers + 46 hook composition
 │   └── plugin-handlers/      # 6-phase config loading pipeline
-├── packages/                 # Monorepo: comment-checker, opencode-sdk, 10 platform binaries
+├── packages/                 # Monorepo: cli-runner, 12 platform binaries
 └── local-ignore/             # Dev-only test fixtures
 ```
 
@@ -123,7 +123,7 @@ bunx oh-my-opencode run     # Non-interactive session
 |----------|---------|---------|
 | ci.yml | push/PR | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
 | publish.yml | manual | Version bump, npm publish, platform binaries, GitHub release, merge to dev |
-| publish-platform.yml | called | 11 platform binaries via bun compile (darwin/linux/windows) |
+| publish-platform.yml | called | 12 platform binaries via bun compile (darwin/linux/windows) |
 | sisyphus-agent.yml | @mention | AI agent handles issues/PRs |
 
 ## NOTES

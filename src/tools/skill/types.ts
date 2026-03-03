@@ -35,4 +35,8 @@ export interface SkillLoadOptions {
   disabledSkills?: Set<string>
   /** Project directory for skill discovery and base directory resolution. Must be ctx.directory from PluginContext — process.cwd() is unsafe in OpenCode. */
   directory: string
+  /** Include Claude marketplace plugin commands in discovery (default: true) */
+  pluginsEnabled?: boolean
+  /** Override plugin enablement from Claude settings by plugin key */
+  enabledPluginsOverride?: Record<string, boolean>
 }

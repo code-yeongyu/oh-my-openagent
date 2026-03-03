@@ -71,6 +71,7 @@ export function createToolRegistry(args: {
     disabledSkills: skillContext.disabledSkills,
     availableCategories,
     availableSkills: skillContext.availableSkills,
+    syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
     onSyncSessionCreated: async (event) => {
       log("[index] onSyncSessionCreated callback", {
         sessionID: event.sessionID,
@@ -98,7 +99,10 @@ export function createToolRegistry(args: {
     getSessionID: getSessionIDForMcp,
   })
 
-  const commands = discoverCommandsSync(ctx.directory)
+  const commands = discoverCommandsSync(ctx.directory, {
+    pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
+    enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+  })
   const skillTool = createSkillTool({
     commands,
     skills: skillContext.mergedSkills,
@@ -118,7 +122,7 @@ export function createToolRegistry(args: {
       }
     : {}
 
-  const hashlineEnabled = pluginConfig.hashline_edit ?? true
+  const hashlineEnabled = pluginConfig.hashline_edit ?? false
   const hashlineToolsRecord: Record<string, ToolDefinition> = hashlineEnabled
     ? { edit: createHashlineEditTool() }
     : {}

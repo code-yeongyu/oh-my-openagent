@@ -51,6 +51,7 @@ export function createHooks(args: {
 
   const skill = createSkillHooks({
     ctx,
+    pluginConfig,
     isHookEnabled,
     safeHookEnabled,
     mergedSkills,

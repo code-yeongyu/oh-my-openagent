@@ -7,6 +7,7 @@ const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
 
 type ModelCacheStateLike = {
   anthropicContext1MEnabled: boolean
+  modelContextLimitsCache?: Map<string, number>
 }
 
 function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
@@ -91,10 +92,12 @@ export function createPreemptiveCompactionHook(
     const cached = tokenCache.get(sessionID)
     if (!cached) return
 
-    const actualLimit =
-      isAnthropicProvider(cached.providerID)
-        ? getAnthropicActualLimit(modelCacheState)
-        : DEFAULT_ACTUAL_LIMIT
+    const modelSpecificLimit = !isAnthropicProvider(cached.providerID)
+      ? modelCacheState?.modelContextLimitsCache?.get(`${cached.providerID}/${cached.modelID}`)
+      : undefined
+    const actualLimit = isAnthropicProvider(cached.providerID)
+      ? getAnthropicActualLimit(modelCacheState)
+      : modelSpecificLimit ?? DEFAULT_ACTUAL_LIMIT
 
     const lastTokens = cached.tokens
     const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
@@ -164,6 +167,7 @@ export function createPreemptiveCompactionHook(
         modelID: info.modelID ?? "",
         tokens: info.tokens,
       })
+      compactedSessions.delete(info.sessionID)
     }
   }
 

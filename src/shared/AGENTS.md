@@ -1,6 +1,6 @@
-# src/shared/ — 101 Utility Files in 13 Categories
+# src/shared/ — 95+ Utility Files in 13 Categories
 
-**Generated:** 2026-02-24
+**Generated:** 2026-03-02
 
 ## OVERVIEW
 
@@ -33,7 +33,7 @@ resolveModel(input)
   4. System default: Ultimate fallback
 ```
 
-Key files: `model-resolver.ts` (entry), `model-resolution-pipeline.ts` (orchestration), `model-requirements.ts` (fallback chains), `model-name-matcher.ts` (fuzzy matching).
+Key files: `model-resolver.ts` (entry), `model-resolution-pipeline.ts` (orchestration), `model-requirements.ts` (fallback chains), `model-availability.ts` (fuzzy matching).
 
 ## MIGRATION SYSTEM
 

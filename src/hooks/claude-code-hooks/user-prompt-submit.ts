@@ -4,7 +4,7 @@ import type {
   ClaudeHooksConfig,
 } from "./types"
 import { findMatchingHooks, log } from "../../shared"
-import { dispatchHook } from "./dispatch-hook"
+import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 
 const USER_PROMPT_SUBMIT_TAG_OPEN = "<user-prompt-submit-hook>"
@@ -82,8 +82,9 @@ export async function executeUserPromptSubmitHooks(
      for (const hook of matcher.hooks) {
        if (hook.type !== "command" && hook.type !== "http") continue
 
-      if (hook.type === "command" && isHookCommandDisabled("UserPromptSubmit", hook.command, extendedConfig ?? null)) {
-        log("UserPromptSubmit hook command skipped (disabled by config)", { command: hook.command })
+      const hookName = getHookIdentifier(hook)
+      if (isHookCommandDisabled("UserPromptSubmit", hookName, extendedConfig ?? null)) {
+        log("UserPromptSubmit hook command skipped (disabled by config)", { command: hookName })
         continue
       }
 

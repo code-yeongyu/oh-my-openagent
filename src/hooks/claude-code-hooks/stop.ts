@@ -4,7 +4,7 @@ import type {
   ClaudeHooksConfig,
 } from "./types"
 import { findMatchingHooks, log } from "../../shared"
-import { dispatchHook } from "./dispatch-hook"
+import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { getTodoPath } from "./todo"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 
@@ -70,8 +70,9 @@ export async function executeStopHooks(
      for (const hook of matcher.hooks) {
        if (hook.type !== "command" && hook.type !== "http") continue
 
-       if (hook.type === "command" && isHookCommandDisabled("Stop", hook.command, extendedConfig ?? null)) {
-        log("Stop hook command skipped (disabled by config)", { command: hook.command })
+      const hookName = getHookIdentifier(hook)
+      if (isHookCommandDisabled("Stop", hookName, extendedConfig ?? null)) {
+        log("Stop hook command skipped (disabled by config)", { command: hookName })
         continue
       }
 
