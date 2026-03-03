@@ -69,6 +69,8 @@ export interface DelegateTaskToolOptions {
   agentOverrides?: AgentOverrides
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
+  /** Default model for all agents and categories when no specific model is configured */
+  defaultModel?: string
 }
 
 export interface BuildSystemContentInput {

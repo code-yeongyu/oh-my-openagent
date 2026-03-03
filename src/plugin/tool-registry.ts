@@ -68,6 +68,7 @@ export function createToolRegistry(args: {
     availableCategories,
     availableSkills: skillContext.availableSkills,
     syncPollTimeoutMs: pluginConfig.background_task?.syncPollTimeoutMs,
+    defaultModel: pluginConfig.default_model,
     onSyncSessionCreated: async (event) => {
       log("[index] onSyncSessionCreated callback", {
         sessionID: event.sessionID,
