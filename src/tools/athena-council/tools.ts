@@ -1,6 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { readFile } from "node:fs/promises"
-import { resolve } from "node:path"
+import { resolve, sep } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CouncilConfig, CouncilMemberConfig } from "../../config/schema/athena"
 import { launchCouncilMember, type CouncilLaunchContext } from "./council-launcher"
@@ -128,7 +128,7 @@ export function createAthenaCouncilTool(args: {
       let promptContent: string
       try {
         const resolvedPath = resolve(directory, toolArgs.prompt_file)
-        const expectedPrefix = resolve(directory, ".sisyphus/tmp")
+        const expectedPrefix = `${resolve(directory, ".sisyphus/tmp")}${sep}`
         if (!resolvedPath.startsWith(expectedPrefix)) {
           return `Invalid prompt_file path: expected path within .sisyphus/tmp/, got: ${toolArgs.prompt_file}`
         }
