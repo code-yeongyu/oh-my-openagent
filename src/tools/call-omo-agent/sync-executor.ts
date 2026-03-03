@@ -2,6 +2,7 @@ import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { getAgentToolRestrictions } from "../../shared"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { createOrGetSession } from "./session-creator"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
@@ -48,7 +49,7 @@ export async function executeSync(
     await (ctx.client.session as unknown as SessionWithPromptAsync).promptAsync({
       path: { id: sessionID },
       body: {
-        agent: args.subagent_type,
+        agent: getAgentDisplayName(args.subagent_type),
         tools: {
           ...getAgentToolRestrictions(args.subagent_type),
           task: false,
