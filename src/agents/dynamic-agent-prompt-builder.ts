@@ -285,6 +285,43 @@ Briefly announce "Consulting Oracle for [reason]" before invocation.
 </Oracle_Usage>`
 }
 
+export function buildArgusSection(agents: AvailableAgent[]): string {
+  const argusAgent = agents.find((a) => a.name === "argus")
+  if (!argusAgent) return ""
+
+  return `<Argus_Usage>
+## Argus — Mandatory Code Review Gate
+
+Argus is a read-only, thorough code reviewer. Calling Argus before completion is **MANDATORY** — not optional like Oracle.
+
+### WHEN to Call Argus (NON-NEGOTIABLE):
+
+- After ANY implementation task completes
+- Before declaring work done
+- Before any PR or commit
+
+### How to Call Argus:
+
+1. Determine BASE_SHA (the commit before Sisyphus started work) and HEAD_SHA (current HEAD after changes)
+2. Pass both SHAs in your prompt to Argus: "Review changes from BASE_SHA to HEAD_SHA"
+3. **End your response** and wait for the Argus result notification (same pattern as Oracle)
+
+### Argus Result Handling:
+
+- **ARGUS: APPROVED** → You may proceed to completion
+- **ARGUS: BLOCKED** → You MUST fix every BLOCKING issue, then call Argus again
+- Repeat until Argus returns APPROVED — there is no override, no skip, no exception
+
+### Rules:
+
+- Argus is NOT optional — skipping Argus review is a hard block violation
+- Sisyphus must wait for Argus result before declaring done
+- If Argus returns BLOCKED, fix ALL blocking issues and re-invoke Argus
+- Only when Argus returns APPROVED may Sisyphus proceed to completion
+- Never cancel Argus
+</Argus_Usage>`
+}
+
 export function buildHardBlocksSection(): string {
   const blocks = [
     "- Type error suppression (`as any`, `@ts-ignore`) — **Never**",
@@ -293,6 +330,7 @@ export function buildHardBlocksSection(): string {
     "- Leave code in broken state after failures — **Never**",
     "- `background_cancel(all=true)` — **Never.** Always cancel individually by taskId.",
     "- Delivering final answer before collecting Oracle result — **Never.**",
+    "- Declaring completion without Argus APPROVED — **Never**",
   ]
 
   return `## Hard Blocks (NEVER violate)

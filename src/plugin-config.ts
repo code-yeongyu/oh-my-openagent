@@ -137,22 +137,30 @@ export function loadPluginConfig(
   directory: string,
   ctx: unknown
 ): OhMyOpenCodeConfig {
-  // User-level config path - prefer .jsonc over .json
+  // User-level config path - prefer better-oh-my-opencode over oh-my-opencode, .jsonc over .json
   const configDir = getOpenCodeConfigDir({ binary: "opencode" });
+  const betterUserBasePath = path.join(configDir, "better-oh-my-opencode");
+  const betterUserDetected = detectConfigFile(betterUserBasePath);
   const userBasePath = path.join(configDir, "oh-my-opencode");
   const userDetected = detectConfigFile(userBasePath);
   const userConfigPath =
-    userDetected.format !== "none"
-      ? userDetected.path
-      : userBasePath + ".json";
+    betterUserDetected.format !== "none"
+      ? betterUserDetected.path
+      : userDetected.format !== "none"
+        ? userDetected.path
+        : betterUserBasePath + ".jsonc";
 
-  // Project-level config path - prefer .jsonc over .json
+  // Project-level config path - prefer better-oh-my-opencode over oh-my-opencode, .jsonc over .json
+  const betterProjectBasePath = path.join(directory, ".opencode", "better-oh-my-opencode");
+  const betterProjectDetected = detectConfigFile(betterProjectBasePath);
   const projectBasePath = path.join(directory, ".opencode", "oh-my-opencode");
   const projectDetected = detectConfigFile(projectBasePath);
   const projectConfigPath =
-    projectDetected.format !== "none"
-      ? projectDetected.path
-      : projectBasePath + ".json";
+    betterProjectDetected.format !== "none"
+      ? betterProjectDetected.path
+      : projectDetected.format !== "none"
+        ? projectDetected.path
+        : betterProjectBasePath + ".jsonc";
 
   // Load user config first (base)
   let config: OhMyOpenCodeConfig =

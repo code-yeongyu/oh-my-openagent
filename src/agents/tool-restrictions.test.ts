@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { createOracleAgent } from "./oracle"
+import { createArgusAgent } from "./argus"
 import { createLibrarianAgent } from "./librarian"
 import { createExploreAgent } from "./explore"
 import { createMomusAgent } from "./momus"
@@ -35,6 +36,40 @@ describe("read-only agent tool restrictions", () => {
       // then
       expect(permission["task"]).toBe("deny")
       expect(permission["call_omo_agent"]).toBeUndefined()
+    })
+  })
+
+  describe("Argus", () => {
+    test("denies all file-writing tools", () => {
+      // given
+      const agent = createArgusAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+
+      // then
+      for (const tool of FILE_WRITE_TOOLS) {
+        expect(permission[tool]).toBe("deny")
+      }
+    })
+
+    test("denies task tool", () => {
+      // given
+      const agent = createArgusAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+
+      // then
+      expect(permission["task"]).toBe("deny")
+    })
+
+    test("is available in all modes", () => {
+      // given
+      const agent = createArgusAgent(TEST_MODEL)
+
+      // then
+      expect(agent.mode).toBe("all")
     })
   })
 

@@ -82,7 +82,17 @@
 
 ---
 
-# Oh My OpenCode
+# Better Oh My OpenCode
+
+A fork of [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode) with structural enforcement of code quality and orchestration discipline.
+
+## What's Different from oh-my-opencode
+
+* **Argus** — a mandatory code reviewer that must return APPROVED before Sisyphus can declare any task complete. Argus reads every changed line and checks for logic bugs, security issues, edge cases, and missing error handling. There is no override.
+* **Sisyphus is a pure orchestrator** — write, edit, and apply_patch are structurally removed at the permission level, not just prompted away. Sisyphus plans, delegates, verifies Argus approval, and reports. It never writes code directly.
+* Based on the original [oh-my-opencode](https://github.com/code-yeongyu/oh-my-opencode) by [@code-yeongyu](https://github.com/code-yeongyu). All credit for the core agent framework, tools, and orchestration system goes to that project.
+
+---
 
 You're juggling Claude Code, Codex, random OSS models. Configuring workflows. Debugging agents.
 
@@ -163,7 +173,9 @@ Even only with following subscriptions, ultrawork will work well (this project i
 <td align="center"><img src=".github/assets/hephaestus.png" height="300" /></td>
 </tr></table>
 
-**Sisyphus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`** ) is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He does not stop halfway.
+**Sisyphus** (`claude-opus-4-6` / **`kimi-k2.5`** / **`glm-5`** ) is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He never writes code directly — write/edit/apply_patch are structurally denied at the permission level.
+
+**Argus** (`claude-sonnet-4-6` / `gpt-5.3-codex`) is your mandatory code reviewer. Hundred-eyed. Misses nothing. Sisyphus cannot declare done without Argus APPROVED.
 
 **Hephaestus** (`gpt-5.3-codex`) is your autonomous deep worker. Give him a goal, not a recipe. He explores the codebase, researches patterns, and executes end-to-end without hand-holding. *The Legitimate Craftsman.*
 
@@ -176,6 +188,8 @@ Every agent is tuned to its model's specific strengths. No manual model-juggling
 > We run best on Opus, but Kimi K2.5 + GPT-5.3 Codex already beats vanilla Claude Code. Zero config needed.
 
 ### Agent Orchestration
+
+Sisyphus never writes code directly — write, edit, and apply_patch tools are denied at the permission level. All implementation goes through subagents. After implementation, Argus reviews every changed line and must return APPROVED before Sisyphus can declare completion.
 
 When Sisyphus delegates to a subagent, it doesn't pick a model. It picks a **category**. The category maps automatically to the right model:
 
@@ -307,7 +321,7 @@ Features you'll think should've always existed. Once you use them, you can't go 
 See full [Features Documentation](docs/reference/features.md).
 
 **Quick Overview:**
-- **Agents**: Sisyphus (the main agent), Prometheus (planner), Oracle (architecture/debugging), Librarian (docs/code search), Explore (fast codebase grep), Multimodal Looker
+- **Agents**: Sisyphus (the main agent), Argus (mandatory code reviewer), Prometheus (planner), Oracle (architecture/debugging), Librarian (docs/code search), Explore (fast codebase grep), Multimodal Looker
 - **Background Agents**: Run multiple agents in parallel like a real dev team
 - **LSP & AST Tools**: Refactoring, rename, diagnostics, AST-aware code search
 - **Hash-anchored Edit Tool**: `LINE#ID` references validate content before applying every change. Surgical edits, zero stale-line errors
