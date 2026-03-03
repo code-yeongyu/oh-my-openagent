@@ -60,7 +60,8 @@ export async function resolveCategoryExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   inheritedModel: string | undefined,
-  systemDefaultModel: string | undefined
+  systemDefaultModel: string | undefined,
+  defaultModel?: string
 ): Promise<CategoryResolutionResult> {
   const { client, userCategories, sisyphusJuniorModel } = executorCtx
 
@@ -89,6 +90,7 @@ export async function resolveCategoryExecution(
     inheritedModel,
     systemDefaultModel,
     availableModels,
+    defaultModel,
   })
 
   if (!resolved) {

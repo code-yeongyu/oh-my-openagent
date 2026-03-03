@@ -99,6 +99,9 @@
     "model_fallback": {
       "type": "boolean"
     },
+    "default_model": {
+      "type": "string"
+    },
     "agents": {
       "type": "object",
       "properties": {

@@ -11,6 +11,7 @@ export interface ResolveCategoryConfigOptions {
   inheritedModel?: string
   systemDefaultModel?: string
   availableModels?: Set<string>
+  defaultModel?: string
 }
 
 export interface ResolveCategoryConfigResult {
@@ -28,7 +29,7 @@ export function resolveCategoryConfig(
   categoryName: string,
   options: ResolveCategoryConfigOptions
 ): ResolveCategoryConfigResult | null {
-  const { userCategories, inheritedModel: _inheritedModel, systemDefaultModel, availableModels } = options
+  const { userCategories, inheritedModel: _inheritedModel, systemDefaultModel, availableModels, defaultModel } = options
 
   const defaultConfig = DEFAULT_CATEGORIES[categoryName]
   const userConfig = userCategories?.[categoryName]
@@ -51,12 +52,11 @@ export function resolveCategoryConfig(
     return null
   }
 
-  // Model priority for categories: user override > category default > system default
-  // Categories have explicit models - no inheritance from parent session
+  // Model priority for categories: user override > category default > default_model > system default
   const model = resolveModel({
     userModel: userConfig?.model,
-    inheritedModel: defaultConfig?.model, // Category's built-in model takes precedence over system default
-    systemDefault: systemDefaultModel,
+    inheritedModel: defaultConfig?.model, // Category's built-in model takes precedence over default_model
+    systemDefault: defaultModel ?? systemDefaultModel, // default_model takes precedence over system default
   })
   const isUserConfiguredModel = normalizeModel(userConfig?.model) !== undefined
   const config: CategoryConfig = {

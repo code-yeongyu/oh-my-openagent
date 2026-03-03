@@ -101,7 +101,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       let maxPromptTokens: number | undefined
 
       if (delegateTaskArgs.category) {
-        const resolution = await resolveCategoryExecution(delegateTaskArgs, options, inheritedModel, systemDefaultModel)
+        const resolution = await resolveCategoryExecution(delegateTaskArgs, options, inheritedModel, systemDefaultModel, options.defaultModel)
         if (resolution.error) {
           return resolution.error
         }

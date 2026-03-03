@@ -70,6 +70,8 @@ export interface DelegateTaskToolOptions {
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
+  /** Default model for all agents and categories when no specific model is configured */
+  defaultModel?: string
 }
 
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
