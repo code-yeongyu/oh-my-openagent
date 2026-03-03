@@ -31,6 +31,18 @@ function removeDefaultedFromRequired(schema: Record<string, unknown>): Record<st
     result.items = result.items.map((item) => removeDefaultedFromRequired(item as Record<string, unknown>))
   }
 
+  if (result.additionalProperties && typeof result.additionalProperties === "object") {
+    result.additionalProperties = removeDefaultedFromRequired(result.additionalProperties as Record<string, unknown>)
+  }
+
+  if (result.patternProperties && typeof result.patternProperties === "object") {
+    const newPatternProperties: Record<string, unknown> = {}
+    for (const [pattern, value] of Object.entries(result.patternProperties as Record<string, unknown>)) {
+      newPatternProperties[pattern] = removeDefaultedFromRequired(value as Record<string, unknown>)
+    }
+    result.patternProperties = newPatternProperties
+  }
+
   for (const key of ["allOf", "anyOf", "oneOf"]) {
     if (Array.isArray(result[key])) {
       result[key] = (result[key] as Record<string, unknown>[]).map((s) => removeDefaultedFromRequired(s))
