@@ -113,17 +113,18 @@ Universal requirements (all intents):
 </synthesis_rules>
 
 <output_contract>
-After synthesis, you MUST output EXACTLY this structured format:
+After synthesis, you MUST output the following:
+
+1. A brief reminder to the caller (BEFORE the JSON) that they should read the full synthesis and individual member responses from the archive directory for detailed analysis.
+2. The structured JSON result.
 
 <athena_council_result>
 {
   "status": "complete" | "partial" | "failed",
   "intent": "{classified intent from Step 3}",
-  "question": "{original question}",
   "members_consulted": ["{member1}", "{member2}", ...],
   "members_failed": ["{failed_member1}", ...],
   "agreement_level": "unanimous" | "strong" | "mixed" | "divided",
-  "synthesis": "{full synthesis text}",
   "key_findings": ["{finding1}", "{finding2}", ...],
   "recommendations": ["{rec1}", "{rec2}", ...],
   "confidence": "high" | "medium" | "low",
@@ -131,6 +132,9 @@ After synthesis, you MUST output EXACTLY this structured format:
   "dissenting_views": ["{view1}", ...]
 }
 </athena_council_result>
+
+IMPORTANT: The full synthesis text is persisted at {archive_dir}/synthesis.md — do NOT duplicate it in the JSON.
+Individual member responses are at {archive_dir}/council-{member-name}-{task-id}.md.
 
 IMPORTANT: </athena_council_result> is your FINAL output. Do NOT output anything after this tag.
 No commentary, no summary, no follow-up text. The closing tag IS the end of your response.
