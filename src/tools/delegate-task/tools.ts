@@ -259,7 +259,8 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       })
 
       if (effectiveRunInBackground) {
-        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
+        const wasForced = isAthenaJunior && !runInBackground
+        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain, wasForced)
       }
 
       return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain)

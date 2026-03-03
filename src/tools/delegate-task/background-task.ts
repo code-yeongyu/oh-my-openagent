@@ -16,6 +16,7 @@ export async function executeBackgroundTask(
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
   fallbackChain?: FallbackEntry[],
+  forcedBackground?: boolean,
 ): Promise<string> {
   const { manager } = executorCtx
 
@@ -75,6 +76,12 @@ export async function executeBackgroundTask(
       storeToolMetadata(ctx.sessionID, ctx.callID, unstableMeta)
     }
 
+    const waitInstruction = forcedBackground
+      ? `This task was automatically backgrounded because council sessions are long-running.
+Use \`background_wait(task_ids=["${task.id}"])\` to block until completion, then \`background_output(task_id="${task.id}")\` to retrieve the result.
+Do NOT poll background_output repeatedly \u2014 background_wait will return when the task finishes.`
+      : `System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.`
+
     return `Background task launched.
 
 Task ID: ${task.id}
@@ -82,7 +89,7 @@ Description: ${task.description}
 Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
-System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
+${waitInstruction}
 
 <task_metadata>
 session_id: ${sessionId}

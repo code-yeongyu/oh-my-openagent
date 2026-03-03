@@ -747,7 +747,11 @@ describe("sisyphus-task", () => {
       )
 
       //#then — should be forced to background despite run_in_background=false
-      expect(String(result)).toContain("Background task launched")
+      const resultStr = String(result)
+      expect(resultStr).toContain("Background task launched")
+      expect(resultStr).toContain("background_wait")
+      expect(resultStr).toContain("automatically backgrounded")
+      expect(resultStr).not.toContain("System notifies on completion")
     }, { timeout: 10000 })
 
     test("athena-junior with run_in_background=true still runs in background normally", async () => {
@@ -805,8 +809,11 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      //#then — should still be background
-      expect(String(result)).toContain("Background task launched")
+      //#then — should still be background but with normal (non-forced) message
+      const resultStr = String(result)
+      expect(resultStr).toContain("Background task launched")
+      expect(resultStr).toContain("System notifies on completion")
+      expect(resultStr).not.toContain("automatically backgrounded")
     }, { timeout: 10000 })
   })
 
