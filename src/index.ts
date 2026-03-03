@@ -74,6 +74,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     managers,
     hooks,
     tools: toolsResult.filteredTools,
+    mergedSkills: toolsResult.mergedSkills,
   })
 
   return {

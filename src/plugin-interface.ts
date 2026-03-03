@@ -1,5 +1,6 @@
 import type { PluginContext, PluginInterface, ToolsRecord } from "./plugin/types"
 import type { OhMyOpenCodeConfig } from "./config"
+import type { LoadedSkill } from "./features/opencode-skill-loader/types"
 
 import { createChatParamsHandler } from "./plugin/chat-params"
 import { createChatHeadersHandler } from "./plugin/chat-headers"
@@ -25,8 +26,9 @@ export function createPluginInterface(args: {
   managers: Managers
   hooks: CreatedHooks
   tools: ToolsRecord
+  mergedSkills: LoadedSkill[]
 }): PluginInterface {
-  const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools } =
+  const { ctx, pluginConfig, firstMessageVariantGate, managers, hooks, tools, mergedSkills } =
     args
 
   return {
@@ -50,7 +52,7 @@ export function createPluginInterface(args: {
       hooks,
     }),
 
-    "experimental.chat.system.transform": createSystemTransformHandler(),
+    "experimental.chat.system.transform": createSystemTransformHandler(mergedSkills),
 
     config: managers.configHandler,
 
