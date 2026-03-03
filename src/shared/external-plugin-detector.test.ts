@@ -391,8 +391,8 @@ describe("external-plugin-detector", () => {
       expect(result.pluginName).toBe("opencode-notifier")
     })
 
-    test("should NOT match npm:@mohak34/opencode-notifier (invalid npm: format)", () => {
-      // given - npm: prefix with scoped name is not valid
+    test("should match npm:@mohak34/opencode-notifier (scoped npm format)", () => {
+      // given - npm: prefix with scoped name is valid
       const opencodeDir = path.join(tempDir, ".opencode")
       fs.mkdirSync(opencodeDir, { recursive: true })
       fs.writeFileSync(
@@ -404,12 +404,12 @@ describe("external-plugin-detector", () => {
       const result = detectExternalNotificationPlugin(tempDir)
 
       // then
-      expect(result.detected).toBe(false)
-      expect(result.pluginName).toBeNull()
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
     })
 
-    test("should NOT match npm:mohak34/opencode-notifier (invalid npm: format)", () => {
-      // given - npm: prefix with org/repo is not valid
+    test("should match npm:mohak34/opencode-notifier (unscoped org npm format)", () => {
+      // given - npm: prefix with org/repo is valid
       const opencodeDir = path.join(tempDir, ".opencode")
       fs.mkdirSync(opencodeDir, { recursive: true })
       fs.writeFileSync(
@@ -421,8 +421,8 @@ describe("external-plugin-detector", () => {
       const result = detectExternalNotificationPlugin(tempDir)
 
       // then
-      expect(result.detected).toBe(false)
-      expect(result.pluginName).toBeNull()
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
     })
   })
 

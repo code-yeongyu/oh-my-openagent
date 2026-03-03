@@ -91,12 +91,13 @@ function getMatchForms(plugin: KnownNotificationPlugin): string[] {
 function matchesNotificationPlugin(entry: string): string | null {
   const normalized = entry.toLowerCase();
   for (const plugin of KNOWN_NOTIFICATION_PLUGINS) {
-    // npm: prefix only applies to bare package names
-    if (
-      normalized === `npm:${plugin.repo}` ||
-      normalized.startsWith(`npm:${plugin.repo}@`)
-    )
-      return plugin.repo;
+    // npm: prefix — bare name or scoped name
+    const npmPrefixed = normalized.startsWith("npm:") ? normalized.slice(4) : null;
+    if (npmPrefixed) {
+      for (const form of getMatchForms(plugin)) {
+        if (npmPrefixed === form || npmPrefixed.startsWith(`${form}@`)) return plugin.repo;
+      }
+    }
     for (const form of getMatchForms(plugin)) {
       if (normalized === form) return plugin.repo;
       if (normalized.startsWith(`${form}@`)) return plugin.repo;
