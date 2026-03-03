@@ -131,5 +131,8 @@ export function applyToolConfig(params: {
     webfetch: "allow",
     external_directory: "allow",
     task: "deny",
+    prepare_council_prompt: "deny",
+    council_finalize: "deny",
+    athena_council: "deny",
   };
 }
