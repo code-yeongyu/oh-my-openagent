@@ -67,7 +67,7 @@ export function compressTaskResult(
   data: TaskResultData,
   config: ToonCompressionConfig
 ): string {
-  return safeCompress(data, config, "parent-session-notifier")
+  return safeCompress(data, "parent-session-notifier")
 }
 
 /**
@@ -78,7 +78,7 @@ export function compressTaskResults(
   config: ToonCompressionConfig
 ): string {
   const results = tasks.map(extractTaskResultData)
-  return safeCompress(results, config, "parent-session-notifier")
+  return safeCompress(results, "parent-session-notifier")
 }
 
 /**

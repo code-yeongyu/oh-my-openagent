@@ -154,7 +154,7 @@ export function createContextInjectorMessagesTransformHook(
       }
 
       // Compress context before injection
-      const compressedContent = safeCompress(pending.merged, compressionConfig, "context-injector")
+      const compressedContent = safeCompress(pending.merged, "context-injector")
 
       // synthetic part pattern (minimal fields)
       const syntheticPart = {

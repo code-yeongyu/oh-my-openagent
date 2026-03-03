@@ -159,7 +159,7 @@ async function formatMcpCapabilities(
           sections.push("")
           sections.push("**inputSchema:**")
           sections.push("```json")
-          sections.push(safeCompress(t.inputSchema, toonConfig, "skill-inputschema"))
+          sections.push(safeCompress(t.inputSchema, "skill-inputschema"))
           sections.push("```")
           sections.push("")
         }

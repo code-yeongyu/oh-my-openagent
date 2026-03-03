@@ -1,11 +1,6 @@
 import type { GrepResult, GrepMatch, CountResult } from "./types"
-import { safeCompress, shouldCompress } from "../../shared/toon-compression"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
+import { safeCompress, shouldCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
 function safeStringify(data: unknown): string {
   try {
@@ -63,7 +58,7 @@ export function formatGrepResult(
     && shouldCompress(result.matches, compressionConfig.threshold)
 
   if (shouldUseCompression) {
-    const compressed = safeCompress(result.matches, compressionConfig, "grep-result")
+    const compressed = safeCompress(result.matches, "grep-result")
     if (compressed !== safeStringify(result.matches)) {
       lines.push("[Compressed matches]")
       lines.push(compressed)

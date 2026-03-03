@@ -11,21 +11,17 @@ import { pollForCompletion } from "./poll-for-completion"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
-import { safeCompress, type ToonCompressionConfig } from "../../shared/toon-compression"
+import { safeCompress, type ToonCompressionConfig, setGlobalCompressionConfig, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
 
 export { resolveRunAgent }
 
 const EVENT_PROCESSOR_SHUTDOWN_TIMEOUT_MS = 2_000
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
 
 export function compressCliMessage(
   message: string,
   config: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
 ): string {
-  return safeCompress(message, config, "cli-runner")
+  return safeCompress(message, "cli-runner")
 }
 
 export async function waitForEventProcessorShutdown(
@@ -57,6 +53,7 @@ export async function run(options: RunOptions): Promise<number> {
   timestampOutput?.enable()
 
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
+  setGlobalCompressionConfig(pluginConfig.toon_compression ?? { enabled: false, threshold: 5000 })
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
   const abortController = new AbortController()
 

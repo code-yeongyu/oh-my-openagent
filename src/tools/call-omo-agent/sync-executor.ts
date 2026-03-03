@@ -79,7 +79,7 @@ export async function executeSync(
   await deps.waitForCompletion(sessionID, toolContext, ctx)
 
   const responseText = await deps.processMessages(sessionID, ctx)
-  const compressedResponse = deps.safeCompress(responseText, compressionConfig, "sync-executor")
+  const compressedResponse = deps.safeCompress(responseText, "sync-executor")
 
   const output =
     compressedResponse +

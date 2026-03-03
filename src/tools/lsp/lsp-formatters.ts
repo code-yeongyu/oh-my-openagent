@@ -232,7 +232,7 @@ export function formatDiagnosticsOutput(
   const shouldCompress = compressionConfig.enabled && diagnostics.length >= 5 && jsonString.length >= compressionConfig.threshold
 
   if (shouldCompress) {
-    const compressed = safeCompress(formattedItems, compressionConfig, "lsp-diagnostics")
+    const compressed = safeCompress(formattedItems, "lsp-diagnostics")
     return `[Compressed diagnostics]\n${compressed}`
   }
 
@@ -257,7 +257,7 @@ export function formatSymbolsOutput(
     const shouldCompress = compressionConfig.enabled && symbols.length >= 5 && jsonString.length >= compressionConfig.threshold
 
     if (shouldCompress) {
-      const compressed = safeCompress(formattedItems, compressionConfig, "lsp-symbols-document")
+      const compressed = safeCompress(formattedItems, "lsp-symbols-document")
       return `[Compressed symbols]\n${compressed}`
     }
 
@@ -276,7 +276,7 @@ export function formatSymbolsOutput(
   const shouldCompress = compressionConfig.enabled && symbols.length >= 5 && jsonString.length >= compressionConfig.threshold
 
   if (shouldCompress) {
-    const compressed = safeCompress(formattedItems, compressionConfig, "lsp-symbols-workspace")
+    const compressed = safeCompress(formattedItems, "lsp-symbols-workspace")
     return `[Compressed symbols]\n${compressed}`
   }
 

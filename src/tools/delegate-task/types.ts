@@ -93,5 +93,5 @@ export function compressDelegateTaskArgs(
   args: DelegateTaskArgs,
   config: ToonCompressionConfig
 ): string {
-  return safeCompress(args, config, "delegate-types")
+  return safeCompress(args, "delegate-types")
 }

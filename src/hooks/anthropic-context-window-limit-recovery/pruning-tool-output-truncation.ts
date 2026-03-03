@@ -9,9 +9,7 @@ import { log } from "../../shared/logger"
 import { getMessageDir } from "../../shared/opencode-message-dir"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
-import { safeCompress } from "../../shared/toon-compression"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
+import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
 
 function tryParseJson(value: string): unknown | null {
   try {
@@ -98,7 +96,7 @@ export async function truncateToolOutputsByCallId(
         if (compressionConfig.enabled) {
           const parsed = tryParseJson(part.state.output)
           if (parsed !== null) {
-            part.state.output = safeCompress(parsed, compressionConfig, "pruning-truncation")
+            part.state.output = safeCompress(parsed, "pruning-truncation")
             writeFileSync(partPath, JSON.stringify(part, null, 2))
           }
         }
@@ -143,13 +141,13 @@ async function truncateToolOutputsByCallIdFromSDK(
         if (!callIds.has(part.callID)) continue
         if (!part.state?.output || part.state?.time?.compacted) continue
 
-        // Apply compression BEFORE truncation for efficiency (smaller payload to prune)
-        if (compressionConfig.enabled) {
-          const parsed = tryParseJson(part.state.output)
-          if (parsed !== null) {
-            part.state.output = safeCompress(parsed, compressionConfig, "pruning-truncation")
-          }
-        }
+         // Apply compression BEFORE truncation for efficiency (smaller payload to prune)
+         if (compressionConfig.enabled) {
+           const parsed = tryParseJson(part.state.output)
+           if (parsed !== null) {
+             part.state.output = safeCompress(parsed, "pruning-truncation")
+           }
+         }
 
         const result = await truncateToolResultAsync(client, sessionID, messageID, part.id, part)
         if (result.success) {

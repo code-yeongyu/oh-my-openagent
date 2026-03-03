@@ -168,5 +168,5 @@ export async function compressStreamedOutput(
     return buffered
   }
 
-  return safeCompress(buffered, config, "hashline-hash")
+  return safeCompress(buffered, "hashline-hash")
 }

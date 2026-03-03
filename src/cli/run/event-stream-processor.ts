@@ -28,15 +28,15 @@ function getCompressionConfig(ctx: RunContext): CompressionConfig {
 }
 
 function compressPayloadData(
-  data: unknown,
-  config: CompressionConfig,
-  isErrorResponse: boolean
-): string {
-  if (isErrorResponse) {
-    return JSON.stringify(data)
-  }
-  return safeCompress(data, config, "cli-event-stream")
-}
+   data: unknown,
+   config: CompressionConfig,
+   isErrorResponse: boolean
+ ): string {
+   if (isErrorResponse) {
+     return JSON.stringify(data)
+   }
+   return safeCompress(data, "cli-event-stream")
+ }
 
 export function compressEventData(
   data: unknown,
@@ -48,13 +48,13 @@ export function compressEventData(
     "type" in data &&
     (data as EventPayload).type === "session.error"
 
-  if (isErrorResponse) {
-    return JSON.stringify(data)
-  }
-  return safeCompress(data, config, "cli-event-stream")
-}
+   if (isErrorResponse) {
+     return JSON.stringify(data)
+   }
+   return safeCompress(data, "cli-event-stream")
+ }
 
-export function compressEventPayload(
+ export function compressEventPayload(
   payload: EventPayload,
   config: CompressionConfig
 ): string {

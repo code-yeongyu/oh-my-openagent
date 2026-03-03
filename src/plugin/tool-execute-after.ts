@@ -35,10 +35,10 @@ function compressOutputIfEligible(output: string, config: { enabled: boolean; th
   }
 
   try {
-    return safeCompress(parsed, config, "tool-execute-after")
-  } catch {
-    return output
-  }
+     return safeCompress(parsed, "tool-execute-after")
+   } catch {
+     return output
+   }
 }
 
 export function createToolExecuteAfterHandler(args: {

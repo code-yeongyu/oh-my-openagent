@@ -157,10 +157,10 @@ export function createChatMessageHandler(args: {
 
     applyUltraworkModelOverrideOnMessage(pluginConfig, input.agent, output, pluginContext.client.tui, input.sessionID)
 
-    // Compress large parts arrays for efficient storage/transmission
-    const compressionConfig = pluginConfig.toon_compression ?? { enabled: false, threshold: 5000 }
-    if (compressionConfig.enabled && shouldCompress(output.parts, compressionConfig.threshold)) {
-      output.message["_compressedParts"] = safeCompress(output.parts, compressionConfig, "chat-message")
-    }
+     // Compress large parts arrays for efficient storage/transmission
+     const compressionConfig = pluginConfig.toon_compression ?? { enabled: false, threshold: 5000 }
+     if (compressionConfig.enabled && shouldCompress(output.parts, compressionConfig.threshold)) {
+       output.message["_compressedParts"] = safeCompress(output.parts, "chat-message")
+     }
   }
 }

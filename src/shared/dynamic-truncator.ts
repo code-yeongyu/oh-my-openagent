@@ -1,15 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { normalizeSDKResponse } from "./normalize-sdk-response";
-import { safeCompress } from "./toon-compression";
+import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "./toon-compression";
 import type { ToonCompressionConfig } from "./toon-compression";
 
 const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 const DEFAULT_TARGET_MAX_TOKENS = 50_000;
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-	enabled: false,
-	threshold: 5000,
-};
 type ModelCacheStateLike = {
 	anthropicContext1MEnabled: boolean;
 }
@@ -61,10 +57,7 @@ function tryParseJson(value: string): unknown | null {
 	}
 }
 
-function tryCompress(
-	output: string,
-	config: ToonCompressionConfig,
-): string {
+function tryCompress(output: string, config: ToonCompressionConfig): string {
 	if (!config.enabled) {
 		return output;
 	}
@@ -74,7 +67,7 @@ function tryCompress(
 		if (parsed === null) {
 			return output;
 		}
-		return safeCompress(parsed, config, "dynamic-truncator");
+		return safeCompress(parsed, "dynamic-truncator");
 	} catch {
 		return output;
 	}

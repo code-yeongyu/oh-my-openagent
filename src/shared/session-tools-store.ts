@@ -9,9 +9,9 @@ const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
 const store = new Map<string, string>()
 
 export function setSessionTools(sessionID: string, tools: Record<string, boolean>): void {
-  const compressed = safeCompress(tools, DEFAULT_COMPRESSION_CONFIG, "session-tools-store")
-  store.set(sessionID, compressed)
-}
+   const compressed = safeCompress(tools, "session-tools-store")
+   store.set(sessionID, compressed)
+ }
 
 export function getSessionTools(sessionID: string): Record<string, boolean> | undefined {
   const compressed = store.get(sessionID)

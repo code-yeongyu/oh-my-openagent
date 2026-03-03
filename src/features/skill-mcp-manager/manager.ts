@@ -36,12 +36,12 @@ export class SkillMcpManager {
   private getClientKey(info: SkillMcpClientInfo): string {
     return `${info.sessionID}:${info.skillName}:${info.serverName}`
   }
-  private compressResult(data: unknown): unknown {
-    if (!this.compressionConfig.enabled) {
-      return data
-    }
-    return safeCompress(data, this.compressionConfig, "skill-mcp-manager")
-  }
+   private compressResult(data: unknown): unknown {
+     if (!this.compressionConfig.enabled) {
+       return data
+     }
+     return safeCompress(data, "skill-mcp-manager")
+   }
 
 
 

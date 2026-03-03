@@ -100,8 +100,7 @@ async function handleCreate(
         },
       };
 
-      const compressionConfig = config.toon_compression ?? { enabled: false, threshold: 5000 };
-      return safeCompress(result, compressionConfig, "task-create");
+      return safeCompress(result, "task-create");
     } finally {
       lock.release();
     }

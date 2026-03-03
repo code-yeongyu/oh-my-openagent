@@ -54,7 +54,7 @@ export async function formatSessionList(
       last_message: info.last_message,
       agents_used: info.agents_used,
     }))
-    return safeCompress(sanitizedInfos, compressionConfig, "session-list")
+    return safeCompress(sanitizedInfos, "session-list")
   }
 
   return formatted
@@ -145,7 +145,7 @@ export function formatSearchResults(
 
   // Apply compression if enabled and output exceeds threshold
   if (compressionConfig?.enabled && shouldCompress(results, compressionConfig.threshold)) {
-    return safeCompress(results, compressionConfig, "session-search")
+    return safeCompress(results, "session-search")
   }
 
   return formatted

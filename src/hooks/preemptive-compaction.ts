@@ -3,13 +3,10 @@ import type { OhMyOpenCodeConfig } from "../config"
 import type { ToonCompressionConfig } from "../config/schema/toon-compression"
 import { safeCompress } from "../shared/toon-compression"
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
+import { DEFAULT_COMPRESSION_CONFIG } from "../shared/toon-compression/config-store"
 
 const DEFAULT_ACTUAL_LIMIT = 200_000
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
 
 type ModelCacheStateLike = {
   anthropicContext1MEnabled: boolean
@@ -185,7 +182,7 @@ export function createPreemptiveCompactionHook(
         modelID: info.modelID ?? "",
         tokens: info.tokens,
       }
-      const compressed = safeCompress(state, compressionConfig, "preemptive-compaction")
+      const compressed = safeCompress(state, "preemptive-compaction")
       tokenCache.set(info.sessionID, compressed)
       compactedSessions.delete(info.sessionID)
     }

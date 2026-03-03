@@ -1,7 +1,8 @@
 import { tool, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { executeHashlineEditTool } from "./hashline-edit-executor"
 import { HASHLINE_EDIT_DESCRIPTION } from "./tool-description"
-import { safeCompress, shouldCompress, type ToonCompressionConfig } from "../../shared/toon-compression"
+import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import { DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression/config-store"
 import type { RawHashlineEdit } from "./normalize-edits"
 
 interface HashlineEditArgs {
@@ -9,11 +10,6 @@ interface HashlineEditArgs {
   edits: RawHashlineEdit[]
   delete?: boolean
   rename?: string
-}
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
 }
 
 export function createHashlineEditTool(): ToolDefinition {
@@ -46,7 +42,7 @@ export function createHashlineEditTool(): ToolDefinition {
       const result = await executeHashlineEditTool(args, context)
       const config = DEFAULT_COMPRESSION_CONFIG
       if (config.enabled && shouldCompress(result, config.threshold)) {
-        return safeCompress(result, config, "hashline-edit")
+        return safeCompress(result, "hashline-edit")
       }
       return result
     },

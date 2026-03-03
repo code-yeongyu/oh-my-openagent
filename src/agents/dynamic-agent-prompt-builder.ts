@@ -192,10 +192,10 @@ export function buildCategorySkillsDelegationGuide(
         location: s.location,
       })),
     ]
-    if (shouldCompress(combinedData, compressionConfig.threshold)) {
-      const compressed = safeCompress(combinedData, compressionConfig, "agent-prompt-builder")
-      return `[Compressed categories/skills data]\n${compressed}`
-    }
+     if (shouldCompress(combinedData, compressionConfig.threshold)) {
+       const compressed = safeCompress(combinedData, "agent-prompt-builder")
+       return `[Compressed categories/skills data]\n${compressed}`
+     }
   }
   const categoryRows = categories.map((c) => {
     const desc = c.description || c.name
@@ -417,10 +417,10 @@ export function buildUltraworkSection(
         location: null as string | null,
       })),
     ]
-    if (shouldCompress(combinedData, compressionConfig.threshold)) {
-      const compressed = safeCompress(combinedData, compressionConfig, "agent-prompt-builder")
-      return `[Compressed ultrawork data]\n${compressed}`
-    }
+     if (shouldCompress(combinedData, compressionConfig.threshold)) {
+       const compressed = safeCompress(combinedData, "agent-prompt-builder")
+       return `[Compressed ultrawork data]\n${compressed}`
+     }
   }
 
   const lines: string[] = []

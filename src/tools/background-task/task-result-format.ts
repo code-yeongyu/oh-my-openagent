@@ -125,7 +125,7 @@ Session ID: ${task.sessionID}
       parts: m.parts,
     }))
     if (shouldCompress(messageData, compressionConfig.threshold)) {
-      const compressed = safeCompress(messageData, compressionConfig, "background-task-result")
+      const compressed = safeCompress(messageData, "background-task-result")
       return `Task Result
 
 Task ID: ${task.id}

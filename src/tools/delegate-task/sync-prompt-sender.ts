@@ -59,7 +59,7 @@ export async function sendSyncPrompt(
       agent: input.agentToUse,
       system: input.systemContent,
       tools,
-      parts: [createInternalAgentTextPart(safeCompress(input.args.prompt, input.compressionConfig ?? { enabled: false, threshold: 5000 }, "delegate-sync-prompt"))],
+      parts: [createInternalAgentTextPart(safeCompress(input.args.prompt, "delegate-sync-prompt"))],
       ...(input.categoryModel
         ? { model: { providerID: input.categoryModel.providerID, modelID: input.categoryModel.modelID } }
         : {}),

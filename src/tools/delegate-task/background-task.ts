@@ -7,12 +7,7 @@ import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { safeCompress } from "../../shared/toon-compression"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
+import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,

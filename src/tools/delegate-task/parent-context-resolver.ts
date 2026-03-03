@@ -56,5 +56,5 @@ export function compressParentContext(
   context: ParentContext,
   config: ToonCompressionConfig
 ): string {
-  return safeCompress(context, config, "delegate-parent-context")
+  return safeCompress(context, "delegate-parent-context")
 }

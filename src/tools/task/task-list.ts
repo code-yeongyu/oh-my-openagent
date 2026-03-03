@@ -74,8 +74,7 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
         reminder: "1 task = 1 task. Maximize parallel execution by running independent tasks (tasks with empty blockedBy) concurrently."
       }
       
-      const compressionConfig = config.toon_compression ?? { enabled: false, threshold: 5000 }
-      return safeCompress(result, compressionConfig, "task-list")
+      return safeCompress(result, "task-list")
     },
   })
 }

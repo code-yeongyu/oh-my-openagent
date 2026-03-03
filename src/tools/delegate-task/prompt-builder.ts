@@ -58,19 +58,19 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
         parts.push("")
         parts.push("### AVAILABLE CATEGORIES (TOON format)")
         parts.push("\n```toon")
-        parts.push(safeCompress(availableCategories, compressionConfig ?? { enabled: false, threshold: 5000 }, "delegate-prompt-builder"))
+        parts.push(safeCompress(availableCategories, "delegate-prompt-builder"))
         parts.push("```")
         parts.push("")
         parts.push("### AVAILABLE SKILLS (TOON format)")
         parts.push("\n```toon")
-        parts.push(safeCompress(availableSkills, compressionConfig ?? { enabled: false, threshold: 5000 }, "delegate-prompt-builder"))
+        parts.push(safeCompress(availableSkills, "delegate-prompt-builder"))
         parts.push("```")
       } else if (shouldCompressCategories && availableCategories) {
         // Only categories compressed
         parts.push("")
         parts.push("### AVAILABLE CATEGORIES (TOON format)")
         parts.push("\n```toon")
-        parts.push(safeCompress(availableCategories, compressionConfig ?? { enabled: false, threshold: 5000 }, "delegate-prompt-builder"))
+        parts.push(safeCompress(availableCategories, "delegate-prompt-builder"))
         parts.push("```")
         parts.push("")
         // Skills uncompressed - use standard rendering
@@ -99,7 +99,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
         parts.push("")
         parts.push("### AVAILABLE SKILLS (TOON format)")
         parts.push("\n```toon")
-        parts.push(safeCompress(availableSkills, compressionConfig ?? { enabled: false, threshold: 5000 }, "delegate-prompt-builder"))
+        parts.push(safeCompress(availableSkills, "delegate-prompt-builder"))
         parts.push("```")
       } else {
         // Fallback: use standard skills section (shouldn't reach here given condition)

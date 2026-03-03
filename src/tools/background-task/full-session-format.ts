@@ -5,6 +5,7 @@ import { formatMessageTime } from "./time-format"
 import { truncateText } from "./truncate-text"
 import { formatTaskStatus } from "./task-status-format"
 import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import { DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression/config-store"
 import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 
 const MAX_MESSAGE_LIMIT = 100
@@ -30,11 +31,6 @@ function buildSessionHeader(
 }
 
 const THINKING_MAX_CHARS = 2000
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
 
 export interface FormatFullSessionOptions {
   includeThinking: boolean
@@ -188,9 +184,9 @@ export async function formatFullSession(
       }),
     }))
 
-    if (shouldCompress(messageData, compressionConfig.threshold)) {
-      const compressed = safeCompress(messageData, compressionConfig, "background-session-format")
-      const header = buildSessionHeader(task, normalizedMessages.length, visibleMessages.length, hasMore)
+     if (shouldCompress(messageData, compressionConfig.threshold)) {
+       const compressed = safeCompress(messageData, "background-session-format")
+       const header = buildSessionHeader(task, normalizedMessages.length, visibleMessages.length, hasMore)
       header.push("")
       header.push("[Compressed output]")
       header.push(compressed)

@@ -4,17 +4,12 @@ import type { SkillMcpArgs } from "./types"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import { safeCompress } from "../../shared/toon-compression"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
+import { DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression/config-store"
 
 interface SkillMcpToolOptions {
   manager: SkillMcpManager
   getLoadedSkills: () => LoadedSkill[]
   getSessionID: () => string
-}
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
 }
 
 type OperationType = { type: "tool" | "resource" | "prompt"; name: string }
@@ -176,28 +171,28 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
 
       const parsedArgs = parseArguments(args.arguments)
 
-      let output: string
-      switch (operation.type) {
-        case "tool": {
-          const result = await manager.callTool(info, context, operation.name, parsedArgs)
-          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG, "skill-mcp-tool")
-          break
-        }
-        case "resource": {
-          const result = await manager.readResource(info, context, operation.name)
-          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG, "skill-mcp-resource")
-          break
-        }
-        case "prompt": {
-          const stringArgs: Record<string, string> = {}
-          for (const [key, value] of Object.entries(parsedArgs)) {
-            stringArgs[key] = String(value)
-          }
-          const result = await manager.getPrompt(info, context, operation.name, stringArgs)
-          output = safeCompress(result, DEFAULT_COMPRESSION_CONFIG, "skill-mcp-prompt")
-          break
-        }
-      }
+       let output: string
+       switch (operation.type) {
+         case "tool": {
+           const result = await manager.callTool(info, context, operation.name, parsedArgs)
+           output = safeCompress(result, "skill-mcp-tool")
+           break
+         }
+         case "resource": {
+           const result = await manager.readResource(info, context, operation.name)
+           output = safeCompress(result, "skill-mcp-resource")
+           break
+         }
+         case "prompt": {
+           const stringArgs: Record<string, string> = {}
+           for (const [key, value] of Object.entries(parsedArgs)) {
+             stringArgs[key] = String(value)
+           }
+           const result = await manager.getPrompt(info, context, operation.name, stringArgs)
+           output = safeCompress(result, "skill-mcp-prompt")
+           break
+         }
+       }
       return applyGrepFilter(output, args.grep)
     },
   })

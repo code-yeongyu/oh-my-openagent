@@ -46,7 +46,7 @@ export function formatTodoList(todos: Todo[], config: ToonCompressionConfig): st
     status: todo.status,
     content: todo.content,
   }))
-  return safeCompress(formatted, config, "todo-continuation")
+  return safeCompress(formatted, "todo-continuation")
 }
 
 export async function injectContinuation(args: {
