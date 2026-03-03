@@ -91,7 +91,7 @@ describe("external-plugin-detector", () => {
 
       // then - returns the matched known plugin pattern, not the full entry
       expect(result.detected).toBe(true)
-      expect(result.pluginName).toContain("opencode-notifier")
+      expect(result.pluginName).toBe("opencode-notifier")
     })
 
     test("should handle JSONC format with comments", () => {
@@ -218,7 +218,7 @@ describe("external-plugin-detector", () => {
 
       // then
       expect(result.detected).toBe(true)
-      expect(result.pluginName).toContain("opencode-notifier")
+      expect(result.pluginName).toBe("opencode-notifier")
     })
 
     test("should match npm:opencode-notifier (npm prefix)", () => {
@@ -303,7 +303,7 @@ describe("external-plugin-detector", () => {
 
       // then
       expect(result.detected).toBe(true)
-      expect(result.pluginName).toContain("opencode-focus-notify")
+      expect(result.pluginName).toBe("opencode-focus-notify")
     })
 
     test("should detect @markarranz/opencode-focus-notify@1.0.0 (scoped with version)", () => {
@@ -320,7 +320,7 @@ describe("external-plugin-detector", () => {
 
       // then
       expect(result.detected).toBe(true)
-      expect(result.pluginName).toContain("opencode-focus-notify")
+      expect(result.pluginName).toBe("opencode-focus-notify")
     })
 
     test("should detect markarranz/opencode-focus-notify (unscoped org format)", () => {
@@ -337,7 +337,92 @@ describe("external-plugin-detector", () => {
 
       // then
       expect(result.detected).toBe(true)
-      expect(result.pluginName).toContain("opencode-focus-notify")
+      expect(result.pluginName).toBe("opencode-focus-notify")
+    })
+
+    test("should detect mohak34/opencode-notifier (unscoped org format)", () => {
+      // given - opencode.json with org/package format
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["mohak34/opencode-notifier"] })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
+    })
+
+    test("should match case-insensitively (OpenCode-Notifier)", () => {
+      // given - mixed case entry
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["OpenCode-Notifier"] })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
+    })
+
+    test("should match file:// with backslash separator (Windows)", () => {
+      // given - Windows-style file path
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["file://C:\\Users\\dev\\plugins\\opencode-notifier"] })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(true)
+      expect(result.pluginName).toBe("opencode-notifier")
+    })
+
+    test("should NOT match npm:@mohak34/opencode-notifier (invalid npm: format)", () => {
+      // given - npm: prefix with scoped name is not valid
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["npm:@mohak34/opencode-notifier"] })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(false)
+      expect(result.pluginName).toBeNull()
+    })
+
+    test("should NOT match npm:mohak34/opencode-notifier (invalid npm: format)", () => {
+      // given - npm: prefix with org/repo is not valid
+      const opencodeDir = path.join(tempDir, ".opencode")
+      fs.mkdirSync(opencodeDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(opencodeDir, "opencode.json"),
+        JSON.stringify({ plugin: ["npm:mohak34/opencode-notifier"] })
+      )
+
+      // when
+      const result = detectExternalNotificationPlugin(tempDir)
+
+      // then
+      expect(result.detected).toBe(false)
+      expect(result.pluginName).toBeNull()
     })
   })
 
