@@ -20,6 +20,24 @@ import {
   cleanupConvertedImage,
 } from "./image-converter"
 
+function getTemporaryConversionPath(error: unknown): string | null {
+  if (!(error instanceof Error)) {
+    return null
+  }
+
+  const temporaryOutputPath = Reflect.get(error, "temporaryOutputPath")
+  if (typeof temporaryOutputPath === "string" && temporaryOutputPath.length > 0) {
+    return temporaryOutputPath
+  }
+
+  const temporaryDirectory = Reflect.get(error, "temporaryDirectory")
+  if (typeof temporaryDirectory === "string" && temporaryDirectory.length > 0) {
+    return temporaryDirectory
+  }
+
+  return null
+}
+
 export { normalizeArgs, validateArgs } from "./look-at-arguments"
 
 export function createLookAt(ctx: PluginInput): ToolDefinition {
@@ -48,6 +66,7 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
       let mimeType: string
       let filePart: { type: "file"; mime: string; url: string; filename: string }
       let tempFilePath: string | null = null
+      let tempConversionPath: string | null = null
       let tempFilesToCleanup: string[] = []
 
       try {
@@ -85,10 +104,15 @@ export function createLookAt(ctx: PluginInput): ToolDefinition {
           log(`[look_at] Detected unsupported format: ${mimeType}, converting to JPEG...`)
           try {
             tempFilePath = convertImageToJpeg(filePath, mimeType)
+            tempConversionPath = tempFilePath
             actualFilePath = tempFilePath
             mimeType = "image/jpeg"
             log(`[look_at] Conversion successful: ${tempFilePath}`)
           } catch (conversionError) {
+            const failedConversionPath = getTemporaryConversionPath(conversionError)
+            if (failedConversionPath) {
+              tempConversionPath = failedConversionPath
+            }
             log(`[look_at] Conversion failed: ${conversionError}`)
             return `Error: Failed to convert image format. ${conversionError}`
           }
@@ -194,10 +218,14 @@ Original error: ${createResult.error}`
         log(`[look_at] Got response, length: ${responseText.length}`)
         return responseText
       } finally {
-        if (tempFilePath) {
+        if (tempConversionPath) {
+          cleanupConvertedImage(tempConversionPath)
+        } else if (tempFilePath) {
           cleanupConvertedImage(tempFilePath)
         }
-        tempFilesToCleanup.forEach(file => cleanupConvertedImage(file))
+        tempFilesToCleanup.forEach(file => {
+          cleanupConvertedImage(file)
+        })
       }
     },
   })

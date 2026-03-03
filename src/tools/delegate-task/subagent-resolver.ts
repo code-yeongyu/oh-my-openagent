@@ -51,7 +51,11 @@ Create the work plan directly - that's your job as the planning agent.`,
 
   try {
     const agentsResult = await client.app.agents()
-    type AgentInfo = { name: string; mode?: "subagent" | "primary" | "all"; model?: { providerID: string; modelID: string } }
+    type AgentInfo = {
+      name: string
+      mode?: "subagent" | "primary" | "all"
+      model?: string | { providerID: string; modelID: string }
+    }
     const agents = normalizeSDKResponse(agentsResult, [] as AgentInfo[], {
       preferResponseOnMissingData: true,
     })
@@ -99,7 +103,9 @@ Create the work plan directly - that's your job as the planning agent.`,
     if (agentOverride?.model || agentRequirement || matchedAgent.model) {
       const availableModels = await getAvailableModelsForDelegateTask(client)
 
-      const normalizedMatchedModel = normalizeModelFormat(matchedAgent.model as Parameters<typeof normalizeModelFormat>[0])
+      const normalizedMatchedModel = matchedAgent.model
+        ? normalizeModelFormat(matchedAgent.model)
+        : undefined
       const matchedAgentModelStr = normalizedMatchedModel
         ? `${normalizedMatchedModel.providerID}/${normalizedMatchedModel.modelID}`
         : undefined
@@ -122,7 +128,10 @@ Create the work plan directly - that's your job as the planning agent.`,
     }
 
     if (!categoryModel && matchedAgent.model) {
-      categoryModel = matchedAgent.model
+      const normalizedMatchedModel = normalizeModelFormat(matchedAgent.model)
+      if (normalizedMatchedModel) {
+        categoryModel = normalizedMatchedModel
+      }
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
