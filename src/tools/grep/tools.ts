@@ -4,8 +4,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { runRg, runRgCount } from "./cli"
 import { formatGrepResult, formatCountResult } from "./result-formatter"
 import type { ToonCompressionConfig } from "../../shared/toon-compression"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
+import { DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
 
 export interface CreateGrepToolsOptions {
   compressionConfig?: ToonCompressionConfig

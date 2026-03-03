@@ -1,10 +1,4 @@
-import { safeCompress } from "./toon-compression"
-import type { ToonCompressionConfig } from "./toon-compression"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
+import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "./toon-compression"
 
 const store = new Map<string, string>()
 

@@ -1,4 +1,3 @@
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 import type { BackgroundTask } from "./types"
 import { safeCompress } from "../../shared/toon-compression"
 
@@ -64,8 +63,7 @@ export function extractTaskResultData(task: BackgroundTask): TaskResultData {
  * Uses TOON format compression when enabled and data exceeds threshold.
  */
 export function compressTaskResult(
-  data: TaskResultData,
-  config: ToonCompressionConfig
+  data: TaskResultData
 ): string {
   return safeCompress(data, "parent-session-notifier")
 }
@@ -74,8 +72,7 @@ export function compressTaskResult(
  * Compresses an array of task results for batch notification.
  */
 export function compressTaskResults(
-  tasks: BackgroundTask[],
-  config: ToonCompressionConfig
+  tasks: BackgroundTask[]
 ): string {
   const results = tasks.map(extractTaskResultData)
   return safeCompress(results, "parent-session-notifier")

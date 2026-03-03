@@ -6,6 +6,7 @@ import {
   normalizeSDKResponse,
   resolveInheritedPromptTools,
   safeCompress,
+  DEFAULT_COMPRESSION_CONFIG,
   type ToonCompressionConfig,
 } from "../../shared"
 import {
@@ -26,11 +27,6 @@ import { getMessageDir } from "./message-directory"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
 
 function hasWritePermission(tools: Record<string, ToolPermission> | undefined): boolean {
   const editPermission = tools?.edit

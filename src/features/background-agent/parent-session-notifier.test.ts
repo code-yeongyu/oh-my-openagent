@@ -7,16 +7,6 @@ import {
   formatCompressedNotification,
 } from "./parent-session-notifier"
 
-const DEFAULT_CONFIG = {
-  enabled: true,
-  threshold: 5000,
-}
-
-const DISABLED_CONFIG = {
-  enabled: false,
-  threshold: 5000,
-}
-
 function createMockTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   return {
     id: "bg_test123",
@@ -93,7 +83,7 @@ describe("extractTaskResultData", () => {
 })
 
 describe("compressTaskResult", () => {
-  describe("#given compression enabled", () => {
+  describe("#given task result data", () => {
     test("returns JSON string for small data", () => {
       const data = {
         taskId: "bg_test",
@@ -101,7 +91,7 @@ describe("compressTaskResult", () => {
         status: "completed",
       }
 
-      const result = compressTaskResult(data, DEFAULT_CONFIG)
+      const result = compressTaskResult(data)
 
       expect(result).toContain("bg_test")
       expect(result).toContain("Small task")
@@ -115,25 +105,10 @@ describe("compressTaskResult", () => {
         error: "Connection timeout",
       }
 
-      const result = compressTaskResult(data, DEFAULT_CONFIG)
+      const result = compressTaskResult(data)
 
       expect(result).toContain("error")
       expect(result).toContain("Connection timeout")
-    })
-  })
-
-  describe("#given compression disabled", () => {
-    test("returns plain JSON string", () => {
-      const data = {
-        taskId: "bg_test",
-        description: "Test task",
-        status: "completed",
-      }
-
-      const result = compressTaskResult(data, DISABLED_CONFIG)
-
-      expect(result).toContain("bg_test")
-      expect(result).toContain("Test task")
     })
   })
 })
@@ -147,7 +122,7 @@ describe("compressTaskResults", () => {
         createMockTask({ id: "bg_003", description: "Third task" }),
       ]
 
-      const result = compressTaskResults(tasks, { enabled: true, threshold: 1 })
+      const result = compressTaskResults(tasks)
 
       expect(result).toContain("bg_001")
       expect(result).toContain("bg_002")
@@ -155,7 +130,7 @@ describe("compressTaskResults", () => {
     })
 
     test("handles empty array", () => {
-      const result = compressTaskResults([], DEFAULT_CONFIG)
+      const result = compressTaskResults([])
 
       expect(result).toBe("[]")
     })
@@ -168,7 +143,7 @@ describe("compressTaskResults", () => {
         createMockTask({ id: "bg_002", status: "error", error: "Failed" }),
       ]
 
-      const result = compressTaskResults(tasks, DEFAULT_CONFIG)
+      const result = compressTaskResults(tasks)
 
       expect(result).toContain("completed")
       expect(result).toContain("error")

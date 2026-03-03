@@ -1,6 +1,5 @@
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 import type { ConcurrencyManager } from "./concurrency"
 import { TMUX_CALLBACK_DELAY_MS } from "./constants"
 import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, createInternalAgentTextPart } from "../../shared"
@@ -15,7 +14,6 @@ export interface SpawnerContext {
   tmuxEnabled: boolean
   onSubagentSessionCreated?: OnSubagentSessionCreated
   onTaskError: (task: BackgroundTask, error: Error) => void
-  toonCompressionConfig?: ToonCompressionConfig
 }
 
 export function createTask(input: LaunchInput): BackgroundTask {
@@ -34,21 +32,14 @@ export function createTask(input: LaunchInput): BackgroundTask {
   }
 }
 
-const DEFAULT_TOON_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
-
 /**
  * Compresses session prompt data for background agents.
  * Uses TOON format compression when enabled and data exceeds threshold.
  * Falls back to original string if compression fails or is not applicable.
  */
 export function compressSessionPromptData(
-  data: unknown,
-  config?: ToonCompressionConfig
+  data: unknown
 ): string {
-  const effectiveConfig = config ?? DEFAULT_TOON_CONFIG
   return safeCompress(data, "background-agent-spawner")
 }
 
@@ -58,19 +49,14 @@ export function compressSessionPromptData(
  * it will be compressed. Otherwise returns the original prompt.
  */
 export function preparePromptWithCompression(
-  prompt: string,
-  config?: ToonCompressionConfig
+  prompt: string
 ): string {
-  if (!config?.enabled) {
-    return prompt
-  }
-
   // Try to parse as JSON to see if it's structured data
   try {
     const parsed = JSON.parse(prompt)
     // Only compress if it's an array or object that could benefit
     if (typeof parsed === "object" && parsed !== null) {
-      const compressed = compressSessionPromptData(parsed, config)
+      const compressed = compressSessionPromptData(parsed)
       // If compression actually compressed it (different from original), use it
       if (compressed.startsWith("toon:") || compressed.length < prompt.length) {
         return compressed

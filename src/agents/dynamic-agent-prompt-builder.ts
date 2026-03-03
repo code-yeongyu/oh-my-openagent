@@ -1,10 +1,5 @@
-import { safeCompress, shouldCompress } from "../shared/toon-compression"
+import { safeCompress, shouldCompress, DEFAULT_COMPRESSION_CONFIG } from "../shared/toon-compression"
 import type { ToonCompressionConfig } from "../shared/toon-compression"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
 
 import type { AgentPromptMetadata } from "./types"
 

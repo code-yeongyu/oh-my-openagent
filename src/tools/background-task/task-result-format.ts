@@ -2,17 +2,12 @@ import type { BackgroundTask } from "../../features/background-agent"
 import { consumeNewMessages } from "../../shared/session-cursor"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
-import { safeCompress, shouldCompress } from "../../shared/toon-compression"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
+import { safeCompress, shouldCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 import { formatDuration } from "./time-format"
 
 function getTimeString(value: unknown): string {
   return typeof value === "string" ? value : ""
-}
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
 }
 
 export interface FormatTaskResultOptions {

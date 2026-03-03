@@ -2,16 +2,11 @@ import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { getAgentToolRestrictions } from "../../shared"
-import { safeCompress } from "../../shared/toon-compression"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
+import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 import { createOrGetSession } from "./session-creator"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
-
-export const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
 
 type SessionWithPromptAsync = {
   promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>

@@ -1,9 +1,7 @@
 import pc from "picocolors"
 import { safeCompress } from "../../shared/toon-compression"
-import type { RunContext, EventPayload, CompressionConfig } from "./types"
-import { DEFAULT_COMPRESSION_CONFIG } from "./types"
+import type { RunContext, EventPayload } from "./types"
 import type { EventState } from "./event-state"
-import { logEventVerbose } from "./event-formatting"
 import {
   handleSessionError,
   handleSessionIdle,
@@ -16,20 +14,8 @@ import {
   handleTuiToast,
 } from "./event-handlers"
 
-function getCompressionConfig(ctx: RunContext): CompressionConfig {
-  if (ctx.compression) {
-    return {
-      enabled: ctx.compression.enabled,
-      threshold: ctx.compression.threshold,
-      maxEncodingSize: ctx.compression.maxEncodingSize,
-    }
-  }
-  return DEFAULT_COMPRESSION_CONFIG
-}
-
 function compressPayloadData(
    data: unknown,
-   config: CompressionConfig,
    isErrorResponse: boolean
  ): string {
    if (isErrorResponse) {
@@ -39,8 +25,7 @@ function compressPayloadData(
  }
 
 export function compressEventData(
-  data: unknown,
-  config: CompressionConfig
+  data: unknown
 ): string {
   const isErrorResponse =
     typeof data === "object" &&
@@ -54,11 +39,10 @@ export function compressEventData(
    return safeCompress(data, "cli-event-stream")
  }
 
- export function compressEventPayload(
-  payload: EventPayload,
-  config: CompressionConfig
+export function compressEventPayload(
+  payload: EventPayload
 ): string {
-  return compressEventData(payload, config)
+  return compressEventData(payload)
 }
 
 export async function processEvents(
@@ -73,17 +57,14 @@ export async function processEvents(
       const payload = event as EventPayload
       if (!payload?.type) {
         if (ctx.verbose) {
-          const config = getCompressionConfig(ctx)
-          const eventStr = compressPayloadData(event, config, false)
+          const eventStr = compressPayloadData(event, false)
           console.error(pc.dim(`[event] no type: ${eventStr}`))
         }
         continue
       }
 
-      const config = getCompressionConfig(ctx)
-
       if (ctx.verbose) {
-        const compressedStr = compressEventPayload(payload, config)
+        const compressedStr = compressEventPayload(payload)
         console.error(pc.dim(`[event] ${compressedStr}`))
       }
 

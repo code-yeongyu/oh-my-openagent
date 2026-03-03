@@ -5,8 +5,7 @@ import { runRgFiles } from "./cli"
 import { resolveGrepCliWithAutoInstall } from "./constants"
 import { formatGlobResult } from "./result-formatter"
 import type { ToonCompressionConfig } from "../../shared/toon-compression"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
+import { DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
 
 export interface CreateGlobToolsOptions {
   compressionConfig?: ToonCompressionConfig

@@ -1,5 +1,5 @@
-import { safeCompress } from "../../shared/toon-compression"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
+import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import type { Prompt, Resource, Tool } from "@modelcontextprotocol/sdk/types.js"
@@ -8,12 +8,6 @@ import { disconnectAll, disconnectSession, forceReconnect } from "./cleanup"
 import { getOrCreateClient, getOrCreateClientWithRetryImpl } from "./connection"
 import { handleStepUpIfNeeded } from "./oauth-handler"
 import type { SkillMcpClientInfo, SkillMcpManagerState, SkillMcpServerContext } from "./types"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
-
 
 export class SkillMcpManager {
   private readonly state: SkillMcpManagerState = {

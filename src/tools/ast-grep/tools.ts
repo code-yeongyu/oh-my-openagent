@@ -4,9 +4,7 @@ import { CLI_LANGUAGES } from "./constants"
 import { runSg } from "./cli"
 import { formatSearchResult, formatReplaceResult } from "./result-formatter"
 import type { CliLanguage } from "./types"
-import type { ToonCompressionConfig } from "../../shared/toon-compression"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
+import { DEFAULT_COMPRESSION_CONFIG, type ToonCompressionConfig } from "../../shared/toon-compression"
 
 async function showOutputToUser(context: unknown, output: string): Promise<void> {
   const ctx = context as {

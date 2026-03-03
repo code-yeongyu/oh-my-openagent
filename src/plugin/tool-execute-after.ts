@@ -1,9 +1,8 @@
 import { consumeToolMetadata } from "../features/tool-metadata-store"
 import type { OhMyOpenCodeConfig } from "../config"
-import { safeCompress, shouldCompress } from "../shared/toon-compression"
+import { safeCompress, shouldCompress, DEFAULT_COMPRESSION_CONFIG } from "../shared/toon-compression"
 import type { CreatedHooks } from "../create-hooks"
 
-const DEFAULT_COMPRESSION_CONFIG = { enabled: false, threshold: 5000 }
 const TRUNCATION_MARKERS = [
   "[truncated]",
   "[output truncated",

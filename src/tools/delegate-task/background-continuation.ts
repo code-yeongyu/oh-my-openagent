@@ -1,15 +1,10 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
-import { safeCompress } from "../../shared/toon-compression"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
+import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
 
 export async function executeBackgroundContinuation(
   args: DelegateTaskArgs,

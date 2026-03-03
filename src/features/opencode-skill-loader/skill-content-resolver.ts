@@ -1,10 +1,5 @@
 import type { ToonCompressionConfig } from "../../shared/toon-compression"
-import { safeCompress } from "../../shared/toon-compression"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-	enabled: false,
-	threshold: 5000,
-}
+import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
 
 /**
  * Compresses skill injection content using TOON compression.

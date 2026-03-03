@@ -8,12 +8,11 @@ import { delay } from "./delay"
 import { formatFullSession } from "./full-session-format"
 import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
-import type { ToonCompressionConfig } from "../../shared/toon-compression"
+import { DEFAULT_COMPRESSION_CONFIG, type ToonCompressionConfig } from "../../shared/toon-compression"
 
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 
 const SISYPHUS_JUNIOR_AGENT = getAgentDisplayName("sisyphus-junior")
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
 
 type ToolContextWithMetadata = {
   sessionID: string

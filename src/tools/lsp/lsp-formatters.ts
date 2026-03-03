@@ -1,5 +1,5 @@
-import { safeCompress } from "../../shared/toon-compression"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
+import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
+import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
 import { SYMBOL_KIND_MAP, SEVERITY_MAP } from "./constants"
 import { uriToPath } from "./lsp-client-wrapper"
@@ -205,11 +205,6 @@ export function formatApplyResult(result: ApplyResult): string {
   return lines.join("\n")
 }
 
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
 
 export function formatDiagnosticsOutput(
   diagnostics: Diagnostic[],

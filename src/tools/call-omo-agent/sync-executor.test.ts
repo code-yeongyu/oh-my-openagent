@@ -190,7 +190,8 @@ describe("executeSync", () => {
 
     test("uses default compression config when not provided", async () => {
       //#given
-      const { executeSync, DEFAULT_COMPRESSION_CONFIG } = require("./sync-executor")
+      const { executeSync } = require("./sync-executor")
+      const { DEFAULT_COMPRESSION_CONFIG } = require("../../shared/toon-compression")
 
       const deps = {
         createOrGetSession: mock(async () => ({ sessionID: "ses-test-789", isNew: true })),

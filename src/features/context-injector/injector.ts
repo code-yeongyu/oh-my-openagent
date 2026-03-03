@@ -2,13 +2,8 @@ import type { ContextCollector } from "./collector"
 import type { Message, Part } from "@opencode-ai/sdk"
 import type { ToonCompressionConfig } from "../../shared/toon-compression"
 import { log } from "../../shared"
-import { safeCompress } from "../../shared/toon-compression"
+import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
 import { getMainSessionID } from "../claude-code-session-state"
-
-const DEFAULT_COMPRESSION_CONFIG: ToonCompressionConfig = {
-  enabled: false,
-  threshold: 5000,
-}
 interface OutputPart {
   type: string
   text?: string
