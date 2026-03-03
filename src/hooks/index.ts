@@ -32,6 +32,7 @@ export { createNoSisyphusGptHook } from "./no-sisyphus-gpt";
 export { createNoHephaestusNonGptHook } from "./no-hephaestus-non-gpt";
 export { createAutoSlashCommandHook } from "./auto-slash-command";
 export { createSkillUsageTrackerHook } from "./skill-usage-tracker"
+export { createSkillBoomerangHook } from "./skill-boomerang"
 export { createTaskReflectionSuggesterHook } from "./task-reflection-suggester";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
 
