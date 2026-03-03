@@ -111,6 +111,7 @@ export function applyToolConfig(params: {
       task: "allow",
       prepare_council_prompt: "allow",
       council_finalize: "allow",
+      athena_council: "allow",
       question: questionPermission,
     };
   }

@@ -34,7 +34,7 @@ const COUNCIL_MEMBER_ALLOWLIST = [
 ]
 
 // Tools granted to Athena by tool-config-handler.ts (not in deny-list, not in AGENT_RESTRICTIONS)
-const ATHENA_HANDLER_GRANTS = ["task", "prepare_council_prompt"]
+const ATHENA_HANDLER_GRANTS = ["task", "prepare_council_prompt", "council_finalize", "athena_council"]
 
 describe("agent tool restrictions parity", () => {
   describe("given Athena restrictions", () => {
