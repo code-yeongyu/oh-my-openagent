@@ -358,7 +358,7 @@ describe("createCouncilFinalize", () => {
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["../../etc/passwd", "bg_valid", "foo/bar"], name: "traversal", intent: "FREEFORM" },
+        { task_ids: ["../../tmp/evil", "bg_valid", "foo/bar"], name: "traversal", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
@@ -441,7 +441,7 @@ describe("createCouncilFinalize", () => {
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_prompt"], name: "prompt-test", prompt_file: "/etc/passwd", intent: "FREEFORM" },
+        { task_ids: ["bg_prompt"], name: "prompt-test", prompt_file: "/tmp/should-not-read", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
@@ -460,7 +460,7 @@ describe("createCouncilFinalize", () => {
 
       const toolDef = createCouncilFinalize(tmpDir)
       const resultStr = await toolDef.execute(
-        { task_ids: ["bg_rel"], name: "rel-test", prompt_file: "../../etc/passwd", intent: "FREEFORM" },
+        { task_ids: ["bg_rel"], name: "rel-test", prompt_file: "../../tmp/should-not-read", intent: "FREEFORM" },
         mockCtx,
       )
       const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
