@@ -188,21 +188,19 @@ describe("switch_agent tool", () => {
     expect(promptedSessions[0]!.path.id).toBe("direct-id-123")
   })
 
-  //#given valid athena switch args
+  //#given athena switch args (athena is not a valid switch target)
   //#when execute is called
-  //#then it creates a new session and prompts with the athena agent
-  test("should create session and prompt for athena switch", async () => {
+  //#then it rejects the switch since athena primary is not in ALLOWED_AGENTS
+  test("should reject athena as switch target", async () => {
     const tool = createToolWithMockClient()
     const result = await tool.execute(
       { agent: "athena", context: "Run council analysis on the architecture decision" },
       toolContext
     )
 
+    expect(result).toContain("Invalid switch target")
     expect(result).toContain("athena")
-    expect(result).toContain("new-session-abc")
-    expect(createdSessions).toHaveLength(1)
-    expect(promptedSessions).toHaveLength(1)
-    expect(promptedSessions[0]!.path.id).toBe("new-session-abc")
-    expect(promptedSessions[0]!.body.parts[0]!.text).toBe("Run council analysis on the architecture decision")
+    expect(createdSessions).toHaveLength(0)
+    expect(promptedSessions).toHaveLength(0)
   })
 })

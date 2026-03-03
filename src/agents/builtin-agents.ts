@@ -12,7 +12,7 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
-import { createAthenaAgent, createAthenaJuniorAgent, ATHENA_JUNIOR_PROMPT_METADATA, ATHENA_PROMPT_METADATA, COUNCIL_DEFAULTS } from "./athena"
+import { createAthenaAgent, createAthenaJuniorAgent, ATHENA_JUNIOR_PROMPT_METADATA, COUNCIL_DEFAULTS } from "./athena"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -61,7 +61,6 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   "multimodal-looker": MULTIMODAL_LOOKER_PROMPT_METADATA,
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,
-  athena: ATHENA_PROMPT_METADATA,
   "athena-junior": ATHENA_JUNIOR_PROMPT_METADATA,
   atlas: atlasPromptMetadata,
 }

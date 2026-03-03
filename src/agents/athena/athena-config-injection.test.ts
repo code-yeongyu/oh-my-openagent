@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
-import { createAthenaAgent, ATHENA_PROMPT_METADATA } from "./agent"
+import { createAthenaAgent } from "./agent"
 import { ATHENA_JUNIOR_PROMPT_METADATA } from "./athena-junior-agent"
 import { ATHENA_NON_INTERACTIVE_PROMPT } from "./non-interactive-prompt"
 
@@ -163,57 +163,6 @@ describe("Athena-Junior prompt metadata", () => {
   })
 })
 
-describe("Athena prompt metadata", () => {
-  describe("#given ATHENA_PROMPT_METADATA", () => {
-    describe("#when checking triggers", () => {
-      it("#then includes a Multi-model council trigger", () => {
-        const hasCouncilTrigger = ATHENA_PROMPT_METADATA.triggers.some((t) =>
-          t.domain.includes("Multi-model council"),
-        )
-        expect(hasCouncilTrigger).toBe(true)
-      })
-    })
-
-    describe("#when checking useWhen entries", () => {
-      it("#then includes an entry mentioning tradeoffs", () => {
-        const hasTradeoffs = ATHENA_PROMPT_METADATA.useWhen?.some((entry) =>
-          entry.includes("tradeoffs"),
-        )
-        expect(hasTradeoffs).toBe(true)
-      })
-    })
-
-    describe("#when checking avoidWhen entries", () => {
-      it("#then includes an entry about implementation tasks", () => {
-        const hasImplWarning = ATHENA_PROMPT_METADATA.avoidWhen?.some((entry) =>
-          entry.includes("Implementation tasks"),
-        )
-        expect(hasImplWarning).toBe(true)
-      })
-
-      it("#then includes an entry about subtask misuse", () => {
-        const hasSubtaskWarning = ATHENA_PROMPT_METADATA.avoidWhen?.some((entry) =>
-          entry.includes("Subtasks"),
-        )
-        expect(hasSubtaskWarning).toBe(true)
-      })
-    })
-
-    describe("#when checking metadata shape", () => {
-      it("#then has category advisor", () => {
-        expect(ATHENA_PROMPT_METADATA.category).toBe("advisor")
-      })
-
-      it("#then has cost EXPENSIVE", () => {
-        expect(ATHENA_PROMPT_METADATA.cost).toBe("EXPENSIVE")
-      })
-
-      it("#then has promptAlias Athena", () => {
-        expect(ATHENA_PROMPT_METADATA.promptAlias).toBe("Athena")
-      })
-    })
-  })
-})
 
 describe("Non-interactive prompt config injection placeholders", () => {
   describe("#given the non-interactive prompt", () => {
