@@ -25,6 +25,8 @@ function matchesQuery(name: string, description: string, query: string): boolean
 function formatSkillList(skills: Array<{ name: string; scope: string; description: string }>, query: string): string {
   const lines: string[] = []
 
+  lines.push("Present this skill list to the user as your complete response. Do not add commentary or ask follow-up questions.\n")
+
   if (query) {
     lines.push(`# Skills matching "${query}"\n`)
   } else {
@@ -63,9 +65,9 @@ function formatSkillList(skills: Array<{ name: string; scope: string; descriptio
   return lines.join("\n")
 }
 
-export async function handleSkillCommand(query: string, _options?: ExecutorOptions): Promise<ExecuteResult> {
+export async function handleSkillCommand(query: string, options?: ExecutorOptions): Promise<ExecuteResult> {
   try {
-    const allSkills = await discoverAllSkills()
+    const allSkills = options?.skills ?? await discoverAllSkills()
     const entries = allSkills.map((s) => ({
       name: s.name,
       scope: s.scope ?? "user",
