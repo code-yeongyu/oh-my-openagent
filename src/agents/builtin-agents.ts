@@ -12,7 +12,7 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
-import { createAthenaAgent, ATHENA_PROMPT_METADATA, createAthenaJuniorAgent, ATHENA_JUNIOR_PROMPT_METADATA, COUNCIL_DEFAULTS } from "./athena"
+import { createAthenaAgent, createAthenaJuniorAgent, ATHENA_JUNIOR_PROMPT_METADATA, ATHENA_PROMPT_METADATA, COUNCIL_DEFAULTS } from "./athena"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,

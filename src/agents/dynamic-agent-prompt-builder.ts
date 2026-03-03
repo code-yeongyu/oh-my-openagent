@@ -1,9 +1,10 @@
-import type { AgentPromptMetadata } from "./types"
+import type { AgentMode, AgentPromptMetadata } from "./types"
 
 export interface AvailableAgent {
   name: string
   description: string
   metadata: AgentPromptMetadata
+  mode?: AgentMode
 }
 
 export interface AvailableTool {
@@ -149,8 +150,16 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
   ]
 
   for (const agent of agents) {
+    const delegationTarget = agent.mode === "primary"
+      ? `\`switch_agent(agent="${agent.name}")\``
+      : agent.mode === "all"
+        ? `\`task(subagent_type="${agent.name}")\` or \`switch_agent(agent="${agent.name}")\``
+        : agent.mode === "subagent"
+          ? `\`task(subagent_type="${agent.name}")\``
+          : `\`${agent.name}\``
+
     for (const trigger of agent.metadata.triggers) {
-      rows.push(`- **${trigger.domain}** → \`${agent.name}\` — ${trigger.trigger}`)
+      rows.push(`- **${trigger.domain}** → ${delegationTarget} — ${trigger.trigger}`)
     }
   }
 

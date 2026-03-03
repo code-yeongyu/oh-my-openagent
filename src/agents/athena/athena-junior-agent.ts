@@ -10,8 +10,8 @@ export const ATHENA_JUNIOR_PROMPT_METADATA: AgentPromptMetadata = {
   cost: "EXPENSIVE",
   promptAlias: "Athena-Junior",
   triggers: [
-    { domain: "Non-interactive council", trigger: "Agent needs multi-model analysis without user interaction" },
-    { domain: "Programmatic synthesis", trigger: "Need structured council output for automated processing" },
+    { domain: "Agent needs multi-model analysis", trigger: "Use task(subagent_type=\"athena-junior\") when council synthesis is needed without interactive handoff" },
+    { domain: "Programmatic synthesis", trigger: "Need structured council output for automated pipelines, retries, or downstream machine processing" },
   ],
   useWhen: [
     "CLI invocation via oh-my-opencode run needing structured council output",

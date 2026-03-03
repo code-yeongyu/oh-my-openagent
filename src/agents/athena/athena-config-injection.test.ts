@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it } from "bun:test"
-import { ATHENA_PROMPT_METADATA, createAthenaAgent } from "./agent"
+import { createAthenaAgent, ATHENA_PROMPT_METADATA } from "./agent"
 import { ATHENA_JUNIOR_PROMPT_METADATA } from "./athena-junior-agent"
 import { ATHENA_NON_INTERACTIVE_PROMPT } from "./non-interactive-prompt"
 
@@ -134,50 +134,12 @@ describe("Athena prompt config injection placeholders", () => {
   })
 })
 
-describe("Athena prompt metadata", () => {
-  describe("#given ATHENA_PROMPT_METADATA", () => {
-    describe("#when checking triggers", () => {
-      it("#then does NOT include a Non-interactive council trigger", () => {
-        const hasNonInteractiveTrigger = ATHENA_PROMPT_METADATA.triggers.some((t) =>
-          t.domain.includes("Non-interactive"),
-        )
-        expect(hasNonInteractiveTrigger).toBe(false)
-      })
-    })
-
-    describe("#when checking useWhen entries", () => {
-      it("#then does NOT include an entry mentioning oh-my-opencode run", () => {
-        const hasCLIEntry = ATHENA_PROMPT_METADATA.useWhen.some((entry) =>
-          entry.includes("oh-my-opencode run"),
-        )
-        expect(hasCLIEntry).toBe(false)
-      })
-
-      it("#then does NOT include an entry mentioning structured council output", () => {
-        const hasStructuredEntry = ATHENA_PROMPT_METADATA.useWhen.some((entry) =>
-          entry.includes("structured") || entry.includes("agent-to-agent"),
-        )
-        expect(hasStructuredEntry).toBe(false)
-      })
-    })
-
-    describe("#when checking avoidWhen entries", () => {
-      it("#then includes an entry referencing athena-junior", () => {
-        const hasAthenaJuniorRef = ATHENA_PROMPT_METADATA.avoidWhen?.some((entry) =>
-          entry.includes("athena-junior"),
-        )
-        expect(hasAthenaJuniorRef).toBe(true)
-      })
-    })
-  })
-})
-
 describe("Athena-Junior prompt metadata", () => {
   describe("#given ATHENA_JUNIOR_PROMPT_METADATA", () => {
     describe("#when checking triggers", () => {
-      it("#then includes a Non-interactive council trigger", () => {
+      it("#then includes a multi-model analysis trigger", () => {
         const hasNonInteractiveTrigger = ATHENA_JUNIOR_PROMPT_METADATA.triggers.some((t) =>
-          t.domain.includes("Non-interactive"),
+          t.domain.includes("multi-model analysis"),
         )
         expect(hasNonInteractiveTrigger).toBe(true)
       })
@@ -196,6 +158,58 @@ describe("Athena-Junior prompt metadata", () => {
           entry.includes("structured") || entry.includes("agent-to-agent"),
         )
         expect(hasStructuredEntry).toBe(true)
+      })
+    })
+  })
+})
+
+describe("Athena prompt metadata", () => {
+  describe("#given ATHENA_PROMPT_METADATA", () => {
+    describe("#when checking triggers", () => {
+      it("#then includes a Multi-model council trigger", () => {
+        const hasCouncilTrigger = ATHENA_PROMPT_METADATA.triggers.some((t) =>
+          t.domain.includes("Multi-model council"),
+        )
+        expect(hasCouncilTrigger).toBe(true)
+      })
+    })
+
+    describe("#when checking useWhen entries", () => {
+      it("#then includes an entry mentioning tradeoffs", () => {
+        const hasTradeoffs = ATHENA_PROMPT_METADATA.useWhen?.some((entry) =>
+          entry.includes("tradeoffs"),
+        )
+        expect(hasTradeoffs).toBe(true)
+      })
+    })
+
+    describe("#when checking avoidWhen entries", () => {
+      it("#then includes an entry about implementation tasks", () => {
+        const hasImplWarning = ATHENA_PROMPT_METADATA.avoidWhen?.some((entry) =>
+          entry.includes("Implementation tasks"),
+        )
+        expect(hasImplWarning).toBe(true)
+      })
+
+      it("#then includes an entry about subtask misuse", () => {
+        const hasSubtaskWarning = ATHENA_PROMPT_METADATA.avoidWhen?.some((entry) =>
+          entry.includes("Subtasks"),
+        )
+        expect(hasSubtaskWarning).toBe(true)
+      })
+    })
+
+    describe("#when checking metadata shape", () => {
+      it("#then has category advisor", () => {
+        expect(ATHENA_PROMPT_METADATA.category).toBe("advisor")
+      })
+
+      it("#then has cost EXPENSIVE", () => {
+        expect(ATHENA_PROMPT_METADATA.cost).toBe("EXPENSIVE")
+      })
+
+      it("#then has promptAlias Athena", () => {
+        expect(ATHENA_PROMPT_METADATA.promptAlias).toBe("Athena")
       })
     })
   })

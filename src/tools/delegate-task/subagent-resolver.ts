@@ -11,6 +11,10 @@ import { getAvailableModelsForDelegateTask } from "./available-models"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
 
+const PRIMARY_AGENT_SUBAGENT_ALTERNATIVES: Record<string, string> = {
+  athena: "task(subagent_type=\"athena-junior\", ...) for non-interactive/programmatic council synthesis",
+}
+
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
@@ -70,10 +74,22 @@ Create the work plan directly - that's your job as the planning agent.`,
           || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase())
 
       if (isPrimaryAgent) {
+        const primaryName = isPrimaryAgent.name
+        const normalizedPrimaryName = primaryName.toLowerCase()
+        const subagentAlternative = PRIMARY_AGENT_SUBAGENT_ALTERNATIVES[normalizedPrimaryName]
+        const guidance = [
+          `Cannot call primary agent "${primaryName}" via task.`,
+          `Use switch_agent(agent="${primaryName}") for interactive handoff to this primary orchestrator.`,
+        ]
+
+        if (subagentAlternative) {
+          guidance.push(`For task() usage, use ${subagentAlternative}.`)
+        }
+
         return {
           agentToUse: "",
           categoryModel: undefined,
-    error: `Cannot call primary agent "${isPrimaryAgent.name}" via task. Primary agents are top-level orchestrators.`,
+          error: guidance.join(" "),
         }
       }
 

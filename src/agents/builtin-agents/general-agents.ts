@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
-import type { BuiltinAgentName, AgentOverrides, AgentPromptMetadata } from "../types"
+import type { AgentMode, BuiltinAgentName, AgentOverrides, AgentPromptMetadata } from "../types"
 import type { CategoryConfig, GitMasterConfig } from "../../config/schema"
 import type { BrowserAutomationProvider } from "../../config/schema"
 import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
@@ -93,10 +93,13 @@ export function collectPendingBuiltinAgents(input: {
 
     const metadata = agentMetadata[agentName]
     if (metadata) {
+      const mode = isFactory(source) ? source.mode : (config.mode as AgentMode | undefined)
+
       availableAgents.push({
         name: agentName,
         description: config.description ?? "",
         metadata,
+        mode,
       })
     }
   }
