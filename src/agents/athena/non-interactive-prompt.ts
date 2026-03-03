@@ -67,7 +67,9 @@ Track every task_id from the response for use in Step 5.
 - Parse returned metadata JSON for member states.
 - If a member's elapsed runtime exceeds {MEMBER_MAX_RUNNING_SECONDS}, mark as failed (timeout).
 - If a member is idle and last_activity_s > {STUCK_THRESHOLD_SECONDS}, mark as failed (stuck).
-- Repeat until ALL members reach terminal state.
+- If retry_failed_if_others_finished is false AND any members are failed while at least one other member is still non-terminal, jump to Step 9 immediately for opportunistic retries, then return to Step 5.
+- If retry_failed_if_others_finished is true, continue until ALL members reach terminal state before Step 6.
+- If retry_failed_if_others_finished is false and no retry candidates exist yet, continue tracking until more status updates arrive.
 
 ### Step 6: Collect results with council_finalize.
 - Call: council_finalize(task_ids=[...], name="{topic-slug}", intent="{intent}", question="{original question}", prompt_file="{path from Step 4.1}", mode="non-interactive")
@@ -95,6 +97,7 @@ If retry_on_fail > 0 and failed members exist:
 2. Return to Step 5 to wait for their completion via background_wait.
 3. Call council_finalize again to collect retried results.
 4. Continue retrying until retry count exhausted or quorum met.
+- If retry_failed_if_others_finished is false, retry opportunistically as soon as failures are detected while others are still running.
 - If retry_failed_if_others_finished is true, only retry after all non-failed members have completed.
 - If cancel_retrying_on_quorum is true, stop retrying once quorum (2+ successful) is met.
 

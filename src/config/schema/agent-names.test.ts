@@ -13,6 +13,17 @@ describe("agent name schemas", () => {
     expect(result.success).toBe(true)
   })
 
+  test("BuiltinAgentNameSchema accepts athena-junior", () => {
+    //#given
+    const candidate = "athena-junior"
+
+    //#when
+    const result = BuiltinAgentNameSchema.safeParse(candidate)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+
   test("OverridableAgentNameSchema accepts athena", () => {
     //#given
     const candidate = "athena"

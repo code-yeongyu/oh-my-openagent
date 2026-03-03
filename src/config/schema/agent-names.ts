@@ -12,6 +12,7 @@ export const BuiltinAgentNameSchema = z.enum([
   "momus",
   "atlas",
   "athena",
+  "athena-junior",
   "council-member",
 ])
 
