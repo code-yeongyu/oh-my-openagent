@@ -205,6 +205,45 @@ describe("ContextCollector", () => {
       const ids = pending.entries.map((e) => e.id)
       expect(ids).toEqual(["first", "second", "third"])
     })
+
+    it("keeps registration order even when Date.now values are not monotonic", () => {
+      // given
+      const sessionID = "ses_order_non_monotonic_time"
+      const originalDateNow = Date.now
+      const mockedTimestamps = [300, 100, 200]
+      let timestampIndex = 0
+      Date.now = () => mockedTimestamps[timestampIndex++] ?? 0
+
+      try {
+        collector.register(sessionID, {
+          id: "first",
+          source: "custom",
+          content: "First",
+          priority: "normal",
+        })
+        collector.register(sessionID, {
+          id: "second",
+          source: "custom",
+          content: "Second",
+          priority: "normal",
+        })
+        collector.register(sessionID, {
+          id: "third",
+          source: "custom",
+          content: "Third",
+          priority: "normal",
+        })
+      } finally {
+        Date.now = originalDateNow
+      }
+
+      // when
+      const pending = collector.getPending(sessionID)
+
+      // then
+      const ids = pending.entries.map((entry) => entry.id)
+      expect(ids).toEqual(["first", "second", "third"])
+    })
   })
 
   describe("consume", () => {

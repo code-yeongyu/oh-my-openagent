@@ -219,8 +219,8 @@ describe("keyword-detector session filtering", () => {
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 
-  test("should not override existing variant", async () => {
-    // given - main session set with pre-existing variant
+  test("should override existing variant when ultrawork keyword is used", async () => {
+    // given - main session set with pre-existing variant from TUI
     setMainSession("main-123")
 
     const toastCalls: string[] = []
@@ -236,8 +236,8 @@ describe("keyword-detector session filtering", () => {
       output
     )
 
-    // then - existing variant should remain
-    expect(output.message.variant).toBe("low")
+    // then - ultrawork should override TUI variant to max
+    expect(output.message.variant).toBe("max")
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 })
@@ -595,6 +595,26 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     const textPart = output.parts.find(p => p.type === "text")
     expect(textPart).toBeDefined()
     expect(textPart!.text).toBe("ulw create a work plan")
+    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+  })
+
+  test("should skip ultrawork injection when agent name contains 'plan' token", async () => {
+    //#given - collector and agent name that includes a plan token
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "plan-agent-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork draft a plan" }],
+    }
+
+    //#when - ultrawork keyword detected with plan-like agent name
+    await hook["chat.message"]({ sessionID, agent: "Plan Agent" }, output)
+
+    //#then - ultrawork should be skipped, text unchanged
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toBe("ultrawork draft a plan")
     expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
   })
 

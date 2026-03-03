@@ -43,6 +43,78 @@ describe("boulder-state", () => {
       expect(result).toBeNull()
     })
 
+    test("should return null for JSON null value", () => {
+      //#given - boulder.json containing null
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, "null")
+
+      //#when
+      const result = readBoulderState(TEST_DIR)
+
+      //#then
+      expect(result).toBeNull()
+    })
+
+    test("should return null for JSON primitive value", () => {
+      //#given - boulder.json containing a string
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, '"just a string"')
+
+      //#when
+      const result = readBoulderState(TEST_DIR)
+
+      //#then
+      expect(result).toBeNull()
+    })
+
+    test("should default session_ids to [] when missing from JSON", () => {
+      //#given - boulder.json without session_ids field
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        plan_name: "plan",
+      }))
+
+      //#when
+      const result = readBoulderState(TEST_DIR)
+
+      //#then
+      expect(result).not.toBeNull()
+      expect(result!.session_ids).toEqual([])
+    })
+
+    test("should default session_ids to [] when not an array", () => {
+      //#given - boulder.json with session_ids as a string
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/path/to/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        session_ids: "not-an-array",
+        plan_name: "plan",
+      }))
+
+      //#when
+      const result = readBoulderState(TEST_DIR)
+
+      //#then
+      expect(result).not.toBeNull()
+      expect(result!.session_ids).toEqual([])
+    })
+
+    test("should default session_ids to [] for empty object", () => {
+      //#given - boulder.json with empty object
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({}))
+
+      //#when
+      const result = readBoulderState(TEST_DIR)
+
+      //#then
+      expect(result).not.toBeNull()
+      expect(result!.session_ids).toEqual([])
+    })
+
     test("should read valid boulder state", () => {
       // given - valid boulder.json
       const state: BoulderState = {
@@ -129,6 +201,23 @@ describe("boulder-state", () => {
       // then
       expect(result).toBeNull()
     })
+
+    test("should not crash when boulder.json has no session_ids field", () => {
+      //#given - boulder.json without session_ids
+      const boulderFile = join(SISYPHUS_DIR, "boulder.json")
+      writeFileSync(boulderFile, JSON.stringify({
+        active_plan: "/plan.md",
+        started_at: "2026-01-01T00:00:00Z",
+        plan_name: "plan",
+      }))
+
+      //#when
+      const result = appendSessionId(TEST_DIR, "ses-new")
+
+      //#then - should not crash and should contain the new session
+      expect(result).not.toBeNull()
+      expect(result!.session_ids).toContain("ses-new")
+    })
   })
 
   describe("clearBoulderState", () => {
@@ -178,6 +267,71 @@ describe("boulder-state", () => {
       expect(progress.total).toBe(4)
       expect(progress.completed).toBe(2)
       expect(progress.isComplete).toBe(false)
+    })
+
+    test("should count space-indented unchecked checkbox", () => {
+      // given - plan file with a two-space indented checkbox
+      const planPath = join(TEST_DIR, "space-indented-plan.md")
+      writeFileSync(planPath, `# Plan
+  - [ ] indented task
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(1)
+      expect(progress.completed).toBe(0)
+      expect(progress.isComplete).toBe(false)
+    })
+
+    test("should count tab-indented unchecked checkbox", () => {
+      // given - plan file with a tab-indented checkbox
+      const planPath = join(TEST_DIR, "tab-indented-plan.md")
+      writeFileSync(planPath, `# Plan
+	- [ ] tab-indented task
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(1)
+      expect(progress.completed).toBe(0)
+      expect(progress.isComplete).toBe(false)
+    })
+
+    test("should count mixed top-level checked and indented unchecked checkboxes", () => {
+      // given - plan file with checked top-level and unchecked indented task
+      const planPath = join(TEST_DIR, "mixed-indented-plan.md")
+      writeFileSync(planPath, `# Plan
+- [x] top-level completed task
+  - [ ] nested unchecked task
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(2)
+      expect(progress.completed).toBe(1)
+      expect(progress.isComplete).toBe(false)
+    })
+
+    test("should count space-indented completed checkbox", () => {
+      // given - plan file with a two-space indented completed checkbox
+      const planPath = join(TEST_DIR, "indented-completed-plan.md")
+      writeFileSync(planPath, `# Plan
+  - [x] indented completed task
+`)
+
+      // when
+      const progress = getPlanProgress(planPath)
+
+      // then
+      expect(progress.total).toBe(1)
+      expect(progress.completed).toBe(1)
+      expect(progress.isComplete).toBe(true)
     })
 
     test("should return isComplete true when all checked", () => {
@@ -245,6 +399,34 @@ describe("boulder-state", () => {
       expect(state.session_ids).toEqual([sessionId])
       expect(state.plan_name).toBe("auth-refactor")
       expect(state.started_at).toBeDefined()
+    })
+
+    test("should include agent field when provided", () => {
+      //#given - plan path, session id, and agent type
+      const planPath = "/path/to/feature.md"
+      const sessionId = "ses-xyz789"
+      const agent = "atlas"
+
+      //#when - createBoulderState is called with agent
+      const state = createBoulderState(planPath, sessionId, agent)
+
+      //#then - state should include the agent field
+      expect(state.agent).toBe("atlas")
+      expect(state.active_plan).toBe(planPath)
+      expect(state.session_ids).toEqual([sessionId])
+      expect(state.plan_name).toBe("feature")
+    })
+
+    test("should allow agent to be undefined", () => {
+      //#given - plan path and session id without agent
+      const planPath = "/path/to/legacy.md"
+      const sessionId = "ses-legacy"
+
+      //#when - createBoulderState is called without agent
+      const state = createBoulderState(planPath, sessionId)
+
+      //#then - state should not have agent field (backward compatible)
+      expect(state.agent).toBeUndefined()
     })
   })
 })

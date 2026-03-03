@@ -24,7 +24,7 @@ export const RALPH_LOOP_TEMPLATE = `You are starting a Ralph Loop - a self-refer
 ## Your Task
 
 Parse the arguments below and begin working on the task. The format is:
-\`"task description" [--completion-promise=TEXT] [--max-iterations=N]\`
+\`"task description" [--completion-promise=TEXT] [--max-iterations=N] [--strategy=reset|continue]\`
 
 Default completion promise is "DONE" and default max iterations is 100.`
 

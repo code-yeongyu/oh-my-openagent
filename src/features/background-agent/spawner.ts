@@ -1,7 +1,7 @@
 import type { BackgroundTask, LaunchInput, ResumeInput } from "./types"
 import type { OpencodeClient, OnSubagentSessionCreated, QueueItem } from "./constants"
 import { TMUX_CALLBACK_DELAY_MS } from "./constants"
-import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry } from "../../shared"
+import { log, getAgentToolRestrictions, promptWithModelSuggestionRetry, createInternalAgentTextPart } from "../../shared"
 import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { isInsideTmux } from "../../shared/tmux"
@@ -61,12 +61,7 @@ export async function startTask(
   const createResult = await client.session.create({
     body: {
       parentID: input.parentSessionID,
-      title: `Background: ${input.description}`,
-      permission: [
-        { permission: "question", action: "deny" as const, pattern: "*" },
-      ],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any,
+    } as Record<string, unknown>,
     query: {
       directory: parentDirectory,
     },
@@ -144,13 +139,12 @@ export async function startTask(
       ...(launchVariant ? { variant: launchVariant } : {}),
       system: input.skillContent,
       tools: {
-        ...getAgentToolRestrictions(input.agent),
         task: false,
-        delegate_task: false,
         call_omo_agent: true,
         question: false,
+        ...getAgentToolRestrictions(input.agent),
       },
-      parts: [{ type: "text", text: input.prompt }],
+      parts: [createInternalAgentTextPart(input.prompt)],
     },
   }).catch((error) => {
     log("[background-agent] promptAsync error:", error)
@@ -222,20 +216,19 @@ export async function resumeTask(
     : undefined
   const resumeVariant = task.model?.variant
 
-  client.session.prompt({
+  client.session.promptAsync({
     path: { id: task.sessionID },
     body: {
       agent: task.agent,
       ...(resumeModel ? { model: resumeModel } : {}),
       ...(resumeVariant ? { variant: resumeVariant } : {}),
       tools: {
-        ...getAgentToolRestrictions(task.agent),
         task: false,
-        delegate_task: false,
         call_omo_agent: true,
         question: false,
+        ...getAgentToolRestrictions(task.agent),
       },
-      parts: [{ type: "text", text: input.prompt }],
+      parts: [createInternalAgentTextPart(input.prompt)],
     },
   }).catch((error) => {
     log("[background-agent] resume prompt error:", error)

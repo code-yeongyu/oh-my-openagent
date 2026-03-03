@@ -1,16 +1,5 @@
 export {
   OhMyOpenCodeConfigSchema,
-  AgentOverrideConfigSchema,
-  AgentOverridesSchema,
-  McpNameSchema,
-  AgentNameSchema,
-  HookNameSchema,
-  BuiltinCommandNameSchema,
-  SisyphusAgentConfigSchema,
-  ExperimentalConfigSchema,
-  RalphLoopConfigSchema,
-  TmuxConfigSchema,
-  TmuxLayoutSchema,
 } from "./schema"
 
 export type {
@@ -29,4 +18,6 @@ export type {
   TmuxLayout,
   SisyphusConfig,
   SisyphusTasksConfig,
+  RuntimeFallbackConfig,
+  FallbackModels,
 } from "./schema"

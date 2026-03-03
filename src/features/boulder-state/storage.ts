@@ -22,7 +22,14 @@ export function readBoulderState(directory: string): BoulderState | null {
 
   try {
     const content = readFileSync(filePath, "utf-8")
-    return JSON.parse(content) as BoulderState
+    const parsed = JSON.parse(content)
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null
+    }
+    if (!Array.isArray(parsed.session_ids)) {
+      parsed.session_ids = []
+    }
+    return parsed as BoulderState
   } catch {
     return null
   }
@@ -48,7 +55,10 @@ export function appendSessionId(directory: string, sessionId: string): BoulderSt
   const state = readBoulderState(directory)
   if (!state) return null
 
-  if (!state.session_ids.includes(sessionId)) {
+  if (!state.session_ids?.includes(sessionId)) {
+    if (!Array.isArray(state.session_ids)) {
+      state.session_ids = []
+    }
     state.session_ids.push(sessionId)
     if (writeBoulderState(directory, state)) {
       return state
@@ -111,8 +121,8 @@ export function getPlanProgress(planPath: string): PlanProgress {
     const content = readFileSync(planPath, "utf-8")
     
     // Match markdown checkboxes: - [ ] or - [x] or - [X]
-    const uncheckedMatches = content.match(/^[-*]\s*\[\s*\]/gm) || []
-    const checkedMatches = content.match(/^[-*]\s*\[[xX]\]/gm) || []
+    const uncheckedMatches = content.match(/^\s*[-*]\s*\[\s*\]/gm) || []
+    const checkedMatches = content.match(/^\s*[-*]\s*\[[xX]\]/gm) || []
 
     const total = uncheckedMatches.length + checkedMatches.length
     const completed = checkedMatches.length
@@ -139,12 +149,16 @@ export function getPlanName(planPath: string): string {
  */
 export function createBoulderState(
   planPath: string,
-  sessionId: string
+  sessionId: string,
+  agent?: string,
+  worktreePath?: string,
 ): BoulderState {
   return {
     active_plan: planPath,
     started_at: new Date().toISOString(),
     session_ids: [sessionId],
     plan_name: getPlanName(planPath),
+    ...(agent !== undefined ? { agent } : {}),
+    ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
   }
 }

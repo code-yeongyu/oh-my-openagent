@@ -86,4 +86,89 @@ describe("createBuiltinSkills", () => {
 		expect(defaultSkills).toHaveLength(4)
 		expect(agentBrowserSkills).toHaveLength(4)
 	})
+
+	test("should exclude playwright when it is in disabledSkills", () => {
+		// #given
+		const options = { disabledSkills: new Set(["playwright"]) }
+
+		// #when
+		const skills = createBuiltinSkills(options)
+
+		// #then
+		expect(skills.map((s) => s.name)).not.toContain("playwright")
+		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
+		expect(skills.map((s) => s.name)).toContain("git-master")
+		expect(skills.map((s) => s.name)).toContain("dev-browser")
+		expect(skills.length).toBe(3)
+	})
+
+	test("should exclude multiple skills when they are in disabledSkills", () => {
+		// #given
+		const options = { disabledSkills: new Set(["playwright", "git-master"]) }
+
+		// #when
+		const skills = createBuiltinSkills(options)
+
+		// #then
+		expect(skills.map((s) => s.name)).not.toContain("playwright")
+		expect(skills.map((s) => s.name)).not.toContain("git-master")
+		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
+		expect(skills.map((s) => s.name)).toContain("dev-browser")
+		expect(skills.length).toBe(2)
+	})
+
+	test("should return an empty array when all skills are disabled", () => {
+		// #given
+		const options = {
+			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser"]),
+		}
+
+		// #when
+		const skills = createBuiltinSkills(options)
+
+		// #then
+		expect(skills.length).toBe(0)
+	})
+
+	test("should return all skills when disabledSkills set is empty", () => {
+		// #given
+		const options = { disabledSkills: new Set<string>() }
+
+		// #when
+		const skills = createBuiltinSkills(options)
+
+		// #then
+		expect(skills.length).toBe(4)
+	})
+
+	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {
+		// given
+		const options = { browserProvider: "playwright-cli" as const }
+
+		// when
+		const skills = createBuiltinSkills(options)
+
+		// then
+		const playwrightSkill = skills.find((s) => s.name === "playwright")
+		const agentBrowserSkill = skills.find((s) => s.name === "agent-browser")
+		expect(playwrightSkill).toBeDefined()
+		expect(playwrightSkill!.description).toContain("browser")
+		expect(playwrightSkill!.allowedTools).toContain("Bash(playwright-cli:*)")
+		expect(playwrightSkill!.mcpConfig).toBeUndefined()
+		expect(agentBrowserSkill).toBeUndefined()
+	})
+
+	test("playwright-cli skill template contains CLI commands", () => {
+		// given
+		const options = { browserProvider: "playwright-cli" as const }
+
+		// when
+		const skills = createBuiltinSkills(options)
+		const skill = skills.find((s) => s.name === "playwright")
+
+		// then
+		expect(skill!.template).toContain("playwright-cli open")
+		expect(skill!.template).toContain("playwright-cli snapshot")
+		expect(skill!.template).toContain("playwright-cli click")
+	})
 })

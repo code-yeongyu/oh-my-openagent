@@ -14,6 +14,10 @@ export interface BoulderState {
   session_ids: string[]
   /** Plan name derived from filename */
   plan_name: string
+  /** Agent type to use when resuming (e.g., 'atlas') */
+  agent?: string
+  /** Absolute path to the git worktree root where work happens */
+  worktree_path?: string
 }
 
 export interface PlanProgress {

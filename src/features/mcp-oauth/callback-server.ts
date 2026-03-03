@@ -1,5 +1,6 @@
+import { findAvailablePort as findAvailablePortShared } from "../../shared/port-utils"
+
 const DEFAULT_PORT = 19877
-const MAX_PORT_ATTEMPTS = 20
 const TIMEOUT_MS = 5 * 60 * 1000
 
 export type OAuthCallbackResult = {
@@ -33,28 +34,8 @@ const SUCCESS_HTML = `<!DOCTYPE html>
 </body>
 </html>`
 
-async function isPortAvailable(port: number): Promise<boolean> {
-  try {
-    const server = Bun.serve({
-      port,
-      hostname: "127.0.0.1",
-      fetch: () => new Response(),
-    })
-    server.stop(true)
-    return true
-  } catch {
-    return false
-  }
-}
-
 export async function findAvailablePort(startPort: number = DEFAULT_PORT): Promise<number> {
-  for (let attempt = 0; attempt < MAX_PORT_ATTEMPTS; attempt++) {
-    const port = startPort + attempt
-    if (await isPortAvailable(port)) {
-      return port
-    }
-  }
-  throw new Error(`No available port found in range ${startPort}-${startPort + MAX_PORT_ATTEMPTS - 1}`)
+  return findAvailablePortShared(startPort)
 }
 
 export async function startCallbackServer(startPort: number = DEFAULT_PORT): Promise<CallbackServer> {

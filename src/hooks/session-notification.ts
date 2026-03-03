@@ -1,26 +1,16 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { platform } from "os"
 import { subagentSessions, getMainSessionID } from "../features/claude-code-session-state"
-import {
-  getOsascriptPath,
-  getNotifySendPath,
-  getPowershellPath,
-  getAfplayPath,
-  getPaplayPath,
-  getAplayPath,
-  startBackgroundCheck,
-} from "./session-notification-utils"
-
-interface Todo {
-  content: string
-  status: string
-  priority: string
-  id: string
-}
+import { startBackgroundCheck } from "./session-notification-utils"
+import type { Platform } from "./session-notification-sender"
+import * as sessionNotificationSender from "./session-notification-sender"
+import { hasIncompleteTodos } from "./session-todo-status"
+import { createIdleNotificationScheduler } from "./session-notification-scheduler"
 
 interface SessionNotificationConfig {
   title?: string
   message?: string
+  questionMessage?: string
+  permissionMessage?: string
   playSound?: boolean
   soundPath?: string
   /** Delay in ms before sending notification to confirm session is still idle (default: 1500) */
@@ -29,132 +19,25 @@ interface SessionNotificationConfig {
   skipIfIncompleteTodos?: boolean
   /** Maximum number of sessions to track before cleanup (default: 100) */
   maxTrackedSessions?: number
-  /** Play sound when question tool awaits user input (default: true) */
   playSoundOnQuestion?: boolean
-  /** Skip sound when idle is triggered by background task completion (default: true) */
   skipSoundOnBackgroundCompletion?: boolean
-}
-
-type Platform = "darwin" | "linux" | "win32" | "unsupported"
-
-function detectPlatform(): Platform {
-  const p = platform()
-  if (p === "darwin" || p === "linux" || p === "win32") return p
-  return "unsupported"
-}
-
-function getDefaultSoundPath(p: Platform): string {
-  switch (p) {
-    case "darwin":
-      return "/System/Library/Sounds/Glass.aiff"
-    case "linux":
-      return "/usr/share/sounds/freedesktop/stereo/complete.oga"
-    case "win32":
-      return "C:\\Windows\\Media\\notify.wav"
-    default:
-      return ""
-  }
-}
-
-async function sendNotification(
-  ctx: PluginInput,
-  p: Platform,
-  title: string,
-  message: string
-): Promise<void> {
-  switch (p) {
-    case "darwin": {
-      const osascriptPath = await getOsascriptPath()
-      if (!osascriptPath) return
-
-      const esTitle = title.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-      const esMessage = message.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-      await ctx.$`${osascriptPath} -e ${"display notification \"" + esMessage + "\" with title \"" + esTitle + "\""}`.catch(() => {})
-      break
-    }
-    case "linux": {
-      const notifySendPath = await getNotifySendPath()
-      if (!notifySendPath) return
-
-      await ctx.$`${notifySendPath} ${title} ${message} 2>/dev/null`.catch(() => {})
-      break
-    }
-    case "win32": {
-      const powershellPath = await getPowershellPath()
-      if (!powershellPath) return
-
-      const psTitle = title.replace(/'/g, "''")
-      const psMessage = message.replace(/'/g, "''")
-      const toastScript = `
-[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
-$Template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
-$RawXml = [xml] $Template.GetXml()
-($RawXml.toast.visual.binding.text | Where-Object {$_.id -eq '1'}).AppendChild($RawXml.CreateTextNode('${psTitle}')) | Out-Null
-($RawXml.toast.visual.binding.text | Where-Object {$_.id -eq '2'}).AppendChild($RawXml.CreateTextNode('${psMessage}')) | Out-Null
-$SerializedXml = New-Object Windows.Data.Xml.Dom.XmlDocument
-$SerializedXml.LoadXml($RawXml.OuterXml)
-$Toast = [Windows.UI.Notifications.ToastNotification]::new($SerializedXml)
-$Notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OpenCode')
-$Notifier.Show($Toast)
-`.trim().replace(/\n/g, "; ")
-      await ctx.$`${powershellPath} -Command ${toastScript}`.catch(() => {})
-      break
-    }
-  }
-}
-
-async function playSound(ctx: PluginInput, p: Platform, soundPath: string): Promise<void> {
-  switch (p) {
-    case "darwin": {
-      const afplayPath = await getAfplayPath()
-      if (!afplayPath) return
-      ctx.$`${afplayPath} ${soundPath}`.catch(() => {})
-      break
-    }
-    case "linux": {
-      const paplayPath = await getPaplayPath()
-      if (paplayPath) {
-        ctx.$`${paplayPath} ${soundPath} 2>/dev/null`.catch(() => {})
-      } else {
-        const aplayPath = await getAplayPath()
-        if (aplayPath) {
-          ctx.$`${aplayPath} ${soundPath} 2>/dev/null`.catch(() => {})
-        }
-      }
-      break
-    }
-    case "win32": {
-      const powershellPath = await getPowershellPath()
-      if (!powershellPath) return
-      ctx.$`${powershellPath} -Command ${"(New-Object Media.SoundPlayer '" + soundPath.replace(/'/g, "''") + "').PlaySync()"}`.catch(() => {})
-      break
-    }
-  }
-}
-
-async function hasIncompleteTodos(ctx: PluginInput, sessionID: string): Promise<boolean> {
-  try {
-    const response = await ctx.client.session.todo({ path: { id: sessionID } })
-    const todos = (response.data ?? response) as Todo[]
-    if (!todos || todos.length === 0) return false
-    return todos.some((t) => t.status !== "completed" && t.status !== "cancelled")
-  } catch {
-    return false
-  }
+  enforceMainSessionFilter?: boolean
 }
 
 export function createSessionNotification(
   ctx: PluginInput,
-  config: SessionNotificationConfig = {}
+  config: SessionNotificationConfig = {},
 ) {
-  const currentPlatform = detectPlatform()
-  const defaultSoundPath = getDefaultSoundPath(currentPlatform)
+  const currentPlatform: Platform = sessionNotificationSender.detectPlatform()
+  const defaultSoundPath = sessionNotificationSender.getDefaultSoundPath(currentPlatform)
 
   startBackgroundCheck(currentPlatform)
 
   const mergedConfig = {
     title: "OpenCode",
     message: "Agent is ready for input",
+    questionMessage: "Agent is asking a question",
+    permissionMessage: "Agent needs permission to continue",
     playSound: false,
     soundPath: defaultSoundPath,
     idleConfirmationDelay: 1500,
@@ -162,119 +45,82 @@ export function createSessionNotification(
     maxTrackedSessions: 100,
     playSoundOnQuestion: true,
     skipSoundOnBackgroundCompletion: true,
+    enforceMainSessionFilter: true,
     ...config,
   }
 
-  const notifiedSessions = new Set<string>()
-  const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  const sessionActivitySinceIdle = new Set<string>()
-  const notificationVersions = new Map<string, number>()
-  const executingNotifications = new Set<string>()
   const backgroundCompletionTriggeredIdle = new Set<string>()
 
-  function cleanupOldSessions() {
-    const maxSessions = mergedConfig.maxTrackedSessions
-    if (notifiedSessions.size > maxSessions) {
-      const sessionsToRemove = Array.from(notifiedSessions).slice(0, notifiedSessions.size - maxSessions)
-      sessionsToRemove.forEach(id => notifiedSessions.delete(id))
-    }
-    if (sessionActivitySinceIdle.size > maxSessions) {
-      const sessionsToRemove = Array.from(sessionActivitySinceIdle).slice(0, sessionActivitySinceIdle.size - maxSessions)
-      sessionsToRemove.forEach(id => sessionActivitySinceIdle.delete(id))
-    }
-    if (notificationVersions.size > maxSessions) {
-      const sessionsToRemove = Array.from(notificationVersions.keys()).slice(0, notificationVersions.size - maxSessions)
-      sessionsToRemove.forEach(id => notificationVersions.delete(id))
-    }
-    if (executingNotifications.size > maxSessions) {
-      const sessionsToRemove = Array.from(executingNotifications).slice(0, executingNotifications.size - maxSessions)
-      sessionsToRemove.forEach(id => executingNotifications.delete(id))
-    }
-    if (backgroundCompletionTriggeredIdle.size > maxSessions) {
-      const sessionsToRemove = Array.from(backgroundCompletionTriggeredIdle).slice(0, backgroundCompletionTriggeredIdle.size - maxSessions)
-      sessionsToRemove.forEach(id => backgroundCompletionTriggeredIdle.delete(id))
-    }
-  }
-
-  function cancelPendingNotification(sessionID: string) {
-    const timer = pendingTimers.get(sessionID)
-    if (timer) {
-      clearTimeout(timer)
-      pendingTimers.delete(sessionID)
-    }
-    sessionActivitySinceIdle.add(sessionID)
-    // Increment version to invalidate any in-flight notifications
-    notificationVersions.set(sessionID, (notificationVersions.get(sessionID) ?? 0) + 1)
-  }
-
-  function markSessionActivity(sessionID: string) {
-    cancelPendingNotification(sessionID)
-    if (!executingNotifications.has(sessionID)) {
-      notifiedSessions.delete(sessionID)
-    }
-  }
-
-  async function executeNotification(sessionID: string, version: number) {
-    if (executingNotifications.has(sessionID)) {
-      pendingTimers.delete(sessionID)
-      return
-    }
-
-    if (notificationVersions.get(sessionID) !== version) {
-      pendingTimers.delete(sessionID)
-      return
-    }
-
-    if (sessionActivitySinceIdle.has(sessionID)) {
-      sessionActivitySinceIdle.delete(sessionID)
-      pendingTimers.delete(sessionID)
-      return
-    }
-
-    if (notifiedSessions.has(sessionID)) {
-      pendingTimers.delete(sessionID)
-      return
-    }
-
-    executingNotifications.add(sessionID)
-    try {
-      if (mergedConfig.skipIfIncompleteTodos) {
-        const hasPendingWork = await hasIncompleteTodos(ctx, sessionID)
-        if (notificationVersions.get(sessionID) !== version) {
-          return
-        }
-        if (hasPendingWork) return
-      }
-
-      if (notificationVersions.get(sessionID) !== version) {
-        return
-      }
-
-      if (sessionActivitySinceIdle.has(sessionID)) {
-        sessionActivitySinceIdle.delete(sessionID)
-        return
-      }
-
-      notifiedSessions.add(sessionID)
-
-      await sendNotification(ctx, currentPlatform, mergedConfig.title, mergedConfig.message)
-
-      const shouldSkipSound = mergedConfig.skipSoundOnBackgroundCompletion && 
-        backgroundCompletionTriggeredIdle.has(sessionID)
+  const scheduler = createIdleNotificationScheduler({
+    ctx,
+    platform: currentPlatform,
+    config: mergedConfig,
+    hasIncompleteTodos,
+    send: sessionNotificationSender.sendSessionNotification,
+    playSound: sessionNotificationSender.playSessionNotificationSound,
+    shouldPlaySound: (sessionID) => {
+      const shouldSkip = mergedConfig.skipSoundOnBackgroundCompletion
+        && backgroundCompletionTriggeredIdle.has(sessionID)
       backgroundCompletionTriggeredIdle.delete(sessionID)
+      return !shouldSkip
+    },
+  })
 
-      if (mergedConfig.playSound && mergedConfig.soundPath && !shouldSkipSound) {
-        await playSound(ctx, currentPlatform, mergedConfig.soundPath)
-      }
-    } finally {
-      executingNotifications.delete(sessionID)
-      pendingTimers.delete(sessionID)
-      // Clear notified state if there was activity during notification
-      if (sessionActivitySinceIdle.has(sessionID)) {
-        notifiedSessions.delete(sessionID)
-        sessionActivitySinceIdle.delete(sessionID)
-      }
+  const QUESTION_TOOLS = new Set(["question", "ask_user_question", "askuserquestion"])
+  const PERMISSION_EVENTS = new Set(["permission.ask", "permission.asked", "permission.updated", "permission.requested"])
+  const PERMISSION_HINT_PATTERN = /\b(permission|approve|approval|allow|deny|consent)\b/i
+
+  const getSessionID = (properties: Record<string, unknown> | undefined): string | undefined => {
+    const sessionID = properties?.sessionID
+    if (typeof sessionID === "string" && sessionID.length > 0) return sessionID
+
+    const sessionId = properties?.sessionId
+    if (typeof sessionId === "string" && sessionId.length > 0) return sessionId
+
+    const info = properties?.info as Record<string, unknown> | undefined
+    const infoSessionID = info?.sessionID
+    if (typeof infoSessionID === "string" && infoSessionID.length > 0) return infoSessionID
+
+    const infoSessionId = info?.sessionId
+    if (typeof infoSessionId === "string" && infoSessionId.length > 0) return infoSessionId
+
+    return undefined
+  }
+
+  const shouldNotifyForSession = (sessionID: string): boolean => {
+    if (subagentSessions.has(sessionID)) return false
+
+    if (mergedConfig.enforceMainSessionFilter) {
+      const mainSessionID = getMainSessionID()
+      if (mainSessionID && sessionID !== mainSessionID) return false
     }
+
+    return true
+  }
+
+  const getEventToolName = (properties: Record<string, unknown> | undefined): string | undefined => {
+    const tool = properties?.tool
+    if (typeof tool === "string" && tool.length > 0) return tool
+
+    const name = properties?.name
+    if (typeof name === "string" && name.length > 0) return name
+
+    return undefined
+  }
+
+  const getQuestionText = (properties: Record<string, unknown> | undefined): string => {
+    const args = properties?.args as Record<string, unknown> | undefined
+    const questions = args?.questions
+    if (!Array.isArray(questions) || questions.length === 0) return ""
+
+    const firstQuestion = questions[0] as Record<string, unknown> | undefined
+    const questionText = firstQuestion?.question
+    return typeof questionText === "string" ? questionText : ""
+  }
+
+  const markSessionActivity = (sessionID: string): void => {
+    backgroundCompletionTriggeredIdle.delete(sessionID)
+    scheduler.markSessionActivity(sessionID)
   }
 
   return async ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -292,36 +138,18 @@ export function createSessionNotification(
     }
 
     if (event.type === "session.idle") {
-      const sessionID = props?.sessionID as string | undefined
+      const sessionID = getSessionID(props)
       if (!sessionID) return
 
-      if (subagentSessions.has(sessionID)) return
+      if (!shouldNotifyForSession(sessionID)) return
 
-      // Only trigger notifications for the main session (not subagent sessions)
-      const mainSessionID = getMainSessionID()
-      if (mainSessionID && sessionID !== mainSessionID) return
-
-      if (notifiedSessions.has(sessionID)) return
-      if (pendingTimers.has(sessionID)) return
-      if (executingNotifications.has(sessionID)) return
-
-      sessionActivitySinceIdle.delete(sessionID)
-      
-      const currentVersion = (notificationVersions.get(sessionID) ?? 0) + 1
-      notificationVersions.set(sessionID, currentVersion)
-
-      const timer = setTimeout(() => {
-        executeNotification(sessionID, currentVersion)
-      }, mergedConfig.idleConfirmationDelay)
-
-      pendingTimers.set(sessionID, timer)
-      cleanupOldSessions()
+      scheduler.scheduleIdleNotification(sessionID)
       return
     }
 
     if (event.type === "message.updated") {
       const info = props?.info as Record<string, unknown> | undefined
-      const sessionID = info?.sessionID as string | undefined
+      const sessionID = getSessionID({ ...props, info })
       if (sessionID) {
         markSessionActivity(sessionID)
       }
@@ -333,7 +161,7 @@ export function createSessionNotification(
       const sessionID = part?.sessionID as string | undefined
       const partType = part?.type as string | undefined
       const text = part?.text as string | undefined
-      
+
       if (sessionID && partType === "text" && text) {
         if (text.includes("[BACKGROUND TASK") || text.includes("[ALL BACKGROUND TASKS COMPLETE]")) {
           backgroundCompletionTriggeredIdle.add(sessionID)
@@ -342,28 +170,45 @@ export function createSessionNotification(
       return
     }
 
-    if (event.type === "tool.execute.before") {
-      const sessionID = props?.sessionID as string | undefined
-      const toolName = (props?.tool as string | undefined)?.toLowerCase()
-      
-      if (sessionID) {
-        markSessionActivity(sessionID)
-        
-        if (mergedConfig.playSoundOnQuestion && 
-            mergedConfig.playSound && 
-            mergedConfig.soundPath &&
-            !subagentSessions.has(sessionID) &&
-            (toolName === "question" || toolName === "askuserquestion" || toolName === "ask_user_question")) {
-          playSound(ctx, currentPlatform, mergedConfig.soundPath).catch(() => {})
-        }
+    if (PERMISSION_EVENTS.has(event.type)) {
+      const sessionID = getSessionID(props)
+      if (!sessionID) return
+      if (!shouldNotifyForSession(sessionID)) return
+
+      markSessionActivity(sessionID)
+      await sessionNotificationSender.sendSessionNotification(
+        ctx,
+        currentPlatform,
+        mergedConfig.title,
+        mergedConfig.permissionMessage,
+      )
+      if (mergedConfig.playSound && mergedConfig.soundPath) {
+        await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
       }
       return
     }
 
-    if (event.type === "tool.execute.after") {
-      const sessionID = props?.sessionID as string | undefined
+    if (event.type === "tool.execute.before" || event.type === "tool.execute.after") {
+      const sessionID = getSessionID(props)
       if (sessionID) {
         markSessionActivity(sessionID)
+
+        if (event.type === "tool.execute.before") {
+          const toolName = getEventToolName(props)?.toLowerCase()
+          if (toolName && QUESTION_TOOLS.has(toolName)) {
+            if (!shouldNotifyForSession(sessionID)) return
+
+            const questionText = getQuestionText(props)
+            const message = PERMISSION_HINT_PATTERN.test(questionText)
+              ? mergedConfig.permissionMessage
+              : mergedConfig.questionMessage
+
+            await sessionNotificationSender.sendSessionNotification(ctx, currentPlatform, mergedConfig.title, message)
+            if (mergedConfig.playSoundOnQuestion && mergedConfig.playSound && mergedConfig.soundPath) {
+              await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
+            }
+          }
+        }
       }
       return
     }
@@ -371,12 +216,8 @@ export function createSessionNotification(
     if (event.type === "session.deleted") {
       const sessionInfo = props?.info as { id?: string } | undefined
       if (sessionInfo?.id) {
-        cancelPendingNotification(sessionInfo.id)
-        notifiedSessions.delete(sessionInfo.id)
-        sessionActivitySinceIdle.delete(sessionInfo.id)
-        notificationVersions.delete(sessionInfo.id)
-        executingNotifications.delete(sessionInfo.id)
         backgroundCompletionTriggeredIdle.delete(sessionInfo.id)
+        scheduler.deleteSession(sessionInfo.id)
       }
     }
   }

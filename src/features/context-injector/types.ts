@@ -27,8 +27,8 @@ export interface ContextEntry {
   content: string
   /** Priority for ordering (default: normal) */
   priority: ContextPriority
-  /** Timestamp when registered */
-  timestamp: number
+  /** Monotonic order when registered */
+  registrationOrder: number
   /** Optional metadata for debugging/logging */
   metadata?: Record<string, unknown>
 }

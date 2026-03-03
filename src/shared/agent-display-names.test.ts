@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test"
-import { AGENT_DISPLAY_NAMES, getAgentDisplayName } from "./agent-display-names"
+import { AGENT_DISPLAY_NAMES, getAgentDisplayName, getAgentConfigKey } from "./agent-display-names"
 
 describe("getAgentDisplayName", () => {
   it("returns display name for lowercase config key (new format)", () => {
@@ -42,8 +42,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "Atlas (Plan Execution Orchestrator)"
-    expect(result).toBe("Atlas (Plan Execution Orchestrator)")
+     // then returns "Atlas (Plan Executor)"
+    expect(result).toBe("Atlas (Plan Executor)")
   })
 
   it("returns display name for prometheus", () => {
@@ -86,8 +86,8 @@ describe("getAgentDisplayName", () => {
     // when getAgentDisplayName called
     const result = getAgentDisplayName(configKey)
 
-    // then returns "Momus (Plan Reviewer)"
-    expect(result).toBe("Momus (Plan Reviewer)")
+     // then returns "Momus (Plan Critic)"
+    expect(result).toBe("Momus (Plan Critic)")
   })
 
   it("returns display name for oracle", () => {
@@ -135,16 +135,58 @@ describe("getAgentDisplayName", () => {
   })
 })
 
+describe("getAgentConfigKey", () => {
+  it("resolves display name to config key", () => {
+    // given display name "Sisyphus (Ultraworker)"
+    // when getAgentConfigKey called
+    // then returns "sisyphus"
+    expect(getAgentConfigKey("Sisyphus (Ultraworker)")).toBe("sisyphus")
+  })
+
+  it("resolves display name case-insensitively", () => {
+    // given display name in different case
+    // when getAgentConfigKey called
+    // then returns "atlas"
+    expect(getAgentConfigKey("atlas (plan executor)")).toBe("atlas")
+  })
+
+  it("passes through lowercase config keys unchanged", () => {
+    // given lowercase config key "prometheus"
+    // when getAgentConfigKey called
+    // then returns "prometheus"
+    expect(getAgentConfigKey("prometheus")).toBe("prometheus")
+  })
+
+  it("returns lowercased unknown agents", () => {
+    // given unknown agent name
+    // when getAgentConfigKey called
+    // then returns lowercased
+    expect(getAgentConfigKey("Custom-Agent")).toBe("custom-agent")
+  })
+
+  it("resolves all core agent display names", () => {
+    // given all core display names
+    // when/then each resolves to its config key
+    expect(getAgentConfigKey("Hephaestus (Deep Agent)")).toBe("hephaestus")
+    expect(getAgentConfigKey("Prometheus (Plan Builder)")).toBe("prometheus")
+    expect(getAgentConfigKey("Atlas (Plan Executor)")).toBe("atlas")
+    expect(getAgentConfigKey("Metis (Plan Consultant)")).toBe("metis")
+    expect(getAgentConfigKey("Momus (Plan Critic)")).toBe("momus")
+    expect(getAgentConfigKey("Sisyphus-Junior")).toBe("sisyphus-junior")
+  })
+})
+
 describe("AGENT_DISPLAY_NAMES", () => {
   it("contains all expected agent mappings", () => {
     // given expected mappings
     const expectedMappings = {
       sisyphus: "Sisyphus (Ultraworker)",
-      atlas: "Atlas (Plan Execution Orchestrator)",
+      hephaestus: "Hephaestus (Deep Agent)",
       prometheus: "Prometheus (Plan Builder)",
+      atlas: "Atlas (Plan Executor)",
       "sisyphus-junior": "Sisyphus-Junior",
       metis: "Metis (Plan Consultant)",
-      momus: "Momus (Plan Reviewer)",
+      momus: "Momus (Plan Critic)",
       oracle: "oracle",
       librarian: "librarian",
       explore: "explore",

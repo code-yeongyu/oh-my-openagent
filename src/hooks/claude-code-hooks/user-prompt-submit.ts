@@ -3,8 +3,8 @@ import type {
   PostToolUseOutput,
   ClaudeHooksConfig,
 } from "./types"
-import { findMatchingHooks, executeHookCommand, log } from "../../shared"
-import { DEFAULT_CONFIG } from "./plugin-config"
+import { findMatchingHooks, log } from "../../shared"
+import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
 
 const USER_PROMPT_SUBMIT_TAG_OPEN = "<user-prompt-submit-hook>"
@@ -44,9 +44,16 @@ export async function executeUserPromptSubmitHooks(
     return { block: false, modifiedParts, messages }
   }
 
+  // Check if hook tags are in the current user input only (not in injected context)
+  // by checking only the text parts that were provided in this message
+  const userInputText = ctx.parts
+    .filter((p) => p.type === "text" && p.text)
+    .map((p) => p.text ?? "")
+    .join("\n")
+
   if (
-    ctx.prompt.includes(USER_PROMPT_SUBMIT_TAG_OPEN) &&
-    ctx.prompt.includes(USER_PROMPT_SUBMIT_TAG_CLOSE)
+    userInputText.includes(USER_PROMPT_SUBMIT_TAG_OPEN) &&
+    userInputText.includes(USER_PROMPT_SUBMIT_TAG_CLOSE)
   ) {
     return { block: false, modifiedParts, messages }
   }
@@ -70,21 +77,18 @@ export async function executeUserPromptSubmitHooks(
     hook_source: "opencode-plugin",
   }
 
-  for (const matcher of matchers) {
-    for (const hook of matcher.hooks) {
-      if (hook.type !== "command") continue
+   for (const matcher of matchers) {
+     if (!matcher.hooks || matcher.hooks.length === 0) continue
+     for (const hook of matcher.hooks) {
+       if (hook.type !== "command" && hook.type !== "http") continue
 
-      if (isHookCommandDisabled("UserPromptSubmit", hook.command, extendedConfig ?? null)) {
-        log("UserPromptSubmit hook command skipped (disabled by config)", { command: hook.command })
+      const hookName = getHookIdentifier(hook)
+      if (isHookCommandDisabled("UserPromptSubmit", hookName, extendedConfig ?? null)) {
+        log("UserPromptSubmit hook command skipped (disabled by config)", { command: hookName })
         continue
       }
 
-      const result = await executeHookCommand(
-        hook.command,
-        JSON.stringify(stdinData),
-        ctx.cwd,
-        { forceZsh: DEFAULT_CONFIG.forceZsh, zshPath: DEFAULT_CONFIG.zshPath }
-      )
+      const result = await dispatchHook(hook, JSON.stringify(stdinData), ctx.cwd)
 
       if (result.stdout) {
         const output = result.stdout.trim()

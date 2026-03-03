@@ -31,6 +31,9 @@ export interface GrepOptions {
   noIgnore?: boolean
   fileType?: string[]
   timeout?: number
+  threads?: number
+  outputMode?: "content" | "files_with_matches" | "count"
+  headLimit?: number
 }
 
 export interface CountResult {

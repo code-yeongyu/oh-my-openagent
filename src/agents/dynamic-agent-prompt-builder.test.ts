@@ -1,0 +1,259 @@
+/// <reference types="bun-types" />
+
+import { describe, it, expect } from "bun:test"
+import {
+  buildCategorySkillsDelegationGuide,
+  buildUltraworkSection,
+  buildDeepParallelSection,
+  buildNonClaudePlannerSection,
+  type AvailableSkill,
+  type AvailableCategory,
+  type AvailableAgent,
+} from "./dynamic-agent-prompt-builder"
+
+describe("buildCategorySkillsDelegationGuide", () => {
+  const categories: AvailableCategory[] = [
+    { name: "visual-engineering", description: "Frontend, UI/UX" },
+    { name: "quick", description: "Trivial tasks" },
+  ]
+
+  const builtinSkills: AvailableSkill[] = [
+    { name: "playwright", description: "Browser automation via Playwright", location: "plugin" },
+    { name: "frontend-ui-ux", description: "Designer-turned-developer", location: "plugin" },
+  ]
+
+  const customUserSkills: AvailableSkill[] = [
+    { name: "react-19", description: "React 19 patterns and best practices", location: "user" },
+    { name: "tailwind-4", description: "Tailwind CSS v4 utilities", location: "user" },
+  ]
+
+  const customProjectSkills: AvailableSkill[] = [
+    { name: "our-design-system", description: "Internal design system components", location: "project" },
+  ]
+
+  it("should list builtin and custom skills in compact format", () => {
+    //#given: mix of builtin and custom skills
+    const allSkills = [...builtinSkills, ...customUserSkills]
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, allSkills)
+
+    //#then: should use compact format with both sections
+    expect(result).toContain("**Built-in**: playwright, frontend-ui-ux")
+    expect(result).toContain("YOUR SKILLS (PRIORITY)")
+    expect(result).toContain("react-19 (user)")
+    expect(result).toContain("tailwind-4 (user)")
+  })
+
+  it("should point to skill tool as source of truth", () => {
+    //#given: skills present
+    const allSkills = [...builtinSkills, ...customUserSkills]
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, allSkills)
+
+    //#then: should reference the skill tool for full descriptions
+    expect(result).toContain("`skill` tool")
+  })
+
+  it("should show source tags for custom skills (user vs project)", () => {
+    //#given: both user and project custom skills
+    const allSkills = [...builtinSkills, ...customUserSkills, ...customProjectSkills]
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, allSkills)
+
+    //#then: should show source tag for each custom skill
+    expect(result).toContain("(user)")
+    expect(result).toContain("(project)")
+  })
+
+  it("should not show custom skill section when only builtin skills exist", () => {
+    //#given: only builtin skills
+    const allSkills = [...builtinSkills]
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, allSkills)
+
+    //#then: should not contain custom skill emphasis
+    expect(result).not.toContain("YOUR SKILLS")
+    expect(result).toContain("**Built-in**:")
+    expect(result).toContain("Available Skills")
+  })
+
+  it("should handle only custom skills (no builtins)", () => {
+    //#given: only custom skills, no builtins
+    const allSkills = [...customUserSkills]
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, allSkills)
+
+    //#then: should show custom skills with emphasis, no builtin line
+    expect(result).toContain("YOUR SKILLS (PRIORITY)")
+    expect(result).not.toContain("**Built-in**:")
+  })
+
+  it("should include priority note for custom skills in evaluation step", () => {
+    //#given: custom skills present
+    const allSkills = [...builtinSkills, ...customUserSkills]
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, allSkills)
+
+    //#then: evaluation section should mention user-installed priority
+    expect(result).toContain("User-installed skills get PRIORITY")
+    expect(result).toContain("INCLUDE rather than omit")
+  })
+
+  it("should NOT include priority note when no custom skills", () => {
+    //#given: only builtin skills
+    const allSkills = [...builtinSkills]
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, allSkills)
+
+    //#then: no priority note for custom skills
+    expect(result).not.toContain("User-installed skills get PRIORITY")
+  })
+
+  it("should return empty string when no categories and no skills", () => {
+    //#given: no categories and no skills
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide([], [])
+
+    //#then: should return empty string
+    expect(result).toBe("")
+  })
+
+  it("should include category descriptions", () => {
+    //#given: categories with descriptions
+    const allSkills = [...builtinSkills]
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, allSkills)
+
+    //#then: should list categories with their descriptions
+    expect(result).toContain("`visual-engineering`")
+    expect(result).toContain("Frontend, UI/UX")
+    expect(result).toContain("`quick`")
+    expect(result).toContain("Trivial tasks")
+  })
+})
+
+describe("buildUltraworkSection", () => {
+  const agents: AvailableAgent[] = []
+
+  it("should separate builtin and custom skills", () => {
+    //#given: mix of builtin and custom skills
+    const skills: AvailableSkill[] = [
+      { name: "playwright", description: "Browser automation", location: "plugin" },
+      { name: "react-19", description: "React 19 patterns", location: "user" },
+    ]
+
+    //#when: building ultrawork section
+    const result = buildUltraworkSection(agents, [], skills)
+
+    //#then: should have separate sections
+    expect(result).toContain("Built-in Skills")
+    expect(result).toContain("User-Installed Skills")
+    expect(result).toContain("HIGH PRIORITY")
+  })
+
+  it("should not separate when only builtin skills", () => {
+    //#given: only builtin skills
+    const skills: AvailableSkill[] = [
+      { name: "playwright", description: "Browser automation", location: "plugin" },
+    ]
+
+    //#when: building ultrawork section
+    const result = buildUltraworkSection(agents, [], skills)
+
+    //#then: should have single section
+    expect(result).toContain("Built-in Skills")
+    expect(result).not.toContain("User-Installed Skills")
+  })
+})
+
+describe("buildDeepParallelSection", () => {
+  const deepCategory: AvailableCategory = { name: "deep", description: "Autonomous problem-solving" }
+  const otherCategory: AvailableCategory = { name: "quick", description: "Trivial tasks" }
+
+  it("#given non-Claude model with deep category #when building #then returns parallel delegation section", () => {
+    //#given
+    const model = "google/gemini-3-pro"
+    const categories = [deepCategory, otherCategory]
+
+    //#when
+    const result = buildDeepParallelSection(model, categories)
+
+    //#then
+    expect(result).toContain("Deep Parallel Delegation")
+    expect(result).toContain("EVERY independent unit")
+    expect(result).toContain("run_in_background=true")
+    expect(result).toContain("4 independent units")
+  })
+
+  it("#given Claude model #when building #then returns empty", () => {
+    //#given
+    const model = "anthropic/claude-opus-4-6"
+    const categories = [deepCategory]
+
+    //#when
+    const result = buildDeepParallelSection(model, categories)
+
+    //#then
+    expect(result).toBe("")
+  })
+
+  it("#given non-Claude model without deep category #when building #then returns empty", () => {
+    //#given
+    const model = "openai/gpt-5.2"
+    const categories = [otherCategory]
+
+    //#when
+    const result = buildDeepParallelSection(model, categories)
+
+    //#then
+    expect(result).toBe("")
+  })
+})
+
+describe("buildNonClaudePlannerSection", () => {
+  it("#given non-Claude model #when building #then returns plan agent section", () => {
+    //#given
+    const model = "google/gemini-3-pro"
+
+    //#when
+    const result = buildNonClaudePlannerSection(model)
+
+    //#then
+    expect(result).toContain("Plan Agent")
+    expect(result).toContain("session_id")
+    expect(result).toContain("Multi-step")
+  })
+
+  it("#given Claude model #when building #then returns empty", () => {
+    //#given
+    const model = "anthropic/claude-sonnet-4-6"
+
+    //#when
+    const result = buildNonClaudePlannerSection(model)
+
+    //#then
+    expect(result).toBe("")
+  })
+
+  it("#given GPT model #when building #then returns plan agent section", () => {
+    //#given
+    const model = "openai/gpt-5.2"
+
+    //#when
+    const result = buildNonClaudePlannerSection(model)
+
+    //#then
+    expect(result).toContain("Plan Agent")
+    expect(result).not.toBe("")
+  })
+})
+
+

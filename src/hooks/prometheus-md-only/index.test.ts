@@ -5,22 +5,17 @@ import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { clearSessionAgent } from "../../features/claude-code-session-state"
-
-const TEST_STORAGE_ROOT = join(tmpdir(), `prometheus-md-only-${randomUUID()}`)
-const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
-const TEST_PART_STORAGE = join(TEST_STORAGE_ROOT, "part")
-
-mock.module("../../features/hook-message-injector/constants", () => ({
-  OPENCODE_STORAGE: TEST_STORAGE_ROOT,
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: TEST_PART_STORAGE,
+// Force stable (JSON) mode for tests that rely on message file storage
+mock.module("../../shared/opencode-storage-detection", () => ({
+  isSqliteBackend: () => false,
+  resetSqliteBackendCache: () => {},
 }))
 
 const { createPrometheusMdOnlyHook } = await import("./index")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")
 
 describe("prometheus-md-only", () => {
-  const TEST_SESSION_ID = "test-session-prometheus"
+  const TEST_SESSION_ID = "ses_test_prometheus"
   let testMessageDir: string
 
   function createMockPluginInput() {
@@ -30,11 +25,11 @@ describe("prometheus-md-only", () => {
     } as never
   }
 
-  function setupMessageStorage(sessionID: string, agent: string): void {
+  function setupMessageStorage(sessionID: string, agent: string | undefined): void {
     testMessageDir = join(MESSAGE_STORAGE, sessionID)
     mkdirSync(testMessageDir, { recursive: true })
     const messageContent = {
-      agent,
+      ...(agent ? { agent } : {}),
       model: { providerID: "test", modelID: "test-model" },
     }
     writeFileSync(
@@ -52,7 +47,122 @@ describe("prometheus-md-only", () => {
         // ignore
       }
     }
-    rmSync(TEST_STORAGE_ROOT, { recursive: true, force: true })
+  })
+
+  describe("agent name matching", () => {
+    test("should enforce md-only restriction for exact prometheus agent name", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+
+    test("should enforce md-only restriction for Prometheus display name Plan Builder", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "Prometheus (Plan Builder)")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+
+    test("should enforce md-only restriction for Prometheus display name Planner", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "Prometheus (Planner)")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+
+    test("should enforce md-only restriction for uppercase PROMETHEUS", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "PROMETHEUS")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+
+    test("should not enforce restriction for non-Prometheus agent", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, "sisyphus")
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).resolves.toBeUndefined()
+    })
+
+    test("should not enforce restriction when agent name is undefined", async () => {
+      //#given
+      setupMessageStorage(TEST_SESSION_ID, undefined)
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/file.ts" },
+      }
+
+      //#when //#then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).resolves.toBeUndefined()
+    })
   })
 
    describe("with Prometheus agent in message storage", () => {
@@ -173,7 +283,25 @@ describe("prometheus-md-only", () => {
       ).rejects.toThrow("can only write/edit .md files")
     })
 
-    test("should not affect non-Write/Edit tools", async () => {
+    test("should allow bash commands from Prometheus", async () => {
+      // given
+      const hook = createPrometheusMdOnlyHook(createMockPluginInput())
+      const input = {
+        tool: "bash",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { command: "echo test" },
+      }
+
+      // when / #then
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).resolves.toBeUndefined()
+    })
+
+    test("should not affect non-blocked tools", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
@@ -209,11 +337,11 @@ describe("prometheus-md-only", () => {
       ).resolves.toBeUndefined()
     })
 
-    test("should inject read-only warning when Prometheus calls delegate_task", async () => {
+    test("should inject read-only warning when Prometheus calls task", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
-        tool: "delegate_task",
+        tool: "task",
         sessionID: TEST_SESSION_ID,
         callID: "call-1",
       }
@@ -271,7 +399,7 @@ describe("prometheus-md-only", () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
-        tool: "delegate_task",
+        tool: "task",
         sessionID: TEST_SESSION_ID,
         callID: "call-1",
       }
@@ -312,11 +440,11 @@ describe("prometheus-md-only", () => {
       ).resolves.toBeUndefined()
     })
 
-    test("should not inject warning for non-Prometheus agents calling delegate_task", async () => {
+    test("should not inject warning for non-Prometheus agents calling task", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
-        tool: "delegate_task",
+        tool: "task",
         sessionID: TEST_SESSION_ID,
         callID: "call-1",
       }
@@ -334,13 +462,128 @@ describe("prometheus-md-only", () => {
     })
   })
 
+  describe("boulder state priority over message files (fixes #927)", () => {
+    const BOULDER_DIR = join(tmpdir(), `boulder-test-${randomUUID()}`)
+    const BOULDER_FILE = join(BOULDER_DIR, ".sisyphus", "boulder.json")
+
+    beforeEach(() => {
+      mkdirSync(join(BOULDER_DIR, ".sisyphus"), { recursive: true })
+    })
+
+    afterEach(() => {
+      rmSync(BOULDER_DIR, { recursive: true, force: true })
+    })
+
+    //#given session was started with prometheus (first message), but /start-work set boulder agent to atlas
+    //#when user types "continue" after interruption (memory cleared, falls back to message files)
+    //#then should use boulder state agent (atlas), not message file agent (prometheus)
+    test("should prioritize boulder agent over message file agent", async () => {
+      // given - prometheus in message files (from /plan)
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      
+      // given - atlas in boulder state (from /start-work)
+      writeFileSync(BOULDER_FILE, JSON.stringify({
+        active_plan: "/test/plan.md",
+        started_at: new Date().toISOString(),
+        session_ids: [TEST_SESSION_ID],
+        plan_name: "test-plan",
+        agent: "atlas"
+      }))
+
+      const hook = createPrometheusMdOnlyHook({
+        client: {},
+        directory: BOULDER_DIR,
+      } as never)
+
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/code.ts" },
+      }
+
+      // when / then - should NOT block because boulder says atlas, not prometheus
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).resolves.toBeUndefined()
+    })
+
+    test("should use prometheus from boulder state when set", async () => {
+      // given - atlas in message files (from some other agent)
+      setupMessageStorage(TEST_SESSION_ID, "atlas")
+      
+      // given - prometheus in boulder state (edge case, but should honor it)
+      writeFileSync(BOULDER_FILE, JSON.stringify({
+        active_plan: "/test/plan.md",
+        started_at: new Date().toISOString(),
+        session_ids: [TEST_SESSION_ID],
+        plan_name: "test-plan",
+        agent: "prometheus"
+      }))
+
+      const hook = createPrometheusMdOnlyHook({
+        client: {},
+        directory: BOULDER_DIR,
+      } as never)
+
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/code.ts" },
+      }
+
+      // when / then - should block because boulder says prometheus
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+
+    test("should fall back to message files when session not in boulder", async () => {
+      // given - prometheus in message files
+      setupMessageStorage(TEST_SESSION_ID, "prometheus")
+      
+      // given - boulder state exists but for different session
+      writeFileSync(BOULDER_FILE, JSON.stringify({
+        active_plan: "/test/plan.md",
+        started_at: new Date().toISOString(),
+        session_ids: ["ses_other_session_id"],
+        plan_name: "test-plan",
+        agent: "atlas"
+      }))
+
+      const hook = createPrometheusMdOnlyHook({
+        client: {},
+        directory: BOULDER_DIR,
+      } as never)
+
+      const input = {
+        tool: "Write",
+        sessionID: TEST_SESSION_ID,
+        callID: "call-1",
+      }
+      const output = {
+        args: { filePath: "/path/to/code.ts" },
+      }
+
+      // when / then - should block because falls back to message files (prometheus)
+      await expect(
+        hook["tool.execute.before"](input, output)
+      ).rejects.toThrow("can only write/edit .md files")
+    })
+  })
+
   describe("without message storage", () => {
     test("should handle missing session gracefully (no agent found)", async () => {
       // given
       const hook = createPrometheusMdOnlyHook(createMockPluginInput())
       const input = {
         tool: "Write",
-        sessionID: "non-existent-session",
+        sessionID: "ses_non_existent_session",
         callID: "call-1",
       }
       const output = {

@@ -1,7 +1,34 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
+import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
+import { readContinuationMarker } from "../../features/run-continuation-state"
 import { createStopContinuationGuardHook } from "./index"
 
+type CancelCall = {
+  taskId: string
+  options?: Parameters<BackgroundManager["cancelTask"]>[1]
+}
+
 describe("stop-continuation-guard", () => {
+  const tempDirs: string[] = []
+
+  function createTempDir(): string {
+    const directory = mkdtempSync(join(tmpdir(), "omo-stop-guard-"))
+    tempDirs.push(directory)
+    return directory
+  }
+
+  afterEach(() => {
+    while (tempDirs.length > 0) {
+      const directory = tempDirs.pop()
+      if (directory) {
+        rmSync(directory, { recursive: true, force: true })
+      }
+    }
+  })
+
   function createMockPluginInput() {
     return {
       client: {
@@ -9,13 +36,41 @@ describe("stop-continuation-guard", () => {
           showToast: async () => ({}),
         },
       },
-      directory: "/tmp/test",
-    } as never
+      directory: createTempDir(),
+    } as any
+  }
+
+  function createBackgroundTask(status: BackgroundTask["status"], id: string): BackgroundTask {
+    return {
+      id,
+      status,
+      description: `${id} description`,
+      parentSessionID: "parent-session",
+      parentMessageID: "parent-message",
+      prompt: "prompt",
+      agent: "sisyphus-junior",
+    }
+  }
+
+  function createMockBackgroundManager(tasks: BackgroundTask[], cancelCalls: CancelCall[]): Pick<BackgroundManager, "getAllDescendantTasks" | "cancelTask"> {
+    return {
+      getAllDescendantTasks: () => tasks,
+      cancelTask: async (taskId: string, options?: Parameters<BackgroundManager["cancelTask"]>[1]) => {
+        cancelCalls.push({ taskId, options })
+        return true
+      },
+    }
+  }
+
+  async function flushMicrotasks(): Promise<void> {
+    await Promise.resolve()
+    await Promise.resolve()
   }
 
   test("should mark session as stopped", () => {
     // given - a guard hook with no stopped sessions
-    const guard = createStopContinuationGuardHook(createMockPluginInput())
+    const input = createMockPluginInput()
+    const guard = createStopContinuationGuardHook(input)
     const sessionID = "test-session-1"
 
     // when - we stop continuation for the session
@@ -23,6 +78,9 @@ describe("stop-continuation-guard", () => {
 
     // then - session should be marked as stopped
     expect(guard.isStopped(sessionID)).toBe(true)
+
+    const marker = readContinuationMarker(input.directory, sessionID)
+    expect(marker?.sources.stop?.state).toBe("stopped")
   })
 
   test("should return false for non-stopped sessions", () => {
@@ -140,5 +198,32 @@ describe("stop-continuation-guard", () => {
 
     // then - should not throw and stopped session remains stopped
     expect(guard.isStopped("some-session")).toBe(true)
+  })
+
+  test("should cancel only running and pending background tasks on stop", async () => {
+    // given - a background manager with mixed task statuses
+    const cancelCalls: CancelCall[] = []
+    const backgroundManager = createMockBackgroundManager(
+      [
+        createBackgroundTask("running", "task-running"),
+        createBackgroundTask("pending", "task-pending"),
+        createBackgroundTask("completed", "task-completed"),
+      ],
+      cancelCalls,
+    )
+    const guard = createStopContinuationGuardHook(createMockPluginInput(), {
+      backgroundManager,
+    })
+
+    // when - stop continuation is triggered
+    guard.stop("test-session-bg")
+    await flushMicrotasks()
+
+    // then - only running and pending tasks are cancelled
+    expect(cancelCalls).toHaveLength(2)
+    expect(cancelCalls[0]?.taskId).toBe("task-running")
+    expect(cancelCalls[0]?.options?.abortSession).toBe(true)
+    expect(cancelCalls[1]?.taskId).toBe("task-pending")
+    expect(cancelCalls[1]?.options?.abortSession).toBe(false)
   })
 })

@@ -42,12 +42,10 @@ This will:
 
 # BEHAVIORAL SUMMARY
 
-| Phase | Trigger | Behavior | Draft Action |
-|-------|---------|----------|--------------|
-| **Interview Mode** | Default state | Consult, research, discuss. Run clearance check after each turn. | CREATE & UPDATE continuously |
-| **Auto-Transition** | Clearance check passes OR explicit trigger | Summon Metis (auto) → Generate plan → Present summary → Offer choice | READ draft for context |
-| **Momus Loop** | User chooses "High Accuracy Review" | Loop through Momus until OKAY | REFERENCE draft content |
-| **Handoff** | User chooses "Start Work" (or Momus approved) | Tell user to run \`/start-work\` | DELETE draft file |
+- **Interview Mode**: Default state — Consult, research, discuss. Run clearance check after each turn. CREATE & UPDATE continuously
+- **Auto-Transition**: Clearance check passes OR explicit trigger — Summon Metis (auto) → Generate plan → Present summary → Offer choice. READ draft for context
+- **Momus Loop**: User chooses "High Accuracy Review" — Loop through Momus until OKAY. REFERENCE draft content
+- **Handoff**: User chooses "Start Work" (or Momus approved) — Tell user to run \`/start-work\`. DELETE draft file
 
 ## Key Principles
 
