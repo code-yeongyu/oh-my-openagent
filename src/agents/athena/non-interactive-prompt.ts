@@ -90,6 +90,14 @@ Track every task_id from the response for use in Step 5.
 - cancel_retrying_on_quorum = {CANCEL_RETRYING_ON_QUORUM}
 - Quorum enforcement: minimum 2 successful members required before synthesis.
 
+If retry_on_fail > 0 and failed members exist:
+1. Re-launch failed members via athena_council with the same prompt_file and members parameter set to the failed member names.
+2. Return to Step 5 to wait for their completion via background_wait.
+3. Call council_finalize again to collect retried results.
+4. Continue retrying until retry count exhausted or quorum met.
+- If retry_failed_if_others_finished is true, only retry after all non-failed members have completed.
+- If cancel_retrying_on_quorum is true, stop retrying once quorum (2+ successful) is met.
+
 ### Step 10: Synthesize using council_finalize runtime guidance.
 - Read every member's archive_file with Read tool.
 - Apply the injected <athena_runtime_guidance> from council_finalize.

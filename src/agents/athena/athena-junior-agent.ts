@@ -25,7 +25,7 @@ export const ATHENA_JUNIOR_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createAthenaJuniorAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions(["call_omo_agent", "question"])
+  const restrictions = createAgentToolRestrictions(["call_omo_agent", "question", "switch_agent"])
   return {
     description:
       "Non-interactive council orchestrator for programmatic multi-model synthesis. Returns structured <athena_council_result> JSON without user interaction. (Athena-Junior - OhMyOpenCode)",

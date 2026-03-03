@@ -1,5 +1,6 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { readFile } from "node:fs/promises"
+import { resolve } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CouncilConfig, CouncilMemberConfig } from "../../config/schema/athena"
 import { launchCouncilMember, type CouncilLaunchContext } from "./council-launcher"
@@ -86,9 +87,10 @@ async function waitForSessionIds(
       if (task?.sessionID) {
         result.set(taskId, task.sessionID)
         pending.delete(taskId)
+      } else if (task?.status === "error" || task?.status === "cancelled" || task?.status === "interrupt") {
+        pending.delete(taskId)
       }
     }
-
     if (pending.size > 0) {
       await new Promise((resolve) => setTimeout(resolve, SESSION_WAIT_INTERVAL_MS))
     }
@@ -100,8 +102,9 @@ async function waitForSessionIds(
 export function createAthenaCouncilTool(args: {
   backgroundManager: BackgroundManager
   councilConfig: CouncilConfig | undefined
+  directory: string
 }): ToolDefinition {
-  const { backgroundManager, councilConfig } = args
+  const { backgroundManager, councilConfig, directory } = args
   const description = buildToolDescription(councilConfig)
 
   return tool({
@@ -124,7 +127,12 @@ export function createAthenaCouncilTool(args: {
 
       let promptContent: string
       try {
-        promptContent = await readFile(toolArgs.prompt_file, "utf-8")
+        const resolvedPath = resolve(directory, toolArgs.prompt_file)
+        const expectedPrefix = resolve(directory, ".sisyphus/tmp")
+        if (!resolvedPath.startsWith(expectedPrefix)) {
+          return `Invalid prompt_file path: expected path within .sisyphus/tmp/, got: ${toolArgs.prompt_file}`
+        }
+        promptContent = await readFile(resolvedPath, "utf-8")
       } catch (err) {
         return `Failed to read prompt file: ${toolArgs.prompt_file}. Error: ${String(err)}`
       }

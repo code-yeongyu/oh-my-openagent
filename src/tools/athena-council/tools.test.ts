@@ -17,7 +17,8 @@ import type { BackgroundManager } from "../../features/background-agent"
 import type { CouncilConfig } from "../../config/schema/athena"
 
 const TEST_TMP_DIR = join(tmpdir(), "athena-council-test")
-const PROMPT_FILE = join(TEST_TMP_DIR, "test-prompt.md")
+const SISYPHUS_TMP_DIR = join(TEST_TMP_DIR, ".sisyphus", "tmp")
+const PROMPT_FILE = join(SISYPHUS_TMP_DIR, "test-prompt.md")
 
 const makeManager = (): BackgroundManager =>
   ({
@@ -46,7 +47,7 @@ const makeCouncilConfig = (members?: Array<{ name: string; model: string; varian
 
 describe("createAthenaCouncilTool", () => {
   beforeEach(async () => {
-    await mkdir(TEST_TMP_DIR, { recursive: true })
+    await mkdir(SISYPHUS_TMP_DIR, { recursive: true })
     await writeFile(PROMPT_FILE, "prompt file content", "utf-8")
     mockLaunchCouncilMember.mockImplementation(async (member: { name: string; model: string }) => ({
       member,
@@ -61,7 +62,7 @@ describe("createAthenaCouncilTool", () => {
   describe("#given council is not configured (undefined)", () => {
     describe("#when execute is called", () => {
       it("#then returns error message about council not configured", async () => {
-        const tool = createAthenaCouncilTool({ backgroundManager: makeManager(), councilConfig: undefined })
+        const tool = createAthenaCouncilTool({ backgroundManager: makeManager(), councilConfig: undefined, directory: TEST_TMP_DIR })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
         expect(result).toContain("Council not configured")
       })
@@ -72,7 +73,7 @@ describe("createAthenaCouncilTool", () => {
     describe("#when execute is called", () => {
       it("#then returns error message about council not configured", async () => {
         const config = makeCouncilConfig([])
-        const tool = createAthenaCouncilTool({ backgroundManager: makeManager(), councilConfig: config })
+        const tool = createAthenaCouncilTool({ backgroundManager: makeManager(), councilConfig: config, directory: TEST_TMP_DIR })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
         expect(result).toContain("Council not configured")
       })
@@ -85,10 +86,12 @@ describe("createAthenaCouncilTool", () => {
         const tool = createAthenaCouncilTool({
           backgroundManager: makeManager(),
           councilConfig: makeCouncilConfig(),
+          directory: TEST_TMP_DIR,
         })
-        const result = await tool.execute({ prompt_file: "/nonexistent/prompt.md" }, makeToolContext())
+        const nonExistentFile = join(SISYPHUS_TMP_DIR, "nonexistent.md")
+        const result = await tool.execute({ prompt_file: nonExistentFile }, makeToolContext())
         expect(result).toContain("Failed to read prompt file")
-        expect(result).toContain("/nonexistent/prompt.md")
+        expect(result).toContain("nonexistent.md")
       })
     })
   })
@@ -99,6 +102,7 @@ describe("createAthenaCouncilTool", () => {
         const tool = createAthenaCouncilTool({
           backgroundManager: makeManager(),
           councilConfig: makeCouncilConfig(),
+          directory: TEST_TMP_DIR,
         })
         const result = await tool.execute(
           { prompt_file: PROMPT_FILE, members: ["NonExistentMember"] },
@@ -116,6 +120,7 @@ describe("createAthenaCouncilTool", () => {
         const tool = createAthenaCouncilTool({
           backgroundManager: makeManager(),
           councilConfig: makeCouncilConfig(),
+          directory: TEST_TMP_DIR,
         })
         const result = await tool.execute(
           { prompt_file: PROMPT_FILE, members: ["Claude Opus"] },
@@ -137,6 +142,7 @@ describe("createAthenaCouncilTool", () => {
         const tool = createAthenaCouncilTool({
           backgroundManager: makeManager(),
           councilConfig: makeCouncilConfig(),
+          directory: TEST_TMP_DIR,
         })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
         const jsonMatch = result.match(/\{[\s\S]*\}/)
@@ -151,6 +157,7 @@ describe("createAthenaCouncilTool", () => {
         const tool = createAthenaCouncilTool({
           backgroundManager: makeManager(),
           councilConfig: makeCouncilConfig(),
+          directory: TEST_TMP_DIR,
         })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
         expect(result).toContain("background_wait")
@@ -176,6 +183,7 @@ describe("createAthenaCouncilTool", () => {
         const tool = createAthenaCouncilTool({
           backgroundManager: makeManager(),
           councilConfig: makeCouncilConfig(),
+          directory: TEST_TMP_DIR,
         })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
         const jsonMatch = result.match(/\{[\s\S]*\}/)
@@ -188,6 +196,7 @@ describe("createAthenaCouncilTool", () => {
         const tool = createAthenaCouncilTool({
           backgroundManager: makeManager(),
           councilConfig: makeCouncilConfig(),
+          directory: TEST_TMP_DIR,
         })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
         const jsonMatch = result.match(/\{[\s\S]*\}/)
@@ -211,6 +220,7 @@ describe("createAthenaCouncilTool", () => {
         const tool = createAthenaCouncilTool({
           backgroundManager: makeManager(),
           councilConfig: makeCouncilConfig(),
+          directory: TEST_TMP_DIR,
         })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
         expect(result).toContain("All council member launches failed")
@@ -221,6 +231,7 @@ describe("createAthenaCouncilTool", () => {
         const tool = createAthenaCouncilTool({
           backgroundManager: makeManager(),
           councilConfig: makeCouncilConfig(),
+          directory: TEST_TMP_DIR,
         })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
         expect(result).toContain("Claude Opus")

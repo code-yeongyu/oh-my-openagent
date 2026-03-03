@@ -300,7 +300,7 @@ Athena-Junior is invoked programmatically — it does not use the Question tool.
       // Non-interactive settings (used by athena-junior)
       "non_interactive_mode": "delegation",
       "non_interactive_members": "custom",
-      "non_interactive_member_list": ["Council: Claude", "Council: GPT"]
+      "non_interactive_member_list": ["Claude", "GPT"]
     }
   }
 }

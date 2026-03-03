@@ -58,10 +58,10 @@ export const AgentOverrideConfigSchema = z.object({
 
 export const AthenaOverrideConfigSchema = AgentOverrideConfigSchema.extend({
   council: AthenaConfigSchema.shape.council.optional(),
-  bulk_launch: AthenaConfigSchema.shape.bulk_launch,
-  non_interactive_mode: AthenaConfigSchema.shape.non_interactive_mode,
-  non_interactive_members: AthenaConfigSchema.shape.non_interactive_members,
-  non_interactive_member_list: AthenaConfigSchema.shape.non_interactive_member_list,
+  bulk_launch: AthenaConfigSchema.shape.bulk_launch.optional(),
+  non_interactive_mode: AthenaConfigSchema.shape.non_interactive_mode.optional(),
+  non_interactive_members: AthenaConfigSchema.shape.non_interactive_members.optional(),
+  non_interactive_member_list: AthenaConfigSchema.shape.non_interactive_member_list.optional(),
 })
 
 export const AgentOverridesSchema = z.object({
@@ -83,6 +83,7 @@ export const AgentOverridesSchema = z.object({
   atlas: AgentOverrideConfigSchema.optional(),
   "council-member": AgentOverrideConfigSchema.optional(),
   athena: AthenaOverrideConfigSchema.optional(),
+  "athena-junior": AthenaOverrideConfigSchema.optional(),
 })
 
 export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>

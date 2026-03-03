@@ -16,13 +16,13 @@ export function isAllowedPath(filePath: string, workspaceRoot: string): boolean 
   // 2. Get relative path from workspace root
   const rel = relative(workspaceRoot, resolved)
 
-  // 3. Reject if escapes root (starts with ".." or is absolute)
-  if (rel.startsWith("..") || isAbsolute(rel)) {
+  // 3. Reject if escapes root (traversal or absolute path)
+  if ((rel === ".." || rel.startsWith("../") || rel.startsWith("..\\")) || isAbsolute(rel)) {
     return false
   }
 
-  // 4. Check if .sisyphus/ or .sisyphus\ exists anywhere in the path (case-insensitive)
-  if (!/\.sisyphus[/\\]/i.test(rel)) {
+  // 4. Check if .sisyphus is a complete path segment
+  if (!/(^|[\/\\])\.sisyphus[\/\\]/i.test(rel)) {
     return false
   }
 
