@@ -150,6 +150,7 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.runtimeFallback?.event?.(input));
     await Promise.resolve(hooks.agentUsageReminder?.event?.(input));
     await Promise.resolve(hooks.categorySkillReminder?.event?.(input));
+    await Promise.resolve(hooks.taskReflectionSuggester?.event?.(input));
     await Promise.resolve(hooks.interactiveBashSession?.event?.(input as EventInput));
     await Promise.resolve(hooks.ralphLoop?.event?.(input));
     await Promise.resolve(hooks.stopContinuationGuard?.event?.(input));
