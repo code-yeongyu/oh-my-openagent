@@ -130,6 +130,10 @@ describe("Athena prompt config injection placeholders", () => {
         expect(athenaConfig.prompt).toContain("runtime guidance message injected by council_finalize")
         expect(athenaConfig.prompt).toContain("<athena_runtime_guidance>")
       })
+      it("#then contains BULK_LAUNCH_STEP_5_2 placeholder", () => {
+        expect(athenaConfig.prompt).toContain("{BULK_LAUNCH_STEP_5_2}")
+      })
+
     })
   })
 })

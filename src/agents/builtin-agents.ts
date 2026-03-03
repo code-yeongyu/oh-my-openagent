@@ -80,6 +80,7 @@ export async function createBuiltinAgents(
   useTaskSystem = false,
   councilConfig?: CouncilConfig,
   disableOmoEnv = false,
+  bulkLaunch = false,
   athenaNonInteractiveConfig?: {
     non_interactive_mode?: string
     non_interactive_members?: string
@@ -230,6 +231,26 @@ export async function createBuiltinAgents(
       const memberMaxRunning = councilConfig.member_max_running_seconds ?? COUNCIL_DEFAULTS.MEMBER_MAX_RUNNING_SECONDS
       const resilienceConfig = `\n\n## Council Resilience Config\n- retry_on_fail: ${retryOnFail}\n- retry_failed_if_others_finished: ${retryIfFinished}\n- cancel_retrying_on_quorum: ${cancelOnQuorum}\n- stuck_threshold_seconds: ${stuckThreshold}\n- member_max_running_seconds: ${memberMaxRunning}`
 
+      const step5_2_individual = `## Step 5.2: For each selected member, call the task tool with:
+  - subagent_type: the exact member name from your available council members listed below (e.g., "Council: Claude Opus 4.6")
+  - run_in_background: true
+  - write_output_to_file: true
+  - prompt: "Read <path> for your instructions." (where <path> is the file path from Step 5.1)
+  - load_skills: []
+  - description: the member name (e.g., "Council: Claude Opus 4.6")
+- Launch ALL selected members before collecting any results.
+- Track every returned task_id and member mapping.
+- IMPORTANT: Use EXACTLY the subagent_type names listed in your available council members below — they MUST match precisely.`
+
+      const step5_2_bulk = `## Step 5.2: Call athena_council to launch ALL members at once:
+- prompt_file: the path returned from Step 5.1
+- members: the resolved member names from Step 4 (omit to launch all configured members)
+
+athena_council launches all members in parallel and returns JSON with task IDs.
+Track every task_id from the response for use in Step 6.`
+
+      const step5_2Content = bulkLaunch ? step5_2_bulk : step5_2_individual
+
       if (result["athena"]) {
         let athenaPrompt = (result["athena"].prompt ?? "") + councilTaskInstructions
         athenaPrompt = athenaPrompt
@@ -239,6 +260,7 @@ export async function createBuiltinAgents(
           .replace(/\{STUCK_THRESHOLD_SECONDS\}/g, String(stuckThreshold))
           .replace(/\{MEMBER_MAX_RUNNING_SECONDS\}/g, String(memberMaxRunning))
           .replace(/\{BACKGROUND_WAIT_TIMEOUT_MS\}/g, String(COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS))
+          .replace(/\{BULK_LAUNCH_STEP_5_2\}/g, step5_2Content)
         athenaPrompt += resilienceConfig
         result["athena"] = { ...result["athena"], prompt: athenaPrompt }
       }

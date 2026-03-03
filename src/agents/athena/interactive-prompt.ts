@@ -149,16 +149,7 @@ Bake the classified intent into your prepare_council_prompt call (Step 5.1).
 
 ## Step 5.1: Call prepare_council_prompt with the user's original question as the prompt parameter, the selected analysis mode, and the classified intent. This saves it to a temp file and returns the file path. Example: prepare_council_prompt({ prompt: "...", mode: "solo", intent: "EVALUATE" })
 
-## Step 5.2: For each selected member, call the task tool with:
-  - subagent_type: the exact member name from your available council members listed below (e.g., "Council: Claude Opus 4.6")
-  - run_in_background: true
-  - write_output_to_file: true
-  - prompt: "Read <path> for your instructions." (where <path> is the file path from Step 5.1)
-  - load_skills: []
-  - description: the member name (e.g., "Council: Claude Opus 4.6")
-- Launch ALL selected members before collecting any results.
-- Track every returned task_id and member mapping.
-- IMPORTANT: Use EXACTLY the subagent_type names listed in your available council members below — they MUST match precisely.
+{BULK_LAUNCH_STEP_5_2}
 
 ### Step 6: Track progress with background_wait (metadata only):
 - After launching all members, call background_wait(task_ids=[...all task IDs...], timeout=${COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS}).

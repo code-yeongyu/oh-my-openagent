@@ -100,6 +100,7 @@ export async function applyAgentConfig(params: {
     useTaskSystem,
     athenaCouncilConfig,
     disableOmoEnv,
+    athenaConfig?.bulk_launch ?? false,
     athenaNonInteractiveConfig,
   );
 

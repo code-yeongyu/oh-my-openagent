@@ -693,3 +693,75 @@ describe("AthenaConfigSchema — non-interactive fields", () => {
     })
   })
 })
+
+describe("AthenaConfigSchema — bulk_launch field", () => {
+  const validCouncil = {
+    members: [
+      { model: "openai/gpt-5.3-codex", name: "council-opus" },
+      { model: "anthropic/claude-opus-4-6", name: "council-gpt" },
+    ],
+  }
+
+  describe("#given bulk_launch field", () => {
+    describe("#when parsed with true", () => {
+      it("#then accepts the value", () => {
+        //#given
+        const config = { council: validCouncil, bulk_launch: true }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.bulk_launch).toBe(true)
+        }
+      })
+    })
+
+    describe("#when parsed with false", () => {
+      it("#then accepts the value", () => {
+        //#given
+        const config = { council: validCouncil, bulk_launch: false }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.bulk_launch).toBe(false)
+        }
+      })
+    })
+
+    describe("#when parsed without bulk_launch", () => {
+      it("#then defaults to false", () => {
+        //#given
+        const config = { council: validCouncil }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.bulk_launch).toBe(false)
+        }
+      })
+    })
+
+    describe("#when parsed with a non-boolean value", () => {
+      it("#then rejects the value", () => {
+        //#given
+        const config = { council: validCouncil, bulk_launch: "yes" }
+
+        //#when
+        const result = AthenaConfigSchema.safeParse(config)
+
+        //#then
+        expect(result.success).toBe(false)
+      })
+    })
+  })
+})

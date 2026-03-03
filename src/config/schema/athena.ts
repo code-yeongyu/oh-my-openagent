@@ -34,6 +34,7 @@ export type CouncilConfig = z.infer<typeof CouncilConfigSchema>
 
 export const AthenaConfigSchema = z.object({
   council: CouncilConfigSchema,
+  bulk_launch: z.boolean().default(false).optional(),
   non_interactive_mode: z.enum(["delegation", "solo"]).default("delegation").optional(),
   non_interactive_members: z.enum(["all", "custom"]).default("all").optional(),
   non_interactive_member_list: z.array(z.string()).optional(),
