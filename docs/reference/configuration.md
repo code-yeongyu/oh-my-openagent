@@ -13,6 +13,15 @@ Complete reference for `oh-my-opencode.jsonc` configuration. This document cover
   - [Agents](#agents)
   - [Categories](#categories)
   - [Model Resolution](#model-resolution)
+- [Athena Council](#athena-council)
+  - [Council Members](#council-members)
+  - [Council Resilience](#council-resilience)
+  - [Launch Strategy](#launch-strategy)
+  - [Non-Interactive Mode](#non-interactive-mode-athena-junior)
+  - [Council Tools](#council-tools)
+  - [Council Archives](#council-archives)
+  - [Background Behavior](#background-behavior)
+  - [Council-Member Agent](#council-member-agent)
 - [Task System](#task-system)
   - [Background Tasks](#background-tasks)
   - [Sisyphus Agent](#sisyphus-agent)
@@ -128,7 +137,7 @@ Here's a practical starting configuration:
 
 ### Agents
 
-Override built-in agent settings. Available agents: `sisyphus`, `hephaestus`, `prometheus`, `athena-junior`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`.
+Override built-in agent settings. Available agents: `sisyphus`, `hephaestus`, `prometheus`, `athena`, `athena-junior`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`, `council-member`.
 
 ```json
 {
@@ -192,7 +201,13 @@ You can also override settings for `Sisyphus` (the main orchestrator) and `build
 
 ## Athena Council
 
-Athena requires at least 2 council members. Each member runs an independent analysis of the same question, then Athena synthesizes the results by agreement level.
+Athena is a multi-model council orchestrator. It launches multiple AI models to independently analyze the same question, then synthesizes their responses by agreement level. Requires at least 2 council members.
+
+There are two variants:
+- **Athena** (primary agent) — Interactive. Asks the user to confirm member selection, analysis mode, and intent before launching.
+- **Athena-Junior** (subagent) — Non-interactive. Invoked programmatically via `task(subagent_type="athena-junior")` or CLI `oh-my-opencode run`. Returns structured `<athena_council_result>` JSON.
+
+### Council Members
 
 ```jsonc
 {
@@ -213,18 +228,64 @@ Athena requires at least 2 council members. Each member runs an independent anal
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `model` | Yes | Provider/model ID (for example, `openai/gpt-5.2`) |
-| `name` | Yes | Display name for the council member (must be unique) |
+| `model` | Yes | Provider/model ID (e.g., `openai/gpt-5.2`) |
+| `name` | Yes | Display name (must be unique, alphanumeric + spaces/hyphens/dots) |
 | `variant` | No | Model variant override |
-| `temperature` | No | Temperature override (0-2) |
+| `temperature` | No | Temperature override (0–2) |
 
-Minimum 2 members are required. The installer (`bunx oh-my-opencode install`) auto-configures council members based on your available providers.
+Minimum 2 members required. The installer (`bunx oh-my-opencode install`) auto-configures council members based on your available providers.
 
-#### Non-Interactive Council (Athena-Junior)
+### Council Resilience
 
-Athena-Junior is the non-interactive variant of Athena, used for programmatic council invocation via `call_omo_agent` or CLI `oh-my-opencode run`. It returns structured `<athena_council_result>` JSON without user interaction (no Question tool).
+Control retry behavior, stuck detection, and member timeouts:
 
-Configure non-interactive behavior under `agents.athena`:
+```jsonc
+{
+  "agents": {
+    "athena": {
+      "council": {
+        "members": [/* ... */],
+        "retry_on_fail": 1,
+        "retry_failed_if_others_finished": true,
+        "cancel_retrying_on_quorum": true,
+        "stuck_threshold_seconds": 120,
+        "member_max_running_seconds": 1800
+      }
+    }
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `retry_on_fail` | number | `0` | Retry attempts per failed member (0–5) |
+| `retry_failed_if_others_finished` | boolean | `false` | Retry failed members only after others complete |
+| `cancel_retrying_on_quorum` | boolean | `true` | Stop retrying once enough members succeed (quorum = 2) |
+| `stuck_threshold_seconds` | number | `120` | Seconds of inactivity before a member is considered stuck |
+| `member_max_running_seconds` | number | `1800` | Hard timeout per member (30 minutes default) |
+
+### Launch Strategy
+
+By default, Athena launches council members one-by-one via `task()` calls, which makes each member visible as a separate task in the TUI. Set `bulk_launch` to launch all members at once via the `athena_council` tool instead:
+
+```jsonc
+{
+  "agents": {
+    "athena": {
+      "bulk_launch": true,
+      "council": { "members": [/* ... */] }
+    }
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `bulk_launch` | boolean | `false` | `false` = launch members one-by-one via `task()` (TUI-inspectable). `true` = launch all at once via `athena_council` tool. |
+
+### Non-Interactive Mode (Athena-Junior)
+
+Athena-Junior is invoked programmatically — it does not use the Question tool. Configure its behavior under `agents.athena`:
 
 ```jsonc
 {
@@ -247,11 +308,64 @@ Configure non-interactive behavior under `agents.athena`:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `non_interactive_mode` | `"delegation"` \| `"solo"` | `"delegation"` | How council members analyze in non-interactive mode. `delegation` = members delegate to subagents (faster), `solo` = members explore themselves (more thorough). |
-| `non_interactive_members` | `"all"` \| `"custom"` | `"all"` | Which members to use. `all` = use all configured council members, `custom` = use only those in `non_interactive_member_list`. |
-| `non_interactive_member_list` | string[] | - | Specific member names when `non_interactive_members` is `"custom"`. Must match names from `council.members`. |
+| `non_interactive_mode` | `"delegation"` \| `"solo"` | `"delegation"` | How council members analyze. `delegation` = members delegate to explore/librarian subagents (faster). `solo` = members explore the codebase themselves (more thorough). |
+| `non_interactive_members` | `"all"` \| `"custom"` | `"all"` | Which members to use. `all` = all configured members. `custom` = only those in `non_interactive_member_list`. |
+| `non_interactive_member_list` | string[] | — | Member names when `non_interactive_members` is `"custom"`. Must match names from `council.members`. |
 
 These settings are injected into Athena-Junior's prompt at runtime. The interactive Athena agent asks users these questions via the Question tool instead.
+
+#### Invoking Athena-Junior
+
+From another agent (e.g., Sisyphus):
+```
+task(subagent_type="athena-junior", load_skills=[], description="...", prompt="...", run_in_background=true)
+```
+
+From CLI:
+```bash
+bunx oh-my-opencode run --agent athena-junior --prompt "Analyze the auth module"
+```
+
+### Council Tools
+
+Three specialized tools power the council workflow. They are **globally denied** to all agents except Athena and Athena-Junior:
+
+| Tool | Purpose |
+|------|---------|
+| `prepare_council_prompt` | Saves the analysis prompt to a temp file for efficient sharing across members |
+| `athena_council` | Launches all council members in parallel as background tasks |
+| `council_finalize` | Extracts `<COUNCIL_MEMBER_RESPONSE>` content from each member, creates archives, injects synthesis guidance |
+
+No configuration needed — permissions are enforced automatically.
+
+### Council Archives
+
+After synthesis, council results are archived to `.sisyphus/athena/council-{name}-{id}/` with:
+- Individual member response files
+- `meta.yaml` with session metadata (members, models, timestamps)
+
+### Background Behavior
+
+Athena-Junior is always executed as a background task, regardless of the caller's `run_in_background` setting. This prevents the 10-minute sync poll timeout from killing long council sessions.
+
+Additionally, Athena-Junior is exempt from the standard 30-minute background task TTL (`TASK_TTL_MS`). Council members are independent background tasks with their own TTLs, so the orchestrator needs to outlive them.
+
+### Council-Member Agent
+
+Council members are dynamically registered as agents named `"Council: {name}"` (e.g., `"Council: Claude"`). Override council-member defaults under `agents.council-member`:
+
+```jsonc
+{
+  "agents": {
+    "council-member": {
+      "temperature": 0.3,
+      "prompt_append": "Focus on security implications."
+    }
+  }
+}
+```
+
+Council members have a restricted tool allowlist: `read`, `grep`, `glob`, `lsp_*`, `ast_grep_search`, `call_omo_agent`, `background_output`, `background_wait`, and `background_cancel`. In delegation mode, members use `call_omo_agent` to delegate searches to explore/librarian. In solo mode, delegation is restricted via prompt instruction. They cannot write or edit files.
 
 ### Permission Options
 
