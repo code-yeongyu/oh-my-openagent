@@ -3,12 +3,13 @@ import type { HookName, OhMyOpenCodeConfig } from "../../config"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { PluginContext } from "../types"
 
-import { createAutoSlashCommandHook, createCategorySkillReminderHook } from "../../hooks"
+import { createAutoSlashCommandHook, createCategorySkillReminderHook, createSkillUsageTrackerHook } from "../../hooks"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 
 export type SkillHooks = {
   categorySkillReminder: ReturnType<typeof createCategorySkillReminderHook> | null
   autoSlashCommand: ReturnType<typeof createAutoSlashCommandHook> | null
+  skillUsageTracker: ReturnType<typeof createSkillUsageTrackerHook> | null
 }
 
 export function createSkillHooks(args: {
@@ -45,5 +46,10 @@ export function createSkillHooks(args: {
         }))
     : null
 
-  return { categorySkillReminder, autoSlashCommand }
+  const skillUsageTracker = isHookEnabled("skill-usage-tracker")
+    ? safeHook("skill-usage-tracker", () =>
+        createSkillUsageTrackerHook(mergedSkills))
+    : null
+
+  return { categorySkillReminder, autoSlashCommand, skillUsageTracker }
 }
