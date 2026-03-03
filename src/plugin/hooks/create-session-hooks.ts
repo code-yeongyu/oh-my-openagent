@@ -274,7 +274,9 @@ export function createSessionHooks(args: {
     return safeHook("ttsr", () => {
       const abortRetryHandler = createAbortRetryHandler({
         abort: async (sessionID) => {
-          await ctx.client.session.abort({ path: { id: sessionID } }).catch(() => {})
+          await ctx.client.session.abort({ path: { id: sessionID } }).catch((err) => {
+            log("[ttsr] Failed to abort session", { sessionID, error: String(err) })
+          })
         },
         promptAsync: async (sessionID, content) => {
           await ctx.client.session
@@ -283,7 +285,9 @@ export function createSessionHooks(args: {
               body: { parts: [{ type: "text", text: content }] },
               query: { directory: ctx.directory },
             })
-            .catch(() => {})
+            .catch((err) => {
+              log("[ttsr] Failed to send interrupt prompt", { sessionID, error: String(err) })
+            })
         },
       })
       const rules: import("../../features/ttsr/types").TtsrRule[] = []
@@ -291,13 +295,15 @@ export function createSessionHooks(args: {
       discoverTtsrRules(ctx.directory).then((discovered) => {
         rules.push(...discovered)
         hookInstance?.addRulesToExistingManagers(discovered)
-      }).catch(() => {})
+      }).catch((err) => {
+        log("[ttsr] Failed to discover TTSR rules", { error: String(err) })
+      })
       const settings: import("../../features/ttsr/types").TtsrSettings = {
         enabled: ttsrConfig.enabled ?? true,
         contextMode: ttsrConfig.contextMode ?? "discard",
-        interruptMode: ttsrConfig.interruptMode ?? "abort-retry",
+        interruptMode: ttsrConfig.interruptMode ?? "always",
         repeatMode: ttsrConfig.repeatMode ?? "once",
-        repeatGap: ttsrConfig.repeatGap ?? 3,
+        repeatGap: ttsrConfig.repeatGap ?? 10,
         maxRetriesPerRule: ttsrConfig.maxRetriesPerRule ?? 3,
       }
       const hook = createTtsrHook({

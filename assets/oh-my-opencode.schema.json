@@ -3854,6 +3854,62 @@
       ],
       "additionalProperties": false
     },
+    "ttsr": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "contextMode": {
+          "default": "discard",
+          "type": "string",
+          "enum": [
+            "discard",
+            "keep"
+          ]
+        },
+        "interruptMode": {
+          "default": "always",
+          "type": "string",
+          "enum": [
+            "always",
+            "prose-only",
+            "tool-only",
+            "never"
+          ]
+        },
+        "repeatMode": {
+          "default": "once",
+          "type": "string",
+          "enum": [
+            "once",
+            "after-gap"
+          ]
+        },
+        "repeatGap": {
+          "default": 10,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "maxRetriesPerRule": {
+          "default": 3,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "enabled",
+        "contextMode",
+        "interruptMode",
+        "repeatMode",
+        "repeatGap",
+        "maxRetriesPerRule"
+      ],
+      "additionalProperties": false
+    },
     "_migrations": {
       "type": "array",
       "items": {
