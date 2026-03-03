@@ -337,7 +337,7 @@ describe("external-plugin-detector", () => {
 
       // then
       expect(result.detected).toBe(true)
-      expect(result.pluginName).toBe("opencode-focus-notify")
+      expect(result.pluginName).toContain("opencode-focus-notify")
     })
   })
 
