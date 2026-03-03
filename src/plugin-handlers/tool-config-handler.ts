@@ -28,6 +28,7 @@ export function applyToolConfig(params: {
     teammate: false,
     prepare_council_prompt: false,
     council_finalize: false,
+    athena_council: false,
     ...(params.pluginConfig.experimental?.task_system
       ? { todowrite: false, todoread: false }
       : {}),
@@ -117,9 +118,9 @@ export function applyToolConfig(params: {
   if (athenaJunior) {
     athenaJunior.permission = {
       ...athenaJunior.permission,
-      task: "allow",
       prepare_council_prompt: "allow",
       council_finalize: "allow",
+      athena_council: "allow",
       question: "deny",
     };
   }

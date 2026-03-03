@@ -20,8 +20,8 @@ background_wait_timeout_ms: {BACKGROUND_WAIT_TIMEOUT_MS}
 </runtime_config>
 
 <registered_council_members>
-Council members are listed at the end of this prompt after config injection.
-Use EXACTLY the subagent_type names listed there.
+Council members are listed in the athena_council tool description.
+Use member names from there when filtering with the members parameter.
 </registered_council_members>
 
 <workflow>
@@ -55,14 +55,12 @@ Precedence for ambiguous cases: DIAGNOSE > AUDIT > PLAN > EVALUATE > EXPLAIN > C
 - mode: from Step 2
 - intent: from Step 3
 
-#### Step 4.2: For each resolved member, call the task tool with:
-- subagent_type: the exact member name from registered council members
-- run_in_background: true
-- write_output_to_file: true
-- prompt: "Read <path> for your instructions." (path from Step 4.1)
-- load_skills: []
-- description: the member name
-Launch ALL members before collecting results. Track every task_id.
+#### Step 4.2: Call athena_council to launch ALL members at once:
+- prompt_file: the path returned from Step 4.1
+- members: the resolved member names from Step 1 (omit to launch all configured members)
+
+athena_council launches all members in parallel and returns JSON with task IDs.
+Track every task_id from the response for use in Step 5.
 
 ### Step 5: Track progress with background_wait.
 - Call background_wait(task_ids=[...all task IDs...], timeout={BACKGROUND_WAIT_TIMEOUT_MS}).
@@ -134,11 +132,13 @@ After synthesis, you MUST output EXACTLY this structured format:
 }
 </athena_council_result>
 
+IMPORTANT: </athena_council_result> is your FINAL output. Do NOT output anything after this tag.
+No commentary, no summary, no follow-up text. The closing tag IS the end of your response.
+
 Status values:
 - "complete": Quorum met, synthesis performed
 - "partial": Some members failed but quorum met
 - "failed": Quorum not met (<2 successful members)
-</output_contract>
 
 <constraints>
 - NEVER use the Question tool — it is unavailable in non-interactive mode.
@@ -148,6 +148,6 @@ Status values:
 - ALWAYS auto-select analysis mode from config (Step 2).
 - ALWAYS return the <athena_council_result> structured output.
 - Use background_wait for progress tracking and council_finalize for result collection.
-- Preserve confidence caveats (especially single-member claims) in synthesis.
+- After outputting </athena_council_result>, STOP IMMEDIATELY. No text after the closing tag.
 </constraints>
 `

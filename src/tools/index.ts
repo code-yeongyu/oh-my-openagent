@@ -48,6 +48,7 @@ export {
 export { createHashlineEditTool } from "./hashline-edit"
 export { createPrepareCouncilPromptTool } from "./prepare-council-prompt"
 export { createCouncilFinalize } from "./council-archive"
+export { createAthenaCouncilTool } from "./athena-council"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager

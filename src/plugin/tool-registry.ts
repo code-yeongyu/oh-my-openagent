@@ -27,6 +27,7 @@ import {
   createTaskUpdateTool,
   createHashlineEditTool,
   createPrepareCouncilPromptTool,
+  createAthenaCouncilTool,
 } from "../tools"
 import { createCouncilFinalize } from "../tools/council-archive"
 import { getMainSessionID } from "../features/claude-code-session-state"
@@ -142,6 +143,10 @@ export function createToolRegistry(args: {
     ...hashlineToolsRecord,
     prepare_council_prompt: createPrepareCouncilPromptTool(ctx.directory),
     council_finalize: createCouncilFinalize(ctx.directory),
+    athena_council: createAthenaCouncilTool({
+      backgroundManager: managers.backgroundManager,
+      councilConfig: pluginConfig.agents?.athena?.council,
+    }),
   }
 
   const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)
