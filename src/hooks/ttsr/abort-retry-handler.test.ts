@@ -64,6 +64,25 @@ describe("createAbortRetryHandler", () => {
       })
     })
 
+    describe("#when handleMatches is called twice and maxRetriesPerRule is one", () => {
+      describe("#then second retry is skipped", () => {
+        it("calls abort and promptAsync only once", async () => {
+          const { handler, abort, promptAsync } = createHandler()
+          const matchedRules = [createRule()]
+          const retryLimitedSettings: TtsrSettings = {
+            ...settings,
+            maxRetriesPerRule: 1,
+          }
+
+          await handler.handleMatches("ses_123", matchedRules, retryLimitedSettings)
+          await handler.handleMatches("ses_123", matchedRules, retryLimitedSettings)
+
+          expect(abort).toHaveBeenCalledTimes(1)
+          expect(promptAsync).toHaveBeenCalledTimes(1)
+        })
+      })
+    })
+
     describe("#when handleMatches completes", () => {
       describe("#then getPendingInjection returns stored interrupt content", () => {
         it("returns the pending injection string for the session", async () => {
@@ -93,18 +112,15 @@ describe("createAbortRetryHandler", () => {
     })
 
     describe("#when handleMatches is called with empty rules", () => {
-      describe("#then abort and promptAsync are still called", () => {
-        it("calls promptAsync with empty rendered content", async () => {
+      describe("#then abort and promptAsync are skipped", () => {
+        it("does not call abort or promptAsync", async () => {
           const { handler, abort, promptAsync, callOrder } = createHandler()
-          const expectedInterrupt = renderMultipleInterrupts([])
 
           await handler.handleMatches("ses_123", [], settings)
 
-          expect(callOrder).toEqual(["abort", "prompt"])
-          expect(abort).toHaveBeenCalledTimes(1)
-          expect(promptAsync).toHaveBeenCalledTimes(1)
-          expect(promptAsync.mock.calls[0]).toEqual(["ses_123", expectedInterrupt])
-          expect(expectedInterrupt).toBe("")
+          expect(callOrder).toEqual([])
+          expect(abort).not.toHaveBeenCalled()
+          expect(promptAsync).not.toHaveBeenCalled()
         })
       })
     })

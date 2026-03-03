@@ -6,6 +6,7 @@ export interface AbortRetryHandler {
   handleMatches(sessionID: string, matchedRules: TtsrRule[], settings: TtsrSettings): Promise<void>
   getPendingInjection(sessionID: string): string | undefined
   clearPendingInjection(sessionID: string): void
+  clearRetryCounts(sessionID: string): void
 }
 
 export interface AbortRetryHandlerDeps {
@@ -15,6 +16,7 @@ export interface AbortRetryHandlerDeps {
 
 export function createAbortRetryHandler(deps: AbortRetryHandlerDeps): AbortRetryHandler {
   const pendingInjections = new Map<string, string>()
+  const retryCounts = new Map<string, Map<string, number>>()
 
   const setPendingInjection = (sessionID: string, content: string): void => {
     pendingInjections.set(sessionID, content)
@@ -25,13 +27,36 @@ export function createAbortRetryHandler(deps: AbortRetryHandlerDeps): AbortRetry
     matchedRules: TtsrRule[],
     settings: TtsrSettings,
   ): Promise<void> => {
-    void settings
-    const interruptContent = renderMultipleInterrupts(matchedRules)
+    const maxRetries = settings.maxRetriesPerRule ?? 3
+    const sessionRetryCounts = retryCounts.get(sessionID) ?? new Map<string, number>()
+    retryCounts.set(sessionID, sessionRetryCounts)
+
+    const eligibleRules = matchedRules.filter((rule) => {
+      const currentRetryCount = sessionRetryCounts.get(rule.name) ?? 0
+      return currentRetryCount < maxRetries
+    })
+
+    if (eligibleRules.length === 0) {
+      log("[ttsr] abort-retry skipped: max retries reached", {
+        sessionID,
+        rules: matchedRules.map((rule) => rule.name),
+        maxRetries,
+      })
+      return
+    }
+
+    for (const rule of eligibleRules) {
+      const currentRetryCount = sessionRetryCounts.get(rule.name) ?? 0
+      sessionRetryCounts.set(rule.name, currentRetryCount + 1)
+    }
+
+    const interruptContent = renderMultipleInterrupts(eligibleRules)
     setPendingInjection(sessionID, interruptContent)
 
     log("[ttsr] abort-retry triggered", {
       sessionID,
-      rules: matchedRules.map((rule) => rule.name),
+      rules: eligibleRules.map((rule) => rule.name),
+      maxRetries,
     })
 
     await deps.abort(sessionID)
@@ -46,9 +71,14 @@ export function createAbortRetryHandler(deps: AbortRetryHandlerDeps): AbortRetry
     pendingInjections.delete(sessionID)
   }
 
+  const clearRetryCounts = (sessionID: string): void => {
+    retryCounts.delete(sessionID)
+  }
+
   return {
     handleMatches,
     getPendingInjection,
     clearPendingInjection,
+    clearRetryCounts,
   }
 }

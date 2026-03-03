@@ -287,8 +287,10 @@ export function createSessionHooks(args: {
         },
       })
       const rules: import("../../features/ttsr/types").TtsrRule[] = []
+      let hookInstance: import("../../hooks").TtsrHook | null = null
       discoverTtsrRules(ctx.directory).then((discovered) => {
         rules.push(...discovered)
+        hookInstance?.addRulesToExistingManagers(discovered)
       }).catch(() => {})
       const settings: import("../../features/ttsr/types").TtsrSettings = {
         enabled: ttsrConfig.enabled ?? true,
@@ -298,13 +300,19 @@ export function createSessionHooks(args: {
         repeatGap: ttsrConfig.repeatGap ?? 3,
         maxRetriesPerRule: ttsrConfig.maxRetriesPerRule ?? 3,
       }
-      return createTtsrHook({
+      const hook = createTtsrHook({
         settings,
         rules,
         onMatch: async (sessionID, matchedRules) => {
           await abortRetryHandler.handleMatches(sessionID, matchedRules, settings)
+          const manager = hookInstance?.getManager(sessionID)
+          if (manager) {
+            manager.markInjected(matchedRules.map((r) => r.name))
+          }
         },
       })
+      hookInstance = hook
+      return hook
     })
   })()
   return {

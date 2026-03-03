@@ -11,6 +11,7 @@ export interface TtsrHookDeps {
 export interface TtsrHook {
   handleEvent(event: { type: string }, props: Record<string, unknown>): Promise<void>
   getManager(sessionID: string): TtsrManager | undefined
+  addRulesToExistingManagers(rules: TtsrRule[]): void
 }
 
 export function createTtsrHook(deps: TtsrHookDeps): TtsrHook {
@@ -123,5 +124,12 @@ export function createTtsrHook(deps: TtsrHookDeps): TtsrHook {
   return {
     handleEvent,
     getManager: (sessionID) => managers.get(sessionID),
+    addRulesToExistingManagers: (newRules) => {
+      for (const manager of managers.values()) {
+        for (const rule of newRules) {
+          manager.addRule(rule)
+        }
+      }
+    },
   }
 }

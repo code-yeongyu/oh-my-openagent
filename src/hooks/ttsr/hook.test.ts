@@ -209,4 +209,37 @@ describe("createTtsrHook", () => {
       })
     })
   })
+
+  describe("#given TtsrHook with no initial rules", () => {
+    describe("#when rules are added to existing managers", () => {
+      describe("#then dynamically added rules can trigger onMatch", () => {
+        it("calls onMatch for text matching the newly added rule", async () => {
+          const onMatch = mock((_sessionID: string, _matchedRules: TtsrRule[]) => Promise.resolve())
+          const hook = createTtsrHook({
+            settings,
+            rules: [],
+            onMatch,
+          })
+
+          await hook.handleEvent({ type: "session.created" }, { info: { id: "ses_123" } })
+          hook.addRulesToExistingManagers([
+            createRule({ name: "added-rule", condition: ["late-pattern"] }),
+          ])
+
+          await hook.handleEvent(
+            { type: "message.part.updated" },
+            {
+              info: {
+                sessionID: "ses_123",
+                role: "assistant",
+                part: { id: "part_1", type: "text", text: "late-pattern" },
+              },
+            }
+          )
+
+          expect(onMatch).toHaveBeenCalledTimes(1)
+        })
+      })
+    })
+  })
 })
