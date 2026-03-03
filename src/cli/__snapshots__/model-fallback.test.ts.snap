@@ -458,7 +458,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
             "name": "GPT 5.3 Codex",
           },
           {
-            "model": "google/gemini-3-pro-preview",
+            "model": "google/gemini-3-pro",
             "name": "Gemini Pro 3",
           },
         ],
@@ -550,7 +550,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
             "name": "GPT 5.3 Codex",
           },
           {
-            "model": "google/gemini-3-pro-preview",
+            "model": "google/gemini-3-pro",
             "name": "Gemini Pro 3",
           },
         ],
@@ -1240,7 +1240,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
             "name": "Claude Opus 4.6",
           },
           {
-            "model": "google/gemini-3-pro-preview",
+            "model": "google/gemini-3-pro",
             "name": "Gemini Pro 3",
           },
         ],
@@ -1398,7 +1398,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
             "name": "GPT 5.3 Codex",
           },
           {
-            "model": "google/gemini-3-pro-preview",
+            "model": "google/gemini-3-pro",
             "name": "Gemini Pro 3",
           },
         ],
@@ -1490,7 +1490,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
             "name": "GPT 5.3 Codex",
           },
           {
-            "model": "google/gemini-3-pro-preview",
+            "model": "google/gemini-3-pro",
             "name": "Gemini Pro 3",
           },
         ],

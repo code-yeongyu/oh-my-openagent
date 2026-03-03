@@ -49,21 +49,23 @@ call_omo_agent(subagent_type="explore", run_in_background=true, description="Fin
 call_omo_agent(subagent_type="explore", run_in_background=true, description="Find error handling", prompt="Find: custom Error classes, error response format, try/catch patterns. Skip tests.")
 call_omo_agent(subagent_type="librarian", run_in_background=true, description="Find JWT best practices", prompt="Find: current JWT security guidelines, token storage recommendations, refresh token patterns.")
 
-// IMPORTANT: Use background_wait to block until results arrive — do NOT just stop and wait for notifications
+// IMPORTANT: background_wait returns when ANY task completes, not all — loop until done
 background_wait(task_ids=["<id1>", "<id2>", "<id3>"])
+// Check remaining_task_ids — call again if non-empty:
+background_wait(task_ids=result.remaining_task_ids)
 
-// Then collect each result
+// Collect results after each background_wait returns completed tasks
 background_output(task_id="<id>")
 \`\`\`
 
 **Rules:**
 - ALWAYS set \`run_in_background=true\` — never block on a single search
-- Launch ALL searches, then call \`background_wait\` with all task IDs to block until they complete
+- Launch ALL searches, then call \`background_wait\` — it returns when ANY task completes. Call again with remaining_task_ids until all are done.
 - Do NOT stop generating and wait for notifications — always use \`background_wait\` to stay active
 - Use \`explore\` for codebase pattern searches (internal)
 - Use \`librarian\` for documentation and external references
 - Keep targeted file reads (Read tool) for yourself — delegate broad searches
-- Collect results with \`background_output\` after \`background_wait\` returns
+- Collect results with \`background_output\` after each \`background_wait\` returns completed tasks
 - Before generating your final \`<COUNCIL_MEMBER_RESPONSE>\`, wait for all the background tasks to finish. 
 - If you decide to form your final response before background tasks finishes, cancel any remaining pending tasks with \`background_cancel\`
 `

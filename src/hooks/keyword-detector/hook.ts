@@ -46,12 +46,12 @@ export function createKeywordDetectorHook(ctx: PluginInput, _collector?: Context
         detectedKeywords = detectedKeywords.filter((k) => k.type !== "ultrawork")
       }
 
-      // Athena is a council orchestrator — skip all keyword injections.
+      // Athena and Athena-Junior are council orchestrators — skip all keyword injections.
       // search/analyze modes tell the agent to use explore agents and grep directly,
       // which conflicts with Athena's job of launching council members via task calls.
       // Use getAgentConfigKey to handle display name remapping ("Athena (Council)" → "athena").
       const agentConfigKey = currentAgent ? getAgentConfigKey(currentAgent) : undefined
-      if (agentConfigKey === "athena") {
+      if (agentConfigKey === "athena" || agentConfigKey === "athena-junior") {
         if (detectedKeywords.length > 0) {
           log(`[keyword-detector] Skipping keywords for Athena (council orchestrator)`, {
             sessionID: input.sessionID,

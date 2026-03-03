@@ -37,8 +37,9 @@ export function createToolExecuteBeforeHandler(args: {
     const toolNameLower = input.tool?.toLowerCase()
 
     if (toolNameLower === "question" || toolNameLower === "askuserquestion" || toolNameLower === "ask_user_question" || toolNameLower === "switch_agent") {
-      if (hasPendingCouncilMembers(input.sessionID)) {
-        const sessionAgent = await resolveSessionAgent(ctx.client, input.sessionID)
+      const sessionID = input.sessionID || getMainSessionID()
+      if (sessionID && hasPendingCouncilMembers(sessionID)) {
+        const sessionAgent = await resolveSessionAgent(ctx.client, sessionID)
         const sessionAgentKey = sessionAgent ? getAgentConfigKey(sessionAgent) : undefined
 
         if (sessionAgentKey === "athena") {

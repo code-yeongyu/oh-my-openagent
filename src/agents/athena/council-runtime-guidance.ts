@@ -44,7 +44,7 @@ export function getValidCouncilIntents(): readonly CouncilIntent[] {
 
 export function resolveCouncilIntent(intent?: string): CouncilIntent | null {
   if (!intent) return null
-  const normalized = intent.toUpperCase()
+  const normalized = intent.trim().toUpperCase()
   return (VALID_INTENTS as readonly string[]).includes(normalized)
     ? (normalized as CouncilIntent)
     : null

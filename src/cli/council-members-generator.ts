@@ -22,7 +22,7 @@ const COUNCIL_CANDIDATES: Array<{
   },
   {
     provider: (a) => a.native.gemini,
-    model: "google/gemini-3-pro-preview",
+    model: "google/gemini-3-pro",
     name: "Gemini Pro 3",
   },
   {
