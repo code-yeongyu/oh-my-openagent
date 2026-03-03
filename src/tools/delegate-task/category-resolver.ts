@@ -64,6 +64,7 @@ export async function resolveCategoryExecution(
   defaultModel?: string
 ): Promise<CategoryResolutionResult> {
   const { client, userCategories, sisyphusJuniorModel } = executorCtx
+  const effectiveDefaultModel = defaultModel ?? executorCtx.defaultModel
 
   const categoryName = args.category!
   const enabledCategories = mergeCategories(userCategories)
@@ -90,7 +91,7 @@ export async function resolveCategoryExecution(
     inheritedModel,
     systemDefaultModel,
     availableModels,
-    defaultModel,
+    defaultModel: effectiveDefaultModel,
   })
 
   if (!resolved) {

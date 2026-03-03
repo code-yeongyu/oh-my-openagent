@@ -140,7 +140,7 @@ Create the work plan directly - that's your job as the planning agent.`,
         categoryDefaultModel: matchedAgentModelStr,
         fallbackChain: agentRequirement?.fallbackChain,
         availableModels,
-        systemDefaultModel: undefined,
+        systemDefaultModel: executorCtx.defaultModel,
       })
 
       const resolutionSkipped = resolution && 'skipped' in resolution

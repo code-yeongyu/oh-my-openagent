@@ -159,6 +159,7 @@ export type TeamCreateExecutorConfig = {
   userCategories?: CategoriesConfig
   sisyphusJuniorModel?: string
   agentOverrides?: AgentOverrides
+  defaultModel?: string
 }
 
 type TeamCreateToolDeps = {
@@ -215,6 +216,7 @@ export function createTeamCreateTool(
           userCategories: executorConfig?.userCategories,
           sisyphusJuniorModel: executorConfig?.sisyphusJuniorModel,
           agentOverrides: executorConfig?.agentOverrides,
+          defaultModel: executorConfig?.defaultModel,
         },
         config,
         bgMgr,
