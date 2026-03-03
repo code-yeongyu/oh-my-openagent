@@ -6,6 +6,7 @@ import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { COUNCIL_DEFAULTS } from "../../agents/athena/constants"
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
@@ -78,8 +79,8 @@ export async function executeBackgroundTask(
 
     const waitInstruction = forcedBackground
       ? `This task was automatically backgrounded because council sessions are long-running.
-Use \`background_wait(task_ids=["${task.id}"])\` to block until completion, then \`background_output(task_id="${task.id}")\` to retrieve the result.
-Do NOT poll background_output repeatedly \u2014 background_wait will return when the task finishes.`
+Use \`background_wait(task_ids=["${task.id}"], timeout=${COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS})\` to block until completion, then \`background_output(task_id="${task.id}")\` to retrieve the result.
+Do NOT poll background_output repeatedly \u2014 background_wait will return when the task finishes. Note: all timeouts are in milliseconds (ms).`
       : `System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.`
 
     return `Background task launched.
