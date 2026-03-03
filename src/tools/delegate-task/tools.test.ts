@@ -809,11 +809,11 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      //#then — should still be background but with normal (non-forced) message
+      //#then — should also get background_wait guidance (athena-junior always gets it)
       const resultStr = String(result)
       expect(resultStr).toContain("Background task launched")
-      expect(resultStr).toContain("System notifies on completion")
-      expect(resultStr).not.toContain("automatically backgrounded")
+      expect(resultStr).toContain("background_wait")
+      expect(resultStr).toContain("automatically backgrounded")
     }, { timeout: 10000 })
   })
 
