@@ -1,4 +1,7 @@
-import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import * as fs from "node:fs"
 import { createSkillTool } from "./tools"
@@ -481,5 +484,101 @@ describe("skill tool - ordering and priority", () => {
     expect(tool.description).toContain("</available_items>")
     expect(tool.description).toContain("<skill>")
     expect(tool.description).toContain("<command>")
+  })
+})
+
+describe("skill tool - file param", () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "skill-file-test-"))
+    mkdirSync(join(tmpDir, "references"), { recursive: true })
+    writeFileSync(join(tmpDir, "references", "api.md"), "# API Reference\nContent here.")
+    writeFileSync(join(tmpDir, "notes.md"), "# Notes\nSome notes.")
+    writeFileSync(join(tmpDir, "SKILL.md"), "---\nname: my-skill\ndescription: test\n---\nSkill body")
+  })
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  function createSkillWithDir(name: string, dir: string): LoadedSkill {
+    return {
+      name,
+      path: join(dir, "SKILL.md"),
+      resolvedPath: dir,
+      definition: { name, description: `Skill ${name}`, template: "Skill body" },
+      scope: "project",
+    }
+  }
+
+  describe("#given skill with subdirectory files", () => {
+    describe("#when file='list'", () => {
+      it("#then returns list of files in skill directory", async () => {
+        const skill = createSkillWithDir("my-skill", tmpDir)
+        const tool = createSkillTool({ skills: [skill] })
+
+        const result = await tool.execute({ name: "my-skill", file: "list" }, mockContext)
+
+        expect(result).toContain("## Skill: my-skill — Files")
+        expect(result).toContain("references/api.md")
+        expect(result).toContain("notes.md")
+      })
+    })
+
+    describe("#when file='references/api.md'", () => {
+      it("#then returns that file's content", async () => {
+        const skill = createSkillWithDir("my-skill", tmpDir)
+        const tool = createSkillTool({ skills: [skill] })
+
+        const result = await tool.execute({ name: "my-skill", file: "references/api.md" }, mockContext)
+
+        expect(result).toContain("## Skill: my-skill — references/api.md")
+        expect(result).toContain("# API Reference")
+        expect(result).toContain("Content here.")
+      })
+    })
+
+    describe("#when file not provided", () => {
+      it("#then returns main skill body as usual", async () => {
+        const skill = createSkillWithDir("my-skill", tmpDir)
+        const tool = createSkillTool({ skills: [skill] })
+
+        const result = await tool.execute({ name: "my-skill" }, mockContext)
+
+        expect(result).toContain("## Skill: my-skill")
+        expect(result).not.toContain("— references/api.md")
+      })
+    })
+
+    describe("#when file attempts path traversal", () => {
+      it("#then throws an error", async () => {
+        const skill = createSkillWithDir("my-skill", tmpDir)
+        const tool = createSkillTool({ skills: [skill] })
+
+        await expect(
+          tool.execute({ name: "my-skill", file: "../../etc/passwd" }, mockContext)
+        ).rejects.toThrow("Path traversal rejected")
+      })
+    })
+  })
+
+  describe("#given skill directory with no extra files", () => {
+    describe("#when file='list'", () => {
+      it("#then returns no-files message", async () => {
+        const emptyDir = mkdtempSync(join(tmpdir(), "skill-empty-"))
+        writeFileSync(join(emptyDir, "SKILL.md"), "---\nname: empty-skill\ndescription: test\n---\nBody")
+        try {
+          const skill = createSkillWithDir("empty-skill", emptyDir)
+          const tool = createSkillTool({ skills: [skill] })
+
+          const result = await tool.execute({ name: "empty-skill", file: "list" }, mockContext)
+
+          expect(result).toContain("No additional files found")
+        } finally {
+          rmSync(emptyDir, { recursive: true, force: true })
+        }
+      })
+    })
   })
 })
