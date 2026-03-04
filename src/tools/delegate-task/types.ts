@@ -1,5 +1,4 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CategoriesConfig, GitMasterConfig, BrowserAutomationProvider, AgentOverrides } from "../../config/schema"
 import type {
@@ -71,8 +70,6 @@ export interface DelegateTaskToolOptions {
   agentOverrides?: AgentOverrides
   onSyncSessionCreated?: (event: SyncSessionCreatedEvent) => Promise<void>
   syncPollTimeoutMs?: number
-  /** TOON compression config for prompt compression in subagent tasks */
-  compressionConfig?: ToonCompressionConfig
 }
 
 export interface BuildSystemContentInput {
@@ -86,12 +83,10 @@ export interface BuildSystemContentInput {
   agentName?: string
   availableCategories?: AvailableCategory[]
   availableSkills?: AvailableSkill[]
-  compressionConfig?: ToonCompressionConfig
 }
 
 export function compressDelegateTaskArgs(
-  args: DelegateTaskArgs,
-  config: ToonCompressionConfig
+  args: DelegateTaskArgs
 ): string {
   return safeCompress(args, "delegate-types")
 }

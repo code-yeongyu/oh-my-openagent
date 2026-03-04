@@ -1,7 +1,6 @@
 import { dirname } from "path"
 import { resolveCommandsInText, resolveFileReferencesInText } from "../../shared"
-import { safeCompress, shouldCompress } from "../../shared/toon-compression"
-import type { ToonCompressionConfig } from "../../shared/toon-compression"
+import { safeCompress, shouldCompress, getGlobalCompressionConfig } from "../../shared/toon-compression"
 import type { CommandInfo } from "./types"
 
 export async function formatLoadedCommand(
@@ -61,8 +60,7 @@ export async function formatLoadedCommand(
 }
 
 export function formatCommandList(
-  items: CommandInfo[],
-  compressionConfig?: ToonCompressionConfig
+  items: CommandInfo[]
 ): string {
   if (items.length === 0) return "No commands or skills found."
 
@@ -77,6 +75,7 @@ export function formatCommandList(
 
   lines.push(`\n**Total**: ${items.length} items`)
   const formatted = lines.join("\n")
+  const compressionConfig = getGlobalCompressionConfig()
 
   // Apply compression if enabled and output exceeds threshold
   if (compressionConfig?.enabled && shouldCompress(items, compressionConfig.threshold)) {

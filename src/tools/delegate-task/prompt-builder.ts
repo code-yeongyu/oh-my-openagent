@@ -1,6 +1,7 @@
 import type { BuildSystemContentInput } from "./types"
 import { buildPlanAgentSystemPrepend, isPlanAgent, PLAN_AGENT_SYSTEM_PREPEND_STATIC_BEFORE_SKILLS, PLAN_AGENT_SYSTEM_PREPEND_STATIC_AFTER_SKILLS, buildPlanAgentSkillsSection } from "./constants"
 import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import { getGlobalCompressionConfig } from "../../shared/toon-compression/config-store"
 import { buildSystemContentWithTokenLimit } from "./token-limiter"
 
 const FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT = 24000
@@ -34,9 +35,9 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
     agentName,
     availableCategories,
     availableSkills,
-    compressionConfig,
   } = input
 
+  const compressionConfig = getGlobalCompressionConfig()
   const threshold = compressionConfig?.threshold ?? 5000
 
   // Check if arrays should be compressed

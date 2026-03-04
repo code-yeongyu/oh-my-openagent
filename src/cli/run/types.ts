@@ -42,11 +42,6 @@ export interface CompressionConfig {
   maxEncodingSize?: number
 }
 
-import { DEFAULT_COMPRESSION_CONFIG as TOON_DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
-
-/** @deprecated Use DEFAULT_COMPRESSION_CONFIG from shared/toon-compression instead */
-export const DEFAULT_COMPRESSION_CONFIG: CompressionConfig = TOON_DEFAULT_COMPRESSION_CONFIG
-
 export interface Todo {
   id?: string;
   content: string;

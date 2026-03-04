@@ -140,14 +140,9 @@ describe("executeBackgroundContinuation - compression", () => {
       run_in_background: true,
     }
 
-    const compressionConfig = {
-      enabled: true,
-      threshold: 10,
-    }
-
     //#when - executeBackgroundContinuation with compression enabled
     const { executeBackgroundContinuation } = require("./background-continuation")
-    await executeBackgroundContinuation(args, mockCtx, mockExecutorCtx, parentContext, compressionConfig)
+    await executeBackgroundContinuation(args, mockCtx, mockExecutorCtx, parentContext)
 
     //#then - prompt should have been processed by safeCompress
     expect(receivedPrompt).toBeDefined()
@@ -194,14 +189,9 @@ describe("executeBackgroundContinuation - compression", () => {
       run_in_background: true,
     }
 
-    const compressionConfig = {
-      enabled: false,
-      threshold: 5000,
-    }
-
     //#when - executeBackgroundContinuation with compression disabled
     const { executeBackgroundContinuation } = require("./background-continuation")
-    await executeBackgroundContinuation(args, mockCtx, mockExecutorCtx, parentContext, compressionConfig)
+    await executeBackgroundContinuation(args, mockCtx, mockExecutorCtx, parentContext)
 
     //#then - prompt should be unchanged
     expect(receivedPrompt).toBe(originalPrompt)

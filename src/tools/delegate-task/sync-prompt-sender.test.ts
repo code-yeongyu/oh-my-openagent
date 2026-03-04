@@ -321,7 +321,6 @@ bunDescribe("sendSyncPrompt", () => {
       categoryModel: undefined,
       toastManager: null,
       taskId: undefined,
-      compressionConfig: { enabled: true, threshold: 100 },
     }
 
     //#when
@@ -365,7 +364,6 @@ bunDescribe("sendSyncPrompt", () => {
       categoryModel: undefined,
       toastManager: null,
       taskId: undefined,
-      compressionConfig: { enabled: true, threshold: 100 },
     }
 
     //#when
@@ -377,4 +375,3 @@ bunDescribe("sendSyncPrompt", () => {
     bunExpect(promptArgs.body.parts[0].text).toContain("plain text prompt")
   })
 })
-

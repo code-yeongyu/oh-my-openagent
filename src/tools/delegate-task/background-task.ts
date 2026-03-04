@@ -1,13 +1,11 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
 import { getTimingConfig } from "./timing"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
@@ -18,7 +16,6 @@ export async function executeBackgroundTask(
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
   fallbackChain?: FallbackEntry[],
-  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG,
 ): Promise<string> {
   const { manager } = executorCtx
 
@@ -70,9 +67,6 @@ export async function executeBackgroundTask(
       command: args.command,
     }
 
-    // Compression is available for inter-agent payload transfers via safeCompress.
-    // The response is human-readable text (not JSON), so compression is not applied to output.
-    // When structured data transfers are implemented, use: safeCompress(metadataPayload, compressionConfig)
     const unstableMeta = {
       title: args.description,
       metadata: metadataPayload,

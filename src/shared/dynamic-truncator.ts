@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { normalizeSDKResponse } from "./normalize-sdk-response";
-import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "./toon-compression";
+import { safeCompress } from "./toon-compression";
+import { DEFAULT_COMPRESSION_CONFIG } from "./toon-compression/config-store";
 import type { ToonCompressionConfig } from "./toon-compression";
 
 const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000;

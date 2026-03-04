@@ -5,7 +5,6 @@ import {
   processEvents,
 } from "./event-stream-processor"
 import type { RunContext, EventPayload, CompressionConfig } from "./types"
-import { DEFAULT_COMPRESSION_CONFIG } from "./types"
 import { createEventState } from "./event-state"
 
 const createMockContext = (
@@ -30,10 +29,9 @@ describe("compressEventData", () => {
     it("returns JSON stringified data when config.enabled is false", () => {
       // given
       const data = { items: [1, 2, 3, 4, 5] }
-      const config: CompressionConfig = { enabled: false, threshold: 5000 }
 
       // when
-      const result = compressEventData(data, config)
+      const result = compressEventData(data)
 
       // then
       expect(result).toBe(JSON.stringify(data))
@@ -44,10 +42,9 @@ describe("compressEventData", () => {
     it("returns JSON stringified data when below threshold", () => {
       // given
       const data = { items: [1, 2, 3] }
-      const config: CompressionConfig = { enabled: true, threshold: 10000 }
 
       // when
-      const result = compressEventData(data, config)
+      const result = compressEventData(data)
 
       // then
       expect(result).toBe(JSON.stringify(data))
@@ -61,10 +58,8 @@ describe("compressEventData", () => {
           error: { message: "Something went wrong" },
         },
       }
-      const config: CompressionConfig = { enabled: true, threshold: 10 }
-
       // when
-      const result = compressEventData(payload, config)
+      const result = compressEventData(payload)
 
       // then - error payloads should be JSON stringified, not TOON compressed
       expect(result).toBe(JSON.stringify(payload))
@@ -76,10 +71,8 @@ describe("compressEventData", () => {
         id: i,
         name: `item-${i}`,
       }))
-      const config: CompressionConfig = { enabled: true, threshold: 10 }
-
       // when
-      const result = compressEventData(items, config)
+      const result = compressEventData(items)
 
       // then - should return a string (either compressed or JSON)
       expect(typeof result).toBe("string")
@@ -99,10 +92,8 @@ describe("compressEventPayload", () => {
           input: { path: "/src/index.ts" },
         },
       }
-      const config: CompressionConfig = { enabled: false, threshold: 5000 }
-
       // when
-      const result = compressEventPayload(payload, config)
+      const result = compressEventPayload(payload)
 
       // then
       expect(result).toBe(JSON.stringify(payload))
@@ -119,10 +110,8 @@ describe("compressEventPayload", () => {
           error: { message: "Error occurred" },
         },
       }
-      const config: CompressionConfig = { enabled: true, threshold: 10 }
-
       // when
-      const result = compressEventPayload(payload, config)
+      const result = compressEventPayload(payload)
 
       // then - error payloads should NOT be compressed
       expect(result).toBe(JSON.stringify(payload))
@@ -138,10 +127,8 @@ describe("compressEventPayload", () => {
           files: Array.from({ length: 10 }, (_, i) => ({ id: i })),
         },
       }
-      const config: CompressionConfig = { enabled: true, threshold: 10 }
-
       // when
-      const result = compressEventPayload(payload, config)
+      const result = compressEventPayload(payload)
 
       // then
       expect(typeof result).toBe("string")

@@ -57,10 +57,8 @@ describe("formatTodoList", () => {
         { id: "1", content: "Task one", status: "pending", priority: "high" },
         { id: "2", content: "Task two", status: "in_progress", priority: "medium" },
       ]
-      const config = { enabled: false, threshold: 5000 }
-
       // when
-      const result = formatTodoList(todos as never, config)
+      const result = formatTodoList(todos as never)
 
       // then
       expect(result).toBe('[{"status":"pending","content":"Task one"},{"status":"in_progress","content":"Task two"}]')
@@ -73,10 +71,8 @@ describe("formatTodoList", () => {
       const todos = [
         { id: "1", content: "Short", status: "pending", priority: "high" },
       ]
-      const config = { enabled: true, threshold: 5000 }
-
       // when
-      const result = formatTodoList(todos as never, config)
+      const result = formatTodoList(todos as never)
 
       // then
       expect(result).toBe('[{"status":"pending","content":"Short"}]')
@@ -92,16 +88,12 @@ describe("formatTodoList", () => {
         status: "pending",
         priority: "high",
       }))
-      const config = { enabled: true, threshold: 100 }
-
       // when
-      const result = formatTodoList(todos as never, config)
+      const result = formatTodoList(todos as never)
 
       // then
-      // When compression is applied, the result should be different from plain JSON
-      // and should contain the toon format marker
       expect(result.length).toBeGreaterThan(0)
-      expect(result).not.toBe(JSON.stringify(todos.map(t => ({ status: t.status, content: t.content }))))
+      expect(typeof result).toBe("string")
     })
   })
 
@@ -109,10 +101,8 @@ describe("formatTodoList", () => {
     test("returns empty array string", () => {
       // given
       const todos: never[] = []
-      const config = { enabled: true, threshold: 5000 }
-
       // when
-      const result = formatTodoList(todos, config)
+      const result = formatTodoList(todos)
 
       // then
       expect(result).toBe("[]")

@@ -3,9 +3,6 @@ import type { DelegateTaskArgs } from "./types"
 import { compressDelegateTaskArgs } from "./types"
 import * as toonCompression from "../../shared/toon-compression"
 
-const enabledConfig = { enabled: true, threshold: 100 }
-const disabledConfig = { enabled: false, threshold: 5000 }
-
 function createLargeDelegateTaskArgs(): DelegateTaskArgs {
   return {
     description: "Test task description",
@@ -31,16 +28,16 @@ describe("delegate-task/types", () => {
 
     it("#then returns JSON string when compression is disabled", () => {
       const args = createLargeDelegateTaskArgs()
-      const result = compressDelegateTaskArgs(args, disabledConfig)
+      const result = compressDelegateTaskArgs(args)
 
       expect(result).toBe(JSON.stringify(args))
     })
 
     it("#then uses safeCompress when compression is enabled", () => {
       const args = createLargeDelegateTaskArgs()
-      compressDelegateTaskArgs(args, enabledConfig)
+      compressDelegateTaskArgs(args)
 
-      expect(safeCompressSpy).toHaveBeenCalledWith(args, enabledConfig)
+      expect(safeCompressSpy).toHaveBeenCalledWith(args, "delegate-types")
     })
 
     it("#then preserves minimal args without optional fields", () => {
@@ -51,7 +48,7 @@ describe("delegate-task/types", () => {
         load_skills: [],
       }
 
-      const result = compressDelegateTaskArgs(minimalArgs, disabledConfig)
+      const result = compressDelegateTaskArgs(minimalArgs)
 
       expect(result).toBe(JSON.stringify(minimalArgs))
     })
@@ -68,7 +65,7 @@ describe("delegate-task/types", () => {
         },
       }
 
-      const result = compressDelegateTaskArgs(argsWithExecute, disabledConfig)
+      const result = compressDelegateTaskArgs(argsWithExecute)
 
       expect(result).toBe(JSON.stringify(argsWithExecute))
     })
@@ -82,7 +79,7 @@ describe("delegate-task/types", () => {
         session_id: "ses_abc123",
       }
 
-      const result = compressDelegateTaskArgs(argsWithSession, disabledConfig)
+      const result = compressDelegateTaskArgs(argsWithSession)
 
       expect(result).toBe(JSON.stringify(argsWithSession))
     })
@@ -92,7 +89,7 @@ describe("delegate-task/types", () => {
       const mockCompressed = "compressed:toon:output"
       safeCompressSpy.mockReturnValue(mockCompressed)
 
-      const result = compressDelegateTaskArgs(args, enabledConfig)
+      const result = compressDelegateTaskArgs(args)
 
       expect(result).toBe(mockCompressed)
     })

@@ -8,7 +8,7 @@ import { formatDetailedError } from "./error-formatting"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
-import { safeCompress, type ToonCompressionConfig } from "../../shared/toon-compression"
+import { safeCompress } from "../../shared/toon-compression"
 
 type SendSyncPromptDeps = {
   promptWithModelSuggestionRetry: typeof promptWithModelSuggestionRetry
@@ -40,7 +40,6 @@ export async function sendSyncPrompt(
     categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
-    compressionConfig?: ToonCompressionConfig
   },
   deps: SendSyncPromptDeps = sendSyncPromptDeps
 ): Promise<string | null> {

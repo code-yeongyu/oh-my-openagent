@@ -6,8 +6,6 @@ import {
   normalizeSDKResponse,
   resolveInheritedPromptTools,
   safeCompress,
-  DEFAULT_COMPRESSION_CONFIG,
-  type ToonCompressionConfig,
 } from "../../shared"
 import {
   findNearestMessageWithFields,
@@ -37,7 +35,7 @@ function hasWritePermission(tools: Record<string, ToolPermission> | undefined): 
   )
 }
 
-export function formatTodoList(todos: Todo[], config: ToonCompressionConfig): string {
+export function formatTodoList(todos: Todo[]): string {
   const formatted = todos.map((todo) => ({
     status: todo.status,
     content: todo.content,
@@ -137,7 +135,7 @@ export async function injectContinuation(args: {
   }
 
   const incompleteTodos = todos.filter((todo) => todo.status !== "completed" && todo.status !== "cancelled")
-  const todoList = formatTodoList(incompleteTodos, DEFAULT_COMPRESSION_CONFIG)
+  const todoList = formatTodoList(incompleteTodos)
   const prompt = `${CONTINUATION_PROMPT}
 
 [Status: ${todos.length - freshIncompleteCount}/${todos.length} completed, ${freshIncompleteCount} remaining]

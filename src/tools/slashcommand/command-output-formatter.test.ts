@@ -2,6 +2,10 @@
 
 import { describe, test, expect } from "bun:test"
 import type { CommandInfo } from "./types"
+import {
+  resetGlobalCompressionConfig,
+  setGlobalCompressionConfig,
+} from "../../shared/toon-compression/config-store"
 
 // Helper to create mock command info
 function createMockCommandInfo(id: number): CommandInfo {
@@ -11,6 +15,7 @@ function createMockCommandInfo(id: number): CommandInfo {
     scope: id % 2 === 0 ? "project" : "user",
     content: `This is command content for command ${id}. It has some description and instructions.`,
     metadata: {
+      name: `command-${String(id).padStart(3, "0")}`,
       description: `Description for command ${id} - a sample command with detailed info`,
       argumentHint: id % 2 === 0 ? "<arg1> [arg2]" : undefined,
     },
@@ -38,8 +43,9 @@ describe("formatCommandList", () => {
       test("#then returns formatted text", async () => {
         const { formatCommandList } = await import("./command-output-formatter")
         const commands = createMockCommandList(3)
+        setGlobalCompressionConfig({ enabled: false, threshold: 5000 })
 
-        const formatted = formatCommandList(commands, { enabled: false, threshold: 5000 })
+        const formatted = formatCommandList(commands)
 
         expect(formatted).toContain("Available Commands & Skills")
         expect(formatted).toContain("command-001")
@@ -51,8 +57,9 @@ describe("formatCommandList", () => {
       test("#then returns formatted text not compressed", async () => {
         const { formatCommandList } = await import("./command-output-formatter")
         const commands = createMockCommandList(3)
+        setGlobalCompressionConfig({ enabled: true, threshold: 5000 })
 
-        const formatted = formatCommandList(commands, { enabled: true, threshold: 5000 })
+        const formatted = formatCommandList(commands)
 
         expect(formatted).toContain("Available Commands & Skills")
         expect(formatted).not.toContain("toon:")
@@ -65,8 +72,9 @@ describe("formatCommandList", () => {
       test("#then returns compressed TOON format", async () => {
         const { formatCommandList } = await import("./command-output-formatter")
         const commands = createMockCommandList(100)
+        setGlobalCompressionConfig({ enabled: true, threshold: 1000 })
 
-        const formatted = formatCommandList(commands, { enabled: true, threshold: 1000 })
+        const formatted = formatCommandList(commands)
 
         // TOON format: [count]: for nested objects OR toon: for mocked compression
         const isCompressed = formatted.includes("[100]:") || formatted.startsWith("toon:")
@@ -81,8 +89,9 @@ describe("formatCommandList", () => {
       test("#then returns formatted text", async () => {
         const { formatCommandList } = await import("./command-output-formatter")
         const commands = createMockCommandList(100)
+        setGlobalCompressionConfig({ enabled: false, threshold: 1000 })
 
-        const formatted = formatCommandList(commands, { enabled: false, threshold: 1000 })
+        const formatted = formatCommandList(commands)
 
         expect(formatted).toContain("Available Commands & Skills")
         expect(formatted).toContain("**Total**: 100 items")
@@ -100,11 +109,12 @@ describe("formatCommandList", () => {
             path: "/path/to/cmd.md",
             scope: "project",
             content: "content",
-            metadata: {},
+            metadata: { name: "no-desc-cmd", description: "" },
           },
         ]
 
-        const formatted = formatCommandList(commands, { enabled: false, threshold: 5000 })
+        setGlobalCompressionConfig({ enabled: false, threshold: 5000 })
+        const formatted = formatCommandList(commands)
 
         expect(formatted).toContain("(no description)")
       })
@@ -123,6 +133,7 @@ describe("formatLoadedCommand", () => {
           scope: "project",
           content: "This is the command content.",
           metadata: {
+            name: "test-cmd",
             description: "A test command",
             argumentHint: "<arg>",
             model: "claude-3",
@@ -152,7 +163,7 @@ describe("formatLoadedCommand", () => {
           path: "/path/to/test-cmd.md",
           scope: "project",
           content: "Hello ${user_message}!",
-          metadata: {},
+          metadata: { name: "test-cmd", description: "test command" },
         }
 
         const formatted = await formatLoadedCommand(command, "World")
@@ -183,3 +194,5 @@ describe("formatLoadedCommand", () => {
     })
   })
 })
+
+resetGlobalCompressionConfig()

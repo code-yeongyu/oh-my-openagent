@@ -1,7 +1,6 @@
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
-import type { ToonCompressionConfig } from "../../shared/toon-compression"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { subagentSessions, syncSubagentSessions, setSessionAgent } from "../../features/claude-code-session-state"
@@ -11,7 +10,6 @@ import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 import { setSessionFallbackChain, clearSessionFallbackChain } from "../../hooks/model-fallback/hook"
-import { safeCompress, shouldCompress } from "../../shared/toon-compression"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -24,7 +22,6 @@ export async function executeSyncTask(
   modelInfo?: ModelFallbackInfo,
   fallbackChain?: import("../../shared/model-requirements").FallbackEntry[],
   deps: SyncTaskDeps = syncTaskDeps,
-  compressionConfig?: ToonCompressionConfig
 ): Promise<string> {
   const { client, directory, onSyncSessionCreated, syncPollTimeoutMs } = executorCtx
   const toastManager = getTaskToastManager()
