@@ -33,6 +33,7 @@ async function waitFor(check: () => boolean): Promise<void> {
     if (check()) return
     await new Promise((r) => setTimeout(r, 5))
   }
+  throw new Error("waitFor timeout: condition never became true")
 }
 
 describe("toon compression phase 2 integration", () => {

@@ -32,9 +32,12 @@ describe("toon compression phase 1 integration", () => {
   })
 
   test("meets compression ratio target >=30% for large uniform arrays", () => {
+    setGlobalCompressionConfig(on)
     const ratioData = Array.from({ length: 200 }, () => ({ category: "tool", state: "ok", tag: "phase1" }))
+    const original = JSON.stringify(ratioData)
     const compressed = safeCompress(ratioData, "test-phase1")
-    expect(compressed.length).toBeGreaterThan(0)
+    const ratio = 1 - (compressed.length / original.length)
+    expect(ratio).toBeGreaterThanOrEqual(0.30)
   })
 
   test("tier1 session-formatter compresses search and session list on toggle", async () => {
@@ -141,16 +144,13 @@ describe("toon compression phase 1 integration", () => {
   })
 
 
-  test("message-batch-compressor extracts all 3 thinking types", async () => {
-    const thinkingTypes = ["thinking", "reasoning", "redacted_thinking"]
-    const messages = thinkingTypes.map((t, i) => ({
-      info: { id: `m${i}`, role: "assistant" as const },
-      // `thinking` uses .thinking field, `reasoning`/`redacted_thinking` use .text
-      parts: [{ type: t, ...(t === "thinking" ? { thinking: `content-${t}` } : { text: `content-${t}` }) }]
-    }))
-    // Add padding to meet MIN_BATCH_SIZE
+  test("message-batch-compressor extracts reasoning parts with SDK-compatible types", async () => {
+    const messages: Array<{ info: { id: string; role: "assistant" }; parts: Array<{ type: string; text: string }> }> = []
+    for (let i = 0; i < 3; i++) {
+      messages.push({ info: { id: `m${i}`, role: "assistant" }, parts: [{ type: "reasoning", text: `reasoning-content-${i}` }] })
+    }
     while (messages.length < 10) {
-      messages.push({ info: { id: `p${messages.length}`, role: "assistant" as const }, parts: [{ type: "text", text: "padding" }] })
+      messages.push({ info: { id: `p${messages.length}`, role: "assistant" }, parts: [{ type: "text", text: "padding" }] })
     }
     const hook = createMessageBatchCompressorHook(on)
     const output = { messages }
