@@ -66,6 +66,7 @@ export async function executeUnstableAgentTask(
         run_in_background: args.run_in_background,
         sessionId: sessionID,
         command: args.command,
+        model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
       },
     }
     await ctx.metadata?.(bgTaskMeta)
