@@ -140,8 +140,11 @@ export function formatAnalyzeResult(results: AnalyzeResult[], extractedMetaVars:
       end: { ...result.range.end, line: result.range.end.line + 1, character: result.range.end.column + 1 }
     }
   }))
-  const plain = JSON.stringify(resultsWith1IndexedLines)
-  const compressed = compressForLLM(resultsWith1IndexedLines, config, "ast-grep-analyze")
+  const dataForCompression = extractedMetaVars
+    ? resultsWith1IndexedLines
+    : resultsWith1IndexedLines.map(r => ({ ...r, metaVariables: [] }))
+  const plain = JSON.stringify(dataForCompression)
+  const compressed = compressForLLM(dataForCompression, config, "ast-grep-analyze")
   if (compressed !== plain) {
     const lines: string[] = [`Found ${results.length} match(es):\n`]
     lines.push(compressed)

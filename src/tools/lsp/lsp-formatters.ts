@@ -223,12 +223,12 @@ export function formatDiagnosticsOutput(
     message: d.message,
   }))
 
-  const jsonString = JSON.stringify(formattedItems)
-  const shouldCompress = compressionConfig.enabled && diagnostics.length >= 5 && jsonString.length >= compressionConfig.threshold
-
-  if (shouldCompress) {
-    const compressed = safeCompress(formattedItems, "lsp-diagnostics")
-    return `[Compressed diagnostics]\n${compressed}`
+  if (compressionConfig.enabled && diagnostics.length >= 5) {
+    const jsonString = JSON.stringify(formattedItems)
+    if (jsonString.length >= compressionConfig.threshold) {
+      const compressed = safeCompress(formattedItems, "lsp-diagnostics")
+      return `[Compressed diagnostics]\n${compressed}`
+    }
   }
 
   return diagnostics.map(formatDiagnostic).join("\n")
@@ -248,12 +248,12 @@ export function formatSymbolsOutput(
     const docSymbols = symbols as DocumentSymbol[]
     const formattedItems = docSymbols.map(formatDocumentSymbolForCompression)
 
-    const jsonString = JSON.stringify(formattedItems)
-    const shouldCompress = compressionConfig.enabled && symbols.length >= 5 && jsonString.length >= compressionConfig.threshold
-
-    if (shouldCompress) {
-      const compressed = safeCompress(formattedItems, "lsp-symbols-document")
-      return `[Compressed symbols]\n${compressed}`
+    if (compressionConfig.enabled && symbols.length >= 5) {
+      const jsonString = JSON.stringify(formattedItems)
+      if (jsonString.length >= compressionConfig.threshold) {
+        const compressed = safeCompress(formattedItems, "lsp-symbols-document")
+        return `[Compressed symbols]\n${compressed}`
+      }
     }
 
     return docSymbols.map((s) => formatDocumentSymbol(s)).join("\n")
@@ -267,12 +267,12 @@ export function formatSymbolsOutput(
     location: formatLocation(s.location),
   }))
 
-  const jsonString = JSON.stringify(formattedItems)
-  const shouldCompress = compressionConfig.enabled && symbols.length >= 5 && jsonString.length >= compressionConfig.threshold
-
-  if (shouldCompress) {
-    const compressed = safeCompress(formattedItems, "lsp-symbols-workspace")
-    return `[Compressed symbols]\n${compressed}`
+  if (compressionConfig.enabled && symbols.length >= 5) {
+    const jsonString = JSON.stringify(formattedItems)
+    if (jsonString.length >= compressionConfig.threshold) {
+      const compressed = safeCompress(formattedItems, "lsp-symbols-workspace")
+      return `[Compressed symbols]\n${compressed}`
+    }
   }
 
   return symInfos.map(formatSymbolInfo).join("\n")
