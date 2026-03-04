@@ -88,17 +88,17 @@ describe("model-error-classifier", () => {
     expect(provider).toBe("anthropic")
   })
 
-  test("selectFallbackProvider maps opencode fallback to quotio when quotio is connected", () => {
+  test("selectFallbackProvider uses connected preferred provider when fallback providers are unavailable", () => {
     //#given
     writeFileSync(
       join(TEST_CACHE_DIR, "connected-providers.json"),
-      JSON.stringify({ connected: ["quotio"], updatedAt: new Date().toISOString() }, null, 2),
+      JSON.stringify({ connected: ["provider-x"], updatedAt: new Date().toISOString() }, null, 2),
     )
 
     //#when
-    const provider = selectFallbackProvider(["opencode"], "quotio")
+    const provider = selectFallbackProvider(["provider-y"], "provider-x")
 
     //#then
-    expect(provider).toBe("quotio")
+    expect(provider).toBe("provider-x")
   })
 })
