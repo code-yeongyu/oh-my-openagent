@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-export const TtsrConfigSchema = z.object({
+const TtsrConfigObjectSchema = z.object({
   /** Enable TTSR stream rule monitoring (default: true) */
   enabled: z.boolean().default(true),
   /** How to handle partial output when aborting (default: "discard") */
@@ -15,4 +15,9 @@ export const TtsrConfigSchema = z.object({
   maxRetriesPerRule: z.number().int().min(1).max(10).default(3),
 })
 
-export type TtsrConfig = z.infer<typeof TtsrConfigSchema>
+export const TtsrConfigSchema = z.union([
+  z.boolean().transform((enabled) => TtsrConfigObjectSchema.parse({ enabled })),
+  TtsrConfigObjectSchema,
+])
+
+export type TtsrConfig = z.infer<typeof TtsrConfigObjectSchema>

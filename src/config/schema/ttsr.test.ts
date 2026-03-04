@@ -29,6 +29,31 @@ describe("TtsrConfigSchema", () => {
     })
   })
 
+  describe("#when config is a boolean true", () => {
+    describe("#then it expands to full config with defaults", () => {
+      test("parses boolean true as enabled with defaults", () => {
+        const result = TtsrConfigSchema.safeParse(true)
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.enabled).toBe(true)
+          expect(result.data.contextMode).toBe("discard")
+        }
+      })
+    })
+  })
+
+  describe("#when config is a boolean false", () => {
+    describe("#then it expands to disabled config with defaults", () => {
+      test("parses boolean false as disabled", () => {
+        const result = TtsrConfigSchema.safeParse(false)
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.enabled).toBe(false)
+        }
+      })
+    })
+  })
+
   describe("#given invalid enum", () => {
     test("#when parse called #then throws zod error", () => {
       expect(() => TtsrConfigSchema.parse({ interruptMode: "invalid" })).toThrow()
