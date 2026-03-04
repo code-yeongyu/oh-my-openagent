@@ -55,3 +55,21 @@ export function hasAgentToolRestrictions(agentName: string): boolean {
     ?? Object.entries(AGENT_RESTRICTIONS).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
   return restrictions !== undefined && Object.keys(restrictions).length > 0
 }
+
+/**
+ * Build the tools restriction object for a subagent.
+ *
+ * - Gets base restrictions from AGENT_RESTRICTIONS via getAgentToolRestrictions().
+ * - If restrictions already define `task`, uses that value (built-in agents stay restricted).
+ * - If restrictions do NOT define `task` (custom/unknown agents), defaults to `task: true` (allow).
+ * - Always sets `call_omo_agent: true` and `question: false`.
+ */
+export function buildSubagentTools(agentName: string): Record<string, boolean> {
+  const restrictions = getAgentToolRestrictions(agentName)
+  return {
+    ...restrictions,
+    ...("task" in restrictions ? {} : { task: true }),
+    call_omo_agent: true,
+    question: false,
+  }
+}

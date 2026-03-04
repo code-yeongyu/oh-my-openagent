@@ -1,9 +1,8 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, SessionMessage } from "./executor-types"
-import { isPlanFamily } from "./constants"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
-import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { buildSubagentTools } from "../../shared/agent-tool-restrictions"
 import { getMessageDir } from "../../shared"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { findNearestMessageWithFields } from "../../features/hook-message-injector"
@@ -78,13 +77,7 @@ export async function executeSyncContinuation(
       resumeVariant = resumeMessage?.model?.variant
     }
 
-    const allowTask = isPlanFamily(resumeAgent)
-    const tools = {
-      ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
-      task: allowTask,
-      call_omo_agent: true,
-      question: false,
-    }
+    const tools = buildSubagentTools(resumeAgent ?? "")
     setSessionTools(args.session_id!, tools)
 
     await promptWithModelSuggestionRetry(client, {

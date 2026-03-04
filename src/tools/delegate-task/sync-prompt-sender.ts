@@ -1,11 +1,10 @@
 import type { DelegateTaskArgs, OpencodeClient } from "./types"
-import { isPlanFamily } from "./constants"
 import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
 } from "../../shared/model-suggestion-retry"
 import { formatDetailedError } from "./error-formatting"
-import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
+import { buildSubagentTools } from "../../shared/agent-tool-restrictions"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { createInternalAgentTextPart } from "../../shared/internal-initiator-marker"
 
@@ -42,13 +41,7 @@ export async function sendSyncPrompt(
   },
   deps: SendSyncPromptDeps = sendSyncPromptDeps
 ): Promise<string | null> {
-  const allowTask = isPlanFamily(input.agentToUse)
-  const tools = {
-    task: allowTask,
-    call_omo_agent: true,
-    question: false,
-    ...getAgentToolRestrictions(input.agentToUse),
-  }
+  const tools = buildSubagentTools(input.agentToUse)
   setSessionTools(input.sessionID, tools)
 
   const promptArgs = {
