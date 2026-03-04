@@ -31,6 +31,7 @@ import {
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import { createAbortRetryHandler } from "../../hooks/ttsr/abort-retry-handler"
 import { discoverTtsrRules } from "../../hooks/ttsr/rule-discovery"
+import { createBuiltinTtsrRules } from "../../features/ttsr/builtin-rules"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -290,7 +291,7 @@ export function createSessionHooks(args: {
             })
         },
       })
-      const rules: import("../../features/ttsr/types").TtsrRule[] = []
+      const rules: import("../../features/ttsr/types").TtsrRule[] = [...createBuiltinTtsrRules()]
       let hookInstance: import("../../hooks").TtsrHook | null = null
       discoverTtsrRules(ctx.directory).then((discovered) => {
         rules.push(...discovered)
