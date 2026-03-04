@@ -73,11 +73,12 @@ function createSyntheticToolResultMessage(
   sessionID: string,
   index: number
 ): MessageWithParts {
-  const messageID = `msg_synthetic_${Date.now()}_${index}`
+  const timestamp = Date.now()
+  const messageID = `msg_synthetic_${timestamp}_${index}`
 
   const parts = toolUseIds.map((toolUseId) => ({
     type: "tool_result" as const,
-    id: `prt_synthetic_${Date.now()}_${toolUseId.slice(-8)}`,
+    id: `prt_synthetic_${timestamp}_${toolUseId.slice(-8)}`,
     sessionID,
     messageID,
     tool_use_id: toolUseId,

@@ -31,7 +31,9 @@ interface MessageInfoExtended {
   id: string
   role: string
   sessionID?: string
-  modelID?: string
+  model?: {
+    modelID?: string
+  }
 }
 
 type MessagesTransformHook = {
@@ -151,7 +153,7 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
 
       // Get model info before synthetic injection (synthetic messages lack modelID)
       const lastUserMessage = messages.findLast(m => m.info.role === "user")
-      const modelID = (lastUserMessage?.info as unknown as MessageInfoExtended)?.modelID || ""
+      const modelID = (lastUserMessage?.info as unknown as MessageInfoExtended)?.model?.modelID || ""
 
       validateToolResults(messages)
 
