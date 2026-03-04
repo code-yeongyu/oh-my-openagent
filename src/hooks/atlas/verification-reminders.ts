@@ -14,9 +14,22 @@ task(session_id="${sessionId}", prompt="fix: [describe the specific failure]")
 export function buildOrchestratorReminder(
   planName: string,
   progress: { total: number; completed: number },
-  sessionId: string
+  sessionId: string,
+  autoCommit: boolean = true
 ): string {
   const remaining = progress.total - progress.completed
+  
+  const commitStep = autoCommit
+    ? `
+**STEP 8: COMMIT ATOMIC UNIT**
+
+- Stage ONLY the verified changes
+- Commit with clear message describing what was done
+`
+    : ""
+
+  const nextStepNumber = autoCommit ? 9 : 8
+
   return `
 ---
 
@@ -60,13 +73,8 @@ Update the plan file \`.sisyphus/plans/${planName}.md\`:
 - Use \`Edit\` tool to modify the checkbox
 
 **DO THIS BEFORE ANYTHING ELSE. Unmarked = Untracked = Lost progress.**
-
-**STEP 8: COMMIT ATOMIC UNIT**
-
-- Stage ONLY the verified changes
-- Commit with clear message describing what was done
-
-**STEP 9: PROCEED TO NEXT TASK**
+${commitStep}
+**STEP ${nextStepNumber}: PROCEED TO NEXT TASK**
 
 - Read the plan file AGAIN to identify the next \`- [ ]\` task
 - Start immediately - DO NOT STOP

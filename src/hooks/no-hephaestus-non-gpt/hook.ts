@@ -12,12 +12,16 @@ const TOAST_MESSAGE = [
 ].join("\n")
 const SISYPHUS_DISPLAY = getAgentDisplayName("sisyphus")
 
-function showToast(ctx: PluginInput, sessionID: string): void {
+type NoHephaestusNonGptHookOptions = {
+  allowNonGptModel?: boolean
+}
+
+function showToast(ctx: PluginInput, sessionID: string, variant: "error" | "warning"): void {
   ctx.client.tui.showToast({
     body: {
       title: TOAST_TITLE,
       message: TOAST_MESSAGE,
-      variant: "error",
+      variant,
       duration: 10000,
     },
   }).catch((error) => {
@@ -28,7 +32,10 @@ function showToast(ctx: PluginInput, sessionID: string): void {
   })
 }
 
-export function createNoHephaestusNonGptHook(ctx: PluginInput) {
+export function createNoHephaestusNonGptHook(
+  ctx: PluginInput,
+  options?: NoHephaestusNonGptHookOptions,
+) {
   return {
     "chat.message": async (input: {
       sessionID: string
@@ -40,9 +47,13 @@ export function createNoHephaestusNonGptHook(ctx: PluginInput) {
       const rawAgent = input.agent ?? getSessionAgent(input.sessionID) ?? ""
       const agentKey = getAgentConfigKey(rawAgent)
       const modelID = input.model?.modelID
+      const allowNonGptModel = options?.allowNonGptModel === true
 
       if (agentKey === "hephaestus" && modelID && !isGptModel(modelID)) {
-        showToast(ctx, input.sessionID)
+        showToast(ctx, input.sessionID, allowNonGptModel ? "warning" : "error")
+        if (allowNonGptModel) {
+          return
+        }
         input.agent = SISYPHUS_DISPLAY
         if (output?.message) {
           output.message.agent = SISYPHUS_DISPLAY

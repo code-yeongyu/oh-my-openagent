@@ -20,6 +20,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
   const { ctx, pluginConfig, modelCacheState } = deps;
 
   return async (config: Record<string, unknown>) => {
+    const formatterConfig = config.formatter;
+
     applyProviderConfig({ config, modelCacheState });
 
     const pluginComponents = await loadPluginComponents({ pluginConfig });
@@ -34,6 +36,8 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     applyToolConfig({ config, pluginConfig, agentResult });
     await applyMcpConfig({ config, pluginConfig, pluginComponents });
     await applyCommandConfig({ config, pluginConfig, ctx, pluginComponents });
+
+    config.formatter = formatterConfig;
 
     log("[config-handler] config handler applied", {
       agentCount: Object.keys(agentResult).length,

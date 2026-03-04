@@ -16,20 +16,15 @@ export async function executeCompact(
   sessionID: string,
   msg: Record<string, unknown>,
   autoCompactState: AutoCompactState,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  // @ts-ignore
-  pluginConfig: OhMyOpenCodeConfig,
-  // @ts-ignore
-  client: any,
-  // @ts-ignore
+  client: Client,
   directory: string,
-  // @ts-ignore
-  experimental?: ExperimentalConfig
+  pluginConfig: OhMyOpenCodeConfig,
+  _experimental?: ExperimentalConfig
 ): Promise<void> {
-  void experimental
+  void _experimental
 
   if (autoCompactState.compactionInProgress.has(sessionID)) {
-    await (client as Client).tui
+    await client.tui
       .showToast({
         body: {
           title: "Compact In Progress",
@@ -61,7 +56,7 @@ export async function executeCompact(
       const result = await runAggressiveTruncationStrategy({
         sessionID,
         autoCompactState,
-        client: client as Client,
+        client: client,
         directory,
         truncateAttempt: truncateState.truncateAttempt,
         currentTokens: errorData.currentTokens,
@@ -76,13 +71,11 @@ export async function executeCompact(
       sessionID,
       msg,
       autoCompactState,
-      client: client as Client,
+      client: client,
       directory,
-      // @ts-ignore
       pluginConfig,
       errorType: errorData?.errorType,
       messageIndex: errorData?.messageIndex,
-      // @ts-ignore
     })
   } finally {
     autoCompactState.compactionInProgress.delete(sessionID);

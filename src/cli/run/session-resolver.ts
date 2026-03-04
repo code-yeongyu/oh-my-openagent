@@ -31,7 +31,7 @@ export async function resolveSession(options: {
         permission: [
           { permission: "question", action: "deny" as const, pattern: "*" },
         ],
-      } as any,
+      } as Record<string, unknown>,
       query: { directory },
     })
 

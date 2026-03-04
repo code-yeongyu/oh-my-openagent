@@ -4,11 +4,9 @@ import {
   startBackgroundCheck,
 } from "./session-notification-utils"
 import {
-  detectPlatform,
-  getDefaultSoundPath,
-  playSessionNotificationSound,
-  sendSessionNotification,
+  type Platform,
 } from "./session-notification-sender"
+import * as sessionNotificationSender from "./session-notification-sender"
 import { hasIncompleteTodos } from "./session-todo-status"
 import { createIdleNotificationScheduler } from "./session-notification-scheduler"
 
@@ -25,13 +23,14 @@ interface SessionNotificationConfig {
   skipIfIncompleteTodos?: boolean
   /** Maximum number of sessions to track before cleanup (default: 100) */
   maxTrackedSessions?: number
+  enforceMainSessionFilter?: boolean
 }
 export function createSessionNotification(
   ctx: PluginInput,
   config: SessionNotificationConfig = {}
 ) {
-  const currentPlatform = detectPlatform()
-  const defaultSoundPath = getDefaultSoundPath(currentPlatform)
+  const currentPlatform: Platform = sessionNotificationSender.detectPlatform()
+  const defaultSoundPath = sessionNotificationSender.getDefaultSoundPath(currentPlatform)
 
   startBackgroundCheck(currentPlatform)
 
@@ -45,6 +44,7 @@ export function createSessionNotification(
     idleConfirmationDelay: 1500,
     skipIfIncompleteTodos: true,
     maxTrackedSessions: 100,
+    enforceMainSessionFilter: true,
     ...config,
   }
 
@@ -53,8 +53,8 @@ export function createSessionNotification(
     platform: currentPlatform,
     config: mergedConfig,
     hasIncompleteTodos,
-    send: sendSessionNotification,
-    playSound: playSessionNotificationSound,
+    send: sessionNotificationSender.sendSessionNotification,
+    playSound: sessionNotificationSender.playSessionNotificationSound,
   })
 
   const QUESTION_TOOLS = new Set(["question", "ask_user_question", "askuserquestion"])
@@ -81,8 +81,10 @@ export function createSessionNotification(
   const shouldNotifyForSession = (sessionID: string): boolean => {
     if (subagentSessions.has(sessionID)) return false
 
-    const mainSessionID = getMainSessionID()
-    if (mainSessionID && sessionID !== mainSessionID) return false
+    if (mergedConfig.enforceMainSessionFilter) {
+      const mainSessionID = getMainSessionID()
+      if (mainSessionID && sessionID !== mainSessionID) return false
+    }
 
     return true
   }
@@ -146,9 +148,14 @@ export function createSessionNotification(
       if (!shouldNotifyForSession(sessionID)) return
 
       scheduler.markSessionActivity(sessionID)
-      await sendSessionNotification(ctx, currentPlatform, mergedConfig.title, mergedConfig.permissionMessage)
+      await sessionNotificationSender.sendSessionNotification(
+        ctx,
+        currentPlatform,
+        mergedConfig.title,
+        mergedConfig.permissionMessage,
+      )
       if (mergedConfig.playSound && mergedConfig.soundPath) {
-        await playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
+        await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
       }
       return
     }
@@ -168,9 +175,9 @@ export function createSessionNotification(
               ? mergedConfig.permissionMessage
               : mergedConfig.questionMessage
 
-            await sendSessionNotification(ctx, currentPlatform, mergedConfig.title, message)
+            await sessionNotificationSender.sendSessionNotification(ctx, currentPlatform, mergedConfig.title, message)
             if (mergedConfig.playSound && mergedConfig.soundPath) {
-              await playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
+              await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
             }
           }
         }

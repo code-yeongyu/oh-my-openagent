@@ -1,11 +1,21 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { basename, join } from "path"
-import { parseFrontmatter, sanitizeModelField, getOpenCodeConfigDir } from "../../shared"
+import {
+  parseFrontmatter,
+  sanitizeModelField,
+  getOpenCodeConfigDir,
+  discoverPluginCommandDefinitions,
+} from "../../shared"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import { loadBuiltinCommands } from "../../features/builtin-commands"
 import type { CommandInfo, CommandMetadata, CommandScope } from "./types"
+
+export interface CommandDiscoveryOptions {
+  pluginsEnabled?: boolean
+  enabledPluginsOverride?: Record<string, boolean>
+}
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
   if (!existsSync(commandsDir)) return []
@@ -48,7 +58,27 @@ function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): Comm
   return commands
 }
 
-export function discoverCommandsSync(directory?: string): CommandInfo[] {
+function discoverPluginCommands(options?: CommandDiscoveryOptions): CommandInfo[] {
+  const pluginDefinitions = discoverPluginCommandDefinitions(options)
+
+  return Object.entries(pluginDefinitions).map(([name, definition]) => ({
+    name,
+    metadata: {
+      name,
+      description: definition.description || "",
+      model: definition.model,
+      agent: definition.agent,
+      subtask: definition.subtask,
+    },
+    content: definition.template,
+    scope: "plugin",
+  }))
+}
+
+export function discoverCommandsSync(
+  directory?: string,
+  options?: CommandDiscoveryOptions,
+): CommandInfo[] {
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(directory ?? process.cwd(), ".claude", "commands")
@@ -59,6 +89,7 @@ export function discoverCommandsSync(directory?: string): CommandInfo[] {
   const opencodeGlobalCommands = discoverCommandsFromDir(opencodeGlobalDir, "opencode")
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
   const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
+  const pluginCommands = discoverPluginCommands(options)
 
   const builtinCommandsMap = loadBuiltinCommands()
   const builtinCommands: CommandInfo[] = Object.values(builtinCommandsMap).map((command) => ({
@@ -81,5 +112,6 @@ export function discoverCommandsSync(directory?: string): CommandInfo[] {
     ...opencodeProjectCommands,
     ...opencodeGlobalCommands,
     ...builtinCommands,
+    ...pluginCommands,
   ]
 }

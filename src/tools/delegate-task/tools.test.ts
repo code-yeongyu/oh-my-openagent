@@ -17,7 +17,7 @@ const TEST_AVAILABLE_MODELS = new Set([
   "anthropic/claude-opus-4-6",
   "anthropic/claude-sonnet-4-6",
   "anthropic/claude-haiku-4-5",
-  "google/gemini-3-pro",
+  "google/gemini-3.1-pro",
   "google/gemini-3-flash",
   "openai/gpt-5.2",
   "openai/gpt-5.3-codex",
@@ -52,7 +52,7 @@ describe("sisyphus-task", () => {
     providerModelsSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
       models: {
         anthropic: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
-        google: ["gemini-3-pro", "gemini-3-flash"],
+        google: ["gemini-3.1-pro", "gemini-3-flash"],
         openai: ["gpt-5.2", "gpt-5.3-codex"],
       },
       connected: ["anthropic", "google", "openai"],
@@ -73,7 +73,7 @@ describe("sisyphus-task", () => {
 
       // when / #then
       expect(category).toBeDefined()
-      expect(category.model).toBe("google/gemini-3-pro")
+      expect(category.model).toBe("google/gemini-3.1-pro")
       expect(category.variant).toBe("high")
     })
 
@@ -781,7 +781,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro")
+      expect(result!.config.model).toBe("google/gemini-3.1-pro")
       expect(result!.promptAppend).toContain("VISUAL/UI")
     })
 
@@ -805,7 +805,7 @@ describe("sisyphus-task", () => {
       const categoryName = "visual-engineering"
       const userCategories = {
         "visual-engineering": {
-          model: "google/gemini-3-pro",
+          model: "google/gemini-3.1-pro",
           prompt_append: "Custom instructions here",
         },
       }
@@ -845,7 +845,7 @@ describe("sisyphus-task", () => {
       const categoryName = "visual-engineering"
       const userCategories = {
         "visual-engineering": {
-          model: "google/gemini-3-pro",
+          model: "google/gemini-3.1-pro",
           temperature: 0.3,
         },
       }
@@ -868,7 +868,7 @@ describe("sisyphus-task", () => {
 
       // then - category's built-in model wins over inheritedModel
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro")
+      expect(result!.config.model).toBe("google/gemini-3.1-pro")
     })
 
     test("systemDefaultModel is used as fallback when custom category has no model", () => {
@@ -910,7 +910,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("google/gemini-3-pro")
+      expect(result!.config.model).toBe("google/gemini-3.1-pro")
     })
   })
 
@@ -1357,29 +1357,58 @@ describe("sisyphus-task", () => {
       return { data: {} }
     })
 
+    const baseTime = Date.now()
+    const initialMessages = [
+      {
+        info: {
+          id: "msg_001",
+          role: "user",
+          agent: "sisyphus-junior",
+          model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
+          variant: "max",
+          time: { created: baseTime },
+        },
+        parts: [{ type: "text", text: "previous message" }],
+      },
+      {
+        info: { id: "msg_002", role: "assistant", time: { created: baseTime + 1 }, finish: "end_turn" },
+        parts: [{ type: "text", text: "Completed." }],
+      },
+    ]
+
+    const messagesCallCounts: Record<string, number> = {}
+
     const mockClient = {
       session: {
         prompt: promptMock,
         promptAsync: promptMock,
-        messages: async () => ({
-          data: [
-            {
-              info: {
-                id: "msg_001",
-                role: "user",
-                agent: "sisyphus-junior",
-                model: { providerID: "anthropic", modelID: "claude-opus-4-6" },
-                variant: "max",
-                time: { created: Date.now() },
+        messages: async (input: any) => {
+          const sessionID = input?.path?.id
+          if (typeof sessionID !== "string") {
+            return { data: [] }
+          }
+
+          const callCount = (messagesCallCounts[sessionID] ?? 0) + 1
+          messagesCallCounts[sessionID] = callCount
+
+          if (sessionID !== "ses_var_test") {
+            return { data: [] }
+          }
+
+          if (callCount === 1) {
+            return { data: initialMessages }
+          }
+
+          return {
+            data: [
+              ...initialMessages,
+              {
+                info: { id: "msg_003", role: "assistant", time: { created: baseTime + 2 }, finish: "end_turn" },
+                parts: [{ type: "text", text: "Continued." }],
               },
-              parts: [{ type: "text", text: "previous message" }],
-            },
-            {
-              info: { id: "msg_002", role: "assistant", time: { created: Date.now() + 1 }, finish: "end_turn" },
-              parts: [{ type: "text", text: "Completed." }],
-            },
-          ],
-        }),
+            ],
+          }
+        },
         status: async () => ({ data: { "ses_var_test": { type: "idle" } } }),
       },
       config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
@@ -1738,7 +1767,7 @@ describe("sisyphus-task", () => {
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "google", id: "gemini-3-pro" }] },
+         model: { list: async () => [{ provider: "google", id: "gemini-3.1-pro" }] },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
            create: async () => ({ data: { id: "ses_unstable_gemini" } }),
@@ -2001,7 +2030,7 @@ describe("sisyphus-task", () => {
        const mockClient = {
          app: { agents: async () => ({ data: [] }) },
          config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
-         model: { list: async () => [{ provider: "google", id: "gemini-3-pro" }] },
+         model: { list: async () => [{ provider: "google", id: "gemini-3.1-pro" }] },
          session: {
            get: async () => ({ data: { directory: "/project" } }),
            create: async () => ({ data: { id: "ses_artistry_gemini" } }),
@@ -2028,7 +2057,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
       
-      // when - artistry category (gemini-3-pro with high variant)
+      // when - artistry category (gemini-3.1-pro with high variant)
       const result = await tool.execute(
         {
           description: "Test artistry forced background",
@@ -3026,9 +3055,9 @@ describe("sisyphus-task", () => {
       // when resolveCategoryConfig is called
       const resolved = resolveCategoryConfig(categoryName, { userCategories, inheritedModel, systemDefaultModel: SYSTEM_DEFAULT_MODEL })
       
-      // then should use category's built-in model (gemini-3-pro for visual-engineering)
+      // then should use category's built-in model (gemini-3.1-pro for visual-engineering)
       expect(resolved).not.toBeNull()
-      expect(resolved!.model).toBe("google/gemini-3-pro")
+      expect(resolved!.model).toBe("google/gemini-3.1-pro")
     })
 
     test("systemDefaultModel is used when no other model is available", () => {
@@ -3522,7 +3551,7 @@ describe("sisyphus-task", () => {
       )
 
       // then - should resolve via AGENT_MODEL_REQUIREMENTS fallback chain for oracle
-      // oracle fallback chain: gpt-5.2 (openai) > gemini-3-pro (google) > claude-opus-4-6 (anthropic)
+      // oracle fallback chain: gpt-5.2 (openai) > gemini-3.1-pro (google) > claude-opus-4-6 (anthropic)
       // Since openai is in connectedProviders, should resolve to openai/gpt-5.2
       expect(promptBody.model).toBeDefined()
       expect(promptBody.model.providerID).toBe("openai")

@@ -1,14 +1,3 @@
-> [!WARNING]
-> **Security warning: impersonation site**
->
-> **ohmyopencode.com is NOT affiliated with this project.** We do not operate or endorse that site.
->
-> OhMyOpenCode is **free and open-source**. Do **not** download installers or enter payment details on third-party sites that claim to be "official."
->
-> Because the impersonation site is behind a paywall, we **cannot verify what it distributes**. Treat any downloads from it as **potentially unsafe**.
->
-> ✅ Official downloads: https://github.com/code-yeongyu/oh-my-opencode/releases
-
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
@@ -47,7 +36,7 @@
 [![GitHub Forks](https://img.shields.io/github/forks/code-yeongyu/oh-my-opencode?color=8ae8ff&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/network/members)
 [![GitHub Stars](https://img.shields.io/github/stars/code-yeongyu/oh-my-opencode?color=ffcb47&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/stargazers)
 [![GitHub Issues](https://img.shields.io/github/issues/code-yeongyu/oh-my-opencode?color=ff80eb&labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/issues)
-[![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/master/LICENSE.md)
+[![License](https://img.shields.io/badge/license-SUL--1.0-white?labelColor=black&style=flat-square)](https://github.com/code-yeongyu/oh-my-opencode/blob/dev/LICENSE.md)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/code-yeongyu/oh-my-opencode)
 
 [English](README.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-cn.md)
@@ -99,7 +88,7 @@ Copy and paste this prompt to your LLM agent (Claude Code, AmpCode, Cursor, etc.
 
 ```
 Install and configure oh-my-opencode by following the instructions here:
-https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/dev/docs/guide/installation.md
 ```
 
 Or read the [Installation Guide](docs/guide/installation.md), but seriously, let an agent do it. Humans fat-finger configs.
@@ -109,7 +98,7 @@ Or read the [Installation Guide](docs/guide/installation.md), but seriously, let
 Fetch the installation guide and follow it:
 
 ```bash
-curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/master/docs/guide/installation.md
+curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/dev/docs/guide/installation.md
 ```
 
 ---
@@ -134,7 +123,7 @@ Everything below, every feature, every optimization, you don't need to know it. 
 
 Even only with following subscriptions, ultrawork will work well (this project is not affiliated, this is just personal recommendation):
 - [ChatGPT Subscription ($20)](https://chatgpt.com/)
-- [Kimi Code Subscription ($0.99) (*only this month)](https://www.kimi.com/membership/pricing?track_id=5cdeca93-66f0-4d35-aabb-b6df8fcea328)
+- [Kimi Code Subscription ($0.99) (*only this month)](https://www.kimi.com/kimiplus/sale)
 - [GLM Coding Plan ($10)](https://z.ai/subscribe)
 - If you are eligible for pay-per-token, using kimi and gemini models won't cost you that much.
 
@@ -220,9 +209,9 @@ The harness problem is real. Most agent failures aren't the model. It's the edit
 Inspired by [oh-my-pi](https://github.com/can1357/oh-my-pi), we implemented **Hashline**. Every line the agent reads comes back tagged with a content hash:
 
 ```
-11#VK: function hello() {
-22#XJ:   return "world";
-33#MB: }
+11#VK| function hello() {
+22#XJ|   return "world";
+33#MB| }
 ```
 
 The agent edits by referencing those tags. If the file changed since the last read, the hash won't match and the edit is rejected before corruption. No whitespace reproduction. No stale-line errors.

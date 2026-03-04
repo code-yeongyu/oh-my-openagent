@@ -1,51 +1,61 @@
-# src/hooks/ — 44 Lifecycle Hooks
+# src/hooks/ — 46 Lifecycle Hooks
 
-**Generated:** 2026-02-21
+**Generated:** 2026-03-02
 
 ## OVERVIEW
 
-44 hooks across 39 directories + 6 standalone files. Three-tier composition: Core(35) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
+46 hooks across 45 directories + 11 standalone files. Three-tier composition: Core(37) + Continuation(7) + Skill(2). All hooks follow `createXXXHook(deps) → HookFunction` factory pattern.
 
 ## HOOK TIERS
 
-### Tier 1: Session Hooks (22) — `create-session-hooks.ts`
+### Tier 1: Session Hooks (23) — `create-session-hooks.ts`
 ## STRUCTURE
 ```
 hooks/
 ├── atlas/                      # Main orchestration (757 lines)
 ├── anthropic-context-window-limit-recovery/ # Auto-summarize
-├── todo-continuation-enforcer.ts # Force TODO completion
-├── ralph-loop/                 # Self-referential dev loop
-├── claude-code-hooks/          # settings.json compat layer - see AGENTS.md
-├── comment-checker/            # Prevents AI slop
+├── anthropic-effort/            # Reasoning effort level adjustment
+├── anthropic-image-context/     # Image context handling for Anthropic
 ├── auto-slash-command/         # Detects /command patterns
-├── rules-injector/             # Conditional rules
+├── auto-update-checker/        # Plugin update check
+├── background-notification/    # OS notification
+├── beast-mode-system/          # Beast mode system prompt injection
+├── category-skill-reminder/    # Reminds of category skills
+├── claude-code-hooks/          # settings.json compat layer
+├── comment-checker/            # Prevents AI slop
+├── compaction-context-injector/ # Injects context on compaction
+├── compaction-todo-preserver/  # Preserves todos through compaction
+├── delegate-task-retry/        # Retries failed delegations
 ├── directory-agents-injector/  # Auto-injects AGENTS.md
 ├── directory-readme-injector/  # Auto-injects README.md
 ├── edit-error-recovery/        # Recovers from failures
-├── thinking-block-validator/   # Ensures valid <thinking>
-├── context-window-monitor.ts   # Reminds of headroom
-├── session-recovery/           # Auto-recovers from crashes
-├── think-mode/                 # Dynamic thinking budget
-├── keyword-detector/           # ultrawork/search/analyze modes
-├── background-notification/    # OS notification
-├── prometheus-md-only/         # Planner read-only mode
-├── agent-usage-reminder/       # Specialized agent hints
-├── auto-update-checker/        # Plugin update check
-├── tool-output-truncator.ts    # Prevents context bloat
-├── compaction-context-injector/ # Injects context on compaction
-├── delegate-task-retry/        # Retries failed delegations
+├── hashline-edit-diff-enhancer/ # Enhanced diff output for hashline edits
+├── hashline-read-enhancer/     # Adds LINE#ID hashes to Read output
 ├── interactive-bash-session/   # Tmux session management
+├── json-error-recovery/        # JSON parse error correction
+├── keyword-detector/           # ultrawork/search/analyze modes
+├── model-fallback/             # Provider-level model fallback
+├── no-hephaestus-non-gpt/      # Block Hephaestus from non-GPT
+├── no-sisyphus-gpt/            # Block Sisyphus from GPT
 ├── non-interactive-env/        # Non-TTY environment handling
-├── start-work/                 # Sisyphus work session starter
-├── task-resume-info/           # Resume info for cancelled tasks
+├── prometheus-md-only/         # Planner read-only mode
 ├── question-label-truncator/   # Auto-truncates question labels
-├── category-skill-reminder/    # Reminds of category skills
-├── empty-task-response-detector.ts # Detects empty responses
-├── sisyphus-junior-notepad/    # Sisyphus Junior notepad
-├── stop-continuation-guard/    # Guards stop continuation
-├── subagent-question-blocker/  # Blocks subagent questions
+├── ralph-loop/                 # Self-referential dev loop
+├── read-image-resizer/         # Resize images for context efficiency
+├── rules-injector/             # Conditional rules
 ├── runtime-fallback/           # Auto-switch models on API errors
+├── session-recovery/           # Auto-recovers from crashes
+├── sisyphus-junior-notepad/    # Sisyphus Junior notepad
+├── start-work/                 # Sisyphus work session starter
+├── stop-continuation-guard/    # Guards stop continuation
+├── task-reminder/              # Task system usage reminders
+├── task-resume-info/           # Resume info for cancelled tasks
+├── tasks-todowrite-disabler/   # Disable TodoWrite when task system active
+├── think-mode/                 # Dynamic thinking budget
+├── thinking-block-validator/   # Ensures valid <thinking>
+├── todo-continuation-enforcer/ # Force TODO completion
+├── unstable-agent-babysitter/  # Monitor unstable agent behavior
+├── write-existing-file-guard/  # Require Read before Write
 └── index.ts                    # Hook aggregation + registration
 ```
 
@@ -70,11 +80,12 @@ hooks/
 | questionLabelTruncator | tool.execute.before | Truncate long question labels |
 | taskResumeInfo | chat.message | Inject task context on resume |
 | anthropicEffort | chat.params | Adjust reasoning effort level |
-| jsonErrorRecovery | tool.execute.after | Detect JSON parse errors, inject correction reminder |
-| sisyphusGptHephaestusReminder | chat.message | Toast warning when Sisyphus uses GPT model |
-| taskReminder | tool.execute.after | Remind about task tools after 10 turns without usage |
+| modelFallback | chat.params | Provider-level model fallback on errors |
+| noSisyphusGpt | chat.message | Block Sisyphus from using GPT models (toast warning) |
+| noHephaestusNonGpt | chat.message | Block Hephaestus from using non-GPT models |
+| runtimeFallback | event | Auto-switch models on API provider errors |
 
-### Tier 2: Tool Guard Hooks (9) — `create-tool-guard-hooks.ts`
+### Tier 2: Tool Guard Hooks (10) — `create-tool-guard-hooks.ts`
 
 | Hook | Event | Purpose |
 |------|-------|---------|
@@ -87,6 +98,7 @@ hooks/
 | tasksTodowriteDisabler | tool.execute.before | Disable TodoWrite when task system active |
 | writeExistingFileGuard | tool.execute.before | Require Read before Write on existing files |
 | hashlineReadEnhancer | tool.execute.after | Enhance Read output with line hashes |
+| jsonErrorRecovery | tool.execute.after | Detect JSON parse errors, inject correction reminder |
 
 ### Tier 3: Transform Hooks (4) — `create-transform-hooks.ts`
 

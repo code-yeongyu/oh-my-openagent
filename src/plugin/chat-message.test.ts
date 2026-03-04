@@ -19,6 +19,7 @@ function createMockHandlerArgs(overrides?: {
     },
     hooks: {
       stopContinuationGuard: null,
+      backgroundNotificationHook: null,
       keywordDetector: null,
       claudeCodeHooks: null,
       autoSlashCommand: null,
@@ -114,5 +115,31 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
 
     //#then - gate should still be marked as applied
     expect(args._appliedSessions).toContain("test-session")
+  })
+
+  test("injects queued background notifications through chat.message hook", async () => {
+    //#given
+    const args = createMockHandlerArgs()
+    args.hooks.backgroundNotificationHook = {
+      "chat.message": async (
+        _input: { sessionID: string },
+        output: ChatMessageHandlerOutput,
+      ): Promise<void> => {
+        output.parts.push({
+          type: "text",
+          text: "<system-reminder>[BACKGROUND TASK COMPLETED]</system-reminder>",
+        })
+      },
+    }
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
+    const output = createMockOutput()
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(output.parts).toHaveLength(1)
+    expect(output.parts[0].text).toContain("[BACKGROUND TASK COMPLETED]")
   })
 })

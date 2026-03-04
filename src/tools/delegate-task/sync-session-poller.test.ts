@@ -273,7 +273,7 @@ describe("pollSyncSession", () => {
         agentToUse: "test-agent",
         toastManager: null,
         taskId: undefined,
-      })
+      }, 0)
 
       //#then - timeout returns error string
       expect(result).toBe("Poll timeout reached after 50ms for session ses_timeout")

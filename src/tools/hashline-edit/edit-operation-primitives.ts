@@ -63,7 +63,7 @@ export function applyReplaceLines(
   const corrected = autocorrectReplacementLines(originalRange, stripped)
   const restored = corrected.map((entry, idx) => {
     if (idx !== 0) return entry
-    return restoreLeadingIndent(lines[startLine - 1], entry)
+    return restoreLeadingIndent(lines[startLine - 1] ?? "", entry)
   })
   result.splice(startLine - 1, endLine - startLine + 1, ...restored)
   return result
@@ -80,7 +80,7 @@ export function applyInsertAfter(
   const result = [...lines]
   const newLines = stripInsertAnchorEcho(lines[line - 1], toNewLines(text))
   if (newLines.length === 0) {
-    throw new Error(`insert_after requires non-empty text for ${anchor}`)
+    throw new Error(`append (anchored) requires non-empty text for ${anchor}`)
   }
   result.splice(line, 0, ...newLines)
   return result
@@ -97,35 +97,9 @@ export function applyInsertBefore(
   const result = [...lines]
   const newLines = stripInsertBeforeEcho(lines[line - 1], toNewLines(text))
   if (newLines.length === 0) {
-    throw new Error(`insert_before requires non-empty text for ${anchor}`)
+    throw new Error(`prepend (anchored) requires non-empty text for ${anchor}`)
   }
   result.splice(line - 1, 0, ...newLines)
-  return result
-}
-
-export function applyInsertBetween(
-  lines: string[],
-  afterAnchor: string,
-  beforeAnchor: string,
-  text: string | string[],
-  options?: EditApplyOptions
-): string[] {
-  if (shouldValidate(options)) {
-    validateLineRef(lines, afterAnchor)
-    validateLineRef(lines, beforeAnchor)
-  }
-  const { line: afterLine } = parseLineRef(afterAnchor)
-  const { line: beforeLine } = parseLineRef(beforeAnchor)
-  if (beforeLine <= afterLine) {
-    throw new Error(`insert_between requires after_line (${afterLine}) < before_line (${beforeLine})`)
-  }
-
-  const result = [...lines]
-  const newLines = stripInsertBoundaryEcho(lines[afterLine - 1], lines[beforeLine - 1], toNewLines(text))
-  if (newLines.length === 0) {
-    throw new Error(`insert_between requires non-empty text for ${afterAnchor}..${beforeAnchor}`)
-  }
-  result.splice(beforeLine - 1, 0, ...newLines)
   return result
 }
 
@@ -149,12 +123,4 @@ export function applyPrepend(lines: string[], text: string | string[]): string[]
     return [...normalized]
   }
   return [...normalized, ...lines]
-}
-
-export function applyReplace(content: string, oldText: string, newText: string | string[]): string {
-  if (!content.includes(oldText)) {
-    throw new Error(`Text not found: "${oldText}"`)
-  }
-  const replacement = Array.isArray(newText) ? newText.join("\n") : newText
-  return content.replaceAll(oldText, replacement)
 }

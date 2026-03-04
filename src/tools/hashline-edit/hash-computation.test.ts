@@ -21,13 +21,25 @@ describe("computeLineHash", () => {
     expect(hash1).toMatch(/^[ZPMQVRWSNKTXJBYH]{2}$/)
   })
 
-  it("produces different hashes for same content on different lines", () => {
+  it("produces same hashes for significant content on different lines", () => {
     //#given
     const content = "function hello() {"
 
     //#when
     const hash1 = computeLineHash(1, content)
     const hash2 = computeLineHash(2, content)
+
+    //#then
+    expect(hash1).toBe(hash2)
+  })
+
+  it("mixes line number for non-significant lines", () => {
+    //#given
+    const punctuationOnly = "{}"
+
+    //#when
+    const hash1 = computeLineHash(1, punctuationOnly)
+    const hash2 = computeLineHash(2, punctuationOnly)
 
     //#then
     expect(hash1).not.toBe(hash2)
@@ -48,7 +60,7 @@ describe("computeLineHash", () => {
 })
 
 describe("formatHashLine", () => {
-  it("formats single line as LINE#ID:content", () => {
+  it("formats single line as LINE#ID|content", () => {
     //#given
     const lineNumber = 42
     const content = "const x = 42"
@@ -57,12 +69,12 @@ describe("formatHashLine", () => {
     const result = formatHashLine(lineNumber, content)
 
     //#then
-    expect(result).toMatch(/^42#[ZPMQVRWSNKTXJBYH]{2}:const x = 42$/)
+    expect(result).toMatch(/^42#[ZPMQVRWSNKTXJBYH]{2}\|const x = 42$/)
   })
 })
 
 describe("formatHashLines", () => {
-  it("formats all lines as LINE#ID:content", () => {
+  it("formats all lines as LINE#ID|content", () => {
     //#given
     const content = "a\nb\nc"
 
@@ -72,9 +84,9 @@ describe("formatHashLines", () => {
     //#then
     const lines = result.split("\n")
     expect(lines).toHaveLength(3)
-    expect(lines[0]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}:a$/)
-    expect(lines[1]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}:b$/)
-    expect(lines[2]).toMatch(/^3#[ZPMQVRWSNKTXJBYH]{2}:c$/)
+    expect(lines[0]).toMatch(/^1#[ZPMQVRWSNKTXJBYH]{2}\|a$/)
+    expect(lines[1]).toMatch(/^2#[ZPMQVRWSNKTXJBYH]{2}\|b$/)
+    expect(lines[2]).toMatch(/^3#[ZPMQVRWSNKTXJBYH]{2}\|c$/)
   })
 })
 

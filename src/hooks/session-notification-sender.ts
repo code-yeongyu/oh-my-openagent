@@ -7,6 +7,7 @@ import {
   getAfplayPath,
   getPaplayPath,
   getAplayPath,
+  getTerminalNotifierPath,
 } from "./session-notification-utils"
 import { buildWindowsToastScript, escapeAppleScriptText, escapePowerShellSingleQuotedText } from "./session-notification-formatting"
 
@@ -39,6 +40,22 @@ export async function sendSessionNotification(
 ): Promise<void> {
   switch (platform) {
     case "darwin": {
+      // Try terminal-notifier first — deterministic click-to-focus
+      const terminalNotifierPath = await getTerminalNotifierPath()
+      if (terminalNotifierPath) {
+        const bundleId = process.env.__CFBundleIdentifier
+        try {
+          if (bundleId) {
+            await ctx.$`${terminalNotifierPath} -title ${title} -message ${message} -activate ${bundleId}`
+          } else {
+            await ctx.$`${terminalNotifierPath} -title ${title} -message ${message}`
+          }
+          break
+        } catch {
+        }
+      }
+
+      // Fallback: osascript (click may open Finder instead of terminal)
       const osascriptPath = await getOsascriptPath()
       if (!osascriptPath) return
 

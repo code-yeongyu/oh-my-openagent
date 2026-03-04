@@ -589,20 +589,22 @@ describe("createBuiltinAgents with requiresProvider gating (hephaestus)", () => 
     }
   })
 
-  test("hephaestus is created when github-copilot provider is connected", async () => {
-    // #given - github-copilot provider has models available
+  test("hephaestus IS created when github-copilot is connected with a GPT model", async () => {
+    // #given - github-copilot provider has gpt-5.3-codex available
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
       new Set(["github-copilot/gpt-5.3-codex"])
     )
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
 
     try {
       // #when
       const agents = await createBuiltinAgents([], {}, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
 
-      // #then
+      // #then - github-copilot is now a valid provider for hephaestus
       expect(agents.hephaestus).toBeDefined()
     } finally {
       fetchSpy.mockRestore()
+      cacheSpy.mockRestore()
     }
   })
 
@@ -986,7 +988,7 @@ describe("buildAgent with category and skills", () => {
     const agent = buildAgent(source["test-agent"], TEST_MODEL)
 
     // #then - category's built-in model is applied
-    expect(agent.model).toBe("google/gemini-3-pro")
+    expect(agent.model).toBe("google/gemini-3.1-pro")
   })
 
   test("agent with category and existing model keeps existing model", () => {

@@ -33,15 +33,6 @@ export async function continueIteration(
       return
     }
 
-    const boundState = options.loopState.setSessionID(newSessionID)
-    if (!boundState) {
-      log(`[${HOOK_NAME}] Failed to bind loop state to new session`, {
-        previousSessionID: options.previousSessionID,
-        newSessionID,
-      })
-      return
-    }
-
     await injectContinuationPrompt(ctx, {
       sessionID: newSessionID,
       inheritFromSessionID: options.previousSessionID,
@@ -51,6 +42,16 @@ export async function continueIteration(
     })
 
     await selectSessionInTui(ctx.client, newSessionID)
+
+    const boundState = options.loopState.setSessionID(newSessionID)
+    if (!boundState) {
+      log(`[${HOOK_NAME}] Failed to bind loop state to new session`, {
+        previousSessionID: options.previousSessionID,
+        newSessionID,
+      })
+      return
+    }
+
     return
   }
 

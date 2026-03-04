@@ -67,6 +67,7 @@ export async function executeBackgroundTask(
         run_in_background: args.run_in_background,
         sessionId: sessionId ?? "pending",
         command: args.command,
+        model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
       },
     }
     await ctx.metadata?.(unstableMeta)

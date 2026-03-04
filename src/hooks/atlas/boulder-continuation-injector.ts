@@ -14,6 +14,7 @@ export async function injectBoulderContinuation(input: {
   remaining: number
   total: number
   agent?: string
+  worktreePath?: string
   backgroundManager?: BackgroundManager
   sessionState: SessionState
 }): Promise<void> {
@@ -24,6 +25,7 @@ export async function injectBoulderContinuation(input: {
     remaining,
     total,
     agent,
+    worktreePath,
     backgroundManager,
     sessionState,
   } = input
@@ -37,9 +39,11 @@ export async function injectBoulderContinuation(input: {
     return
   }
 
+  const worktreeContext = worktreePath ? `\n\n[Worktree: ${worktreePath}]` : ""
   const prompt =
     BOULDER_CONTINUATION_PROMPT.replace(/{PLAN_NAME}/g, planName) +
-    `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]`
+    `\n\n[Status: ${total - remaining}/${total} completed, ${remaining} remaining]` +
+    worktreeContext
 
   try {
     log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
@@ -62,6 +66,7 @@ export async function injectBoulderContinuation(input: {
     log(`[${HOOK_NAME}] Boulder continuation injected`, { sessionID })
   } catch (err) {
     sessionState.promptFailureCount += 1
+    sessionState.lastFailureAt = Date.now()
     log(`[${HOOK_NAME}] Boulder continuation failed`, {
       sessionID,
       error: String(err),

@@ -1,6 +1,6 @@
 // bin/platform.test.ts
 import { describe, expect, test } from "bun:test";
-import { getPlatformPackage, getBinaryPath } from "./platform.js";
+import { getBinaryPath, getPlatformPackage, getPlatformPackageCandidates } from "./platform.js";
 
 describe("getPlatformPackage", () => {
   // #region Darwin platforms
@@ -144,5 +144,60 @@ describe("getBinaryPath", () => {
 
     // #then returns path without extension
     expect(result).toBe("oh-my-opencode-linux-x64/bin/oh-my-opencode");
+  });
+});
+
+describe("getPlatformPackageCandidates", () => {
+  test("returns x64 and baseline candidates for Linux glibc", () => {
+    // #given Linux x64 with glibc
+    const input = { platform: "linux", arch: "x64", libcFamily: "glibc" };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then returns modern first then baseline fallback
+    expect(result).toEqual([
+      "oh-my-opencode-linux-x64",
+      "oh-my-opencode-linux-x64-baseline",
+    ]);
+  });
+
+  test("returns x64 musl and baseline candidates for Linux musl", () => {
+    // #given Linux x64 with musl
+    const input = { platform: "linux", arch: "x64", libcFamily: "musl" };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then returns musl modern first then musl baseline fallback
+    expect(result).toEqual([
+      "oh-my-opencode-linux-x64-musl",
+      "oh-my-opencode-linux-x64-musl-baseline",
+    ]);
+  });
+
+  test("returns baseline first when preferBaseline is true", () => {
+    // #given Windows x64 and baseline preference
+    const input = { platform: "win32", arch: "x64", preferBaseline: true };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then baseline package is preferred first
+    expect(result).toEqual([
+      "oh-my-opencode-windows-x64-baseline",
+      "oh-my-opencode-windows-x64",
+    ]);
+  });
+
+  test("returns only one candidate for ARM64", () => {
+    // #given non-x64 platform
+    const input = { platform: "linux", arch: "arm64", libcFamily: "glibc" };
+
+    // #when getting package candidates
+    const result = getPlatformPackageCandidates(input);
+
+    // #then baseline fallback is not included
+    expect(result).toEqual(["oh-my-opencode-linux-arm64"]);
   });
 });

@@ -178,7 +178,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     expect(models).toBeTruthy()
 
     const required = [
-      "antigravity-gemini-3-pro",
+      "antigravity-gemini-3.1-pro",
       "antigravity-gemini-3-flash",
       "antigravity-claude-sonnet-4-6",
       "antigravity-claude-sonnet-4-6-thinking",
@@ -206,7 +206,7 @@ describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
     const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
 
     // #when checking Gemini Pro variants
-    const pro = models["antigravity-gemini-3-pro"]
+    const pro = models["antigravity-gemini-3.1-pro"]
     // #then should have low and high variants
     expect(pro.variants).toBeTruthy()
     expect(pro.variants.low).toBeTruthy()
@@ -277,7 +277,7 @@ describe("generateOmoConfig - model fallback system", () => {
     const result = generateOmoConfig(config)
 
     // #then Sisyphus is omitted (requires all fallback providers)
-    expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json")
+    expect(result.$schema).toBe("https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json")
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
   })
 
@@ -323,8 +323,8 @@ describe("generateOmoConfig - model fallback system", () => {
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
     // #then Oracle should use native OpenAI (first fallback entry)
     expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("openai/gpt-5.2")
-    // #then multimodal-looker should use native OpenAI (fallback within native tier)
-    expect((result.agents as Record<string, { model: string }>)["multimodal-looker"].model).toBe("openai/gpt-5.2")
+    // #then multimodal-looker should use native OpenAI (first fallback entry is gpt-5.3-codex)
+    expect((result.agents as Record<string, { model: string }>)["multimodal-looker"].model).toBe("openai/gpt-5.3-codex")
   })
 
   test("uses haiku for explore when Claude max20", () => {

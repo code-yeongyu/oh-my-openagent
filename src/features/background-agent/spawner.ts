@@ -61,9 +61,7 @@ export async function startTask(
   const createResult = await client.session.create({
     body: {
       parentID: input.parentSessionID,
-      title: `Background: ${input.description}`,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any,
+    } as Record<string, unknown>,
     query: {
       directory: parentDirectory,
     },

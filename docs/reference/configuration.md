@@ -56,7 +56,7 @@ JSONC supports `// line comments`, `/* block comments */`, and trailing commas.
 
 Enable schema autocomplete:
 ```json
-{ "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json" }
+{ "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json" }
 ```
 
 Run `bunx oh-my-opencode install` for guided setup. Run `opencode models` to list available models.
@@ -67,7 +67,7 @@ Here's a practical starting configuration:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/master/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
@@ -573,13 +573,13 @@ Define `fallback_models` per agent or category:
 
 ### Hashline Edit
 
-Replaces the built-in `Edit` tool with a hash-anchored version using `LINE#ID` references to prevent stale-line edits. Enabled by default.
+Replaces the built-in `Edit` tool with a hash-anchored version using `LINE#ID` references to prevent stale-line edits. Disabled by default.
 
 ```json
-{ "hashline_edit": false }
+{ "hashline_edit": true }
 ```
 
-When enabled, two companion hooks are active: `hashline-read-enhancer` (annotates Read output) and `hashline-edit-diff-enhancer` (shows diffs). Disable them individually via `disabled_hooks`.
+When enabled, two companion hooks are active: `hashline-read-enhancer` (annotates Read output) and `hashline-edit-diff-enhancer` (shows diffs). Opt-in by setting `hashline_edit: true`. Disable the companion hooks individually via `disabled_hooks` if needed.
 
 ### Experimental
 

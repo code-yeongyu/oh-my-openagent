@@ -31,7 +31,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     // #then - fallbackChain has claude-opus-4-6 first, big-pickle last
     expect(sisyphus).toBeDefined()
     expect(sisyphus.fallbackChain).toBeArray()
-    expect(sisyphus.fallbackChain).toHaveLength(4)
+    expect(sisyphus.fallbackChain).toHaveLength(3)
     expect(sisyphus.requiresAnyModel).toBe(true)
 
     const primary = sisyphus.fallbackChain[0]
@@ -39,7 +39,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("claude-opus-4-6")
     expect(primary.variant).toBe("max")
 
-    const last = sisyphus.fallbackChain[3]
+    const last = sisyphus.fallbackChain[2]
     expect(last.providers[0]).toBe("opencode")
     expect(last.model).toBe("big-pickle")
   })
@@ -86,19 +86,27 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(quaternary.model).toBe("gpt-5-nano")
   })
 
-  test("multimodal-looker has valid fallbackChain with kimi-k2.5-free as primary", () => {
+  test("multimodal-looker has valid fallbackChain with gpt-5.3-codex as primary", () => {
     // given - multimodal-looker agent requirement
     const multimodalLooker = AGENT_MODEL_REQUIREMENTS["multimodal-looker"]
 
     // when - accessing multimodal-looker requirement
-    // then - fallbackChain exists with kimi-k2.5-free first, gpt-5-nano last
+    // then - fallbackChain: gpt-5.3-codex -> k2p5 -> gemini-3-flash -> glm-4.6v -> gpt-5-nano
     expect(multimodalLooker).toBeDefined()
     expect(multimodalLooker.fallbackChain).toBeArray()
     expect(multimodalLooker.fallbackChain).toHaveLength(5)
 
     const primary = multimodalLooker.fallbackChain[0]
-    expect(primary.providers[0]).toBe("opencode")
-    expect(primary.model).toBe("kimi-k2.5-free")
+    expect(primary.providers).toEqual(["openai", "opencode"])
+    expect(primary.model).toBe("gpt-5.3-codex")
+    expect(primary.variant).toBe("medium")
+
+    const secondary = multimodalLooker.fallbackChain[1]
+    expect(secondary.providers).toEqual(["kimi-for-coding"])
+    expect(secondary.model).toBe("k2p5")
+
+    const tertiary = multimodalLooker.fallbackChain[2]
+    expect(tertiary.model).toBe("gemini-3-flash")
 
     const last = multimodalLooker.fallbackChain[4]
     expect(last.providers).toEqual(["openai", "github-copilot", "opencode"])
@@ -153,29 +161,29 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("openai")
   })
 
-  test("atlas has valid fallbackChain with kimi-k2.5-free as primary", () => {
+  test("atlas has valid fallbackChain with claude-sonnet-4-6 as primary", () => {
     // given - atlas agent requirement
     const atlas = AGENT_MODEL_REQUIREMENTS["atlas"]
 
     // when - accessing Atlas requirement
-    // then - fallbackChain exists with kimi-k2.5-free as first entry
+    // then - fallbackChain exists with claude-sonnet-4-6 as first entry
     expect(atlas).toBeDefined()
     expect(atlas.fallbackChain).toBeArray()
     expect(atlas.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = atlas.fallbackChain[0]
-    expect(primary.model).toBe("kimi-k2.5-free")
-    expect(primary.providers[0]).toBe("opencode")
+    expect(primary.model).toBe("claude-sonnet-4-6")
+    expect(primary.providers[0]).toBe("anthropic")
   })
 
-  test("hephaestus requires openai/github-copilot/opencode provider", () => {
+  test("hephaestus supports openai, github-copilot, venice, and opencode providers", () => {
     // #given - hephaestus agent requirement
     const hephaestus = AGENT_MODEL_REQUIREMENTS["hephaestus"]
 
     // #when - accessing hephaestus requirement
-    // #then - requiresProvider is set to openai, github-copilot, opencode (not requiresModel)
+    // #then - requiresProvider includes openai, github-copilot, venice, and opencode
     expect(hephaestus).toBeDefined()
-    expect(hephaestus.requiresProvider).toEqual(["openai", "github-copilot", "opencode"])
+    expect(hephaestus.requiresProvider).toEqual(["openai", "github-copilot", "venice", "opencode"])
     expect(hephaestus.requiresModel).toBeUndefined()
   })
 
@@ -248,19 +256,19 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("openai")
   })
 
-  test("visual-engineering has valid fallbackChain with gemini-3-pro high as primary", () => {
+  test("visual-engineering has valid fallbackChain with gemini-3.1-pro high as primary", () => {
     // given - visual-engineering category requirement
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // when - accessing visual-engineering requirement
-    // then - fallbackChain: gemini-3-pro(high) → glm-5 → opus-4-6(max)
+    // then - fallbackChain: gemini-3.1-pro(high) → glm-5 → opus-4-6(max)
     expect(visualEngineering).toBeDefined()
     expect(visualEngineering.fallbackChain).toBeArray()
     expect(visualEngineering.fallbackChain).toHaveLength(3)
 
     const primary = visualEngineering.fallbackChain[0]
     expect(primary.providers[0]).toBe("google")
-    expect(primary.model).toBe("gemini-3-pro")
+    expect(primary.model).toBe("gemini-3.1-pro")
     expect(primary.variant).toBe("high")
 
     const second = visualEngineering.fallbackChain[1]
@@ -319,18 +327,18 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
   })
 
-  test("artistry has valid fallbackChain with gemini-3-pro as primary", () => {
+  test("artistry has valid fallbackChain with gemini-3.1-pro as primary", () => {
     // given - artistry category requirement
     const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
 
     // when - accessing artistry requirement
-    // then - fallbackChain exists with gemini-3-pro as first entry
+    // then - fallbackChain exists with gemini-3.1-pro as first entry
     expect(artistry).toBeDefined()
     expect(artistry.fallbackChain).toBeArray()
     expect(artistry.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = artistry.fallbackChain[0]
-    expect(primary.model).toBe("gemini-3-pro")
+    expect(primary.model).toBe("gemini-3.1-pro")
     expect(primary.variant).toBe("high")
     expect(primary.providers[0]).toBe("google")
   })
@@ -340,7 +348,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
     // when - accessing writing requirement
-    // then - fallbackChain: gemini-3-flash → claude-sonnet-4-6
+    // then - fallbackChain: gemini-3-flash -> claude-sonnet-4-6
     expect(writing).toBeDefined()
     expect(writing.fallbackChain).toBeArray()
     expect(writing.fallbackChain).toHaveLength(2)
@@ -489,11 +497,43 @@ describe("requiresModel field in categories", () => {
     expect(deep.requiresModel).toBe("gpt-5.3-codex")
   })
 
-  test("artistry category has requiresModel set to gemini-3-pro", () => {
+  test("artistry category has requiresModel set to gemini-3.1-pro", () => {
     // given
     const artistry = CATEGORY_MODEL_REQUIREMENTS["artistry"]
 
     // when / #then
-    expect(artistry.requiresModel).toBe("gemini-3-pro")
+    expect(artistry.requiresModel).toBe("gemini-3.1-pro")
+  })
+})
+
+describe("gpt-5.3-codex provider restrictions", () => {
+  test("no gpt-5.3-codex entry in AGENT_MODEL_REQUIREMENTS includes github-copilot as provider", () => {
+    // given - all agent requirements
+    const allAgentEntries = Object.values(AGENT_MODEL_REQUIREMENTS).flatMap(
+      (req) => req.fallbackChain
+    )
+
+    // when - filtering entries with gpt-5.3-codex model
+    const codexEntries = allAgentEntries.filter((entry) => entry.model === "gpt-5.3-codex")
+
+    // then - none of them include github-copilot as a provider
+    for (const entry of codexEntries) {
+      expect(entry.providers).not.toContain("github-copilot")
+    }
+  })
+
+  test("no gpt-5.3-codex entry in CATEGORY_MODEL_REQUIREMENTS includes github-copilot as provider", () => {
+    // given - all category requirements
+    const allCategoryEntries = Object.values(CATEGORY_MODEL_REQUIREMENTS).flatMap(
+      (req) => req.fallbackChain
+    )
+
+    // when - filtering entries with gpt-5.3-codex model
+    const codexEntries = allCategoryEntries.filter((entry) => entry.model === "gpt-5.3-codex")
+
+    // then - none of them include github-copilot as a provider
+    for (const entry of codexEntries) {
+      expect(entry.providers).not.toContain("github-copilot")
+    }
   })
 })

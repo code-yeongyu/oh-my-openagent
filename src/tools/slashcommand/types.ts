@@ -1,6 +1,6 @@
 import type { LazyContentLoader } from "../../features/opencode-skill-loader"
 
-export type CommandScope = "builtin" | "config" | "user" | "project" | "opencode" | "opencode-project"
+export type CommandScope = "builtin" | "config" | "user" | "project" | "opencode" | "opencode-project" | "plugin"
 
 export interface CommandMetadata {
   name: string

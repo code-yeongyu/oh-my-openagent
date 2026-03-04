@@ -21,7 +21,6 @@ function tryUpdateMessageModel(
   )
   const result = stmt.run(targetModel.providerID, targetModel.modelID, messageId)
   if (result.changes === 0) return false
-
   if (variant) {
     db.prepare(
       `UPDATE message SET data = json_set(data, '$.variant', ?, '$.thinking', ?) WHERE id = ?`,

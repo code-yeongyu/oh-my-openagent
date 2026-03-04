@@ -12,6 +12,7 @@ import {
   createTasksTodowriteDisablerHook,
   createWriteExistingFileGuardHook,
   createHashlineReadEnhancerHook,
+  createReadImageResizerHook,
   createJsonErrorRecoveryHook,
   createDefinitionGatesHook,
 } from "../../hooks"
@@ -35,6 +36,7 @@ export type ToolGuardHooks = {
   hashlineReadEnhancer: ReturnType<typeof createHashlineReadEnhancerHook> | null
   jsonErrorRecovery: ReturnType<typeof createJsonErrorRecoveryHook> | null
   definitionGates: ReturnType<typeof createDefinitionGatesHook> | null
+  readImageResizer: ReturnType<typeof createReadImageResizerHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -100,7 +102,7 @@ export function createToolGuardHooks(args: {
     : null
 
   const hashlineReadEnhancer = isHookEnabled("hashline-read-enhancer")
-    ? safeHook("hashline-read-enhancer", () => createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.hashline_edit ?? true } }))
+    ? safeHook("hashline-read-enhancer", () => createHashlineReadEnhancerHook(ctx, { hashline_edit: { enabled: pluginConfig.hashline_edit ?? false } }))
     : null
 
   const jsonErrorRecovery = isHookEnabled("json-error-recovery")
@@ -109,6 +111,10 @@ export function createToolGuardHooks(args: {
 
   const definitionGates = isHookEnabled("definition-gates")
     ? safeHook("definition-gates", () => createDefinitionGatesHook(ctx))
+    : null
+
+  const readImageResizer = isHookEnabled("read-image-resizer")
+    ? safeHook("read-image-resizer", () => createReadImageResizerHook(ctx))
     : null
 
   return {
@@ -123,5 +129,6 @@ export function createToolGuardHooks(args: {
     hashlineReadEnhancer,
     jsonErrorRecovery,
     definitionGates,
+    readImageResizer,
   }
 }

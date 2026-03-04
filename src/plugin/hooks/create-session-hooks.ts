@@ -84,7 +84,7 @@ export function createSessionHooks(args: {
     isHookEnabled("preemptive-compaction") &&
     pluginConfig.experimental?.preemptive_compaction
       ? safeHook("preemptive-compaction", () =>
-          createPreemptiveCompactionHook(ctx, pluginConfig, modelCacheState as any))
+          createPreemptiveCompactionHook(ctx, pluginConfig, modelCacheState))
       : null
 
   const sessionRecovery = isHookEnabled("session-recovery")
@@ -177,7 +177,7 @@ export function createSessionHooks(args: {
 
   const anthropicContextWindowLimitRecovery = isHookEnabled("anthropic-context-window-limit-recovery")
     ? safeHook("anthropic-context-window-limit-recovery", () =>
-        createAnthropicContextWindowLimitRecoveryHook(ctx, { experimental: pluginConfig.experimental }))
+        createAnthropicContextWindowLimitRecoveryHook(ctx, { experimental: pluginConfig.experimental, pluginConfig }))
     : null
 
   const autoUpdateChecker = isHookEnabled("auto-update-checker")
@@ -234,7 +234,10 @@ export function createSessionHooks(args: {
     : null
 
   const noHephaestusNonGpt = isHookEnabled("no-hephaestus-non-gpt")
-    ? safeHook("no-hephaestus-non-gpt", () => createNoHephaestusNonGptHook(ctx))
+    ? safeHook("no-hephaestus-non-gpt", () =>
+      createNoHephaestusNonGptHook(ctx, {
+        allowNonGptModel: pluginConfig.agents?.hephaestus?.allow_non_gpt_model,
+      }))
     : null
 
   const questionLabelTruncator = isHookEnabled("question-label-truncator")
