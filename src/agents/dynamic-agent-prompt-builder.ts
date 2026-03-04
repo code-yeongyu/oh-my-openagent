@@ -189,9 +189,38 @@ export function buildCategorySkillsDelegationGuide(
     ]
      if (shouldCompress(combinedData, compressionConfig.threshold)) {
        const compressed = safeCompress(combinedData, "agent-prompt-builder")
-       return `[Compressed categories/skills data]\n${compressed}`
+       return `[Compressed categories/skills data]\n${compressed}\n\n---\n\n### MANDATORY: Category + Skill Selection Protocol
+
+**STEP 1: Select Category**
+- Read each category's description
+- Match task requirements to category domain
+- Select the category whose domain BEST fits the task
+
+**STEP 2: Evaluate ALL Skills**
+Check the \`skill\` tool for available skills and their descriptions. For EVERY skill, ask:
+> "Does this skill's expertise domain overlap with my task?"
+
+- If YES → INCLUDE in \`load_skills=[...]\`
+- If NO → OMIT (no justification needed)
+
+---
+
+### Delegation Pattern
+
+\`\`\`typescript
+task(
+  category="[selected-category]",
+  load_skills=["skill-1", "skill-2"],  // Include ALL relevant skills
+  prompt="..."
+)
+\`\`\`
+
+**ANTI-PATTERN (will produce poor results):**
+\`\`\`typescript
+task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
+\`\`\``
      }
-  }
+   }
   const categoryRows = categories.map((c) => {
     const desc = c.description || c.name
     return `- \`${c.name}\` — ${desc}`
