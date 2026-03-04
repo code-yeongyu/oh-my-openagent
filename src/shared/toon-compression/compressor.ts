@@ -131,6 +131,13 @@ function encodeWithTimeout(data: unknown, maxSize: number | undefined, useCase: 
     )
   }
 
+  const estimatedTime = estimateEncodingTime(data)
+  if (estimatedTime > COMPRESSION_TIMEOUT_MS) {
+    // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
+    log(`[toon-compression] [${useCase}] Skipped: estimated timeout`, { estimatedMs: Math.round(estimatedTime), timeoutMs: COMPRESSION_TIMEOUT_MS })
+    throw new Error(`TOON compression skipped: estimated encoding time ${Math.round(estimatedTime)}ms exceeds timeout ${COMPRESSION_TIMEOUT_MS}ms`)
+  }
+
   const startTime = Date.now()
   const compressed = encode(data)
   const duration = Date.now() - startTime
@@ -189,6 +196,7 @@ export type CompressionEvaluation = {
     isUniformArray: boolean
   }
   blockingReason?: string
+  stringifiedPayload?: string
 }
 
 export function evaluateCompressionConditions(data: unknown, threshold: number): CompressionEvaluation {
@@ -225,26 +233,26 @@ export function evaluateCompressionConditions(data: unknown, threshold: number):
 
   const payload = toPlainTextString(data)
   if (payload.length <= threshold) {
-    return { decision: false, conditions, blockingReason: "Payload below threshold" }
+    return { decision: false, conditions, blockingReason: "Payload below threshold", stringifiedPayload: payload }
   }
   conditions.aboveThreshold = true
 
   if (!Array.isArray(data)) {
-    return { decision: false, conditions, blockingReason: "Data is not an array" }
+    return { decision: false, conditions, blockingReason: "Data is not an array", stringifiedPayload: payload }
   }
   conditions.isArray = true
 
   if (data.length < MIN_COMPRESSIBLE_ARRAY_LENGTH) {
-    return { decision: false, conditions, blockingReason: "Array too short" }
+    return { decision: false, conditions, blockingReason: "Array too short", stringifiedPayload: payload }
   }
   conditions.arrayLongEnough = true
 
   if (!isUniformArray(data)) {
-    return { decision: false, conditions, blockingReason: "Array is not uniform" }
+    return { decision: false, conditions, blockingReason: "Array is not uniform", stringifiedPayload: payload }
   }
   conditions.isUniformArray = true
 
-  return { decision: true, conditions }
+  return { decision: true, conditions, stringifiedPayload: payload }
 }
 
 export function shouldCompress(data: unknown, threshold: number): boolean {
@@ -272,19 +280,19 @@ export function compressForLLM(data: unknown, config: ToonCompressionConfig, use
   }
 
   const evaluation = evaluateCompressionConditions(data, config.threshold)
-  const { decision, conditions, blockingReason } = evaluation
+  const { decision, conditions, blockingReason, stringifiedPayload } = evaluation
 
   // TEMPORARY: Debug logging - remove when PR merged to upstream/dev
   log(`[toon-compression] [${useCase}] trigger: validThreshold=${conditions.validThreshold}, notNull=${conditions.notNullOrUndefined}, notBinary=${conditions.notBinaryLike}, notError=${conditions.notErrorLike}, aboveThreshold=${conditions.aboveThreshold}, isArray=${conditions.isArray}, arrayLongEnough=${conditions.arrayLongEnough}, isUniform=${conditions.isUniformArray} → ${decision ? 'COMPRESS' : 'SKIP'} (${blockingReason || 'eligible'})`)
 
   if (!decision) {
-    return toPlainTextString(data)
+    return stringifiedPayload ?? toPlainTextString(data)
   }
 
   try {
     return encodeWithTimeout(data, config.maxEncodingSize, useCase)
   } catch (error) {
     log("[toon-compression] Compression failed, falling back to plain text:", error)
-    return toPlainTextString(data)
+    return stringifiedPayload ?? toPlainTextString(data)
   }
 }
