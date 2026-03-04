@@ -32,22 +32,7 @@ export async function executeSyncContinuation(
     })
   }
 
-  const syncContMeta = {
-    title: `Continue: ${args.description}`,
-    metadata: {
-      prompt: args.prompt,
-      load_skills: args.load_skills,
-      description: args.description,
-      run_in_background: args.run_in_background,
-      sessionId: args.session_id,
-      sync: true,
-      command: args.command,
-    },
-  }
-  await ctx.metadata?.(syncContMeta)
-  if (ctx.callID) {
-    storeToolMetadata(ctx.sessionID, ctx.callID, syncContMeta)
-  }
+  let syncContMeta: { title: string; metadata: Record<string, unknown> } | undefined
 
   let resumeAgent: string | undefined
   let resumeModel: { providerID: string; modelID: string } | undefined
@@ -76,6 +61,24 @@ export async function executeSyncContinuation(
         ? { providerID: resumeMessage.model.providerID, modelID: resumeMessage.model.modelID }
         : undefined
       resumeVariant = resumeMessage?.model?.variant
+    }
+
+    syncContMeta = {
+      title: `Continue: ${args.description}`,
+      metadata: {
+        prompt: args.prompt,
+        load_skills: args.load_skills,
+        description: args.description,
+        run_in_background: args.run_in_background,
+        sessionId: args.session_id,
+        sync: true,
+        command: args.command,
+        model: resumeModel,
+      },
+    }
+    await ctx.metadata?.(syncContMeta)
+    if (ctx.callID) {
+      storeToolMetadata(ctx.sessionID, ctx.callID, syncContMeta)
     }
 
     const allowTask = isPlanFamily(resumeAgent)
