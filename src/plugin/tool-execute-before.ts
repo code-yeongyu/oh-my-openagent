@@ -8,6 +8,7 @@ import { resolveSessionAgent } from "./session-agent-resolver"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "../hooks/ralph-loop/constants"
 import { readState, writeState } from "../hooks/ralph-loop/storage"
+import { sanitizeToolArgsNullBytes } from "../hooks/null-byte-sanitizer"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -21,6 +22,7 @@ export function createToolExecuteBeforeHandler(args: {
   const { ctx, hooks } = args
 
   return async (input, output): Promise<void> => {
+    sanitizeToolArgsNullBytes(input, output)
     await hooks.writeExistingFileGuard?.["tool.execute.before"]?.(input, output)
     await hooks.questionLabelTruncator?.["tool.execute.before"]?.(input, output)
     await hooks.claudeCodeHooks?.["tool.execute.before"]?.(input, output)
