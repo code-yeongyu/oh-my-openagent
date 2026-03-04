@@ -55,6 +55,7 @@ export async function tryFallbackRetry(args: {
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   queuesByKey: Map<string, QueueItem[]>
   processKey: (key: string) => void
+  connectedProviders?: string[] | null
   onRetrying?: (details: {
     task: BackgroundTask
     source: string
@@ -77,8 +78,9 @@ export async function tryFallbackRetry(args: {
   if (!canRetry) return false
 
   const attemptCount = task.attemptCount ?? 0
-  const providerModelsCache = deps.readProviderModelsCache()
-  const connectedProviders = providerModelsCache?.connected ?? deps.readConnectedProvidersCache()
+  const connectedProviders = args.connectedProviders !== undefined
+    ? args.connectedProviders
+    : (deps.readProviderModelsCache()?.connected ?? deps.readConnectedProvidersCache())
   const connectedSet = connectedProviders ? new Set(connectedProviders.map(p => p.toLowerCase())) : null
 
   const isReachable = (entry: FallbackEntry): boolean => {

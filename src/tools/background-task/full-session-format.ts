@@ -1,7 +1,7 @@
 import type { BackgroundTask } from "../../features/background-agent"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult, BackgroundOutputMessage } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
-import { formatMessageTime } from "./time-format"
+import { formatMessageTime, getTimeTimestamp } from "./time-format"
 import { truncateText } from "./truncate-text"
 import { formatTaskStatus } from "./task-status-format"
 import { getBackgroundOutputFetchTimeoutMs, withSdkCallTimeout } from "./with-sdk-call-timeout"
@@ -67,9 +67,9 @@ export async function formatFullSession(
   }
 
   const sortedMessages = [...rawMessages].sort((a, b) => {
-    const timeA = String(a.info?.time ?? "")
-    const timeB = String(b.info?.time ?? "")
-    return timeA.localeCompare(timeB)
+    const timeA = getTimeTimestamp(a.info?.time)
+    const timeB = getTimeTimestamp(b.info?.time)
+    return timeA - timeB
   })
 
   let filteredMessages = sortedMessages

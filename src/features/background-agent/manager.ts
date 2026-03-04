@@ -263,6 +263,7 @@ export class BackgroundManager {
   private loggedSessionStatusUnavailable = false
   readonly taskHistory = new TaskHistory()
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
+  private connectedProvidersOverride?: string[] | null
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -857,7 +858,7 @@ The fallback retry session is now created and can be inspected directly.
     const launchTools = {
       task: false,
       call_omo_agent: true,
-      question: false,
+      question: true,
       ...getAgentToolRestrictions(input.agent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
       }),
@@ -1315,7 +1316,7 @@ The fallback retry session is now created and can be inspected directly.
             const tools = {
               task: false,
               call_omo_agent: true,
-              question: false,
+              question: true,
               ...getAgentToolRestrictions(existingTask.agent, {
                 includeTeamToolDenylist: existingTask.teamRunId === undefined,
               }),
@@ -1948,6 +1949,7 @@ The fallback retry session is now created and can be inspected directly.
       idleDeferralTimers: this.idleDeferralTimers,
       queuesByKey: this.queuesByKey,
       processKey: (key: string) => this.processKey(key),
+      connectedProviders: this.connectedProvidersOverride,
       onRetrying: ({ task, source }) => {
         const currentAttempt = getCurrentAttempt(task)
         const previousAttempt = getPreviousAttempt(task, currentAttempt?.attemptId)

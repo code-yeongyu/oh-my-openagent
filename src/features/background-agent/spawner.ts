@@ -37,7 +37,7 @@ export function buildFallbackBody(
     tools: {
       task: false,
       call_omo_agent: true,
-      question: false,
+      question: true,
       ...getAgentToolRestrictions(fallbackAgent, options),
     },
   }
@@ -170,7 +170,7 @@ export async function startTask(
     tools: {
       task: false,
       call_omo_agent: true,
-      question: false,
+      question: true,
       ...getAgentToolRestrictions(normalizedAgent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
       }),

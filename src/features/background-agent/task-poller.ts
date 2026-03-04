@@ -11,7 +11,6 @@ import {
   DEFAULT_SESSION_GONE_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
   MIN_RUNTIME_BEFORE_STALE_MS,
-  TERMINAL_TASK_TTL_MS,
   TASK_TTL_MS,
 } from "./constants"
 import { abortWithTimeout } from "./abort-with-timeout"
@@ -39,28 +38,8 @@ export function pruneStaleTasksAndNotifications(args: {
   const { tasks, notifications, onTaskPruned } = args
   const effectiveTtl = args.taskTtlMs ?? TASK_TTL_MS
   const now = Date.now()
-  const tasksWithPendingNotifications = new Set<string>()
-
-  for (const queued of notifications.values()) {
-    for (const task of queued) {
-      tasksWithPendingNotifications.add(task.id)
-    }
-  }
-
   for (const [taskId, task] of tasks.entries()) {
-    if (TERMINAL_TASK_STATUSES.has(task.status)) {
-      if (tasksWithPendingNotifications.has(taskId)) continue
-
-      const completedAt = task.completedAt?.getTime()
-      if (!completedAt) continue
-
-      const age = now - completedAt
-      if (age <= TERMINAL_TASK_TTL_MS) continue
-
-      removeTaskToastTracking(taskId)
-      tasks.delete(taskId)
-      continue
-    }
+    if (TERMINAL_TASK_STATUSES.has(task.status)) continue
 
     if (task.teamRunId) {
       continue

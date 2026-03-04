@@ -3,12 +3,8 @@ import { extractErrorMessage } from "../../features/background-agent/error-class
 import { consumeNewMessages } from "../../shared/session-cursor"
 import type { BackgroundOutputClient, BackgroundOutputMessagesResult } from "./clients"
 import { extractMessages, getErrorMessage } from "./session-messages"
-import { formatDuration } from "./time-format"
+import { formatDuration, getTimeTimestamp } from "./time-format"
 import { getBackgroundOutputFetchTimeoutMs, withSdkCallTimeout } from "./with-sdk-call-timeout"
-
-function getTimeString(value: unknown): string {
-  return typeof value === "string" ? value : ""
-}
 
 export async function formatTaskResult(task: BackgroundTask, client: BackgroundOutputClient): Promise<string> {
   if (!task.sessionId) {
@@ -59,9 +55,9 @@ Session ID: ${task.sessionId}
   }
 
   const sortedMessages = [...relevantMessages].sort((a, b) => {
-    const timeA = getTimeString(a.info?.time)
-    const timeB = getTimeString(b.info?.time)
-    return timeA.localeCompare(timeB)
+    const timeA = getTimeTimestamp(a.info?.time)
+    const timeB = getTimeTimestamp(b.info?.time)
+    return timeA - timeB
   })
 
   const sessionError = sortedMessages

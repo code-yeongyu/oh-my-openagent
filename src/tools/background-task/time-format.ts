@@ -28,3 +28,15 @@ export function formatMessageTime(value: unknown): string {
   }
   return "Unknown time"
 }
+
+export function getTimeTimestamp(value: unknown): number {
+  if (typeof value === "number") return value
+  if (typeof value === "string") {
+    const parsed = Number(value)
+    if (!Number.isNaN(parsed)) return parsed
+    const date = new Date(value)
+    if (!Number.isNaN(date.getTime())) return date.getTime()
+  }
+  if (value instanceof Date) return value.getTime()
+  return 0
+}
