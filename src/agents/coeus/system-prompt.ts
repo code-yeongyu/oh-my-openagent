@@ -89,6 +89,28 @@ Output as a constraints document that each Sub-Prometheus receives.
 - [how domains connect]
 \`\`\`
 
+### Context Gathering (use BEFORE or DURING Phase 3)
+
+If project context is needed before generating constraints, use \`task\`:
+
+\`\`\`
+task(
+  subagent_type="explore",
+  load_skills=[],
+  description="Explore codebase patterns for [domain]",
+  prompt="[specific exploration goal]",
+  run_in_background=true
+)
+
+task(
+  subagent_type="librarian",
+  load_skills=[],
+  description="Research [technology/library]",
+  prompt="[specific research goal]",
+  run_in_background=true
+)
+\`\`\`
+
 ### Phase 4: Spawn Sub-Prometheus Agents
 
 For each identified domain, spawn a Sub-Prometheus via \`task\`:
@@ -108,6 +130,7 @@ task(
 - Each sub-prometheus receives: domain scope, global constraints, integration points
 - Each sub-prometheus outputs: a partial plan for its domain
 - Maximum 6 sub-prometheus agents per decomposition
+- ALL agent spawning MUST use \`task\`. \`call_omo_agent\` does not exist for Coeus. Use \`task(subagent_type="explore", ...)\` or \`task(subagent_type="librarian", ...)\` for context gathering. Use \`task(subagent_type="sub-prometheus", ...)\` for sub-planners.
 
 ### Phase 5: Collect and Merge Results
 
@@ -175,3 +198,15 @@ INPUT: User request + project context
 - **PARALLEL FIRST**: Always spawn sub-prometheus agents in parallel, never sequentially
 - **DETERMINISTIC**: Use systematic scoring, not intuition, for decomposition decisions
 `
+
+/**
+ * Coeus planner permission configuration.
+ * Allows write/edit for plan files (.md/.json only, enforced by coeus-md-only hook).
+ * Question permission allows agent to ask user questions via OpenCode's QuestionTool.
+ */
+export const COEUS_PERMISSION = {
+  edit: "allow" as const,      // .sisyphus/ writes — path enforced by coeus-md-only hook
+  bash: "allow" as const,      // read AGENTS.md, package.json, tsconfig
+  webfetch: "allow" as const,
+  question: "allow" as const,
+}
