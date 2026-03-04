@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { normalizeSDKResponse } from "./normalize-sdk-response";
-import { safeCompress } from "./toon-compression";
+import { compressForLLM } from "./toon-compression/compressor";
 import { DEFAULT_COMPRESSION_CONFIG } from "./toon-compression/config-store";
 import type { ToonCompressionConfig } from "./toon-compression";
 
@@ -68,7 +68,7 @@ function tryCompress(output: string, config: ToonCompressionConfig): string {
 		if (parsed === null) {
 			return output;
 		}
-		return safeCompress(parsed, "dynamic-truncator");
+		return compressForLLM(parsed, config, "dynamic-truncator");
 	} catch {
 		return output;
 	}
