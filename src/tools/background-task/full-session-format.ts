@@ -180,6 +180,10 @@ export async function formatFullSession(
         if (part.type === "reasoning" && part.text) {
           return { ...part, text: truncateText(part.text, thinkingMaxChars) }
         }
+        if (part.type === "tool_result") {
+          const toolTexts = extractToolResultText(part)
+          return { type: "tool_result" as const, content: toolTexts.join("\n") }
+        }
         return part
       }),
     }))

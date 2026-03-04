@@ -51,6 +51,11 @@ export function compressSessionPromptData(
 export function preparePromptWithCompression(
   prompt: string
 ): string {
+  const trimmed = prompt.trim()
+  if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+    return prompt
+  }
+
   // Try to parse as JSON to see if it's structured data
   try {
     const parsed = JSON.parse(prompt)

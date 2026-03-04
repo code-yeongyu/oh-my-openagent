@@ -69,6 +69,8 @@ export function createToolExecuteAfterHandler(args: {
       }
     }
 
+    // OpenCode SDK can pass undefined for output.output due to breaking changes
+    if (output.output === undefined) return
     output.output = compressOutputIfEligible(output.output, compressionConfig)
 
     await hooks.claudeCodeHooks?.["tool.execute.after"]?.(input, output)
