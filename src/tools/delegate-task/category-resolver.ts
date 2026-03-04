@@ -175,8 +175,7 @@ Available categories: ${categoryNames.join(", ")}`,
   }
 
   const unstableModel = actualModel?.toLowerCase()
-  const categoryConfigModel = resolved.config.model?.toLowerCase()
-  const isUnstableAgent = resolved.config.is_unstable_agent === true || [unstableModel, categoryConfigModel].some(m => m ? m.includes("gemini") || m.includes("minimax") || m.includes("kimi") : false)
+  const isUnstableAgent = resolved.config.is_unstable_agent === true || (unstableModel != null && (unstableModel.includes("gemini") || unstableModel.includes("minimax") || unstableModel.includes("kimi")))
 
   return {
     agentToUse: SISYPHUS_JUNIOR_AGENT,

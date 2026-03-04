@@ -221,4 +221,78 @@ describe("executeUnstableAgentTask - interrupt detection", () => {
     expect(result.toLowerCase()).toContain("stale timeout")
     expect(elapsed).toBeLessThan(400)
   })
+
+  test("should complete gracefully when getTask returns undefined (race condition)", async () => {
+    //#given - a background task where getTask returns undefined (task cleaned up before poll)
+    let pollCount = 0
+    const launchState = {
+      id: "bg_test_race",
+      sessionID: "ses_test_race",
+      status: "running" as string,
+      description: "test race condition",
+      prompt: "test prompt",
+      agent: "sisyphus-junior",
+      error: undefined as string | undefined,
+    }
+
+    const mockManager = {
+      launch: async () => launchState,
+      getTask: () => {
+        pollCount++
+        if (pollCount >= 2) return undefined
+        return launchState
+      },
+    }
+
+    const mockClient = {
+      session: {
+        status: async () => ({ data: { [launchState.sessionID!]: { type: "idle" } } }),
+        messages: async () => ({
+          data: [{
+            info: { role: "assistant", time: { created: Date.now() } },
+            parts: [{ type: "text", text: "Task result" }],
+          }],
+        }),
+      },
+    }
+
+    const { executeUnstableAgentTask } = require("./unstable-agent-task")
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      manager: mockManager,
+      client: mockClient,
+      directory: "/tmp",
+    }
+
+    const parentContext = {
+      sessionID: "parent-session",
+      messageID: "msg-123",
+    }
+
+    //#when - getTask returns undefined during polling (race condition)
+    const startTime = Date.now()
+    const result = await executeUnstableAgentTask(
+      args, mockCtx, mockExecutorCtx, parentContext,
+      "test-agent", undefined, undefined, "test-model"
+    )
+    const elapsed = Date.now() - startTime
+
+    //#then - should complete successfully, not crash or timeout
+    expect(result).toContain("COMPLETED SUCCESSFULLY")
+    expect(elapsed).toBeLessThan(400)
+  })
 })
