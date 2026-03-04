@@ -91,6 +91,7 @@ export async function executeSyncTask(
         sessionId: sessionID,
         sync: true,
         command: args.command,
+        model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
       },
     }
     await ctx.metadata?.(syncTaskMeta)

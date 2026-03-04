@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process"
-import { existsSync, mkdtempSync, unlinkSync, writeFileSync, readFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { log } from "../../shared"
 
 const SUPPORTED_FORMATS = new Set([
@@ -32,6 +32,8 @@ const UNSUPPORTED_FORMATS = new Set([
   "image/x-photoshop",
 ])
 
+const CONVERSION_TIMEOUT_MS = 30_000
+
 export function needsConversion(mimeType: string): boolean {
   if (SUPPORTED_FORMATS.has(mimeType)) {
     return false
@@ -57,9 +59,10 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
   try {
     if (process.platform === "darwin") {
       try {
-        execFileSync("sips", ["-s", "format", "jpeg", inputPath, "--out", outputPath], {
+        execFileSync("sips", ["-s", "format", "jpeg", "--", inputPath, "--out", outputPath], {
           stdio: "pipe",
           encoding: "utf-8",
+          timeout: CONVERSION_TIMEOUT_MS,
         })
         
         if (existsSync(outputPath)) {
@@ -72,9 +75,11 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
     }
 
     try {
-      execFileSync("convert", [inputPath, outputPath], {
+      const imagemagickCommand = process.platform === "darwin" ? "convert" : "magick"
+      execFileSync(imagemagickCommand, ["--", inputPath, outputPath], {
         stdio: "pipe",
         encoding: "utf-8",
+        timeout: CONVERSION_TIMEOUT_MS,
       })
       
       if (existsSync(outputPath)) {
@@ -97,6 +102,11 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
         unlinkSync(outputPath)
       }
     } catch {}
+
+    if (error instanceof Error) {
+      const conversionError = error as Error & { temporaryOutputPath?: string }
+      conversionError.temporaryOutputPath = outputPath
+    }
     
     throw error
   }
@@ -104,9 +114,14 @@ export function convertImageToJpeg(inputPath: string, mimeType: string): string 
 
 export function cleanupConvertedImage(filePath: string): void {
   try {
+    const tempDirectory = dirname(filePath)
     if (existsSync(filePath)) {
       unlinkSync(filePath)
       log(`[image-converter] Cleaned up temporary file: ${filePath}`)
+    }
+    if (existsSync(tempDirectory)) {
+      rmSync(tempDirectory, { recursive: true, force: true })
+      log(`[image-converter] Cleaned up temporary directory: ${tempDirectory}`)
     }
   } catch (error) {
     log(`[image-converter] Failed to cleanup ${filePath}: ${error}`)
