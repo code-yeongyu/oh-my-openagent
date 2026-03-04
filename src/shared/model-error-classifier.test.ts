@@ -36,6 +36,20 @@ describe("model-error-classifier", () => {
     expect(result).toBe(true)
   })
 
+  test("treats cooling-down auto-retry messages as retryable", () => {
+    //#given
+    const error = {
+      message:
+        "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+    }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
   test("selectFallbackProvider prefers first connected provider in preference order", () => {
     //#given
     writeFileSync(
@@ -72,5 +86,19 @@ describe("model-error-classifier", () => {
 
     //#then
     expect(provider).toBe("anthropic")
+  })
+
+  test("selectFallbackProvider maps opencode fallback to quotio when quotio is connected", () => {
+    //#given
+    writeFileSync(
+      join(TEST_CACHE_DIR, "connected-providers.json"),
+      JSON.stringify({ connected: ["quotio"], updatedAt: new Date().toISOString() }, null, 2),
+    )
+
+    //#when
+    const provider = selectFallbackProvider(["opencode"], "quotio")
+
+    //#then
+    expect(provider).toBe("quotio")
   })
 })

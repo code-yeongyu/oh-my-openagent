@@ -36,6 +36,11 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "rate_limit",
   "rate limit",
   "quota",
+  "quota will reset after",
+  "usage limit has been reached",
+  "all credentials for model",
+  "cooling down",
+  "exhausted your capacity",
   "not found",
   "unavailable",
   "insufficient",
@@ -54,6 +59,23 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "502",
   "504",
 ]
+
+const AUTO_RETRY_GATE_PATTERNS = [
+  "rate limit",
+  "quota",
+  "usage limit",
+  "limit reached",
+  "cooling down",
+  "credentials for model",
+  "exhausted your capacity",
+]
+
+function hasProviderAutoRetrySignal(message: string): boolean {
+  if (!message.includes("retrying in")) {
+    return false
+  }
+  return AUTO_RETRY_GATE_PATTERNS.some((pattern) => message.includes(pattern))
+}
 
 export interface ErrorInfo {
   name?: string
@@ -79,6 +101,9 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
 
   // Check message patterns for unknown errors
   const msg = error.message?.toLowerCase() ?? ""
+  if (hasProviderAutoRetrySignal(msg)) {
+    return true
+  }
   return RETRYABLE_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
 }
 
@@ -124,6 +149,14 @@ export function selectFallbackProvider(
   const connectedProviders = readConnectedProvidersCache()
   if (connectedProviders) {
     const connectedSet = new Set(connectedProviders.map(p => p.toLowerCase()))
+    if (connectedSet.has("quotio")) {
+      const hasQuotio = providers.some((p) => p.toLowerCase() === "quotio")
+      const hasOpencode = providers.some((p) => p.toLowerCase() === "opencode")
+      if (hasQuotio || hasOpencode) {
+        return "quotio"
+      }
+    }
+
     for (const provider of providers) {
       if (connectedSet.has(provider.toLowerCase())) {
         return provider

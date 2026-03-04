@@ -387,6 +387,130 @@ describe("runtime-fallback", () => {
       expect(fallbackLog?.data).toMatchObject({ from: "openai/gpt-5.3-codex", to: "anthropic/claude-opus-4-6" })
     })
 
+    test("should trigger fallback on session.status auto-retry signal", async () => {
+      const promptCalls: unknown[] = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "continue" }],
+                },
+              ],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2"]),
+        }
+      )
+
+      const sessionID = "test-session-status-auto-retry"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "quotio/claude-opus-4-6" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.status",
+          properties: {
+            sessionID,
+            status: {
+              type: "retry",
+              attempt: 1,
+              message: "All credentials for model claude-opus-4-6 are cooling down [retrying in 7m 56s attempt #1]",
+            },
+          },
+        },
+      })
+
+      const signalLog = logCalls.find((c) => c.msg.includes("Detected provider auto-retry signal in session.status"))
+      expect(signalLog).toBeDefined()
+
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({ from: "quotio/claude-opus-4-6", to: "openai/gpt-5.2" })
+      expect(promptCalls.length).toBe(1)
+    })
+
+    test("should deduplicate session.status countdown updates for the same retry attempt", async () => {
+      const promptCalls: unknown[] = []
+      const hook = createRuntimeFallbackHook(
+        createMockPluginInput({
+          session: {
+            messages: async () => ({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "continue" }],
+                },
+              ],
+            }),
+            promptAsync: async (args) => {
+              promptCalls.push(args)
+              return {}
+            },
+          },
+        }),
+        {
+          config: createMockConfig({ notify_on_fallback: false }),
+          pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.2"]),
+        }
+      )
+
+      const sessionID = "test-session-status-dedup"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "quotio/claude-opus-4-6" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.status",
+          properties: {
+            sessionID,
+            status: {
+              type: "retry",
+              attempt: 1,
+              message: "All credentials for model claude-opus-4-6 are cooling down [retrying in 7m 56s attempt #1]",
+            },
+          },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.status",
+          properties: {
+            sessionID,
+            status: {
+              type: "retry",
+              attempt: 1,
+              message: "All credentials for model claude-opus-4-6 are cooling down [retrying in 7m 55s attempt #1]",
+            },
+          },
+        },
+      })
+
+      expect(promptCalls.length).toBe(1)
+    })
+
     test("should NOT trigger fallback on auto-retry signal when timeout_seconds is 0", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false, timeout_seconds: 0 }),

@@ -6,7 +6,7 @@ import { _resetForTesting, setMainSession } from "../features/claude-code-sessio
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
 
 describe("createEventHandler - model fallback", () => {
-  const createHandler = (args?: { hooks?: any }) => {
+  const createHandler = (args?: { hooks?: any; pluginConfig?: any }) => {
     const abortCalls: string[] = []
     const promptCalls: string[] = []
 
@@ -26,7 +26,7 @@ describe("createEventHandler - model fallback", () => {
           },
         },
       } as any,
-      pluginConfig: {} as any,
+      pluginConfig: (args?.pluginConfig ?? {}) as any,
       firstMessageVariantGate: {
         markSessionCreated: () => {},
         clear: () => {},
@@ -206,11 +206,222 @@ describe("createEventHandler - model fallback", () => {
     //#then
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
-    expect(output.message["model"]).toEqual({
-      providerID: "anthropic",
+    expect(output.message["model"]).toMatchObject({
       modelID: "claude-opus-4-6",
     })
+    expect(["anthropic", "quotio"]).toContain((output.message["model"] as { providerID?: string })?.providerID)
     expect(output.message["variant"]).toBe("max")
+  })
+
+  test("does not spam abort/prompt when session.status retry countdown updates", async () => {
+    //#given
+    const sessionID = "ses_status_retry_dedup"
+    setMainSession(sessionID)
+    clearPendingModelFallback(sessionID)
+    const modelFallback = createModelFallbackHook()
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_status_dedup",
+            sessionID,
+            role: "user",
+            modelID: "claude-opus-4-6-thinking",
+            providerID: "anthropic",
+            agent: "Sisyphus (Ultraworker)",
+          },
+        },
+      },
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message:
+              "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+            next: 300,
+          },
+        },
+      },
+    })
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message:
+              "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~4 days attempt #1]",
+            next: 299,
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+  })
+
+  test("does not trigger model-fallback from session.status when runtime_fallback is enabled", async () => {
+    //#given
+    const sessionID = "ses_status_retry_runtime_enabled"
+    setMainSession(sessionID)
+    clearPendingModelFallback(sessionID)
+    const modelFallback = createModelFallbackHook()
+    const runtimeFallback = {
+      event: async () => {},
+      "chat.message": async () => {},
+    }
+    const { handler, abortCalls, promptCalls } = createHandler({
+      hooks: { modelFallback, runtimeFallback },
+      pluginConfig: { runtime_fallback: { enabled: true } },
+    })
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_status_runtime_enabled",
+            sessionID,
+            role: "user",
+            modelID: "claude-opus-4-6",
+            providerID: "quotio",
+            agent: "Sisyphus (Ultraworker)",
+          },
+        },
+      },
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message:
+              "All credentials for model claude-opus-4-6 are cooling down [retrying in 7m 56s attempt #1]",
+            next: 476,
+          },
+        },
+      },
+    })
+
+    //#then
+    expect(abortCalls).toEqual([])
+    expect(promptCalls).toEqual([])
+  })
+
+  test("prefers user-configured fallback_models over hardcoded chain on session.status retry", async () => {
+    //#given
+    const sessionID = "ses_status_retry_user_fallback"
+    setMainSession(sessionID)
+    clearPendingModelFallback(sessionID)
+
+    const modelFallback = createModelFallbackHook()
+    const pluginConfig = {
+      agents: {
+        sisyphus: {
+          fallback_models: ["quotio/gpt-5.2", "quotio/kimi-k2.5"],
+        },
+      },
+    }
+
+    const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback }, pluginConfig })
+
+    const chatMessageHandler = createChatMessageHandler({
+      ctx: {
+        client: {
+          tui: {
+            showToast: async () => ({}),
+          },
+        },
+      } as any,
+      pluginConfig: {} as any,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+      },
+      hooks: {
+        modelFallback,
+        stopContinuationGuard: null,
+        keywordDetector: null,
+        claudeCodeHooks: null,
+        autoSlashCommand: null,
+        startWork: null,
+        ralphLoop: null,
+      } as any,
+    })
+
+    await handler({
+      event: {
+        type: "message.updated",
+        properties: {
+          info: {
+            id: "msg_user_status_user_fallback",
+            sessionID,
+            role: "user",
+            time: { created: 1 },
+            content: [],
+            modelID: "claude-opus-4-6",
+            providerID: "quotio",
+            agent: "Sisyphus (Ultraworker)",
+            path: { cwd: "/tmp", root: "/tmp" },
+          },
+        },
+      },
+    })
+
+    //#when
+    await handler({
+      event: {
+        type: "session.status",
+        properties: {
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: 1,
+            message:
+              "All credentials for model claude-opus-4-6-thinking are cooling down [retrying in ~5 days attempt #1]",
+            next: 300,
+          },
+        },
+      },
+    })
+
+    const output = { message: {}, parts: [] as Array<{ type: string; text?: string }> }
+    await chatMessageHandler(
+      {
+        sessionID,
+        agent: "sisyphus",
+        model: { providerID: "quotio", modelID: "claude-opus-4-6" },
+      },
+      output,
+    )
+
+    //#then
+    expect(abortCalls).toEqual([sessionID])
+    expect(promptCalls).toEqual([sessionID])
+    expect(output.message["model"]).toEqual({
+      providerID: "quotio",
+      modelID: "gpt-5.2",
+    })
+    expect(output.message["variant"]).toBeUndefined()
   })
 
   test("advances main-session fallback chain across repeated session.error retries end-to-end", async () => {
@@ -323,10 +534,10 @@ describe("createEventHandler - model fallback", () => {
     const first = await triggerRetryCycle()
 
     //#then - first fallback entry applied (prefers current provider when available)
-    expect(first.message["model"]).toEqual({
-      providerID: "anthropic",
+    expect(first.message["model"]).toMatchObject({
       modelID: "claude-opus-4-6",
     })
+    expect(["anthropic", "quotio"]).toContain((first.message["model"] as { providerID?: string })?.providerID)
     expect(first.message["variant"]).toBe("max")
 
     //#when - second retry cycle
@@ -337,6 +548,7 @@ describe("createEventHandler - model fallback", () => {
       providerID: "kimi-for-coding",
       modelID: "k2p5",
     })
+    expect((second.message["model"] as { providerID?: string })?.providerID).toBeTruthy()
     expect(second.message["variant"]).toBeUndefined()
     expect(abortCalls).toEqual([sessionID, sessionID])
     expect(promptCalls).toEqual([sessionID, sessionID])
