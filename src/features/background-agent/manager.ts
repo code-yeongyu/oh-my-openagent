@@ -6,7 +6,7 @@ import type {
   ResumeInput,
 } from "./types"
 import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
-import { safeCompress } from "../../shared/toon-compression"
+import { compressForLLM } from "../../shared/toon-compression"
 import { TaskHistory } from "./task-history"
 import {
   log,
@@ -158,7 +158,7 @@ export class BackgroundManager {
     try {
       const parsed = JSON.parse(prompt)
       if (typeof parsed === "object" && parsed !== null) {
-        return safeCompress(parsed, "background-agent-manager")
+        return compressForLLM(parsed, config, "background-agent-manager")
       }
     } catch {
       // Not valid JSON, return as-is

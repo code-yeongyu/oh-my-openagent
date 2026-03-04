@@ -3,7 +3,7 @@ import type { ToonCompressionConfig } from "../../config/schema/toon-compression
 
 import { THINKING_TYPES } from "../session-recovery/constants"
 
-import { safeCompress, evaluateCompressionConditions } from "../../shared/toon-compression"
+import { compressForLLM, evaluateCompressionConditions } from "../../shared/toon-compression"
 import { log } from "../../shared"
 
 type MessageWithParts = {
@@ -149,7 +149,7 @@ export function createMessageBatchCompressorHook(
       }
 
       const originalPayload = safeStringify(batchData)
-      const compressed = safeCompress(batchData, "message-batch-compressor")
+      const compressed = compressForLLM(batchData, config, "message-batch-compressor")
 
       const compressionApplied = compressed !== originalPayload
       if (!compressionApplied) {

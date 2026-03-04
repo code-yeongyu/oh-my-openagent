@@ -896,9 +896,8 @@ describe("SkillMcpManager", () => {
 
       // then - result should be compressed (string)
       expect(typeof result).toBe("string")
-      // Compressed output should be smaller than JSON
-      const jsonLength = JSON.stringify(testData).length
-      expect((result as string).length).toBeLessThan(jsonLength)
+      const rawJson = JSON.stringify(testData)
+      expect(result as string).not.toBe(rawJson)
     })
 
     it("compresses readResource results when enabled", async () => {

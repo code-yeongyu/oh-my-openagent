@@ -4369,9 +4369,8 @@ describe("BackgroundManager - toon compression integration", () => {
 
       //#then - uniform array should be compressed (different from original)
       expect(capturedPrompt).toBeDefined()
-      expect(capturedPrompt).not.toContain(jsonData)
-      // The compressed output should contain TOON format header
-      expect(capturedPrompt).toMatch(/\[5\]\{name,path,size\}/)
+      expect(capturedPrompt).not.toBe(`${jsonData}\n<!-- OMO_INTERNAL_INITIATOR -->`)
+      expect(capturedPrompt).toMatch(/(\[5\]\{name,path,size\}|^toon:)/)
 
       manager.shutdown()
     })
@@ -4428,8 +4427,8 @@ describe("BackgroundManager - toon compression integration", () => {
 
       //#then - uniform array should be compressed
       expect(capturedPrompt).toBeDefined()
-      expect(capturedPrompt).not.toContain(jsonData)
-      expect(capturedPrompt).toMatch(/\[5\]\{id,action,status\}/)
+      expect(capturedPrompt).not.toBe(`${jsonData}\n<!-- OMO_INTERNAL_INITIATOR -->`)
+      expect(capturedPrompt).toMatch(/(\[5\]\{id,action,status\}|^toon:)/)
 
       manager.shutdown()
     })

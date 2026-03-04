@@ -1,4 +1,4 @@
-import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
+import { compressForLLM, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
 import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js"
@@ -34,8 +34,8 @@ export class SkillMcpManager {
      if (!this.compressionConfig.enabled) {
        return data
      }
-     return safeCompress(data, "skill-mcp-manager")
-   }
+      return compressForLLM(data, this.compressionConfig, "skill-mcp-manager")
+    }
 
 
 

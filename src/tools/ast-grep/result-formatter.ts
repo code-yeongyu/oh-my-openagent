@@ -1,5 +1,5 @@
 import type { AnalyzeResult, SgResult } from "./types"
-import { safeCompress } from "../../shared/toon-compression"
+import { compressForLLM } from "../../shared/toon-compression"
 import type { ToonCompressionConfig } from "../../shared/toon-compression"
 
 const DEFAULT_CONFIG: ToonCompressionConfig = { enabled: false, threshold: 5000 }
@@ -21,8 +21,9 @@ export function formatSearchResult(result: SgResult, config: ToonCompressionConf
       end: { ...match.range.end, line: match.range.end.line + 1, character: match.range.end.column + 1 }
     }
   }))
-  const compressed = safeCompress(matchesWith1IndexedLines, "ast-grep-search")
-  if (compressed.startsWith("toon:")) {
+  const plain = JSON.stringify(matchesWith1IndexedLines)
+  const compressed = compressForLLM(matchesWith1IndexedLines, config, "ast-grep-search")
+  if (compressed !== plain) {
     const lines: string[] = []
     if (result.truncated) {
       const reason = result.truncatedReason === "max_matches"
@@ -77,8 +78,9 @@ export function formatReplaceResult(result: SgResult, isDryRun: boolean, config:
       end: { ...match.range.end, line: match.range.end.line + 1, character: match.range.end.column + 1 }
     }
   }))
-  const compressed = safeCompress(matchesWith1IndexedLines, "ast-grep-replace")
-  if (compressed.startsWith("toon:")) {
+  const plain = JSON.stringify(matchesWith1IndexedLines)
+  const compressed = compressForLLM(matchesWith1IndexedLines, config, "ast-grep-replace")
+  if (compressed !== plain) {
     const prefix = isDryRun ? "[DRY RUN] " : ""
     const lines: string[] = []
     if (result.truncated) {
@@ -138,8 +140,9 @@ export function formatAnalyzeResult(results: AnalyzeResult[], extractedMetaVars:
       end: { ...result.range.end, line: result.range.end.line + 1, character: result.range.end.column + 1 }
     }
   }))
-  const compressed = safeCompress(resultsWith1IndexedLines, "ast-grep-analyze")
-  if (compressed.startsWith("toon:")) {
+  const plain = JSON.stringify(resultsWith1IndexedLines)
+  const compressed = compressForLLM(resultsWith1IndexedLines, config, "ast-grep-analyze")
+  if (compressed !== plain) {
     const lines: string[] = [`Found ${results.length} match(es):\n`]
     lines.push(compressed)
     return lines.join("\n")
