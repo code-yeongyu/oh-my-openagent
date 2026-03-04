@@ -42,7 +42,9 @@ export interface SystemInfo {
   loadedVersion: string | null
   bunVersion: string | null
   configPath: string | null
+  omoConfigPath: string | null
   configValid: boolean
+  omoConfigValid: boolean
   isLocalDev: boolean
 }
 

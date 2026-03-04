@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
 
 import { MIN_OPENCODE_VERSION, CHECK_IDS, CHECK_NAMES } from "../constants"
 import type { CheckResult, DoctorIssue, SystemInfo } from "../types"
@@ -31,12 +32,26 @@ function buildMessage(status: CheckResult["status"], issues: DoctorIssue[]): str
   return `${issues.length} system warning(s) detected`
 }
 
+function findOmoConfigPath(configPath: string | null): string | null {
+  if (!configPath) return null
+  const configDir = dirname(configPath)
+
+  const jsoncPath = join(configDir, "oh-my-opencode.jsonc")
+  if (existsSync(jsoncPath)) return jsoncPath
+
+  const jsonPath = join(configDir, "oh-my-opencode.json")
+  if (existsSync(jsonPath)) return jsonPath
+
+  return null
+}
+
 export async function gatherSystemInfo(): Promise<SystemInfo> {
   const [binaryInfo, pluginInfo] = await Promise.all([findOpenCodeBinary(), Promise.resolve(getPluginInfo())])
   const loadedInfo = getLoadedPluginVersion()
 
   const opencodeVersion = binaryInfo ? await getOpenCodeVersion(binaryInfo.path) : null
   const pluginVersion = pluginInfo.pinnedVersion ?? loadedInfo.expectedVersion
+  const omoConfigPath = findOmoConfigPath(pluginInfo.configPath)
 
   return {
     opencodeVersion,
@@ -45,7 +60,9 @@ export async function gatherSystemInfo(): Promise<SystemInfo> {
     loadedVersion: loadedInfo.loadedVersion,
     bunVersion: Bun.version,
     configPath: pluginInfo.configPath,
+    omoConfigPath,
     configValid: isConfigValid(pluginInfo.configPath),
+    omoConfigValid: isConfigValid(omoConfigPath),
     isLocalDev: pluginInfo.isLocalDev,
   }
 }
