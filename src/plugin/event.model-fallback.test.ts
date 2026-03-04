@@ -209,7 +209,7 @@ describe("createEventHandler - model fallback", () => {
     expect(output.message["model"]).toMatchObject({
       modelID: "claude-opus-4-6",
     })
-    expect(["anthropic", "quotio"]).toContain((output.message["model"] as { providerID?: string })?.providerID)
+    expect(["anthropic", "quotio", "opencode"]).toContain((output.message["model"] as { providerID?: string })?.providerID)
     expect(output.message["variant"]).toBe("max")
   })
 
@@ -537,7 +537,7 @@ describe("createEventHandler - model fallback", () => {
     expect(first.message["model"]).toMatchObject({
       modelID: "claude-opus-4-6",
     })
-    expect(["anthropic", "quotio"]).toContain((first.message["model"] as { providerID?: string })?.providerID)
+    expect(["anthropic", "quotio", "opencode"]).toContain((first.message["model"] as { providerID?: string })?.providerID)
     expect(first.message["variant"]).toBe("max")
 
     //#when - second retry cycle
