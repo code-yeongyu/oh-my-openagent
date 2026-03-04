@@ -100,9 +100,12 @@ If retry_on_fail > 0 and failed members exist:
 - If retry_failed_if_others_finished is false, retry opportunistically as soon as failures are detected while others are still running.
 - If retry_failed_if_others_finished is true, only retry after all non-failed members have completed.
 - If cancel_retrying_on_quorum is true, stop retrying once quorum (2+ successful) is met.
-- If retry_on_fail is 0, no failed members remain, or retry budget is exhausted, do NOT re-launch members; proceed to Step 10.
+- If retry_on_fail is 0, no failed members remain, or retry budget is exhausted, do NOT re-launch members.
+- If Step 6 (council_finalize) has already executed for the current task IDs, proceed to Step 10.
+- Otherwise, return to Step 5 and continue tracking until Step 6 can run for the current task IDs.
 
 ### Step 10: Synthesize using council_finalize runtime guidance.
+- Preconditions: Step 6 (council_finalize) has executed for the current task IDs and archive data is available.
 - Read every member's archive_file with Read tool.
 - Apply the injected <athena_runtime_guidance> from council_finalize.
 - Track agreement/disagreement across members.
