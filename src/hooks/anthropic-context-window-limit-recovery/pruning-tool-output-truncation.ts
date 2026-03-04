@@ -96,8 +96,12 @@ export async function truncateToolOutputsByCallId(
         if (compressionConfig.enabled) {
           const parsed = tryParseJson(part.state.output)
           if (parsed !== null) {
-            part.state.output = safeCompress(parsed, "pruning-truncation")
-            writeFileSync(partPath, JSON.stringify(part, null, 2))
+            const original = part.state.output
+            const compressed = safeCompress(parsed, "pruning-truncation")
+            if (compressed !== original) {
+              part.state.output = compressed
+              writeFileSync(partPath, JSON.stringify(part, null, 2))
+            }
           }
         }
 
@@ -141,13 +145,9 @@ async function truncateToolOutputsByCallIdFromSDK(
         if (!callIds.has(part.callID)) continue
         if (!part.state?.output || part.state?.time?.compacted) continue
 
-         // Apply compression BEFORE truncation for efficiency (smaller payload to prune)
-         if (compressionConfig.enabled) {
-           const parsed = tryParseJson(part.state.output)
-           if (parsed !== null) {
-             part.state.output = safeCompress(parsed, "pruning-truncation")
-           }
-         }
+        // NOTE: Compression is NOT applied here because truncateToolResultAsync
+        // overwrites part.state.output with TRUNCATION_MESSAGE, making compression wasted effort.
+        // The non-SDK path (above) does use compression since truncateToolResult reads the file fresh.
 
         const result = await truncateToolResultAsync(client, sessionID, messageID, part.id, part)
         if (result.success) {
