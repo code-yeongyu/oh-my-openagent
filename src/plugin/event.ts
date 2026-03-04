@@ -21,7 +21,7 @@ import { resetMessageCursor } from "../shared";
 import { getAgentConfigKey } from "../shared/agent-display-names";
 import { log } from "../shared/logger";
 import { shouldRetryError } from "../shared/model-error-classifier";
-import type { FallbackEntry } from "../shared/model-requirements";
+import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
 import { clearSessionModel, setSessionModel } from "../shared/session-model-state";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
@@ -123,30 +123,6 @@ function extractProviderModelFromErrorMessage(message: string): { providerID?: s
 
   return {};
 }
-function parseFallbackModelEntry(
-  model: string,
-  defaultProviderID: string,
-): FallbackEntry | undefined {
-  const trimmed = model.trim();
-  if (!trimmed) return undefined;
-
-  const parts = trimmed.split("/");
-  const providerID = parts.length >= 2 ? parts[0].trim() : defaultProviderID;
-  const rawModelID = parts.length >= 2 ? parts.slice(1).join("/").trim() : trimmed;
-  if (!providerID || !rawModelID) return undefined;
-
-  const variantMatch = rawModelID.match(/^(.*)\(([^()]+)\)\s*$/);
-  if (variantMatch) {
-    const parsedModelID = variantMatch[1]?.trim();
-    const parsedVariant = variantMatch[2]?.trim();
-    if (parsedModelID && parsedVariant) {
-      return { providers: [providerID], model: parsedModelID, variant: parsedVariant };
-    }
-  }
-
-  return { providers: [providerID], model: rawModelID };
-}
-
 function applyUserConfiguredFallbackChain(
   sessionID: string,
   agentName: string,
@@ -157,11 +133,9 @@ function applyUserConfiguredFallbackChain(
   const configuredFallbackModels = getFallbackModelsForSession(sessionID, agentKey, pluginConfig);
   if (configuredFallbackModels.length === 0) return;
 
-  const fallbackChain = configuredFallbackModels
-    .map((model) => parseFallbackModelEntry(model, currentProviderID))
-    .filter((entry): entry is FallbackEntry => entry !== undefined);
+  const fallbackChain = buildFallbackChainFromModels(configuredFallbackModels, currentProviderID);
 
-  if (fallbackChain.length > 0) {
+  if (fallbackChain && fallbackChain.length > 0) {
     setSessionFallbackChain(sessionID, fallbackChain);
   }
 }

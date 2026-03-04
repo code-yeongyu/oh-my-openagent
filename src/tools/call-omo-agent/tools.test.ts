@@ -99,4 +99,48 @@ describe("createCallOmoAgent", () => {
     //#then
     expect(result).not.toContain("disabled via disabled_agents")
   })
+
+  test("uses agent override fallback_models when launching background subagent", async () => {
+    //#given
+    const launch = mock(() => Promise.resolve({
+      id: "task-fallback",
+      sessionID: "sub-session",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    }))
+    const managerWithLaunch = {
+      launch,
+      getTask: mock(() => undefined),
+    } as unknown as BackgroundManager
+    const toolDef = createCallOmoAgent(
+      mockCtx,
+      managerWithLaunch,
+      [],
+      {
+        explore: {
+          fallback_models: ["quotio/kimi-k2.5", "openai/gpt-5.2(high)"],
+        },
+      },
+    )
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    await executeFunc(
+      {
+        description: "Test fallback",
+        prompt: "Test prompt",
+        subagent_type: "explore",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+    )
+
+    //#then
+    const launchArgs = launch.mock.calls[0]?.[0]
+    expect(launchArgs.fallbackChain).toEqual([
+      { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
+      { providers: ["openai"], model: "gpt-5.2", variant: "high" },
+    ])
+  })
 })

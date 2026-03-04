@@ -14,6 +14,7 @@ function getExplicitHighBaseModel(model: string): string | null {
 
 export function resolveModelForDelegateTask(input: {
   userModel?: string
+  userFallbackModels?: string[]
   categoryDefaultModel?: string
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
@@ -41,6 +42,28 @@ export function resolveModelForDelegateTask(input: {
       }
 
       return { model: match }
+    }
+  }
+
+  const userFallbackModels = input.userFallbackModels
+  if (userFallbackModels && userFallbackModels.length > 0) {
+    if (input.availableModels.size === 0) {
+      const first = normalizeModel(userFallbackModels[0])
+      if (first) {
+        return { model: first }
+      }
+    } else {
+      for (const fallbackModel of userFallbackModels) {
+        const normalizedFallback = normalizeModel(fallbackModel)
+        if (!normalizedFallback) continue
+
+        const parts = normalizedFallback.split("/")
+        const providerHint = parts.length >= 2 ? [parts[0]] : undefined
+        const match = fuzzyMatchModel(normalizedFallback, input.availableModels, providerHint)
+        if (match) {
+          return { model: match }
+        }
+      }
     }
   }
 
