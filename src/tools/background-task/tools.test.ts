@@ -2,6 +2,7 @@
 
 import { describe, test, expect } from "bun:test"
 import { createBackgroundCancel, createBackgroundOutput } from "./tools"
+import { getTimeTimestamp } from "./time-format"
 import type { BackgroundManager, BackgroundTask } from "../../features/background-agent"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import type { BackgroundCancelClient, BackgroundOutputManager, BackgroundOutputClient } from "./tools"
@@ -528,6 +529,98 @@ describe("background_cancel", () => {
     )
   })
 })
+
+describe("getTimeTimestamp", () => {
+  test("returns number when given number", () => {
+    // #given
+    const value = 1704067200000
+    
+    // #when
+    const result = getTimeTimestamp(value)
+    
+    // #then
+    expect(result).toBe(1704067200000)
+  })
+  
+  test("parses numeric string as timestamp", () => {
+    // #given
+    const value = "1704067200000"
+    
+    // #when
+    const result = getTimeTimestamp(value)
+    
+    // #then
+    expect(result).toBe(1704067200000)
+  })
+  
+  test("parses ISO string to timestamp", () => {
+    // #given
+    const value = "2026-01-01T00:00:00Z"
+    const expectedTime = new Date(value).getTime()
+    
+    // #when
+    const result = getTimeTimestamp(value)
+    
+    // #then
+    expect(result).toBe(expectedTime)
+  })
+  
+  test("handles Date object", () => {
+    // #given
+    const value = new Date("2026-01-01T00:00:00Z")
+    
+    // #when
+    const result = getTimeTimestamp(value)
+    
+    // #then
+    expect(result).toBe(value.getTime())
+  })
+  
+  test("handles object with created property", () => {
+    // #given
+    const value = { created: 1704067200000 }
+    
+    // #when
+    const result = getTimeTimestamp(value)
+    
+    // #then
+    expect(result).toBe(1704067200000)
+  })
+  
+  test("handles object with undefined created property", () => {
+    // #given
+    const value = { created: undefined }
+    
+    // #when
+    const result = getTimeTimestamp(value)
+    
+    // #then
+    expect(result).toBe(0)
+  })
+  
+  test("returns 0 for invalid input", () => {
+    // #given
+    const value = { invalid: true }
+    
+    // #when
+    const result = getTimeTimestamp(value)
+    
+    // #then
+    expect(result).toBe(0)
+  })
+  
+  test("returns 0 for null", () => {
+    // #given
+    const value = null
+    
+    // #when
+    const result = getTimeTimestamp(value)
+    
+    // #then
+    expect(result).toBe(0)
+  })
+})
+
 type BackgroundOutputMessage = {
   id?: string
   info?: { role?: string; time?: string | { created?: number }; agent?: string }

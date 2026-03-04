@@ -38,5 +38,9 @@ export function getTimeTimestamp(value: unknown): number {
     if (!Number.isNaN(date.getTime())) return date.getTime()
   }
   if (value instanceof Date) return value.getTime()
+  if (typeof value === "object" && value !== null && "created" in value) {
+    const created = (value as { created?: number }).created
+    if (typeof created === "number") return created
+  }
   return 0
 }
