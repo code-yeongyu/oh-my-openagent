@@ -83,7 +83,7 @@ exports[`generateModelConfig single native provider uses Claude models when only
       "variant": "max",
     },
     "multimodal-looker": {
-      "model": "anthropic/claude-haiku-4-5",
+      "model": "opencode/glm-4.7-free",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
@@ -145,7 +145,7 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
       "variant": "max",
     },
     "multimodal-looker": {
-      "model": "anthropic/claude-haiku-4-5",
+      "model": "opencode/glm-4.7-free",
     },
     "oracle": {
       "model": "anthropic/claude-opus-4-6",
@@ -212,7 +212,8 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -279,7 +280,8 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -468,7 +470,8 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -542,7 +545,8 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -596,7 +600,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/kimi-k2.5-free",
+      "model": "opencode/claude-sonnet-4-5",
     },
     "explore": {
       "model": "opencode/claude-haiku-4-5",
@@ -617,7 +621,8 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "opencode/gemini-3-flash",
+      "model": "opencode/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "opencode/gpt-5.2",
@@ -670,7 +675,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/kimi-k2.5-free",
+      "model": "opencode/claude-sonnet-4-5",
     },
     "explore": {
       "model": "opencode/claude-haiku-4-5",
@@ -691,7 +696,8 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "opencode/gemini-3-flash",
+      "model": "opencode/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "opencode/gpt-5.2",
@@ -988,7 +994,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/kimi-k2.5-free",
+      "model": "anthropic/claude-sonnet-4-5",
     },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1009,7 +1015,8 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "opencode/gemini-3-flash",
+      "model": "opencode/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "opencode/gpt-5.2",
@@ -1083,7 +1090,8 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -1263,7 +1271,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/kimi-k2.5-free",
+      "model": "github-copilot/claude-sonnet-4.5",
     },
     "explore": {
       "model": "opencode/claude-haiku-4-5",
@@ -1284,7 +1292,8 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "opencode/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "github-copilot/gpt-5.2",
@@ -1337,7 +1346,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/kimi-k2.5-free",
+      "model": "anthropic/claude-sonnet-4-5",
     },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1358,7 +1367,8 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
@@ -1411,7 +1421,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "opencode/kimi-k2.5-free",
+      "model": "anthropic/claude-sonnet-4-5",
     },
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
@@ -1432,7 +1442,8 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "variant": "medium",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "openai/gpt-5.3-codex",
+      "variant": "medium",
     },
     "oracle": {
       "model": "openai/gpt-5.2",
