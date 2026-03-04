@@ -24,6 +24,15 @@ function compressPayloadData(
    return safeCompress(data, "cli-event-stream")
  }
 
+const MAX_TERMINAL_LENGTH = 200
+
+function truncateForTerminal(str: string): string {
+  if (str.length <= MAX_TERMINAL_LENGTH) {
+    return str
+  }
+  return str.slice(0, MAX_TERMINAL_LENGTH) + "..."
+}
+
 export function compressEventData(
   data: unknown
 ): string {
@@ -34,9 +43,9 @@ export function compressEventData(
     (data as EventPayload).type === "session.error"
 
    if (isErrorResponse) {
-     return JSON.stringify(data)
+     return truncateForTerminal(JSON.stringify(data))
    }
-   return safeCompress(data, "cli-event-stream")
+   return truncateForTerminal(safeCompress(data, "cli-event-stream"))
  }
 
 export function compressEventPayload(
