@@ -251,6 +251,6 @@ export function createCerberusAgent(
     return { ...base, reasoningEffort: "medium" }
   }
 
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } }
+  return { ...base, thinking: { type: "enabled", budgetTokens: 16000 } }
 }
 createCerberusAgent.mode = MODE

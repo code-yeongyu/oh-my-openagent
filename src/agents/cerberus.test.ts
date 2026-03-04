@@ -26,7 +26,7 @@ describe("cerberus agent", () => {
         const typedConfig = config as Record<string, unknown>
         const thinking = typedConfig.thinking as { type: string; budgetTokens: number }
         expect(thinking.type).toBe("enabled")
-        expect(thinking.budgetTokens).toBe(32000)
+        expect(thinking.budgetTokens).toBe(16000)
       })
 
       it("#then returns a description mentioning Cerberus", () => {
@@ -34,13 +34,13 @@ describe("cerberus agent", () => {
       })
 
       it("#then denies call_omo_agent in permission", () => {
-        expect(JSON.stringify(config.permission)).toContain("call_omo_agent")
-        expect(JSON.stringify(config.permission)).toContain("deny")
+        const perm = config.permission as Record<string, string>
+        expect(perm["call_omo_agent"]).toBe("deny")
       })
 
       it("#then allows question in permission", () => {
-        expect(JSON.stringify(config.permission)).toContain("question")
-        expect(JSON.stringify(config.permission)).toContain("allow")
+        const perm = config.permission as Record<string, string>
+        expect(perm["question"]).toBe("allow")
       })
     })
 
