@@ -149,11 +149,11 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
         return
       }
 
-      validateToolResults(messages)
-
-      // Get the model info from the last user message
+      // Get model info before synthetic injection (synthetic messages lack modelID)
       const lastUserMessage = messages.findLast(m => m.info.role === "user")
       const modelID = (lastUserMessage?.info as unknown as MessageInfoExtended)?.modelID || ""
+
+      validateToolResults(messages)
 
       // Only process if extended thinking might be enabled
       if (!isExtendedThinkingModel(modelID)) {

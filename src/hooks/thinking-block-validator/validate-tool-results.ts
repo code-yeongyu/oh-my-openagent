@@ -115,11 +115,13 @@ function appendMissingToolResults(
   if (missingIds.length === 0) return
 
   const sessionID = (assistantInfo as unknown as ExtendedInfo).sessionID || ""
+  const messageID = (userMessage.info as unknown as ExtendedInfo).id || `msg_synthetic_${Date.now()}`
+  const timestamp = Date.now()
   const syntheticParts = missingIds.map((toolUseId) => ({
     type: "tool_result" as const,
-    id: `prt_synthetic_${Date.now()}_${toolUseId.slice(-8)}`,
+    id: `prt_synthetic_${timestamp}_${toolUseId.slice(-8)}`,
     sessionID,
-    messageID: (userMessage.info as unknown as ExtendedInfo).id || `msg_synthetic_${Date.now()}`,
+    messageID,
     tool_use_id: toolUseId,
     content: "Tool execution was interrupted before completion.",
     is_error: true,
