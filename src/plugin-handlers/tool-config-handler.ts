@@ -87,6 +87,16 @@ export function applyToolConfig(params: {
       ...denyTodoTools,
     };
   }
+  const coeus = agentByKey(params.agentResult, "coeus");
+  if (coeus) {
+    coeus.permission = {
+      ...coeus.permission,
+      call_omo_agent: "deny",
+      task: "allow",
+      "task_*": "allow",
+      ...denyTodoTools,
+    };
+  }
   const junior = agentByKey(params.agentResult, "sisyphus-junior");
   if (junior) {
     junior.permission = {
