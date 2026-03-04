@@ -6,6 +6,10 @@ import { buildSystemContentWithTokenLimit } from "./token-limiter"
 
 const FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT = 24000
 
+function sanitizeMarkdownTableCell(text: string): string {
+  return text.replace(/\|/g, "\\|").replace(/\n/g, " ")
+}
+
 function usesFreeOrLocalModel(model: { providerID: string; modelID: string; variant?: string } | undefined): boolean {
   if (!model) {
     return false
@@ -76,7 +80,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
         parts.push("")
         // Skills uncompressed - use standard rendering
         if (availableSkills && availableSkills.length > 0) {
-          const skillRows = availableSkills.map(s => `| \`${s.name}\` | ${s.description} |`).join("\n")
+          const skillRows = availableSkills.map(s => `| \`${s.name}\` | ${sanitizeMarkdownTableCell(s.description)} |`).join("\n")
           parts.push("### AVAILABLE SKILLS (ALWAYS EVALUATE ALL)")
           parts.push("")
           parts.push("Skills inject specialized expertise into the delegated agent.")
@@ -89,7 +93,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
       } else if (shouldCompressSkills && availableSkills) {
         // Only skills compressed - categories use standard rendering
         if (availableCategories && availableCategories.length > 0) {
-          const categoryRows = availableCategories.map(c => `| \`${c.name}\` | ${c.description || c.name} | ${c.model || ""} |`).join("\n")
+          const categoryRows = availableCategories.map(c => `| \`${c.name}\` | ${sanitizeMarkdownTableCell(c.description || c.name)} | ${c.model || ""} |`).join("\n")
           parts.push("")
           parts.push("### AVAILABLE CATEGORIES")
           parts.push("")

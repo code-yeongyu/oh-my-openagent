@@ -9,6 +9,7 @@ import { clearSkillCache } from "../../features/opencode-skill-loader/skill-cont
 import { __setTimingConfig, __resetTimingConfig } from "./timing"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 import * as executor from "./executor"
+import { setGlobalCompressionConfig, resetGlobalCompressionConfig } from "../../shared/toon-compression/config-store"
 
 const SYSTEM_DEFAULT_MODEL = "anthropic/claude-sonnet-4-6"
 
@@ -2895,6 +2896,14 @@ describe("sisyphus-task", () => {
     })
 
     describe("toon compression", () => {
+      beforeEach(() => {
+        setGlobalCompressionConfig({ enabled: true, threshold: 5000 })
+      })
+
+      afterEach(() => {
+        resetGlobalCompressionConfig()
+      })
+
       test("compresses large availableCategories array when compression enabled", () => {
         // given - create large array that exceeds threshold
         const { buildSystemContent } = require("./tools")
@@ -2903,13 +2912,11 @@ describe("sisyphus-task", () => {
           description: `Description for category ${i} that is long enough to make the array large`.repeat(5),
           model: `provider/model-${i}`,
         }))
-        const compressionConfig = { enabled: true, threshold: 5000 }
 
         // when
         const result = buildSystemContent({
           agentName: "plan",
           availableCategories,
-          compressionConfig,
         })
 
         // then
@@ -2925,13 +2932,10 @@ describe("sisyphus-task", () => {
           name: `skill-${i}`,
           description: `Description for skill ${i} that is long enough to make the array large`.repeat(5),
         }))
-        const compressionConfig = { enabled: true, threshold: 5000 }
-
         // when
         const result = buildSystemContent({
           agentName: "plan",
           availableSkills,
-          compressionConfig,
         })
 
         // then
@@ -2945,13 +2949,12 @@ describe("sisyphus-task", () => {
         const availableCategories = [
           { name: "deep", description: "Goal-oriented", model: "openai/gpt-5.3-codex" },
         ]
-        const compressionConfig = { enabled: false, threshold: 5000 }
+        setGlobalCompressionConfig({ enabled: false, threshold: 5000 })
 
         // when
         const result = buildSystemContent({
           agentName: "plan",
           availableCategories,
-          compressionConfig,
         })
 
         // then - should use table format, not TOON
@@ -2965,13 +2968,10 @@ describe("sisyphus-task", () => {
         const availableCategories = [
           { name: "deep", description: "Goal-oriented", model: "openai/gpt-5.3-codex" },
         ]
-        const compressionConfig = { enabled: true, threshold: 5000 }
-
         // when
         const result = buildSystemContent({
           agentName: "plan",
           availableCategories,
-          compressionConfig,
         })
 
         // then - should use table format (array too small to compress)
