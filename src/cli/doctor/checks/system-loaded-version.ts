@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { getLatestVersion } from "../../../hooks/auto-update-checker/checker"
 import { extractChannel } from "../../../hooks/auto-update-checker"
 import { PACKAGE_NAME } from "../constants"
-import { getOpenCodeCacheDir, parseJsonc } from "../../../shared"
+import { getOpenCodeConfigDir, parseJsonc } from "../../../shared"
 
 interface PackageJsonShape {
   version?: string
@@ -26,16 +26,6 @@ function getPlatformDefaultCacheDir(platform: NodeJS.Platform = process.platform
   return join(homedir(), ".cache")
 }
 
-function resolveOpenCodeCacheDir(): string {
-  const xdgCacheHome = process.env.XDG_CACHE_HOME
-  if (xdgCacheHome) return join(xdgCacheHome, "opencode")
-
-  const fromShared = getOpenCodeCacheDir()
-  const platformDefault = join(getPlatformDefaultCacheDir(), "opencode")
-  if (existsSync(fromShared) || !existsSync(platformDefault)) return fromShared
-  return platformDefault
-}
-
 function readPackageJson(filePath: string): PackageJsonShape | null {
   if (!existsSync(filePath)) return null
 
@@ -53,8 +43,26 @@ function normalizeVersion(value: string | undefined): string | null {
   return match?.[0] ?? null
 }
 
+function resolvePluginInstallDir(): string {
+  const configDir = getOpenCodeConfigDir({ binary: "opencode", version: null })
+  const configInstalled = join(configDir, "node_modules", PACKAGE_NAME, "package.json")
+  if (existsSync(configInstalled)) return configDir
+
+  const cacheDir = join(getPlatformDefaultCacheDir(), "opencode")
+  const cacheInstalled = join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")
+  if (existsSync(cacheInstalled)) return cacheDir
+
+  const xdgCacheHome = process.env.XDG_CACHE_HOME
+  if (xdgCacheHome) {
+    const xdgDir = join(xdgCacheHome, "opencode")
+    if (existsSync(join(xdgDir, "node_modules", PACKAGE_NAME, "package.json"))) return xdgDir
+  }
+
+  return configDir
+}
+
 export function getLoadedPluginVersion(): LoadedVersionInfo {
-  const cacheDir = resolveOpenCodeCacheDir()
+  const cacheDir = resolvePluginInstallDir()
   const cachePackagePath = join(cacheDir, "package.json")
   const installedPackagePath = join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")
 
