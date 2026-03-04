@@ -6,6 +6,7 @@ import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableErro
 import { createFallbackState, prepareFallback } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
 
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts } = deps
@@ -182,22 +183,6 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     if (!result.success) {
       log(`[${HOOK_NAME}] Fallback preparation failed`, { sessionID, error: result.error })
     }
-  }
-
-  const normalizeRetryStatusMessage = (message: string): string =>
-    message
-      .replace(/\[retrying in [^\]]*attempt\s*#\d+\]/gi, "[retrying]")
-      .replace(/retrying in\s+[^(]*attempt\s*#\d+/gi, "retrying")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase()
-
-  const extractRetryAttempt = (statusAttempt: unknown, message: string): string => {
-    if (typeof statusAttempt === "number" && Number.isFinite(statusAttempt)) {
-      return String(statusAttempt)
-    }
-    const match = message.match(/attempt\s*#\s*(\d+)/i)
-    return match?.[1] ?? "?"
   }
 
   const handleSessionStatus = async (props: Record<string, unknown> | undefined) => {

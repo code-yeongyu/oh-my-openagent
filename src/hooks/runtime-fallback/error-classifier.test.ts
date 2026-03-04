@@ -17,6 +17,20 @@ describe("runtime-fallback error classifier", () => {
     expect(signal).toBeDefined()
   })
 
+  test("detects single-word cooldown auto-retry status signals", () => {
+    //#given
+    const info = {
+      status:
+        "All credentials for model claude-opus-4-6 are cooldown [retrying in 7m 56s attempt #1]",
+    }
+
+    //#when
+    const signal = extractAutoRetrySignal(info)
+
+    //#then
+    expect(signal).toBeDefined()
+  })
+
   test("treats cooling-down retry messages as retryable", () => {
     //#given
     const error = {
