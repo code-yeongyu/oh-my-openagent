@@ -515,6 +515,7 @@ describe("runtime-fallback", () => {
             sessionID,
             status: {
               type: "retry",
+              next: 476,
               attempt: 1,
               message: "All credentials for model claude-opus-4-6 are cooling down [retrying in 7m 56s attempt #1]",
             },
@@ -573,6 +574,7 @@ describe("runtime-fallback", () => {
             sessionID,
             status: {
               type: "retry",
+              next: 476,
               attempt: 1,
               message: "All credentials for model claude-opus-4-6 are cooling down [retrying in 7m 56s attempt #1]",
             },
@@ -587,6 +589,7 @@ describe("runtime-fallback", () => {
             sessionID,
             status: {
               type: "retry",
+              next: 475,
               attempt: 1,
               message: "All credentials for model claude-opus-4-6 are cooling down [retrying in 7m 55s attempt #1]",
             },

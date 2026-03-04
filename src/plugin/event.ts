@@ -22,6 +22,7 @@ import { getAgentConfigKey } from "../shared/agent-display-names";
 import { log } from "../shared/logger";
 import { shouldRetryError } from "../shared/model-error-classifier";
 import { buildFallbackChainFromModels } from "../shared/fallback-chain-from-models";
+import { extractRetryAttempt, normalizeRetryStatusMessage } from "../shared/retry-status-utils";
 import { clearSessionModel, setSessionModel } from "../shared/session-model-state";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { lspManager } from "../tools";
@@ -45,28 +46,6 @@ function normalizeFallbackModelID(modelID: string): string {
     .replace(/-thinking$/i, "")
     .replace(/-max$/i, "")
     .replace(/-high$/i, "");
-}
-
-function normalizeRetryStatusMessage(message: string): string {
-  return message
-    .replace(/\[retrying in [^\]]*attempt\s*#\d+\]/gi, "[retrying]")
-    .replace(/retrying in\s+[^(]*attempt\s*#\d+/gi, "retrying")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
-function extractRetryAttempt(statusAttempt: unknown, message: string): string {
-  if (typeof statusAttempt === "number" && Number.isFinite(statusAttempt)) {
-    return String(statusAttempt);
-  }
-
-  const attemptMatch = message.match(/attempt\s*#\s*(\d+)/i);
-  if (attemptMatch?.[1]) {
-    return attemptMatch[1];
-  }
-
-  return "?";
 }
 
 function extractErrorName(error: unknown): string | undefined {
