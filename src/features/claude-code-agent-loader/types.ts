@@ -7,6 +7,7 @@ export interface AgentFrontmatter {
   description?: string
   model?: string
   tools?: string
+  mode?: "subagent" | "primary" | "all"
 }
 
 export interface LoadedAgent {
