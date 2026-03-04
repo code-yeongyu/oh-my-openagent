@@ -15,6 +15,7 @@
  */
 
 import type { Message, Part } from "@opencode-ai/sdk"
+import { validateToolResults } from "./validate-tool-results"
 
 interface MessageWithParts {
   info: Message
@@ -147,6 +148,8 @@ export function createThinkingBlockValidatorHook(): MessagesTransformHook {
       if (!messages || messages.length === 0) {
         return
       }
+
+      validateToolResults(messages)
 
       // Get the model info from the last user message
       const lastUserMessage = messages.findLast(m => m.info.role === "user")
