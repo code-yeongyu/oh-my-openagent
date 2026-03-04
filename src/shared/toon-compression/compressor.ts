@@ -284,7 +284,7 @@ export function compressForLLM(data: unknown, config: ToonCompressionConfig, use
   try {
     return encodeWithTimeout(data, config.maxEncodingSize, useCase)
   } catch (error) {
-    console.warn("[toon-compression] Compression failed, falling back to plain text:", error)
+    log("[toon-compression] Compression failed, falling back to plain text:", error)
     return toPlainTextString(data)
   }
 }
