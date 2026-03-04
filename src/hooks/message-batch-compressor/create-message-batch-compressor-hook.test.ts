@@ -147,7 +147,7 @@ describe("createMessageBatchCompressorHook", () => {
       const hook = createMessageBatchCompressorHook(config)
 
       const imagePart: Part = {
-        type: "image",
+        type: "file",
         source: { data: "base64imagedata", mimeType: "image/png" },
       } as Part
 
@@ -169,7 +169,7 @@ describe("createMessageBatchCompressorHook", () => {
       const parts = output.messages[0].parts
       expect(parts.length).toBe(2) // 1 text + 1 image
       expect(parts[0].type).toBe("text")
-      expect(parts[1].type).toBe("image")
+      expect(parts[1].type).toBe("file")
       expect((parts[1] as { source?: { data: string } }).source.data).toBe("base64imagedata")
     })
 
@@ -179,11 +179,11 @@ describe("createMessageBatchCompressorHook", () => {
       const hook = createMessageBatchCompressorHook(config)
 
       const image1: Part = {
-        type: "image",
+        type: "file",
         source: { data: "image1data", mimeType: "image/png" },
       } as Part
       const image2: Part = {
-        type: "image",
+        type: "file",
         source: { data: "image2data", mimeType: "image/jpeg" },
       } as Part
 
@@ -204,7 +204,7 @@ describe("createMessageBatchCompressorHook", () => {
       expect(output.messages.length).toBe(1)
       const parts = output.messages[0].parts
       expect(parts.length).toBe(3) // 1 text + 2 images
-      const imageParts = parts.filter((p) => p.type === "image")
+      const imageParts = parts.filter((p) => p.type === "file")
       expect(imageParts.length).toBe(2)
     })
   })

@@ -20,16 +20,13 @@ type MessagesTransformHook = {
 
 const MIN_BATCH_SIZE = 5
 
-type ExtractedToolUse = {
+type ExtractedTool = {
   tool: string
   callID: string
   input: Record<string, unknown>
-}
-
-type ExtractedToolResult = {
-  callID: string
-  output: unknown
-  error: unknown
+  output?: string
+  error?: string
+  status: "pending" | "running" | "completed" | "error"
 }
 
 function safeStringify(data: unknown): string {
@@ -46,14 +43,13 @@ function safeStringify(data: unknown): string {
 }
 
 
-function extractBatchData(messages: MessageWithParts[]): { batchData: unknown[]; imageParts: Part[] } {
-  const imageParts: Part[] = []
+function extractBatchData(messages: MessageWithParts[]): { batchData: unknown[]; fileParts: Part[] } {
+  const fileParts: Part[] = []
 
   const batchData = messages.map((message) => {
     const textContents: string[] = []
     const thinkingContents: string[] = []
-    const toolUses: ExtractedToolUse[] = []
-    const toolResults: ExtractedToolResult[] = []
+    const tools: ExtractedTool[] = []
 
     for (const part of message.parts) {
       const maybePart = part as {
@@ -62,13 +58,13 @@ function extractBatchData(messages: MessageWithParts[]): { batchData: unknown[];
         thinking?: string
         tool?: string
         callID?: string
-        input?: Record<string, unknown>
-        output?: unknown
-        error?: unknown
-        source?: unknown
-        mimeType?: unknown
-        data?: unknown
-        url?: unknown
+        state?: {
+          status?: string
+          input?: Record<string, unknown>
+          output?: string
+          error?: string
+        }
+        mime?: string
       }
 
       if (maybePart.type === "text") {
@@ -84,26 +80,20 @@ function extractBatchData(messages: MessageWithParts[]): { batchData: unknown[];
         continue
       }
 
-      if (maybePart.type === "tool_use") {
-        toolUses.push({
+      if (maybePart.type === "tool" && maybePart.state) {
+        tools.push({
           tool: typeof maybePart.tool === "string" ? maybePart.tool : "",
           callID: typeof maybePart.callID === "string" ? maybePart.callID : "",
-          input: maybePart.input ?? {},
+          input: maybePart.state.input ?? {},
+          output: maybePart.state.output,
+          error: maybePart.state.error,
+          status: (maybePart.state.status as ExtractedTool["status"]) ?? "pending",
         })
         continue
       }
 
-      if (maybePart.type === "tool_result") {
-        toolResults.push({
-          callID: typeof maybePart.callID === "string" ? maybePart.callID : "",
-          output: maybePart.output ?? "",
-          error: maybePart.error ?? "",
-        })
-        continue
-      }
-
-      if (maybePart.type === "image") {
-        imageParts.push(part)
+      if (maybePart.type === "file") {
+        fileParts.push(part)
         continue
       }
     }
@@ -113,12 +103,11 @@ function extractBatchData(messages: MessageWithParts[]): { batchData: unknown[];
       timestamp: message.info.time?.created ?? null,
       textContents,
       thinkingContents,
-      toolUses,
-      toolResults,
+      tools,
     }
   })
 
-  return { batchData, imageParts }
+  return { batchData, fileParts }
 }
 
 export function createMessageBatchCompressorHook(
@@ -136,7 +125,7 @@ export function createMessageBatchCompressorHook(
         return
       }
 
-      const { batchData, imageParts } = extractBatchData(messages)
+      const { batchData, fileParts } = extractBatchData(messages)
 
       const evaluation = evaluateCompressionConditions(batchData, config.threshold)
 
@@ -156,7 +145,7 @@ export function createMessageBatchCompressorHook(
         return
       }
 
-      const parts: Part[] = [{ type: "text", text: compressed } as Part, ...imageParts]
+      const parts: Part[] = [{ type: "text", text: compressed } as Part, ...fileParts]
 
       output.messages = [
         {
@@ -171,7 +160,7 @@ export function createMessageBatchCompressorHook(
       log("[message-batch-compressor] Compressed message batch", {
         originalCount: messages.length,
         compressedLength: compressed.length,
-        imageCount: imageParts.length,
+        fileCount: fileParts.length,
       })
     },
   }
