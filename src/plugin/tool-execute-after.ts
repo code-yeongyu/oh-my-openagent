@@ -1,6 +1,7 @@
 import { consumeToolMetadata } from "../features/tool-metadata-store"
 import type { OhMyOpenCodeConfig } from "../config"
-import { safeCompress, shouldCompress, DEFAULT_COMPRESSION_CONFIG } from "../shared/toon-compression"
+import { safeCompress, shouldCompress } from "../shared/toon-compression"
+import { getGlobalCompressionConfig } from "../shared/toon-compression/config-store"
 import type { CreatedHooks } from "../create-hooks"
 
 const TRUNCATION_MARKERS = [
@@ -50,7 +51,7 @@ export function createToolExecuteAfterHandler(args: {
     | undefined,
 ) => Promise<void> {
   const { hooks, pluginConfig } = args
-  const compressionConfig = pluginConfig.toon_compression ?? DEFAULT_COMPRESSION_CONFIG
+  const compressionConfig = getGlobalCompressionConfig()
 
   return async (
     input: { tool: string; sessionID: string; callID: string },

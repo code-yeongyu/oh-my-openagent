@@ -12,6 +12,7 @@ import {
   createContextInjectorMessagesTransformHook,
 } from "../../features/context-injector"
 import { safeCreateHook } from "../../shared/safe-create-hook"
+import { getGlobalCompressionConfig } from "../../shared/toon-compression/config-store"
 
 export type TransformHooks = {
   claudeCodeHooks: ReturnType<typeof createClaudeCodeHooksHook> | null
@@ -57,7 +58,7 @@ export function createTransformHooks(args: {
   const contextInjectorMessagesTransform =
     createContextInjectorMessagesTransformHook(
       contextCollector,
-      pluginConfig.toon_compression ?? { enabled: false, threshold: 5000 },
+      getGlobalCompressionConfig(),
     )
 
   const thinkingBlockValidator = isHookEnabled("thinking-block-validator")
@@ -71,7 +72,7 @@ export function createTransformHooks(args: {
   const messageBatchCompressor = isHookEnabled("message-batch-compressor")
     ? safeCreateHook(
         "message-batch-compressor",
-        () => createMessageBatchCompressorHook(pluginConfig.toon_compression ?? { enabled: false, threshold: 5000 }),
+        () => createMessageBatchCompressorHook(getGlobalCompressionConfig()),
         { enabled: safeHookEnabled },
       )
     : null

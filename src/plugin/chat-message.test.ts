@@ -1,6 +1,7 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, beforeEach } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message"
+import { setGlobalCompressionConfig, resetGlobalCompressionConfig } from "../shared/toon-compression/config-store"
 
 type ChatMessagePart = { type: string; text?: string; [key: string]: unknown }
 type ChatMessageHandlerOutput = { message: Record<string, unknown>; parts: ChatMessagePart[] }
@@ -144,6 +145,10 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
 })
 
 describe("createChatMessageHandler - toon compression", () => {
+  beforeEach(() => {
+    resetGlobalCompressionConfig()
+  })
+
   function createLargePartsArray(count: number): ChatMessagePart[] {
     return Array.from({ length: count }, (_, i) => ({
       type: "text",
@@ -153,8 +158,10 @@ describe("createChatMessageHandler - toon compression", () => {
 
   test("does not compress small parts array", async () => {
     //#given - small parts array, compression enabled
+    const config = { enabled: true, threshold: 100 }
+    setGlobalCompressionConfig(config)
     const args = createMockHandlerArgs({
-      pluginConfig: { toon_compression: { enabled: true, threshold: 100 } },
+      pluginConfig: { toon_compression: config },
     })
     const handler = createChatMessageHandler(args)
     const input = createMockInput()
@@ -170,8 +177,10 @@ describe("createChatMessageHandler - toon compression", () => {
 
   test("compresses large uniform parts array when enabled", async () => {
     //#given - large uniform parts array, compression enabled with low threshold
+    const config = { enabled: true, threshold: 100 }
+    setGlobalCompressionConfig(config)
     const args = createMockHandlerArgs({
-      pluginConfig: { toon_compression: { enabled: true, threshold: 100 } },
+      pluginConfig: { toon_compression: config },
     })
     const handler = createChatMessageHandler(args)
     const input = createMockInput()
@@ -188,8 +197,10 @@ describe("createChatMessageHandler - toon compression", () => {
 
   test("does not compress when disabled even with large array", async () => {
     //#given - large parts array, compression disabled
+    const config = { enabled: false, threshold: 100 }
+    setGlobalCompressionConfig(config)
     const args = createMockHandlerArgs({
-      pluginConfig: { toon_compression: { enabled: false, threshold: 100 } },
+      pluginConfig: { toon_compression: config },
     })
     const handler = createChatMessageHandler(args)
     const input = createMockInput()
@@ -220,8 +231,10 @@ describe("createChatMessageHandler - toon compression", () => {
 
   test("does not compress non-uniform parts array", async () => {
     //#given - large but non-uniform parts array
+    const config = { enabled: true, threshold: 100 }
+    setGlobalCompressionConfig(config)
     const args = createMockHandlerArgs({
-      pluginConfig: { toon_compression: { enabled: true, threshold: 100 } },
+      pluginConfig: { toon_compression: config },
     })
     const handler = createChatMessageHandler(args)
     const input = createMockInput()

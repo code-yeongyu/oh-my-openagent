@@ -1,4 +1,4 @@
-const { describe, expect, mock, spyOn, test } = require("bun:test")
+const { describe, expect, mock, spyOn, test, beforeEach } = require("bun:test")
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -18,6 +18,7 @@ import { createMessagesTransformHandler } from "../plugin/messages-transform"
 import { compressTaskResults } from "../features/background-agent/parent-session-notifier"
 import { createChatMessageHandler } from "../plugin/chat-message"
 import { safeCompress } from "../shared/toon-compression"
+import { setGlobalCompressionConfig, resetGlobalCompressionConfig } from "../shared/toon-compression/config-store"
 
 const on = { enabled: true, threshold: 100 }
 const off = { enabled: false, threshold: 100 }
@@ -26,6 +27,10 @@ const parts = Array.from({ length: 10 }, (_, i) => ({ type: "text", text: `part-
 const isCompressed = (value: string) => /\[\d+\]\{/.test(value) || value.startsWith("toon:")
 
 describe("toon compression phase 1 integration", () => {
+  beforeEach(() => {
+    resetGlobalCompressionConfig()
+  })
+
   test("meets compression ratio target >=30% for large uniform arrays", () => {
     const ratioData = Array.from({ length: 200 }, () => ({ category: "tool", state: "ok", tag: "phase1" }))
     const compressed = safeCompress(ratioData, "test-phase1")
@@ -73,9 +78,11 @@ describe("toon compression phase 1 integration", () => {
   })
 
   test("tier2 hooks honor enabled disabled and fallback behavior", async () => {
+    setGlobalCompressionConfig(on)
     const outputOn = { title: "x", output: JSON.stringify(many), metadata: {} }
     const outputOff = { title: "x", output: JSON.stringify(many), metadata: {} }
     const handlerOn = createToolExecuteAfterHandler({ hooks: {} as never, pluginConfig: { toon_compression: on } as never })
+    setGlobalCompressionConfig(off)
     const handlerOff = createToolExecuteAfterHandler({ hooks: {} as never, pluginConfig: { toon_compression: off } as never })
     await handlerOn({ tool: "glob", sessionID: "s", callID: "c1" }, outputOn)
     await handlerOff({ tool: "glob", sessionID: "s", callID: "c2" }, outputOff)
@@ -126,6 +133,7 @@ describe("toon compression phase 1 integration", () => {
 
     expect(compressTaskResults(many.map((x) => ({ id: `bg_${x.id}`, description: x.value, status: "completed" } as never))).length).toBeGreaterThan(0)
 
+    setGlobalCompressionConfig(on)
     const chat = createChatMessageHandler({ ctx: { client: { tui: { showToast: async () => {} } } } as never, pluginConfig: { toon_compression: on } as never, firstMessageVariantGate: { shouldOverride: () => false, markApplied: () => {} }, hooks: {} as never })
     const chatOut = { message: {}, parts: parts.map((p) => ({ ...p })) }
     await chat({ sessionID: "s" }, chatOut as never)
