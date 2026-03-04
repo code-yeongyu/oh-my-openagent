@@ -1,9 +1,18 @@
-import { describe, it, expect } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { formatGlobResult } from "./result-formatter"
 import type { GlobResult } from "./types"
 import type { ToonCompressionConfig } from "../../shared/toon-compression"
+import { setGlobalCompressionConfig, resetGlobalCompressionConfig } from "../../shared/toon-compression/config-store"
 
 describe("formatGlobResult", () => {
+  beforeEach(() => {
+    setGlobalCompressionConfig({ enabled: true, threshold: 5000 })
+  })
+
+  afterEach(() => {
+    resetGlobalCompressionConfig()
+  })
+
   const defaultConfig: ToonCompressionConfig = {
     enabled: true,
     threshold: 5000,

@@ -1,11 +1,20 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach } from "bun:test"
 
 import { formatGrepResult } from "./result-formatter"
 import type { GrepResult } from "./types"
+import { setGlobalCompressionConfig, resetGlobalCompressionConfig } from "../../shared/toon-compression/config-store"
 
 describe("formatGrepResult", () => {
+  beforeEach(() => {
+    setGlobalCompressionConfig({ enabled: true, threshold: 5000 })
+  })
+
+  afterEach(() => {
+    resetGlobalCompressionConfig()
+  })
+
   describe("#given grep result has error", () => {
     describe("#when formatting result", () => {
       test("#then returns error message", () => {
