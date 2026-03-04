@@ -100,7 +100,7 @@ describe("Athena prompt config injection placeholders", () => {
         const prompt = athenaConfig.prompt ?? ""
         expect(prompt).toContain("FIRST INTERACTION")
         expect(prompt).toContain("SUBSEQUENT INTERACTIONS")
-        expect(prompt).toContain("Pre-checks (override all categories)")
+        expect(prompt).toContain("Pre-checks (override all categories, evaluated in order")
         expect(prompt).toContain("Council-worthy & clear")
         expect(prompt).toContain("Simple/factual")
         expect(prompt).toContain("Wrong-agent")
