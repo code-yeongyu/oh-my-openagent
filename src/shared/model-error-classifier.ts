@@ -140,7 +140,8 @@ export function hasMoreFallbacks(
  * Selects the best provider for a fallback entry.
  * Priority:
  * 1) First connected provider in the entry's provider preference order
- * 2) First provider listed in the fallback entry (when cache is missing)
+ * 2) Preferred provider when connected (and entry providers are unavailable)
+ * 3) First provider listed in the fallback entry
  */
 export function selectFallbackProvider(
   providers: string[],
@@ -149,18 +150,18 @@ export function selectFallbackProvider(
   const connectedProviders = readConnectedProvidersCache()
   if (connectedProviders) {
     const connectedSet = new Set(connectedProviders.map(p => p.toLowerCase()))
-    if (connectedSet.has("quotio")) {
-      const hasQuotio = providers.some((p) => p.toLowerCase() === "quotio")
-      const hasOpencode = providers.some((p) => p.toLowerCase() === "opencode")
-      if (hasQuotio || hasOpencode) {
-        return "quotio"
-      }
-    }
 
     for (const provider of providers) {
       if (connectedSet.has(provider.toLowerCase())) {
         return provider
       }
+    }
+
+    if (
+      preferredProviderID &&
+      connectedSet.has(preferredProviderID.toLowerCase())
+    ) {
+      return preferredProviderID
     }
   }
 
