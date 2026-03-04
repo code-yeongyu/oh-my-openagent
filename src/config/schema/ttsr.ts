@@ -1,8 +1,8 @@
 import { z } from "zod"
 
 const TtsrConfigObjectSchema = z.object({
-  /** Enable TTSR stream rule monitoring (default: true) */
-  enabled: z.boolean().default(true),
+  /** Enable TTSR stream rule monitoring (default: false) */
+  enabled: z.boolean().default(false),
   /** How to handle partial output when aborting (default: "discard") */
   contextMode: z.enum(["discard", "keep"]).default("discard"),
   /** When to trigger interrupts (default: "always") */

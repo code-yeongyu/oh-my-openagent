@@ -7,7 +7,7 @@ describe("TtsrConfigSchema", () => {
       const result = TtsrConfigSchema.parse({})
 
       expect(result).toEqual({
-        enabled: true,
+        enabled: false,
         contextMode: "discard",
         interruptMode: "always",
         repeatMode: "once",

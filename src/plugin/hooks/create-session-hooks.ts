@@ -300,7 +300,7 @@ export function createSessionHooks(args: {
         log("[ttsr] Failed to discover TTSR rules", { error: String(err) })
       })
       const settings: import("../../features/ttsr/types").TtsrSettings = {
-        enabled: ttsrConfig.enabled ?? true,
+        enabled: ttsrConfig.enabled ?? false,
         contextMode: ttsrConfig.contextMode ?? "discard",
         interruptMode: ttsrConfig.interruptMode ?? "always",
         repeatMode: ttsrConfig.repeatMode ?? "once",
