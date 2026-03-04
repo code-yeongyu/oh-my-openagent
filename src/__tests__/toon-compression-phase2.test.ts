@@ -121,7 +121,7 @@ describe("toon compression phase 2 integration", () => {
       waitForCompletion: async () => {},
       processMessages: async () => promptJson,
       safeCompress: (data: unknown, _useCase: string) => `C:${String(data).slice(0, 1)}`,
-    }, on)
+    })
     expect(out).toContain("session_id: s2")
     expect(out).toContain("C:")
 

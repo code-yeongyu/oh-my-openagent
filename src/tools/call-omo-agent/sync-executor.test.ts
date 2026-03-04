@@ -92,15 +92,15 @@ describe("executeSync", () => {
   })
 
   describe("#compression", () => {
-    test("calls safeCompress with responseText and compressionConfig", async () => {
+    test("calls safeCompress with responseText and useCase", async () => {
       //#given
       const { executeSync } = require("./sync-executor")
 
       let compressedData: unknown
-      let receivedConfig: unknown
-      const mockSafeCompress = mock((data: unknown, config: unknown) => {
+      let receivedUseCase: unknown
+      const mockSafeCompress = mock((data: unknown, useCase: string) => {
         compressedData = data
-        receivedConfig = config
+        receivedUseCase = useCase
         return "compressed-result"
       })
 
@@ -133,15 +133,13 @@ describe("executeSync", () => {
         },
       }
 
-      const compressionConfig = { enabled: true, threshold: 100 }
-
       //#when
-      await executeSync(args, toolContext, ctx as any, deps, compressionConfig)
+      await executeSync(args, toolContext, ctx as any, deps)
 
       //#then
       expect(mockSafeCompress).toHaveBeenCalled()
       expect(compressedData).toBe("agent response text")
-      expect(receivedConfig).toEqual(compressionConfig)
+      expect(receivedUseCase).toBe("sync-executor")
     })
 
     test("uses compressed response in output", async () => {
@@ -177,10 +175,8 @@ describe("executeSync", () => {
         },
       }
 
-      const compressionConfig = { enabled: true, threshold: 100 }
-
       //#when
-      const result = await executeSync(args, toolContext, ctx as any, deps, compressionConfig)
+      const result = await executeSync(args, toolContext, ctx as any, deps)
 
       //#then
       expect(result).toContain("COMPRESSED_DATA")
@@ -188,10 +184,9 @@ describe("executeSync", () => {
       expect(result).toContain("ses-test-456")
     })
 
-    test("uses default compression config when not provided", async () => {
+    test("uses safeCompress for output compression", async () => {
       //#given
       const { executeSync } = require("./sync-executor")
-      const { DEFAULT_COMPRESSION_CONFIG } = require("../../shared/toon-compression")
 
       const deps = {
         createOrGetSession: mock(async () => ({ sessionID: "ses-test-789", isNew: true })),
@@ -226,9 +221,6 @@ describe("executeSync", () => {
       const result = await executeSync(args, toolContext, ctx as any, deps)
 
       //#then
-      expect(DEFAULT_COMPRESSION_CONFIG).toBeDefined()
-      expect(DEFAULT_COMPRESSION_CONFIG.enabled).toBe(false)
-      expect(DEFAULT_COMPRESSION_CONFIG.threshold).toBe(5000)
       expect(result).toContain("safe-result")
     })
   })

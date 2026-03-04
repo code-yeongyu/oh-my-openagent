@@ -1,5 +1,5 @@
 import type { SessionInfo, SessionMessage, SearchResult } from "./types"
-import { safeCompress, shouldCompress } from "../../shared/toon-compression"
+import { safeCompress, compressForLLM, shouldCompress } from "../../shared/toon-compression"
 import type { ToonCompressionConfig } from "../../shared/toon-compression"
 import { getSessionInfo, readSessionMessages } from "./storage"
 
@@ -54,7 +54,7 @@ export async function formatSessionList(
       last_message: info.last_message,
       agents_used: info.agents_used,
     }))
-    return safeCompress(sanitizedInfos, "session-list")
+    return compressForLLM(sanitizedInfos, compressionConfig, "session-list")
   }
 
   return formatted
@@ -145,7 +145,7 @@ export function formatSearchResults(
 
   // Apply compression if enabled and output exceeds threshold
   if (compressionConfig?.enabled && shouldCompress(results, compressionConfig.threshold)) {
-    return safeCompress(results, "session-search")
+    return compressForLLM(results, compressionConfig, "session-search")
   }
 
   return formatted

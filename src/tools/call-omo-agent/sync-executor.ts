@@ -2,8 +2,7 @@ import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { getAgentToolRestrictions } from "../../shared"
-import { safeCompress, DEFAULT_COMPRESSION_CONFIG } from "../../shared/toon-compression"
-import type { ToonCompressionConfig } from "../../shared/toon-compression"
+import { safeCompress } from "../../shared/toon-compression"
 import { createOrGetSession } from "./session-creator"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
@@ -36,8 +35,7 @@ export async function executeSync(
     metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   },
   ctx: PluginInput,
-  deps: ExecuteSyncDeps = defaultDeps,
-  compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG
+  deps: ExecuteSyncDeps = defaultDeps
 ): Promise<string> {
   const { sessionID } = await deps.createOrGetSession(args, toolContext, ctx)
 
