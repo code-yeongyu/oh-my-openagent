@@ -20,6 +20,7 @@ import {
   createStartWorkHook,
   createPrometheusMdOnlyHook,
   createCoeusMdOnlyHook,
+  createCoeusCommandHook,
   createSisyphusJuniorNotepadHook,
   createNoSisyphusGptHook,
   createNoHephaestusNonGptHook,
@@ -55,6 +56,7 @@ export type SessionHooks = {
   startWork: ReturnType<typeof createStartWorkHook> | null
   prometheusMdOnly: ReturnType<typeof createPrometheusMdOnlyHook> | null
   coeusMdOnly: ReturnType<typeof createCoeusMdOnlyHook> | null
+  coeusCommand: ReturnType<typeof createCoeusCommandHook> | null
   sisyphusJuniorNotepad: ReturnType<typeof createSisyphusJuniorNotepadHook> | null
   noSisyphusGpt: ReturnType<typeof createNoSisyphusGptHook> | null
   noHephaestusNonGpt: ReturnType<typeof createNoHephaestusNonGptHook> | null
@@ -229,6 +231,10 @@ export function createSessionHooks(args: {
     ? safeHook("coeus-md-only", () => createCoeusMdOnlyHook(ctx))
     : null
 
+  const coeusCommand = isHookEnabled("coeus-command")
+    ? safeHook("coeus-command", () => createCoeusCommandHook(ctx))
+    : null
+
   const sisyphusJuniorNotepad = isHookEnabled("sisyphus-junior-notepad")
     ? safeHook("sisyphus-junior-notepad", () => createSisyphusJuniorNotepadHook(ctx))
     : null
@@ -285,6 +291,7 @@ export function createSessionHooks(args: {
     startWork,
     prometheusMdOnly,
     coeusMdOnly,
+    coeusCommand,
     sisyphusJuniorNotepad,
     noSisyphusGpt,
     noHephaestusNonGpt,
