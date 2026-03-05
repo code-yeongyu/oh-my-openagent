@@ -17,7 +17,7 @@ oh-my-opencode/
 │   ├── hooks/                # 46 hooks across 45 directories + 11 standalone files
 │   ├── tools/                # 26 tools across 15 directories
 │   ├── features/             # 19 feature modules (background-agent, skill-loader, tmux, MCP-OAuth, etc.)
-│   ├── shared/               # 95+ utility files in 13 categories
+│   ├── shared/               # 95+ utility files in 13 categories (includes taxonomy-client.ts)
 │   ├── config/               # Zod v4 schema system (24 files)
 │   ├── cli/                  # CLI: install, run, doctor, mcp-oauth (Commander.js)
 │   ├── mcp/                  # 3 built-in remote MCPs (websearch, context7, grep_app)
@@ -59,6 +59,7 @@ OhMyOpenCodePlugin(ctx)
 | Orchestrator | `src/hooks/atlas/` | Main orchestration hook (1976 lines) |
 | Delegation | `src/tools/delegate-task/` | Category routing (constants.ts 569 lines) |
 | Task system | `src/features/claude-tasks/` | Task schema, storage, todo sync |
+| Coeus planner | `src/agents/coeus/` | Recursive divide-and-conquer planner (14 files) |
 | Plugin interface | `src/plugin/` | 21 files composing hooks, handlers, registries |
 
 ## TDD (Test-Driven Development)
@@ -125,6 +126,20 @@ OhMyOpenCodePlugin(ctx)
 | Coeus | anthropic/claude-opus-4-6 | 0.1 | Recursive divide-and-conquer planner (fallback: kimi-k2.5 → gpt-5.2 → gemini-3-pro) |
 | Sub-Prometheus | anthropic/claude-sonnet-4-5 | 0.1 | Domain-specific sub-planner spawned by Coeus |
 | Sisyphus-Junior | anthropic/claude-sonnet-4-5 | 0.1 | Category-spawned executor |
+
+## BUILTIN COMMANDS
+
+| Command | Agent | Purpose |
+|---------|-------|---------|
+| `/init-deep` | — | Auto-generate hierarchical AGENTS.md files throughout project |
+| `/ralph-loop` | — | Self-referential dev loop until completion |
+| `/ulw-loop` | — | Ultrawork loop with continuous execution |
+| `/cancel-ralph` | — | Cancel active Ralph Loop |
+| `/refactor` | — | Intelligent refactoring with LSP, AST-grep, TDD |
+| `/start-work` | atlas | Start Sisyphus work session from Prometheus plan |
+| `/stop-continuation` | — | Stop all continuation mechanisms (ralph loop, todo, boulder) |
+| `/handoff` | — | Create detailed context summary for new session |
+| `/coeus` | coeus | Deep research planning with knowledge verification |
 
 ## OPENCODE PLUGIN API
 

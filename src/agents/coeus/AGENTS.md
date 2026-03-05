@@ -8,10 +8,12 @@ Recursive divide-and-conquer planner. Decomposes complex multi-domain problems i
 ```
 coeus/
 ├── agent.ts              # Coeus agent factory + metadata
-├── system-prompt.ts      # 6-phase system prompt
+├── system-prompt.ts      # 6-phase system prompt (Phase 0: brief ingestion + taxonomy verification)
 ├── orchestrator.ts       # Orchestration flow (assess → decompose → spawn → merge)
 ├── types.ts              # ComplexityScore, DecompositionDecision, thresholds
 ├── index.ts              # Barrel export
+├── brief/                # Brief-writer module (Phase 0 ingestion)
+├── verification/         # Knowledge verification module (4 files)
 ├── schemas/
 │   ├── sub-plan-schema.ts    # SubPlanSchema (Zod)
 │   ├── merged-plan-schema.ts # MergedPlanSchema (Zod)
@@ -86,6 +88,8 @@ Solution library with per-claim provenance. 4-tier authority hierarchy:
 - Tier 2: Official docs (MDN, RFC, language specs)
 - Tier 3: Established practice (high-star repos, conference talks)
 - Tier 4: Community (blog posts, tutorials)
+
+**Alexandria Philosophy**: Queries verify, not debate. Novel solutions = rabbit hole. Verification records stored at `.sisyphus/bet-records/`.
 
 ## KEY CONSTRAINTS
 

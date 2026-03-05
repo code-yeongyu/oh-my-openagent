@@ -22,6 +22,7 @@ hooks/
 ├── beast-mode-system/          # Beast mode system prompt injection
 ├── category-skill-reminder/    # Reminds of category skills
 ├── claude-code-hooks/          # settings.json compat layer
+├── coeus-command/              # State detection hook for /coeus sessions
 ├── comment-checker/            # Prevents AI slop
 ├── compaction-context-injector/ # Injects context on compaction
 ├── compaction-todo-preserver/  # Preserves todos through compaction
@@ -75,6 +76,7 @@ hooks/
 | editErrorRecovery | tool.execute.after | Retry failed file edits |
 | delegateTaskRetry | tool.execute.after | Retry failed task delegations |
 | startWork | chat.message | `/start-work` command handler |
+| coeusCommand | chat.message | State detection hook for `/coeus` sessions |
 | prometheusMdOnly | tool.execute.before | Enforce .md-only writes for Prometheus |
 | sisyphusJuniorNotepad | chat.message | Notepad injection for subagents |
 | questionLabelTruncator | tool.execute.before | Truncate long question labels |
