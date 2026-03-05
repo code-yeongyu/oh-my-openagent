@@ -76,7 +76,8 @@ export class TmuxSessionManager {
     this.pollingManager = new TmuxPollingManager(
       this.client,
       this.sessions,
-      this.closeSessionById.bind(this)
+      this.closeSessionById.bind(this),
+      this.sourcePaneId
     )
     log("[tmux-session-manager] initialized", {
       configEnabled: this.tmuxConfig.enabled,

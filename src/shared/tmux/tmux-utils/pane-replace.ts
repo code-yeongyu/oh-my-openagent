@@ -3,7 +3,7 @@ import type { TmuxConfig } from "../../../config/schema"
 import { getTmuxPath } from "../../../tools/interactive-bash/tmux-path-resolver"
 import type { SpawnPaneResult } from "../types"
 import { isInsideTmux } from "./environment"
-import { formatPaneTitle } from "../../../features/tmux-subagent/pane-title-indicator"
+import { formatPaneTitle } from "./pane-title-indicator"
 
 export async function replaceTmuxPane(
 	paneId: string,

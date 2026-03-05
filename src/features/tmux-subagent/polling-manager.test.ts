@@ -40,6 +40,7 @@ describe("TmuxPollingManager overlap", () => {
       client as unknown as import("../../tools/delegate-task/types").OpencodeClient,
       sessions,
       async () => {},
+      "%0"
     )
 
     //#when

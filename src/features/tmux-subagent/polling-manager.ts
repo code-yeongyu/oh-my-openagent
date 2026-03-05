@@ -4,7 +4,7 @@ import type { TrackedSession } from "./types"
 import { SESSION_MISSING_GRACE_MS } from "../../shared/tmux"
 import { log } from "../../shared"
 import { normalizeSDKResponse } from "../../shared"
-import { setPaneTitleWithIndicator } from "./pane-title-indicator"
+import { setPaneTitleWithIndicator } from "../../shared/tmux/tmux-utils/pane-title-indicator"
 import { queryWindowState } from "./pane-state-querier"
 
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000
@@ -18,7 +18,8 @@ export class TmuxPollingManager {
   constructor(
     private client: OpencodeClient,
     private sessions: Map<string, TrackedSession>,
-    private closeSessionById: (sessionId: string) => Promise<void>
+    private closeSessionById: (sessionId: string) => Promise<void>,
+    private sourcePaneId?: string
   ) {}
 
   startPolling(): void {
@@ -42,20 +43,22 @@ export class TmuxPollingManager {
   private async updatePaneTitles(): Promise<void> {
     if (this.sessions.size === 0) return
     
-    const firstSession = Array.from(this.sessions.values())[0]
-    if (!firstSession) return
+    const queryPaneId = this.sourcePaneId ?? Array.from(this.sessions.values())[0]?.paneId
+    if (!queryPaneId) return
     
-    const state = await queryWindowState(firstSession.paneId)
+    const state = await queryWindowState(queryPaneId)
     if (!state) {
       log("[tmux-session-manager] failed to query window state for title updates")
       return
     }
     
-    const totalAgentPanes = state.agentPanes.length
-    if (totalAgentPanes === 0) return
+    const trackedPaneIds = new Set(Array.from(this.sessions.values()).map(s => s.paneId))
+    const trackedAgentPanes = state.agentPanes.filter(p => trackedPaneIds.has(p.paneId))
     
-    for (let i = 0; i < state.agentPanes.length; i++) {
-      const pane = state.agentPanes[i]
+    if (trackedAgentPanes.length === 0) return
+    
+    for (let i = 0; i < trackedAgentPanes.length; i++) {
+      const pane = trackedAgentPanes[i]
       if (!pane) continue
       
       const trackedSession = Array.from(this.sessions.values()).find(
@@ -70,7 +73,7 @@ export class TmuxPollingManager {
         pane.paneId,
         description,
         index,
-        totalAgentPanes,
+        trackedAgentPanes.length,
         pane.isActive
       )
     }

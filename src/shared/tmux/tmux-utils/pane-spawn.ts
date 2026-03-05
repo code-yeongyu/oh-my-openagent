@@ -5,7 +5,7 @@ import type { SpawnPaneResult } from "../types"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
-import { formatPaneTitle } from "../../../features/tmux-subagent/pane-title-indicator"
+import { formatPaneTitle } from "./pane-title-indicator"
 
 export async function spawnTmuxPane(
 	sessionId: string,
