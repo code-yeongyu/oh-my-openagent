@@ -7,6 +7,21 @@ import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./syste
 import { isSisyphusPath } from "./sisyphus-path"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 
+/**
+ * Check if a path is a plan file inside .sisyphus/plans/
+ */
+function isPlanPath(filePath: string): boolean {
+  return /\.sisyphus[/\\]plans[/\\].*\.md$/.test(filePath)
+}
+
+/**
+ * Transform Commit fields in plan content when autoCommit is disabled.
+ * Converts "Commit: YES" and "Commit: NO" to "Commit: NO (user disabled auto-commits)"
+ */
+export function transformPlanCommitFields(content: string): string {
+  return content.replace(/Commit:\s*(YES|NO)/g, "Commit: NO (user disabled auto-commits)")
+}
+
 export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
@@ -50,6 +65,22 @@ export function createToolExecuteBeforeHandler(input: {
         log(`[${HOOK_NAME}] Injected single-task directive to task`, {
           sessionID: toolInput.sessionID,
         })
+      }
+      return
+    }
+
+    // Transform plan content when autoCommit is disabled
+    if (!autoCommit && toolInput.tool === "read") {
+      const filePath = toolOutput.args.filePath as string | undefined
+      if (filePath && isPlanPath(filePath)) {
+        const content = toolOutput.args.content as string | undefined
+        if (content) {
+          toolOutput.args.content = transformPlanCommitFields(content)
+          log(`[${HOOK_NAME}] Transformed plan Commit fields for read`, {
+            sessionID: toolInput.sessionID,
+            filePath,
+          })
+        }
       }
     }
   }
