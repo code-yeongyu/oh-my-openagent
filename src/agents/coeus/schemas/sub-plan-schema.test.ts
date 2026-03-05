@@ -166,40 +166,185 @@ describe('SubPlanSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  //#given a sub-plan with multiple tasks
-  //#when parsing with SubPlanSchema
-  //#then it should validate successfully
-  it('validates sub-plan with multiple tasks', () => {
-    const subPlan = {
-      domain: 'database',
-      domain_description: 'Database layer implementation',
-      tasks: [
-        {
-          id: 'task-1',
-          title: 'Create schema',
-          description: 'Define database schema',
-          depends_on: [],
-          category: 'infrastructure',
-          skills: ['sql'],
-          files_touched: ['migrations/001_schema.sql'],
-          acceptance_criteria: ['Schema should be created'],
-        },
-        {
-          id: 'task-2',
-          title: 'Add indexes',
-          description: 'Add database indexes',
-          depends_on: ['task-1'],
-          category: 'optimization',
-          skills: ['sql'],
-          files_touched: ['migrations/002_indexes.sql'],
-          acceptance_criteria: ['Indexes should improve query performance'],
-        },
-      ],
-      wave_assignments: { 'wave-1': 1, 'wave-2': 1 },
-      constraints_acknowledged: true,
-      source_sub_planner: 'session-xyz789',
-    }
-    const result = SubPlanSchema.safeParse(subPlan)
-    expect(result.success).toBe(true)
-  })
+   //#given a sub-plan with multiple tasks
+   //#when parsing with SubPlanSchema
+   //#then it should validate successfully
+   it('validates sub-plan with multiple tasks', () => {
+     const subPlan = {
+       domain: 'database',
+       domain_description: 'Database layer implementation',
+       tasks: [
+         {
+           id: 'task-1',
+           title: 'Create schema',
+           description: 'Define database schema',
+           depends_on: [],
+           category: 'infrastructure',
+           skills: ['sql'],
+           files_touched: ['migrations/001_schema.sql'],
+           acceptance_criteria: ['Schema should be created'],
+         },
+         {
+           id: 'task-2',
+           title: 'Add indexes',
+           description: 'Add database indexes',
+           depends_on: ['task-1'],
+           category: 'optimization',
+           skills: ['sql'],
+           files_touched: ['migrations/002_indexes.sql'],
+           acceptance_criteria: ['Indexes should improve query performance'],
+         },
+       ],
+       wave_assignments: { 'wave-1': 1, 'wave-2': 1 },
+       constraints_acknowledged: true,
+       source_sub_planner: 'session-xyz789',
+     }
+     const result = SubPlanSchema.safeParse(subPlan)
+     expect(result.success).toBe(true)
+   })
+
+   //#given a sub-plan without rabbit_holes or integration_touchpoints
+   //#when parsing with SubPlanSchema
+   //#then it should validate successfully (regression check)
+   it('validates sub-plan without new optional fields', () => {
+     const subPlan = {
+       domain: 'authentication',
+       domain_description: 'User authentication and authorization',
+       tasks: [
+         {
+           id: 'task-1',
+           title: 'Implement JWT',
+           description: 'Add JWT authentication',
+           depends_on: [],
+           category: 'feature',
+           skills: ['typescript', 'security'],
+           files_touched: ['src/auth/jwt.ts'],
+           acceptance_criteria: ['JWT tokens should be generated'],
+         },
+       ],
+       wave_assignments: { 'wave-1': 1 },
+       constraints_acknowledged: true,
+       source_sub_planner: 'session-abc123',
+     }
+     const result = SubPlanSchema.safeParse(subPlan)
+     expect(result.success).toBe(true)
+   })
+
+   //#given a sub-plan with rabbit_holes field
+   //#when parsing with SubPlanSchema
+   //#then it should validate successfully
+   it('validates sub-plan with rabbit_holes', () => {
+     const subPlan = {
+       domain: 'authentication',
+       domain_description: 'User authentication and authorization',
+       tasks: [
+         {
+           id: 'task-1',
+           title: 'Implement JWT',
+           description: 'Add JWT authentication',
+           depends_on: [],
+           category: 'feature',
+           skills: ['typescript', 'security'],
+           files_touched: ['src/auth/jwt.ts'],
+           acceptance_criteria: ['JWT tokens should be generated'],
+         },
+       ],
+       wave_assignments: { 'wave-1': 1 },
+       constraints_acknowledged: true,
+       source_sub_planner: 'session-abc123',
+       rabbit_holes: [
+         {
+           boundary: 'OAuth2 integration',
+           description: 'Potential scope expansion to support OAuth2 providers',
+           source: 'verification-record',
+         },
+         {
+           boundary: 'Multi-factor authentication',
+           description: 'Could expand to include MFA support',
+         },
+       ],
+     }
+     const result = SubPlanSchema.safeParse(subPlan)
+     expect(result.success).toBe(true)
+   })
+
+   //#given a sub-plan with integration_touchpoints field
+   //#when parsing with SubPlanSchema
+   //#then it should validate successfully
+   it('validates sub-plan with integration_touchpoints', () => {
+     const subPlan = {
+       domain: 'authentication',
+       domain_description: 'User authentication and authorization',
+       tasks: [
+         {
+           id: 'task-1',
+           title: 'Implement JWT',
+           description: 'Add JWT authentication',
+           depends_on: [],
+           category: 'feature',
+           skills: ['typescript', 'security'],
+           files_touched: ['src/auth/jwt.ts'],
+           acceptance_criteria: ['JWT tokens should be generated'],
+         },
+       ],
+       wave_assignments: { 'wave-1': 1 },
+       constraints_acknowledged: true,
+       source_sub_planner: 'session-abc123',
+       integration_touchpoints: [
+         {
+           from_domain: 'authentication',
+           to_domain: 'user-service',
+           contract: 'POST /users/{id}/verify-token',
+         },
+         {
+           from_domain: 'authentication',
+           to_domain: 'audit-logging',
+           contract: 'POST /audit/log-auth-event',
+         },
+       ],
+     }
+     const result = SubPlanSchema.safeParse(subPlan)
+     expect(result.success).toBe(true)
+   })
+
+   //#given a sub-plan with both rabbit_holes and integration_touchpoints
+   //#when parsing with SubPlanSchema
+   //#then it should validate successfully
+   it('validates sub-plan with both rabbit_holes and integration_touchpoints', () => {
+     const subPlan = {
+       domain: 'authentication',
+       domain_description: 'User authentication and authorization',
+       tasks: [
+         {
+           id: 'task-1',
+           title: 'Implement JWT',
+           description: 'Add JWT authentication',
+           depends_on: [],
+           category: 'feature',
+           skills: ['typescript', 'security'],
+           files_touched: ['src/auth/jwt.ts'],
+           acceptance_criteria: ['JWT tokens should be generated'],
+         },
+       ],
+       wave_assignments: { 'wave-1': 1 },
+       constraints_acknowledged: true,
+       source_sub_planner: 'session-abc123',
+       rabbit_holes: [
+         {
+           boundary: 'OAuth2 integration',
+           description: 'Potential scope expansion to support OAuth2 providers',
+           source: 'verification-record',
+         },
+       ],
+       integration_touchpoints: [
+         {
+           from_domain: 'authentication',
+           to_domain: 'user-service',
+           contract: 'POST /users/{id}/verify-token',
+         },
+       ],
+     }
+     const result = SubPlanSchema.safeParse(subPlan)
+     expect(result.success).toBe(true)
+   })
 })

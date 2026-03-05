@@ -22,6 +22,16 @@ export const SubPlanSchema = z.object({
   wave_assignments: z.record(z.string(), z.number()),
   constraints_acknowledged: z.boolean(),
   source_sub_planner: z.string(),
+  rabbit_holes: z.array(z.object({
+    boundary: z.string(),
+    description: z.string(),
+    source: z.string().optional(),
+  })).optional(),
+  integration_touchpoints: z.array(z.object({
+    from_domain: z.string(),
+    to_domain: z.string(),
+    contract: z.string(),
+  })).optional(),
 })
 
 export type SubPlan = z.infer<typeof SubPlanSchema>
