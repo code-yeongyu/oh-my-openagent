@@ -1,103 +1,27 @@
-import { describe, it, expect, spyOn, afterEach } from "bun:test"
+import { describe, it, expect } from "bun:test"
 import * as config from "./config"
 
 describe("config check", () => {
-  describe("validateConfig", () => {
-    it("returns valid: false for non-existent file", () => {
-      // given non-existent file path
-      // when validating
-      const result = config.validateConfig("/non/existent/path.json")
+  describe("checkConfig", () => {
+    it("returns a valid CheckResult", async () => {
+      //#given config check is available
+      //#when running the consolidated config check
+      const result = await config.checkConfig()
 
-      // then should indicate invalid
-      expect(result.valid).toBe(false)
-      expect(result.errors.length).toBeGreaterThan(0)
-    })
-  })
-
-  describe("getConfigInfo", () => {
-    it("returns exists: false when no config found", () => {
-      // given no config file exists
-      // when getting config info
-      const info = config.getConfigInfo()
-
-      // then should handle gracefully
-      expect(typeof info.exists).toBe("boolean")
-      expect(typeof info.valid).toBe("boolean")
-    })
-  })
-
-  describe("checkConfigValidity", () => {
-    let getInfoSpy: ReturnType<typeof spyOn>
-
-    afterEach(() => {
-      getInfoSpy?.mockRestore()
+      //#then should return a properly shaped CheckResult
+      expect(result.name).toBe("Configuration")
+      expect(["pass", "fail", "warn", "skip"]).toContain(result.status)
+      expect(typeof result.message).toBe("string")
+      expect(Array.isArray(result.issues)).toBe(true)
     })
 
-    it("returns pass when no config exists (uses defaults)", async () => {
-      // given no config file
-      getInfoSpy = spyOn(config, "getConfigInfo").mockReturnValue({
-        exists: false,
-        path: null,
-        format: null,
-        valid: true,
-        errors: [],
-      })
+    it("includes issues array even when config is valid", async () => {
+      //#given a normal environment
+      //#when running config check
+      const result = await config.checkConfig()
 
-      // when checking validity
-      const result = await config.checkConfigValidity()
-
-      // then should pass with default message
-      expect(result.status).toBe("pass")
-      expect(result.message).toContain("default")
-    })
-
-    it("returns pass when config is valid", async () => {
-      // given valid config
-      getInfoSpy = spyOn(config, "getConfigInfo").mockReturnValue({
-        exists: true,
-        path: "/home/user/.config/opencode/oh-my-opencode.json",
-        format: "json",
-        valid: true,
-        errors: [],
-      })
-
-      // when checking validity
-      const result = await config.checkConfigValidity()
-
-      // then should pass
-      expect(result.status).toBe("pass")
-      expect(result.message).toContain("JSON")
-    })
-
-    it("returns fail when config has validation errors", async () => {
-      // given invalid config
-      getInfoSpy = spyOn(config, "getConfigInfo").mockReturnValue({
-        exists: true,
-        path: "/home/user/.config/opencode/oh-my-opencode.json",
-        format: "json",
-        valid: false,
-        errors: ["agents.oracle: Invalid model format"],
-      })
-
-      // when checking validity
-      const result = await config.checkConfigValidity()
-
-      // then should fail with errors
-      expect(result.status).toBe("fail")
-      expect(result.details?.some((d) => d.includes("Error"))).toBe(true)
-    })
-  })
-
-  describe("getConfigCheckDefinition", () => {
-    it("returns valid check definition", () => {
-      // given
-      // when getting definition
-      const def = config.getConfigCheckDefinition()
-
-      // then should have required properties
-      expect(def.id).toBe("config-validation")
-      expect(def.category).toBe("configuration")
-      expect(def.critical).toBe(false)
+      //#then issues should be an array (possibly empty)
+      expect(Array.isArray(result.issues)).toBe(true)
     })
   })
 })

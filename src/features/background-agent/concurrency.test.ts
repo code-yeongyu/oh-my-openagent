@@ -6,12 +6,12 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   test("should return model-specific limit when modelConcurrency is set", () => {
     // given
     const config: BackgroundTaskConfig = {
-      modelConcurrency: { "anthropic/claude-sonnet-4-5": 5 }
+      modelConcurrency: { "anthropic/claude-sonnet-4-6": 5 }
     }
     const manager = new ConcurrencyManager(config)
 
     // when
-    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-6")
 
     // then
     expect(limit).toBe(5)
@@ -25,7 +25,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const manager = new ConcurrencyManager(config)
 
     // when
-    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-6")
 
     // then
     expect(limit).toBe(3)
@@ -34,13 +34,13 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   test("should return provider limit even when modelConcurrency exists but doesn't match", () => {
     // given
     const config: BackgroundTaskConfig = {
-      modelConcurrency: { "google/gemini-3-pro": 5 },
+      modelConcurrency: { "google/gemini-3.1-pro": 5 },
       providerConcurrency: { anthropic: 3 }
     }
     const manager = new ConcurrencyManager(config)
 
     // when
-    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-6")
 
     // then
     expect(limit).toBe(3)
@@ -54,7 +54,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const manager = new ConcurrencyManager(config)
 
     // when
-    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-6")
 
     // then
     expect(limit).toBe(2)
@@ -65,7 +65,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const manager = new ConcurrencyManager()
 
     // when
-    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-6")
 
     // then
     expect(limit).toBe(5)
@@ -77,7 +77,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const manager = new ConcurrencyManager(config)
 
     // when
-    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-6")
 
     // then
     expect(limit).toBe(5)
@@ -86,16 +86,16 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   test("should prioritize model-specific over provider-specific over default", () => {
     // given
     const config: BackgroundTaskConfig = {
-      modelConcurrency: { "anthropic/claude-sonnet-4-5": 10 },
+      modelConcurrency: { "anthropic/claude-sonnet-4-6": 10 },
       providerConcurrency: { anthropic: 5 },
       defaultConcurrency: 2
     }
     const manager = new ConcurrencyManager(config)
 
     // when
-    const modelLimit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
-    const providerLimit = manager.getConcurrencyLimit("anthropic/claude-opus-4-5")
-    const defaultLimit = manager.getConcurrencyLimit("google/gemini-3-pro")
+    const modelLimit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-6")
+    const providerLimit = manager.getConcurrencyLimit("anthropic/claude-opus-4-6")
+    const defaultLimit = manager.getConcurrencyLimit("google/gemini-3.1-pro")
 
     // then
     expect(modelLimit).toBe(10)
@@ -137,7 +137,7 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
     const manager = new ConcurrencyManager(config)
 
     // when
-    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-6")
 
     // then
     expect(limit).toBe(Infinity)
@@ -146,12 +146,12 @@ describe("ConcurrencyManager.getConcurrencyLimit", () => {
   test("should return Infinity when modelConcurrency is 0", () => {
     // given
     const config: BackgroundTaskConfig = {
-      modelConcurrency: { "anthropic/claude-sonnet-4-5": 0 }
+      modelConcurrency: { "anthropic/claude-sonnet-4-6": 0 }
     }
     const manager = new ConcurrencyManager(config)
 
     // when
-    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-5")
+    const limit = manager.getConcurrencyLimit("anthropic/claude-sonnet-4-6")
 
     // then
     expect(limit).toBe(Infinity)
@@ -327,16 +327,16 @@ describe("ConcurrencyManager.acquire/release", () => {
   test("should use model-specific limit for acquire", async () => {
     // given
     const config: BackgroundTaskConfig = {
-      modelConcurrency: { "anthropic/claude-sonnet-4-5": 2 },
+      modelConcurrency: { "anthropic/claude-sonnet-4-6": 2 },
       defaultConcurrency: 5
     }
     manager = new ConcurrencyManager(config)
-    await manager.acquire("anthropic/claude-sonnet-4-5")
-    await manager.acquire("anthropic/claude-sonnet-4-5")
+    await manager.acquire("anthropic/claude-sonnet-4-6")
+    await manager.acquire("anthropic/claude-sonnet-4-6")
 
     // when
     let resolved = false
-    const waitPromise = manager.acquire("anthropic/claude-sonnet-4-5").then(() => { resolved = true })
+    const waitPromise = manager.acquire("anthropic/claude-sonnet-4-6").then(() => { resolved = true })
 
     // Give microtask queue a chance to run
     await Promise.resolve()
@@ -345,7 +345,7 @@ describe("ConcurrencyManager.acquire/release", () => {
     expect(resolved).toBe(false)
 
     // Cleanup
-    manager.release("anthropic/claude-sonnet-4-5")
+    manager.release("anthropic/claude-sonnet-4-6")
     await waitPromise
   })
 })

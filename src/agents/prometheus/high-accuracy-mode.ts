@@ -15,8 +15,9 @@ export const PROMETHEUS_HIGH_ACCURACY_MODE = `# PHASE 3: PLAN GENERATION
 \`\`\`typescript
 // After generating initial plan
 while (true) {
-  const result = delegate_task(
+  const result = task(
     subagent_type="momus",
+    load_skills=[],
     prompt=".sisyphus/plans/{name}.md",
     run_in_background=false
   )

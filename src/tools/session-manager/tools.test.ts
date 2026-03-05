@@ -1,8 +1,11 @@
 import { describe, test, expect } from "bun:test"
-import { session_list, session_read, session_search, session_info } from "./tools"
+import { createSessionManagerTools } from "./tools"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
+import type { PluginInput } from "@opencode-ai/plugin"
 
 const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
+
+const mockCtx = { directory: projectDir } as PluginInput
 
 const mockContext: ToolContext = {
   sessionID: "test-session",
@@ -14,6 +17,9 @@ const mockContext: ToolContext = {
   metadata: () => {},
   ask: async () => {},
 }
+
+const tools = createSessionManagerTools(mockCtx)
+const { session_list, session_read, session_search, session_info } = tools
 
 describe("session-manager tools", () => {
   test("session_list executes without error", async () => {
@@ -38,23 +44,23 @@ describe("session-manager tools", () => {
   })
 
   test("session_list filters by project_path", async () => {
-    // given
+    //#given
     const projectPath = "/Users/yeongyu/local-workspaces/oh-my-opencode"
 
-    // when
+    //#when
     const result = await session_list.execute({ project_path: projectPath }, mockContext)
 
-    // then
+    //#then
     expect(typeof result).toBe("string")
   })
 
-  test("session_list uses process.cwd() as default project_path", async () => {
-    // given - no project_path provided
+  test("session_list uses ctx.directory as default project_path", async () => {
+    //#given - no project_path provided
 
-    // when
+    //#when
     const result = await session_list.execute({}, mockContext)
 
-    // then - should not throw and return string (uses process.cwd() internally)
+    //#then
     expect(typeof result).toBe("string")
   })
 

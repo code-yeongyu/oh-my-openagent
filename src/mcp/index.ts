@@ -1,7 +1,6 @@
 import { createWebsearchConfig } from "./websearch"
 import { context7 } from "./context7"
 import { grep_app } from "./grep-app"
-import type { McpName } from "./types"
 import type { OhMyOpenCodeConfig } from "../config/schema"
 
 export { McpNameSchema, type McpName } from "./types"

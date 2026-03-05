@@ -11,6 +11,7 @@ export interface ParsedTokenLimitError {
 export interface RetryState {
   attempt: number
   lastAttemptTime: number
+  firstAttemptTime: number
 }
 
 export interface TruncateState {

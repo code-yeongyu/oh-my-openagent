@@ -4,6 +4,12 @@ import type { ConcurrencyManager } from "../background-agent/concurrency"
 
 type OpencodeClient = PluginInput["client"]
 
+type ClientWithTui = {
+  tui?: {
+    showToast: (opts: { body: { title: string; message: string; variant: string; duration: number } }) => Promise<unknown>
+  }
+}
+
 export class TaskToastManager {
   private tasks: Map<string, TrackedTask> = new Map()
   private client: OpencodeClient
@@ -20,6 +26,7 @@ export class TaskToastManager {
 
   addTask(task: {
     id: string
+    sessionID?: string
     description: string
     agent: string
     isBackground: boolean
@@ -30,6 +37,7 @@ export class TaskToastManager {
   }): void {
     const trackedTask: TrackedTask = {
       id: task.id,
+      sessionID: task.sessionID,
       description: task.description,
       agent: task.agent,
       status: task.status ?? "running",
@@ -52,6 +60,18 @@ export class TaskToastManager {
     if (task) {
       task.status = status
     }
+  }
+
+  /**
+   * Update model info for a task by session ID
+   */
+  updateTaskModelBySession(sessionID: string, modelInfo: ModelFallbackInfo): void {
+    if (!sessionID) return
+    const task = Array.from(this.tasks.values()).find((t) => t.sessionID === sessionID)
+    if (!task) return
+    if (task.modelInfo?.model === modelInfo.model && task.modelInfo?.type === modelInfo.type) return
+    task.modelInfo = modelInfo
+    this.showTaskListToast(task)
   }
 
   /**
@@ -110,14 +130,17 @@ export class TaskToastManager {
     const lines: string[] = []
 
     const isFallback = newTask.modelInfo && (
-      newTask.modelInfo.type === "inherited" || newTask.modelInfo.type === "system-default"
+      newTask.modelInfo.type === "inherited" ||
+      newTask.modelInfo.type === "system-default" ||
+      newTask.modelInfo.type === "runtime-fallback"
     )
     if (isFallback) {
-      const suffixMap: Record<"inherited" | "system-default", string> = {
+      const suffixMap: Record<"inherited" | "system-default" | "runtime-fallback", string> = {
         inherited: " (inherited from parent)",
         "system-default": " (system default fallback)",
+        "runtime-fallback": " (runtime fallback)",
       }
-      const suffix = suffixMap[newTask.modelInfo!.type as "inherited" | "system-default"]
+      const suffix = suffixMap[newTask.modelInfo!.type as "inherited" | "system-default" | "runtime-fallback"]
       lines.push(`[FALLBACK] Model: ${newTask.modelInfo!.model}${suffix}`)
       lines.push("")
     }
@@ -153,8 +176,7 @@ export class TaskToastManager {
    * Show consolidated toast with all running/queued tasks
    */
   private showTaskListToast(newTask: TrackedTask): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as ClientWithTui
     if (!tuiClient.tui?.showToast) return
 
     const message = this.buildTaskListMessage(newTask)
@@ -179,8 +201,7 @@ export class TaskToastManager {
    * Show task completion toast
    */
   showCompletionToast(task: { id: string; description: string; duration: string }): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tuiClient = this.client as any
+    const tuiClient = this.client as ClientWithTui
     if (!tuiClient.tui?.showToast) return
 
     this.removeTask(task.id)
@@ -216,4 +237,8 @@ export function initTaskToastManager(
 ): TaskToastManager {
   instance = new TaskToastManager(client, concurrencyManager)
   return instance
+}
+
+export function _resetTaskToastManagerForTesting(): void {
+  instance = null
 }

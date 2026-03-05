@@ -1,218 +1,170 @@
-import { describe, it, expect } from "bun:test"
-import {
-  formatStatusSymbol,
-  formatCheckResult,
-  formatCategoryHeader,
-  formatSummary,
-  formatHeader,
-  formatFooter,
-  formatJsonOutput,
-  formatBox,
-  formatHelpSuggestions,
-} from "./formatter"
-import type { CheckResult, DoctorSummary, DoctorResult } from "./types"
+import { describe, expect, it } from "bun:test"
+import { stripAnsi } from "./format-shared"
+import type { DoctorResult } from "./types"
 
-describe("formatter", () => {
-  describe("formatStatusSymbol", () => {
-    it("returns green check for pass", () => {
-      const symbol = formatStatusSymbol("pass")
-      expect(symbol).toContain("\u2713")
+function createDoctorResult(): DoctorResult {
+  return {
+    results: [
+      { name: "System", status: "pass", message: "ok", issues: [] },
+      { name: "Configuration", status: "warn", message: "warn", issues: [] },
+    ],
+    systemInfo: {
+      opencodeVersion: "1.0.200",
+      opencodePath: "/usr/local/bin/opencode",
+      pluginVersion: "3.4.0",
+      loadedVersion: "3.4.0",
+      bunVersion: "1.2.0",
+      configPath: "/tmp/opencode.jsonc",
+      configValid: true,
+      isLocalDev: false,
+    },
+    tools: {
+      lspInstalled: 2,
+      lspTotal: 4,
+      astGrepCli: true,
+      astGrepNapi: false,
+      commentChecker: true,
+      ghCli: { installed: true, authenticated: true, username: "yeongyu" },
+      mcpBuiltin: ["context7", "grep_app"],
+      mcpUser: ["custom"],
+    },
+    summary: {
+      total: 2,
+      passed: 1,
+      failed: 0,
+      warnings: 1,
+      skipped: 0,
+      duration: 12,
+    },
+    exitCode: 0,
+  }
+}
+
+function createDoctorResultWithIssues(): DoctorResult {
+  const base = createDoctorResult()
+  base.results[1].issues = [
+    { title: "Config issue", description: "Bad config", severity: "error" as const, fix: "Fix it" },
+    { title: "Tool warning", description: "Missing tool", severity: "warning" as const },
+  ]
+  base.summary.failed = 1
+  base.summary.warnings = 1
+  return base
+}
+
+describe("formatDoctorOutput", () => {
+  describe("#given default mode", () => {
+    it("shows System OK when no issues", async () => {
+      //#given
+      const result = createDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?default-ok-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "default"))
+
+      //#then
+      expect(output).toContain("System OK (opencode 1.0.200 · oh-my-opencode 3.4.0)")
     })
 
-    it("returns red cross for fail", () => {
-      const symbol = formatStatusSymbol("fail")
-      expect(symbol).toContain("\u2717")
-    })
+    it("shows issue count and details when issues exist", async () => {
+      //#given
+      const result = createDoctorResultWithIssues()
+      const { formatDoctorOutput } = await import(`./formatter?default-issues-${Date.now()}`)
 
-    it("returns yellow warning for warn", () => {
-      const symbol = formatStatusSymbol("warn")
-      expect(symbol).toContain("\u26A0")
-    })
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "default"))
 
-    it("returns dim circle for skip", () => {
-      const symbol = formatStatusSymbol("skip")
-      expect(symbol).toContain("\u25CB")
-    })
-  })
-
-  describe("formatCheckResult", () => {
-    it("includes name and message", () => {
-      const result: CheckResult = {
-        name: "Test Check",
-        status: "pass",
-        message: "All good",
-      }
-
-      const output = formatCheckResult(result, false)
-
-      expect(output).toContain("Test Check")
-      expect(output).toContain("All good")
-    })
-
-    it("includes details when verbose", () => {
-      const result: CheckResult = {
-        name: "Test Check",
-        status: "pass",
-        message: "OK",
-        details: ["Detail 1", "Detail 2"],
-      }
-
-      const output = formatCheckResult(result, true)
-
-      expect(output).toContain("Detail 1")
-      expect(output).toContain("Detail 2")
-    })
-
-    it("hides details when not verbose", () => {
-      const result: CheckResult = {
-        name: "Test Check",
-        status: "pass",
-        message: "OK",
-        details: ["Detail 1"],
-      }
-
-      const output = formatCheckResult(result, false)
-
-      expect(output).not.toContain("Detail 1")
-    })
-  })
-
-  describe("formatCategoryHeader", () => {
-    it("formats category name with styling", () => {
-      const header = formatCategoryHeader("installation")
-
-      expect(header).toContain("Installation")
+      //#then
+      expect(output).toContain("issues found:")
+      expect(output).toContain("1. Config issue")
+      expect(output).toContain("2. Tool warning")
     })
   })
 
-  describe("formatSummary", () => {
-    it("shows all counts", () => {
-      const summary: DoctorSummary = {
-        total: 10,
-        passed: 7,
-        failed: 1,
-        warnings: 2,
-        skipped: 0,
-        duration: 150,
-      }
+  describe("#given status mode", () => {
+    it("renders system version line", async () => {
+      //#given
+      const result = createDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?status-ver-${Date.now()}`)
 
-      const output = formatSummary(summary)
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "status"))
 
-      expect(output).toContain("7 passed")
-      expect(output).toContain("1 failed")
-      expect(output).toContain("2 warnings")
-      expect(output).toContain("10 checks")
-      expect(output).toContain("150ms")
+      //#then
+      expect(output).toContain("1.0.200 · 3.4.0 · Bun 1.2.0")
+    })
+
+    it("renders tool and MCP info", async () => {
+      //#given
+      const result = createDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?status-tools-${Date.now()}`)
+
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "status"))
+
+      //#then
+      expect(output).toContain("LSP 2/4")
+      expect(output).toContain("context7")
     })
   })
 
-  describe("formatHeader", () => {
-    it("includes doctor branding", () => {
-      const header = formatHeader()
+  describe("#given verbose mode", () => {
+    it("includes all section headers", async () => {
+      //#given
+      const result = createDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?verbose-headers-${Date.now()}`)
 
-      expect(header).toContain("Doctor")
-    })
-  })
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "verbose"))
 
-  describe("formatFooter", () => {
-    it("shows error message when failures", () => {
-      const summary: DoctorSummary = {
-        total: 5,
-        passed: 4,
-        failed: 1,
-        warnings: 0,
-        skipped: 0,
-        duration: 100,
-      }
-
-      const footer = formatFooter(summary)
-
-      expect(footer).toContain("Issues detected")
+      //#then
+      expect(output).toContain("System Information")
+      expect(output).toContain("Configuration")
+      expect(output).toContain("Tools")
+      expect(output).toContain("MCPs")
+      expect(output).toContain("Summary")
     })
 
-    it("shows warning message when warnings only", () => {
-      const summary: DoctorSummary = {
-        total: 5,
-        passed: 4,
-        failed: 0,
-        warnings: 1,
-        skipped: 0,
-        duration: 100,
-      }
+    it("shows check summary counts", async () => {
+      //#given
+      const result = createDoctorResult()
+      const { formatDoctorOutput } = await import(`./formatter?verbose-summary-${Date.now()}`)
 
-      const footer = formatFooter(summary)
+      //#when
+      const output = stripAnsi(formatDoctorOutput(result, "verbose"))
 
-      expect(footer).toContain("warnings")
-    })
-
-    it("shows success message when all pass", () => {
-      const summary: DoctorSummary = {
-        total: 5,
-        passed: 5,
-        failed: 0,
-        warnings: 0,
-        skipped: 0,
-        duration: 100,
-      }
-
-      const footer = formatFooter(summary)
-
-      expect(footer).toContain("operational")
+      //#then
+      expect(output).toContain("1 passed")
+      expect(output).toContain("0 failed")
+      expect(output).toContain("1 warnings")
     })
   })
 
   describe("formatJsonOutput", () => {
-    it("returns valid JSON", () => {
-      const result: DoctorResult = {
-        results: [{ name: "Test", status: "pass", message: "OK" }],
-        summary: { total: 1, passed: 1, failed: 0, warnings: 0, skipped: 0, duration: 50 },
-        exitCode: 0,
-      }
+    it("returns valid JSON", async () => {
+      //#given
+      const result = createDoctorResult()
+      const { formatJsonOutput } = await import(`./formatter?json-valid-${Date.now()}`)
 
+      //#when
       const output = formatJsonOutput(result)
-      const parsed = JSON.parse(output)
 
-      expect(parsed.results.length).toBe(1)
-      expect(parsed.summary.total).toBe(1)
+      //#then
+      expect(() => JSON.parse(output)).not.toThrow()
+    })
+
+    it("preserves all result fields", async () => {
+      //#given
+      const result = createDoctorResult()
+      const { formatJsonOutput } = await import(`./formatter?json-fields-${Date.now()}`)
+
+      //#when
+      const output = formatJsonOutput(result)
+      const parsed = JSON.parse(output) as DoctorResult
+
+      //#then
+      expect(parsed.summary.total).toBe(2)
+      expect(parsed.systemInfo.pluginVersion).toBe("3.4.0")
       expect(parsed.exitCode).toBe(0)
-    })
-  })
-
-  describe("formatBox", () => {
-    it("wraps content in box", () => {
-      const box = formatBox("Test content")
-
-      expect(box).toContain("Test content")
-      expect(box).toContain("\u2500")
-    })
-
-    it("includes title when provided", () => {
-      const box = formatBox("Content", "My Title")
-
-      expect(box).toContain("My Title")
-    })
-  })
-
-  describe("formatHelpSuggestions", () => {
-    it("extracts suggestions from failed checks", () => {
-      const results: CheckResult[] = [
-        { name: "Test", status: "fail", message: "Error", details: ["Run: fix-command"] },
-        { name: "OK", status: "pass", message: "Good" },
-      ]
-
-      const suggestions = formatHelpSuggestions(results)
-
-      expect(suggestions).toContain("Run: fix-command")
-    })
-
-    it("returns empty array when no failures", () => {
-      const results: CheckResult[] = [
-        { name: "OK", status: "pass", message: "Good" },
-      ]
-
-      const suggestions = formatHelpSuggestions(results)
-
-      expect(suggestions.length).toBe(0)
     })
   })
 })

@@ -1,8 +1,10 @@
+import { afterEach, describe, expect, test } from "bun:test"
 import { _resetForTesting, setMainSession } from "../../features/claude-code-session-state"
 import type { BackgroundTask } from "../../features/background-agent"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import { createUnstableAgentBabysitterHook } from "./index"
 
-const projectDir = "/Users/yeongyu/local-workspaces/oh-my-opencode"
+const projectDir = process.cwd()
 
 type BabysitterContext = Parameters<typeof createUnstableAgentBabysitterHook>[0]
 
@@ -19,6 +21,9 @@ function createMockPluginInput(options: {
           data: messagesBySession[path.id] ?? [],
         }),
         prompt: async (input: unknown) => {
+          promptCalls.push({ input })
+        },
+        promptAsync: async (input: unknown) => {
           promptCalls.push({ input })
         },
       },
@@ -89,6 +94,7 @@ describe("unstable-agent-babysitter hook", () => {
     expect(text).toContain("background_output")
     expect(text).toContain("background_cancel")
     expect(text).toContain("deep thought")
+    expect(text).toContain(OMO_INTERNAL_INITIATOR_MARKER)
   })
 
   test("fires reminder for hung minimax task", async () => {
@@ -124,6 +130,7 @@ describe("unstable-agent-babysitter hook", () => {
     expect(text).toContain("background_output")
     expect(text).toContain("background_cancel")
     expect(text).toContain("minimax thought")
+    expect(text).toContain(OMO_INTERNAL_INITIATOR_MARKER)
   })
 
   test("does not remind stable model tasks", async () => {

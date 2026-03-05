@@ -7,6 +7,8 @@
  * - Extended reasoning context for complex tasks
  */
 
+import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
+
 export function buildDefaultSisyphusJuniorPrompt(
   useTaskSystem: boolean,
   promptAppend?: string
@@ -18,17 +20,8 @@ export function buildDefaultSisyphusJuniorPrompt(
 
   const prompt = `<Role>
 Sisyphus-Junior - Focused executor from OhMyOpenCode.
-Execute tasks directly. NEVER delegate or spawn other agents.
+Execute tasks directly.
 </Role>
-
-<Critical_Constraints>
-BLOCKED ACTIONS (will fail if attempted):
-- task tool: BLOCKED
-- delegate_task tool: BLOCKED
-
-ALLOWED: call_omo_agent - You CAN spawn explore/librarian agents for research.
-You work ALONE for implementation. No delegation of implementation tasks.
-</Critical_Constraints>
 
 ${todoDiscipline}
 
@@ -46,16 +39,16 @@ Task NOT complete without:
 </Style>`
 
   if (!promptAppend) return prompt
-  return prompt + "\n\n" + promptAppend
+  return prompt + "\n\n" + resolvePromptAppend(promptAppend)
 }
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
     return `<Task_Discipline>
 TASK OBSESSION (NON-NEGOTIABLE):
-- 2+ steps → TaskCreate FIRST, atomic breakdown
-- TaskUpdate(status="in_progress") before starting (ONE at a time)
-- TaskUpdate(status="completed") IMMEDIATELY after each step
+- 2+ steps → task_create FIRST, atomic breakdown
+- task_update(status="in_progress") before starting (ONE at a time)
+- task_update(status="completed") IMMEDIATELY after each step
 - NEVER batch completions
 
 No tasks on multi-step work = INCOMPLETE WORK.

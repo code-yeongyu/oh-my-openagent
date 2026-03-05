@@ -1,12 +1,12 @@
 import { join } from "path"
 import { existsSync } from "fs"
 import { getClaudeConfigDir } from "../../shared"
-import type { ClaudeHooksConfig, HookMatcher, HookCommand } from "./types"
+import type { ClaudeHooksConfig, HookMatcher, HookAction } from "./types"
 
 interface RawHookMatcher {
   matcher?: string
   pattern?: string
-  hooks: HookCommand[]
+  hooks: HookAction[]
 }
 
 interface RawClaudeHooksConfig {
@@ -20,7 +20,7 @@ interface RawClaudeHooksConfig {
 function normalizeHookMatcher(raw: RawHookMatcher): HookMatcher {
   return {
     matcher: raw.matcher ?? raw.pattern ?? "*",
-    hooks: raw.hooks,
+    hooks: Array.isArray(raw.hooks) ? raw.hooks : [],
   }
 }
 

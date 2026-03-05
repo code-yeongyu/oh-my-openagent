@@ -1,6 +1,5 @@
 import * as path from "node:path"
 import * as os from "node:os"
-import * as fs from "node:fs"
 import { getOpenCodeConfigDir } from "../../shared"
 
 export const PACKAGE_NAME = "oh-my-opencode"

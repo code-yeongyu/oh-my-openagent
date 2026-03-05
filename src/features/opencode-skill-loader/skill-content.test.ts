@@ -314,6 +314,44 @@ describe("resolveMultipleSkillsAsync", () => {
 		expect(gitMasterContent).toContain("Co-authored-by: Sisyphus")
 	})
 
+	it("should inject custom string footer when commit_footer is a string", async () => {
+		// given: git-master skill with custom string footer
+		const skillNames = ["git-master"]
+		const customFooter = "Custom footer from my team"
+		const options = {
+			gitMasterConfig: {
+				commit_footer: customFooter,
+				include_co_authored_by: false,
+			},
+		}
+
+		// when: resolving with custom footer config
+		const result = await resolveMultipleSkillsAsync(skillNames, options)
+
+		// then: custom footer is injected instead of default
+		const gitMasterContent = result.resolved.get("git-master")
+		expect(gitMasterContent).toContain(customFooter)
+		expect(gitMasterContent).not.toContain("Ultraworked with [Sisyphus]")
+	})
+
+	it("should use default Sisyphus footer when commit_footer is boolean true", async () => {
+		// given: git-master skill with boolean true footer
+		const skillNames = ["git-master"]
+		const options = {
+			gitMasterConfig: {
+				commit_footer: true,
+				include_co_authored_by: false,
+			},
+		}
+
+		// when: resolving with boolean true footer config
+		const result = await resolveMultipleSkillsAsync(skillNames, options)
+
+		// then: default Sisyphus footer is injected
+		const gitMasterContent = result.resolved.get("git-master")
+		expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
+	})
+
 	it("should handle empty array", async () => {
 		// given: empty skill names
 		const skillNames: string[] = []
@@ -387,5 +425,35 @@ describe("resolveMultipleSkills with browserProvider", () => {
 		// then: agent-browser not found
 		expect(result.resolved.has("agent-browser")).toBe(false)
 		expect(result.notFound).toContain("agent-browser")
+	})
+})
+
+describe("resolveMultipleSkillsAsync with browserProvider filtering", () => {
+	it("should exclude discovered agent-browser when browserProvider is playwright", async () => {
+		// given: playwright is the selected browserProvider (default)
+		const skillNames = ["playwright", "git-master"]
+		const options = { browserProvider: "playwright" as const }
+
+		// when: resolving multiple skills
+		const result = await resolveMultipleSkillsAsync(skillNames, options)
+
+		// then: playwright resolved, agent-browser would be excluded if discovered
+		expect(result.resolved.has("playwright")).toBe(true)
+		expect(result.resolved.has("git-master")).toBe(true)
+		expect(result.notFound).not.toContain("playwright")
+	})
+
+	it("should exclude discovered playwright when browserProvider is agent-browser", async () => {
+		// given: agent-browser is the selected browserProvider
+		const skillNames = ["agent-browser", "git-master"]
+		const options = { browserProvider: "agent-browser" as const }
+
+		// when: resolving multiple skills
+		const result = await resolveMultipleSkillsAsync(skillNames, options)
+
+		// then: agent-browser resolved, playwright would be excluded if discovered
+		expect(result.resolved.has("agent-browser")).toBe(true)
+		expect(result.resolved.has("git-master")).toBe(true)
+		expect(result.notFound).not.toContain("agent-browser")
 	})
 })

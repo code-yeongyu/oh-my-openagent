@@ -5,6 +5,9 @@ import {
   BrowserAutomationProviderSchema,
   BuiltinCategoryNameSchema,
   CategoryConfigSchema,
+  ExperimentalConfigSchema,
+  GitMasterConfigSchema,
+  HookNameSchema,
   OhMyOpenCodeConfigSchema,
 } from "./schema"
 
@@ -391,6 +394,19 @@ describe("BuiltinCategoryNameSchema", () => {
   })
 })
 
+describe("HookNameSchema", () => {
+  test("rejects removed beast-mode-system hook name", () => {
+    //#given
+    const input = "beast-mode-system"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+})
+
 describe("Sisyphus-Junior agent override", () => {
   test("schema accepts agents['Sisyphus-Junior'] and retains the key after parsing", () => {
     // given
@@ -551,6 +567,18 @@ describe("BrowserAutomationProviderSchema", () => {
     // then
     expect(result.success).toBe(false)
   })
+
+  test("accepts 'playwright-cli' as valid provider", () => {
+    // given
+    const input = "playwright-cli"
+
+    // when
+    const result = BrowserAutomationProviderSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data).toBe("playwright-cli")
+  })
 })
 
 describe("BrowserAutomationConfigSchema", () => {
@@ -574,6 +602,17 @@ describe("BrowserAutomationConfigSchema", () => {
 
     // then
     expect(result.provider).toBe("agent-browser")
+  })
+
+  test("accepts playwright-cli provider in config", () => {
+    // given
+    const input = { provider: "playwright-cli" }
+
+    // when
+    const result = BrowserAutomationConfigSchema.parse(input)
+
+    // then
+    expect(result.provider).toBe("playwright-cli")
   })
 })
 
@@ -604,5 +643,262 @@ describe("OhMyOpenCodeConfigSchema - browser_automation_engine", () => {
     // then
     expect(result.success).toBe(true)
     expect(result.data?.browser_automation_engine).toBeUndefined()
+  })
+
+  test("accepts browser_automation_engine with playwright-cli", () => {
+    // given
+    const input = { browser_automation_engine: { provider: "playwright-cli" } }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    // then
+    expect(result.success).toBe(true)
+    expect(result.data?.browser_automation_engine?.provider).toBe("playwright-cli")
+  })
+})
+
+describe("OhMyOpenCodeConfigSchema - hashline_edit", () => {
+  test("accepts hashline_edit as true", () => {
+    //#given
+    const input = { hashline_edit: true }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBe(true)
+  })
+
+  test("accepts hashline_edit as false", () => {
+    //#given
+    const input = { hashline_edit: false }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBe(false)
+  })
+
+  test("hashline_edit is optional", () => {
+    //#given
+    const input = { auto_update: true }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+    expect(result.data?.hashline_edit).toBeUndefined()
+  })
+
+  test("rejects non-boolean hashline_edit", () => {
+    //#given
+    const input = { hashline_edit: "true" }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("ExperimentalConfigSchema feature flags", () => {
+  test("accepts plugin_load_timeout_ms as number", () => {
+    //#given
+    const config = { plugin_load_timeout_ms: 5000 }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.plugin_load_timeout_ms).toBe(5000)
+    }
+  })
+
+  test("rejects plugin_load_timeout_ms below 1000", () => {
+    //#given
+    const config = { plugin_load_timeout_ms: 500 }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+  test("accepts safe_hook_creation as boolean", () => {
+    //#given
+    const config = { safe_hook_creation: false }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.safe_hook_creation).toBe(false)
+    }
+  })
+
+  test("both fields are optional", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.plugin_load_timeout_ms).toBeUndefined()
+      expect(result.data.safe_hook_creation).toBeUndefined()
+    }
+  })
+
+  test("accepts disable_omo_env as true", () => {
+    //#given
+    const config = { disable_omo_env: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_omo_env).toBe(true)
+    }
+  })
+
+  test("accepts disable_omo_env as false", () => {
+    //#given
+    const config = { disable_omo_env: false }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_omo_env).toBe(false)
+    }
+  })
+
+  test("disable_omo_env is optional", () => {
+    //#given
+    const config = { safe_hook_creation: true }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.disable_omo_env).toBeUndefined()
+    }
+  })
+
+  test("rejects non-boolean disable_omo_env", () => {
+    //#given
+    const config = { disable_omo_env: "true" }
+
+    //#when
+    const result = ExperimentalConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+
+})
+
+describe("GitMasterConfigSchema", () => {
+  test("accepts boolean true for commit_footer", () => {
+    //#given
+    const config = { commit_footer: true }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(true)
+    }
+  })
+
+  test("accepts boolean false for commit_footer", () => {
+    //#given
+    const config = { commit_footer: false }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(false)
+    }
+  })
+
+  test("accepts string value for commit_footer", () => {
+    //#given
+    const config = { commit_footer: "Custom footer text" }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe("Custom footer text")
+    }
+  })
+
+  test("defaults commit_footer to true when not provided", () => {
+    //#given
+    const config = {}
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.commit_footer).toBe(true)
+    }
+  })
+
+  test("rejects number for commit_footer", () => {
+    //#given
+    const config = { commit_footer: 123 }
+
+    //#when
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("skills schema", () => {
+  test("accepts skills.sources configuration", () => {
+    //#given
+    const config = {
+      skills: {
+        sources: [{ path: "skill/", recursive: true }],
+      },
+    }
+
+    //#when
+    const result = OhMyOpenCodeConfigSchema.safeParse(config)
+
+    //#then
+    expect(result.success).toBe(true)
   })
 })

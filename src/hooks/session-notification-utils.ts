@@ -1,5 +1,3 @@
-import { spawn } from "bun"
-
 type Platform = "darwin" | "linux" | "win32" | "unsupported"
 
 async function findCommand(commandName: string): Promise<string | null> {
@@ -34,11 +32,13 @@ export const getPowershellPath = createCommandFinder("powershell")
 export const getAfplayPath = createCommandFinder("afplay")
 export const getPaplayPath = createCommandFinder("paplay")
 export const getAplayPath = createCommandFinder("aplay")
+export const getTerminalNotifierPath = createCommandFinder("terminal-notifier")
 
 export function startBackgroundCheck(platform: Platform): void {
   if (platform === "darwin") {
     getOsascriptPath().catch(() => {})
     getAfplayPath().catch(() => {})
+    getTerminalNotifierPath().catch(() => {})
   } else if (platform === "linux") {
     getNotifySendPath().catch(() => {})
     getPaplayPath().catch(() => {})

@@ -1,17 +1,20 @@
-import { describe, test, expect, beforeEach, mock } from "bun:test"
-import { TaskToastManager } from "./manager"
+declare const require: (name: string) => any
+const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
 import type { ConcurrencyManager } from "../background-agent/concurrency"
 
+type TaskToastManagerClass = typeof import("./manager").TaskToastManager
+
 describe("TaskToastManager", () => {
+  let TaskToastManager: TaskToastManagerClass
   let mockClient: {
     tui: {
       showToast: ReturnType<typeof mock>
     }
   }
-  let toastManager: TaskToastManager
+  let toastManager: InstanceType<TaskToastManagerClass>
   let mockConcurrencyManager: ConcurrencyManager
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockClient = {
       tui: {
         showToast: mock(() => Promise.resolve()),
@@ -20,8 +23,16 @@ describe("TaskToastManager", () => {
     mockConcurrencyManager = {
       getConcurrencyLimit: mock(() => 5),
     } as unknown as ConcurrencyManager
+
+    const mod = await import("./manager")
+    TaskToastManager = mod.TaskToastManager
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     toastManager = new TaskToastManager(mockClient as any, mockConcurrencyManager)
+  })
+
+  afterEach(() => {
+    mock.restore()
   })
 
   describe("skills in toast message", () => {
@@ -151,7 +162,7 @@ describe("TaskToastManager", () => {
         description: "Task with category default model",
         agent: "sisyphus-junior",
         isBackground: false,
-        modelInfo: { model: "google/gemini-3-pro", type: "category-default" as const },
+        modelInfo: { model: "google/gemini-3.1-pro", type: "category-default" as const },
       }
 
       // when - addTask is called
@@ -171,7 +182,7 @@ describe("TaskToastManager", () => {
         description: "Task with system default model",
         agent: "sisyphus-junior",
         isBackground: false,
-        modelInfo: { model: "anthropic/claude-sonnet-4-5", type: "system-default" as const },
+        modelInfo: { model: "anthropic/claude-sonnet-4-6", type: "system-default" as const },
       }
 
       // when - addTask is called
@@ -181,7 +192,7 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
-      expect(call.body.message).toContain("anthropic/claude-sonnet-4-5")
+      expect(call.body.message).toContain("anthropic/claude-sonnet-4-6")
       expect(call.body.message).toContain("(system default fallback)")
     })
 
@@ -192,7 +203,7 @@ describe("TaskToastManager", () => {
         description: "Task with inherited model",
         agent: "sisyphus-junior",
         isBackground: false,
-        modelInfo: { model: "cliproxy/claude-opus-4-5", type: "inherited" as const },
+        modelInfo: { model: "cliproxy/claude-opus-4-6", type: "inherited" as const },
       }
 
       // when - addTask is called
@@ -202,8 +213,29 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).toContain("[FALLBACK]")
-      expect(call.body.message).toContain("cliproxy/claude-opus-4-5")
+      expect(call.body.message).toContain("cliproxy/claude-opus-4-6")
       expect(call.body.message).toContain("(inherited from parent)")
+    })
+
+    test("should display warning when model is runtime fallback", () => {
+      // given - runtime-fallback indicates a model swap mid-run
+      const task = {
+        id: "task_runtime",
+        description: "Task with runtime fallback model",
+        agent: "explore",
+        isBackground: false,
+        modelInfo: { model: "anthropic/oswe-vscode-prime", type: "runtime-fallback" as const },
+      }
+
+      // when - addTask is called
+      toastManager.addTask(task)
+
+      // then - toast should show fallback warning
+      expect(mockClient.tui.showToast).toHaveBeenCalled()
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("[FALLBACK]")
+      expect(call.body.message).toContain("anthropic/oswe-vscode-prime")
+      expect(call.body.message).toContain("(runtime fallback)")
     })
 
     test("should not display model info when user-defined", () => {
@@ -244,6 +276,34 @@ describe("TaskToastManager", () => {
       expect(mockClient.tui.showToast).toHaveBeenCalled()
       const call = mockClient.tui.showToast.mock.calls[0][0]
       expect(call.body.message).not.toContain("[FALLBACK] Model:")
+    })
+  })
+
+  describe("updateTaskModelBySession", () => {
+    test("updates task model info and shows fallback toast", () => {
+      // given - task without model info
+      const task = {
+        id: "task_update",
+        sessionID: "ses_update_1",
+        description: "Task that will fallback",
+        agent: "explore",
+        isBackground: false,
+      }
+      toastManager.addTask(task)
+      mockClient.tui.showToast.mockClear()
+
+      // when - runtime fallback applied by session
+      toastManager.updateTaskModelBySession("ses_update_1", {
+        model: "nvidia/stepfun-ai/step-3.5-flash",
+        type: "runtime-fallback",
+      })
+
+      // then - new toast shows fallback model
+      expect(mockClient.tui.showToast).toHaveBeenCalled()
+      const call = mockClient.tui.showToast.mock.calls[0][0]
+      expect(call.body.message).toContain("[FALLBACK]")
+      expect(call.body.message).toContain("nvidia/stepfun-ai/step-3.5-flash")
+      expect(call.body.message).toContain("(runtime fallback)")
     })
   })
 })

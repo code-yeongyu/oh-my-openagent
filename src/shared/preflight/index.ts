@@ -3,6 +3,7 @@ import color from "picocolors"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
 import { loadProviderModelsFromCache, flattenProviderModels } from "./cache"
 import { resolveModel } from "./resolve"
+import { findWorkingModel } from "./live-probe"
 
 export type PreflightChange = {
   path: string

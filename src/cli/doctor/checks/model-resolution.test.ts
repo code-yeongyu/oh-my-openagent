@@ -26,7 +26,7 @@ describe("model-resolution check", () => {
       // then: Should have category entries
       const visual = info.categories.find((c) => c.name === "visual-engineering")
       expect(visual).toBeDefined()
-      expect(visual!.requirement.fallbackChain[0]?.model).toBe("gemini-3-pro")
+      expect(visual!.requirement.fallbackChain[0]?.model).toBe("gemini-3.1-pro")
       expect(visual!.requirement.fallbackChain[0]?.providers).toContain("google")
     })
   })
@@ -42,7 +42,7 @@ describe("model-resolution check", () => {
       // given: User has override for oracle agent
       const mockConfig = {
         agents: {
-          oracle: { model: "anthropic/claude-opus-4-5" },
+          oracle: { model: "anthropic/claude-opus-4-6" },
         },
       }
 
@@ -51,8 +51,8 @@ describe("model-resolution check", () => {
       // then: Oracle should show the override
       const oracle = info.agents.find((a) => a.name === "oracle")
       expect(oracle).toBeDefined()
-      expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-5")
-      expect(oracle!.effectiveResolution).toBe("User override: anthropic/claude-opus-4-5")
+      expect(oracle!.userOverride).toBe("anthropic/claude-opus-4-6")
+      expect(oracle!.effectiveResolution).toBe("User override: anthropic/claude-opus-4-6")
     })
 
     it("shows user override for category when configured", async () => {
@@ -165,16 +165,4 @@ describe("model-resolution check", () => {
     })
   })
 
-  describe("getModelResolutionCheckDefinition", () => {
-    it("returns valid check definition", async () => {
-      const { getModelResolutionCheckDefinition } = await import("./model-resolution")
-
-      const def = getModelResolutionCheckDefinition()
-
-      expect(def.id).toBe("model-resolution")
-      expect(def.name).toBe("Model Resolution")
-      expect(def.category).toBe("configuration")
-      expect(typeof def.check).toBe("function")
-    })
-  })
 })

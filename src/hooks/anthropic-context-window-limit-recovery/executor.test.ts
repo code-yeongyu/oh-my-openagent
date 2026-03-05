@@ -1,7 +1,9 @@
+/// <reference types="bun-types" />
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { executeCompact } from "./executor"
 import type { AutoCompactState } from "./types"
-import * as storage from "./storage"
+import * as recoveryStrategy from "./recovery-strategy"
+import * as messagesReader from "../session-recovery/storage/messages-reader"
 
 type TimerCallback = (...args: any[]) => void
 
@@ -10,16 +12,16 @@ interface FakeTimeouts {
   restore: () => void
 }
 
+// Capture the real implementations at module load time, before any test can patch them.
+// This ensures restore() always returns to the true originals regardless of test execution order.
+const TRUE_ORIGINAL_SET_TIMEOUT = globalThis.setTimeout
+const TRUE_ORIGINAL_CLEAR_TIMEOUT = globalThis.clearTimeout
+
 function createFakeTimeouts(): FakeTimeouts {
   let now = 0
   let nextId = 1
   const timers = new Map<number, { id: number; time: number; callback: TimerCallback; args: any[] }>()
   const cleared = new Set<number>()
-
-  const original = {
-    setTimeout: globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout,
-  }
 
   const normalizeDelay = (delay?: number) => {
     if (typeof delay !== "number" || !Number.isFinite(delay)) return 0
@@ -67,8 +69,8 @@ function createFakeTimeouts(): FakeTimeouts {
   }
 
   const restore = () => {
-    globalThis.setTimeout = original.setTimeout
-    globalThis.clearTimeout = original.clearTimeout
+    globalThis.setTimeout = TRUE_ORIGINAL_SET_TIMEOUT
+    globalThis.clearTimeout = TRUE_ORIGINAL_CLEAR_TIMEOUT
   }
 
   return { advanceBy, restore }
@@ -80,7 +82,7 @@ describe("executeCompact lock management", () => {
   let fakeTimeouts: FakeTimeouts
   const sessionID = "test-session-123"
   const directory = "/test/dir"
-  const msg = { providerID: "anthropic", modelID: "claude-opus-4-5" }
+  const msg = { providerID: "anthropic", modelID: "claude-opus-4-6" }
 
   beforeEach(() => {
     // given: Fresh state for each test
@@ -98,7 +100,7 @@ describe("executeCompact lock management", () => {
         messages: mock(() => Promise.resolve({ data: [] })),
         summarize: mock(() => Promise.resolve()),
         revert: mock(() => Promise.resolve()),
-        prompt_async: mock(() => Promise.resolve()),
+        promptAsync: mock(() => Promise.resolve()),
       },
       tui: {
         showToast: mock(() => Promise.resolve()),
@@ -168,7 +170,8 @@ describe("executeCompact lock management", () => {
   })
 
   test("clears lock when fixEmptyMessages path executes", async () => {
-    // given: Empty content error scenario
+    //#given - Empty content error scenario with no messages in storage
+    const readMessagesSpy = spyOn(messagesReader, "readMessages").mockReturnValue([])
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "non-empty content required",
       messageIndex: 0,
@@ -176,16 +179,17 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    // when: Execute compaction (fixEmptyMessages will be called)
+    //#when - Execute compaction (fixEmptyMessages will be called)
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
 
-    // then: Lock should be cleared
+    //#then - Lock should be cleared
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+    readMessagesSpy.mockRestore()
   })
 
   test("clears lock when truncation is sufficient", async () => {
-    // given: Aggressive truncation scenario with sufficient truncation
-    // This test verifies the early return path in aggressive truncation
+    //#given - Aggressive truncation scenario with no messages in storage
+    const readMessagesSpy = spyOn(messagesReader, "readMessages").mockReturnValue([])
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 250000,
@@ -197,7 +201,7 @@ describe("executeCompact lock management", () => {
       aggressive_truncation: true,
     }
 
-    // when: Execute compaction with experimental flag
+    //#when - Execute compaction with experimental flag
     await executeCompact(
       sessionID,
       msg,
@@ -207,8 +211,9 @@ describe("executeCompact lock management", () => {
       experimental,
     )
 
-    // then: Lock should be cleared even on early return
+    //#then - Lock should be cleared even on early return
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
+    readMessagesSpy.mockRestore()
   })
 
   test("prevents concurrent compaction attempts", async () => {
@@ -279,9 +284,9 @@ describe("executeCompact lock management", () => {
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
   })
 
-  test("clears lock when prompt_async in continuation throws", async () => {
-    // given: prompt_async will fail during continuation
-    mockClient.session.prompt_async = mock(() =>
+  test("clears lock when promptAsync in continuation throws", async () => {
+    // given: promptAsync will fail during continuation
+    mockClient.session.promptAsync = mock(() =>
       Promise.reject(new Error("Prompt failed")),
     )
     autoCompactState.errorDataBySession.set(sessionID, {
@@ -309,18 +314,13 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockReturnValue({
-      success: true,
-      sufficient: false,
-      truncatedCount: 3,
-      totalBytesRemoved: 10000,
-      targetBytesToRemove: 50000,
-      truncatedTools: [
-        { toolName: "Grep", originalSize: 5000 },
-        { toolName: "Read", originalSize: 3000 },
-        { toolName: "Bash", originalSize: 2000 },
-      ],
-    })
+    const truncateSpy = spyOn(
+      recoveryStrategy,
+      "runAggressiveTruncationStrategy",
+    ).mockImplementation(async (params) => ({
+      handled: false,
+      nextTruncateAttempt: params.truncateAttempt + 1,
+    }))
 
     // when: Execute compaction
     await executeCompact(sessionID, msg, autoCompactState, mockClient, directory)
@@ -332,7 +332,7 @@ describe("executeCompact lock management", () => {
     expect(mockClient.session.summarize).toHaveBeenCalledWith(
       expect.objectContaining({
         path: { id: sessionID },
-        body: { providerID: "anthropic", modelID: "claude-opus-4-5", auto: true },
+        body: { providerID: "anthropic", modelID: "claude-opus-4-6", auto: true },
       }),
     )
 
@@ -350,16 +350,24 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(storage, "truncateUntilTargetTokens").mockReturnValue({
-      success: true,
-      sufficient: true,
-      truncatedCount: 5,
-      totalBytesRemoved: 60000,
-      targetBytesToRemove: 50000,
-      truncatedTools: [
-        { toolName: "Grep", originalSize: 30000 },
-        { toolName: "Read", originalSize: 30000 },
-      ],
+    const truncateSpy = spyOn(
+      recoveryStrategy,
+      "runAggressiveTruncationStrategy",
+    ).mockImplementation(async (params) => {
+      setTimeout(() => {
+        void params.client.session
+          .promptAsync({
+            path: { id: params.sessionID },
+            body: { auto: true } as never,
+            query: { directory: params.directory },
+          })
+          .catch(() => {})
+      }, 500)
+
+      return {
+        handled: true,
+        nextTruncateAttempt: params.truncateAttempt + 1,
+      }
     })
 
     // when: Execute compaction
@@ -374,8 +382,8 @@ describe("executeCompact lock management", () => {
     // then: Summarize should NOT be called (early return from sufficient truncation)
     expect(mockClient.session.summarize).not.toHaveBeenCalled()
 
-    // then: prompt_async should be called (Continue after successful truncation)
-    expect(mockClient.session.prompt_async).toHaveBeenCalled()
+    // then: promptAsync should be called (Continue after successful truncation)
+    expect(mockClient.session.promptAsync).toHaveBeenCalled()
 
     // then: Lock should be cleared
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)

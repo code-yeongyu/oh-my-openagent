@@ -1,5 +1,10 @@
 import type { createOpencodeClient } from "@opencode-ai/sdk"
 import { log } from "./logger"
+import {
+  createPromptTimeoutContext,
+  PROMPT_TIMEOUT_MS,
+  type PromptRetryOptions,
+} from "./prompt-timeout-context"
 
 type Client = ReturnType<typeof createOpencodeClient>
 
@@ -77,15 +82,73 @@ interface PromptBody {
 interface PromptArgs {
   path: { id: string }
   body: PromptBody
+  signal?: AbortSignal
   [key: string]: unknown
 }
 
 export async function promptWithModelSuggestionRetry(
   client: Client,
   args: PromptArgs,
+  options: PromptRetryOptions = {},
 ): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? PROMPT_TIMEOUT_MS
+  const timeoutContext = createPromptTimeoutContext(args, timeoutMs)
+  // NOTE: Model suggestion retry removed — promptAsync returns 204 immediately,
+  // model errors happen asynchronously server-side and cannot be caught here
+  const promptPromise = client.session.promptAsync({
+    ...args,
+    signal: timeoutContext.signal,
+  } as Parameters<typeof client.session.promptAsync>[0])
+
   try {
-    await client.session.prompt(args as Parameters<typeof client.session.prompt>[0])
+    await promptPromise
+    if (timeoutContext.wasTimedOut()) {
+      throw new Error(`promptAsync timed out after ${timeoutMs}ms`)
+    }
+  } catch (error) {
+    if (timeoutContext.wasTimedOut()) {
+      throw new Error(`promptAsync timed out after ${timeoutMs}ms`)
+    }
+    throw error
+  } finally {
+    timeoutContext.cleanup()
+  }
+}
+
+/**
+ * Synchronous variant of promptWithModelSuggestionRetry.
+ *
+ * Uses `session.prompt` (blocking HTTP call that waits for the LLM response)
+ * instead of `promptAsync` (fire-and-forget HTTP 204).
+ *
+ * Required by callers that need the response to be available immediately after
+ * the call returns — e.g. look_at, which reads session messages right away.
+ */
+export async function promptSyncWithModelSuggestionRetry(
+  client: Client,
+  args: PromptArgs,
+  options: PromptRetryOptions = {},
+): Promise<void> {
+  const timeoutMs = options.timeoutMs ?? PROMPT_TIMEOUT_MS
+
+  try {
+    const timeoutContext = createPromptTimeoutContext(args, timeoutMs)
+    try {
+      await client.session.prompt({
+        ...args,
+        signal: timeoutContext.signal,
+      } as Parameters<typeof client.session.prompt>[0])
+      if (timeoutContext.wasTimedOut()) {
+        throw new Error(`prompt timed out after ${timeoutMs}ms`)
+      }
+    } catch (error) {
+      if (timeoutContext.wasTimedOut()) {
+        throw new Error(`prompt timed out after ${timeoutMs}ms`)
+      }
+      throw error
+    } finally {
+      timeoutContext.cleanup()
+    }
   } catch (error) {
     const suggestion = parseModelSuggestion(error)
     if (!suggestion || !args.body.model) {
@@ -97,7 +160,7 @@ export async function promptWithModelSuggestionRetry(
       suggested: suggestion.suggestion,
     })
 
-    await client.session.prompt({
+    const retryArgs: PromptArgs = {
       ...args,
       body: {
         ...args.body,
@@ -106,6 +169,24 @@ export async function promptWithModelSuggestionRetry(
           modelID: suggestion.suggestion,
         },
       },
-    } as Parameters<typeof client.session.prompt>[0])
+    }
+
+    const timeoutContext = createPromptTimeoutContext(retryArgs, timeoutMs)
+    try {
+      await client.session.prompt({
+        ...retryArgs,
+        signal: timeoutContext.signal,
+      } as Parameters<typeof client.session.prompt>[0])
+      if (timeoutContext.wasTimedOut()) {
+        throw new Error(`prompt timed out after ${timeoutMs}ms`)
+      }
+    } catch (retryError) {
+      if (timeoutContext.wasTimedOut()) {
+        throw new Error(`prompt timed out after ${timeoutMs}ms`)
+      }
+      throw retryError
+    } finally {
+      timeoutContext.cleanup()
+    }
   }
 }

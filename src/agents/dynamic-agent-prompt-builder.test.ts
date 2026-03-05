@@ -4,7 +4,8 @@ import { describe, it, expect } from "bun:test"
 import {
   buildCategorySkillsDelegationGuide,
   buildUltraworkSection,
-  formatCustomSkillsBlock,
+  buildDeepParallelSection,
+  buildNonClaudePlannerSection,
   type AvailableSkill,
   type AvailableCategory,
   type AvailableAgent,
@@ -30,42 +31,41 @@ describe("buildCategorySkillsDelegationGuide", () => {
     { name: "our-design-system", description: "Internal design system components", location: "project" },
   ]
 
-  it("should separate builtin and custom skills into distinct sections", () => {
+  it("should list builtin and custom skills in compact format", () => {
     //#given: mix of builtin and custom skills
     const allSkills = [...builtinSkills, ...customUserSkills]
 
     //#when: building the delegation guide
     const result = buildCategorySkillsDelegationGuide(categories, allSkills)
 
-    //#then: should have separate sections
-    expect(result).toContain("Built-in Skills")
-    expect(result).toContain("User-Installed Skills")
-    expect(result).toContain("HIGH PRIORITY")
+    //#then: should use compact format with both sections
+    expect(result).toContain("**Built-in**: playwright, frontend-ui-ux")
+    expect(result).toContain("YOUR SKILLS (PRIORITY)")
+    expect(result).toContain("react-19 (user)")
+    expect(result).toContain("tailwind-4 (user)")
   })
 
-  it("should include custom skill names in CRITICAL warning", () => {
-    //#given: custom skills installed
+  it("should point to skill tool as source of truth", () => {
+    //#given: skills present
     const allSkills = [...builtinSkills, ...customUserSkills]
 
     //#when: building the delegation guide
     const result = buildCategorySkillsDelegationGuide(categories, allSkills)
 
-    //#then: should mention custom skills by name in the warning
-    expect(result).toContain('"react-19"')
-    expect(result).toContain('"tailwind-4"')
-    expect(result).toContain("CRITICAL")
+    //#then: should reference the skill tool for full descriptions
+    expect(result).toContain("`skill` tool")
   })
 
-  it("should show source column for custom skills (user vs project)", () => {
+  it("should show source tags for custom skills (user vs project)", () => {
     //#given: both user and project custom skills
     const allSkills = [...builtinSkills, ...customUserSkills, ...customProjectSkills]
 
     //#when: building the delegation guide
     const result = buildCategorySkillsDelegationGuide(categories, allSkills)
 
-    //#then: should show source for each custom skill
-    expect(result).toContain("| user |")
-    expect(result).toContain("| project |")
+    //#then: should show source tag for each custom skill
+    expect(result).toContain("(user)")
+    expect(result).toContain("(project)")
   })
 
   it("should not show custom skill section when only builtin skills exist", () => {
@@ -76,8 +76,8 @@ describe("buildCategorySkillsDelegationGuide", () => {
     const result = buildCategorySkillsDelegationGuide(categories, allSkills)
 
     //#then: should not contain custom skill emphasis
-    expect(result).not.toContain("User-Installed Skills")
-    expect(result).not.toContain("HIGH PRIORITY")
+    expect(result).not.toContain("YOUR SKILLS")
+    expect(result).toContain("**Built-in**:")
     expect(result).toContain("Available Skills")
   })
 
@@ -88,10 +88,9 @@ describe("buildCategorySkillsDelegationGuide", () => {
     //#when: building the delegation guide
     const result = buildCategorySkillsDelegationGuide(categories, allSkills)
 
-    //#then: should show custom skills with emphasis, no builtin section
-    expect(result).toContain("User-Installed Skills")
-    expect(result).toContain("HIGH PRIORITY")
-    expect(result).not.toContain("Built-in Skills")
+    //#then: should show custom skills with emphasis, no builtin line
+    expect(result).toContain("YOUR SKILLS (PRIORITY)")
+    expect(result).not.toContain("**Built-in**:")
   })
 
   it("should include priority note for custom skills in evaluation step", () => {
@@ -103,7 +102,7 @@ describe("buildCategorySkillsDelegationGuide", () => {
 
     //#then: evaluation section should mention user-installed priority
     expect(result).toContain("User-installed skills get PRIORITY")
-    expect(result).toContain("INCLUDE it rather than omit it")
+    expect(result).toContain("INCLUDE rather than omit")
   })
 
   it("should NOT include priority note when no custom skills", () => {
@@ -124,6 +123,20 @@ describe("buildCategorySkillsDelegationGuide", () => {
 
     //#then: should return empty string
     expect(result).toBe("")
+  })
+
+  it("should include category descriptions", () => {
+    //#given: categories with descriptions
+    const allSkills = [...builtinSkills]
+
+    //#when: building the delegation guide
+    const result = buildCategorySkillsDelegationGuide(categories, allSkills)
+
+    //#then: should list categories with their descriptions
+    expect(result).toContain("`visual-engineering`")
+    expect(result).toContain("Frontend, UI/UX")
+    expect(result).toContain("`quick`")
+    expect(result).toContain("Trivial tasks")
   })
 })
 
@@ -161,45 +174,86 @@ describe("buildUltraworkSection", () => {
   })
 })
 
-describe("formatCustomSkillsBlock", () => {
-  const customSkills: AvailableSkill[] = [
-    { name: "react-19", description: "React 19 patterns", location: "user" },
-    { name: "tailwind-4", description: "Tailwind v4", location: "project" },
-  ]
+describe("buildDeepParallelSection", () => {
+  const deepCategory: AvailableCategory = { name: "deep", description: "Autonomous problem-solving" }
+  const otherCategory: AvailableCategory = { name: "quick", description: "Trivial tasks" }
 
-  const customRows = customSkills.map((s) => {
-    const source = s.location === "project" ? "project" : "user"
-    return `| \`${s.name}\` | ${s.description} | ${source} |`
+  it("#given non-Claude model with deep category #when building #then returns parallel delegation section", () => {
+    //#given
+    const model = "google/gemini-3-pro"
+    const categories = [deepCategory, otherCategory]
+
+    //#when
+    const result = buildDeepParallelSection(model, categories)
+
+    //#then
+    expect(result).toContain("Deep Parallel Delegation")
+    expect(result).toContain("EVERY independent unit")
+    expect(result).toContain("run_in_background=true")
+    expect(result).toContain("4 independent units")
   })
 
-  it("should produce consistent output used by both builders", () => {
-    //#given: custom skills and rows
-    //#when: formatting with default header level
-    const result = formatCustomSkillsBlock(customRows, customSkills)
+  it("#given Claude model #when building #then returns empty", () => {
+    //#given
+    const model = "anthropic/claude-opus-4-6"
+    const categories = [deepCategory]
 
-    //#then: contains all expected elements
-    expect(result).toContain("User-Installed Skills (HIGH PRIORITY)")
-    expect(result).toContain("CRITICAL")
-    expect(result).toContain('"react-19"')
-    expect(result).toContain('"tailwind-4"')
-    expect(result).toContain("| user |")
-    expect(result).toContain("| project |")
+    //#when
+    const result = buildDeepParallelSection(model, categories)
+
+    //#then
+    expect(result).toBe("")
   })
 
-  it("should use #### header by default", () => {
-    //#given: default header level
-    const result = formatCustomSkillsBlock(customRows, customSkills)
+  it("#given non-Claude model without deep category #when building #then returns empty", () => {
+    //#given
+    const model = "openai/gpt-5.2"
+    const categories = [otherCategory]
 
-    //#then: uses markdown h4
-    expect(result).toContain("#### User-Installed Skills")
-  })
+    //#when
+    const result = buildDeepParallelSection(model, categories)
 
-  it("should use bold header when specified", () => {
-    //#given: bold header level (used by Atlas)
-    const result = formatCustomSkillsBlock(customRows, customSkills, "**")
-
-    //#then: uses bold instead of h4
-    expect(result).toContain("**User-Installed Skills (HIGH PRIORITY):**")
-    expect(result).not.toContain("#### User-Installed Skills")
+    //#then
+    expect(result).toBe("")
   })
 })
+
+describe("buildNonClaudePlannerSection", () => {
+  it("#given non-Claude model #when building #then returns plan agent section", () => {
+    //#given
+    const model = "google/gemini-3-pro"
+
+    //#when
+    const result = buildNonClaudePlannerSection(model)
+
+    //#then
+    expect(result).toContain("Plan Agent")
+    expect(result).toContain("session_id")
+    expect(result).toContain("Multi-step")
+  })
+
+  it("#given Claude model #when building #then returns empty", () => {
+    //#given
+    const model = "anthropic/claude-sonnet-4-6"
+
+    //#when
+    const result = buildNonClaudePlannerSection(model)
+
+    //#then
+    expect(result).toBe("")
+  })
+
+  it("#given GPT model #when building #then returns plan agent section", () => {
+    //#given
+    const model = "openai/gpt-5.2"
+
+    //#when
+    const result = buildNonClaudePlannerSection(model)
+
+    //#then
+    expect(result).toContain("Plan Agent")
+    expect(result).not.toBe("")
+  })
+})
+
+

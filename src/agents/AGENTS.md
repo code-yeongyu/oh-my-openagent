@@ -1,73 +1,79 @@
-# AGENTS KNOWLEDGE BASE
+# src/agents/ — 11 Agent Definitions
+
+**Generated:** 2026-03-02
 
 ## OVERVIEW
 
-11 AI agents for multi-model orchestration. Each agent has factory function + metadata + fallback chains.
+Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each has static `mode` property. Built via `buildAgent()` compositing factory + categories + skills.
 
-**Primary Agents** (respect UI model selection):
-- Sisyphus, Atlas, Prometheus
+## AGENT INVENTORY
 
-**Subagents** (use own fallback chains):
-- Hephaestus, Oracle, Librarian, Explore, Multimodal-Looker, Metis, Momus, Sisyphus-Junior
-
-## STRUCTURE
-```
-agents/
-├── atlas.ts                    # Master Orchestrator (holds todo list)
-├── sisyphus.ts                 # Main prompt (SF Bay Area engineer identity)
-├── hephaestus.ts               # Autonomous Deep Worker (GPT 5.2 Codex, "The Legitimate Craftsman")
-├── sisyphus-junior.ts          # Delegated task executor (category-spawned)
-├── oracle.ts                   # Strategic advisor (GPT-5.2)
-├── librarian.ts                # Multi-repo research (GitHub CLI, Context7)
-├── explore.ts                  # Fast contextual grep (Grok Code Fast)
-├── multimodal-looker.ts        # Media analyzer (Gemini 3 Flash)
-├── prometheus-prompt.ts        # Planning (Interview/Consultant mode, 1283 lines)
-├── metis.ts                    # Pre-planning analysis (Gap detection)
-├── momus.ts                    # Plan reviewer (Ruthless fault-finding)
-├── dynamic-agent-prompt-builder.ts  # Dynamic prompt generation
-├── types.ts                    # AgentModelConfig, AgentPromptMetadata
-├── utils.ts                    # createBuiltinAgents(), resolveModelWithFallback()
-└── index.ts                    # builtinAgents export
-```
-
-## AGENT MODELS
-| Agent | Model | Temp | Purpose |
-|-------|-------|------|---------|
-| Sisyphus | anthropic/claude-opus-4-5 | 0.1 | Primary orchestrator (fallback: kimi-k2.5 → glm-4.7 → gpt-5.2-codex → gemini-3-pro) |
-| Hephaestus | openai/gpt-5.2-codex | 0.1 | Autonomous deep worker, "The Legitimate Craftsman" (requires gpt-5.2-codex, no fallback) |
-| Atlas | anthropic/claude-sonnet-4-5 | 0.1 | Master orchestrator (fallback: kimi-k2.5 → gpt-5.2) |
-| oracle | openai/gpt-5.2 | 0.1 | Consultation, debugging |
-| librarian | zai-coding-plan/glm-4.7 | 0.1 | Docs, GitHub search (fallback: glm-4.7-free) |
-| explore | xai/grok-code-fast-1 | 0.1 | Fast contextual grep (fallback: claude-haiku-4-5 → gpt-5-mini → gpt-5-nano) |
-| multimodal-looker | google/gemini-3-flash | 0.1 | PDF/image analysis |
-| Prometheus | anthropic/claude-opus-4-5 | 0.1 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
-| Metis | anthropic/claude-opus-4-5 | 0.3 | Pre-planning analysis (fallback: kimi-k2.5 → gpt-5.2) |
-| Momus | openai/gpt-5.2 | 0.1 | Plan validation (fallback: claude-opus-4-5) |
-| Sisyphus-Junior | anthropic/claude-sonnet-4-5 | 0.1 | Category-spawned executor |
-
-## HOW TO ADD
-1. Create `src/agents/my-agent.ts` exporting factory + metadata.
-2. Add to `agentSources` in `src/agents/utils.ts`.
-3. Update `AgentNameSchema` in `src/config/schema.ts`.
-4. Register in `src/index.ts` initialization.
+| Agent | Model | Temp | Mode | Fallback Chain | Purpose |
+|-------|-------|------|------|----------------|---------|
+| **Sisyphus** | claude-opus-4-6 | 0.1 | all | kimi-k2.5 → glm-5 → big-pickle | Main orchestrator, plans + delegates |
+| **Hephaestus** | gpt-5.3-codex | 0.1 | all | gpt-5.2 (copilot) | Autonomous deep worker |
+| **Oracle** | gpt-5.2 | 0.1 | subagent | gemini-3.1-pro → claude-opus-4-6 | Read-only consultation |
+| **Librarian** | kimi-k2.5 | 0.1 | subagent | gemini-3-flash → gpt-5.2 → glm-4.6v | External docs/code search |
+| **Explore** | grok-code-fast-1 | 0.1 | subagent | minimax-m2.5 → claude-haiku-4-5 → gpt-5-nano | Contextual grep |
+| **Multimodal-Looker** | gemini-3-flash | 0.1 | subagent | minimax-m2.5 → big-pickle | PDF/image analysis |
+| **Metis** | claude-opus-4-6 | **0.3** | subagent | gpt-5.2 → kimi-k2.5 → gemini-3.1-pro | Pre-planning consultant |
+| **Momus** | gpt-5.2 | 0.1 | subagent | claude-opus-4-6 → gemini-3.1-pro | Plan reviewer |
+| **Atlas** | kimi-k2.5 | 0.1 | primary | claude-sonnet-4-6 → gpt-5.2 | Todo-list orchestrator |
+| **Prometheus** | claude-opus-4-6 | 0.1 | — | kimi-k2.5 → gpt-5.2 → gemini-3.1-pro | Strategic planner (internal) |
+| **Sisyphus-Junior** | claude-sonnet-4-6 | 0.1 | all | user-configurable | Category-spawned executor |
 
 ## TOOL RESTRICTIONS
+
 | Agent | Denied Tools |
 |-------|-------------|
-| oracle | write, edit, task, delegate_task |
-| librarian | write, edit, task, delegate_task, call_omo_agent |
-| explore | write, edit, task, delegate_task, call_omo_agent |
-| multimodal-looker | Allowlist: read only |
-| Sisyphus-Junior | task, delegate_task |
+| Oracle | write, edit, task, call_omo_agent |
+| Librarian | write, edit, task, call_omo_agent |
+| Explore | write, edit, task, call_omo_agent |
+| Multimodal-Looker | ALL except read |
+| Atlas | task, call_omo_agent |
+| Momus | write, edit, task |
 
-## PATTERNS
-- **Factory**: `createXXXAgent(model: string): AgentConfig`
-- **Metadata**: `XXX_PROMPT_METADATA` with category, cost, triggers.
-- **Tool restrictions**: `createAgentToolRestrictions(tools)` or `createAgentToolAllowlist(tools)`.
-- **Thinking**: 32k budget tokens for Sisyphus, Oracle, Prometheus, Atlas.
+## STRUCTURE
 
-## ANTI-PATTERNS
-- **Trust reports**: NEVER trust "I'm done" - verify outputs.
-- **High temp**: Don't use >0.3 for code agents.
-- **Sequential calls**: Use `delegate_task` with `run_in_background` for exploration.
-- **Prometheus writing code**: Planner only - never implements.
+```
+agents/
+├── sisyphus.ts            # 559 LOC, main orchestrator
+├── hephaestus.ts          # 507 LOC, autonomous worker
+├── oracle.ts              # Read-only consultant
+├── librarian.ts           # External search
+├── explore.ts             # Codebase grep
+├── multimodal-looker.ts   # Vision/PDF
+├── metis.ts               # Pre-planning
+├── momus.ts               # Plan review
+├── atlas/agent.ts         # Todo orchestrator
+├── types.ts               # AgentFactory, AgentMode
+├── agent-builder.ts       # buildAgent() composition
+├── utils.ts               # Agent utilities
+├── builtin-agents.ts      # createBuiltinAgents() registry
+└── builtin-agents/        # maybeCreateXXXConfig conditional factories
+    ├── sisyphus-agent.ts
+    ├── hephaestus-agent.ts
+    ├── atlas-agent.ts
+    ├── general-agents.ts  # collectPendingBuiltinAgents
+    └── available-skills.ts
+```
+
+## FACTORY PATTERN
+
+```typescript
+const createXXXAgent: AgentFactory = (model: string) => ({
+  instructions: "...",
+  model,
+  temperature: 0.1,
+  // ...config
+})
+createXXXAgent.mode = "subagent" // or "primary" or "all"
+```
+
+Model resolution: `AGENT_MODEL_REQUIREMENTS` in `shared/model-requirements.ts` defines fallback chains per agent.
+
+## MODES
+
+- **primary**: Respects UI-selected model, uses fallback chain
+- **subagent**: Uses own fallback chain, ignores UI selection
+- **all**: Available in both contexts (Sisyphus-Junior)

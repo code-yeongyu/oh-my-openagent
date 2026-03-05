@@ -1,5 +1,5 @@
-import { describe, it, expect } from "bun:test"
-import { createEventState, serializeError, type EventState } from "./events"
+import { afterEach, beforeEach, describe, it, expect, spyOn } from "bun:test"
+import { createEventState, processEvents, serializeError, type EventState } from "./events"
 import type { RunContext, EventPayload } from "./types"
 
 const createMockContext = (sessionID: string = "test-session"): RunContext => ({
@@ -87,6 +87,66 @@ describe("createEventState", () => {
 })
 
 describe("event handling", () => {
+  it("does not log verbose event traces by default", async () => {
+    // given
+    const ctx = createMockContext("my-session")
+    const state = createEventState()
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+
+    const payload: EventPayload = {
+      type: "custom.event",
+      properties: { sessionID: "my-session" },
+    }
+
+    const events = toAsyncIterable([payload])
+
+    const baselineCallCount = errorSpy.mock.calls.length
+
+    try {
+      // when
+      await processEvents(ctx, events, state)
+
+      // then
+      const newCalls = errorSpy.mock.calls.slice(baselineCallCount)
+      const hasEventTrace = newCalls.some((call) =>
+        String(call?.[0] ?? "").includes("custom.event"),
+      )
+      expect(hasEventTrace).toBe(false)
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
+  it("logs full event traces when verbose is enabled", async () => {
+    // given
+    const ctx = { ...createMockContext("my-session"), verbose: true }
+    const state = createEventState()
+    const errorSpy = spyOn(console, "error").mockImplementation(() => {})
+
+    const payload: EventPayload = {
+      type: "custom.event",
+      properties: { sessionID: "my-session" },
+    }
+
+    const events = toAsyncIterable([payload])
+
+    const baselineCallCount = errorSpy.mock.calls.length
+
+    try {
+      // when
+      await processEvents(ctx, events, state)
+
+      // then
+      const newCalls = errorSpy.mock.calls.slice(baselineCallCount)
+      const hasEventTrace = newCalls.some((call) =>
+        String(call?.[0] ?? "").includes("custom.event"),
+      )
+      expect(hasEventTrace).toBe(true)
+    } finally {
+      errorSpy.mockRestore()
+    }
+  })
+
   it("session.idle sets mainSessionIdle to true for matching session", async () => {
     // given
     const ctx = createMockContext("my-session")
@@ -98,7 +158,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -118,7 +177,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -138,7 +196,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -161,12 +218,32 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
 
     // then
+    expect(state.hasReceivedMeaningfulWork).toBe(true)
+  })
+
+  it("message.updated with camelCase sessionId sets hasReceivedMeaningfulWork", async () => {
+    //#given - assistant message uses sessionId key
+    const ctx = createMockContext("my-session")
+    const state = createEventState()
+
+    const payload: EventPayload = {
+      type: "message.updated",
+      properties: {
+        info: { sessionId: "my-session", role: "assistant" },
+      },
+    }
+
+    const events = toAsyncIterable([payload])
+
+    //#when
+    await processEvents(ctx, events, state)
+
+    //#then
     expect(state.hasReceivedMeaningfulWork).toBe(true)
   })
 
@@ -183,7 +260,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -207,7 +283,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -231,7 +306,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
@@ -244,13 +318,8 @@ describe("event handling", () => {
     // given
     const ctx = createMockContext("my-session")
     const state: EventState = {
+      ...createEventState(),
       mainSessionIdle: true,
-      mainSessionError: false,
-      lastError: null,
-      lastOutput: "",
-      lastPartText: "",
-      currentTool: null,
-      hasReceivedMeaningfulWork: false,
     }
 
     const payload: EventPayload = {
@@ -259,7 +328,6 @@ describe("event handling", () => {
     }
 
     const events = toAsyncIterable([payload])
-    const { processEvents } = await import("./events")
 
     // when
     await processEvents(ctx, events, state)
