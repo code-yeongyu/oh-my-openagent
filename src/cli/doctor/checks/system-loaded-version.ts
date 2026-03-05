@@ -44,19 +44,26 @@ function normalizeVersion(value: string | undefined): string | null {
 }
 
 function resolvePluginInstallDir(): string {
+  // 1. Config directory (primary install location)
   const configDir = getOpenCodeConfigDir({ binary: "opencode", version: null })
   const configInstalled = join(configDir, "node_modules", PACKAGE_NAME, "package.json")
   if (existsSync(configInstalled)) return configDir
 
-  const cacheDir = join(getPlatformDefaultCacheDir(), "opencode")
-  const cacheInstalled = join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")
-  if (existsSync(cacheInstalled)) return cacheDir
-
+  // 2. XDG_CACHE_HOME override (per XDG spec, takes precedence over defaults)
   const xdgCacheHome = process.env.XDG_CACHE_HOME
   if (xdgCacheHome) {
     const xdgDir = join(xdgCacheHome, "opencode")
     if (existsSync(join(xdgDir, "node_modules", PACKAGE_NAME, "package.json"))) return xdgDir
   }
+
+  // 3. Default XDG cache path (covers macOS users without XDG_CACHE_HOME)
+  const defaultXdgCache = join(homedir(), ".cache", "opencode")
+  if (existsSync(join(defaultXdgCache, "node_modules", PACKAGE_NAME, "package.json"))) return defaultXdgCache
+
+  // 4. Platform-specific cache directory (~/Library/Caches on macOS, etc.)
+  const cacheDir = join(getPlatformDefaultCacheDir(), "opencode")
+  const cacheInstalled = join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")
+  if (existsSync(cacheInstalled)) return cacheDir
 
   return configDir
 }
