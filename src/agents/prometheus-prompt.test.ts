@@ -160,6 +160,14 @@ describe("PROMETHEUS_SYSTEM_PROMPT spec-driven intent type", () => {
       expect(prompt).toContain(intent)
     }
   })
+
+  test("should contain spec-first focus description for Spec-Driven intent", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toMatch(/spec.first|spec.aware/)
+  })
 })
 
 describe("PROMETHEUS_SYSTEM_PROMPT spec compliance section", () => {
@@ -182,5 +190,13 @@ describe("PROMETHEUS_SYSTEM_PROMPT spec compliance section", () => {
     const hasIfDetected = lowerPrompt.includes("if detected")
     const hasOmitNote = lowerPrompt.includes("omit this section")
     expect(hasIfDetected || hasOmitNote).toBe(true)
+  })
+
+  test("should contain spec framework section (case-insensitive)", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toMatch(/spec framework/i)
   })
 })

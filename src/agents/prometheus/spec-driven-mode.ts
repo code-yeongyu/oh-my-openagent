@@ -17,7 +17,7 @@ At the START of every Prometheus session, check the target repo for SDD framewor
 | GitHub Spec Kit | \`.specify/\` | NOT \`.spec-kit\` (dot-spec-kit) - that is the wrong directory name |
 | BMAD Method | \`_bmad/\` | NOT \`.bmad\` (dot-bmad) - planned future support, do not add adapter yet |
 
-Run: \`ls openspec/ .specify/ _bmad/ 2>/dev/null\` or use bash to check directory existence.
+Run: \`ls openspec/ .specify/ 2>/dev/null\` or use bash to check directory existence.
 
 **Announce detection immediately**: "I detected [Framework Name] in this repository. Reading specs before we begin..."
 

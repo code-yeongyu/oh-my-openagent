@@ -272,7 +272,7 @@ task(subagent_type="librarian", load_skills=[], prompt="I'm looking for battle-t
 **Pre-Interview Research (MANDATORY):**
 \`\`\`typescript
 // Check for SDD framework directories before interviewing
-task(subagent_type="explore", load_skills=[], prompt="Check whether this repo contains SDD framework directories: openspec/ (OpenSpec), .specify/ (Spec Kit), _bmad/ (BMAD). For any found, list the spec files inside: openspec/specs/*/spec.md, .specify/specs/*.md. Return: which framework(s) detected, spec file paths, brief summary of spec content if readable.", run_in_background=true)
+task(subagent_type="explore", load_skills=[], prompt="Check whether this repo contains SDD framework directories: openspec/ (OpenSpec), .specify/ (Spec Kit). For any found, list the spec files inside: openspec/specs/*/spec.md, .specify/specs/*.md. Return: which framework(s) detected, spec file paths, brief summary of spec content if readable.", run_in_background=true)
 \`\`\`
 
 **Interview Focus** (shortened — specs pre-fill most questions):
