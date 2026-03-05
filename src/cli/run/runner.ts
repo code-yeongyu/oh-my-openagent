@@ -124,11 +124,28 @@ export async function run(options: RunOptions): Promise<number> {
       console.log(pc.dim(`Using port ${serverPort}`))
     }
 
-    const { client, server } = await createOpencode({
+    let { client, server } = await createOpencode({
       signal: abortController.signal,
       port: serverPort,
       hostname: serverHostname,
     })
+
+    const { findWorkingModel } = await import("../../shared/preflight/live-probe")
+    const agentModel = preflightResult.config.agents?.[resolvedAgent as keyof typeof preflightResult.config.agents]?.model
+    const agentFallback = (preflightResult.config.agents as any)?.[resolvedAgent]?.fallback_model
+    
+    if (agentModel) {
+      const modelsToTry = [agentModel, agentFallback].filter(Boolean) as string[]
+      const { model: workingModel, probes } = await findWorkingModel(client, modelsToTry)
+      
+      if (!workingModel && probes.some(p => p.ok === false && (p as any).shouldFallback)) {
+        console.log(pc.yellow(`\n⚠️  Agent model "${agentModel}" quota exceeded. Attempting fallback...`))
+        
+        if (agentFallback) {
+          console.log(pc.cyan(`Switching to fallback model: ${agentFallback}`))
+        }
+      }
+    }
 
     const cleanup = () => {
       if (timeoutId) clearTimeout(timeoutId)
