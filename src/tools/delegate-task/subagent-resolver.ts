@@ -12,12 +12,14 @@ import { log } from "../../shared/logger"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveModelForDelegateTask } from "./model-selection"
+import { matchAgentByName, matchPrimaryAgentByName, type TaskAgentCatalog } from "./agent-catalog"
 
 export async function resolveSubagentExecution(
   args: DelegateTaskArgs,
   executorCtx: ExecutorContext,
   parentAgent: string | undefined,
-  categoryExamples: string
+  categoryExamples: string,
+  preFetchedCatalog?: TaskAgentCatalog | null
 ): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
   const { client, agentOverrides, userCategories } = executorCtx
 
@@ -52,38 +54,35 @@ Create the work plan directly - that's your job as the planning agent.`,
   let fallbackChain: FallbackEntry[] | undefined = undefined
 
   try {
-    const agentsResult = await client.app.agents()
-    type AgentInfo = {
-      name: string
-      mode?: "subagent" | "primary" | "all"
-      model?: string | { providerID: string; modelID: string }
+    // Use pre-fetched catalog if available to avoid double-fetch
+    const agentCatalog = preFetchedCatalog ?? await (async () => {
+      const { getTaskAgentCatalog } = await import("./agent-catalog")
+      return getTaskAgentCatalog(client)
+    })()
+
+    if (!agentCatalog) {
+      return {
+        agentToUse: "",
+        categoryModel: undefined,
+        error: `Failed to fetch agent catalog for "${agentToUse}"`,
+      }
     }
-    const agents = normalizeSDKResponse(agentsResult, [] as AgentInfo[], {
-      preferResponseOnMissingData: true,
-    })
 
-    const callableAgents = agents.filter((a) => a.mode !== "primary")
+    const match = matchAgentByName(agentToUse, agentCatalog)
 
-    const resolvedDisplayName = getAgentDisplayName(agentToUse)
-    const matchedAgent = callableAgents.find(
-      (agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
-        || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase()
-    )
-    if (!matchedAgent) {
-      const isPrimaryAgent = agents
-        .filter((a) => a.mode === "primary")
-        .find((agent) => agent.name.toLowerCase() === agentToUse.toLowerCase()
-          || agent.name.toLowerCase() === resolvedDisplayName.toLowerCase())
+    if (!match) {
+      // Check if it's a primary agent using shared matcher
+      const primaryMatch = matchPrimaryAgentByName(agentToUse, agentCatalog)
 
-      if (isPrimaryAgent) {
+      if (primaryMatch) {
         return {
           agentToUse: "",
           categoryModel: undefined,
-    error: `Cannot call primary agent "${isPrimaryAgent.name}" via task. Primary agents are top-level orchestrators.`,
+    error: `Cannot call primary agent "${primaryMatch.canonicalName}" via task. Primary agents are top-level orchestrators.`,
         }
       }
 
-      const availableAgents = callableAgents
+      const availableAgents = agentCatalog.callable
         .map((a) => a.name)
         .sort()
         .join(", ")
@@ -94,7 +93,8 @@ Create the work plan directly - that's your job as the planning agent.`,
       }
     }
 
-    agentToUse = matchedAgent.name
+    agentToUse = match.canonicalName
+    const matchedAgent = match.agent
 
     const agentConfigKey = getAgentConfigKey(agentToUse)
     const agentOverride = agentOverrides?.[agentConfigKey as keyof typeof agentOverrides]

@@ -47,7 +47,7 @@ describe("resolveSubagentExecution", () => {
     logSpy?.mockRestore()
   })
 
-  test("returns delegation error when agent discovery fails instead of silently proceeding", async () => {
+  test("returns catalog error when agent discovery fails", async () => {
     //#given
     const resolverError = new Error("agents API unavailable")
     const args = createBaseArgs()
@@ -61,10 +61,10 @@ describe("resolveSubagentExecution", () => {
     //#then
     expect(result.agentToUse).toBe("")
     expect(result.categoryModel).toBeUndefined()
-    expect(result.error).toBe("Failed to delegate to agent \"oracle\": agents API unavailable")
+    expect(result.error).toBe('Failed to fetch agent catalog for "oracle"')
   })
 
-  test("logs failure details when subagent resolution throws", async () => {
+  test("returns delegation error when pre-fetched catalog is null", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "review" })
     const executorCtx = createExecutorContext(async () => {
@@ -72,17 +72,12 @@ describe("resolveSubagentExecution", () => {
     })
 
     //#when
-    await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep")
+    const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep", null)
 
     //#then
-    expect(logSpy).toHaveBeenCalledTimes(1)
-    const callArgs = logSpy?.mock.calls[0]
-    expect(callArgs?.[0]).toBe("[delegate-task] Failed to resolve subagent execution")
-    expect(callArgs?.[1]).toEqual({
-      requestedAgent: "review",
-      parentAgent: "sisyphus",
-      error: "network timeout",
-    })
+    expect(result.agentToUse).toBe("")
+    expect(result.categoryModel).toBeUndefined()
+    expect(result.error).toBe('Failed to fetch agent catalog for "review"')
   })
 
   test("normalizes matched agent model string before returning categoryModel", async () => {

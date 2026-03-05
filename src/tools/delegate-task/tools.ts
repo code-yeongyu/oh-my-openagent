@@ -5,6 +5,8 @@ import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { mergeCategories } from "../../shared/merge-categories"
 import { log } from "../../shared/logger"
 import { buildSystemContent } from "./prompt-builder"
+import { resolveTaskTarget } from "./task-target-resolver"
+import { getTaskAgentCatalog } from "./agent-catalog"
 import type {
   AvailableCategory,
   AvailableSkill,
@@ -109,15 +111,6 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
     async execute(args: DelegateTaskArgs, toolContext) {
       const ctx = toolContext as ToolContextWithMetadata
 
-      if (args.category) {
-        if (args.subagent_type && args.subagent_type !== SISYPHUS_JUNIOR_AGENT) {
-          log("[task] category provided - overriding subagent_type to sisyphus-junior", {
-            category: args.category,
-            subagent_type: args.subagent_type,
-          })
-        }
-        args.subagent_type = SISYPHUS_JUNIOR_AGENT
-      }
       await ctx.metadata?.({
         title: args.description,
       })
@@ -146,6 +139,43 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
       const runInBackground = args.run_in_background === true
 
+      // Resolve task target using catalog-backed normalization
+      const agentCatalog = await getTaskAgentCatalog(options.client)
+      const target = resolveTaskTarget(args, availableCategories, agentCatalog)
+
+      // Handle resolution errors
+      if (target.kind === "error") {
+        return target.message
+      }
+
+      // Apply normalization to args
+      if (target.kind === "continuation") {
+        // No mutation needed for continuation
+      } else if (target.kind === "category") {
+        args.category = target.name
+        args.subagent_type = undefined
+        if (target.correctedFrom === "subagent_type") {
+          log("[task] corrected subagent_type to category", {
+            original: args.subagent_type,
+            corrected: target.name,
+          })
+        }
+      } else if (target.kind === "agent") {
+        args.category = undefined
+        args.subagent_type = target.name
+      }
+
+      // Apply runner compatibility shim after normalization
+      if (args.category) {
+        if (args.subagent_type && args.subagent_type !== SISYPHUS_JUNIOR_AGENT) {
+          log("[task] category provided - overriding subagent_type to sisyphus-junior", {
+            category: args.category,
+            subagent_type: args.subagent_type,
+          })
+        }
+        args.subagent_type = SISYPHUS_JUNIOR_AGENT
+      }
+
       const { content: skillContent, contents: skillContents, error: skillError } = await resolveSkillContent(args.load_skills, {
         gitMasterConfig: options.gitMasterConfig,
         browserProvider: options.browserProvider,
@@ -158,15 +188,12 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
 
       const parentContext = await resolveParentContext(ctx, options.client)
 
+      // Handle continuation (session_id was validated by resolver)
       if (args.session_id) {
         if (runInBackground) {
           return executeBackgroundContinuation(args, ctx, options, parentContext)
         }
         return executeSyncContinuation(args, ctx, options)
-      }
-
-      if (!args.category && !args.subagent_type) {
-        return `Invalid arguments: Must provide either category or subagent_type.`
       }
 
       let systemDefaultModel: string | undefined
@@ -230,7 +257,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
           return executeUnstableAgentTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, actualModel)
         }
       } else {
-        const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples)
+        const resolution = await resolveSubagentExecution(args, options, parentContext.agent, categoryExamples, agentCatalog)
         if (resolution.error) {
           return resolution.error
         }
