@@ -186,10 +186,12 @@ export class BackgroundManager {
       this.pendingByParent.set(input.parentSessionID, pending)
     }
 
+    const modifiedInput = { ...input, description: descriptionWithIndicator }
+
     // Add to queue
-    const key = this.getConcurrencyKeyFromInput(input)
+    const key = this.getConcurrencyKeyFromInput(modifiedInput)
     const queue = this.queuesByKey.get(key) ?? []
-    queue.push({ task, input })
+    queue.push({ task, input: modifiedInput })
     this.queuesByKey.set(key, queue)
 
     log("[background-agent] Task queued:", { taskId: task.id, key, queueLength: queue.length })

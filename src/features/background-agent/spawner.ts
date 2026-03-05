@@ -61,6 +61,7 @@ export async function startTask(
   const createResult = await client.session.create({
     body: {
       parentID: input.parentSessionID,
+      title: input.description,
     } as Record<string, unknown>,
     query: {
       directory: parentDirectory,
