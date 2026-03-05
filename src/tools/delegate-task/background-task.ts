@@ -78,7 +78,7 @@ export async function executeBackgroundTask(
     }
 
     const taskMetadataBlock = sessionId
-      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${sessionId}\n</task_metadata>`
+      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${sessionId}\nbackground_task_id: ${task.id}\n</task_metadata>`
       : ""
 
     return `Background task launched.
