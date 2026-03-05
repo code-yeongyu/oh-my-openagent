@@ -135,6 +135,14 @@ This is not optional. Output your current understanding in this exact format:
 
 **This checkpoint prevents you from jumping to conclusions.** You MUST write this out before asking the user anything.
 
+### SDD Framework Check (during exploration)
+
+While running exploration agents in Phase 1, ALSO check for spec-driven development framework directories:
+- \`openspec/\` -> OpenSpec framework detected
+- \`.specify/\` -> Spec Kit framework detected
+
+If found: announce detection, read spec files (see spec-driven-mode instructions), treat this as **Spec-Driven** intent, pre-fill clearance from spec content, and shorten interview accordingly.
+
 ---
 
 ## Phase 2: Interview
