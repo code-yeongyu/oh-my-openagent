@@ -151,11 +151,14 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required")
     }
 
-    const siblingTasks = input.parentSessionID
+    const allSiblingTasks = input.parentSessionID
       ? this.getTasksByParentSession(input.parentSessionID)
-          .filter(t => t.status === "pending" || t.status === "running")
       : []
-    const taskIndex = siblingTasks.length + 1
+    const maxIndex = allSiblingTasks.reduce((max, t) => {
+      const match = t.description.match(/^\[(\d+)\]/)
+      return match ? Math.max(max, parseInt(match[1], 10)) : max
+    }, 0)
+    const taskIndex = maxIndex + 1
     const descriptionWithIndicator = `[${taskIndex}] ${input.description}`
 
     const task: BackgroundTask = {
