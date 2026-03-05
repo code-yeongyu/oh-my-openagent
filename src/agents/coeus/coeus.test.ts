@@ -94,7 +94,7 @@ describe("createCoeusAgent factory", () => {
     expect(config.mode).toBe("all")
   })
 
-  test("should deny write and edit tools", () => {
+  test("should allow edit, bash, webfetch, question tools (COEUS_PERMISSION)", () => {
     //#given
     const model = "test-model"
 
@@ -103,8 +103,10 @@ describe("createCoeusAgent factory", () => {
 
     //#then
     expect(config.permission).toBeDefined()
-    expect(config.permission!["write"]).toBe("deny")
-    expect(config.permission!["edit"]).toBe("deny")
+    expect(config.permission!["edit"]).toBe("allow")
+    expect(config.permission!["bash"]).toBe("allow")
+    expect(config.permission!["webfetch"]).toBe("allow")
+    expect(config.permission!["question"]).toBe("allow")
   })
 
   test("should NOT deny task tool (plan family can delegate)", () => {

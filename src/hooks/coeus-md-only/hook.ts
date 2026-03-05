@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { HOOK_NAME, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING } from "./constants"
+import { HOOK_NAME, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, COEUS_WORKFLOW_REMINDER } from "./constants"
 import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
@@ -58,6 +58,17 @@ export function createCoeusMdOnlyHook(ctx: PluginInput) {
           `${getAgentDisplayName("coeus")} is a READ-ONLY recursive planner. ` +
           `Plans go in .sisyphus/plans/*.md, sub-plans in .sisyphus/sub-plans/**/*.json.`
         )
+      }
+
+      const normalizedPath = filePath.toLowerCase().replace(/\\/g, "/")
+      if (normalizedPath.includes(".sisyphus/plans/")) {
+        log(`[${HOOK_NAME}] Injecting workflow reminder for plan write`, {
+          sessionID: input.sessionID,
+          tool: toolName,
+          filePath,
+          agent: agentName,
+        })
+        output.message = (output.message || "") + COEUS_WORKFLOW_REMINDER
       }
 
       log(`[${HOOK_NAME}] Allowed: .sisyphus/ write permitted`, {

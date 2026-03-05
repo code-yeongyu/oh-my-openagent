@@ -1,5 +1,5 @@
 import type { CategoryConfig } from "../config/schema";
-import { COEUS_SYSTEM_PROMPT } from "../agents/coeus";
+import { COEUS_SYSTEM_PROMPT, COEUS_PERMISSION } from "../agents/coeus";
 import { resolvePromptAppend } from "../agents/builtin-agents/resolve-file-uri";
 import { AGENT_MODEL_REQUIREMENTS } from "../shared/model-requirements";
 import {
@@ -69,6 +69,7 @@ export async function buildCoeusAgentConfig(params: {
     ...(resolvedModel ? { model: resolvedModel } : {}),
     ...(variantToUse ? { variant: variantToUse } : {}),
     mode: "all",
+    permission: COEUS_PERMISSION,
     prompt: COEUS_SYSTEM_PROMPT,
     description: `${(params.configAgentCoeus?.description as string) ?? "Recursive planner"} (Coeus - OhMyOpenCode)`,
     color: (params.configAgentCoeus?.color as string) ?? "#A98181",

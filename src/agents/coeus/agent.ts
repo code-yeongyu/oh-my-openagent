@@ -1,11 +1,10 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "../types"
-import { createAgentToolRestrictions } from "../../shared/permission-compat"
-import { COEUS_SYSTEM_PROMPT } from "./system-prompt"
+import { COEUS_SYSTEM_PROMPT, COEUS_PERMISSION } from "./system-prompt"
 
 const MODE: AgentMode = "all"
 
-const coeusRestrictions = createAgentToolRestrictions(["write", "edit"])
+const coeusRestrictions = { permission: COEUS_PERMISSION }
 
 export function createCoeusAgent(model: string): AgentConfig {
   return {
