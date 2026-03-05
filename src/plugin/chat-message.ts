@@ -108,9 +108,7 @@ export function createChatMessageHandler(args: {
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }
-    if (hooks.coeusCommand && isStartWorkHookOutput(output)) {
-      await hooks.coeusCommand["chat.message"]?.(input, output)
-    }
+    await hooks.coeusCommand?.["chat.message"]?.(input, output)
 
     if (!hasConnectedProvidersCache()) {
       pluginContext.client.tui
