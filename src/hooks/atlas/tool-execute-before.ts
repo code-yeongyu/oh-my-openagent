@@ -17,9 +17,10 @@ function isPlanPath(filePath: string): boolean {
 /**
  * Transform Commit fields in plan content when autoCommit is disabled.
  * Converts "Commit: YES" and "Commit: NO" to "Commit: NO (user disabled auto-commits)"
+ * Uses negative lookahead to ensure idempotency (won't re-transform already-transformed content).
  */
 export function transformPlanCommitFields(content: string): string {
-  return content.replace(/Commit:\s*(YES|NO)/g, "Commit: NO (user disabled auto-commits)")
+  return content.replace(/Commit:\s*(YES|NO)(?!\s*\(user disabled auto-commits\))/g, "Commit: NO (user disabled auto-commits)")
 }
 
 export function createToolExecuteBeforeHandler(input: {
