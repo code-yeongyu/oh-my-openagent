@@ -12,7 +12,6 @@ import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log } from "./shared"
-import { applyUserDisplayNames } from "./shared/agent-display-names"
 import { startTmuxCheck } from "./tools"
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
@@ -26,16 +25,6 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   startTmuxCheck()
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
-  if (pluginConfig.agents) {
-    const displayNames = Object.fromEntries(
-      Object.entries(pluginConfig.agents)
-        .filter(([, cfg]) => cfg?.display_name)
-        .map(([key, cfg]) => [key, cfg!.display_name!]),
-    )
-    if (Object.keys(displayNames).length > 0) {
-      applyUserDisplayNames(displayNames)
-    }
-  }
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
 
   const isHookEnabled = (hookName: HookName): boolean => !disabledHooks.has(hookName)

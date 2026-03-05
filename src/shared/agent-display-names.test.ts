@@ -315,3 +315,4 @@ describe("#given user-defined display name overrides via config", () => {
     })
   })
 })
+

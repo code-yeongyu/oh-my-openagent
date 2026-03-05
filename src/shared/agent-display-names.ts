@@ -33,10 +33,6 @@ export function resetUserDisplayNames(): void {
   userOverrides = undefined
 }
 
-export function isUserDisplayNamesActive(): boolean {
-  return userOverrides !== undefined
-}
-
 /**
  * Get display name for an agent config key.
  * Uses case-insensitive lookup for backward compatibility.
