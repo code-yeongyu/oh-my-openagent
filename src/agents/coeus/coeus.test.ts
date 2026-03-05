@@ -82,6 +82,76 @@ describe("COEUS_SYSTEM_PROMPT policy requirements", () => {
   })
 })
 
+describe("Phase 0: Brief Ingestion + Knowledge Verification", () => {
+  test("should contain Phase 0 section", () => {
+    //#given
+    const prompt = COEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("Phase 0")
+  })
+
+  test("should reference brief metadata", () => {
+    //#given
+    const prompt = COEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toContain("brief")
+  })
+
+  test("should mention novel territory for unmatched taxonomy entries", () => {
+    //#given
+    const prompt = COEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toContain("novel")
+  })
+
+  test("should warn about rabbit holes for unverified boundaries", () => {
+    //#given
+    const prompt = COEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).toContain("rabbit hole")
+  })
+
+  test("should NOT contain appetite or time constraint language", () => {
+    //#given
+    const prompt = COEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt.toLowerCase()).not.toContain("appetite")
+    expect(prompt.toLowerCase()).not.toContain("time constraint")
+  })
+
+  test("should appear before Phase 1 in the prompt", () => {
+    //#given
+    const prompt = COEUS_SYSTEM_PROMPT
+
+    //#when
+    const phase0Index = prompt.indexOf("Phase 0")
+    const phase1Index = prompt.indexOf("Phase 1")
+
+    //#then
+    expect(phase0Index).toBeGreaterThan(-1)
+    expect(phase1Index).toBeGreaterThan(-1)
+    expect(phase0Index).toBeLessThan(phase1Index)
+  })
+
+  test("should preserve all existing phases (1-6)", () => {
+    //#given
+    const prompt = COEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("Phase 1")
+    expect(prompt).toContain("Phase 2")
+    expect(prompt).toContain("Phase 3")
+    expect(prompt).toContain("Phase 4")
+    expect(prompt).toContain("Phase 5")
+    expect(prompt).toContain("Phase 6")
+  })
+})
+
 describe("createCoeusAgent factory", () => {
   test("should return AgentConfig with mode 'all'", () => {
     //#given

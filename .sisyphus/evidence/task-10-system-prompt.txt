@@ -1,0 +1,22 @@
+# Task 10: Phase 0 Brief Ingestion + Knowledge Verification
+
+## Changes
+- src/agents/coeus/system-prompt.ts: Added Phase 0 block before Phase 1
+- src/agents/coeus/coeus.test.ts: Added 7 new tests for Phase 0
+
+## TDD Evidence
+- RED: 5 failures (Phase 0, brief, novel, rabbit hole, ordering), 23 pass
+- GREEN: 28 pass, 0 fail, 48 expect() calls
+
+## Test Assertions
+1. COEUS_SYSTEM_PROMPT.includes("Phase 0") → true
+2. COEUS_SYSTEM_PROMPT.toLowerCase().includes("brief") → true
+3. COEUS_SYSTEM_PROMPT.toLowerCase().includes("novel") → true
+4. COEUS_SYSTEM_PROMPT.toLowerCase().includes("rabbit hole") → true
+5. !COEUS_SYSTEM_PROMPT.toLowerCase().includes("appetite") → true
+6. Phase 0 index < Phase 1 index → true
+7. All phases 1-6 preserved → true
+
+## Typecheck
+- Pre-existing error in plugin-interface.ts (unrelated, no coeus files)
+- Only files changed: system-prompt.ts, coeus.test.ts
