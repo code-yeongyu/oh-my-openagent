@@ -151,14 +151,18 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required")
     }
 
-    // Create task immediately with status="pending"
+    const siblingTasks = input.parentSessionID
+      ? this.getTasksByParentSession(input.parentSessionID)
+          .filter(t => t.status === "pending" || t.status === "running")
+      : []
+    const taskIndex = siblingTasks.length + 1
+    const descriptionWithIndicator = `[${taskIndex}] ${input.description}`
+
     const task: BackgroundTask = {
       id: `bg_${crypto.randomUUID().slice(0, 8)}`,
       status: "pending",
       queuedAt: new Date(),
-      // Do NOT set startedAt - will be set when running
-      // Do NOT set sessionID - will be set when running
-      description: input.description,
+      description: descriptionWithIndicator,
       prompt: input.prompt,
       agent: input.agent,
       parentSessionID: input.parentSessionID,
@@ -173,7 +177,7 @@ export class BackgroundManager {
     }
 
     this.tasks.set(task.id, task)
-    this.taskHistory.record(input.parentSessionID, { id: task.id, agent: input.agent, description: input.description, status: "pending", category: input.category })
+    this.taskHistory.record(input.parentSessionID, { id: task.id, agent: input.agent, description: descriptionWithIndicator, status: "pending", category: input.category })
 
     // Track for batched notifications immediately (pending state)
     if (input.parentSessionID) {
@@ -194,7 +198,7 @@ export class BackgroundManager {
     if (toastManager) {
       toastManager.addTask({
         id: task.id,
-        description: input.description,
+        description: descriptionWithIndicator,
         agent: input.agent,
         isBackground: true,
         status: "queued",
