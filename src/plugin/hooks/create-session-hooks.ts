@@ -25,7 +25,10 @@ import {
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
+  createLearningBusInjectorHook,
 } from "../../hooks"
+import { createExecutionGateHook } from "../../hooks"
+import { createAutoCheckpointHook } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
 import {
   detectExternalNotificationPlugin,
@@ -60,6 +63,9 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
+  learningBusInjector: ReturnType<typeof createLearningBusInjectorHook> | null
+  executionGate: ReturnType<typeof createExecutionGateHook> | null
+  autoCheckpoint: ReturnType<typeof createAutoCheckpointHook> | null
 }
 
 export function createSessionHooks(args: {
@@ -261,6 +267,19 @@ export function createSessionHooks(args: {
           pluginConfig,
         }))
     : null
+
+  const learningBusInjector = isHookEnabled("learning-bus-injector")
+    ? safeHook("learning-bus-injector", () => createLearningBusInjectorHook(ctx))
+    : null
+
+  const executionGate = isHookEnabled("execution-gate")
+    ? safeHook("execution-gate", () => createExecutionGateHook(ctx))
+    : null
+
+  const autoCheckpoint = isHookEnabled("auto-checkpoint")
+    ? safeHook("auto-checkpoint", () => createAutoCheckpointHook(ctx))
+    : null
+
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -285,5 +304,8 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     anthropicEffort,
     runtimeFallback,
-  }
+    learningBusInjector,
+    executionGate,
+    autoCheckpoint,
+}
 }
