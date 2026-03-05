@@ -214,6 +214,32 @@ describe("coeus-md-only", () => {
       //#when //#then
       await expect(hook["tool.execute.before"](input, output)).resolves.toBeUndefined()
     })
+
+    //#given coeus writes a brief .md in .sisyphus/briefs/
+    //#when the hook intercepts
+    //#then it should allow (.md only in briefs/)
+    test("should allow coeus to write .sisyphus/briefs/auth-system-20260305.md", async () => {
+      //#given
+      const hook = createCoeusMdOnlyHook(createMockPluginInput())
+      const input = { tool: "Write", sessionID: TEST_SESSION_ID, callID: "call-1" }
+      const output = { args: { filePath: "/tmp/test-coeus/.sisyphus/briefs/auth-system-20260305.md" } }
+
+      //#when //#then
+      await expect(hook["tool.execute.before"](input, output)).resolves.toBeUndefined()
+    })
+
+    //#given coeus writes a bet-record .json in .sisyphus/bet-records/
+    //#when the hook intercepts
+    //#then it should allow (.json only in bet-records/)
+    test("should allow coeus to write .sisyphus/bet-records/auth-system-20260305.json", async () => {
+      //#given
+      const hook = createCoeusMdOnlyHook(createMockPluginInput())
+      const input = { tool: "Write", sessionID: TEST_SESSION_ID, callID: "call-1" }
+      const output = { args: { filePath: "/tmp/test-coeus/.sisyphus/bet-records/auth-system-20260305.json" } }
+
+      //#when //#then
+      await expect(hook["tool.execute.before"](input, output)).resolves.toBeUndefined()
+    })
   })
 
   describe("blocked writes", () => {
@@ -274,6 +300,36 @@ describe("coeus-md-only", () => {
       const hook = createCoeusMdOnlyHook(createMockPluginInput())
       const input = { tool: "Edit", sessionID: TEST_SESSION_ID, callID: "call-1" }
       const output = { args: { filePath: "/path/to/code.py" } }
+
+      //#when //#then
+      await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(
+        "can only write/edit"
+      )
+    })
+
+    //#given coeus writes .json in .sisyphus/briefs/ (only .md allowed)
+    //#when the hook intercepts
+    //#then it should block
+    test("should block coeus from writing .sisyphus/briefs/auth-system.json", async () => {
+      //#given
+      const hook = createCoeusMdOnlyHook(createMockPluginInput())
+      const input = { tool: "Write", sessionID: TEST_SESSION_ID, callID: "call-1" }
+      const output = { args: { filePath: "/tmp/test-coeus/.sisyphus/briefs/auth-system.json" } }
+
+      //#when //#then
+      await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(
+        "can only write/edit"
+      )
+    })
+
+    //#given coeus writes .ts in .sisyphus/bet-records/ (only .json allowed)
+    //#when the hook intercepts
+    //#then it should block
+    test("should block coeus from writing .sisyphus/bet-records/auth-system.ts", async () => {
+      //#given
+      const hook = createCoeusMdOnlyHook(createMockPluginInput())
+      const input = { tool: "Write", sessionID: TEST_SESSION_ID, callID: "call-1" }
+      const output = { args: { filePath: "/tmp/test-coeus/.sisyphus/bet-records/auth-system.ts" } }
 
       //#when //#then
       await expect(hook["tool.execute.before"](input, output)).rejects.toThrow(

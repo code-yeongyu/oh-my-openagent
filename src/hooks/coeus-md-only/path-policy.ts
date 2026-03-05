@@ -32,6 +32,19 @@ export function isAllowedFile(filePath: string, workspaceRoot: string): boolean 
     return false
   }
 
+  const normalizedPath = rel.toLowerCase().replace(/\\/g, "/")
+
+  // briefs/ — .md only
+  if (normalizedPath.includes(".sisyphus/briefs/")) {
+    return resolved.toLowerCase().endsWith(".md")
+  }
+
+  // bet-records/ — .json only
+  if (normalizedPath.includes(".sisyphus/bet-records/")) {
+    return resolved.toLowerCase().endsWith(".json")
+  }
+
+  // Default: .md or .json allowed
   const hasAllowedExtension = ALLOWED_EXTENSIONS.some(
     ext => resolved.toLowerCase().endsWith(ext.toLowerCase())
   )
