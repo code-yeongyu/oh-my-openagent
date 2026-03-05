@@ -10,11 +10,12 @@ import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
+  autoCommit: boolean
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
-  const { ctx, pendingFilePaths } = input
+  const { ctx, pendingFilePaths, autoCommit } = input
 
   return async (toolInput, toolOutput): Promise<void> => {
     if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {
