@@ -56,37 +56,39 @@ export async function executeBackgroundTask(
       SessionCategoryRegistry.register(sessionId, args.category)
     }
 
+    const metadata = {
+      prompt: args.prompt,
+      agent: task.agent,
+      category: args.category,
+      load_skills: args.load_skills,
+      description: args.description,
+      run_in_background: args.run_in_background,
+      command: args.command,
+      ...(sessionId ? { sessionId } : {}),
+      ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
+    }
+
     const unstableMeta = {
       title: args.description,
-      metadata: {
-        prompt: args.prompt,
-        agent: task.agent,
-        category: args.category,
-        load_skills: args.load_skills,
-        description: args.description,
-        run_in_background: args.run_in_background,
-        sessionId: sessionId ?? "pending",
-        command: args.command,
-        model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
-      },
+      metadata,
     }
     await ctx.metadata?.(unstableMeta)
     if (ctx.callID) {
       storeToolMetadata(ctx.sessionID, ctx.callID, unstableMeta)
     }
 
+    const taskMetadataBlock = sessionId
+      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${sessionId}\nbackground_task_id: ${task.id}\n</task_metadata>`
+      : ""
+
     return `Background task launched.
 
-Task ID: ${task.id}
+Background Task ID: ${task.id}
 Description: ${task.description}
 Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
-System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
-
-<task_metadata>
-session_id: ${sessionId}
-</task_metadata>`
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.${taskMetadataBlock}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch background task",
