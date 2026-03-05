@@ -5,3 +5,9 @@ export {
   parseBriefMetadata,
   type PlanningBriefMetadata,
 } from './planning-brief-schema'
+export {
+  BoundaryVerificationSchema,
+  VerificationRecordSchema,
+  type BoundaryVerification,
+  type VerificationRecord,
+} from './verification-record-schema'
