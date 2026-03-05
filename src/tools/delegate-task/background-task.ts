@@ -56,28 +56,39 @@ export async function executeBackgroundTask(
       SessionCategoryRegistry.register(sessionId, args.category)
     }
 
-    const metadataPayload = {
+    const metadata = {
       prompt: args.prompt,
       agent: task.agent,
       category: args.category,
       load_skills: args.load_skills,
       description: args.description,
       run_in_background: args.run_in_background,
-      sessionId: sessionId ?? "pending",
       command: args.command,
-      model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
+      ...(sessionId ? { sessionId } : {}),
+      ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
     }
 
     const unstableMeta = {
       title: args.description,
-      metadata: metadataPayload,
+      metadata,
     }
     await ctx.metadata?.(unstableMeta)
     if (ctx.callID) {
       storeToolMetadata(ctx.sessionID, ctx.callID, unstableMeta)
     }
 
-    return buildLaunchResponse(task, args.category, sessionId)
+    const taskMetadataBlock = sessionId
+      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${sessionId}\nbackground_task_id: ${task.id}\n</task_metadata>`
+      : ""
+
+    return `Background task launched.
+
+Background Task ID: ${task.id}
+Description: ${task.description}
+Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
+Status: ${task.status}
+
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.${taskMetadataBlock}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch background task",
@@ -86,27 +97,4 @@ export async function executeBackgroundTask(
       category: args.category,
     })
   }
-}
-
-/**
- * Build a formatted response string for background task launch.
- * The response is human-readable text, not JSON, so compression is not applied.
- */
-function buildLaunchResponse(
-  task: { id: string; description: string; agent: string; status: string },
-  category: string | undefined,
-  sessionId: string | undefined,
-): string {
-  return `Background task launched.
-
-Task ID: ${task.id}
-Description: ${task.description}
-Agent: ${task.agent}${category ? ` (category: ${category})` : ""}
-Status: ${task.status}
-
-System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
-
-<task_metadata>
-session_id: ${sessionId}
-</task_metadata>`
 }

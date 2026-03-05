@@ -1,261 +1,158 @@
-const { describe, test, expect, beforeEach, afterEach, mock } = require("bun:test")
+const bunTest = require("bun:test")
+const describeFn = bunTest.describe
+const testFn = bunTest.test
+const expectFn = bunTest.expect
+const beforeEachFn = bunTest.beforeEach
+const afterEachFn = bunTest.afterEach
 
-import { executeBackgroundTask } from "./executor"
-import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
-import type { ToonCompressionConfig } from "../../config/schema/toon-compression"
-import * as toonCompression from "../../shared/toon-compression"
+const { executeBackgroundTask } = require("./background-task")
+const { __setTimingConfig, __resetTimingConfig } = require("./timing")
 
-describe("executeBackgroundTask - compression integration", () => {
-  let abort: AbortController
-  let metadataCalls: Array<{ title: string; metadata: Record<string, unknown> }> = []
-
-  beforeEach(() => {
-    abort = new AbortController()
-    metadataCalls = []
+describeFn("executeBackgroundTask output/session metadata compatibility", () => {
+  beforeEachFn(() => {
+    //#given - reduce waiting to keep tests fast
+    __setTimingConfig({
+      WAIT_FOR_SESSION_INTERVAL_MS: 1,
+      WAIT_FOR_SESSION_TIMEOUT_MS: 2,
+    })
   })
 
-  afterEach(() => {
-    mock.restore()
+  afterEachFn(() => {
+    __resetTimingConfig()
   })
 
-  test("#given compression enabled, #when executing background task, #then returns formatted text (not JSON)", async () => {
-    // given
-    const compressionConfig: ToonCompressionConfig = {
-      enabled: true,
-      threshold: 100,
+  testFn("does not emit synthetic pending session metadata when session id is unresolved", async () => {
+    //#given - launched task without resolved subagent session id
+    const metadataCalls: any[] = []
+    const manager = {
+      launch: async () => ({
+        id: "bg_unresolved",
+        sessionID: undefined,
+        description: "Unresolved session",
+        agent: "explore",
+        status: "running",
+      }),
+      getTask: () => undefined,
     }
 
-    const ctx: ToolContextWithMetadata = {
-      sessionID: "ses_parent",
-      messageID: "msg_parent",
-      agent: "sisyphus",
-      abort: abort.signal,
-      metadata: async (input) => {
-        metadataCalls.push(input)
-      },
-    }
-
-    const args: DelegateTaskArgs = {
-      load_skills: [],
-      description: "Test task with compression",
-      prompt: "Do something with structured data",
-      run_in_background: true,
-      category: "quick",
-    }
-
-    const executorCtx = {
-      manager: {
-        launch: async () => ({
-          id: "task_compressed",
-          description: "Test task with compression",
-          prompt: "Do something with structured data",
-          agent: "sisyphus-junior",
-          status: "pending",
-          sessionID: "ses_child_compressed",
-        }),
-        getTask: () => undefined,
-      },
-    } as any
-
-    const parentContext = {
-      sessionID: "ses_parent",
-      messageID: "msg_parent",
-    }
-
-    // when
     const result = await executeBackgroundTask(
-      args,
-      ctx,
-      executorCtx,
-      parentContext,
-      "sisyphus-junior",
-      undefined,
-      undefined,
-      undefined,
-      compressionConfig,
-    )
-
-    // then
-    expect(result).toContain("Background task launched")
-    expect(result).toContain("Task ID: task_compressed")
-    expect(result).toContain("Status: pending")
-    // Response is formatted text, not JSON/TOON
-    expect(result).not.toMatch(/^\|/) // TOON format starts with |
-  })
-
-  test("#given compression disabled, #when executing background task, #then returns formatted text", async () => {
-    // given
-    const compressionConfig: ToonCompressionConfig = {
-      enabled: false,
-      threshold: 5000,
-    }
-
-    const ctx: ToolContextWithMetadata = {
-      sessionID: "ses_parent",
-      messageID: "msg_parent",
-      agent: "sisyphus",
-      abort: abort.signal,
-      metadata: async () => {},
-    }
-
-    const args: DelegateTaskArgs = {
-      load_skills: [],
-      description: "Test task without compression",
-      prompt: "Do something",
-      run_in_background: true,
-      category: "deep",
-    }
-
-    const executorCtx = {
-      manager: {
-        launch: async () => ({
-          id: "task_no_compress",
-          description: "Test task without compression",
-          agent: "sisyphus-junior",
-          status: "pending",
-          sessionID: "ses_child_no_compress",
-        }),
-        getTask: () => undefined,
+      {
+        description: "Unresolved session",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
       },
-    } as any
-
-    const parentContext = {
-      sessionID: "ses_parent",
-      messageID: "msg_parent",
-    }
-
-    // when
-    const result = await executeBackgroundTask(
-      args,
-      ctx,
-      executorCtx,
-      parentContext,
-      "sisyphus-junior",
-      undefined,
-      undefined,
-      undefined,
-      compressionConfig,
-    )
-
-    // then
-    expect(result).toContain("Background task launched")
-    expect(result).toContain("Task ID: task_no_compress")
-  })
-
-  test("#given default compression config, #when executing background task, #then uses default disabled state", async () => {
-    // given - using default compression config (not passing the parameter)
-    const ctx: ToolContextWithMetadata = {
-      sessionID: "ses_parent",
-      messageID: "msg_parent",
-      agent: "sisyphus",
-      abort: abort.signal,
-      metadata: async () => {},
-    }
-
-    const args: DelegateTaskArgs = {
-      load_skills: [],
-      description: "Test task default config",
-      prompt: "Do something",
-      run_in_background: true,
-    }
-
-    const executorCtx = {
-      manager: {
-        launch: async () => ({
-          id: "task_default",
-          description: "Test task default config",
-          agent: "explore",
-          status: "pending",
-          sessionID: "ses_child_default",
-        }),
-        getTask: () => undefined,
+      {
+        sessionID: "ses_parent",
+        callID: "call_1",
+        metadata: async (value: any) => metadataCalls.push(value),
+        abort: new AbortController().signal,
       },
-    } as any
-
-    const parentContext = {
-      sessionID: "ses_parent",
-      messageID: "msg_parent",
-    }
-
-    // when - not passing compression config (uses default)
-    const result = await executeBackgroundTask(
-      args,
-      ctx,
-      executorCtx,
-      parentContext,
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_1" },
       "explore",
       undefined,
       undefined,
       undefined,
     )
 
-    // then
-    expect(result).toContain("Background task launched")
-    expect(result).toContain("Task ID: task_default")
+    //#then - output and metadata should avoid fake session markers
+    expectFn(result).not.toContain("<task_metadata>")
+    expectFn(result).not.toContain("session_id: undefined")
+    expectFn(result).not.toContain("session_id: pending")
+    expectFn(metadataCalls).toHaveLength(1)
+    expectFn("sessionId" in metadataCalls[0].metadata).toBe(false)
   })
 
-  test("#given metadata with structured payload, #when task launched, #then metadata is stored correctly", async () => {
-    // given
-    const compressionConfig: ToonCompressionConfig = {
-      enabled: true,
-      threshold: 100,
+  testFn("emits task metadata session_id when real session id is available", async () => {
+    //#given - launched task with resolved subagent session id
+    const metadataCalls: any[] = []
+    const manager = {
+      launch: async () => ({
+        id: "bg_resolved",
+        sessionID: "ses_sub_123",
+        description: "Resolved session",
+        agent: "explore",
+        status: "running",
+      }),
+      getTask: () => ({ sessionID: "ses_sub_123" }),
     }
 
-    const ctx: ToolContextWithMetadata = {
-      sessionID: "ses_parent",
-      messageID: "msg_parent",
-      agent: "sisyphus",
-      abort: abort.signal,
-      callID: "call_123",
-      metadata: async (input) => {
-        metadataCalls.push(input)
+    const result = await executeBackgroundTask(
+      {
+        description: "Resolved session",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
       },
-    }
-
-    const args: DelegateTaskArgs = {
-      load_skills: ["git-master"],
-      description: "Test metadata storage",
-      prompt: "Do git operations",
-      run_in_background: true,
-      category: "quick",
-    }
-
-    const executorCtx = {
-      manager: {
-        launch: async () => ({
-          id: "task_meta",
-          description: "Test metadata storage",
-          agent: "sisyphus-junior",
-          status: "pending",
-          sessionID: "ses_child_meta",
-        }),
-        getTask: () => undefined,
+      {
+        sessionID: "ses_parent",
+        callID: "call_2",
+        metadata: async (value: any) => metadataCalls.push(value),
+        abort: new AbortController().signal,
       },
-    } as any
-
-    const parentContext = {
-      sessionID: "ses_parent",
-      messageID: "msg_parent",
-    }
-
-    // when
-    await executeBackgroundTask(
-      args,
-      ctx,
-      executorCtx,
-      parentContext,
-      "sisyphus-junior",
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_2" },
+      "explore",
       undefined,
       undefined,
       undefined,
-      compressionConfig,
     )
 
-    // then
-    expect(metadataCalls.length).toBe(1)
-    expect(metadataCalls[0].title).toBe("Test metadata storage")
-    expect(metadataCalls[0].metadata.prompt).toBe("Do git operations")
-    expect(metadataCalls[0].metadata.category).toBe("quick")
-    expect(metadataCalls[0].metadata.load_skills).toEqual(["git-master"])
+    //#then - output and metadata should include canonical session linkage
+    expectFn(result).toContain("<task_metadata>")
+    expectFn(result).toContain("session_id: ses_sub_123")
+    expectFn(result).toContain("task_id: ses_sub_123")
+    expectFn(result).toContain("background_task_id: bg_resolved")
+    expectFn(result).toContain("Background Task ID: bg_resolved")
+    expectFn(metadataCalls).toHaveLength(1)
+    expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_sub_123")
+  })
+
+  testFn("captures late-resolved session id and emits synced metadata", async () => {
+    //#given - background task session id appears after launch via manager polling
+    const metadataCalls: any[] = []
+    let reads = 0
+    const manager = {
+      launch: async () => ({
+        id: "bg_late",
+        sessionID: undefined,
+        description: "Late session",
+        agent: "explore",
+        status: "running",
+      }),
+      getTask: () => {
+        reads += 1
+        return reads >= 2 ? { sessionID: "ses_late_123" } : undefined
+      },
+    }
+
+    const result = await executeBackgroundTask(
+      {
+        description: "Late session",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_3",
+        metadata: async (value: any) => metadataCalls.push(value),
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_3" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then - late session id still propagates to task metadata contract
+    expectFn(result).toContain("session_id: ses_late_123")
+    expectFn(result).toContain("task_id: ses_late_123")
+    expectFn(result).toContain("background_task_id: bg_late")
+    expectFn(metadataCalls).toHaveLength(1)
+    expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_late_123")
   })
 })
