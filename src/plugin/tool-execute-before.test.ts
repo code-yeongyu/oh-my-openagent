@@ -86,6 +86,36 @@ describe("createToolExecuteBeforeHandler", () => {
     expect(called).toBe(false)
   })
 
+  test("calls coeusMdOnly hook when present", async () => {
+    //#given
+    let coeusMdOnlyCalled = false
+    const ctx = {
+      client: {
+        session: {
+          messages: async () => ({ data: [] }),
+        },
+      },
+    }
+
+    const hooks = {
+      coeusMdOnly: {
+        "tool.execute.before": async () => {
+          coeusMdOnlyCalled = true
+        },
+      },
+    }
+
+    const handler = createToolExecuteBeforeHandler({ ctx, hooks })
+    const input = { tool: "write", sessionID: "ses_coeus", callID: "call_1" }
+    const output = { args: { filePath: ".sisyphus/plans/test.md" } as Record<string, unknown> }
+
+    //#when
+    await handler(input, output)
+
+    //#then
+    expect(coeusMdOnlyCalled).toBe(true)
+  })
+
   describe("task tool subagent_type normalization", () => {
     const emptyHooks = {}
 
