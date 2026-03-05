@@ -2,8 +2,21 @@ import { log } from "../../shared"
 
 const NULL_BYTE_REGEX = /\x00/g
 
-function stripNullBytes(value: string): string {
-	return value.replace(NULL_BYTE_REGEX, "")
+function sanitizeValue(value: unknown): unknown {
+	if (typeof value === "string") {
+		return value.includes("\x00") ? value.replace(NULL_BYTE_REGEX, "") : value
+	}
+	if (Array.isArray(value)) {
+		return value.map(sanitizeValue)
+	}
+	if (value !== null && typeof value === "object") {
+		const result: Record<string, unknown> = {}
+		for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+			result[k] = sanitizeValue(v)
+		}
+		return result
+	}
+	return value
 }
 
 export function sanitizeToolArgsNullBytes(
@@ -14,8 +27,9 @@ export function sanitizeToolArgsNullBytes(
 	let sanitized = false
 
 	for (const [key, value] of Object.entries(argsObject)) {
-		if (typeof value === "string" && value.includes("\x00")) {
-			argsObject[key] = stripNullBytes(value)
+		const cleaned = sanitizeValue(value)
+		if (cleaned !== value) {
+			argsObject[key] = cleaned
 			sanitized = true
 		}
 	}

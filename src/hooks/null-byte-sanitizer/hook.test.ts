@@ -52,4 +52,30 @@ describe("sanitizeToolArgsNullBytes", () => {
 			expect(output.args.content).toBe("const x = 1")
 		})
 	})
+
+	describe("#given string array args with null bytes", () => {
+		it("#then strips null bytes from array elements", () => {
+			const input = { tool: "ast_grep_search" }
+			const output = { args: { paths: ["/src/\x00foo", "/lib/\x00bar"] } as Record<string, unknown> }
+
+			sanitizeToolArgsNullBytes(input, output)
+
+			expect(output.args.paths).toEqual(["/src/foo", "/lib/bar"])
+		})
+	})
+
+	describe("#given nested object args with null bytes", () => {
+		it("#then strips null bytes from nested string values", () => {
+			const input = { tool: "write" }
+			const output = {
+				args: {
+					options: { path: "/tmp/\x00test", encoding: "utf-8" },
+				} as Record<string, unknown>,
+			}
+
+			sanitizeToolArgsNullBytes(input, output)
+
+			expect(output.args.options).toEqual({ path: "/tmp/test", encoding: "utf-8" })
+		})
+	})
 })
