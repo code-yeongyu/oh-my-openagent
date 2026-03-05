@@ -1,0 +1,25 @@
+Task 11: Integrate knowledge verification into orchestrator
+Date: 2026-03-05
+Branch: feature/coeus-recursive-planning
+
+## Changes
+- src/agents/coeus/orchestrator.ts: Added runKnowledgeVerification function
+- src/agents/coeus/orchestrator.test.ts: Added 3 integration tests
+- src/agents/coeus/index.ts: Exported runKnowledgeVerification
+
+## Test Results
+bun test src/agents/coeus/orchestrator.test.ts
+19 pass, 0 fail, 54 expect() calls (16 existing + 3 new)
+
+## Typecheck
+Only pre-existing plugin-interface.ts error. No new errors.
+
+## LSP Diagnostics
+orchestrator.ts: clean
+index.ts: clean
+
+## Test Coverage
+1. runKnowledgeVerification returns VerificationRecord with correct domains/slug
+2. verified_count + unverified_count + novel_count === boundaries.length
+3. VerificationRecordSchema.parse(result) succeeds
+4. All 16 existing tests pass (no regression)

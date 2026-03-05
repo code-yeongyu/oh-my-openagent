@@ -8,6 +8,11 @@ import { detectCycles } from "./validation/cycle-detector"
 import { mergeSubPlans } from "./merge/plan-merger"
 import type { SubPlan } from "./schemas/sub-plan-schema"
 import type { MergedPlan } from "./schemas/merged-plan-schema"
+import { buildBoundaryClaims } from "./verification/boundary-claim-builder"
+import { verifyClaims } from "./verification/taxonomy-verifier"
+import { assembleVerificationRecord } from "./verification/verification-record-assembler"
+import { createLocalTaxonomyClient } from "../../shared/taxonomy-client"
+import type { VerificationRecord } from "./schemas/verification-record-schema"
 
 const CONCERN_DOMAINS: Record<string, RegExp> = {
   auth: /\b(auth(?:entication|orization)?|login|logout|signup|sign[- ]?up|sign[- ]?in|oauth|jwt|sessions?|tokens?|passwords?|credentials?|permissions?|rbac|acl)\b/i,
@@ -108,6 +113,21 @@ export function validateAndMerge(
   const cycles = detectCycles(merged.dependency_graph)
 
   return { merged, errors: [], overlaps, cycles }
+}
+
+export async function runKnowledgeVerification(
+  domains: string[],
+  constraints: string,
+  taxonomyDir: string
+): Promise<VerificationRecord> {
+  const client = createLocalTaxonomyClient(taxonomyDir)
+  const claims = buildBoundaryClaims(domains, constraints)
+  const verifications = await verifyClaims(claims, client)
+  return assembleVerificationRecord(
+    domains.join("-"),
+    domains,
+    verifications
+  )
 }
 
 export const orchestrateRecursivePlanning = {

@@ -1,8 +1,10 @@
 import { describe, test, expect } from "bun:test"
-import { evaluateRequest, buildDecompositionContext, validateAndMerge } from "./orchestrator"
+import { evaluateRequest, buildDecompositionContext, validateAndMerge, runKnowledgeVerification } from "./orchestrator"
 import type { SubPlan } from "./schemas/sub-plan-schema"
 import type { ComplexityScore, DecompositionDecision } from "./types"
 import { DECOMPOSITION_THRESHOLD } from "./types"
+import { VerificationRecordSchema } from "./schemas/verification-record-schema"
+import path from "path"
 
 function makeSubPlan(overrides: Partial<SubPlan> = {}): SubPlan {
   return {
@@ -298,5 +300,49 @@ describe("validateAndMerge", () => {
     //#then errors mention constraints
     expect(result.merged).toBeNull()
     expect(result.errors.some((e) => e.toLowerCase().includes("constraint"))).toBe(true)
+  })
+})
+
+describe("runKnowledgeVerification", () => {
+  const taxonomyDir = path.join(import.meta.dir, "taxonomy", "seed")
+
+  test("returns VerificationRecord for multi-domain input", async () => {
+    //#given domains and a taxonomy directory
+    const domains = ["auth", "frontend"]
+
+    //#when running knowledge verification
+    const result = await runKnowledgeVerification(domains, "", taxonomyDir)
+
+    //#then returns record with matching domains
+    expect(result.domains).toEqual(["auth", "frontend"])
+    expect(result.slug).toBe("auth-frontend")
+    expect(result.created).toBeTruthy()
+    expect(Array.isArray(result.boundaries)).toBe(true)
+  })
+
+  test("boundary counts sum equals boundaries length", async () => {
+    //#given domains
+    const domains = ["auth", "frontend"]
+
+    //#when running knowledge verification
+    const result = await runKnowledgeVerification(domains, "", taxonomyDir)
+
+    //#then counts sum to total boundaries
+    const totalCounts = result.verified_count + result.unverified_count + result.novel_count
+    expect(totalCounts).toBe(result.boundaries.length)
+  })
+
+  test("result passes VerificationRecordSchema validation", async () => {
+    //#given domains and constraints
+    const domains = ["backend", "database"]
+    const constraints = "Use Bun only"
+
+    //#when running knowledge verification
+    const result = await runKnowledgeVerification(domains, constraints, taxonomyDir)
+
+    //#then schema parse succeeds
+    const parsed = VerificationRecordSchema.parse(result)
+    expect(parsed.slug).toBe("backend-database")
+    expect(parsed.domains).toEqual(["backend", "database"])
   })
 })
