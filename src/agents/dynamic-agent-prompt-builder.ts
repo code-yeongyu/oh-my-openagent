@@ -160,6 +160,40 @@ export function buildDelegationTable(agents: AvailableAgent[]): string {
   return rows.join("\n")
 }
 
+function buildCategorySkillSelectionProtocol(hasCustomSkills: boolean): string {
+  return `### MANDATORY: Category + Skill Selection Protocol
+
+**STEP 1: Select Category**
+- Read each category's description
+- Match task requirements to category domain
+- Select the category whose domain BEST fits the task
+
+**STEP 2: Evaluate ALL Skills**
+Check the \`skill\` tool for available skills and their descriptions. For EVERY skill, ask:
+> "Does this skill's expertise domain overlap with my task?"
+
+- If YES → INCLUDE in \`load_skills=[...]\`
+- If NO → OMIT (no justification needed)
+${hasCustomSkills ? `> **User-installed skills get PRIORITY.** When in doubt, INCLUDE rather than omit.` : ""}
+
+---
+
+### Delegation Pattern
+
+\`\`\`typescript
+task(
+  category="[selected-category]",
+  load_skills=["skill-1", "skill-2"],  // Include ALL relevant skills — ESPECIALLY user-installed ones
+  prompt="..."
+)
+\`\`\`
+
+**ANTI-PATTERN (will produce poor results):**
+\`\`\`typescript
+task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
+\`\`\``
+}
+
 
 export function buildCategorySkillsDelegationGuide(
   categories: AvailableCategory[],
@@ -167,6 +201,9 @@ export function buildCategorySkillsDelegationGuide(
   compressionConfig: ToonCompressionConfig = DEFAULT_COMPRESSION_CONFIG
 ): string {
   if (categories.length === 0 && skills.length === 0) return ""
+
+  const builtinSkills = skills.filter((s) => s.location === "plugin")
+  const customSkills = skills.filter((s) => s.location !== "plugin")
 
   // Check if we should compress the structured data
   if (compressionConfig.enabled) {
@@ -189,45 +226,13 @@ export function buildCategorySkillsDelegationGuide(
     ]
      if (shouldCompress(combinedData, compressionConfig.threshold)) {
        const compressed = safeCompress(combinedData, "agent-prompt-builder")
-       return `[Compressed categories/skills data]\n${compressed}\n\n---\n\n### MANDATORY: Category + Skill Selection Protocol
-
-**STEP 1: Select Category**
-- Read each category's description
-- Match task requirements to category domain
-- Select the category whose domain BEST fits the task
-
-**STEP 2: Evaluate ALL Skills**
-Check the \`skill\` tool for available skills and their descriptions. For EVERY skill, ask:
-> "Does this skill's expertise domain overlap with my task?"
-
-- If YES → INCLUDE in \`load_skills=[...]\`
-- If NO → OMIT (no justification needed)
-
----
-
-### Delegation Pattern
-
-\`\`\`typescript
-task(
-  category="[selected-category]",
-  load_skills=["skill-1", "skill-2"],  // Include ALL relevant skills
-  prompt="..."
-)
-\`\`\`
-
-**ANTI-PATTERN (will produce poor results):**
-\`\`\`typescript
-task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
-\`\`\``
-     }
-   }
+        return `[Compressed categories/skills data]\n${compressed}\n\n---\n\n${buildCategorySkillSelectionProtocol(customSkills.length > 0)}`
+      }
+    }
   const categoryRows = categories.map((c) => {
     const desc = c.description || c.name
     return `- \`${c.name}\` — ${desc}`
   })
-
-  const builtinSkills = skills.filter((s) => s.location === "plugin")
-  const customSkills = skills.filter((s) => s.location !== "plugin")
 
   const builtinNames = builtinSkills.map((s) => s.name).join(", ")
   const customNames = customSkills.map((s) => {
@@ -276,38 +281,7 @@ ${skillsSection}
 
 ---
 
-### MANDATORY: Category + Skill Selection Protocol
-
-**STEP 1: Select Category**
-- Read each category's description
-- Match task requirements to category domain
-- Select the category whose domain BEST fits the task
-
-**STEP 2: Evaluate ALL Skills**
-Check the \`skill\` tool for available skills and their descriptions. For EVERY skill, ask:
-> "Does this skill's expertise domain overlap with my task?"
-
-- If YES → INCLUDE in \`load_skills=[...]\`
-- If NO → OMIT (no justification needed)
-${customSkills.length > 0 ? `
-> **User-installed skills get PRIORITY.** When in doubt, INCLUDE rather than omit.` : ""}
-
----
-
-### Delegation Pattern
-
-\`\`\`typescript
-task(
-  category="[selected-category]",
-  load_skills=["skill-1", "skill-2"],  // Include ALL relevant skills — ESPECIALLY user-installed ones
-  prompt="..."
-)
-\`\`\`
-
-**ANTI-PATTERN (will produce poor results):**
-\`\`\`typescript
-task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
-\`\`\``
+${buildCategorySkillSelectionProtocol(customSkills.length > 0)}`
 }
 
 export function buildOracleSection(agents: AvailableAgent[]): string {

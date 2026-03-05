@@ -148,7 +148,8 @@ describe("createMessageBatchCompressorHook", () => {
 
       const imagePart: Part = {
         type: "file",
-        source: { data: "base64imagedata", mimeType: "image/png" },
+        mime: "image/png",
+        url: "data:image/png;base64,base64imagedata",
       } as Part
 
       const messages: MessageWithParts[] = [
@@ -170,7 +171,7 @@ describe("createMessageBatchCompressorHook", () => {
       expect(parts.length).toBe(2) // 1 text + 1 image
       expect(parts[0].type).toBe("text")
       expect(parts[1].type).toBe("file")
-      expect((parts[1] as { source?: { data: string } }).source.data).toBe("base64imagedata")
+      expect((parts[1] as { url?: string }).url).toBe("data:image/png;base64,base64imagedata")
     })
 
     it("should preserve multiple image parts from different messages", async () => {
@@ -180,11 +181,13 @@ describe("createMessageBatchCompressorHook", () => {
 
       const image1: Part = {
         type: "file",
-        source: { data: "image1data", mimeType: "image/png" },
+        mime: "image/png",
+        url: "data:image/png;base64,image1data",
       } as Part
       const image2: Part = {
         type: "file",
-        source: { data: "image2data", mimeType: "image/jpeg" },
+        mime: "image/jpeg",
+        url: "data:image/jpeg;base64,image2data",
       } as Part
 
       const messages: MessageWithParts[] = [
