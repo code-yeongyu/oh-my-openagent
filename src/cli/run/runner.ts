@@ -6,6 +6,7 @@ import { createEventState, processEvents, serializeError } from "./events"
 import type { OhMyOpenCodeConfig } from "../../config"
 import { loadPluginConfig } from "../../plugin-config"
 import { getAvailableServerPort, DEFAULT_SERVER_PORT } from "../../shared/port-utils"
+import { preflightConfig, displayPreflightResults } from "../../shared/preflight"
 
 const POLL_INTERVAL_MS = 500
 const DEFAULT_TIMEOUT_MS = 0
@@ -88,7 +89,12 @@ export async function run(options: RunOptions): Promise<number> {
     timeout = DEFAULT_TIMEOUT_MS,
   } = options
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
-  const resolvedAgent = resolveRunAgent(options, pluginConfig)
+  
+  // Preflight check: validate and auto-switch models
+  const preflightResult = preflightConfig(pluginConfig)
+  displayPreflightResults(preflightResult)
+  
+  const resolvedAgent = resolveRunAgent(options, preflightResult.config)
 
   console.log(pc.cyan("Starting opencode server (auto port selection enabled)..."))
 
