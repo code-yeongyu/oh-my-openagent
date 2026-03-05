@@ -136,7 +136,9 @@ Question({
     question: "How should we handle the selected findings?",
     header: "Action",
     options: [
-      { label: "Fix now (Atlas)", description: "Hand off to Atlas for direct implementation" },
+      { label: "Fix now with (Atlas)", description: "Hand off to Atlas for task based implementation" },
+      { label: "Fix now with (Hephaestus)", description: "Hand off to Hephaestus for direct implementation" },
+      { label: "Fix now with (Sisyphus)", description: "Hand off to Sisyphus for collaborative implementation" },
       { label: "Create plan (Prometheus)", description: "Hand off to Prometheus for planning and phased execution" },
       { label: "Cross-check with council", description: "Launch a new council session with this synthesis as context" },
       { label: "No action", description: "Review only - no delegation" }
@@ -146,7 +148,9 @@ Question({
 })
 
 6) Execute selected action:
-- Fix now (Atlas) -> switch_agent(agent="atlas") with ONLY selected findings
+- Fix now with (Atlas) -> switch_agent(agent="atlas") with ONLY selected findings
+- Fix now with (Hephaestus) -> switch_agent(agent="hephaestus") with ONLY selected findings
+- Fix now with (Sisyphus) -> switch_agent(agent="sisyphus") with ONLY selected findings
 - Create plan (Prometheus) -> switch_agent(agent="prometheus") with ONLY selected findings
 - Cross-check with council -> launch a new council session with the current synthesis as context. Restart from Step 2 (council setup) with the synthesis included in the prompt.
 - No action -> acknowledge and end
