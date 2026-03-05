@@ -102,7 +102,55 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#then - output and metadata should include canonical session linkage
     expectFn(result).toContain("<task_metadata>")
     expectFn(result).toContain("session_id: ses_sub_123")
+    expectFn(result).toContain("task_id: ses_sub_123")
+    expectFn(result).toContain("Background Task ID: bg_resolved")
     expectFn(metadataCalls).toHaveLength(1)
     expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_sub_123")
+  })
+
+  testFn("captures late-resolved session id and emits synced metadata", async () => {
+    //#given - background task session id appears after launch via manager polling
+    const metadataCalls: any[] = []
+    let reads = 0
+    const manager = {
+      launch: async () => ({
+        id: "bg_late",
+        sessionID: undefined,
+        description: "Late session",
+        agent: "explore",
+        status: "running",
+      }),
+      getTask: () => {
+        reads += 1
+        return reads >= 2 ? { sessionID: "ses_late_123" } : undefined
+      },
+    }
+
+    const result = await executeBackgroundTask(
+      {
+        description: "Late session",
+        prompt: "check",
+        run_in_background: true,
+        load_skills: [],
+      },
+      {
+        sessionID: "ses_parent",
+        callID: "call_3",
+        metadata: async (value: any) => metadataCalls.push(value),
+        abort: new AbortController().signal,
+      },
+      { manager },
+      { sessionID: "ses_parent", messageID: "msg_3" },
+      "explore",
+      undefined,
+      undefined,
+      undefined,
+    )
+
+    //#then - late session id still propagates to task metadata contract
+    expectFn(result).toContain("session_id: ses_late_123")
+    expectFn(result).toContain("task_id: ses_late_123")
+    expectFn(metadataCalls).toHaveLength(1)
+    expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_late_123")
   })
 })
