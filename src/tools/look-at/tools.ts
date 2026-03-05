@@ -217,6 +217,10 @@ Original error: ${createResult.error}`
 
         log(`[look_at] Got response, length: ${responseText.length}`)
         return responseText
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        log(`[look_at] Unexpected error analyzing ${sourceDescription}:`, error)
+        return `Error: Failed to analyze ${sourceDescription}: ${errorMessage}`
       } finally {
         if (tempConversionPath) {
           cleanupConvertedImage(tempConversionPath)
