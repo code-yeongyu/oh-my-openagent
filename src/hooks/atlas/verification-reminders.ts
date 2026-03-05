@@ -26,9 +26,14 @@ export function buildOrchestratorReminder(
 - Stage ONLY the verified changes
 - Commit with clear message describing what was done
 `
-    : ""
+    : `
+**STEP 8: COMMITS DISABLED**
 
-  const nextStepNumber = autoCommit ? 9 : 8
+The user has disabled auto-commits (\`start_work.auto_commit: false\`).
+Changes will NOT be committed automatically.
+`
+
+  const nextStepNumber = 9
 
   return `
 ---
