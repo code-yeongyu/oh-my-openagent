@@ -6,6 +6,7 @@ import { subagentSessions } from "../claude-code-session-state"
 import { getTaskToastManager } from "../task-toast-manager"
 import { isInsideTmux } from "../../shared/tmux"
 import type { ConcurrencyManager } from "./concurrency"
+import { createSystemDirective } from "../../shared/system-directive"
 
 export interface SpawnerContext {
   client: OpencodeClient
@@ -132,6 +133,19 @@ export async function startTask(
     : undefined
   const launchVariant = input.model?.variant
 
+  const indexMatch = input.description.match(/^\[(\d+)\]/)
+  const index = indexMatch ? indexMatch[1] : "?"
+
+  const bannerText = `${createSystemDirective("SUBAGENT TAB INDICATOR")}
+
+┌─────────────────────────────────────────┐
+│  📋 Sub-Agent [${index}]                               │
+│  🤖 Agent: ${input.agent}                      │
+└─────────────────────────────────────────┘
+
+---
+`
+
   promptWithModelSuggestionRetry(client, {
     path: { id: sessionID },
     body: {
@@ -145,7 +159,7 @@ export async function startTask(
         question: false,
         ...getAgentToolRestrictions(input.agent),
       },
-      parts: [createInternalAgentTextPart(input.prompt)],
+      parts: [createInternalAgentTextPart(bannerText), createInternalAgentTextPart(input.prompt)],
     },
   }).catch((error) => {
     log("[background-agent] promptAsync error:", error)
