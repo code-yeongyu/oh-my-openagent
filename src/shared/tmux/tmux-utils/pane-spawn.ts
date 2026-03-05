@@ -5,6 +5,7 @@ import type { SpawnPaneResult } from "../types"
 import type { SplitDirection } from "./environment"
 import { isInsideTmux } from "./environment"
 import { isServerRunning } from "./server-health"
+import { formatPaneTitle } from "../../../features/tmux-subagent/pane-title-indicator"
 
 export async function spawnTmuxPane(
 	sessionId: string,
@@ -70,7 +71,7 @@ export async function spawnTmuxPane(
 		return { success: false }
 	}
 
-	const title = `omo-subagent-${description.slice(0, 20)}`
+	const title = formatPaneTitle(description, 1, 1, false)
 	const titleProc = spawn([tmux, "select-pane", "-t", paneId, "-T", title], {
 		stdout: "ignore",
 		stderr: "pipe",

@@ -4,6 +4,8 @@ import type { TrackedSession } from "./types"
 import { SESSION_MISSING_GRACE_MS } from "../../shared/tmux"
 import { log } from "../../shared"
 import { normalizeSDKResponse } from "../../shared"
+import { setPaneTitleWithIndicator } from "./pane-title-indicator"
+import { queryWindowState } from "./pane-state-querier"
 
 const SESSION_TIMEOUT_MS = 10 * 60 * 1000
 const MIN_STABILITY_TIME_MS = 10 * 1000
@@ -34,6 +36,43 @@ export class TmuxPollingManager {
       clearInterval(this.pollInterval)
       this.pollInterval = undefined
       log("[tmux-session-manager] polling stopped")
+    }
+  }
+
+  private async updatePaneTitles(): Promise<void> {
+    if (this.sessions.size === 0) return
+    
+    const firstSession = Array.from(this.sessions.values())[0]
+    if (!firstSession) return
+    
+    const state = await queryWindowState(firstSession.paneId)
+    if (!state) {
+      log("[tmux-session-manager] failed to query window state for title updates")
+      return
+    }
+    
+    const totalAgentPanes = state.agentPanes.length
+    if (totalAgentPanes === 0) return
+    
+    for (let i = 0; i < state.agentPanes.length; i++) {
+      const pane = state.agentPanes[i]
+      if (!pane) continue
+      
+      const trackedSession = Array.from(this.sessions.values()).find(
+        s => s.paneId === pane.paneId
+      )
+      if (!trackedSession) continue
+      
+      const index = i + 1
+      const description = trackedSession.description
+      
+      await setPaneTitleWithIndicator(
+        pane.paneId,
+        description,
+        index,
+        totalAgentPanes,
+        pane.isActive
+      )
     }
   }
 
@@ -136,6 +175,8 @@ export class TmuxPollingManager {
         log("[tmux-session-manager] closing session due to poll", { sessionId })
         await this.closeSessionById(sessionId)
       }
+      
+      await this.updatePaneTitles()
     } catch (err) {
       log("[tmux-session-manager] poll error", { error: String(err) })
     } finally {
