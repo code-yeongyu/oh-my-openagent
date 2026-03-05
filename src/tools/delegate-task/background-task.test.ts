@@ -103,6 +103,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     expectFn(result).toContain("<task_metadata>")
     expectFn(result).toContain("session_id: ses_sub_123")
     expectFn(result).toContain("task_id: ses_sub_123")
+    expectFn(result).toContain("background_task_id: bg_resolved")
     expectFn(result).toContain("Background Task ID: bg_resolved")
     expectFn(metadataCalls).toHaveLength(1)
     expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_sub_123")
@@ -150,6 +151,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#then - late session id still propagates to task metadata contract
     expectFn(result).toContain("session_id: ses_late_123")
     expectFn(result).toContain("task_id: ses_late_123")
+    expectFn(result).toContain("background_task_id: bg_late")
     expectFn(metadataCalls).toHaveLength(1)
     expectFn(metadataCalls[0].metadata.sessionId).toBe("ses_late_123")
   })
