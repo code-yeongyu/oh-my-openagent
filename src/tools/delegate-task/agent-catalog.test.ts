@@ -11,6 +11,15 @@ function createMockClient(agentsFn: () => Promise<unknown>): OpencodeClient {
   } as OpencodeClient
 }
 
+function createCatalog(agents: Array<{ name: string; mode?: string }>): TaskAgentCatalog {
+  const all = agents.map((a) => ({ ...a, mode: (a.mode as "subagent" | "primary" | "all") || "subagent" }))
+  return {
+    all,
+    callable: all.filter((a) => a.mode !== "primary"),
+    primary: all.filter((a) => a.mode === "primary"),
+  }
+}
+
 describe("getTaskAgentCatalog", () => {
   test("returns null when client.app.agents() throws", async () => {
     //#given
@@ -85,15 +94,6 @@ describe("getTaskAgentCatalog", () => {
 })
 
 describe("matchAgentByName", () => {
-  const createCatalog = (agents: Array<{ name: string; mode?: string }>): TaskAgentCatalog => {
-    const all = agents.map((a) => ({ ...a, mode: (a.mode as "subagent" | "primary" | "all") || "subagent" }))
-    return {
-      all,
-      callable: all.filter((a) => a.mode !== "primary"),
-      primary: all.filter((a) => a.mode === "primary"),
-    }
-  }
-
   test("returns null for empty name", () => {
     //#given
     const catalog = createCatalog([{ name: "explore" }])
@@ -178,29 +178,20 @@ describe("matchAgentByName", () => {
     expect(result).toBeNull()
   })
 
-  test("matches by display name alias", () => {
+  test("resolves display name to canonical agent name", () => {
     //#given
-    const catalog = createCatalog([{ name: "sisyphus-junior" }])
+    const catalog = createCatalog([{ name: "hephaestus" }])
 
     //#when
-    const result = matchAgentByName("Sisyphus-Junior", catalog)
+    const result = matchAgentByName("Hephaestus (Deep Agent)", catalog)
 
     //#then
     expect(result).not.toBeNull()
-    expect(result!.canonicalName).toBe("sisyphus-junior")
+    expect(result!.canonicalName).toBe("hephaestus")
   })
 })
 
 describe("matchPrimaryAgentByName", () => {
-  const createCatalog = (agents: Array<{ name: string; mode?: string }>): TaskAgentCatalog => {
-    const all = agents.map((a) => ({ ...a, mode: (a.mode as "subagent" | "primary" | "all") || "subagent" }))
-    return {
-      all,
-      callable: all.filter((a) => a.mode !== "primary"),
-      primary: all.filter((a) => a.mode === "primary"),
-    }
-  }
-
   test("matches primary agent by name", () => {
     //#given
     const catalog = createCatalog([
@@ -240,5 +231,17 @@ describe("matchPrimaryAgentByName", () => {
     //#then
     expect(result).not.toBeNull()
     expect(result!.canonicalName).toBe("Prometheus")
+  })
+
+  test("resolves display name to canonical primary agent name", () => {
+    //#given
+    const catalog = createCatalog([{ name: "sisyphus", mode: "primary" }])
+
+    //#when
+    const result = matchPrimaryAgentByName("Sisyphus (Ultraworker)", catalog)
+
+    //#then
+    expect(result).not.toBeNull()
+    expect(result!.canonicalName).toBe("sisyphus")
   })
 })

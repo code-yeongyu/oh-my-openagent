@@ -313,8 +313,42 @@ describe("resolveTaskTarget", () => {
       //#when
       const result = resolveTaskTarget(args, categories, catalog)
 
-      //#then - should be unknown (primary agents not callable)
+      //#then - should be primary_agent error (primary agents not callable)
       expect(result.kind).toBe("error")
+      const errorResult = result as Extract<TaskTarget, { kind: "error" }>
+      expect(errorResult.code).toBe("primary_agent")
+      expect(errorResult.message).toContain("Cannot call primary agent")
+    })
+
+    test("returns primary_agent error with canonical name", () => {
+      //#given - sisyphus in primary bucket, case insensitive
+      const args = createArgs({ subagent_type: "SISYPHUS" })
+
+      //#when
+      const result = resolveTaskTarget(args, categories, catalog)
+
+      //#then
+      expect(result.kind).toBe("error")
+      const errorResult = result as Extract<TaskTarget, { kind: "error" }>
+      expect(errorResult.code).toBe("primary_agent")
+      expect(errorResult.message).toContain("sisyphus")
+    })
+
+    test("unknown_agent error includes available agents list", () => {
+      //#given
+      const args = createArgs({ subagent_type: "nonexistent" })
+
+      //#when
+      const result = resolveTaskTarget(args, categories, catalog)
+
+      //#then
+      expect(result.kind).toBe("error")
+      const errorResult = result as Extract<TaskTarget, { kind: "error" }>
+      expect(errorResult.code).toBe("unknown_agent")
+      expect(errorResult.message).toContain("Available agents:")
+      expect(errorResult.message).toContain("explore")
+      expect(errorResult.message).toContain("librarian")
+      expect(errorResult.message).toContain("oracle")
     })
   })
 })

@@ -1,6 +1,6 @@
 import type { OpencodeClient } from "./types"
 import { normalizeSDKResponse } from "../../shared"
-import { getAgentDisplayName } from "../../shared/agent-display-names"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
 
 export interface AgentInfo {
   name: string
@@ -55,14 +55,12 @@ export function matchAgentByName(
     return null
   }
 
-  const resolvedDisplayName = getAgentDisplayName(trimmedName)
-  const lowerName = trimmedName.toLowerCase()
-  const lowerDisplayName = resolvedDisplayName.toLowerCase()
+  const configKey = getAgentConfigKey(trimmedName)
+  const lowerConfigKey = configKey.toLowerCase()
 
   const matchedAgent = catalog.callable.find(
     (agent) =>
-      agent.name.toLowerCase() === lowerName ||
-      agent.name.toLowerCase() === lowerDisplayName
+      agent.name.toLowerCase() === lowerConfigKey
   )
 
   if (!matchedAgent) {
@@ -88,14 +86,12 @@ export function matchPrimaryAgentByName(
     return null
   }
 
-  const resolvedDisplayName = getAgentDisplayName(trimmedName)
-  const lowerName = trimmedName.toLowerCase()
-  const lowerDisplayName = resolvedDisplayName.toLowerCase()
+  const configKey = getAgentConfigKey(trimmedName)
+  const lowerConfigKey = configKey.toLowerCase()
 
   const matchedAgent = catalog.primary.find(
     (agent) =>
-      agent.name.toLowerCase() === lowerName ||
-      agent.name.toLowerCase() === lowerDisplayName
+      agent.name.toLowerCase() === lowerConfigKey
   )
 
   if (!matchedAgent) {

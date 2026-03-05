@@ -140,7 +140,9 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const runInBackground = args.run_in_background === true
 
       // Resolve task target using catalog-backed normalization
-      const agentCatalog = await getTaskAgentCatalog(options.client)
+      // Only fetch catalog when resolver actually needs it (not for continuations/explicit categories)
+      const needsCatalog = !args.session_id?.trim() && !args.category?.trim()
+      const agentCatalog = needsCatalog ? await getTaskAgentCatalog(options.client) : null
       const target = resolveTaskTarget(args, availableCategories, agentCatalog)
 
       // Handle resolution errors
@@ -153,10 +155,11 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         // No mutation needed for continuation
       } else if (target.kind === "category") {
         args.category = target.name
+        const originalSubagentType = args.subagent_type
         args.subagent_type = undefined
         if (target.correctedFrom === "subagent_type") {
           log("[task] corrected subagent_type to category", {
-            original: args.subagent_type,
+            original: originalSubagentType,
             corrected: target.name,
           })
         }
@@ -189,7 +192,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       const parentContext = await resolveParentContext(ctx, options.client)
 
       // Handle continuation (session_id was validated by resolver)
-      if (args.session_id) {
+      if (args.session_id?.trim()) {
         if (runInBackground) {
           return executeBackgroundContinuation(args, ctx, options, parentContext)
         }

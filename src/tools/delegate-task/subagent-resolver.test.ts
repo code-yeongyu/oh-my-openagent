@@ -70,6 +70,7 @@ describe("resolveSubagentExecution", () => {
     const executorCtx = createExecutorContext(async () => {
       throw new Error("network timeout")
     })
+    const agentsSpy = spyOn(executorCtx.client.app, "agents")
 
     //#when
     const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep", null)
@@ -78,6 +79,7 @@ describe("resolveSubagentExecution", () => {
     expect(result.agentToUse).toBe("")
     expect(result.categoryModel).toBeUndefined()
     expect(result.error).toBe('Failed to fetch agent catalog for "review"')
+    expect(agentsSpy).not.toHaveBeenCalled()
   })
 
   test("normalizes matched agent model string before returning categoryModel", async () => {

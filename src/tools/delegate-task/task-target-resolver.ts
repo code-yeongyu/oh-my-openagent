@@ -1,6 +1,6 @@
 import type { DelegateTaskArgs } from "./types"
 import type { TaskAgentCatalog, AgentMatch } from "./agent-catalog"
-import { matchAgentByName } from "./agent-catalog"
+import { matchAgentByName, matchPrimaryAgentByName } from "./agent-catalog"
 
 export type TaskTarget =
   | { kind: "continuation" }
@@ -84,6 +84,16 @@ export function resolveTaskTarget(
       return { kind: "agent", name: agentMatch.canonicalName }
     }
 
+    // Priority 4b: Primary agent check (better error than "unknown")
+    const primaryMatch = matchPrimaryAgentByName(subagentType, agentCatalog)
+    if (primaryMatch) {
+      return {
+        kind: "error",
+        code: "primary_agent",
+        message: `Cannot call primary agent "${primaryMatch.canonicalName}" via task. Primary agents are top-level orchestrators.`,
+      }
+    }
+
     // Priority 5: Category match (correction from subagent_type)
     const categoryMatch = findCategory(subagentType, availableCategories)
     if (categoryMatch) {
@@ -95,10 +105,14 @@ export function resolveTaskTarget(
     }
 
     // Priority 6a: No match found with usable catalog - error
+    const availableAgents = agentCatalog.callable
+      .map((a) => a.name)
+      .sort()
+      .join(", ")
     return {
       kind: "error",
       code: "unknown_agent",
-      message: `Unknown agent: "${subagentType}"`,
+      message: `Unknown agent: "${subagentType}". Available agents: ${availableAgents}`,
     }
   }
 

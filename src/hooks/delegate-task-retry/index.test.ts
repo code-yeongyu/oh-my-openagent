@@ -13,8 +13,8 @@ describe("sisyphus-task-retry", () => {
       expect(DELEGATE_TASK_ERROR_PATTERNS.length).toBeGreaterThan(5)
       
       const patternTexts = DELEGATE_TASK_ERROR_PATTERNS.map(p => p.pattern)
-      expect(patternTexts).toContain("run_in_background")
-      expect(patternTexts).toContain("load_skills")
+      expect(patternTexts).toContain("'run_in_background' parameter is REQUIRED")
+      expect(patternTexts).toContain("'load_skills' parameter is REQUIRED")
       expect(patternTexts).toContain("category OR subagent_type")
       expect(patternTexts).toContain("Unknown category")
       expect(patternTexts).toContain("Unknown agent")
@@ -121,6 +121,29 @@ describe("sisyphus-task-retry", () => {
       
       expect(result).not.toBeNull()
       expect(result?.errorType).toBe("unknown_delegate_task_error")
+    })
+
+    it("should not detect errors in long successful task output", () => {
+      //#given
+      const longOutput = "A".repeat(600) + "run_in_background" + "B".repeat(100)
+
+      //#when
+      const result = detectDelegateTaskError(longOutput)
+
+      //#then
+      expect(result).toBeNull()
+    })
+
+    it("should still detect errors in short error output", () => {
+      //#given
+      const shortOutput = "Unknown agent: 'foobar'"
+
+      //#when
+      const result = detectDelegateTaskError(shortOutput)
+
+      //#then
+      expect(result).not.toBeNull()
+      expect(result?.errorType).toBe("unknown_agent")
     })
   })
 

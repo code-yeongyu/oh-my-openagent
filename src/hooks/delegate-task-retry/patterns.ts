@@ -6,13 +6,13 @@ export interface DelegateTaskErrorPattern {
 
 export const DELEGATE_TASK_ERROR_PATTERNS: DelegateTaskErrorPattern[] = [
   {
-    pattern: "run_in_background",
+    pattern: "'run_in_background' parameter is REQUIRED",
     errorType: "missing_run_in_background",
     fixHint:
       "Add run_in_background=false (for delegation) or run_in_background=true (for parallel exploration)",
   },
   {
-    pattern: "load_skills",
+    pattern: "'load_skills' parameter is REQUIRED",
     errorType: "missing_load_skills",
     fixHint:
       "Add load_skills=[] parameter (empty array if no skills needed). Note: Calling Skill tool does NOT populate this.",
@@ -62,6 +62,10 @@ export interface DetectedError {
 }
 
 export function detectDelegateTaskError(output: string): DetectedError | null {
+  // Skip detection on long outputs — these are successful task results,
+  // not error messages. Error returns from the task tool are concise.
+  if (output.length > 500) return null
+
   // Pattern-first: scan for known error patterns regardless of prefix
   for (const errorPattern of DELEGATE_TASK_ERROR_PATTERNS) {
     if (output.includes(errorPattern.pattern)) {
