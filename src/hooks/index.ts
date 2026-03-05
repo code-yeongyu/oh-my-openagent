@@ -51,3 +51,7 @@ export { createWriteExistingFileGuardHook } from "./write-existing-file-guard";
 export { createHashlineReadEnhancerHook } from "./hashline-read-enhancer";
 export { createJsonErrorRecoveryHook, JSON_ERROR_TOOL_EXCLUDE_LIST, JSON_ERROR_PATTERNS, JSON_ERROR_REMINDER } from "./json-error-recovery";
 export { createReadImageResizerHook } from "./read-image-resizer"
+export { createLearningBusInjectorHook, type LearningBusInjectorHook } from "./learning-bus-injector"
+export { createExecutionGateHook, type ExecutionGateHook } from "./execution-gate"
+export { createResourceGateHook, type MemoryStatus } from "./resource-gate"
+export { createAutoCheckpointHook } from "./auto-checkpoint"
