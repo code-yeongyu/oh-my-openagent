@@ -62,14 +62,22 @@ export interface DetectedError {
 }
 
 export function detectDelegateTaskError(output: string): DetectedError | null {
-  if (!output.includes("[ERROR]") && !output.includes("Invalid arguments")) return null
-
+  // Pattern-first: scan for known error patterns regardless of prefix
   for (const errorPattern of DELEGATE_TASK_ERROR_PATTERNS) {
     if (output.includes(errorPattern.pattern)) {
       return {
         errorType: errorPattern.errorType,
         originalOutput: output,
       }
+    }
+  }
+
+  // Fallback: if no known pattern matched but output contains error indicators,
+  // return unknown_delegate_task_error for retry eligibility
+  if (output.includes("[ERROR]") || output.includes("Invalid arguments")) {
+    return {
+      errorType: "unknown_delegate_task_error",
+      originalOutput: output,
     }
   }
 

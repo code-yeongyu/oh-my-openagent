@@ -77,6 +77,51 @@ describe("sisyphus-task-retry", () => {
       
       expect(result).toBeNull()
     })
+
+    it("should detect bare unknown agent without [ERROR] prefix", () => {
+      const output = 'Unknown agent: "deep". Available agents: explore, librarian, oracle'
+      
+      const result = detectDelegateTaskError(output)
+      
+      expect(result).not.toBeNull()
+      expect(result?.errorType).toBe("unknown_agent")
+    })
+
+    it("should detect bare unknown category without [ERROR] prefix", () => {
+      const output = 'Unknown category: "oraclee". Available: visual-engineering, ultrabrain, quick'
+      
+      const result = detectDelegateTaskError(output)
+      
+      expect(result).not.toBeNull()
+      expect(result?.errorType).toBe("unknown_category")
+    })
+
+    it("should detect bare empty agent without [ERROR] prefix", () => {
+      const output = 'Agent name cannot be empty.'
+      
+      const result = detectDelegateTaskError(output)
+      
+      expect(result).not.toBeNull()
+      expect(result?.errorType).toBe("empty_agent")
+    })
+
+    it("should detect bare primary agent without [ERROR] prefix", () => {
+      const output = 'Cannot call primary agent "plan" via task. Primary agents are top-level orchestrators.'
+      
+      const result = detectDelegateTaskError(output)
+      
+      expect(result).not.toBeNull()
+      expect(result?.errorType).toBe("primary_agent")
+    })
+
+    it("should return unknown_delegate_task_error for prefixed unknown errors", () => {
+      const output = '[ERROR] Some unexpected error occurred with the task system'
+      
+      const result = detectDelegateTaskError(output)
+      
+      expect(result).not.toBeNull()
+      expect(result?.errorType).toBe("unknown_delegate_task_error")
+    })
   })
 
   describe("buildRetryGuidance", () => {
@@ -105,15 +150,52 @@ describe("sisyphus-task-retry", () => {
     })
 
     it("should provide fix for unknown agent with available list", () => {
-      const errorInfo = { 
-        errorType: "unknown_agent", 
-        originalOutput: '[ERROR] Unknown agent: "fake". Available agents: explore, oracle' 
+      const errorInfo = {
+        errorType: "unknown_agent",
+        originalOutput: '[ERROR] Unknown agent: "fake". Available agents: explore, oracle'
       }
-      
+
       const guidance = buildRetryGuidance(errorInfo)
-      
+
       expect(guidance).toContain("explore")
       expect(guidance).toContain("oracle")
+    })
+
+    it("should include lane hint for unknown_agent explaining category vs subagent_type", () => {
+      const errorInfo = {
+        errorType: "unknown_agent",
+        originalOutput: '[ERROR] Unknown agent: "deep". Available agents: explore, oracle'
+      }
+
+      const guidance = buildRetryGuidance(errorInfo)
+
+      expect(guidance).toContain("category")
+      expect(guidance).toContain("subagent_type")
+      expect(guidance).toContain("Lane Hint")
+    })
+
+    it("should include lane hint for empty_agent", () => {
+      const errorInfo = {
+        errorType: "empty_agent",
+        originalOutput: 'Agent name cannot be empty.'
+      }
+
+      const guidance = buildRetryGuidance(errorInfo)
+
+      expect(guidance).toContain("Lane Hint")
+      expect(guidance).toContain("category")
+    })
+
+    it("should include lane hint for primary_agent", () => {
+      const errorInfo = {
+        errorType: "primary_agent",
+        originalOutput: 'Cannot call primary agent "plan" via task.'
+      }
+
+      const guidance = buildRetryGuidance(errorInfo)
+
+      expect(guidance).toContain("Lane Hint")
+      expect(guidance).toContain("category")
     })
   })
 })
