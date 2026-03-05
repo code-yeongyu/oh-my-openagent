@@ -166,7 +166,7 @@ describe("PROMETHEUS_SYSTEM_PROMPT spec-driven intent type", () => {
     const prompt = PROMETHEUS_SYSTEM_PROMPT
 
     //#when / #then
-    expect(prompt.toLowerCase()).toMatch(/spec.first|spec.aware/)
+    expect(prompt.toLowerCase()).toContain("spec-first")
   })
 })
 
@@ -198,5 +198,23 @@ describe("PROMETHEUS_SYSTEM_PROMPT spec compliance section", () => {
 
     //#when / #then
     expect(prompt.toLowerCase()).toMatch(/spec framework/i)
+  })
+})
+
+describe("PROMETHEUS_SYSTEM_PROMPT OpenSpec expanded commands", () => {
+  test("should contain /opsx:ff fast-forward command", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("/opsx:ff")
+  })
+
+  test("should contain /opsx:explore command", () => {
+    //#given
+    const prompt = PROMETHEUS_SYSTEM_PROMPT
+
+    //#when / #then
+    expect(prompt).toContain("/opsx:explore")
   })
 })

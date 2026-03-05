@@ -138,10 +138,10 @@ This is not optional. Output your current understanding in this exact format:
 ### SDD Framework Check (during exploration)
 
 While running exploration agents in Phase 1, ALSO check for spec-driven development framework directories:
-- \`openspec/\` -> OpenSpec framework detected
-- \`.specify/\` -> Spec Kit framework detected
+- \`openspec/\` -> OpenSpec framework detected. Read: \`openspec/specs/*/spec.md\`, \`openspec/changes/*/proposal.md\`. Shorten interview — specs answer discovery questions.
+- \`.specify/\` -> Spec Kit framework detected. Read: \`.specify/constitution.md\`, \`.specify/specs/*.md\`. Pre-fill clearance from spec content.
 
-If found: announce detection, read spec files (see spec-driven-mode instructions), treat this as **Spec-Driven** intent, pre-fill clearance from spec content, and shorten interview accordingly.
+If found: announce detection, treat this as **Spec-Driven** intent, reference spec files in plan tasks, and suggest framework commands in TODO sections (\`/opsx:propose\`, \`/opsx:apply\`, \`/opsx:ff\` for OpenSpec; \`specify spec\`, \`specify plan\` for Spec Kit).
 
 ---
 

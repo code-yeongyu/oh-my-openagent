@@ -46,11 +46,20 @@ When a framework is detected, adjust your interview behavior:
 
 ## Available Framework Commands Reference
 
-### OpenSpec commands:
-- \`/opsx:propose\` - Create a new change proposal from requirements
-- \`/opsx:apply\` - Apply an approved proposal to generate tasks
-- \`/opsx:archive\` - Archive a completed change
-- \`/opsx:verify\` - Verify implementation matches spec
+### OpenSpec commands (core profile — available by default):
+- \`/opsx:propose\` - Create a change and generate all planning artifacts in one step
+- \`/opsx:explore\` - Think through ideas, investigate problems, compare approaches
+- \`/opsx:apply\` - Implement tasks from tasks.md, checking off as you go
+- \`/opsx:archive\` - Archive a completed change (optionally syncs delta specs)
+
+### OpenSpec commands (expanded profile — requires \`openspec config profile\` + \`openspec update\`):
+- \`/opsx:new\` - Scaffold a new change folder (no artifacts generated yet)
+- \`/opsx:continue\` - Create the next single artifact in the dependency chain
+- \`/opsx:ff\` - Fast-forward: create ALL planning artifacts at once
+- \`/opsx:verify\` - Validate implementation matches artifacts
+- \`/opsx:sync\` - Merge delta specs into main specs
+- \`/opsx:bulk-archive\` - Archive multiple completed changes with conflict detection
+- \`/opsx:onboard\` - Interactive guided tutorial using the actual codebase
 
 ### Spec Kit commands:
 - \`specify spec\` - Create or update a spec
