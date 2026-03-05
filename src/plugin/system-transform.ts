@@ -1,5 +1,5 @@
 export function createSystemTransformHandler(): (
-  input: { sessionID?: string; model: { id: string; providerID: string; [key: string]: unknown } },
+  input: { sessionID: string },
   output: { system: string[] },
 ) => Promise<void> {
   return async (): Promise<void> => {}
