@@ -10,14 +10,13 @@ describe("sisyphus-task-retry", () => {
     // given error patterns are defined
     // then should include all known task error types
     it("should contain all known error patterns", () => {
-      expect(DELEGATE_TASK_ERROR_PATTERNS.length).toBeGreaterThan(5)
+      expect(DELEGATE_TASK_ERROR_PATTERNS.length).toBeGreaterThanOrEqual(7)
       
       const patternTexts = DELEGATE_TASK_ERROR_PATTERNS.map(p => p.pattern)
       expect(patternTexts).toContain("'run_in_background' parameter is REQUIRED")
       expect(patternTexts).toContain("'load_skills' parameter is REQUIRED")
-      expect(patternTexts).toContain("category OR subagent_type")
-      expect(patternTexts).toContain("Unknown category")
-      expect(patternTexts).toContain("Unknown agent")
+      expect(patternTexts).toContain('Unknown category: "')
+      expect(patternTexts).toContain('Unknown agent: "')
     })
   })
 
@@ -41,15 +40,6 @@ describe("sisyphus-task-retry", () => {
       
       expect(result).not.toBeNull()
       expect(result?.errorType).toBe("missing_load_skills")
-    })
-
-    it("should detect category/subagent mutual exclusion error", () => {
-      const output = "[ERROR] Invalid arguments: Provide EITHER category OR subagent_type, not both."
-      
-      const result = detectDelegateTaskError(output)
-      
-      expect(result).not.toBeNull()
-      expect(result?.errorType).toBe("mutual_exclusion")
     })
 
     it("should detect unknown category error", () => {
@@ -123,20 +113,43 @@ describe("sisyphus-task-retry", () => {
       expect(result?.errorType).toBe("unknown_delegate_task_error")
     })
 
-    it("should not detect errors in long successful task output", () => {
-      //#given
-      const longOutput = "A".repeat(600) + "run_in_background" + "B".repeat(100)
+    it("should not false-positive on prose mentioning error concepts", () => {
+      //#given a successful agent response discussing errors without matching the structural format
+      const proseOutput = "I found the Unknown agent handler in task-target-resolver.ts. The Skills not found logic is in skill-resolver.ts."
 
       //#when
-      const result = detectDelegateTaskError(longOutput)
+      const result = detectDelegateTaskError(proseOutput)
 
       //#then
       expect(result).toBeNull()
     })
 
-    it("should still detect errors in short error output", () => {
+    it("should not false-positive on prose mentioning Invalid arguments", () => {
       //#given
-      const shortOutput = "Unknown agent: 'foobar'"
+      const proseOutput = "Fixed the Invalid arguments handling in the validation layer."
+
+      //#when
+      const result = detectDelegateTaskError(proseOutput)
+
+      //#then
+      expect(result).toBeNull()
+    })
+
+    it("should not false-positive on long output containing error substrings", () => {
+      //#given a long successful response that contains pattern substrings
+      const longOutput = 'The task system returns Unknown agent: "X" errors when the catalog lookup fails. ' + "A".repeat(600)
+
+      //#when
+      const result = detectDelegateTaskError(longOutput)
+
+      //#then structurally-anchored pattern still matches — this IS an error format
+      expect(result).not.toBeNull()
+      expect(result?.errorType).toBe("unknown_agent")
+    })
+
+    it("should detect errors in short error output", () => {
+      //#given
+      const shortOutput = 'Unknown agent: "foobar". Available agents: explore, oracle'
 
       //#when
       const result = detectDelegateTaskError(shortOutput)
@@ -144,6 +157,18 @@ describe("sisyphus-task-retry", () => {
       //#then
       expect(result).not.toBeNull()
       expect(result?.errorType).toBe("unknown_agent")
+    })
+
+    it("should detect skills not found with structural anchor", () => {
+      //#given
+      const output = "Skills not found: nonexistent-skill. Available: git-master, playwright"
+
+      //#when
+      const result = detectDelegateTaskError(output)
+
+      //#then
+      expect(result).not.toBeNull()
+      expect(result?.errorType).toBe("unknown_skills")
     })
   })
 

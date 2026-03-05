@@ -18,39 +18,33 @@ export const DELEGATE_TASK_ERROR_PATTERNS: DelegateTaskErrorPattern[] = [
       "Add load_skills=[] parameter (empty array if no skills needed). Note: Calling Skill tool does NOT populate this.",
   },
   {
-    pattern: "category OR subagent_type",
-    errorType: "mutual_exclusion",
-    fixHint:
-      "Provide ONLY one of: category (e.g., 'general', 'quick') OR subagent_type (e.g., 'oracle', 'explore')",
-  },
-  {
     pattern: "Must provide either category or subagent_type",
     errorType: "missing_category_or_agent",
     fixHint: "Add either category='general' OR subagent_type='explore'",
   },
   {
-    pattern: "Unknown category",
+    pattern: 'Unknown category: "',
     errorType: "unknown_category",
     fixHint: "Use a valid category from the Available list in the error message",
   },
   {
-    pattern: "Agent name cannot be empty",
+    pattern: "Agent name cannot be empty.",
     errorType: "empty_agent",
     fixHint: "Provide a non-empty subagent_type value",
   },
   {
-    pattern: "Unknown agent",
+    pattern: 'Unknown agent: "',
     errorType: "unknown_agent",
     fixHint: "Use a valid agent from the Available agents list in the error message",
   },
   {
-    pattern: "Cannot call primary agent",
+    pattern: 'Cannot call primary agent "',
     errorType: "primary_agent",
     fixHint:
       "Primary agents cannot be called via task. Use a subagent like 'explore', 'oracle', or 'librarian'",
   },
   {
-    pattern: "Skills not found",
+    pattern: "Skills not found: ",
     errorType: "unknown_skills",
     fixHint: "Use valid skill names from the Available list in the error message",
   },
@@ -62,11 +56,10 @@ export interface DetectedError {
 }
 
 export function detectDelegateTaskError(output: string): DetectedError | null {
-  // Skip detection on long outputs — these are successful task results,
-  // not error messages. Error returns from the task tool are concise.
-  if (output.length > 500) return null
-
-  // Pattern-first: scan for known error patterns regardless of prefix
+  // Pattern-first: scan for known error patterns regardless of prefix.
+  // Patterns are structurally anchored to actual error message formats
+  // (e.g., 'Unknown agent: "' not just 'Unknown agent') to prevent
+  // false positives on successful task outputs discussing errors.
   for (const errorPattern of DELEGATE_TASK_ERROR_PATTERNS) {
     if (output.includes(errorPattern.pattern)) {
       return {
@@ -78,7 +71,7 @@ export function detectDelegateTaskError(output: string): DetectedError | null {
 
   // Fallback: if no known pattern matched but output contains error indicators,
   // return unknown_delegate_task_error for retry eligibility
-  if (output.includes("[ERROR]") || output.includes("Invalid arguments")) {
+  if (output.includes("[ERROR]") || output.includes("Invalid arguments:")) {
     return {
       errorType: "unknown_delegate_task_error",
       originalOutput: output,
