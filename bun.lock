@@ -9,7 +9,7 @@
         "@ast-grep/napi": "^0.40.0",
         "@clack/prompts": "^0.11.0",
         "@code-yeongyu/comment-checker": "^0.7.0",
-        "@modelcontextprotocol/sdk": "^1.25.2",
+        "@modelcontextprotocol/sdk": "^1.27.1",
         "@opencode-ai/plugin": "^1.2.16",
         "@opencode-ai/sdk": "^1.2.17",
         "commander": "^14.0.2",
@@ -49,7 +49,12 @@
     "@code-yeongyu/comment-checker",
   ],
   "overrides": {
+    "@hono/node-server": "^1.19.10",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@opencode-ai/sdk": "^1.2.17",
+    "ajv": "^8.18.0",
+    "hono": "^4.12.5",
+    "qs": "^6.15.0",
   },
   "packages": {
     "@ast-grep/cli": ["@ast-grep/cli@0.40.5", "", { "dependencies": { "detect-libc": "2.1.2" }, "optionalDependencies": { "@ast-grep/cli-darwin-arm64": "0.40.5", "@ast-grep/cli-darwin-x64": "0.40.5", "@ast-grep/cli-linux-arm64-gnu": "0.40.5", "@ast-grep/cli-linux-x64-gnu": "0.40.5", "@ast-grep/cli-win32-arm64-msvc": "0.40.5", "@ast-grep/cli-win32-ia32-msvc": "0.40.5", "@ast-grep/cli-win32-x64-msvc": "0.40.5" }, "bin": { "sg": "sg", "ast-grep": "ast-grep" } }, "sha512-yVXL7Gz0WIHerQLf+MVaVSkhIhidtWReG5akNVr/JS9OVCVkSdz7gWm7H8jVv2M9OO1tauuG76K3UaRGBPu5lQ=="],
