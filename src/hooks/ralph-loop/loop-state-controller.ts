@@ -3,6 +3,7 @@ import {
 	DEFAULT_COMPLETION_PROMISE,
 	DEFAULT_MAX_ITERATIONS,
 	HOOK_NAME,
+	ULTRAWORK_VERIFICATION_PROMISE,
 } from "./constants"
 import { clearState, incrementIteration, readState, writeState } from "./storage"
 import { log } from "../../shared/logger"
@@ -28,18 +29,22 @@ export function createLoopStateController(options: {
 				strategy?: "reset" | "continue"
 			},
 		): boolean {
+			const initialCompletionPromise =
+				loopOptions?.completionPromise ??
+				DEFAULT_COMPLETION_PROMISE
 			const state: RalphLoopState = {
 				active: true,
 				iteration: 1,
-				max_iterations:
-					loopOptions?.maxIterations ??
-					config?.default_max_iterations ??
-					DEFAULT_MAX_ITERATIONS,
+				max_iterations: loopOptions?.ultrawork
+					? undefined
+					: loopOptions?.maxIterations ??
+						config?.default_max_iterations ??
+						DEFAULT_MAX_ITERATIONS,
 				message_count_at_start: loopOptions?.messageCountAtStart,
-				completion_promise:
-					loopOptions?.completionPromise ??
-					DEFAULT_COMPLETION_PROMISE,
+				completion_promise: initialCompletionPromise,
+				initial_completion_promise: initialCompletionPromise,
 				ultrawork: loopOptions?.ultrawork,
+				verification_pending: undefined,
 				strategy: loopOptions?.strategy ?? config?.default_strategy ?? "continue",
 				started_at: new Date().toISOString(),
 				prompt,
@@ -103,6 +108,23 @@ export function createLoopStateController(options: {
 			}
 
 			state.message_count_at_start = messageCountAtStart
+			if (!writeState(directory, state, stateDir)) {
+				return null
+			}
+
+			return state
+		},
+
+		markVerificationPending(sessionID: string): RalphLoopState | null {
+			const state = readState(directory, stateDir)
+			if (!state || state.session_id !== sessionID || !state.ultrawork) {
+				return null
+			}
+
+			state.verification_pending = true
+			state.completion_promise = ULTRAWORK_VERIFICATION_PROMISE
+			state.initial_completion_promise ??= DEFAULT_COMPLETION_PROMISE
+
 			if (!writeState(directory, state, stateDir)) {
 				return null
 			}

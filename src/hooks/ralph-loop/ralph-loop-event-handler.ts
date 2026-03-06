@@ -2,11 +2,13 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
 import type { RalphLoopOptions, RalphLoopState } from "./types"
 import { HOOK_NAME } from "./constants"
+import { handleDetectedCompletion } from "./completion-handler"
 import {
 	detectCompletionInSessionMessages,
 	detectCompletionInTranscript,
 } from "./completion-promise-detector"
 import { continueIteration } from "./iteration-continuation"
+import { handleDeletedLoopSession, handleErroredLoopSession } from "./session-event-handler"
 
 type SessionRecovery = {
 	isRecovering: (sessionID: string) => boolean
@@ -18,6 +20,7 @@ type LoopStateController = {
 	clear: () => boolean
 	incrementIteration: () => RalphLoopState | null
 	setSessionID: (sessionID: string) => RalphLoopState | null
+	markVerificationPending: (sessionID: string) => RalphLoopState | null
 }
 type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; sessionRecovery: SessionRecovery; loopState: LoopStateController }
 
@@ -76,7 +79,11 @@ export function createRalphLoopEventHandler(
 				}
 
 				const transcriptPath = options.getTranscriptPath(sessionID)
-				const completionViaTranscript = detectCompletionInTranscript(transcriptPath, state.completion_promise)
+				const completionViaTranscript = detectCompletionInTranscript(
+					transcriptPath,
+					state.completion_promise,
+					state.started_at,
+				)
 				const completionViaApi = completionViaTranscript
 					? false
 					: await detectCompletionInSessionMessages(ctx, {
@@ -96,15 +103,20 @@ export function createRalphLoopEventHandler(
 							? "transcript_file"
 							: "session_messages_api",
 					})
-					options.loopState.clear()
-
-					const title = state.ultrawork ? "ULTRAWORK LOOP COMPLETE!" : "Ralph Loop Complete!"
-					const message = state.ultrawork ? `JUST ULW ULW! Task completed after ${state.iteration} iteration(s)` : `Task completed after ${state.iteration} iteration(s)`
-					await ctx.client.tui?.showToast?.({ body: { title, message, variant: "success", duration: 5000 } }).catch(() => {})
+					await handleDetectedCompletion(ctx, {
+						sessionID,
+						state,
+						loopState: options.loopState,
+						directory: options.directory,
+						apiTimeoutMs: options.apiTimeoutMs,
+					})
 					return
 				}
 
-				if (state.iteration >= state.max_iterations) {
+				if (
+					typeof state.max_iterations === "number"
+					&& state.iteration >= state.max_iterations
+				) {
 					log(`[${HOOK_NAME}] Max iterations reached`, {
 						sessionID,
 						iteration: state.iteration,
@@ -133,7 +145,7 @@ export function createRalphLoopEventHandler(
 				await ctx.client.tui?.showToast?.({
 					body: {
 						title: "Ralph Loop",
-						message: `Iteration ${newState.iteration}/${newState.max_iterations}`,
+						message: `Iteration ${newState.iteration}/${typeof newState.max_iterations === "number" ? newState.max_iterations : "unbounded"}`,
 						variant: "info",
 						duration: 2000,
 					},
@@ -159,36 +171,12 @@ export function createRalphLoopEventHandler(
 		}
 
 		if (event.type === "session.deleted") {
-			const sessionInfo = props?.info as { id?: string } | undefined
-			if (!sessionInfo?.id) return
-			const state = options.loopState.getState()
-			if (state?.session_id === sessionInfo.id) {
-				options.loopState.clear()
-				log(`[${HOOK_NAME}] Session deleted, loop cleared`, { sessionID: sessionInfo.id })
-			}
-			options.sessionRecovery.clear(sessionInfo.id)
+			if (!handleDeletedLoopSession(props, options.loopState, options.sessionRecovery)) return
 			return
 		}
 
 		if (event.type === "session.error") {
-			const sessionID = props?.sessionID as string | undefined
-			const error = props?.error as { name?: string } | undefined
-
-			if (error?.name === "MessageAbortedError") {
-				if (sessionID) {
-					const state = options.loopState.getState()
-					if (state?.session_id === sessionID) {
-						options.loopState.clear()
-						log(`[${HOOK_NAME}] User aborted, loop cleared`, { sessionID })
-					}
-					options.sessionRecovery.clear(sessionID)
-				}
-				return
-			}
-
-			if (sessionID) {
-				options.sessionRecovery.markRecovering(sessionID)
-			}
+			handleErroredLoopSession(props, options.loopState, options.sessionRecovery)
 		}
 	}
 }
