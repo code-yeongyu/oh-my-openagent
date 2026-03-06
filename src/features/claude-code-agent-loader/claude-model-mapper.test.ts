@@ -16,50 +16,46 @@ describe("mapClaudeModelToOpenCode", () => {
     })
   })
 
-  describe("#given model with date suffix", () => {
-    it("#when called with claude-sonnet-4-5-20250514 #then strips date suffix", () => {
-      expect(mapClaudeModelToOpenCode("claude-sonnet-4-5-20250514")).toBe("claude-sonnet-4-5")
+  describe("#given bare Claude model name", () => {
+    it("#when called with claude-sonnet-4-5-20250514 #then adds anthropic prefix", () => {
+      expect(mapClaudeModelToOpenCode("claude-sonnet-4-5-20250514")).toBe("anthropic/claude-sonnet-4-5-20250514")
     })
 
-    it("#when called with claude-opus-4-20250414 #then strips date suffix", () => {
-      expect(mapClaudeModelToOpenCode("claude-opus-4-20250414")).toBe("claude-opus-4")
+    it("#when called with claude-opus-4-6 #then adds anthropic prefix", () => {
+      expect(mapClaudeModelToOpenCode("claude-opus-4-6")).toBe("anthropic/claude-opus-4-6")
     })
 
-    it("#when called with claude-haiku-4-5-20250514 #then strips date suffix", () => {
-      expect(mapClaudeModelToOpenCode("claude-haiku-4-5-20250514")).toBe("claude-haiku-4-5")
+    it("#when called with claude-haiku-4-5 #then adds anthropic prefix", () => {
+      expect(mapClaudeModelToOpenCode("claude-haiku-4-5")).toBe("anthropic/claude-haiku-4-5")
     })
 
-    it("#when called with claude-3-5-sonnet-20241022 #then strips date suffix", () => {
-      expect(mapClaudeModelToOpenCode("claude-3-5-sonnet-20241022")).toBe("claude-3-5-sonnet")
+    it("#when called with claude-3-5-sonnet-20241022 #then adds anthropic prefix", () => {
+      expect(mapClaudeModelToOpenCode("claude-3-5-sonnet-20241022")).toBe("anthropic/claude-3-5-sonnet-20241022")
     })
   })
 
   describe("#given model with dot version numbers", () => {
-    it("#when called with claude-3.5-sonnet #then normalizes dots to dashes", () => {
-      expect(mapClaudeModelToOpenCode("claude-3.5-sonnet")).toBe("claude-3-5-sonnet")
+    it("#when called with claude-3.5-sonnet #then normalizes dots and adds prefix", () => {
+      expect(mapClaudeModelToOpenCode("claude-3.5-sonnet")).toBe("anthropic/claude-3-5-sonnet")
     })
 
-    it("#when called with claude-3.5-sonnet-20241022 #then normalizes dots and strips date", () => {
-      expect(mapClaudeModelToOpenCode("claude-3.5-sonnet-20241022")).toBe("claude-3-5-sonnet")
-    })
-  })
-
-  describe("#given already-normalized model", () => {
-    it("#when called with claude-sonnet-4-6 #then returns unchanged", () => {
-      expect(mapClaudeModelToOpenCode("claude-sonnet-4-6")).toBe("claude-sonnet-4-6")
-    })
-
-    it("#when called with claude-opus-4-6 #then returns unchanged", () => {
-      expect(mapClaudeModelToOpenCode("claude-opus-4-6")).toBe("claude-opus-4-6")
-    })
-
-    it("#when called with claude-haiku-4-5 #then returns unchanged", () => {
-      expect(mapClaudeModelToOpenCode("claude-haiku-4-5")).toBe("claude-haiku-4-5")
+    it("#when called with claude-3.5-sonnet-20241022 #then normalizes dots and adds prefix", () => {
+      expect(mapClaudeModelToOpenCode("claude-3.5-sonnet-20241022")).toBe("anthropic/claude-3-5-sonnet-20241022")
     })
   })
 
-  describe("#given non-Claude model", () => {
-    it("#when called with gpt-5.2 #then normalizes dots only", () => {
+  describe("#given model already in provider/model format", () => {
+    it("#when called with anthropic/claude-sonnet-4-6 #then passes through unchanged", () => {
+      expect(mapClaudeModelToOpenCode("anthropic/claude-sonnet-4-6")).toBe("anthropic/claude-sonnet-4-6")
+    })
+
+    it("#when called with openai/gpt-5.2 #then passes through unchanged", () => {
+      expect(mapClaudeModelToOpenCode("openai/gpt-5.2")).toBe("openai/gpt-5.2")
+    })
+  })
+
+  describe("#given non-Claude bare model", () => {
+    it("#when called with gpt-5.2 #then normalizes dots without adding prefix", () => {
       expect(mapClaudeModelToOpenCode("gpt-5.2")).toBe("gpt-5-2")
     })
 
@@ -74,7 +70,7 @@ describe("mapClaudeModelToOpenCode", () => {
 
   describe("#given model with leading/trailing whitespace", () => {
     it("#when called with padded string #then trims before mapping", () => {
-      expect(mapClaudeModelToOpenCode("  claude-sonnet-4-5-20250514  ")).toBe("claude-sonnet-4-5")
+      expect(mapClaudeModelToOpenCode("  claude-sonnet-4-6  ")).toBe("anthropic/claude-sonnet-4-6")
     })
   })
 })
