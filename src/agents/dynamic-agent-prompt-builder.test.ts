@@ -4,7 +4,7 @@ import { describe, it, expect } from "bun:test"
 import {
   buildCategorySkillsDelegationGuide,
   buildUltraworkSection,
-  buildDeepParallelSection,
+  buildParallelDelegationSection,
   buildNonClaudePlannerSection,
   type AvailableSkill,
   type AvailableCategory,
@@ -174,23 +174,39 @@ describe("buildUltraworkSection", () => {
   })
 })
 
-describe("buildDeepParallelSection", () => {
+describe("buildParallelDelegationSection", () => {
   const deepCategory: AvailableCategory = { name: "deep", description: "Autonomous problem-solving" }
+  const unspecifiedHighCategory: AvailableCategory = { name: "unspecified-high", description: "High effort tasks" }
   const otherCategory: AvailableCategory = { name: "quick", description: "Trivial tasks" }
 
-  it("#given non-Claude model with deep category #when building #then returns parallel delegation section", () => {
+  it("#given non-Claude model with deep category #when building #then returns aggressive delegation section", () => {
     //#given
     const model = "google/gemini-3-pro"
     const categories = [deepCategory, otherCategory]
 
     //#when
-    const result = buildDeepParallelSection(model, categories)
+    const result = buildParallelDelegationSection(model, categories)
 
     //#then
-    expect(result).toContain("Deep Parallel Delegation")
-    expect(result).toContain("EVERY independent unit")
+    expect(result).toContain("DECOMPOSE AND DELEGATE")
+    expect(result).toContain("NOT AN IMPLEMENTER")
     expect(result).toContain("run_in_background=true")
     expect(result).toContain("4 independent units")
+    expect(result).toContain("NEVER implement directly")
+  })
+
+  it("#given non-Claude model with unspecified-high category #when building #then returns aggressive delegation section", () => {
+    //#given
+    const model = "openai/gpt-5.2"
+    const categories = [unspecifiedHighCategory, otherCategory]
+
+    //#when
+    const result = buildParallelDelegationSection(model, categories)
+
+    //#then
+    expect(result).toContain("DECOMPOSE AND DELEGATE")
+    expect(result).toContain("`deep` or `unspecified-high`")
+    expect(result).toContain("NEVER work sequentially")
   })
 
   it("#given Claude model #when building #then returns empty", () => {
@@ -199,19 +215,19 @@ describe("buildDeepParallelSection", () => {
     const categories = [deepCategory]
 
     //#when
-    const result = buildDeepParallelSection(model, categories)
+    const result = buildParallelDelegationSection(model, categories)
 
     //#then
     expect(result).toBe("")
   })
 
-  it("#given non-Claude model without deep category #when building #then returns empty", () => {
+  it("#given non-Claude model without deep or unspecified-high category #when building #then returns empty", () => {
     //#given
     const model = "openai/gpt-5.2"
     const categories = [otherCategory]
 
     //#when
-    const result = buildDeepParallelSection(model, categories)
+    const result = buildParallelDelegationSection(model, categories)
 
     //#then
     expect(result).toBe("")

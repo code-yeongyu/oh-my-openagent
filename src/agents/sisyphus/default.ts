@@ -19,7 +19,7 @@ import {
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
-  buildDeepParallelSection,
+  buildParallelDelegationSection,
   buildNonClaudePlannerSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
@@ -158,7 +158,7 @@ export function buildDefaultSisyphusPrompt(
   const oracleSection = buildOracleSection(availableAgents);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
-  const deepParallelSection = buildDeepParallelSection(model, availableCategories);
+  const parallelDelegationSection = buildParallelDelegationSection(model, availableCategories);
   const nonClaudePlannerSection = buildNonClaudePlannerSection(model);
   const taskManagementSection = buildTaskManagementSection(useTaskSystem);
   const todoHookNote = useTaskSystem
@@ -356,7 +356,7 @@ ${categorySkillsGuide}
 
 ${nonClaudePlannerSection}
 
-${deepParallelSection}
+${parallelDelegationSection}
 
 ${delegationTable}
 
