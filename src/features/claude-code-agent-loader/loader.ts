@@ -5,6 +5,7 @@ import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import type { AgentScope, AgentFrontmatter, LoadedAgent } from "./types"
+import { mapClaudeModelToOpenCode } from "./claude-model-mapper"
 
 function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
   if (!toolsStr) return undefined
@@ -42,10 +43,13 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
 
        const formattedDescription = `(${scope}) ${originalDescription}`
 
+       const mappedModel = mapClaudeModelToOpenCode(data.model)
+
        const config: AgentConfig = {
          description: formattedDescription,
          mode: "subagent",
          prompt: body.trim(),
+         ...(mappedModel && { model: mappedModel }),
        }
 
        const toolsConfig = parseToolsConfig(data.tools)

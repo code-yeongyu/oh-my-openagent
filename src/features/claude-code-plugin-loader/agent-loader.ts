@@ -5,6 +5,7 @@ import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { log } from "../../shared/logger"
 import type { AgentFrontmatter } from "../claude-code-agent-loader/types"
+import { mapClaudeModelToOpenCode } from "../claude-code-agent-loader/claude-model-mapper"
 import type { LoadedPlugin } from "./types"
 
 function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
@@ -46,10 +47,13 @@ export function loadPluginAgents(plugins: LoadedPlugin[]): Record<string, AgentC
         const originalDescription = data.description || ""
         const formattedDescription = `(plugin: ${plugin.name}) ${originalDescription}`
 
+        const mappedModel = mapClaudeModelToOpenCode(data.model)
+
         const config: AgentConfig = {
           description: formattedDescription,
           mode: "subagent",
           prompt: body.trim(),
+          ...(mappedModel && { model: mappedModel }),
         }
 
         const toolsConfig = parseToolsConfig(data.tools)
