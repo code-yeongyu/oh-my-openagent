@@ -13,8 +13,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
-      { providers: ["zai-coding-plan"], model: "glm-4.7" },
-      { providers: ["opencode"], model: "glm-4.7-free" },
+      { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
     ],
     requiresAnyModel: true,
   },
@@ -90,7 +89,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["kimi-for-coding"], model: "k2p5" },
       {
         providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.2",
+        model: "gpt-5.4",
         variant: "high",
       },
       {
@@ -123,8 +122,8 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.2",
-        variant: "medium",
+        model: "gpt-5.4",
+        variant: "xhigh",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
@@ -145,7 +144,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-sonnet-4-5",
       },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3.1-pro",
