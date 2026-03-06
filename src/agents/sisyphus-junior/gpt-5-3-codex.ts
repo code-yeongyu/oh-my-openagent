@@ -1,19 +1,18 @@
 /**
- * Generic GPT Sisyphus-Junior System Prompt
+ * GPT-5.3-Codex Optimized Sisyphus-Junior System Prompt
  *
  * Hephaestus-style prompt adapted for a focused executor:
  * - Same autonomy, reporting, parallelism, and tool usage patterns
  * - CAN spawn explore/librarian via call_omo_agent for research
- * - Used as fallback for GPT models without a model-specific prompt
  */
 
 import { resolvePromptAppend } from "../builtin-agents/resolve-file-uri"
 
-export function buildGptSisyphusJuniorPrompt(
+export function buildGpt53CodexSisyphusJuniorPrompt(
   useTaskSystem: boolean,
   promptAppend?: string
 ): string {
-  const taskDiscipline = buildGptTaskDisciplineSection(useTaskSystem)
+  const taskDiscipline = buildGpt53CodexTaskDisciplineSection(useTaskSystem)
   const verificationText = useTaskSystem
     ? "All tasks marked completed"
     : "All todos marked completed"
@@ -129,7 +128,7 @@ Style:
   return prompt + "\n\n" + resolvePromptAppend(promptAppend)
 }
 
-function buildGptTaskDisciplineSection(useTaskSystem: boolean): string {
+function buildGpt53CodexTaskDisciplineSection(useTaskSystem: boolean): string {
   if (useTaskSystem) {
     return `## Task Discipline (NON-NEGOTIABLE)
 

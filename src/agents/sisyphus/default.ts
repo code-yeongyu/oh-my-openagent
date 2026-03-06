@@ -1,30 +1,14 @@
-import type { AgentConfig } from "@opencode-ai/sdk";
-import type { AgentMode, AgentPromptMetadata } from "./types";
-import { isGptModel, isGeminiModel, isGpt5_4Model } from "./types";
-import {
-  buildGeminiToolMandate,
-  buildGeminiDelegationOverride,
-  buildGeminiVerificationOverride,
-  buildGeminiIntentGateEnforcement,
-  buildGeminiToolGuide,
-  buildGeminiToolCallExamples,
-} from "./sisyphus/gemini";
-import { buildGpt54SisyphusPrompt } from "./sisyphus/gpt-5-4";
-import { buildTaskManagementSection } from "./sisyphus/default";
+/**
+ * Default/base Sisyphus prompt builder.
+ * Used for Claude and other non-specialized models.
+ */
 
-const MODE: AgentMode = "all";
-export const SISYPHUS_PROMPT_METADATA: AgentPromptMetadata = {
-  category: "utility",
-  cost: "EXPENSIVE",
-  promptAlias: "Sisyphus",
-  triggers: [],
-};
 import type {
   AvailableAgent,
   AvailableTool,
   AvailableSkill,
   AvailableCategory,
-} from "./dynamic-agent-prompt-builder";
+} from "../dynamic-agent-prompt-builder";
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -38,9 +22,119 @@ import {
   buildDeepParallelSection,
   buildNonClaudePlannerSection,
   categorizeTools,
-} from "./dynamic-agent-prompt-builder";
+} from "../dynamic-agent-prompt-builder";
 
-function buildDynamicSisyphusPrompt(
+export function buildTaskManagementSection(useTaskSystem: boolean): string {
+  if (useTaskSystem) {
+    return `<Task_Management>
+## Task Management (CRITICAL)
+
+**DEFAULT BEHAVIOR**: Create tasks BEFORE starting any non-trivial task. This is your PRIMARY coordination mechanism.
+
+### When to Create Tasks (MANDATORY)
+
+- Multi-step task (2+ steps) → ALWAYS \`TaskCreate\` first
+- Uncertain scope → ALWAYS (tasks clarify thinking)
+- User request with multiple items → ALWAYS
+- Complex single task → \`TaskCreate\` to break down
+
+### Workflow (NON-NEGOTIABLE)
+
+1. **IMMEDIATELY on receiving request**: \`TaskCreate\` to plan atomic steps.
+   - ONLY ADD TASKS TO IMPLEMENT SOMETHING, ONLY WHEN USER WANTS YOU TO IMPLEMENT SOMETHING.
+2. **Before starting each step**: \`TaskUpdate(status="in_progress")\` (only ONE at a time)
+3. **After completing each step**: \`TaskUpdate(status="completed")\` IMMEDIATELY (NEVER batch)
+4. **If scope changes**: Update tasks before proceeding
+
+### Why This Is Non-Negotiable
+
+- **User visibility**: User sees real-time progress, not a black box
+- **Prevents drift**: Tasks anchor you to the actual request
+- **Recovery**: If interrupted, tasks enable seamless continuation
+- **Accountability**: Each task = explicit commitment
+
+### Anti-Patterns (BLOCKING)
+
+- Skipping tasks on multi-step tasks — user has no visibility, steps get forgotten
+- Batch-completing multiple tasks — defeats real-time tracking purpose
+- Proceeding without marking in_progress — no indication of what you're working on
+- Finishing without completing tasks — task appears incomplete to user
+
+**FAILURE TO USE TASKS ON NON-TRIVIAL TASKS = INCOMPLETE WORK.**
+
+### Clarification Protocol (when asking):
+
+\`\`\`
+I want to make sure I understand correctly.
+
+**What I understood**: [Your interpretation]
+**What I'm unsure about**: [Specific ambiguity]
+**Options I see**:
+1. [Option A] - [effort/implications]
+2. [Option B] - [effort/implications]
+
+**My recommendation**: [suggestion with reasoning]
+
+Should I proceed with [recommendation], or would you prefer differently?
+\`\`\`
+</Task_Management>`;
+  }
+
+  return `<Task_Management>
+## Todo Management (CRITICAL)
+
+**DEFAULT BEHAVIOR**: Create todos BEFORE starting any non-trivial task. This is your PRIMARY coordination mechanism.
+
+### When to Create Todos (MANDATORY)
+
+- Multi-step task (2+ steps) → ALWAYS create todos first
+- Uncertain scope → ALWAYS (todos clarify thinking)
+- User request with multiple items → ALWAYS
+- Complex single task → Create todos to break down
+
+### Workflow (NON-NEGOTIABLE)
+
+1. **IMMEDIATELY on receiving request**: \`todowrite\` to plan atomic steps.
+   - ONLY ADD TODOS TO IMPLEMENT SOMETHING, ONLY WHEN USER WANTS YOU TO IMPLEMENT SOMETHING.
+2. **Before starting each step**: Mark \`in_progress\` (only ONE at a time)
+3. **After completing each step**: Mark \`completed\` IMMEDIATELY (NEVER batch)
+4. **If scope changes**: Update todos before proceeding
+
+### Why This Is Non-Negotiable
+
+- **User visibility**: User sees real-time progress, not a black box
+- **Prevents drift**: Todos anchor you to the actual request
+- **Recovery**: If interrupted, todos enable seamless continuation
+- **Accountability**: Each todo = explicit commitment
+
+### Anti-Patterns (BLOCKING)
+
+- Skipping todos on multi-step tasks — user has no visibility, steps get forgotten
+- Batch-completing multiple todos — defeats real-time tracking purpose
+- Proceeding without marking in_progress — no indication of what you're working on
+- Finishing without completing todos — task appears incomplete to user
+
+**FAILURE TO USE TODOS ON NON-TRIVIAL TASKS = INCOMPLETE WORK.**
+
+### Clarification Protocol (when asking):
+
+\`\`\`
+I want to make sure I understand correctly.
+
+**What I understood**: [Your interpretation]
+**What I'm unsure about**: [Specific ambiguity]
+**Options I see**:
+1. [Option A] - [effort/implications]
+2. [Option B] - [effort/implications]
+
+**My recommendation**: [suggestion with reasoning]
+
+Should I proceed with [recommendation], or would you prefer differently?
+\`\`\`
+</Task_Management>`;
+}
+
+export function buildDefaultSisyphusPrompt(
   model: string,
   availableAgents: AvailableAgent[],
   availableTools: AvailableTool[] = [],
@@ -143,7 +237,7 @@ This verbalization anchors your routing decision and makes your reasoning transp
 **Delegation Check (MANDATORY before acting directly):**
 1. Is there a specialized agent that perfectly matches this request?
 2. If not, is there a \`task\` category best describes this task? (visual-engineering, ultrabrain, quick etc.) What skills are available to equip the agent with?
-  - MUST FIND skills to use, for: \`task(load_skills=[{skill1}, ...])\` MUST PASS SKILL AS TASK PARAMETER.
+   - MUST FIND skills to use, for: \`task(load_skills=[{skill1}, ...])\` MUST PASS SKILL AS TASK PARAMETER.
 3. Can I do it myself for the best result, FOR SURE? REALLY, REALLY, THERE IS NO APPROPRIATE CATEGORIES TO WORK WITH?
 
 **Default Bias: DELEGATE. WORK YOURSELF ONLY WHEN IT IS SUPER SIMPLE.**
@@ -232,7 +326,7 @@ result = task(..., run_in_background=false)  // Never wait synchronously for exp
 \`\`\`
 
 ### Background Result Collection:
-1. Launch parallel agents \u2192 receive task_ids
+1. Launch parallel agents → receive task_ids
 2. Continue immediate work
 3. System sends \`<system-reminder>\` on each task completion — then call \`background_output(task_id="...")\`
 4. Need results not yet ready? **End your response.** The notification will trigger your next turn.
@@ -292,10 +386,10 @@ AFTER THE WORK YOU DELEGATED SEEMS DONE, ALWAYS VERIFY THE RESULTS AS FOLLOWING:
 Every \`task()\` output includes a session_id. **USE IT.**
 
 **ALWAYS continue when:**
-- Task failed/incomplete → \`session_id=\"{session_id}\", prompt=\"Fix: {specific error}\"\`
-- Follow-up question on result → \`session_id=\"{session_id}\", prompt=\"Also: {question}\"\`
-- Multi-turn with same agent → \`session_id=\"{session_id}\"\` - NEVER start fresh
-- Verification failed → \`session_id=\"{session_id}\", prompt=\"Failed verification: {error}. Fix.\"\`
+- Task failed/incomplete → \`session_id="{session_id}", prompt="Fix: {specific error}"\`
+- Follow-up question on result → \`session_id="{session_id}", prompt="Also: {question}"\`
+- Multi-turn with same agent → \`session_id="{session_id}"\` - NEVER start fresh
+- Verification failed → \`session_id="{session_id}", prompt="Failed verification: {error}. Fix."\`
 
 **Why session_id is CRITICAL:**
 - Subagent has FULL conversation context preserved
@@ -439,94 +533,4 @@ ${antiPatterns}
 `;
 }
 
-export function createSisyphusAgent(
-  model: string,
-  availableAgents?: AvailableAgent[],
-  availableToolNames?: string[],
-  availableSkills?: AvailableSkill[],
-  availableCategories?: AvailableCategory[],
-  useTaskSystem = false,
-): AgentConfig {
-  const tools = availableToolNames ? categorizeTools(availableToolNames) : [];
-  const skills = availableSkills ?? [];
-  const categories = availableCategories ?? [];
-  const agents = availableAgents ?? [];
-
-  if (isGpt5_4Model(model)) {
-    const prompt = buildGpt54SisyphusPrompt(
-      model,
-      agents,
-      tools,
-      skills,
-      categories,
-      useTaskSystem,
-    );
-    return {
-      description:
-        "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
-      mode: MODE,
-      model,
-      maxTokens: 64000,
-      prompt,
-      color: "#00CED1",
-      permission: {
-        question: "allow",
-        call_omo_agent: "deny",
-      } as AgentConfig["permission"],
-      reasoningEffort: "medium",
-    };
-  }
-
-  let prompt = buildDynamicSisyphusPrompt(
-    model,
-    agents,
-    tools,
-    skills,
-    categories,
-    useTaskSystem,
-  );
-
-  if (isGeminiModel(model)) {
-    // 1. Intent gate + tool mandate — early in prompt (after intent verbalization)
-    prompt = prompt.replace(
-      "</intent_verbalization>",
-      `</intent_verbalization>\n\n${buildGeminiIntentGateEnforcement()}\n\n${buildGeminiToolMandate()}`
-    );
-
-    // 2. Tool guide + examples — after tool_usage_rules (where tools are discussed)
-    prompt = prompt.replace(
-      "</tool_usage_rules>",
-      `</tool_usage_rules>\n\n${buildGeminiToolGuide()}\n\n${buildGeminiToolCallExamples()}`
-    );
-
-    // 3. Delegation + verification overrides — before Constraints (NOT at prompt end)
-    //    Gemini suffers from lost-in-the-middle: content at prompt end gets weaker attention.
-    //    Placing these before <Constraints> ensures they're in a high-attention zone.
-    prompt = prompt.replace(
-      "<Constraints>",
-      `${buildGeminiDelegationOverride()}\n\n${buildGeminiVerificationOverride()}\n\n<Constraints>`
-    );
-  }
-
-  const permission = {
-    question: "allow",
-    call_omo_agent: "deny",
-  } as AgentConfig["permission"];
-  const base = {
-    description:
-      "Powerful AI orchestrator. Plans obsessively with todos, assesses search complexity before exploration, delegates strategically via category+skills combinations. Uses explore for internal code (parallel-friendly), librarian for external docs. (Sisyphus - OhMyOpenCode)",
-    mode: MODE,
-    model,
-    maxTokens: 64000,
-    prompt,
-    color: "#00CED1",
-    permission,
-  };
-
-  if (isGptModel(model)) {
-    return { ...base, reasoningEffort: "medium" };
-  }
-
-  return { ...base, thinking: { type: "enabled", budgetTokens: 32000 } };
-}
-createSisyphusAgent.mode = MODE;
+export { categorizeTools };

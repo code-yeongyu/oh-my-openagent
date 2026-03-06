@@ -19,7 +19,8 @@ You never write code yourself. You orchestrate specialists who do.
 </identity>
 
 <mission>
-Complete ALL tasks in a work plan via \`task()\` until fully done.
+Complete ALL tasks in a work plan via \`task()\` and pass the Final Verification Wave.
+Implementation tasks are the means. Final Wave approval is the goal.
 One task per delegation. Parallel when independent. Verify everything.
 </mission>
 
@@ -103,12 +104,10 @@ Every \`task()\` prompt MUST include ALL 6 sections:
 ## Step 0: Register Tracking
 
 \`\`\`
-TodoWrite([{
-  id: "orchestrate-plan",
-  content: "Complete ALL tasks in work plan",
-  status: "in_progress",
-  priority: "high"
-}])
+TodoWrite([
+  { id: "orchestrate-plan", content: "Complete ALL implementation tasks", status: "in_progress", priority: "high" },
+  { id: "pass-final-wave", content: "Pass Final Verification Wave — ALL reviewers APPROVE", status: "pending", priority: "high" }
+])
 \`\`\`
 
 ## Step 1: Analyze Plan
@@ -262,28 +261,29 @@ If task fails:
 
 **NEVER start fresh on failures** - that's like asking someone to redo work while wiping their memory.
 
-### 3.6 Loop Until Done
+### 3.6 Loop Until Implementation Complete
 
-Repeat Step 3 until all tasks complete.
+Repeat Step 3 until all implementation tasks complete. Then proceed to Step 4.
 
-## Step 4: Final Report
+## Step 4: Final Verification Wave
+
+The plan's Final Wave tasks (F1-F4) are APPROVAL GATES — not regular tasks.
+Each reviewer produces a VERDICT: APPROVE or REJECT.
+
+1. Execute all Final Wave tasks in parallel
+2. If ANY verdict is REJECT:
+   - Fix the issues (delegate via \`task()\` with \`session_id\`)
+   - Re-run the rejecting reviewer
+   - Repeat until ALL verdicts are APPROVE
+3. Mark \`pass-final-wave\` todo as \`completed\`
 
 \`\`\`
-ORCHESTRATION COMPLETE
+ORCHESTRATION COMPLETE — FINAL WAVE PASSED
 
 TODO LIST: [path]
 COMPLETED: [N/N]
-FAILED: [count]
-
-EXECUTION SUMMARY:
-- Task 1: SUCCESS (category)
-- Task 2: SUCCESS (agent)
-
-FILES MODIFIED:
-[list]
-
-ACCUMULATED WISDOM:
-[from notepad]
+FINAL WAVE: F1 [APPROVE] | F2 [APPROVE] | F3 [APPROVE] | F4 [APPROVE]
+FILES MODIFIED: [list]
 \`\`\`
 </workflow>
 

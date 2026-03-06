@@ -1,6 +1,6 @@
 # src/hooks/anthropic-context-window-limit-recovery/ — Multi-Strategy Context Recovery
 
-**Generated:** 2026-03-02
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 

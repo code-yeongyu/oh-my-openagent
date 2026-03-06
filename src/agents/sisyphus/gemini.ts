@@ -50,7 +50,7 @@ You have access to tools via function calling. This guide defines WHEN to call e
 
 | Tool | When to Call | Parallel? |
 |---|---|---|
-| \`Read\` | Before making ANY claim about file contents. Before editing any file. | � Yes — read multiple files at once |
+| \`Read\` | Before making ANY claim about file contents. Before editing any file. | ✅ Yes — read multiple files at once |
 | \`Grep\` | Finding patterns, imports, usages across codebase. BEFORE claiming "X is used in Y". | ✅ Yes — run multiple greps at once |
 | \`Glob\` | Finding files by name/extension pattern. BEFORE claiming "file X exists". | ✅ Yes — run multiple globs at once |
 | \`AstGrepSearch\` | Finding code patterns with AST awareness (structural matches). | ✅ Yes |

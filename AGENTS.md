@@ -1,10 +1,10 @@
-# PROJECT KNOWLEDGE BASE
+# oh-my-opencode — O P E N C O D E Plugin
 
-**Generated:** 2026-03-02 | **Commit:** 1c2caa09 | **Branch:** dev
+**Generated:** 2026-03-06 | **Commit:** 7fe44024 | **Branch:** dev
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 46 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1243 TypeScript files, 155k LOC.
+OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 46 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1268 TypeScript files, 160k LOC.
 
 ## STRUCTURE
 
@@ -43,6 +43,21 @@ OhMyOpenCodePlugin(ctx)
  10. Return plugin with experimental.session.compacting
 ```
 
+## 8 OPENCODE HOOK HANDLERS
+
+| Handler | Purpose |
+|---------|---------|
+| `config` | 6-phase: provider → plugin-components → agents → tools → MCPs → commands |
+| `tool` | 26 registered tools |
+| `chat.message` | First-message variant, session setup, keyword detection |
+| `chat.params` | Anthropic effort level adjustment |
+| `chat.headers` | Copilot x-initiator header injection |
+| `event` | Session lifecycle (created, deleted, idle, error) |
+| `tool.execute.before` | Pre-tool hooks (file guard, label truncator, rules injector) |
+| `tool.execute.after` | Post-tool hooks (output truncation, metadata store) |
+| `experimental.chat.messages.transform` | Context injection, thinking block validation |
+
+
 ## WHERE TO LOOK
 
 | Task | Location | Notes |
@@ -69,130 +84,77 @@ OhMyOpenCodePlugin(ctx)
 2. **GREEN**: Implement minimum → PASS
 3. **REFACTOR**: Clean up → stay GREEN
 
-**Rules:**
-- NEVER write implementation before test
-- NEVER delete failing tests — fix the code
-- Test file: `*.test.ts` alongside source (176 test files)
-- BDD comments: `//#given`, `//#when`, `//#then`
+- `agents`, `categories`, `claude_code`: deep merged recursively
+- `disabled_*` arrays: Set union (concatenated + deduplicated)
+- All other fields: override replaces base value
+- Zod `safeParse()` fills defaults for omitted fields
+- `migrateConfigFile()` transforms legacy keys automatically
+
+Fields: agents (14 overridable, 21 fields each), categories (8 built-in + custom), disabled_* arrays (agents, hooks, mcps, skills, commands, tools), 19 feature-specific configs.
+
+## THREE-TIER MCP SYSTEM
+
+| Tier | Source | Mechanism |
+|------|--------|-----------|
+| Built-in | `src/mcp/` | 3 remote HTTP: websearch (Exa/Tavily), context7, grep_app |
+| Claude Code | `.mcp.json` | `${VAR}` env expansion via claude-code-mcp-loader |
+| Skill-embedded | SKILL.md YAML | Managed by SkillMcpManager (stdio + HTTP) |
 
 ## CONVENTIONS
 
-- **Package manager**: Bun only (`bun run`, `bun build`, `bunx`)
-- **Types**: bun-types (NEVER @types/node)
-- **Build**: `bun build` (ESM) + `tsc --emitDeclarationOnly`
-- **Exports**: Barrel pattern via index.ts
-- **Naming**: kebab-case dirs, `createXXXHook`/`createXXXTool` factories
-- **Testing**: BDD comments, 176 test files, 1130 TypeScript files
-- **Temperature**: 0.1 for code agents, max 0.3
-- **Modular architecture**: 200 LOC hard limit per file (prompt strings exempt)
+- **Runtime**: Bun only — never use npm/yarn
+- **TypeScript**: strict mode, ESNext, bundler moduleResolution, `bun-types` (never `@types/node`)
+- **Test pattern**: Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style (nested describe with `#given`/`#when`/`#then` prefixes)
+- **CI test split**: mock-heavy tests run in isolation (separate `bun test` processes), rest in batch
+- **Factory pattern**: `createXXX()` for all tools, hooks, agents
+- **Hook tiers**: Session (23) → Tool-Guard (10) → Transform (4) → Continuation (7) → Skill (2)
+- **Agent modes**: `primary` (respects UI model) vs `subagent` (own fallback chain) vs `all`
+- **Model resolution**: 4-step: override → category-default → provider-fallback → system-default
+- **Config format**: JSONC with comments, Zod v4 validation, snake_case keys
+- **File naming**: kebab-case for all files/directories
+- **Module structure**: index.ts barrel exports, no catch-all files (utils.ts, helpers.ts banned), 200 LOC soft limit
+- **Imports**: relative within module, barrel imports across modules (`import { log } from "./shared"`)
+- **No path aliases**: no `@/` — relative imports only
 
 ## ANTI-PATTERNS
 
-| Category | Forbidden |
-|----------|-----------|
-| Package Manager | npm, yarn — Bun exclusively |
-| Types | @types/node — use bun-types |
-| File Ops | mkdir/touch/rm/cp/mv in code — use bash tool |
-| Publishing | Direct `bun publish` — GitHub Actions only |
-| Versioning | Local version bump — CI manages |
-| Type Safety | `as any`, `@ts-ignore`, `@ts-expect-error` |
-| Error Handling | Empty catch blocks |
-| Testing | Deleting failing tests, writing implementation before test |
-| Agent Calls | Sequential — use `task` parallel |
-| Hook Logic | Heavy PreToolUse — slows every call |
-| Commits | Giant (3+ files), separate test from impl |
-| Temperature | >0.3 for code agents |
-| Trust | Agent self-reports — ALWAYS verify |
-| Git | `git add -i`, `git rebase -i` (no interactive input) |
-| Git | Skip hooks (--no-verify), force push without request |
-| Bash | `sleep N` — use conditional waits |
-| Bash | `cd dir && cmd` — use workdir parameter |
-| Files | Catch-all utils.ts/helpers.ts — name by purpose |
-
-## AGENT MODELS
-
-| Agent | Model | Temp | Purpose |
-|-------|-------|------|---------|
-| Sisyphus | anthropic/claude-opus-4-6 | 0.1 | Primary orchestrator (fallback: kimi-k2.5 → glm-4.7 → gpt-5.3-codex → gemini-3-pro) |
-| Hephaestus | openai/gpt-5.3-codex | 0.1 | Autonomous deep worker (NO fallback) |
-| Atlas | anthropic/claude-sonnet-4-5 | 0.1 | Master orchestrator (fallback: kimi-k2.5 → gpt-5.2) |
-| Prometheus | anthropic/claude-opus-4-6 | 0.1 | Strategic planning (fallback: kimi-k2.5 → gpt-5.2) |
-| oracle | openai/gpt-5.2 | 0.1 | Consultation, debugging (fallback: claude-opus-4-6) |
-| librarian | zai-coding-plan/glm-4.7 | 0.1 | Docs, GitHub search (fallback: glm-4.7-free) |
-| explore | xai/grok-code-fast-1 | 0.1 | Fast codebase grep (fallback: claude-haiku-4-5 → gpt-5-mini → gpt-5-nano) |
-| multimodal-looker | google/gemini-3-flash | 0.1 | PDF/image analysis |
-| Metis | anthropic/claude-opus-4-6 | 0.3 | Pre-planning analysis (fallback: kimi-k2.5 → gpt-5.2) |
-| Momus | openai/gpt-5.2 | 0.1 | Plan validation (fallback: claude-opus-4-6) |
-| Coeus | anthropic/claude-opus-4-6 | 0.1 | Recursive divide-and-conquer planner (fallback: kimi-k2.5 → gpt-5.2 → gemini-3-pro) |
-| Sub-Prometheus | anthropic/claude-sonnet-4-5 | 0.1 | Domain-specific sub-planner spawned by Coeus |
-| Sisyphus-Junior | anthropic/claude-sonnet-4-5 | 0.1 | Category-spawned executor |
-
-## BUILTIN COMMANDS
-
-| Command | Agent | Purpose |
-|---------|-------|---------|
-| `/init-deep` | — | Auto-generate hierarchical AGENTS.md files throughout project |
-| `/ralph-loop` | — | Self-referential dev loop until completion |
-| `/ulw-loop` | — | Ultrawork loop with continuous execution |
-| `/cancel-ralph` | — | Cancel active Ralph Loop |
-| `/refactor` | — | Intelligent refactoring with LSP, AST-grep, TDD |
-| `/start-work` | atlas | Start Sisyphus work session from Prometheus plan |
-| `/stop-continuation` | — | Stop all continuation mechanisms (ralph loop, todo, boulder) |
-| `/handoff` | — | Create detailed context summary for new session |
-| `/coeus` | coeus | Deep research planning with knowledge verification |
-
-## OPENCODE PLUGIN API
-
-Plugin SDK from `@opencode-ai/plugin`. Plugin = `async (PluginInput) => Hooks`.
-
-| Hook | Purpose |
-|------|---------|
-| `tool` | Register custom tools (Record<string, ToolDefinition>) |
-| `chat.message` | Intercept user messages (can modify parts) |
-| `chat.params` | Modify LLM parameters (temperature, topP, options) |
-| `tool.execute.before` | Pre-tool interception (can modify args) |
-| `tool.execute.after` | Post-tool processing (can modify output) |
-| `event` | Session lifecycle events (session.created, session.stop, etc.) |
-| `config` | Config modification (register agents, MCPs, commands) |
-| `experimental.chat.messages.transform` | Transform message history |
-| `experimental.session.compacting` | Session compaction customization |
-
-## DEPENDENCIES
-
-| Package | Purpose |
-|---------|---------|
-| `@opencode-ai/plugin` + `sdk` | OpenCode integration SDK |
-| `@ast-grep/cli` + `napi` | AST pattern matching (search/replace) |
-| `@code-yeongyu/comment-checker` | AI comment detection/prevention |
-| `@modelcontextprotocol/sdk` | MCP client for remote HTTP servers |
-| `@clack/prompts` | Interactive CLI TUI |
-| `commander` | CLI argument parsing |
-| `zod` (v4) | Schema validation for config |
-| `jsonc-parser` | JSONC config with comments |
-| `picocolors` | Terminal colors |
-| `picomatch` | Glob pattern matching |
-| `vscode-jsonrpc` | LSP communication |
-| `js-yaml` | YAML parsing (tasks, skills) |
-| `detect-libc` | Platform binary selection |
+- Never use `as any`, `@ts-ignore`, `@ts-expect-error`
+- Never suppress lint/type errors
+- Never add emojis to code/comments unless user explicitly asks
+- Never commit unless explicitly requested
+- Never run `bun publish` directly — use GitHub Actions
+- Never modify `package.json` version locally
+- Test: given/when/then — never use Arrange-Act-Assert comments
+- Comments: avoid AI-generated comment patterns (enforced by comment-checker hook)
+- Never create catch-all files (`utils.ts`, `helpers.ts`, `service.ts`)
+- Empty catch blocks `catch(e) {}` — always handle errors
+- Never use em dashes (—), en dashes (–), or AI filler phrases in generated content
+- index.ts is entry point ONLY — never dump business logic there
 
 ## COMMANDS
 
 ```bash
-bun run typecheck      # Type check
-bun run build          # ESM + declarations + schema
-bun run rebuild        # Clean + Build
-bun test               # 176 test files
-bun run build:schema   # Regenerate JSON schema
+bun test                    # Bun test suite
+bun run build              # Build plugin (ESM + declarations + schema)
+bun run build:all          # Build + platform binaries
+bun run rebuild            # Clean + Build
+bun run typecheck           # tsc --noEmit
+bun run build:schema       # Regenerate JSON schema
+bunx oh-my-opencode install # Interactive setup
+bunx oh-my-opencode doctor  # Health diagnostics
+bunx oh-my-opencode run     # Non-interactive session
 ```
 
 ## DEPLOYMENT
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| ci.yml | push/PR | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
-| publish.yml | manual | Version bump, npm publish, platform binaries, GitHub release, merge to dev |
-| publish-platform.yml | called | 12 platform binaries via bun compile (darwin/linux/windows) |
-| sisyphus-agent.yml | @mention | AI agent handles issues/PRs |
+| ci.yml | push/PR to master/dev | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
+| publish.yml | manual dispatch | Version bump, npm publish, platform binaries, GitHub release, merge to master |
+| publish-platform.yml | called by publish | 12 platform binaries via bun compile (darwin/linux/windows) |
+| sisyphus-agent.yml | @mention / dispatch | AI agent handles issues/PRs |
+| cla.yml | issue_comment/PR | CLA assistant for contributors |
+| lint-workflows.yml | push to .github/ | actionlint + shellcheck on workflow files |
 
 ## COMPLEXITY HOTSPOTS
 
@@ -227,9 +189,14 @@ Three-tier system:
 
 ## NOTES
 
-- **OpenCode**: Requires >= 1.0.150
-- **1130 TypeScript files**, 176 test files, 127k+ lines
-- **Flaky tests**: ralph-loop (CI timeout), session-state (parallel pollution)
-- **Trusted deps**: @ast-grep/cli, @ast-grep/napi, @code-yeongyu/comment-checker
+- Logger writes to `/tmp/oh-my-opencode.log` — check there for debugging
+- Background tasks: 5 concurrent per model/provider (configurable)
+- Plugin load timeout: 10s for Claude Code plugins
+- Model fallback priority: Claude > OpenAI > Gemini > Copilot > OpenCode Zen > Z.ai > Kimi
+- Config migration runs automatically on legacy keys (agent names, hook names, model versions)
+- Build: bun build (ESM) + tsc --emitDeclarationOnly, externals: @ast-grep/napi
+- Test setup: `test-setup.ts` preloaded via bunfig.toml, mock-heavy tests run in isolation in CI
+- 98 barrel export files (index.ts) establish module boundaries
+- Architecture rules enforced via `.sisyphus/rules/modular-code-enforcement.md`
 - **No linter/formatter**: No ESLint, Prettier, or Biome configured
 - **License**: SUL-1.0 (Sisyphus Use License)
