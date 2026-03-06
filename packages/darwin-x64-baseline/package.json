@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode-darwin-x64-baseline",
-  "version": "3.10.0",
+  "version": "3.10.1",
   "description": "Platform-specific binary for oh-my-opencode (darwin-x64-baseline, no AVX2)",
   "license": "MIT",
   "repository": {
