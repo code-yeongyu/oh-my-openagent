@@ -104,7 +104,7 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_3",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.2" },
+      model: { providerID: "openai", modelID: "gpt-5.4" },
     }, output)
 
     // then - no toast
@@ -126,7 +126,7 @@ describe("no-sisyphus-gpt hook", () => {
     // when - chat.message runs without input.agent
     await hook["chat.message"]?.({
       sessionID: "ses_4",
-      model: { providerID: "openai", modelID: "gpt-5.2" },
+      model: { providerID: "openai", modelID: "gpt-4o" },
     }, output)
 
     // then - toast shown via session-agent fallback

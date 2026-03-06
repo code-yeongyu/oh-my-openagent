@@ -182,7 +182,7 @@ You can override specific agents or categories in your config:
     "explore": { "model": "github-copilot/grok-code-fast-1" },
 
     // Architecture consultation: GPT or Claude Opus
-    "oracle": { "model": "openai/gpt-5.2", "variant": "high" },
+    "oracle": { "model": "openai/gpt-5.4", "variant": "high" },
   },
 
   "categories": {
@@ -215,7 +215,7 @@ You can override specific agents or categories in your config:
 **GPT models** (explicit reasoning, principle-driven):
 
 - GPT-5.3-codex — deep coding powerhouse, required for Hephaestus
-- GPT-5.2 — high intelligence, default for Oracle
+- GPT-5.4 — high intelligence, default for Oracle
 - GPT-5-Nano — ultra-cheap, fast utility tasks
 
 **Different-behavior models**:

@@ -36,7 +36,7 @@ describe("resolveAgentVariant", () => {
         sisyphus: { category: "ultrabrain" },
       },
       categories: {
-        ultrabrain: { model: "openai/gpt-5.2", variant: "xhigh" },
+        ultrabrain: { model: "openai/gpt-5.4", variant: "xhigh" },
       },
     } as OhMyOpenCodeConfig
 
@@ -127,7 +127,7 @@ describe("resolveVariantForModel", () => {
   test("returns undefined for provider not in sisyphus chain", () => {
     // #given openai is not in sisyphus fallback chain anymore
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.2" }
+    const model = { providerID: "openai", modelID: "gpt-5.4" }
 
     // when
     const variant = resolveVariantForModel(config, "sisyphus", model)
@@ -191,7 +191,7 @@ describe("resolveVariantForModel", () => {
   test("returns correct variant for oracle agent with openai", () => {
     // given
     const config = {} as OhMyOpenCodeConfig
-    const model = { providerID: "openai", modelID: "gpt-5.2" }
+    const model = { providerID: "openai", modelID: "gpt-5.4" }
 
     // when
     const variant = resolveVariantForModel(config, "oracle", model)

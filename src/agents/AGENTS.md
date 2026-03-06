@@ -11,12 +11,12 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | Agent | Model | Temp | Mode | Fallback Chain | Purpose |
 |-------|-------|------|------|----------------|---------|
 | **Sisyphus** | claude-opus-4-6 max | 0.1 | all | glm-5 → big-pickle | Main orchestrator, plans + delegates |
-| **Hephaestus** | gpt-5.3-codex medium | 0.1 | all | gpt-5.2 medium (copilot) | Autonomous deep worker |
-| **Oracle** | gpt-5.2 high | 0.1 | subagent | gemini-3.1-pro high → claude-opus-4-6 max | Read-only consultation |
+| **Hephaestus** | gpt-5.3-codex medium | 0.1 | all | gpt-5.4 medium (copilot) | Autonomous deep worker |
+| **Oracle** | gpt-5.4 high | 0.1 | subagent | gemini-3.1-pro high → claude-opus-4-6 max | Read-only consultation |
 | **Librarian** | gemini-3-flash | 0.1 | subagent | minimax-m2.5-free → big-pickle | External docs/code search |
 | **Explore** | grok-code-fast-1 | 0.1 | subagent | minimax-m2.5-free → claude-haiku-4-5 → gpt-5-nano | Contextual grep |
 | **Multimodal-Looker** | gpt-5.3-codex medium | 0.1 | subagent | k2p5 → gemini-3-flash → glm-4.6v → gpt-5-nano | PDF/image analysis |
-| **Metis** | claude-opus-4-6 max | **0.3** | subagent | gpt-5.2 high → gemini-3.1-pro high | Pre-planning consultant |
+| **Metis** | claude-opus-4-6 max | **0.3** | subagent | gpt-5.4 high → gemini-3.1-pro high | Pre-planning consultant |
 | **Momus** | gpt-5.4 xhigh | 0.1 | subagent | claude-opus-4-6 max → gemini-3.1-pro high | Plan reviewer |
 | **Atlas** | claude-sonnet-4-6 | 0.1 | primary | gpt-5.4 medium | Todo-list orchestrator |
 | **Prometheus** | claude-opus-4-6 max | 0.1 | — | gpt-5.4 high → gemini-3.1-pro | Strategic planner (internal) |

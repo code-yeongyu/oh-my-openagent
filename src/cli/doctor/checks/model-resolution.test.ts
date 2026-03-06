@@ -61,7 +61,7 @@ describe("model-resolution check", () => {
       // given: User has override for visual-engineering category
       const mockConfig = {
         categories: {
-          "visual-engineering": { model: "openai/gpt-5.2" },
+          "visual-engineering": { model: "openai/gpt-5.4" },
         },
       }
 
@@ -70,8 +70,8 @@ describe("model-resolution check", () => {
       // then: visual-engineering should show the override
       const visual = info.categories.find((c) => c.name === "visual-engineering")
       expect(visual).toBeDefined()
-      expect(visual!.userOverride).toBe("openai/gpt-5.2")
-      expect(visual!.effectiveResolution).toBe("User override: openai/gpt-5.2")
+      expect(visual!.userOverride).toBe("openai/gpt-5.4")
+      expect(visual!.effectiveResolution).toBe("User override: openai/gpt-5.4")
     })
 
     it("shows provider fallback when no override exists", async () => {
@@ -96,7 +96,7 @@ describe("model-resolution check", () => {
       //#given User has model with variant override for oracle agent
       const mockConfig = {
         agents: {
-          oracle: { model: "openai/gpt-5.2", variant: "xhigh" },
+          oracle: { model: "openai/gpt-5.4", variant: "xhigh" },
         },
       }
 
@@ -106,7 +106,7 @@ describe("model-resolution check", () => {
       //#then Oracle should have userVariant set
       const oracle = info.agents.find((a) => a.name === "oracle")
       expect(oracle).toBeDefined()
-      expect(oracle!.userOverride).toBe("openai/gpt-5.2")
+      expect(oracle!.userOverride).toBe("openai/gpt-5.4")
       expect(oracle!.userVariant).toBe("xhigh")
     })
 

@@ -252,7 +252,7 @@ describe("generateOmoConfig - model fallback system", () => {
     // #then Sisyphus is omitted (requires all fallback providers)
     expect((result.agents as Record<string, { model: string }>).sisyphus).toBeUndefined()
     // #then Oracle should use native OpenAI (first fallback entry)
-    expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("openai/gpt-5.2")
+    expect((result.agents as Record<string, { model: string }>).oracle.model).toBe("openai/gpt-5.4")
     // #then multimodal-looker should use native OpenAI (first fallback entry is gpt-5.3-codex)
     expect((result.agents as Record<string, { model: string }>)["multimodal-looker"].model).toBe("openai/gpt-5.3-codex")
   })

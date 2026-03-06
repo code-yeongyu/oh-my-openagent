@@ -12,9 +12,9 @@ describe("isGpt5_4Model", () => {
 
   test("does not match other GPT models", () => {
     expect(isGpt5_4Model("openai/gpt-5.3-codex")).toBe(false);
-    expect(isGpt5_4Model("openai/gpt-5.2")).toBe(false);
+    expect(isGpt5_4Model("openai/gpt-5.1")).toBe(false);
     expect(isGpt5_4Model("openai/gpt-4o")).toBe(false);
-    expect(isGpt5_4Model("github-copilot/gpt-5.2")).toBe(false);
+    expect(isGpt5_4Model("github-copilot/gpt-4o")).toBe(false);
   });
 
   test("does not match non-GPT models", () => {
@@ -26,7 +26,7 @@ describe("isGpt5_4Model", () => {
 
 describe("isGptModel", () => {
   test("standard openai provider gpt models", () => {
-    expect(isGptModel("openai/gpt-5.2")).toBe(true);
+    expect(isGptModel("openai/gpt-5.4")).toBe(true);
     expect(isGptModel("openai/gpt-4o")).toBe(true);
   });
 
@@ -39,22 +39,22 @@ describe("isGptModel", () => {
   });
 
   test("github copilot gpt models", () => {
-    expect(isGptModel("github-copilot/gpt-5.2")).toBe(true);
+    expect(isGptModel("github-copilot/gpt-5.4")).toBe(true);
     expect(isGptModel("github-copilot/gpt-4o")).toBe(true);
   });
 
   test("litellm proxied gpt models", () => {
-    expect(isGptModel("litellm/gpt-5.2")).toBe(true);
+    expect(isGptModel("litellm/gpt-5.4")).toBe(true);
     expect(isGptModel("litellm/gpt-4o")).toBe(true);
   });
 
   test("other proxied gpt models", () => {
     expect(isGptModel("ollama/gpt-4o")).toBe(true);
-    expect(isGptModel("custom-provider/gpt-5.2")).toBe(true);
+    expect(isGptModel("custom-provider/gpt-5.4")).toBe(true);
   });
 
   test("venice provider gpt models", () => {
-    expect(isGptModel("venice/gpt-5.2")).toBe(true);
+    expect(isGptModel("venice/gpt-5.4")).toBe(true);
     expect(isGptModel("venice/gpt-4o")).toBe(true);
   });
 
@@ -108,7 +108,7 @@ describe("isGeminiModel", () => {
   });
 
   test("#given gpt models #then returns false", () => {
-    expect(isGeminiModel("openai/gpt-5.2")).toBe(false);
+    expect(isGeminiModel("openai/gpt-5.4")).toBe(false);
     expect(isGeminiModel("openai/o3-mini")).toBe(false);
     expect(isGeminiModel("litellm/gpt-4o")).toBe(false);
   });
