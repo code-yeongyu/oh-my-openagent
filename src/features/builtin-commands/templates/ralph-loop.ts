@@ -35,7 +35,7 @@ export const ULW_LOOP_TEMPLATE = `You are starting an ULTRAWORK Loop - a self-re
 1. You will work on the task continuously
 2. When you believe the work is complete, output: \`<promise>{{COMPLETION_PROMISE}}</promise>\`
 3. That does NOT finish the loop yet. The system will require Oracle verification
-4. The loop only ends after Oracle verifies the result with \`<promise>VERIFIED</promise>\`
+4. The loop only ends after the system confirms Oracle verified the result
 5. There is no iteration limit
 
 ## Rules
@@ -46,7 +46,7 @@ export const ULW_LOOP_TEMPLATE = `You are starting an ULTRAWORK Loop - a self-re
 
 ## Exit Conditions
 
-1. **Verified Completion**: Oracle returns \`<promise>VERIFIED</promise>\`
+1. **Verified Completion**: Oracle verifies the result and the system confirms it
 2. **Cancel**: User runs \`/cancel-ralph\`
 
 ## Your Task

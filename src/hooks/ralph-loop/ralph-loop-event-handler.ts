@@ -21,6 +21,7 @@ type LoopStateController = {
 	incrementIteration: () => RalphLoopState | null
 	setSessionID: (sessionID: string) => RalphLoopState | null
 	markVerificationPending: (sessionID: string) => RalphLoopState | null
+	setVerificationSessionID: (sessionID: string, verificationSessionID: string) => RalphLoopState | null
 }
 type RalphLoopEventHandlerOptions = { directory: string; apiTimeoutMs: number; getTranscriptPath: (sessionID: string) => string | undefined; checkSessionExists?: RalphLoopOptions["checkSessionExists"]; sessionRecovery: SessionRecovery; loopState: LoopStateController }
 
@@ -78,14 +79,30 @@ export function createRalphLoopEventHandler(
 					return
 				}
 
-				const transcriptPath = options.getTranscriptPath(sessionID)
-				const completionViaTranscript = detectCompletionInTranscript(
-					transcriptPath,
-					state.completion_promise,
-					state.started_at,
-				)
+				const verificationSessionID = state.verification_pending
+					? state.verification_session_id
+					: undefined
+				const completionSessionID = verificationSessionID ?? (state.verification_pending ? undefined : sessionID)
+				const transcriptPath = completionSessionID ? options.getTranscriptPath(completionSessionID) : undefined
+				const completionViaTranscript = completionSessionID
+					? detectCompletionInTranscript(
+						transcriptPath,
+						state.completion_promise,
+						state.started_at,
+					)
+					: false
 				const completionViaApi = completionViaTranscript
 					? false
+					: verificationSessionID
+						? await detectCompletionInSessionMessages(ctx, {
+							sessionID: verificationSessionID,
+							promise: state.completion_promise,
+							apiTimeoutMs: options.apiTimeoutMs,
+							directory: options.directory,
+							sinceMessageIndex: undefined,
+						})
+					: state.verification_pending
+						? false
 					: await detectCompletionInSessionMessages(ctx, {
 						sessionID,
 						promise: state.completion_promise,

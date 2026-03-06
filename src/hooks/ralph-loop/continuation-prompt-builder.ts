@@ -25,7 +25,7 @@ You already emitted <promise>{{INITIAL_PROMISE}}</promise>. This does NOT finish
 REQUIRED NOW:
 - Call Oracle using task(subagent_type="oracle", load_skills=[], run_in_background=false, ...)
 - Ask Oracle to verify whether the original task is actually complete
-- The loop only finishes when Oracle returns <promise>{{PROMISE}}</promise>
+- The system will inspect the Oracle session directly for the verification result
 - If Oracle does not verify, continue fixing the task and do not consider it complete
 
 Original task:
