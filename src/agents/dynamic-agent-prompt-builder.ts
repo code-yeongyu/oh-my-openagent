@@ -247,7 +247,34 @@ task(
 **ANTI-PATTERN (will produce poor results):**
 \`\`\`typescript
 task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
-\`\`\``
+\`\`\`
+
+---
+
+### Category Domain Matching (ZERO TOLERANCE)
+
+Every delegation MUST use the category that matches the task's domain. Mismatched categories produce measurably worse output because each category runs on a model optimized for that specific domain.
+
+**VISUAL WORK = ALWAYS \`visual-engineering\`. NO EXCEPTIONS.**
+
+Any task involving UI, UX, CSS, styling, layout, animation, design, or frontend components MUST go to \`visual-engineering\`. Never delegate visual work to \`quick\`, \`unspecified-*\`, or any other category.
+
+\`\`\`typescript
+// CORRECT: Visual work → visual-engineering category
+task(category="visual-engineering", load_skills=["frontend-ui-ux"], prompt="Redesign the sidebar layout with new spacing...")
+
+// WRONG: Visual work in wrong category — WILL PRODUCE INFERIOR RESULTS
+task(category="quick", load_skills=[], prompt="Redesign the sidebar layout with new spacing...")
+\`\`\`
+
+| Task Domain | MUST Use Category |
+|---|---|
+| UI, styling, animations, layout, design | \`visual-engineering\` |
+| Hard logic, architecture decisions, algorithms | \`ultrabrain\` |
+| Autonomous research + end-to-end implementation | \`deep\` |
+| Single-file typo, trivial config change | \`quick\` |
+
+**When in doubt about category, it is almost never \`quick\` or \`unspecified-*\`. Match the domain.**`
 }
 
 export function buildOracleSection(agents: AvailableAgent[]): string {
