@@ -2,11 +2,11 @@ import { normalizeModelID } from "../../shared/model-normalization"
 
 const ANTHROPIC_PREFIX = "anthropic/"
 
-const CLAUDE_CODE_ALIAS_MAP: Record<string, string> = {
-  sonnet: `${ANTHROPIC_PREFIX}claude-sonnet-4-6`,
-  opus: `${ANTHROPIC_PREFIX}claude-opus-4-6`,
-  haiku: `${ANTHROPIC_PREFIX}claude-haiku-4-5`,
-}
+const CLAUDE_CODE_ALIAS_MAP = new Map<string, string>([
+  ["sonnet", `${ANTHROPIC_PREFIX}claude-sonnet-4-6`],
+  ["opus", `${ANTHROPIC_PREFIX}claude-opus-4-6`],
+  ["haiku", `${ANTHROPIC_PREFIX}claude-haiku-4-5`],
+])
 
 export function mapClaudeModelToOpenCode(model: string | undefined): string | undefined {
   if (!model) return undefined
@@ -16,7 +16,7 @@ export function mapClaudeModelToOpenCode(model: string | undefined): string | un
 
   if (trimmed === "inherit") return undefined
 
-  const aliasResult = CLAUDE_CODE_ALIAS_MAP[trimmed.toLowerCase()]
+  const aliasResult = CLAUDE_CODE_ALIAS_MAP.get(trimmed.toLowerCase())
   if (aliasResult) return aliasResult
 
   if (trimmed.includes("/")) return trimmed
@@ -27,5 +27,5 @@ export function mapClaudeModelToOpenCode(model: string | undefined): string | un
     return `${ANTHROPIC_PREFIX}${normalized}`
   }
 
-  return normalized
+  return undefined
 }
