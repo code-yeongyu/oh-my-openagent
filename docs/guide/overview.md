@@ -81,12 +81,13 @@ Named after the Greek myth. He rolls the boulder every day. Never stops. Never g
 Sisyphus is your main orchestrator. He plans, delegates to specialists, and drives tasks to completion with aggressive parallel execution. He doesn't stop halfway. He doesn't get distracted. He finishes.
 
 **Recommended models:**
+
 - **Claude Opus 4.6** — Best overall experience. Sisyphus was built with Claude-optimized prompts.
 - **Claude Sonnet 4.6** — Good balance of capability and cost.
 - **Kimi K2.5** — Great Claude-like alternative. Many users run this combo exclusively.
 - **GLM 5** — Solid option, especially via Z.ai.
 
-Sisyphus has Claude-optimized prompts. No GPT prompt exists for Sisyphus. Claude-family models work best because that's what the prompts were engineered for.
+Sisyphus still works best on Claude-family models, Kimi, and GLM. GPT-5.4 now has a dedicated prompt path, but older GPT models are still a poor fit and should route to Hephaestus instead.
 
 ### Hephaestus: The Legitimate Craftsman
 
@@ -173,43 +174,52 @@ You can override specific agents or categories in your config:
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
     "sisyphus": {
       "model": "kimi-for-coding/k2p5",
-      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" }
+      "ultrawork": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
     },
 
     // Research agents: cheaper models are fine
-    "librarian": { "model": "zai-coding-plan/glm-4.7" },
+    "librarian": { "model": "google/gemini-3-flash" },
     "explore": { "model": "github-copilot/grok-code-fast-1" },
 
     // Architecture consultation: GPT or Claude Opus
-    "oracle": { "model": "openai/gpt-5.2", "variant": "high" }
+    "oracle": { "model": "openai/gpt-5.2", "variant": "high" },
   },
 
   "categories": {
     // Frontend work: Gemini dominates visual tasks
-    "visual-engineering": { "model": "google/gemini-3-pro", "variant": "high" },
+    "visual-engineering": {
+      "model": "google/gemini-3.1-pro",
+      "variant": "high",
+    },
+
+    // General high-effort work
+    "unspecified-high": { "model": "openai/gpt-5.4", "variant": "high" },
 
     // Quick tasks: use the cheapest models
     "quick": { "model": "anthropic/claude-haiku-4-5" },
 
     // Deep reasoning: GPT-5.3-codex
-    "ultrabrain": { "model": "openai/gpt-5.3-codex", "variant": "xhigh" }
-  }
+    "ultrabrain": { "model": "openai/gpt-5.3-codex", "variant": "xhigh" },
+  },
 }
 ```
 
 ### Model Families
 
 **Claude-like models** (instruction-following, structured output):
+
 - Claude Opus 4.6, Claude Sonnet 4.6, Claude Haiku 4.5
 - Kimi K2.5 — behaves very similarly to Claude
 - GLM 5 — Claude-like behavior, good for broad tasks
 
 **GPT models** (explicit reasoning, principle-driven):
+
 - GPT-5.3-codex — deep coding powerhouse, required for Hephaestus
 - GPT-5.2 — high intelligence, default for Oracle
 - GPT-5-Nano — ultra-cheap, fast utility tasks
 
 **Different-behavior models**:
+
 - Gemini 3 Pro — excels at visual/frontend tasks
 - MiniMax M2.5 — fast and smart for utility tasks
 - Grok Code Fast 1 — optimized for code grep/search
