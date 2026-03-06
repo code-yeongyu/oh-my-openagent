@@ -103,6 +103,128 @@ describe("ulw-loop verification", () => {
 		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP COMPLETE!")).toBe(true)
 	})
 
+	test("#given ulw loop is awaiting verification #when oracle session idles with VERIFIED #then loop completes without parent idle", async () => {
+		const hook = createRalphLoopHook(createMockPluginInput(), {
+			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+		writeState(testDir, {
+			...hook.getState()!,
+			verification_session_id: "ses-oracle",
+		})
+		writeFileSync(
+			oracleTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: `verified <promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>` } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "ses-oracle" } } })
+
+		expect(hook.getState()).toBeNull()
+		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP COMPLETE!")).toBe(true)
+	})
+
+	test("#given ulw loop is awaiting verification without oracle session #when idle fires again #then loop waits instead of continuing", async () => {
+		const hook = createRalphLoopHook(createMockPluginInput(), {
+			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+		const stateAfterDone = hook.getState()
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+
+		expect(hook.getState()?.iteration).toBe(stateAfterDone?.iteration)
+		expect(promptCalls).toHaveLength(1)
+		expect(hook.getState()?.verification_pending).toBe(true)
+	})
+
+	test("#given ulw loop is awaiting oracle verification #when oracle has not verified yet #then loop waits instead of continuing", async () => {
+		const hook = createRalphLoopHook(createMockPluginInput(), {
+			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+		writeState(testDir, {
+			...hook.getState()!,
+			verification_session_id: "ses-oracle",
+		})
+		writeFileSync(
+			oracleTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "still checking" } })}\n`,
+		)
+		const stateBeforeWait = hook.getState()
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+
+		expect(hook.getState()?.iteration).toBe(stateBeforeWait?.iteration)
+		expect(promptCalls).toHaveLength(1)
+		expect(hook.getState()?.verification_session_id).toBe("ses-oracle")
+	})
+
+	test("#given oracle verification fails #when oracle session idles #then main session receives retry instructions", async () => {
+		const sessionMessages: Record<string, unknown[]> = {
+			"session-123": [{}, {}, {}],
+		}
+		const hook = createRalphLoopHook({
+			...createMockPluginInput(),
+			client: {
+				...createMockPluginInput().client,
+				session: {
+					...createMockPluginInput().client.session,
+					messages: async (opts: { path: { id: string } }) => ({
+						data: sessionMessages[opts.path.id] ?? [],
+					}),
+				},
+			},
+		} as Parameters<typeof createRalphLoopHook>[0], {
+			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+		writeState(testDir, {
+			...hook.getState()!,
+			verification_session_id: "ses-oracle",
+		})
+		writeFileSync(
+			oracleTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "verification failed: missing tests" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "ses-oracle" } } })
+
+		expect(hook.getState()?.iteration).toBe(2)
+		expect(hook.getState()?.completion_promise).toBe("DONE")
+		expect(hook.getState()?.verification_pending).toBeUndefined()
+		expect(hook.getState()?.verification_session_id).toBeUndefined()
+		expect(hook.getState()?.message_count_at_start).toBe(3)
+		expect(promptCalls).toHaveLength(2)
+		expect(promptCalls[1]?.sessionID).toBe("session-123")
+		expect(promptCalls[1]?.text).toContain("Verification failed")
+		expect(promptCalls[1]?.text).toContain("Oracle does not lie")
+		expect(promptCalls[1]?.text).toContain('task(subagent_type="oracle"')
+	})
+
 	test("#given ulw loop without max iterations #when it continues #then it stays unbounded", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
