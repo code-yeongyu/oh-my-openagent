@@ -214,7 +214,7 @@ export const DEFAULT_CATEGORIES: Record<string, CategoryConfig> = {
   artistry: { model: "google/gemini-3.1-pro", variant: "high" },
   quick: { model: "anthropic/claude-haiku-4-5" },
   "unspecified-low": { model: "anthropic/claude-sonnet-4-6" },
-  "unspecified-high": { model: "anthropic/claude-opus-4-6", variant: "max" },
+  "unspecified-high": { model: "openai/gpt-5.4", variant: "high" },
   writing: { model: "kimi-for-coding/k2p5" },
 }
 
