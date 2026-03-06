@@ -2896,6 +2896,37 @@ describe("sisyphus-task", () => {
     })
   })
 
+  describe("buildTaskPrompt", () => {
+    test("appends English ULW TDD and commit guidance for plan agent", () => {
+      // given
+      const { buildTaskPrompt } = require("./tools")
+      const prompt = "Create a work plan for this feature"
+
+      // when
+      const result = buildTaskPrompt(prompt, "plan")
+
+      // then
+      expect(result).toContain(prompt)
+      expect(result).toContain("Answer in English.")
+      expect(result).toContain("Write the plan in English.")
+      expect(result).toContain("Plan well for ultrawork execution.")
+      expect(result).toContain("Use TDD-oriented planning.")
+      expect(result).toContain("Include a clear atomic commit strategy.")
+    })
+
+    test("does not append plan guidance for non-plan agents", () => {
+      // given
+      const { buildTaskPrompt } = require("./tools")
+      const prompt = "Investigate this module"
+
+      // when
+      const result = buildTaskPrompt(prompt, "explore")
+
+      // then
+      expect(result).toBe(prompt)
+    })
+  })
+
   describe("modelInfo detection via resolveCategoryConfig", () => {
     test("catalog model is used for category with catalog entry", () => {
       // given - ultrabrain has catalog entry

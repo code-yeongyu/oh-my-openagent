@@ -11,6 +11,7 @@ import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
+import { buildTaskPrompt } from "./prompt-builder"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
@@ -82,6 +83,7 @@ export async function executeSyncContinuation(
     }
 
     const allowTask = isPlanFamily(resumeAgent)
+    const effectivePrompt = buildTaskPrompt(args.prompt, resumeAgent)
     const tools = {
       ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
       task: allowTask,
@@ -97,7 +99,7 @@ export async function executeSyncContinuation(
         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
         ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
         tools,
-        parts: [{ type: "text", text: args.prompt }],
+        parts: [{ type: "text", text: effectivePrompt }],
       },
     })
    } catch (promptError) {
