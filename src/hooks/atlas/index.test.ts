@@ -1421,6 +1421,50 @@ describe("atlas hook", () => {
     })
 
     describe("delayed retry timer (abort-stuck fix)", () => {
+      const capturedTimers = new Map<number, { callback: Function; cleared: boolean }>()
+      let nextFakeId = 99000
+      const originalSetTimeout = globalThis.setTimeout
+      const originalClearTimeout = globalThis.clearTimeout
+
+      beforeEach(() => {
+        capturedTimers.clear()
+        nextFakeId = 99000
+
+        globalThis.setTimeout = ((callback: Function, delay?: number, ...args: unknown[]) => {
+          const normalized = typeof delay === "number" ? delay : 0
+          if (normalized >= 5000) {
+            const id = nextFakeId++
+            capturedTimers.set(id, { callback: () => callback(...args), cleared: false })
+            return id as unknown as ReturnType<typeof setTimeout>
+          }
+          return originalSetTimeout(callback as Parameters<typeof originalSetTimeout>[0], delay)
+        }) as unknown as typeof setTimeout
+
+        globalThis.clearTimeout = ((id?: number | ReturnType<typeof setTimeout>) => {
+          if (typeof id === "number" && capturedTimers.has(id)) {
+            capturedTimers.get(id)!.cleared = true
+            capturedTimers.delete(id)
+            return
+          }
+          originalClearTimeout(id as Parameters<typeof originalClearTimeout>[0])
+        }) as unknown as typeof clearTimeout
+      })
+
+      afterEach(() => {
+        globalThis.setTimeout = originalSetTimeout
+        globalThis.clearTimeout = originalClearTimeout
+      })
+
+      async function firePendingTimers(): Promise<void> {
+        for (const [id, entry] of capturedTimers) {
+          if (!entry.cleared) {
+            capturedTimers.delete(id)
+            await entry.callback()
+          }
+        }
+        await flushMicrotasks()
+      }
+
       test("should schedule delayed retry when cooldown blocks idle for incomplete boulder", async () => {
         // given - boulder with incomplete plan
         const planPath = join(TEST_DIR, "test-plan.md")
@@ -1445,12 +1489,10 @@ describe("atlas hook", () => {
           event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
         })
 
-        // then - wait for retry timer to fire (RETRY_DELAY_MS = 6000ms)
-        await new Promise(resolve => setTimeout(resolve, 7000))
-        await flushMicrotasks()
-
+        // then - fire pending timer and verify retry
+        await firePendingTimers()
         expect(mockInput._promptMock).toHaveBeenCalledTimes(2)
-      }, 15000)
+      })
 
       test("should not schedule duplicate retry timers for rapid idle events", async () => {
         // given - boulder with incomplete plan
@@ -1482,12 +1524,10 @@ describe("atlas hook", () => {
           event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
         })
 
-        // then - wait for retry timer, only one retry should fire
-        await new Promise(resolve => setTimeout(resolve, 7000))
-        await flushMicrotasks()
-
+        // then - only one retry fires despite multiple cooldown-blocked idles
+        await firePendingTimers()
         expect(mockInput._promptMock).toHaveBeenCalledTimes(2)
-      }, 15000)
+      })
 
       test("should not retry if plan completes before timer fires", async () => {
         // given - boulder with incomplete plan
@@ -1515,12 +1555,10 @@ describe("atlas hook", () => {
 
         writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
 
-        // then - wait for retry timer, it should bail out seeing complete plan
-        await new Promise(resolve => setTimeout(resolve, 7000))
-        await flushMicrotasks()
-
+        // then - retry sees complete plan and bails out
+        await firePendingTimers()
         expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
-      }, 15000)
+      })
 
       test("should cleanup pending retry timer on session.deleted", async () => {
         // given - boulder with incomplete plan, schedule retry timer
@@ -1550,12 +1588,10 @@ describe("atlas hook", () => {
           event: { type: "session.deleted", properties: { info: { id: MAIN_SESSION_ID } } },
         })
 
-        // then - wait for timer period, prompt should only have been called once
-        await new Promise(resolve => setTimeout(resolve, 7000))
-        await flushMicrotasks()
-
+        // then - timer was cleared, prompt called only once
+        await firePendingTimers()
         expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
-      }, 15000)
+      })
 
       test("should cleanup pending retry timer on session.compacted", async () => {
         // given - boulder with incomplete plan, schedule retry timer
@@ -1585,12 +1621,10 @@ describe("atlas hook", () => {
           event: { type: "session.compacted", properties: { sessionID: MAIN_SESSION_ID } },
         })
 
-        // then - wait for timer period, prompt should only have been called once
-        await new Promise(resolve => setTimeout(resolve, 7000))
-        await flushMicrotasks()
-
+        // then - timer was cleared, prompt called only once
+        await firePendingTimers()
         expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
-      }, 15000)
+      })
     })
   })
 })

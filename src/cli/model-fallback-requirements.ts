@@ -272,7 +272,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
           model: "claude-opus-4-6",
           variant: "max",
         },
-        { providers: ["zai-coding-plan"], model: "glm-5" },
+        { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
         { providers: ["kimi-for-coding"], model: "k2p5" },
         { providers: ["opencode"], model: "kimi-k2.5" },
       ],
