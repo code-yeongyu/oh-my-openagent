@@ -12,7 +12,7 @@ function createCommandFinder(commandName: string): () => Promise<string | null> 
   let cachedPath: string | null = null
   let pending: Promise<string | null> | null = null
 
-  return async () => {
+  return async (): Promise<string | null> => {
     if (cachedPath !== null) return cachedPath
     if (pending) return pending
 
@@ -22,7 +22,11 @@ function createCommandFinder(commandName: string): () => Promise<string | null> 
       return path
     })()
 
-    return pending
+    try {
+      return await pending
+    } finally {
+      pending = null
+    }
   }
 }
 

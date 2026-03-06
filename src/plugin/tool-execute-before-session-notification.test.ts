@@ -15,18 +15,22 @@ describe("createToolExecuteBeforeHandler session notification sessionID", () => 
       },
     }
 
-    const handler = createToolExecuteBeforeHandler({
-      ctx: { client: { session: { messages: async () => ({ data: [] }) } } },
-      hooks,
-    })
+    try {
+      const handler = createToolExecuteBeforeHandler({
+        ctx: { client: { session: { messages: async () => ({ data: [] }) } } },
+        hooks,
+      })
 
-    await handler(
-      { tool: "question", sessionID: "", callID: "call_q" },
-      { args: { questions: [{ question: "Continue?", options: [{ label: "Yes" }] }] } },
-    )
+      await handler(
+        { tool: "question", sessionID: "", callID: "call_q" },
+        { args: { questions: [{ question: "Continue?", options: [{ label: "Yes" }] }] } },
+      )
 
-    expect(getMainSessionIDSpy).toHaveBeenCalled()
-    expect(capturedSessionID).toBe(mainSessionID)
+      expect(getMainSessionIDSpy).toHaveBeenCalled()
+      expect(capturedSessionID).toBe(mainSessionID)
+    } finally {
+      getMainSessionIDSpy.mockRestore()
+    }
   })
 })
 
