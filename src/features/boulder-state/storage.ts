@@ -4,10 +4,10 @@
  * Handles reading/writing boulder.json for active plan tracking.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, renameSync, cpSync, rmSync, statSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
-import type { BoulderState, PlanProgress } from "./types"
-import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
+import type { BoulderState, PlanProgress, ArchiveResult } from "./types"
+import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR, COMPLETED_PLANS_DIR, NOTEPAD_BASE_PATH, COMPLETED_NOTEPAD_DIR } from "./constants"
 
 export function getBoulderFilePath(directory: string): string {
   return join(directory, BOULDER_DIR, BOULDER_FILE)
@@ -83,30 +83,38 @@ export function clearBoulderState(directory: string): boolean {
 }
 
 /**
- * Find Prometheus plan files for this project.
- * Prometheus stores plans at: {project}/.sisyphus/plans/{name}.md
+ * Helper: Find .md files in a directory, sorted by modification time (newest first).
+ * Each file is stat'd exactly once for efficiency.
  */
-export function findPrometheusPlans(directory: string): string[] {
-  const plansDir = join(directory, PROMETHEUS_PLANS_DIR)
-
-  if (!existsSync(plansDir)) {
+function findMdFilesSortedByMtime(dirPath: string): string[] {
+  if (!existsSync(dirPath)) {
     return []
   }
 
   try {
-    const files = readdirSync(plansDir)
-    return files
-      .filter((f) => f.endsWith(".md"))
-      .map((f) => join(plansDir, f))
-      .sort((a, b) => {
-        // Sort by modification time, newest first
-        const aStat = require("node:fs").statSync(a)
-        const bStat = require("node:fs").statSync(b)
-        return bStat.mtimeMs - aStat.mtimeMs
-      })
+    const files = readdirSync(dirPath)
+    const mdFiles = files.filter((f) => f.endsWith(".md"))
+
+    // Get all stats once, then sort - O(n) stats instead of O(n log n) in sort comparator
+    const filesWithStats = mdFiles
+      .map((f) => ({
+        path: join(dirPath, f),
+        mtimeMs: statSync(join(dirPath, f)).mtimeMs,
+      }))
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+
+    return filesWithStats.map((f) => f.path)
   } catch {
     return []
   }
+}
+
+/**
+ * Find Prometheus plan files for this project.
+ * Prometheus stores plans at: {project}/.sisyphus/plans/{name}.md
+ */
+export function findPrometheusPlans(directory: string): string[] {
+  return findMdFilesSortedByMtime(join(directory, PROMETHEUS_PLANS_DIR))
 }
 
 /**
@@ -161,4 +169,115 @@ export function createBoulderState(
     ...(agent !== undefined ? { agent } : {}),
     ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
   }
+}
+
+/**
+ * Find a unique target path by appending -2, -3, etc. if needed.
+ */
+function findUniqueTargetPath(basePath: string): string {
+  if (!existsSync(basePath)) {
+    return basePath
+  }
+
+  let counter = 2
+  while (true) {
+    const newPath = basePath.replace(/\.md$/, `-${counter}.md`)
+    if (!existsSync(newPath)) {
+      return newPath
+    }
+    counter++
+  }
+}
+
+/**
+ * Archive a completed plan by moving it to the completed directory.
+ * Also moves the corresponding notepad file if it exists.
+ * Handles name conflicts by auto-renaming.
+ */
+export function archivePlan(directory: string, planName: string): ArchiveResult {
+  const sourcePlanPath = join(directory, PROMETHEUS_PLANS_DIR, `${planName}.md`)
+  const sourceNotepadPath = join(directory, NOTEPAD_BASE_PATH, `${planName}.md`)
+
+  if (!existsSync(sourcePlanPath)) {
+    return { success: false, error: `Source plan not found: ${planName}` }
+  }
+
+  const completedPlansDir = join(directory, COMPLETED_PLANS_DIR)
+  const completedNotepadDir = join(directory, COMPLETED_NOTEPAD_DIR)
+
+  try {
+    if (!existsSync(completedPlansDir)) {
+      mkdirSync(completedPlansDir, { recursive: true })
+    }
+  } catch (err) {
+    return { success: false, error: `Failed to create completed plans directory: ${err}` }
+  }
+
+  const targetPlanPath = findUniqueTargetPath(join(completedPlansDir, `${planName}.md`))
+  const hasNotepad = existsSync(sourceNotepadPath)
+  let targetNotepadPath: string | undefined
+
+  if (hasNotepad) {
+    try {
+      if (!existsSync(completedNotepadDir)) {
+        mkdirSync(completedNotepadDir, { recursive: true })
+      }
+    } catch (err) {
+      return { success: false, error: `Failed to create completed notepad directory: ${err}` }
+    }
+    targetNotepadPath = findUniqueTargetPath(join(completedNotepadDir, `${planName}.md`))
+  }
+
+  let planMoved = false
+  let notepadMoved = false
+
+  try {
+    try {
+      renameSync(sourcePlanPath, targetPlanPath)
+      planMoved = true
+    } catch {
+      try {
+        cpSync(sourcePlanPath, targetPlanPath)
+        rmSync(sourcePlanPath)
+        planMoved = true
+      } catch (fallbackErr) {
+        return { success: false, error: `Failed to move plan: ${fallbackErr}` }
+      }
+    }
+
+    if (hasNotepad && targetNotepadPath) {
+      try {
+        renameSync(sourceNotepadPath, targetNotepadPath)
+        notepadMoved = true
+      } catch {
+        try {
+          cpSync(sourceNotepadPath, targetNotepadPath)
+          rmSync(sourceNotepadPath)
+          notepadMoved = true
+        } catch {
+          if (planMoved) {
+            try { renameSync(targetPlanPath, sourcePlanPath) } catch {}
+          }
+          return { success: false, error: "Failed to move notepad, rolled back plan" }
+        }
+      }
+    }
+
+    return {
+      success: true,
+      archivedPlanPath: targetPlanPath,
+      archivedNotepadPath: notepadMoved ? targetNotepadPath : undefined,
+    }
+  } catch (err) {
+    if (planMoved) { try { renameSync(targetPlanPath, sourcePlanPath) } catch {} }
+    if (notepadMoved && targetNotepadPath) { try { renameSync(targetNotepadPath, sourceNotepadPath) } catch {} }
+    return { success: false, error: `Archive failed: ${err}` }
+  }
+}
+
+/**
+ * Find all completed plan files in the completed directory.
+ */
+export function findCompletedPlans(directory: string): string[] {
+  return findMdFilesSortedByMtime(join(directory, COMPLETED_PLANS_DIR))
 }

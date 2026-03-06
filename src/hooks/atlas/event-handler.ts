@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { getPlanProgress, readBoulderState, archivePlan, clearBoulderState } from "../../features/boulder-state"
 import { getSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
@@ -120,6 +120,23 @@ export function createAtlasEventHandler(input: {
       const progress = getPlanProgress(boulderState.active_plan)
       if (progress.isComplete) {
         log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+
+        // Auto-archive the completed plan
+        const archiveResult = archivePlan(ctx.directory, boulderState.plan_name)
+        if (archiveResult.success) {
+          clearBoulderState(ctx.directory)
+          log(`[${HOOK_NAME}] Plan archived successfully`, {
+            sessionID,
+            plan: boulderState.plan_name,
+            archivedPath: archiveResult.archivedPlanPath,
+          })
+        } else {
+          log(`[${HOOK_NAME}] Plan archival failed`, {
+            sessionID,
+            plan: boulderState.plan_name,
+            error: archiveResult.error,
+          })
+        }
         return
       }
 
