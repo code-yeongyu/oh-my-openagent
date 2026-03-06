@@ -101,7 +101,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.2",
+        model: "gpt-5.4",
         variant: "high",
       },
       {
@@ -133,8 +133,8 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.2",
-        variant: "medium",
+        model: "gpt-5.4",
+        variant: "xhigh",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
@@ -154,7 +154,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-sonnet-4-6",
       },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
     ],
   },
 };
