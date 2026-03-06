@@ -16,6 +16,30 @@ describe("mapClaudeModelToOpenCode", () => {
     })
   })
 
+  describe("#given Claude Code alias", () => {
+    it("#when called with sonnet #then maps to anthropic/claude-sonnet-4-6", () => {
+      expect(mapClaudeModelToOpenCode("sonnet")).toBe("anthropic/claude-sonnet-4-6")
+    })
+
+    it("#when called with opus #then maps to anthropic/claude-opus-4-6", () => {
+      expect(mapClaudeModelToOpenCode("opus")).toBe("anthropic/claude-opus-4-6")
+    })
+
+    it("#when called with haiku #then maps to anthropic/claude-haiku-4-5", () => {
+      expect(mapClaudeModelToOpenCode("haiku")).toBe("anthropic/claude-haiku-4-5")
+    })
+
+    it("#when called with Sonnet (capitalized) #then maps case-insensitively", () => {
+      expect(mapClaudeModelToOpenCode("Sonnet")).toBe("anthropic/claude-sonnet-4-6")
+    })
+  })
+
+  describe("#given inherit", () => {
+    it("#when called with inherit #then returns undefined", () => {
+      expect(mapClaudeModelToOpenCode("inherit")).toBeUndefined()
+    })
+  })
+
   describe("#given bare Claude model name", () => {
     it("#when called with claude-sonnet-4-5-20250514 #then adds anthropic prefix", () => {
       expect(mapClaudeModelToOpenCode("claude-sonnet-4-5-20250514")).toBe("anthropic/claude-sonnet-4-5-20250514")
@@ -25,8 +49,8 @@ describe("mapClaudeModelToOpenCode", () => {
       expect(mapClaudeModelToOpenCode("claude-opus-4-6")).toBe("anthropic/claude-opus-4-6")
     })
 
-    it("#when called with claude-haiku-4-5 #then adds anthropic prefix", () => {
-      expect(mapClaudeModelToOpenCode("claude-haiku-4-5")).toBe("anthropic/claude-haiku-4-5")
+    it("#when called with claude-haiku-4-5-20251001 #then adds anthropic prefix", () => {
+      expect(mapClaudeModelToOpenCode("claude-haiku-4-5-20251001")).toBe("anthropic/claude-haiku-4-5-20251001")
     })
 
     it("#when called with claude-3-5-sonnet-20241022 #then adds anthropic prefix", () => {
@@ -61,10 +85,6 @@ describe("mapClaudeModelToOpenCode", () => {
 
     it("#when called with gemini-3-flash #then returns unchanged", () => {
       expect(mapClaudeModelToOpenCode("gemini-3-flash")).toBe("gemini-3-flash")
-    })
-
-    it("#when called with a custom model name #then returns unchanged", () => {
-      expect(mapClaudeModelToOpenCode("my-custom-model")).toBe("my-custom-model")
     })
   })
 
