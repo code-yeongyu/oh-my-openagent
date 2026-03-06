@@ -28,6 +28,34 @@ Parse the arguments below and begin working on the task. The format is:
 
 Default completion promise is "DONE" and default max iterations is 100.`
 
+export const ULW_LOOP_TEMPLATE = `You are starting an ULTRAWORK Loop - a self-referential development loop that runs until verified completion.
+
+## How ULTRAWORK Loop Works
+
+1. You will work on the task continuously
+2. When you believe the work is complete, output: \`<promise>{{COMPLETION_PROMISE}}</promise>\`
+3. That does NOT finish the loop yet. The system will require Oracle verification
+4. The loop only ends after Oracle verifies the result with \`<promise>VERIFIED</promise>\`
+5. There is no iteration limit
+
+## Rules
+
+- Focus on finishing the task completely
+- After you emit the completion promise, run Oracle verification when instructed
+- Do not treat DONE as final completion until Oracle verifies it
+
+## Exit Conditions
+
+1. **Verified Completion**: Oracle returns \`<promise>VERIFIED</promise>\`
+2. **Cancel**: User runs \`/cancel-ralph\`
+
+## Your Task
+
+Parse the arguments below and begin working on the task. The format is:
+\`"task description" [--completion-promise=TEXT] [--strategy=reset|continue]\`
+
+Default completion promise is "DONE".`
+
 export const CANCEL_RALPH_TEMPLATE = `Cancel the currently active Ralph Loop.
 
 This will:
