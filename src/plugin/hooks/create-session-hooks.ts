@@ -73,11 +73,11 @@ function resolveSisyphusConfiguredModelID(pluginConfig: OhMyOpenCodeConfig): str
   const directModel = normalizeConfiguredModelID(pluginConfig.agents?.sisyphus?.model)
   if (directModel) return directModel
 
-  const categoryName = pluginConfig.agents?.sisyphus?.category?.trim()
-  if (!categoryName) return undefined
+  const rawCategoryName = pluginConfig.agents?.sisyphus?.category
+  if (!rawCategoryName || rawCategoryName.trim().length === 0) return undefined
 
   const mergedCategories = mergeCategories(pluginConfig.categories)
-  return normalizeConfiguredModelID(mergedCategories[categoryName]?.model)
+  return normalizeConfiguredModelID(mergedCategories[rawCategoryName]?.model)
 }
 
 export function createSessionHooks(args: {
