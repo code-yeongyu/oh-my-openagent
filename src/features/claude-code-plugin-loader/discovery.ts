@@ -9,7 +9,6 @@ import type {
   LoadedPlugin,
   PluginLoadResult,
   PluginLoadError,
-  PluginScope,
   ClaudeSettings,
   PluginLoaderOptions,
 } from "./types"
@@ -112,6 +111,17 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
   const errors: PluginLoadError[] = []
 
   if (!db || !db.plugins) {
+    const builtinPath = join(getPluginsBaseDir(), "builtin-default-plugin")
+    const defaultPlugin: LoadedPlugin = {
+      name: "OpenCodeBuiltinDefault",
+      version: "0.0.0",
+      scope: "managed",
+      installPath: builtinPath,
+      pluginKey: "opencode-builtin-default@managed",
+      manifest: undefined
+    }
+    plugins.push(defaultPlugin)
+    log("Injected builtin default plugin for initialization", { path: builtinPath })
     return { plugins, errors }
   }
 
@@ -143,7 +153,7 @@ export function discoverInstalledPlugins(options?: PluginLoaderOptions): PluginL
     const loadedPlugin: LoadedPlugin = {
       name: pluginName,
       version: version || manifest?.version || "unknown",
-      scope: scope as PluginScope,
+      scope,
       installPath,
       pluginKey,
       manifest: manifest ?? undefined,
