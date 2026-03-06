@@ -417,7 +417,7 @@ describe("start-work hook", () => {
       detectSpy.mockRestore()
     })
 
-    test("should inject model-decides instructions when no --worktree flag", async () => {
+    test("should NOT inject worktree instructions when no --worktree flag", async () => {
       // given - single plan, no worktree flag
       const plansDir = join(testDir, ".sisyphus", "plans")
       mkdirSync(plansDir, { recursive: true })
@@ -431,10 +431,10 @@ describe("start-work hook", () => {
       // when
       await hook["chat.message"]({ sessionID: "session-123" }, output)
 
-      // then - model-decides instructions should appear
-      expect(output.parts[0].text).toContain("Worktree Setup Required")
-      expect(output.parts[0].text).toContain("git worktree list --porcelain")
-      expect(output.parts[0].text).toContain("git worktree add")
+      // then - no worktree instructions should appear
+      expect(output.parts[0].text).not.toContain("Worktree Setup Required")
+      expect(output.parts[0].text).not.toContain("Worktree Active")
+      expect(output.parts[0].text).not.toContain("git worktree list --porcelain")
     })
 
     test("should inject worktree path when --worktree flag is valid", async () => {
@@ -452,8 +452,10 @@ describe("start-work hook", () => {
       // when
       await hook["chat.message"]({ sessionID: "session-123" }, output)
 
-      // then - validated path shown, no model-decides instructions
-      expect(output.parts[0].text).toContain("**Worktree**: /validated/worktree")
+      // then - strong worktree active instructions shown
+      expect(output.parts[0].text).toContain("Worktree Active")
+      expect(output.parts[0].text).toContain("/validated/worktree")
+      expect(output.parts[0].text).toContain("subagent")
       expect(output.parts[0].text).not.toContain("Worktree Setup Required")
     })
 
@@ -548,8 +550,10 @@ describe("start-work hook", () => {
       // when
       await hook["chat.message"]({ sessionID: "session-789" }, output)
 
-      // then - shows existing worktree, no model-decides instructions
+      // then - shows strong worktree active instructions
+      expect(output.parts[0].text).toContain("Worktree Active")
       expect(output.parts[0].text).toContain("/existing/wt")
+      expect(output.parts[0].text).toContain("subagent")
       expect(output.parts[0].text).not.toContain("Worktree Setup Required")
     })
   })
