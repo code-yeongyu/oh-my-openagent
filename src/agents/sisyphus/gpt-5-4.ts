@@ -27,7 +27,6 @@ import {
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
-  buildDeepParallelSection,
   buildNonClaudePlannerSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
@@ -90,7 +89,6 @@ export function buildGpt54SisyphusPrompt(
   const oracleSection = buildOracleSection(availableAgents);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
-  const deepParallelSection = buildDeepParallelSection(model, availableCategories);
   const nonClaudePlannerSection = buildNonClaudePlannerSection(model);
   const taskManagementSection = buildGpt54TaskManagementSection(useTaskSystem);
   const todoHookNote = useTaskSystem
@@ -260,8 +258,6 @@ Stop searching when: you have enough context, same info repeating, 2 iterations 
 ${categorySkillsGuide}
 
 ${nonClaudePlannerSection}
-
-${deepParallelSection}
 
 ${delegationTable}
 
