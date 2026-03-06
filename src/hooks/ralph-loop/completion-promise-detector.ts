@@ -20,6 +20,7 @@ function buildPromisePattern(promise: string): RegExp {
 export function detectCompletionInTranscript(
 	transcriptPath: string | undefined,
 	promise: string,
+	startedAt?: string,
 ): boolean {
 	if (!transcriptPath) return false
 
@@ -32,8 +33,9 @@ export function detectCompletionInTranscript(
 
 		for (const line of lines) {
 			try {
-				const entry = JSON.parse(line) as { type?: string }
+				const entry = JSON.parse(line) as { type?: string; timestamp?: string }
 				if (entry.type === "user") continue
+				if (startedAt && entry.timestamp && entry.timestamp < startedAt) continue
 				if (pattern.test(line)) return true
 			} catch {
 				continue

@@ -1,6 +1,10 @@
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import type { RalphLoopState } from "./types"
 
+function getMaxIterationsLabel(state: RalphLoopState): string {
+	return typeof state.max_iterations === "number" ? String(state.max_iterations) : "unbounded"
+}
+
 const CONTINUATION_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - RALPH LOOP {{ITERATION}}/{{MAX}}]
 
 Your previous attempt did not output the completion promise. Continue working on the task.
@@ -14,12 +18,29 @@ IMPORTANT:
 Original task:
 {{PROMPT}}`
 
+const ULTRAWORK_VERIFICATION_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - ULTRAWORK LOOP VERIFICATION {{ITERATION}}/{{MAX}}]
+
+You already emitted <promise>{{INITIAL_PROMISE}}</promise>. This does NOT finish the loop yet.
+
+REQUIRED NOW:
+- Call Oracle using task(subagent_type="oracle", load_skills=[], run_in_background=false, ...)
+- Ask Oracle to verify whether the original task is actually complete
+- The loop only finishes when Oracle returns <promise>{{PROMISE}}</promise>
+- If Oracle does not verify, continue fixing the task and do not consider it complete
+
+Original task:
+{{PROMPT}}`
+
 export function buildContinuationPrompt(state: RalphLoopState): string {
-	const continuationPrompt = CONTINUATION_PROMPT.replace(
+	const template = state.verification_pending
+		? ULTRAWORK_VERIFICATION_PROMPT
+		: CONTINUATION_PROMPT
+	const continuationPrompt = template.replace(
 		"{{ITERATION}}",
 		String(state.iteration),
 	)
-		.replace("{{MAX}}", String(state.max_iterations))
+		.replace("{{MAX}}", getMaxIterationsLabel(state))
+		.replace("{{INITIAL_PROMISE}}", state.initial_completion_promise ?? state.completion_promise)
 		.replace("{{PROMISE}}", state.completion_promise)
 		.replace("{{PROMPT}}", state.prompt)
 
