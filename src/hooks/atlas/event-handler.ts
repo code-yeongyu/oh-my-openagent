@@ -128,13 +128,21 @@ export function createAtlasEventHandler(input: {
           state.pendingRetryTimer = setTimeout(async () => {
             state.pendingRetryTimer = undefined
 
+            if (state.promptFailureCount >= 2) return
+
             const currentBoulder = readBoulderState(ctx.directory)
             if (!currentBoulder) return
+            if (!currentBoulder.session_ids?.includes(sessionID)) return
 
             const currentProgress = getPlanProgress(currentBoulder.active_plan)
             if (currentProgress.isComplete) return
 
             if (options?.isContinuationStopped?.(sessionID)) return
+
+            const hasBgTasks = backgroundManager
+              ? backgroundManager.getTasksByParentSession(sessionID).some((t: { status: string }) => t.status === "running")
+              : false
+            if (hasBgTasks) return
 
             state.lastContinuationInjectedAt = Date.now()
             const currentRemaining = currentProgress.total - currentProgress.completed
