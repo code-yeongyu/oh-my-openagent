@@ -70,6 +70,9 @@
     "hashline_edit": {
       "type": "boolean"
     },
+    "default_injection_toggle": {
+      "type": "boolean"
+    },
     "model_fallback": {
       "type": "boolean"
     },
