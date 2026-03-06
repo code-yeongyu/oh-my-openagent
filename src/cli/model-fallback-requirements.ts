@@ -31,7 +31,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.2",
+        model: "gpt-5.4",
         variant: "high",
       },
       {
@@ -108,7 +108,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["kimi-for-coding"], model: "k2p5" },
       {
         providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.2",
+        model: "gpt-5.4",
         variant: "high",
       },
       {
@@ -224,7 +224,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
         },
         {
           providers: ["openai", "github-copilot", "opencode"],
-          model: "gpt-5.2",
+          model: "gpt-5.4",
         },
       ],
       requiresModel: "gemini-3.1-pro",

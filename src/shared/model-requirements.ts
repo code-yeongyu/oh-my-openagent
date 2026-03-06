@@ -32,7 +32,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gpt-5.3-codex",
         variant: "medium",
       },
-      { providers: ["github-copilot"], model: "gpt-5.2", variant: "medium" },
+      { providers: ["github-copilot"], model: "gpt-5.4", variant: "medium" },
     ],
     requiresProvider: ["openai", "github-copilot", "venice", "opencode"],
   },
@@ -40,7 +40,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.2",
+        model: "gpt-5.4",
         variant: "high",
       },
       {
@@ -119,7 +119,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       {
         providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.2",
+        model: "gpt-5.4",
         variant: "high",
       },
       {
@@ -226,7 +226,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-opus-4-6",
         variant: "max",
       },
-      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.2" },
+      { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4" },
     ],
     requiresModel: "gemini-3.1-pro",
   },

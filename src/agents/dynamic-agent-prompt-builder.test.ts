@@ -197,7 +197,7 @@ describe("buildParallelDelegationSection", () => {
 
   it("#given non-Claude model with unspecified-high category #when building #then returns aggressive delegation section", () => {
     //#given
-    const model = "openai/gpt-5.2"
+    const model = "openai/gpt-5.4"
     const categories = [unspecifiedHighCategory, otherCategory]
 
     //#when
@@ -223,7 +223,7 @@ describe("buildParallelDelegationSection", () => {
 
   it("#given non-Claude model without deep or unspecified-high category #when building #then returns empty", () => {
     //#given
-    const model = "openai/gpt-5.2"
+    const model = "openai/gpt-5.4"
     const categories = [otherCategory]
 
     //#when
@@ -261,7 +261,7 @@ describe("buildNonClaudePlannerSection", () => {
 
   it("#given GPT model #when building #then returns plan agent section", () => {
     //#given
-    const model = "openai/gpt-5.2"
+    const model = "openai/gpt-5.4"
 
     //#when
     const result = buildNonClaudePlannerSection(model)

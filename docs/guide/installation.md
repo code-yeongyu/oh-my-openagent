@@ -49,7 +49,7 @@ Ask the user these questions to determine CLI options:
    - If **no** → `--claude=no`
 
 2. **Do you have an OpenAI/ChatGPT Plus Subscription?**
-   - If **yes** → `--openai=yes` (GPT-5.2 for Oracle agent)
+   - If **yes** → `--openai=yes` (GPT-5.4 for Oracle agent)
    - If **no** → `--openai=no` (default)
 
 3. **Will you integrate Gemini models?**
@@ -200,7 +200,7 @@ When GitHub Copilot is the best available provider, oh-my-opencode uses these mo
 | Agent         | Model                             |
 | ------------- | --------------------------------- |
 | **Sisyphus**  | `github-copilot/claude-opus-4-6`  |
-| **Oracle**    | `github-copilot/gpt-5.2`          |
+| **Oracle**    | `github-copilot/gpt-5.4`          |
 | **Explore**   | `github-copilot/grok-code-fast-1` |
 | **Librarian** | `github-copilot/gemini-3-flash`   |
 
@@ -228,7 +228,7 @@ When OpenCode Zen is the best available provider (no native or Copilot), these m
 | Agent         | Model                                                |
 | ------------- | ---------------------------------------------------- |
 | **Sisyphus**  | `opencode/claude-opus-4-6`                           |
-| **Oracle**    | `opencode/gpt-5.2`                                   |
+| **Oracle**    | `opencode/gpt-5.4`                                   |
 | **Explore**   | `opencode/gpt-5-nano`                                |
 | **Librarian** | `opencode/minimax-m2.5-free` / `opencode/big-pickle` |
 
@@ -280,7 +280,7 @@ Not all models behave the same way. Understanding which models are "similar" hel
 | Model             | Provider(s)                      | Notes                                             |
 | ----------------- | -------------------------------- | ------------------------------------------------- |
 | **GPT-5.3-codex** | openai, github-copilot, opencode | Deep coding powerhouse. Required for Hephaestus.  |
-| **GPT-5.2**       | openai, github-copilot, opencode | High intelligence. Default for Oracle.            |
+| **GPT-5.4**       | openai, github-copilot, opencode | High intelligence. Default for Oracle.            |
 | **GPT-5-Nano**    | opencode                         | Ultra-cheap, fast. Good for simple utility tasks. |
 
 **Different-Behavior Models**:
@@ -310,7 +310,7 @@ Based on your subscriptions, here's how the agents were configured:
 | Agent        | Role             | Default Chain                                   | What It Does                                                                             |
 | ------------ | ---------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
 | **Sisyphus** | Main ultraworker | Opus (max) → Kimi K2.5 → GLM 5 → Big Pickle     | Primary coding agent. Orchestrates everything. **Never use GPT — no GPT prompt exists.** |
-| **Metis**    | Plan review      | Opus (max) → Kimi K2.5 → GPT-5.2 → Gemini 3 Pro | Reviews Prometheus plans for gaps.                                                       |
+| **Metis**    | Plan review      | Opus (max) → Kimi K2.5 → GPT-5.4 → Gemini 3 Pro | Reviews Prometheus plans for gaps.                                                       |
 
 **Dual-Prompt Agents** (auto-switch between Claude and GPT prompts):
 
@@ -320,16 +320,16 @@ Priority: **Claude > GPT > Claude-like models**
 
 | Agent          | Role              | Default Chain                                              | GPT Prompt?                                                      |
 | -------------- | ----------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- |
-| **Prometheus** | Strategic planner | Opus (max) → **GPT-5.2 (high)** → Kimi K2.5 → Gemini 3 Pro | Yes — XML-tagged, principle-driven (~300 lines vs ~1,100 Claude) |
-| **Atlas**      | Todo orchestrator | **Kimi K2.5** → Sonnet → GPT-5.2                           | Yes — GPT-optimized todo management                              |
+| **Prometheus** | Strategic planner | Opus (max) → **GPT-5.4 (high)** → Kimi K2.5 → Gemini 3 Pro | Yes — XML-tagged, principle-driven (~300 lines vs ~1,100 Claude) |
+| **Atlas**      | Todo orchestrator | **Kimi K2.5** → Sonnet → GPT-5.4                           | Yes — GPT-optimized todo management                              |
 
 **GPT-Native Agents** (built for GPT, don't override to Claude):
 
 | Agent          | Role                   | Default Chain                          | Notes                                                  |
 | -------------- | ---------------------- | -------------------------------------- | ------------------------------------------------------ |
 | **Hephaestus** | Deep autonomous worker | GPT-5.3-codex (medium) only            | "Codex on steroids." No fallback. Requires GPT access. |
-| **Oracle**     | Architecture/debugging | GPT-5.2 (high) → Gemini 3 Pro → Opus   | High-IQ strategic backup. GPT preferred.               |
-| **Momus**      | High-accuracy reviewer | GPT-5.2 (medium) → Opus → Gemini 3 Pro | Verification agent. GPT preferred.                     |
+| **Oracle**     | Architecture/debugging | GPT-5.4 (high) → Gemini 3 Pro → Opus   | High-IQ strategic backup. GPT preferred.               |
+| **Momus**      | High-accuracy reviewer | GPT-5.4 (medium) → Opus → Gemini 3 Pro | Verification agent. GPT preferred.                     |
 
 **Utility Agents** (speed over intelligence):
 
@@ -339,7 +339,7 @@ These agents do search, grep, and retrieval. They intentionally use fast, cheap 
 | --------------------- | ------------------ | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
 | **Explore**           | Fast codebase grep | MiniMax M2.5 Free → Grok Code Fast → MiniMax M2.5 → Haiku → GPT-5-Nano | Speed is everything. Grok is blazing fast for grep.            |
 | **Librarian**         | Docs/code search   | MiniMax M2.5 Free → Gemini Flash → Big Pickle                          | Entirely free-tier. Doc retrieval doesn't need deep reasoning. |
-| **Multimodal Looker** | Vision/screenshots | Kimi K2.5 → Kimi Free → Gemini Flash → GPT-5.2 → GLM-4.6v              | Kimi excels at multimodal understanding.                       |
+| **Multimodal Looker** | Vision/screenshots | Kimi K2.5 → Kimi Free → Gemini Flash → GPT-5.4 → GLM-4.6v              | Kimi excels at multimodal understanding.                       |
 
 #### Why Different Models Need Different Prompts
 
@@ -388,8 +388,8 @@ GPT (5.3-codex, 5.2) > Claude Opus (decent fallback) > Gemini (acceptable)
 **Safe** (same family):
 
 - Sisyphus: Opus → Sonnet, Kimi K2.5, GLM 5
-- Prometheus: Opus → GPT-5.2 (auto-switches prompt)
-- Atlas: Kimi K2.5 → Sonnet, GPT-5.2 (auto-switches)
+- Prometheus: Opus → GPT-5.4 (auto-switches prompt)
+- Atlas: Kimi K2.5 → Sonnet, GPT-5.4 (auto-switches)
 
 **Dangerous** (no prompt support):
 

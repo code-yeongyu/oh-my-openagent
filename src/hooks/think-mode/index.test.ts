@@ -70,7 +70,7 @@ describe("createThinkModeHook", () => {
     const input = createHookInput({
       sessionID,
       providerID: "github-copilot",
-      modelID: "gpt-5.2",
+      modelID: "gpt-5.4",
     })
     const output = createHookOutput("ultrathink about this")
 
@@ -81,7 +81,7 @@ describe("createThinkModeHook", () => {
     expect(output.message.variant).toBe("high")
     expect(output.message.model).toEqual({
       providerID: "github-copilot",
-      modelID: "gpt-5-2-high",
+      modelID: "gpt-5-4-high",
     })
   })
 

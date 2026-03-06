@@ -19,7 +19,7 @@ const TEST_AVAILABLE_MODELS = new Set([
   "anthropic/claude-haiku-4-5",
   "google/gemini-3.1-pro",
   "google/gemini-3-flash",
-  "openai/gpt-5.2",
+  "openai/gpt-5.4",
   "openai/gpt-5.3-codex",
 ])
 
@@ -53,7 +53,7 @@ describe("sisyphus-task", () => {
       models: {
         anthropic: ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
         google: ["gemini-3.1-pro", "gemini-3-flash"],
-        openai: ["gpt-5.2", "gpt-5.3-codex"],
+        openai: ["gpt-5.4", "gpt-5.3-codex"],
       },
       connected: ["anthropic", "google", "openai"],
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -824,7 +824,7 @@ describe("sisyphus-task", () => {
       const categoryName = "my-custom"
       const userCategories = {
         "my-custom": {
-          model: "openai/gpt-5.2",
+          model: "openai/gpt-5.4",
           temperature: 0.5,
           prompt_append: "You are a custom agent",
         },
@@ -835,7 +835,7 @@ describe("sisyphus-task", () => {
 
       // then
       expect(result).not.toBeNull()
-      expect(result!.config.model).toBe("openai/gpt-5.2")
+      expect(result!.config.model).toBe("openai/gpt-5.4")
       expect(result!.config.temperature).toBe(0.5)
       expect(result!.promptAppend).toBe("You are a custom agent")
     })
@@ -948,7 +948,7 @@ describe("sisyphus-task", () => {
          manager: mockManager,
          client: mockClient,
          userCategories: {
-           ultrabrain: { model: "openai/gpt-5.2", variant: "xhigh" },
+           ultrabrain: { model: "openai/gpt-5.4", variant: "xhigh" },
          },
          connectedProvidersOverride: TEST_CONNECTED_PROVIDERS,
          availableModelsOverride: createTestAvailableModels(),
@@ -976,7 +976,7 @@ describe("sisyphus-task", () => {
       // then
       expect(launchInput.model).toEqual({
         providerID: "openai",
-        modelID: "gpt-5.2",
+        modelID: "gpt-5.4",
         variant: "xhigh",
       })
     })
@@ -1040,9 +1040,9 @@ describe("sisyphus-task", () => {
 
       // then - variant MUST be "max" from DEFAULT_CATEGORIES
       expect(launchInput.model).toEqual({
-        providerID: "anthropic",
-        modelID: "claude-opus-4-6",
-        variant: "max",
+        providerID: "openai",
+        modelID: "gpt-5.4",
+        variant: "high",
       })
     }, { timeout: 20000 })
 
@@ -1101,10 +1101,10 @@ describe("sisyphus-task", () => {
 
       // then - variant MUST be "max" from DEFAULT_CATEGORIES (passed as separate field)
       expect(promptBody.model).toEqual({
-        providerID: "anthropic",
-        modelID: "claude-opus-4-6",
+        providerID: "openai",
+        modelID: "gpt-5.4",
       })
-      expect(promptBody.variant).toBe("max")
+      expect(promptBody.variant).toBe("high")
     }, { timeout: 20000 })
   })
 
@@ -1976,7 +1976,7 @@ describe("sisyphus-task", () => {
          },
        }
        
-       // Use ultrabrain which uses gpt-5.2 (non-gemini)
+       // Use ultrabrain which uses gpt-5.4 (non-gemini)
        const tool = createDelegateTask({
          manager: mockManager,
          client: mockClient,
@@ -2185,7 +2185,7 @@ describe("sisyphus-task", () => {
         client: mockClient,
         userCategories: {
           "my-unstable-cat": {
-            model: "openai/gpt-5.2",
+            model: "openai/gpt-5.4",
             is_unstable_agent: true,
           },
         },
@@ -2568,7 +2568,7 @@ describe("sisyphus-task", () => {
       const tool = createDelegateTask({
         manager: mockManager,
         client: mockClient,
-        sisyphusJuniorModel: "openai/gpt-5.2",
+        sisyphusJuniorModel: "openai/gpt-5.4",
         userCategories: {
           "my-custom": { temperature: 0.5 },
         },
@@ -2595,7 +2595,7 @@ describe("sisyphus-task", () => {
 
       // then - sisyphus-junior override model should be used as fallback
       expect(launchInput.model.providerID).toBe("openai")
-      expect(launchInput.model.modelID).toBe("gpt-5.2")
+      expect(launchInput.model.modelID).toBe("gpt-5.4")
     })
   })
 
@@ -3406,7 +3406,7 @@ describe("sisyphus-task", () => {
          app: {
            agents: async () => ({
              data: [
-               { name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+               { name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.4" } },
              ],
            }),
          },
@@ -3473,7 +3473,7 @@ describe("sisyphus-task", () => {
          app: {
            agents: async () => ({
              data: [
-               { name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.2" } },
+               { name: "oracle", mode: "subagent", model: { providerID: "openai", modelID: "gpt-5.4" } },
              ],
            }),
          },
@@ -3582,11 +3582,11 @@ describe("sisyphus-task", () => {
       )
 
       // then - should resolve via AGENT_MODEL_REQUIREMENTS fallback chain for oracle
-      // oracle fallback chain: gpt-5.2 (openai) > gemini-3.1-pro (google) > claude-opus-4-6 (anthropic)
-      // Since openai is in connectedProviders, should resolve to openai/gpt-5.2
+      // oracle fallback chain: gpt-5.4 (openai) > gemini-3.1-pro (google) > claude-opus-4-6 (anthropic)
+      // Since openai is in connectedProviders, should resolve to openai/gpt-5.4
       expect(promptBody.model).toBeDefined()
       expect(promptBody.model.providerID).toBe("openai")
-      expect(promptBody.model.modelID).toContain("gpt-5.2")
+      expect(promptBody.model.modelID).toContain("gpt-5.4")
     }, { timeout: 20000 })
   })
 

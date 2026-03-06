@@ -83,8 +83,8 @@ Here's a practical starting configuration:
     "librarian": { "model": "google/gemini-3-flash" },
     "explore": { "model": "github-copilot/grok-code-fast-1" },
 
-    // Architecture consultation: GPT-5.2 or Claude Opus
-    "oracle": { "model": "openai/gpt-5.2", "variant": "high" },
+    // Architecture consultation: GPT-5.4 or Claude Opus
+    "oracle": { "model": "openai/gpt-5.4", "variant": "high" },
 
     // Prometheus inherits sisyphus model; just add prompt guidance
     "prometheus": {
@@ -268,13 +268,13 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | Agent                 | Default Model       | Provider Priority                                                            |
 | --------------------- | ------------------- | ---------------------------------------------------------------------------- |
 | **Sisyphus**          | `claude-opus-4-6`   | `claude-opus-4-6` → `glm-5` → `big-pickle`                                   |
-| **Hephaestus**        | `gpt-5.3-codex`     | `gpt-5.3-codex` → `gpt-5.2` (GitHub Copilot fallback)                        |
-| **oracle**            | `gpt-5.2`           | `gpt-5.2` → `gemini-3.1-pro` → `claude-opus-4-6`                             |
+| **Hephaestus**        | `gpt-5.3-codex`     | `gpt-5.3-codex` → `gpt-5.4` (GitHub Copilot fallback)                        |
+| **oracle**            | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`                             |
 | **librarian**         | `gemini-3-flash`    | `gemini-3-flash` → `minimax-m2.5-free` → `big-pickle`                        |
 | **explore**           | `grok-code-fast-1`  | `grok-code-fast-1` → `minimax-m2.5-free` → `claude-haiku-4-5` → `gpt-5-nano` |
 | **multimodal-looker** | `gpt-5.3-codex`     | `gpt-5.3-codex` → `k2p5` → `gemini-3-flash` → `glm-4.6v` → `gpt-5-nano`      |
 | **Prometheus**        | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4` → `gemini-3.1-pro`                             |
-| **Metis**             | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.2` → `gemini-3.1-pro`                             |
+| **Metis**             | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4` → `gemini-3.1-pro`                             |
 | **Momus**             | `gpt-5.4`           | `gpt-5.4` → `claude-opus-4-6` → `gemini-3.1-pro`                             |
 | **Atlas**             | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.4`                                              |
 
@@ -285,7 +285,7 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | **visual-engineering** | `gemini-3.1-pro`    | `gemini-3.1-pro` → `glm-5` → `claude-opus-4-6`                 |
 | **ultrabrain**         | `gpt-5.3-codex`     | `gpt-5.3-codex` → `gemini-3.1-pro` → `claude-opus-4-6`         |
 | **deep**               | `gpt-5.3-codex`     | `gpt-5.3-codex` → `claude-opus-4-6` → `gemini-3.1-pro`         |
-| **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.2`               |
+| **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`               |
 | **quick**              | `claude-haiku-4-5`  | `claude-haiku-4-5` → `gemini-3-flash` → `gpt-5-nano`           |
 | **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash`       |
 | **unspecified-high**   | `gpt-5.4`           | `gpt-5.4` → `claude-opus-4-6` → `glm-5` → `k2p5` → `kimi-k2.5` |

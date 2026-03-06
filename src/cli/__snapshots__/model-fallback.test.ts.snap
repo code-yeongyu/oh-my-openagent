@@ -205,7 +205,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "model": "opencode/glm-4.7-free",
     },
     "metis": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.4",
       "variant": "high",
     },
     "momus": {
@@ -217,7 +217,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "oracle": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -274,7 +274,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "model": "opencode/glm-4.7-free",
     },
     "metis": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.4",
       "variant": "high",
     },
     "momus": {
@@ -286,7 +286,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "oracle": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -476,7 +476,7 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "variant": "medium",
     },
     "oracle": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -551,7 +551,7 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "variant": "medium",
     },
     "oracle": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -627,7 +627,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "variant": "medium",
     },
     "oracle": {
-      "model": "opencode/gpt-5.2",
+      "model": "opencode/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -702,7 +702,7 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "variant": "medium",
     },
     "oracle": {
-      "model": "opencode/gpt-5.2",
+      "model": "opencode/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -773,7 +773,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "model": "github-copilot/gemini-3-flash-preview",
     },
     "oracle": {
-      "model": "github-copilot/gpt-5.2",
+      "model": "github-copilot/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -839,7 +839,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "model": "github-copilot/gemini-3-flash-preview",
     },
     "oracle": {
-      "model": "github-copilot/gpt-5.2",
+      "model": "github-copilot/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -1021,7 +1021,7 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "variant": "medium",
     },
     "oracle": {
-      "model": "opencode/gpt-5.2",
+      "model": "opencode/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -1096,7 +1096,7 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "variant": "medium",
     },
     "oracle": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -1298,7 +1298,7 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
       "variant": "medium",
     },
     "oracle": {
-      "model": "github-copilot/gpt-5.2",
+      "model": "github-copilot/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -1373,7 +1373,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "variant": "medium",
     },
     "oracle": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {
@@ -1448,7 +1448,7 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "variant": "medium",
     },
     "oracle": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.4",
       "variant": "high",
     },
     "prometheus": {

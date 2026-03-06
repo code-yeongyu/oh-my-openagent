@@ -45,7 +45,7 @@ flowchart TB
 
     subgraph Workers["Worker Layer (Specialized Agents)"]
         Junior[" Sisyphus-Junior<br/>(Task Executor)<br/>Claude Sonnet 4.6"]
-        Oracle[" Oracle<br/>(Architecture)<br/>GPT-5.2"]
+        Oracle[" Oracle<br/>(Architecture)<br/>GPT-5.4"]
         Explore[" Explore<br/>(Codebase Grep)<br/>Grok Code"]
         Librarian[" Librarian<br/>(Docs/OSS)<br/>Gemini 3 Flash"]
         Frontend[" Frontend<br/>(UI/UX)<br/>Gemini 3.1 Pro"]

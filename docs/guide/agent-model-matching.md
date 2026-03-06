@@ -65,7 +65,7 @@ These agents have Claude-optimized prompts — long, detailed, mechanics-driven.
 | Agent        | Role              | Fallback Chain                         | Notes                                                                                             |
 | ------------ | ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | **Sisyphus** | Main orchestrator | Claude Opus → GLM 5 → Big Pickle       | Claude-family first. GPT-5.4 has dedicated support, but Claude/Kimi/GLM remain the preferred fit. |
-| **Metis**    | Plan gap analyzer | Claude Opus → GPT-5.2 → Gemini 3.1 Pro | Claude preferred, GPT acceptable fallback.                                                        |
+| **Metis**    | Plan gap analyzer | Claude Opus → GPT-5.4 → Gemini 3.1 Pro | Claude preferred, GPT acceptable fallback.                                                        |
 
 ### Dual-Prompt Agents → Claude preferred, GPT supported
 
@@ -83,7 +83,7 @@ These agents are built for GPT's principle-driven style. Their prompts assume au
 | Agent          | Role                    | Fallback Chain                         | Notes                                            |
 | -------------- | ----------------------- | -------------------------------------- | ------------------------------------------------ |
 | **Hephaestus** | Autonomous deep worker  | GPT-5.3 Codex only                     | No fallback. Requires GPT access. The craftsman. |
-| **Oracle**     | Architecture consultant | GPT-5.2 → Gemini 3.1 Pro → Claude Opus | Read-only high-IQ consultation.                  |
+| **Oracle**     | Architecture consultant | GPT-5.4 → Gemini 3.1 Pro → Claude Opus | Read-only high-IQ consultation.                  |
 | **Momus**      | Ruthless reviewer       | GPT-5.4 → Claude Opus → Gemini 3.1 Pro | Verification and plan review.                    |
 
 ### Utility Runners → Speed over Intelligence
@@ -119,7 +119,7 @@ Principle-driven, explicit reasoning, deep technical capability. Best for agents
 | Model             | Strengths                                                                                       |
 | ----------------- | ----------------------------------------------------------------------------------------------- |
 | **GPT-5.3 Codex** | Deep coding powerhouse. Autonomous exploration. Required for Hephaestus.                        |
-| **GPT-5.2**       | High intelligence, strategic reasoning. Default for Oracle.                                     |
+| **GPT-5.4**       | High intelligence, strategic reasoning. Default for Oracle.                                     |
 | **GPT-5.4**       | Strong principle-driven reasoning. Default for Momus and a key fallback for Prometheus / Atlas. |
 | **GPT-5-Nano**    | Ultra-cheap, fast. Good for simple utility tasks.                                               |
 
@@ -149,7 +149,7 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | `visual-engineering` | Frontend, UI, CSS, design  | Gemini 3.1 Pro → GLM 5 → Claude Opus         |
 | `ultrabrain`         | Maximum reasoning needed   | GPT-5.3 Codex → Gemini 3.1 Pro → Claude Opus |
 | `deep`               | Deep coding, complex logic | GPT-5.3 Codex → Claude Opus → Gemini 3.1 Pro |
-| `artistry`           | Creative, novel approaches | Gemini 3.1 Pro → Claude Opus → GPT-5.2       |
+| `artistry`           | Creative, novel approaches | Gemini 3.1 Pro → Claude Opus → GPT-5.4       |
 | `quick`              | Simple, fast tasks         | Claude Haiku → Gemini Flash → GPT-5-Nano     |
 | `unspecified-high`   | General complex work       | GPT-5.4 → Claude Opus → GLM 5 → K2P5         |
 | `unspecified-low`    | General standard work      | Claude Sonnet → GPT-5.3 Codex → Gemini Flash |
@@ -179,7 +179,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
     "explore": { "model": "github-copilot/grok-code-fast-1" },
 
     // Architecture consultation: GPT or Claude Opus
-    "oracle": { "model": "openai/gpt-5.2", "variant": "high" },
+    "oracle": { "model": "openai/gpt-5.4", "variant": "high" },
 
     // Prometheus inherits sisyphus model; just add prompt guidance
     "prometheus": {
