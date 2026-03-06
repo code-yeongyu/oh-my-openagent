@@ -1,5 +1,28 @@
 import { describe, test, expect } from "bun:test";
-import { isGptModel, isGeminiModel } from "./types";
+import { isGptModel, isGeminiModel, isGpt5_4Model } from "./types";
+
+describe("isGpt5_4Model", () => {
+  test("detects gpt-5.4 models", () => {
+    expect(isGpt5_4Model("openai/gpt-5.4")).toBe(true);
+    expect(isGpt5_4Model("openai/gpt-5-4")).toBe(true);
+    expect(isGpt5_4Model("openai/gpt-5.4-codex")).toBe(true);
+    expect(isGpt5_4Model("github-copilot/gpt-5.4")).toBe(true);
+    expect(isGpt5_4Model("venice/gpt-5-4")).toBe(true);
+  });
+
+  test("does not match other GPT models", () => {
+    expect(isGpt5_4Model("openai/gpt-5.3-codex")).toBe(false);
+    expect(isGpt5_4Model("openai/gpt-5.2")).toBe(false);
+    expect(isGpt5_4Model("openai/gpt-4o")).toBe(false);
+    expect(isGpt5_4Model("github-copilot/gpt-5.2")).toBe(false);
+  });
+
+  test("does not match non-GPT models", () => {
+    expect(isGpt5_4Model("anthropic/claude-opus-4-6")).toBe(false);
+    expect(isGpt5_4Model("google/gemini-3.1-pro")).toBe(false);
+    expect(isGpt5_4Model("openai/o1")).toBe(false);
+  });
+});
 
 describe("isGptModel", () => {
   test("standard openai provider gpt models", () => {

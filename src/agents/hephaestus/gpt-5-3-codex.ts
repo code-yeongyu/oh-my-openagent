@@ -1,11 +1,12 @@
+/** GPT-5.3 Codex optimized Hephaestus prompt */
 import type { AgentConfig } from "@opencode-ai/sdk";
-import type { AgentMode } from "./types";
+import type { AgentMode } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
   AvailableSkill,
   AvailableCategory,
-} from "./dynamic-agent-prompt-builder";
+} from "../dynamic-agent-prompt-builder";
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -17,8 +18,7 @@ import {
   buildHardBlocksSection,
   buildAntiPatternsSection,
   categorizeTools,
-} from "./dynamic-agent-prompt-builder";
-
+} from "../dynamic-agent-prompt-builder";
 const MODE: AgentMode = "all";
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
@@ -103,7 +103,7 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
  * - End-to-end task completion without premature stopping
  */
 
-function buildHephaestusPrompt(
+export function buildHephaestusPrompt(
   availableAgents: AvailableAgent[] = [],
   availableTools: AvailableTool[] = [],
   availableSkills: AvailableSkill[] = [],
