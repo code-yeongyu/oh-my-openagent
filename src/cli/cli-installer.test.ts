@@ -21,19 +21,9 @@ describe("runCliInstaller", () => {
     console.error = originalConsoleError
   })
 
-  it("runs auth and provider setup steps when openai or copilot are enabled without gemini", async () => {
+  it("completes installation without auth plugin or provider config steps", async () => {
     //#given
-    const addAuthPluginsSpy = spyOn(configManager, "addAuthPlugins").mockResolvedValue({
-      success: true,
-      configPath: "/tmp/opencode.jsonc",
-    })
-    const addProviderConfigSpy = spyOn(configManager, "addProviderConfig").mockReturnValue({
-      success: true,
-      configPath: "/tmp/opencode.jsonc",
-    })
     const restoreSpies = [
-      addAuthPluginsSpy,
-      addProviderConfigSpy,
       spyOn(configManager, "detectCurrentConfig").mockReturnValue({
         isInstalled: false,
         hasClaude: false,
@@ -73,8 +63,6 @@ describe("runCliInstaller", () => {
 
     //#then
     expect(result).toBe(0)
-    expect(addAuthPluginsSpy).toHaveBeenCalledTimes(1)
-    expect(addProviderConfigSpy).toHaveBeenCalledTimes(1)
 
     for (const spy of restoreSpies) {
       spy.mockRestore()

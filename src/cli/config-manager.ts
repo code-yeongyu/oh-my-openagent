@@ -14,9 +14,6 @@ export { writeOmoConfig } from "./config-manager/write-omo-config"
 
 export { isOpenCodeInstalled, getOpenCodeVersion } from "./config-manager/opencode-binary"
 
-export { fetchLatestVersion, addAuthPlugins } from "./config-manager/auth-plugins"
-export { ANTIGRAVITY_PROVIDER_CONFIG } from "./config-manager/antigravity-provider-configuration"
-export { addProviderConfig } from "./config-manager/add-provider-config"
 export { detectCurrentConfig } from "./config-manager/detect-current-config"
 
 export type { BunInstallResult } from "./config-manager/bun-install"

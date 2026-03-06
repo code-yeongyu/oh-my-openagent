@@ -1,6 +1,6 @@
 import { describe, expect, test, mock, afterEach } from "bun:test"
 
-import { ANTIGRAVITY_PROVIDER_CONFIG, getPluginNameWithVersion, fetchNpmDistTags, generateOmoConfig } from "./config-manager"
+import { getPluginNameWithVersion, fetchNpmDistTags, generateOmoConfig } from "./config-manager"
 import type { InstallConfig } from "./types"
 
 describe("getPluginNameWithVersion", () => {
@@ -166,76 +166,6 @@ describe("fetchNpmDistTags", () => {
 
     // #then should return null
     expect(result).toBeNull()
-  })
-})
-
-describe("config-manager ANTIGRAVITY_PROVIDER_CONFIG", () => {
-  test("all models include full spec (limit + modalities + Antigravity label)", () => {
-    const google = (ANTIGRAVITY_PROVIDER_CONFIG as any).google
-    expect(google).toBeTruthy()
-
-    const models = google.models as Record<string, any>
-    expect(models).toBeTruthy()
-
-    const required = [
-      "antigravity-gemini-3.1-pro",
-      "antigravity-gemini-3-flash",
-      "antigravity-claude-sonnet-4-6",
-      "antigravity-claude-sonnet-4-6-thinking",
-      "antigravity-claude-opus-4-5-thinking",
-    ]
-
-    for (const key of required) {
-      const model = models[key]
-      expect(model).toBeTruthy()
-      expect(typeof model.name).toBe("string")
-      expect(model.name.includes("(Antigravity)")).toBe(true)
-
-      expect(model.limit).toBeTruthy()
-      expect(typeof model.limit.context).toBe("number")
-      expect(typeof model.limit.output).toBe("number")
-
-      expect(model.modalities).toBeTruthy()
-      expect(Array.isArray(model.modalities.input)).toBe(true)
-      expect(Array.isArray(model.modalities.output)).toBe(true)
-    }
-  })
-
-  test("Gemini models have variant definitions", () => {
-    // #given the antigravity provider config
-    const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
-
-    // #when checking Gemini Pro variants
-    const pro = models["antigravity-gemini-3.1-pro"]
-    // #then should have low and high variants
-    expect(pro.variants).toBeTruthy()
-    expect(pro.variants.low).toBeTruthy()
-    expect(pro.variants.high).toBeTruthy()
-
-    // #when checking Gemini Flash variants
-    const flash = models["antigravity-gemini-3-flash"]
-    // #then should have minimal, low, medium, high variants
-    expect(flash.variants).toBeTruthy()
-    expect(flash.variants.minimal).toBeTruthy()
-    expect(flash.variants.low).toBeTruthy()
-    expect(flash.variants.medium).toBeTruthy()
-    expect(flash.variants.high).toBeTruthy()
-  })
-
-  test("Claude thinking models have variant definitions", () => {
-    // #given the antigravity provider config
-    const models = (ANTIGRAVITY_PROVIDER_CONFIG as any).google.models as Record<string, any>
-
-    // #when checking Claude thinking variants
-    const sonnetThinking = models["antigravity-claude-sonnet-4-6-thinking"]
-    const opusThinking = models["antigravity-claude-opus-4-5-thinking"]
-
-    // #then both should have low and max variants
-    for (const model of [sonnetThinking, opusThinking]) {
-      expect(model.variants).toBeTruthy()
-      expect(model.variants.low).toBeTruthy()
-      expect(model.variants.max).toBeTruthy()
-    }
   })
 })
 
