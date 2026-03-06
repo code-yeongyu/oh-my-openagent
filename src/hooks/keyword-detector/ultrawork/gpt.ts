@@ -1,15 +1,11 @@
 /**
- * Ultrawork message optimized for GPT 5.2 series models.
- *
- * Key characteristics (from GPT 5.2 Prompting Guide):
- * - "Stronger instruction adherence" - follows instructions more literally
- * - "Conservative grounding bias" - prefers correctness over speed
- * - "Parallelize independent reads to reduce latency" - official guidance
+ * Ultrawork message optimized for GPT 5.4 series models.
  *
  * Design principles:
+ * - Expert coding agent framing with approach-first mentality
+ * - Prose-first output (do not default to bullets)
  * - Two-track parallel context gathering (Direct tools + Background agents)
- * - Fire background agents, then use direct tools while waiting
- * - Explicit complexity-based decision criteria
+ * - Deterministic tool usage and explicit decision criteria
  */
 
 export const ULTRAWORK_GPT_MESSAGE = `<ultrawork-mode>
@@ -19,11 +15,11 @@ export const ULTRAWORK_GPT_MESSAGE = `<ultrawork-mode>
 [CODE RED] Maximum precision required. Think deeply before acting.
 
 <output_verbosity_spec>
-- Default: 3-6 sentences or ≤5 bullets for typical answers
-- Simple yes/no questions: ≤2 sentences
-- Complex multi-file tasks: 1 short overview paragraph + ≤5 bullets (What, Where, Risks, Next, Open)
-- Avoid long narrative paragraphs; prefer compact bullets
-- Do not rephrase the user's request unless it changes semantics
+- Default: 1-2 short paragraphs. Do not default to bullets.
+- Simple yes/no questions: ≤2 sentences.
+- Complex multi-file tasks: 1 overview paragraph + up to 4 high-level sections grouped by outcome, not by file.
+- Use lists only when content is inherently list-shaped (distinct items, steps, options).
+- Do not rephrase the user's request unless it changes semantics.
 </output_verbosity_spec>
 
 <scope_constraints>
@@ -144,8 +140,8 @@ A task is complete when:
 
 ---
 
-`
+`;
 
 export function getGptUltraworkMessage(): string {
-  return ULTRAWORK_GPT_MESSAGE
+  return ULTRAWORK_GPT_MESSAGE;
 }
