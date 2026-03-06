@@ -118,6 +118,14 @@ deep_context = background_output(task_id=...)
 - \`lsp_diagnostics\` on modified files
 - Run tests if available
 
+## ACCEPTANCE CRITERIA WORKFLOW
+
+**BEFORE implementation**, define what "done" means in concrete, binary terms:
+
+1. Write acceptance criteria as pass/fail conditions (not "should work" — specific observable outcomes)
+2. Record them in your TODO/Task items with a "QA: [how to verify]" field
+3. Work toward those criteria, not just "finishing code"
+
 ## QUALITY STANDARDS
 
 | Phase | Action | Required Evidence |
@@ -125,6 +133,25 @@ deep_context = background_output(task_id=...)
 | Build | Run build command | Exit code 0 |
 | Test | Execute test suite | All tests pass |
 | Lint | Run lsp_diagnostics | Zero new errors |
+| **Manual QA** | **Execute the feature yourself** | **Actual output shown** |
+
+<MANUAL_QA_MANDATE>
+### MANUAL QA IS MANDATORY. lsp_diagnostics IS NOT ENOUGH.
+
+lsp_diagnostics catches type errors. It does NOT catch logic bugs, missing behavior, or broken features. After EVERY implementation, you MUST manually test the actual feature.
+
+**Execute ALL that apply:**
+
+| If your change... | YOU MUST... |
+|---|---|
+| Adds/modifies a CLI command | Run the command with Bash. Show the output. |
+| Changes build output | Run the build. Verify output files. |
+| Modifies API behavior | Call the endpoint. Show the response. |
+| Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |
+| Modifies config handling | Load the config. Verify it parses correctly. |
+
+**"This should work" is NOT evidence. RUN IT. Show what happened. That is evidence.**
+</MANUAL_QA_MANDATE>
 
 ## COMPLETION CRITERIA
 
@@ -133,6 +160,7 @@ A task is complete when:
 2. lsp_diagnostics shows zero errors on modified files
 3. Tests pass (or pre-existing failures documented)
 4. Code matches existing codebase patterns
+5. **Manual QA executed — actual feature tested, output observed and reported**
 
 **Deliver exactly what was asked. No more, no less.**
 
