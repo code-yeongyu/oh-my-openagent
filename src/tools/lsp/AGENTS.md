@@ -1,10 +1,10 @@
 # src/tools/lsp/ — LSP Tool Implementations
 
-**Generated:** 2026-03-02
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 
-32 files. Full LSP (Language Server Protocol) client stack exposed as 6 tools. Custom implementation that manages server processes, opens files, and forwards requests — does NOT delegate to OpenCode's built-in LSP.
+33 files. Full LSP (Language Server Protocol) client stack exposed as 6 tools. Custom implementation that manages server processes, opens files, and forwards requests — does NOT delegate to OpenCode's built-in LSP.
 
 ## TOOL EXPOSURE
 

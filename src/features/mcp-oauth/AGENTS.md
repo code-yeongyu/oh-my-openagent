@@ -1,6 +1,6 @@
 # src/features/mcp-oauth/ — OAuth 2.0 + PKCE + DCR for MCP Servers
 
-**Generated:** 2026-03-02
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 
