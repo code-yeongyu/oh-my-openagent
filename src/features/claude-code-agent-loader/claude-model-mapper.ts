@@ -2,15 +2,24 @@ import { normalizeModelID } from "../../shared/model-normalization"
 
 const ANTHROPIC_PREFIX = "anthropic/"
 
+const CLAUDE_CODE_ALIAS_MAP: Record<string, string> = {
+  sonnet: `${ANTHROPIC_PREFIX}claude-sonnet-4-6`,
+  opus: `${ANTHROPIC_PREFIX}claude-opus-4-6`,
+  haiku: `${ANTHROPIC_PREFIX}claude-haiku-4-5`,
+}
+
 export function mapClaudeModelToOpenCode(model: string | undefined): string | undefined {
   if (!model) return undefined
 
   const trimmed = model.trim()
   if (trimmed.length === 0) return undefined
 
-  if (trimmed.includes("/")) {
-    return trimmed
-  }
+  if (trimmed === "inherit") return undefined
+
+  const aliasResult = CLAUDE_CODE_ALIAS_MAP[trimmed.toLowerCase()]
+  if (aliasResult) return aliasResult
+
+  if (trimmed.includes("/")) return trimmed
 
   const normalized = normalizeModelID(trimmed)
 
