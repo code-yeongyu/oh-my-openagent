@@ -12,6 +12,16 @@ const TOAST_MESSAGE = [
 ].join("\n")
 const HEPHAESTUS_DISPLAY = getAgentDisplayName("hephaestus")
 
+type NoSisyphusGptHookOptions = {
+  configuredModelID?: string
+}
+
+function normalizeModelID(modelID?: string): string | undefined {
+  if (typeof modelID !== "string") return undefined
+  const trimmed = modelID.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
 function showToast(ctx: PluginInput, sessionID: string): void {
   ctx.client.tui.showToast({
     body: {
@@ -28,7 +38,10 @@ function showToast(ctx: PluginInput, sessionID: string): void {
   })
 }
 
-export function createNoSisyphusGptHook(ctx: PluginInput) {
+export function createNoSisyphusGptHook(
+  ctx: PluginInput,
+  options?: NoSisyphusGptHookOptions,
+) {
   return {
     "chat.message": async (input: {
       sessionID: string
@@ -39,7 +52,7 @@ export function createNoSisyphusGptHook(ctx: PluginInput) {
     }): Promise<void> => {
       const rawAgent = input.agent ?? getSessionAgent(input.sessionID) ?? ""
       const agentKey = getAgentConfigKey(rawAgent)
-      const modelID = input.model?.modelID
+      const modelID = normalizeModelID(options?.configuredModelID) ?? normalizeModelID(input.model?.modelID)
 
       if (agentKey === "sisyphus" && modelID && isGptModel(modelID) && !isGpt5_4Model(modelID)) {
         showToast(ctx, input.sessionID)

@@ -33,6 +33,7 @@ import {
   log,
   normalizeSDKResponse,
 } from "../../shared"
+import { mergeCategories } from "../../shared/merge-categories"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
 
@@ -62,6 +63,23 @@ export type SessionHooks = {
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
 }
 
+function normalizeConfiguredModelID(model?: string): string | undefined {
+  if (typeof model !== "string") return undefined
+  const trimmed = model.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
+function resolveSisyphusConfiguredModelID(pluginConfig: OhMyOpenCodeConfig): string | undefined {
+  const directModel = normalizeConfiguredModelID(pluginConfig.agents?.sisyphus?.model)
+  if (directModel) return directModel
+
+  const categoryName = pluginConfig.agents?.sisyphus?.category?.trim()
+  if (!categoryName) return undefined
+
+  const mergedCategories = mergeCategories(pluginConfig.categories)
+  return normalizeConfiguredModelID(mergedCategories[categoryName]?.model)
+}
+
 export function createSessionHooks(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
@@ -70,6 +88,7 @@ export function createSessionHooks(args: {
   safeHookEnabled: boolean
 }): SessionHooks {
   const { ctx, pluginConfig, modelCacheState, isHookEnabled, safeHookEnabled } = args
+  const configuredSisyphusModelID = resolveSisyphusConfiguredModelID(pluginConfig)
   const safeHook = <T>(hookName: HookName, factory: () => T): T | null =>
     safeCreateHook(hookName, factory, { enabled: safeHookEnabled })
 
@@ -228,7 +247,10 @@ export function createSessionHooks(args: {
     : null
 
   const noSisyphusGpt = isHookEnabled("no-sisyphus-gpt")
-    ? safeHook("no-sisyphus-gpt", () => createNoSisyphusGptHook(ctx))
+    ? safeHook("no-sisyphus-gpt", () =>
+      createNoSisyphusGptHook(ctx, {
+        configuredModelID: configuredSisyphusModelID,
+      }))
     : null
 
   const noHephaestusNonGpt = isHookEnabled("no-hephaestus-non-gpt")
