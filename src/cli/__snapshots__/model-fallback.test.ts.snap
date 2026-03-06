@@ -305,7 +305,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "xhigh",
     },
     "unspecified-high": {
-      "model": "openai/gpt-5.2",
+      "model": "openai/gpt-5.4",
       "variant": "high",
     },
     "unspecified-low": {
@@ -428,7 +428,7 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
       "variant": "high",
     },
     "unspecified-high": {
-      "model": "google/gemini-3.1-pro-preview",
+      "model": "opencode/glm-4.7-free",
     },
     "unspecified-low": {
       "model": "google/gemini-3-flash-preview",
@@ -578,8 +578,8 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "variant": "xhigh",
     },
     "unspecified-high": {
-      "model": "anthropic/claude-opus-4-6",
-      "variant": "max",
+      "model": "openai/gpt-5.4",
+      "variant": "high",
     },
     "unspecified-low": {
       "model": "anthropic/claude-sonnet-4-5",
@@ -729,8 +729,8 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "variant": "xhigh",
     },
     "unspecified-high": {
-      "model": "opencode/claude-opus-4-6",
-      "variant": "max",
+      "model": "opencode/gpt-5.4",
+      "variant": "high",
     },
     "unspecified-low": {
       "model": "opencode/claude-sonnet-4-5",
@@ -862,8 +862,8 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "variant": "high",
     },
     "unspecified-high": {
-      "model": "github-copilot/claude-opus-4.6",
-      "variant": "max",
+      "model": "github-copilot/gpt-5.4",
+      "variant": "high",
     },
     "unspecified-low": {
       "model": "github-copilot/claude-sonnet-4.5",
@@ -974,7 +974,7 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
       "model": "opencode/glm-4.7-free",
     },
     "unspecified-high": {
-      "model": "opencode/glm-4.7-free",
+      "model": "zai-coding-plan/glm-5",
     },
     "unspecified-low": {
       "model": "opencode/glm-4.7-free",
@@ -1475,8 +1475,8 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
       "variant": "xhigh",
     },
     "unspecified-high": {
-      "model": "anthropic/claude-opus-4-6",
-      "variant": "max",
+      "model": "openai/gpt-5.4",
+      "variant": "high",
     },
     "unspecified-low": {
       "model": "anthropic/claude-sonnet-4-5",
