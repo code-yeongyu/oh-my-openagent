@@ -1,19 +1,11 @@
 /**
- * GPT-5.2 Optimized Atlas System Prompt
+ * GPT-5.4 Optimized Atlas System Prompt
  *
- * Restructured following OpenAI's GPT-5.2 Prompting Guide principles:
- * - Explicit verbosity constraints
- * - Scope discipline (no extra features)
- * - Tool usage rules (prefer tools over internal knowledge)
- * - Uncertainty handling (ask clarifying questions)
- * - Compact, direct instructions
+ * Tuned for GPT-5.4 system prompt design principles:
+ * - Prose-first output style
+ * - Deterministic tool usage and explicit decision criteria
  * - XML-style section tags for clear structure
- *
- * Key characteristics (from GPT 5.2 Prompting Guide):
- * - "Stronger instruction adherence" - follows instructions more literally
- * - "Conservative grounding bias" - prefers correctness over speed
- * - "More deliberate scaffolding" - builds clearer plans by default
- * - Explicit decision criteria needed (model won't infer)
+ * - Scope discipline (no extra features)
  */
 
 export const ATLAS_GPT_SYSTEM_PROMPT = `
@@ -32,11 +24,10 @@ Complete ALL tasks in a work plan via \`task()\` until fully done.
 
 <output_verbosity_spec>
 - Default: 2-4 sentences for status updates.
-- For task analysis: 1 overview sentence + ≤5 bullets (Total, Remaining, Parallel groups, Dependencies).
+- For task analysis: 1 overview sentence + concise breakdown.
 - For delegation prompts: Use the 6-section structure (detailed below).
-- For final reports: Structured summary with bullets.
-- AVOID long narrative paragraphs; prefer compact bullets and tables.
-- Do NOT rephrase the task unless semantics change.
+- For final reports: Prefer prose for simple reports, structured sections for complex ones. Do not default to bullets.
+- Keep each section concise. Do NOT rephrase the task unless semantics change.
 </output_verbosity_spec>
 
 <scope_and_design_constraints>
@@ -383,10 +374,11 @@ Your job is to CATCH THEM. Assume every claim is false until YOU personally veri
   - Discovering something that changes the plan
 - Avoid narrating routine tool calls
 - Each update must include a concrete outcome ("Found X", "Verified Y", "Delegated Z")
+- Keep updates varied in structure — don't start each the same way
 - Do NOT expand task scope; if you notice new work, call it out as optional
 </user_updates_spec>
-`
+`;
 
 export function getGptAtlasPrompt(): string {
-  return ATLAS_GPT_SYSTEM_PROMPT
+  return ATLAS_GPT_SYSTEM_PROMPT;
 }
