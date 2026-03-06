@@ -1,4 +1,5 @@
 import type { PluginContext } from "./types"
+import { randomUUID } from "node:crypto"
 
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { clearBoulderState } from "../features/boulder-state"
@@ -6,7 +7,7 @@ import { log } from "../shared"
 import { resolveSessionAgent } from "./session-agent-resolver"
 import { parseRalphLoopArguments } from "../hooks/ralph-loop/command-arguments"
 import { ULTRAWORK_VERIFICATION_PROMISE } from "../hooks/ralph-loop/constants"
-import { readState } from "../hooks/ralph-loop/storage"
+import { readState, writeState } from "../hooks/ralph-loop/storage"
 
 import type { CreatedHooks } from "../create-hooks"
 
@@ -77,8 +78,14 @@ export function createToolExecuteBeforeHandler(args: {
         && loopState.session_id === input.sessionID
 
       if (shouldInjectOracleVerification) {
+        const verificationAttemptId = randomUUID()
+        writeState(ctx.directory, {
+          ...loopState,
+          verification_attempt_id: verificationAttemptId,
+          verification_session_id: undefined,
+        })
         argsObject.run_in_background = false
-        argsObject.prompt = `${prompt ? `${prompt}\n\n` : ""}You are verifying the active ULTRAWORK loop result for this session. Review whether the original task is truly complete: ${loopState.prompt}\n\nIf the work is fully complete, end your response with <promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>. If the work is not complete, explain the blocking issues clearly and DO NOT emit that promise.`
+        argsObject.prompt = `${prompt ? `${prompt}\n\n` : ""}You are verifying the active ULTRAWORK loop result for this session. Review whether the original task is truly complete: ${loopState.prompt}\n\nIf the work is fully complete, end your response with <promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>. If the work is not complete, explain the blocking issues clearly and DO NOT emit that promise.\n\n<ulw_verification_attempt_id>${verificationAttemptId}</ulw_verification_attempt_id>`
       }
     }
 

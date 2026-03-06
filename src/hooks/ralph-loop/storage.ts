@@ -62,6 +62,12 @@ export function readState(directory: string, customPath?: string): RalphLoopStat
       initial_completion_promise: data.initial_completion_promise
         ? stripQuotes(data.initial_completion_promise)
         : undefined,
+      verification_attempt_id: data.verification_attempt_id
+        ? stripQuotes(data.verification_attempt_id)
+        : undefined,
+      verification_session_id: data.verification_session_id
+        ? stripQuotes(data.verification_session_id)
+        : undefined,
       started_at: stripQuotes(data.started_at) || new Date().toISOString(),
       prompt: body.trim(),
       session_id: data.session_id ? stripQuotes(data.session_id) : undefined,
@@ -100,6 +106,12 @@ export function writeState(
     const initialCompletionPromiseLine = state.initial_completion_promise
       ? `initial_completion_promise: "${state.initial_completion_promise}"\n`
       : ""
+    const verificationAttemptLine = state.verification_attempt_id
+      ? `verification_attempt_id: "${state.verification_attempt_id}"\n`
+      : ""
+    const verificationSessionLine = state.verification_session_id
+      ? `verification_session_id: "${state.verification_session_id}"\n`
+      : ""
     const messageCountAtStartLine =
       typeof state.message_count_at_start === "number"
         ? `message_count_at_start: ${state.message_count_at_start}\n`
@@ -112,7 +124,7 @@ export function writeState(
 active: ${state.active}
 iteration: ${state.iteration}
 ${maxIterationsLine}completion_promise: "${state.completion_promise}"
-${initialCompletionPromiseLine}started_at: "${state.started_at}"
+${initialCompletionPromiseLine}${verificationAttemptLine}${verificationSessionLine}started_at: "${state.started_at}"
 ${sessionIdLine}${ultraworkLine}${verificationPendingLine}${strategyLine}${messageCountAtStartLine}---
 ${state.prompt}
 `

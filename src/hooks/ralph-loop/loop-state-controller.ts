@@ -43,6 +43,8 @@ export function createLoopStateController(options: {
 				message_count_at_start: loopOptions?.messageCountAtStart,
 				completion_promise: initialCompletionPromise,
 				initial_completion_promise: initialCompletionPromise,
+				verification_attempt_id: undefined,
+				verification_session_id: undefined,
 				ultrawork: loopOptions?.ultrawork,
 				verification_pending: undefined,
 				strategy: loopOptions?.strategy ?? config?.default_strategy ?? "continue",
@@ -123,7 +125,24 @@ export function createLoopStateController(options: {
 
 			state.verification_pending = true
 			state.completion_promise = ULTRAWORK_VERIFICATION_PROMISE
+			state.verification_attempt_id = undefined
+			state.verification_session_id = undefined
 			state.initial_completion_promise ??= DEFAULT_COMPLETION_PROMISE
+
+			if (!writeState(directory, state, stateDir)) {
+				return null
+			}
+
+			return state
+		},
+
+		setVerificationSessionID(sessionID: string, verificationSessionID: string): RalphLoopState | null {
+			const state = readState(directory, stateDir)
+			if (!state || state.session_id !== sessionID || !state.ultrawork || !state.verification_pending) {
+				return null
+			}
+
+			state.verification_session_id = verificationSessionID
 
 			if (!writeState(directory, state, stateDir)) {
 				return null
