@@ -1419,5 +1419,178 @@ describe("atlas hook", () => {
       // then - should continue because start-work updated session agent to atlas
       expect(mockInput._promptMock).toHaveBeenCalled()
     })
+
+    describe("delayed retry timer (abort-stuck fix)", () => {
+      test("should schedule delayed retry when cooldown blocks idle for incomplete boulder", async () => {
+        // given - boulder with incomplete plan
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        // when - first idle injects, second idle within cooldown schedules retry timer
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        // then - wait for retry timer to fire (RETRY_DELAY_MS = 6000ms)
+        await new Promise(resolve => setTimeout(resolve, 7000))
+        await flushMicrotasks()
+
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(2)
+      }, 15000)
+
+      test("should not schedule duplicate retry timers for rapid idle events", async () => {
+        // given - boulder with incomplete plan
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        // when - first idle injects, then 3 rapid idles within cooldown
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        // then - wait for retry timer, only one retry should fire
+        await new Promise(resolve => setTimeout(resolve, 7000))
+        await flushMicrotasks()
+
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(2)
+      }, 15000)
+
+      test("should not retry if plan completes before timer fires", async () => {
+        // given - boulder with incomplete plan
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        // when - first idle injects, second schedules retry, then plan completes before timer fires
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
+
+        // then - wait for retry timer, it should bail out seeing complete plan
+        await new Promise(resolve => setTimeout(resolve, 7000))
+        await flushMicrotasks()
+
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      }, 15000)
+
+      test("should cleanup pending retry timer on session.deleted", async () => {
+        // given - boulder with incomplete plan, schedule retry timer
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        // when - delete session before timer fires
+        await hook.handler({
+          event: { type: "session.deleted", properties: { info: { id: MAIN_SESSION_ID } } },
+        })
+
+        // then - wait for timer period, prompt should only have been called once
+        await new Promise(resolve => setTimeout(resolve, 7000))
+        await flushMicrotasks()
+
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      }, 15000)
+
+      test("should cleanup pending retry timer on session.compacted", async () => {
+        // given - boulder with incomplete plan, schedule retry timer
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        // when - compact session before timer fires
+        await hook.handler({
+          event: { type: "session.compacted", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        // then - wait for timer period, prompt should only have been called once
+        await new Promise(resolve => setTimeout(resolve, 7000))
+        await flushMicrotasks()
+
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      }, 15000)
+    })
   })
 })

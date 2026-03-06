@@ -11,6 +11,7 @@ import type { AtlasHookOptions, SessionState } from "./types"
 
 const CONTINUATION_COOLDOWN_MS = 5000
 const FAILURE_BACKOFF_MS = 5 * 60 * 1000
+const RETRY_DELAY_MS = CONTINUATION_COOLDOWN_MS + 1000
 
 export function createAtlasEventHandler(input: {
   ctx: PluginInput
@@ -123,9 +124,42 @@ export function createAtlasEventHandler(input: {
       }
 
       if (state.lastContinuationInjectedAt && now - state.lastContinuationInjectedAt < CONTINUATION_COOLDOWN_MS) {
+        if (!state.pendingRetryTimer) {
+          state.pendingRetryTimer = setTimeout(async () => {
+            state.pendingRetryTimer = undefined
+
+            const currentBoulder = readBoulderState(ctx.directory)
+            if (!currentBoulder) return
+
+            const currentProgress = getPlanProgress(currentBoulder.active_plan)
+            if (currentProgress.isComplete) return
+
+            if (options?.isContinuationStopped?.(sessionID)) return
+
+            state.lastContinuationInjectedAt = Date.now()
+            const currentRemaining = currentProgress.total - currentProgress.completed
+            try {
+              await injectBoulderContinuation({
+                ctx,
+                sessionID,
+                planName: currentBoulder.plan_name,
+                remaining: currentRemaining,
+                total: currentProgress.total,
+                agent: currentBoulder.agent,
+                worktreePath: currentBoulder.worktree_path,
+                backgroundManager,
+                sessionState: state,
+              })
+            } catch (err) {
+              log(`[${HOOK_NAME}] Delayed retry failed`, { sessionID, error: err })
+              state.promptFailureCount++
+            }
+          }, RETRY_DELAY_MS)
+        }
         log(`[${HOOK_NAME}] Skipped: continuation cooldown active`, {
           sessionID,
           cooldownRemaining: CONTINUATION_COOLDOWN_MS - (now - state.lastContinuationInjectedAt),
+          pendingRetry: !!state.pendingRetryTimer,
         })
         return
       }
@@ -191,6 +225,10 @@ export function createAtlasEventHandler(input: {
     if (event.type === "session.deleted") {
       const sessionInfo = props?.info as { id?: string } | undefined
       if (sessionInfo?.id) {
+        const deletedState = sessions.get(sessionInfo.id)
+        if (deletedState?.pendingRetryTimer) {
+          clearTimeout(deletedState.pendingRetryTimer)
+        }
         sessions.delete(sessionInfo.id)
         log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID: sessionInfo.id })
       }
@@ -200,6 +238,10 @@ export function createAtlasEventHandler(input: {
     if (event.type === "session.compacted") {
       const sessionID = (props?.sessionID ?? (props?.info as { id?: string } | undefined)?.id) as string | undefined
       if (sessionID) {
+        const compactedState = sessions.get(sessionID)
+        if (compactedState?.pendingRetryTimer) {
+          clearTimeout(compactedState.pendingRetryTimer)
+        }
         sessions.delete(sessionID)
         log(`[${HOOK_NAME}] Session compacted: cleaned up`, { sessionID })
       }
