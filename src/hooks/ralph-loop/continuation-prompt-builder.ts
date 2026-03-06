@@ -31,6 +31,20 @@ REQUIRED NOW:
 Original task:
 {{PROMPT}}`
 
+const ULTRAWORK_VERIFICATION_FAILED_PROMPT = `${SYSTEM_DIRECTIVE_PREFIX} - ULTRAWORK LOOP VERIFICATION FAILED {{ITERATION}}/{{MAX}}]
+
+Oracle did not emit <promise>VERIFIED</promise>. Verification failed.
+
+REQUIRED NOW:
+- Verification failed. Fix the task until Oracle's review is satisfied
+- Oracle does not lie. Treat the verification result as ground truth
+- Do not claim completion early or argue with the failed verification
+- After fixing the remaining issues, request Oracle review again using task(subagent_type="oracle", load_skills=[], run_in_background=false, ...)
+- Only when the work is ready for review again, output: <promise>{{PROMISE}}</promise>
+
+Original task:
+{{PROMPT}}`
+
 export function buildContinuationPrompt(state: RalphLoopState): string {
 	const template = state.verification_pending
 		? ULTRAWORK_VERIFICATION_PROMPT
@@ -41,6 +55,18 @@ export function buildContinuationPrompt(state: RalphLoopState): string {
 	)
 		.replace("{{MAX}}", getMaxIterationsLabel(state))
 		.replace("{{INITIAL_PROMISE}}", state.initial_completion_promise ?? state.completion_promise)
+		.replace("{{PROMISE}}", state.completion_promise)
+		.replace("{{PROMPT}}", state.prompt)
+
+	return state.ultrawork ? `ultrawork ${continuationPrompt}` : continuationPrompt
+}
+
+export function buildVerificationFailurePrompt(state: RalphLoopState): string {
+	const continuationPrompt = ULTRAWORK_VERIFICATION_FAILED_PROMPT.replace(
+		"{{ITERATION}}",
+		String(state.iteration),
+	)
+		.replace("{{MAX}}", getMaxIterationsLabel(state))
 		.replace("{{PROMISE}}", state.completion_promise)
 		.replace("{{PROMPT}}", state.prompt)
 
