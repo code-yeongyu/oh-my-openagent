@@ -34,26 +34,28 @@ function findPlanByName(plans: string[], requestedName: string): string | null {
   return partialMatch || null
 }
 
-const MODEL_DECIDES_WORKTREE_BLOCK = `
-## Worktree Setup Required
+function createWorktreeActiveBlock(worktreePath: string): string {
+  return `
+## Worktree Active
 
-No worktree specified. Before starting work, you MUST choose or create one:
+**Worktree**: \`${worktreePath}\`
 
-1. \`git worktree list --porcelain\` — list existing worktrees
-2. Create if needed: \`git worktree add <absolute-path> <branch-or-HEAD>\`
-3. Update \`.sisyphus/boulder.json\` — add \`"worktree_path": "<absolute-path>"\`
-4. Work exclusively inside that worktree directory`
+**CRITICAL — DO NOT FORGET**: You are working inside a git worktree. ALL operations MUST be performed exclusively within this worktree directory.
+- Every file read, write, edit, and git operation MUST target paths under: \`${worktreePath}\`
+- When delegating tasks to subagents, you MUST include the worktree path in your delegation prompt so they also operate exclusively within the worktree
+- NEVER operate on the main repository directory — always use the worktree path above`
+}
 
 function resolveWorktreeContext(
   explicitWorktreePath: string | null,
 ): { worktreePath: string | undefined; block: string } {
   if (explicitWorktreePath === null) {
-    return { worktreePath: undefined, block: MODEL_DECIDES_WORKTREE_BLOCK }
+    return { worktreePath: undefined, block: "" }
   }
 
   const validatedPath = detectWorktreePath(explicitWorktreePath)
   if (validatedPath) {
-    return { worktreePath: validatedPath, block: `\n**Worktree**: ${validatedPath}` }
+    return { worktreePath: validatedPath, block: createWorktreeActiveBlock(validatedPath) }
   }
 
   return {
@@ -165,7 +167,7 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
             appendSessionId(ctx.directory, sessionId)
           }
 
-          const worktreeDisplay = effectiveWorktree ? `\n**Worktree**: ${effectiveWorktree}` : worktreeBlock
+          const worktreeDisplay = effectiveWorktree ? createWorktreeActiveBlock(effectiveWorktree) : worktreeBlock
 
           contextInfo = `
 ## Active Work Session Found
