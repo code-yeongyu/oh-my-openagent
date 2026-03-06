@@ -79,12 +79,22 @@ describe("mapClaudeModelToOpenCode", () => {
   })
 
   describe("#given non-Claude bare model", () => {
-    it("#when called with gpt-5.2 #then normalizes dots without adding prefix", () => {
-      expect(mapClaudeModelToOpenCode("gpt-5.2")).toBe("gpt-5-2")
+    it("#when called with gpt-5.2 #then returns undefined", () => {
+      expect(mapClaudeModelToOpenCode("gpt-5.2")).toBeUndefined()
     })
 
-    it("#when called with gemini-3-flash #then returns unchanged", () => {
-      expect(mapClaudeModelToOpenCode("gemini-3-flash")).toBe("gemini-3-flash")
+    it("#when called with gemini-3-flash #then returns undefined", () => {
+      expect(mapClaudeModelToOpenCode("gemini-3-flash")).toBeUndefined()
+    })
+  })
+
+  describe("#given prototype property name", () => {
+    it("#when called with constructor #then returns undefined", () => {
+      expect(mapClaudeModelToOpenCode("constructor")).toBeUndefined()
+    })
+
+    it("#when called with toString #then returns undefined", () => {
+      expect(mapClaudeModelToOpenCode("toString")).toBeUndefined()
     })
   })
 
