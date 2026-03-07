@@ -103,7 +103,9 @@ export class LSPClient extends LSPClientConnection {
       if (result && typeof result === "object" && "items" in result) {
         return result as { items: Diagnostic[] }
       }
-    } catch {}
+    } catch (diagErr) {
+      // Diagnostic request failed, fall back to cached diagnostics
+    }
 
     return { items: this.diagnosticsStore.get(uri) ?? [] }
   }

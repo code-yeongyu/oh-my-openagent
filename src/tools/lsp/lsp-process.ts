@@ -126,7 +126,9 @@ function wrapNodeProcess(proc: ChildProcess): UnifiedProcess {
         } else {
           proc.kill()
         }
-      } catch {}
+      } catch (killErr) {
+        // Process may already be dead
+      }
     },
   }
 }
