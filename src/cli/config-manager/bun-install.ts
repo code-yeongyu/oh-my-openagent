@@ -1,4 +1,5 @@
-import { getConfigDir } from "./config-context"
+import { getOpenCodeCacheDir } from "../../shared/data-path"
+import { log } from "../../shared/logger"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 const BUN_INSTALL_TIMEOUT_SECONDS = 60
@@ -16,9 +17,11 @@ export async function runBunInstall(): Promise<boolean> {
 }
 
 export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
+  const cacheDir = getOpenCodeCacheDir()
+
   try {
     const proc = spawnWithWindowsHide(["bun", "install"], {
-      cwd: getConfigDir(),
+      cwd: cacheDir,
       stdout: "inherit",
       stderr: "inherit",
     })
@@ -34,13 +37,13 @@ export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
     if (result === "timeout") {
       try {
         proc.kill()
-      } catch {
-        /* intentionally empty - process may have already exited */
+      } catch (err) {
+        log("[cli/install] Failed to kill timed out bun install process:", err)
       }
       return {
         success: false,
         timedOut: true,
-        error: `bun install timed out after ${BUN_INSTALL_TIMEOUT_SECONDS} seconds. Try running manually: cd ${getConfigDir()} && bun i`,
+        error: `bun install timed out after ${BUN_INSTALL_TIMEOUT_SECONDS} seconds. Try running manually: cd ${cacheDir} && bun i`,
       }
     }
 

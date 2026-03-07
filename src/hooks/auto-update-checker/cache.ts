@@ -1,6 +1,6 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { PACKAGE_NAME, USER_CONFIG_DIR } from "./constants"
+import { CACHE_DIR, PACKAGE_NAME } from "./constants"
 import { log } from "../../shared/logger"
 
 interface BunLockfile {
@@ -17,18 +17,13 @@ function stripTrailingCommas(json: string): string {
 }
 
 function removeFromBunLock(packageName: string): boolean {
-  const lockPath = path.join(USER_CONFIG_DIR, "bun.lock")
+  const lockPath = path.join(CACHE_DIR, "bun.lock")
   if (!fs.existsSync(lockPath)) return false
 
   try {
     const content = fs.readFileSync(lockPath, "utf-8")
     const lock = JSON.parse(stripTrailingCommas(content)) as BunLockfile
-    let modified = false
-
-    if (lock.workspaces?.[""]?.dependencies?.[packageName]) {
-      delete lock.workspaces[""].dependencies[packageName]
-      modified = true
-    }
+  let modified = false
 
     if (lock.packages?.[packageName]) {
       delete lock.packages[packageName]
@@ -48,11 +43,9 @@ function removeFromBunLock(packageName: string): boolean {
 
 export function invalidatePackage(packageName: string = PACKAGE_NAME): boolean {
   try {
-    const pkgDir = path.join(USER_CONFIG_DIR, "node_modules", packageName)
-    const pkgJsonPath = path.join(USER_CONFIG_DIR, "package.json")
+    const pkgDir = path.join(CACHE_DIR, "node_modules", packageName)
 
     let packageRemoved = false
-    let dependencyRemoved = false
     let lockRemoved = false
 
     if (fs.existsSync(pkgDir)) {
@@ -61,20 +54,9 @@ export function invalidatePackage(packageName: string = PACKAGE_NAME): boolean {
       packageRemoved = true
     }
 
-    if (fs.existsSync(pkgJsonPath)) {
-      const content = fs.readFileSync(pkgJsonPath, "utf-8")
-      const pkgJson = JSON.parse(content)
-      if (pkgJson.dependencies?.[packageName]) {
-        delete pkgJson.dependencies[packageName]
-        fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2))
-        log(`[auto-update-checker] Dependency removed from package.json: ${packageName}`)
-        dependencyRemoved = true
-      }
-    }
-
     lockRemoved = removeFromBunLock(packageName)
 
-    if (!packageRemoved && !dependencyRemoved && !lockRemoved) {
+    if (!packageRemoved && !lockRemoved) {
       log(`[auto-update-checker] Package not found, nothing to invalidate: ${packageName}`)
       return false
     }
