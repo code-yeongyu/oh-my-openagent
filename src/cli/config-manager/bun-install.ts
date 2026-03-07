@@ -1,4 +1,4 @@
-import { getConfigDir } from "./config-context"
+import { getOpenCodeConfigDir } from "../../shared"
 
 const BUN_INSTALL_TIMEOUT_SECONDS = 60
 const BUN_INSTALL_TIMEOUT_MS = BUN_INSTALL_TIMEOUT_SECONDS * 1000
@@ -17,7 +17,7 @@ export async function runBunInstall(): Promise<boolean> {
 export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
   try {
     const proc = Bun.spawn(["bun", "install"], {
-      cwd: getConfigDir(),
+      cwd: getOpenCodeConfigDir({ binary: "opencode" }),
       stdout: "inherit",
       stderr: "inherit",
     })
@@ -39,7 +39,7 @@ export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
       return {
         success: false,
         timedOut: true,
-        error: `bun install timed out after ${BUN_INSTALL_TIMEOUT_SECONDS} seconds. Try running manually: cd ${getConfigDir()} && bun i`,
+        error: `bun install timed out after ${BUN_INSTALL_TIMEOUT_SECONDS} seconds. Try running manually: cd ${getOpenCodeConfigDir({ binary: "opencode" })} && bun i`,
       }
     }
 
