@@ -6,6 +6,7 @@ import { STOP_CONTINUATION_TEMPLATE } from "./templates/stop-continuation"
 import { REFACTOR_TEMPLATE } from "./templates/refactor"
 import { START_WORK_TEMPLATE } from "./templates/start-work"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { REMOVE_DEADCODE_TEMPLATE } from "./templates/remove-deadcode"
 
 const BUILTIN_COMMAND_DEFINITIONS: Record<BuiltinCommandName, Omit<CommandDefinition, "name">> = {
   "init-deep": {
@@ -93,6 +94,13 @@ Timestamp: $TIMESTAMP
 $ARGUMENTS
 </user-request>`,
     argumentHint: "[goal]",
+  },
+  "remove-deadcode": {
+    description: "(builtin) Find and remove dead code (zero-reference symbols) using LSP analysis",
+    template: `<command-instruction>
+${REMOVE_DEADCODE_TEMPLATE}
+</command-instruction>`,
+    argumentHint: "[target-path] [--scope=<file|module|project>] [--dry-run]",
   },
 }
 

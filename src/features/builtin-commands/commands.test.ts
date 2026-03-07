@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test"
 import { loadBuiltinCommands } from "./commands"
 import { HANDOFF_TEMPLATE } from "./templates/handoff"
+import { REMOVE_DEADCODE_TEMPLATE } from "./templates/remove-deadcode"
 import type { BuiltinCommandName } from "./types"
 
 describe("loadBuiltinCommands", () => {
@@ -57,6 +58,119 @@ describe("loadBuiltinCommands", () => {
 
     //#then
     expect(commands.handoff.description).toContain("context summary")
+  })
+})
+
+describe("loadBuiltinCommands - remove-deadcode", () => {
+  test("should include remove-deadcode command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["remove-deadcode"]).toBeDefined()
+    expect(commands["remove-deadcode"].name).toBe("remove-deadcode")
+  })
+
+  test("should exclude remove-deadcode when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["remove-deadcode"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["remove-deadcode"]).toBeUndefined()
+  })
+
+  test("should include remove-deadcode template content in command template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["remove-deadcode"].template).toContain(REMOVE_DEADCODE_TEMPLATE)
+  })
+
+  test("should include $ARGUMENTS in remove-deadcode template", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["remove-deadcode"].template).toContain("$ARGUMENTS")
+  })
+
+  test("should have correct description for remove-deadcode", () => {
+    //#given - no disabled commands
+
+    //#when
+    const commands = loadBuiltinCommands()
+
+    //#then
+    expect(commands["remove-deadcode"].description).toContain("dead code")
+  })
+})
+
+describe("REMOVE_DEADCODE_TEMPLATE", () => {
+  test("should include LSP-based symbol discovery instructions", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("LspDocumentSymbols")
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("LspFindReferences")
+  })
+
+  test("should include phased approach", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("PHASE 1")
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("PHASE 2")
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("PHASE 3")
+  })
+
+  test("should include verification instructions", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("lsp_diagnostics")
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("bun test")
+  })
+
+  test("should include safety rules against breaking exports", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("export")
+  })
+
+  test("should include dry-run support", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("dry-run")
+  })
+
+  test("should include confidence classification", () => {
+    //#given - the template string
+
+    //#when / #then
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("HIGH")
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("MEDIUM")
+    expect(REMOVE_DEADCODE_TEMPLATE).toContain("LOW")
+  })
+
+  test("should not contain emojis", () => {
+    //#given - the template string
+
+    //#when / #then
+    const emojiRegex = /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2702}-\u{27B0}\u{24C2}-\u{1F251}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/u
+    expect(emojiRegex.test(REMOVE_DEADCODE_TEMPLATE)).toBe(false)
   })
 })
 
