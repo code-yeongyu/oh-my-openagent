@@ -66,7 +66,8 @@ export function createToolExecuteAfterHandler(input: {
       return
     }
 
-    if (!autoCommit && (toolInput.tool === "read" || toolInput.tool === "Read")) {
+    if (toolInput.tool === "read" || toolInput.tool === "Read") {
+      // Always cleanup pendingFilePaths to prevent memory leak
       let filePath = toolInput.callID ? pendingFilePaths.get(toolInput.callID) : undefined
       if (toolInput.callID) {
         pendingFilePaths.delete(toolInput.callID)
@@ -74,7 +75,8 @@ export function createToolExecuteAfterHandler(input: {
       if (!filePath) {
         filePath = extractFilePath(toolOutput.metadata)
       }
-      if (filePath && isPlanPath(filePath)) {
+      // Transform plan files only when autoCommit is disabled
+      if (!autoCommit && filePath && isPlanPath(filePath)) {
         const output = toolOutput.output
         if (output && typeof output === "string") {
           toolOutput.output = transformPlanCommitFields(output)
