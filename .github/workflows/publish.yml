@@ -213,8 +213,8 @@ jobs:
           fi
           npm publish --access public --provenance $TAG_ARG
         env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
-
       - name: Publish oh-my-openagent
         if: steps.check.outputs.skip != 'true'
         run: |
@@ -242,8 +242,8 @@ jobs:
           fi
           npm publish --access public --provenance $TAG_ARG || echo "oh-my-openagent publish may have failed (package may already exist)"
         env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
-
       - name: Restore package.json
         if: steps.check.outputs.skip != 'true'
         run: |
