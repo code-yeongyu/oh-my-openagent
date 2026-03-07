@@ -24,8 +24,14 @@ const mockFindPluginEntry = mock((_directory: string): PluginEntry | null => cre
 const mockGetCachedVersion = mock((): string | null => "3.4.0")
 const mockGetLatestVersion = mock(async (): Promise<string | null> => "3.5.0")
 const mockExtractChannel = mock(() => "latest")
-const mockInvalidatePackage = mock(() => {})
-const mockRunBunInstall = mock(async () => true)
+const operationOrder: string[] = []
+const mockSyncCachePackageJsonToIntent = mock((_pluginEntry: PluginEntry) => {
+  operationOrder.push("sync")
+})
+const mockInvalidatePackage = mock((_packageName: string) => {
+  operationOrder.push("invalidate")
+})
+const mockRunBunInstallWithDetails = mock(async () => ({ success: true }))
 const mockShowUpdateAvailableToast = mock(
   async (_ctx: PluginInput, _latestVersion: string, _getToastMessage: ToastMessageGetter): Promise<void> => {}
 )
@@ -38,10 +44,11 @@ mock.module("../checker", () => ({
   getCachedVersion: mockGetCachedVersion,
   getLatestVersion: mockGetLatestVersion,
   revertPinnedVersion: mock(() => false),
+  syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
 }))
 mock.module("../version-channel", () => ({ extractChannel: mockExtractChannel }))
 mock.module("../cache", () => ({ invalidatePackage: mockInvalidatePackage }))
-mock.module("../../../cli/config-manager", () => ({ runBunInstall: mockRunBunInstall }))
+mock.module("../../../cli/config-manager", () => ({ runBunInstallWithDetails: mockRunBunInstallWithDetails }))
 mock.module("./update-toasts", () => ({
   showUpdateAvailableToast: mockShowUpdateAvailableToast,
   showAutoUpdatedToast: mockShowAutoUpdatedToast,
@@ -51,36 +58,44 @@ mock.module("../../../shared/logger", () => ({ log: () => {} }))
 const modulePath = "./background-update-check?test"
 const { runBackgroundUpdateCheck } = await import(modulePath)
 
-async function runCheck(autoUpdate = true): Promise<void> {
-  const mockContext = { directory: "/test" } as PluginInput
-  const getToastMessage: ToastMessageGetter = (isUpdate, version) =>
-    isUpdate ? `Update to ${version}` : "Up to date"
+const mockContext = { directory: "/test" } as PluginInput
+const getToastMessage: ToastMessageGetter = (isUpdate, version) =>
+  isUpdate ? `Update to ${version}` : "Up to date"
 
+async function runCheck(autoUpdate = true): Promise<void> {
   await runBackgroundUpdateCheck(mockContext, autoUpdate, getToastMessage)
 }
 
 function expectNoUpdateEffects(): void {
   expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
   expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
-  expect(mockRunBunInstall).not.toHaveBeenCalled()
+  expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
+  expect(mockSyncCachePackageJsonToIntent).not.toHaveBeenCalled()
+  expect(mockInvalidatePackage).not.toHaveBeenCalled()
 }
 
 describe("runBackgroundUpdateCheck", () => {
+  let pluginEntry: PluginEntry
+
   beforeEach(() => {
     mockFindPluginEntry.mockReset()
     mockGetCachedVersion.mockReset()
     mockGetLatestVersion.mockReset()
     mockExtractChannel.mockReset()
+    mockSyncCachePackageJsonToIntent.mockReset()
     mockInvalidatePackage.mockReset()
-    mockRunBunInstall.mockReset()
+    mockRunBunInstallWithDetails.mockReset()
     mockShowUpdateAvailableToast.mockReset()
     mockShowAutoUpdatedToast.mockReset()
 
-    mockFindPluginEntry.mockReturnValue(createPluginEntry())
+    operationOrder.length = 0
+
+    pluginEntry = createPluginEntry()
+    mockFindPluginEntry.mockReturnValue(pluginEntry)
     mockGetCachedVersion.mockReturnValue("3.4.0")
     mockGetLatestVersion.mockResolvedValue("3.5.0")
     mockExtractChannel.mockReturnValue("latest")
-    mockRunBunInstall.mockResolvedValue(true)
+    mockRunBunInstallWithDetails.mockResolvedValue({ success: true })
   })
 
   describe("#given no-op scenarios", () => {
@@ -129,13 +144,10 @@ describe("runBackgroundUpdateCheck", () => {
       //#when
       await runCheck(autoUpdate)
       //#then
-      expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(
-        expect.objectContaining({ directory: "/test" }),
-        "3.5.0",
-        expect.any(Function)
-      )
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockContext, "3.5.0", getToastMessage)
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
+      expect(operationOrder).toEqual([])
     })
   })
 
@@ -147,7 +159,7 @@ describe("runBackgroundUpdateCheck", () => {
       await runCheck()
       //#then
       expect(mockShowUpdateAvailableToast).toHaveBeenCalledTimes(1)
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })
 
@@ -177,35 +189,33 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given unpinned with auto-update and install succeeds", () => {
     it("invalidates cache, installs, and shows auto-updated toast", async () => {
       //#given
-      mockRunBunInstall.mockResolvedValue(true)
+      mockRunBunInstallWithDetails.mockResolvedValue({ success: true })
       //#when
       await runCheck()
       //#then
+      expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledWith(pluginEntry)
       expect(mockInvalidatePackage).toHaveBeenCalledTimes(1)
-      expect(mockRunBunInstall).toHaveBeenCalledTimes(1)
-      expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(
-        expect.objectContaining({ directory: "/test" }),
-        "3.4.0",
-        "3.5.0"
-      )
+      expect(mockRunBunInstallWithDetails).toHaveBeenCalledTimes(1)
+      expect(mockRunBunInstallWithDetails).toHaveBeenCalledWith({ outputMode: "pipe" })
+      expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockContext, "3.4.0", "3.5.0")
       expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
+      expect(operationOrder).toEqual(["sync", "invalidate"])
     })
   })
 
   describe("#given unpinned with auto-update and install fails", () => {
     it("falls back to notification-only toast", async () => {
       //#given
-      mockRunBunInstall.mockResolvedValue(false)
+      mockRunBunInstallWithDetails.mockResolvedValue({ success: false, error: "install failed" })
       //#when
       await runCheck()
       //#then
-      expect(mockRunBunInstall).toHaveBeenCalledTimes(1)
-      expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(
-        expect.objectContaining({ directory: "/test" }),
-        "3.5.0",
-        expect.any(Function)
-      )
+      expect(mockRunBunInstallWithDetails).toHaveBeenCalledTimes(1)
+      expect(mockRunBunInstallWithDetails).toHaveBeenCalledWith({ outputMode: "pipe" })
+      expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledWith(pluginEntry)
+      expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockContext, "3.5.0", getToastMessage)
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
+      expect(operationOrder).toEqual(["sync", "invalidate"])
     })
   })
 })
