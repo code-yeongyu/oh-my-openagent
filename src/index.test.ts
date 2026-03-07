@@ -2,6 +2,10 @@ import { describe, expect, it, mock } from "bun:test"
 
 describe("experimental.session.compacting handler", () => {
   function createCompactingHandler(hooks: {
+    compactionContextInjector?: {
+      capture: (sessionID: string) => Promise<void>
+      inject: (sessionID: string) => string
+    }
     compactionTodoPreserver?: { capture: (sessionID: string) => Promise<void> }
     claudeCodeHooks?: {
       "experimental.session.compacting"?: (
@@ -9,19 +13,19 @@ describe("experimental.session.compacting handler", () => {
         output: { context: string[] },
       ) => Promise<void>
     }
-    compactionContextInjector?: (sessionID: string) => string
   }) {
     return async (
       _input: { sessionID: string },
       output: { context: string[] },
     ): Promise<void> => {
+      await hooks.compactionContextInjector?.capture(_input.sessionID)
       await hooks.compactionTodoPreserver?.capture(_input.sessionID)
       await hooks.claudeCodeHooks?.["experimental.session.compacting"]?.(
         _input,
         output,
       )
       if (hooks.compactionContextInjector) {
-        output.context.push(hooks.compactionContextInjector(_input.sessionID))
+        output.context.push(hooks.compactionContextInjector.inject(_input.sessionID))
       }
     }
   }
@@ -33,6 +37,15 @@ describe("experimental.session.compacting handler", () => {
     const callOrder: string[] = []
 
     const handler = createCompactingHandler({
+      compactionContextInjector: {
+        capture: mock(async () => {
+          callOrder.push("checkpointCapture")
+        }),
+        inject: mock((sessionID: string) => {
+          callOrder.push("contextInjector")
+          return `context-for-${sessionID}`
+        }),
+      },
       compactionTodoPreserver: {
         capture: mock(async () => { callOrder.push("capture") }),
       },
@@ -41,16 +54,12 @@ describe("experimental.session.compacting handler", () => {
           callOrder.push("preCompact")
         }),
       },
-      compactionContextInjector: mock((sessionID: string) => {
-        callOrder.push("contextInjector")
-        return `context-for-${sessionID}`
-      }),
     })
 
     const output = { context: [] as string[] }
     await handler({ sessionID: "ses_test" }, output)
 
-    expect(callOrder).toEqual(["capture", "preCompact", "contextInjector"])
+    expect(callOrder).toEqual(["checkpointCapture", "capture", "preCompact", "contextInjector"])
     expect(output.context).toEqual(["context-for-ses_test"])
   })
 
@@ -77,17 +86,22 @@ describe("experimental.session.compacting handler", () => {
   //#then handler completes without error and other hooks still run
   it("handles null claudeCodeHooks gracefully", async () => {
     const captureMock = mock(async () => {})
+    const checkpointCaptureMock = mock(async () => {})
     const contextMock = mock(() => "injected-context")
 
     const handler = createCompactingHandler({
+      compactionContextInjector: {
+        capture: checkpointCaptureMock,
+        inject: contextMock,
+      },
       compactionTodoPreserver: { capture: captureMock },
       claudeCodeHooks: undefined,
-      compactionContextInjector: contextMock,
     })
 
     const output = { context: [] as string[] }
     await handler({ sessionID: "ses_test" }, output)
 
+    expect(checkpointCaptureMock).toHaveBeenCalledWith("ses_test")
     expect(captureMock).toHaveBeenCalledWith("ses_test")
     expect(contextMock).toHaveBeenCalledWith("ses_test")
     expect(output.context).toEqual(["injected-context"])
