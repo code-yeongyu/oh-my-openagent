@@ -158,6 +158,7 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.interactiveBashSession?.event?.(input as EventInput));
     await Promise.resolve(hooks.ralphLoop?.event?.(input));
     await Promise.resolve(hooks.stopContinuationGuard?.event?.(input));
+    await Promise.resolve(hooks.compactionContextInjector?.event?.(input));
     await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input));
     await Promise.resolve(hooks.writeExistingFileGuard?.event?.(input));
     await Promise.resolve(hooks.atlasHook?.handler?.(input));
