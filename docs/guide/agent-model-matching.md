@@ -64,7 +64,7 @@ These agents have Claude-optimized prompts — long, detailed, mechanics-driven.
 
 | Agent        | Role              | Fallback Chain                         | Notes                                                                                             |
 | ------------ | ----------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| **Sisyphus** | Main orchestrator | Claude Opus → GLM 5 → Big Pickle       | Claude-family first. GPT-5.4 has dedicated support, but Claude/Kimi/GLM remain the preferred fit. |
+| **Sisyphus** | Main orchestrator | Claude Opus → K2P5 → Kimi K2.5 → GPT-5.4 → GLM 5 → Big Pickle | Claude-family first. GPT-5.4 has dedicated prompt support. Kimi/GLM as intermediate fallbacks. |
 | **Metis**    | Plan gap analyzer | Claude Opus → GPT-5.4 → Gemini 3.1 Pro | Claude preferred, GPT acceptable fallback.                                                        |
 
 ### Dual-Prompt Agents → Claude preferred, GPT supported

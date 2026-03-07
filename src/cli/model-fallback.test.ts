@@ -396,7 +396,7 @@ describe("generateModelConfig", () => {
       expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
     })
 
-    test("Sisyphus is omitted when no fallback provider is available (OpenAI not in chain)", () => {
+    test("Sisyphus resolves to gpt-5.4 medium when only OpenAI is available", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -404,7 +404,8 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.sisyphus).toBeUndefined()
+      expect(result.agents?.sisyphus?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.sisyphus?.variant).toBe("medium")
     })
   })
 

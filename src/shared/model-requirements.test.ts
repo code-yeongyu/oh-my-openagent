@@ -23,15 +23,15 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("high")
   })
 
-  test("sisyphus has claude-opus-4-6 as primary and requiresAnyModel", () => {
+  test("sisyphus has claude-opus-4-6 as primary with k2p5, kimi-k2.5, gpt-5.4 medium fallbacks", () => {
     // #given - sisyphus agent requirement
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // #when - accessing Sisyphus requirement
-    // #then - fallbackChain has claude-opus-4-6 first, big-pickle last
+    // #then - fallbackChain has 6 entries with correct ordering
     expect(sisyphus).toBeDefined()
     expect(sisyphus.fallbackChain).toBeArray()
-    expect(sisyphus.fallbackChain).toHaveLength(3)
+    expect(sisyphus.fallbackChain).toHaveLength(6)
     expect(sisyphus.requiresAnyModel).toBe(true)
 
     const primary = sisyphus.fallbackChain[0]
@@ -39,7 +39,19 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.model).toBe("claude-opus-4-6")
     expect(primary.variant).toBe("max")
 
-    const last = sisyphus.fallbackChain[2]
+    const second = sisyphus.fallbackChain[1]
+    expect(second.providers).toEqual(["kimi-for-coding"])
+    expect(second.model).toBe("k2p5")
+
+    const third = sisyphus.fallbackChain[2]
+    expect(third.model).toBe("kimi-k2.5")
+
+    const fourth = sisyphus.fallbackChain[3]
+    expect(fourth.providers).toContain("openai")
+    expect(fourth.model).toBe("gpt-5.4")
+    expect(fourth.variant).toBe("medium")
+
+    const last = sisyphus.fallbackChain[5]
     expect(last.providers[0]).toBe("opencode")
     expect(last.model).toBe("big-pickle")
   })

@@ -891,9 +891,9 @@ describe("createBuiltinAgents with requiresAnyModel gating (sisyphus)", () => {
   })
 
   test("sisyphus is not created when no fallback model is available and provider not connected", async () => {
-    // #given - only openai/gpt-5.4 available, not in sisyphus fallback chain
+    // #given - only venice/deepseek-v3.2 available, not in sisyphus fallback chain
     const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
-      new Set(["openai/gpt-5.4"])
+      new Set(["venice/deepseek-v3.2"])
     )
     const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue([])
 
