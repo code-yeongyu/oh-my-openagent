@@ -188,6 +188,7 @@ describe("AGENT_DISPLAY_NAMES", () => {
       metis: "Metis (Plan Consultant)",
       momus: "Momus (Plan Critic)",
       athena: "Athena (Council)",
+      "athena-junior": "Athena-Junior (Council)",
       oracle: "oracle",
       librarian: "librarian",
       explore: "explore",
