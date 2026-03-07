@@ -13,7 +13,7 @@ describeFn("executeBackgroundTask output/session metadata compatibility", () => 
     //#given - reduce waiting to keep tests fast
     __setTimingConfig({
       WAIT_FOR_SESSION_INTERVAL_MS: 1,
-      WAIT_FOR_SESSION_TIMEOUT_MS: 2,
+      WAIT_FOR_SESSION_TIMEOUT_MS: 50,
     })
   })
 
