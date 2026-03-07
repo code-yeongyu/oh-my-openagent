@@ -52,7 +52,7 @@ export function createNoSisyphusGptHook(
     }): Promise<void> => {
       const rawAgent = input.agent ?? getSessionAgent(input.sessionID) ?? ""
       const agentKey = getAgentConfigKey(rawAgent)
-      const modelID = normalizeModelID(options?.configuredModelID) ?? normalizeModelID(input.model?.modelID)
+      const modelID = normalizeModelID(input.model?.modelID) ?? normalizeModelID(options?.configuredModelID)
 
       if (agentKey === "sisyphus" && modelID && isGptModel(modelID) && !isGpt5_4Model(modelID)) {
         showToast(ctx, input.sessionID)

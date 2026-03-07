@@ -74,7 +74,7 @@ describe("no-sisyphus-gpt hook", () => {
     expect(output.message.agent).toBeUndefined()
   })
 
-  test("does not switch when sisyphus configured model is gpt-5.4", async () => {
+  test("prioritizes input model over configured model when input model is present", async () => {
     const showToast = spyOn({ fn: async () => ({}) }, "fn")
     const hook = createNoSisyphusGptHook({
       client: { tui: { showToast } },
@@ -88,6 +88,25 @@ describe("no-sisyphus-gpt hook", () => {
       sessionID: "ses_cfg_gpt54",
       agent: SISYPHUS_DISPLAY,
       model: { providerID: "openai", modelID: "gpt-5.3-codex" },
+    }, output)
+
+    expect(showToast).toHaveBeenCalledTimes(1)
+    expect(output.message.agent).toBe(HEPHAESTUS_DISPLAY)
+  })
+
+  test("uses configured model when input model is missing", async () => {
+    const showToast = spyOn({ fn: async () => ({}) }, "fn")
+    const hook = createNoSisyphusGptHook({
+      client: { tui: { showToast } },
+    } as any, {
+      configuredModelID: "openai/gpt-5.4",
+    })
+
+    const output = createOutput()
+
+    await hook["chat.message"]?.({
+      sessionID: "ses_cfg_no_input_model",
+      agent: SISYPHUS_DISPLAY,
     }, output)
 
     expect(showToast).toHaveBeenCalledTimes(0)
