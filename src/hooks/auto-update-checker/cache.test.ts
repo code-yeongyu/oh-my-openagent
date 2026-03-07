@@ -1,11 +1,20 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import * as dataPath from "../../shared/data-path"
-import * as opencodeConfigDir from "../../shared/opencode-config-dir"
 
 const TEST_CACHE_DIR = join(import.meta.dir, "__test-cache__")
 const TEST_OPENCODE_CACHE_DIR = join(TEST_CACHE_DIR, "opencode")
+const TEST_USER_CONFIG_DIR = "/tmp/opencode-config"
+
+mock.module("./constants", () => ({
+  CACHE_DIR: TEST_OPENCODE_CACHE_DIR,
+  USER_CONFIG_DIR: TEST_USER_CONFIG_DIR,
+  PACKAGE_NAME: "oh-my-opencode",
+}))
+
+mock.module("../../shared/logger", () => ({
+  log: () => {},
+}))
 
 function resetTestCache(): void {
   if (existsSync(TEST_CACHE_DIR)) {
@@ -42,25 +51,18 @@ function resetTestCache(): void {
 }
 
 describe("invalidatePackage", () => {
-  let getOpenCodeCacheDirSpy: ReturnType<typeof spyOn>
-  let getOpenCodeConfigDirSpy: ReturnType<typeof spyOn>
-
   beforeEach(() => {
-    getOpenCodeCacheDirSpy = spyOn(dataPath, "getOpenCodeCacheDir").mockReturnValue(TEST_OPENCODE_CACHE_DIR)
-    getOpenCodeConfigDirSpy = spyOn(opencodeConfigDir, "getOpenCodeConfigDir").mockReturnValue("/tmp/opencode-config")
     resetTestCache()
   })
 
   afterEach(() => {
-    getOpenCodeCacheDirSpy.mockRestore()
-    getOpenCodeConfigDirSpy.mockRestore()
     if (existsSync(TEST_CACHE_DIR)) {
       rmSync(TEST_CACHE_DIR, { recursive: true, force: true })
     }
   })
 
   it("invalidates the installed package from the OpenCode cache directory", async () => {
-    const { invalidatePackage } = await import(`./cache?test=${Date.now()}`)
+    const { invalidatePackage } = await import("./cache")
 
     const result = invalidatePackage()
 
