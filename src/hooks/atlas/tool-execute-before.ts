@@ -10,7 +10,8 @@ import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 /**
  * Check if a path is a plan file inside .sisyphus/plans/
  */
-function isPlanPath(filePath: string): boolean {
+export function isPlanPath(filePath: string | undefined): boolean {
+  if (!filePath) return false
   return /\.sisyphus[/\\]plans[/\\].*\.md$/.test(filePath)
 }
 
@@ -58,6 +59,15 @@ export function createToolExecuteBeforeHandler(input: {
       return
     }
 
+    // Store filePath for Read tools (for plan transformation in tool.execute.after)
+    if (toolInput.tool === "read" || toolInput.tool === "Read") {
+      const filePath = (toolOutput.args.filePath ?? toolOutput.args.path ?? toolOutput.args.file) as string | undefined
+      if (filePath && toolInput.callID) {
+        pendingFilePaths.set(toolInput.callID, filePath)
+      }
+      return
+    }
+
     // Check task - inject single-task directive
     if (toolInput.tool === "task") {
       const prompt = toolOutput.args.prompt as string | undefined
@@ -68,21 +78,6 @@ export function createToolExecuteBeforeHandler(input: {
         })
       }
       return
-    }
-
-    // Transform plan content when autoCommit is disabled
-    if (!autoCommit && toolInput.tool === "read") {
-      const filePath = toolOutput.args.filePath as string | undefined
-      if (filePath && isPlanPath(filePath)) {
-        const content = toolOutput.args.content as string | undefined
-        if (content) {
-          toolOutput.args.content = transformPlanCommitFields(content)
-          log(`[${HOOK_NAME}] Transformed plan Commit fields for read`, {
-            sessionID: toolInput.sessionID,
-            filePath,
-          })
-        }
-      }
     }
   }
 }

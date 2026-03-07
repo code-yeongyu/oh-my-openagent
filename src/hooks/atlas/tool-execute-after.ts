@@ -9,7 +9,28 @@ import { isSisyphusPath } from "./sisyphus-path"
 import { extractSessionIdFromOutput } from "./subagent-session-id"
 import { buildCompletionGate, buildOrchestratorReminder, buildStandaloneVerificationReminder } from "./verification-reminders"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
+import { isPlanPath, transformPlanCommitFields } from "./tool-execute-before"
 import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
+
+/**
+ * Extract file path from metadata using multiple possible key names.
+ * Tries: filepath, filePath, path, file (in that order)
+ */
+function extractFilePath(metadata: unknown): string | undefined {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined
+  }
+
+  const objectMeta = metadata as Record<string, unknown>
+  const candidates = [objectMeta.filepath, objectMeta.filePath, objectMeta.path, objectMeta.file]
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.length > 0) {
+      return candidate
+    }
+  }
+
+  return undefined
+}
 
 export function createToolExecuteAfterHandler(input: {
   ctx: PluginInput
@@ -18,7 +39,6 @@ export function createToolExecuteAfterHandler(input: {
   }): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput) => Promise<void> {
   const { ctx, pendingFilePaths, autoCommit } = input
   return async (toolInput, toolOutput): Promise<void> => {
-    // Guard against undefined output (e.g., from /review command - see issue #1035)
     if (!toolOutput) {
       return
     }
@@ -42,6 +62,27 @@ export function createToolExecuteAfterHandler(input: {
           tool: toolInput.tool,
           filePath,
         })
+      }
+      return
+    }
+
+    if (!autoCommit && (toolInput.tool === "read" || toolInput.tool === "Read")) {
+      let filePath = toolInput.callID ? pendingFilePaths.get(toolInput.callID) : undefined
+      if (toolInput.callID) {
+        pendingFilePaths.delete(toolInput.callID)
+      }
+      if (!filePath) {
+        filePath = extractFilePath(toolOutput.metadata)
+      }
+      if (filePath && isPlanPath(filePath)) {
+        const output = toolOutput.output
+        if (output && typeof output === "string") {
+          toolOutput.output = transformPlanCommitFields(output)
+          log(`[${HOOK_NAME}] Transformed plan Commit fields for read`, {
+            sessionID: toolInput.sessionID,
+            filePath,
+          })
+        }
       }
       return
     }

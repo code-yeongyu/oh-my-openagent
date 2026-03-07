@@ -748,6 +748,81 @@ describe("atlas hook", () => {
         })
       })
     })
+
+    describe("Plan file transformation with autoCommit", () => {
+      const ORCHESTRATOR_SESSION = "orchestrator-plan-transform-test"
+
+      beforeEach(() => {
+        setupMessageStorage(ORCHESTRATOR_SESSION, "atlas")
+      })
+
+      afterEach(() => {
+        cleanupMessageStorage(ORCHESTRATOR_SESSION)
+      })
+
+      test("should transform Commit fields when autoCommit is false and reading plan file", async () => {
+        // given
+        const hook = createAtlasHook(createMockPluginInput(), { directory: TEST_DIR, autoCommit: false })
+        const planContent = "# Plan\n\nCommit: YES\n\n- [ ] Task 1"
+        const output = {
+          title: "Read",
+          output: planContent,
+          metadata: { filePath: "/project/.sisyphus/plans/test-plan.md" },
+        }
+
+        // when
+        await hook["tool.execute.after"](
+          { tool: "read", sessionID: ORCHESTRATOR_SESSION },
+          output
+        )
+
+        // then
+        expect(output.output).toContain("Commit: NO (user disabled auto-commits)")
+        expect(output.output).not.toContain("Commit: YES")
+      })
+
+      test("should NOT transform Commit fields when autoCommit is true", async () => {
+        // given
+        const hook = createAtlasHook(createMockPluginInput(), { directory: TEST_DIR, autoCommit: true })
+        const planContent = "# Plan\n\nCommit: YES\n\n- [ ] Task 1"
+        const output = {
+          title: "Read",
+          output: planContent,
+          metadata: { filePath: "/project/.sisyphus/plans/test-plan.md" },
+        }
+
+        // when
+        await hook["tool.execute.after"](
+          { tool: "read", sessionID: ORCHESTRATOR_SESSION },
+          output
+        )
+
+        // then
+        expect(output.output).toContain("Commit: YES")
+        expect(output.output).not.toContain("Commit: NO (user disabled auto-commits)")
+      })
+
+      test("should NOT transform when file is not a plan file", async () => {
+        // given
+        const hook = createAtlasHook(createMockPluginInput(), { directory: TEST_DIR, autoCommit: false })
+        const content = "# Regular file\n\nCommit: YES\n\nSome content"
+        const output = {
+          title: "Read",
+          output: content,
+          metadata: { filePath: "/project/src/file.ts" },
+        }
+
+        // when
+        await hook["tool.execute.after"](
+          { tool: "read", sessionID: ORCHESTRATOR_SESSION },
+          output
+        )
+
+        // then
+        expect(output.output).toContain("Commit: YES")
+        expect(output.output).not.toContain("Commit: NO (user disabled auto-commits)")
+      })
+    })
   })
 
   describe("session.idle handler (boulder continuation)", () => {
