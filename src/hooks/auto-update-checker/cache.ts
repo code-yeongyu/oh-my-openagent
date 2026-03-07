@@ -1,6 +1,6 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { CACHE_DIR, PACKAGE_NAME } from "./constants"
+import { CACHE_DIR, PACKAGE_NAME, USER_CONFIG_DIR } from "./constants"
 import { log } from "../../shared/logger"
 
 interface BunLockfile {
@@ -23,7 +23,7 @@ function removeFromBunLock(packageName: string): boolean {
   try {
     const content = fs.readFileSync(lockPath, "utf-8")
     const lock = JSON.parse(stripTrailingCommas(content)) as BunLockfile
-  let modified = false
+    let modified = false
 
     if (lock.packages?.[packageName]) {
       delete lock.packages[packageName]
@@ -43,15 +43,20 @@ function removeFromBunLock(packageName: string): boolean {
 
 export function invalidatePackage(packageName: string = PACKAGE_NAME): boolean {
   try {
-    const pkgDir = path.join(CACHE_DIR, "node_modules", packageName)
+    const pkgDirs = [
+      path.join(USER_CONFIG_DIR, "node_modules", packageName),
+      path.join(CACHE_DIR, "node_modules", packageName),
+    ]
 
     let packageRemoved = false
     let lockRemoved = false
 
-    if (fs.existsSync(pkgDir)) {
-      fs.rmSync(pkgDir, { recursive: true, force: true })
-      log(`[auto-update-checker] Package removed: ${pkgDir}`)
-      packageRemoved = true
+    for (const pkgDir of pkgDirs) {
+      if (fs.existsSync(pkgDir)) {
+        fs.rmSync(pkgDir, { recursive: true, force: true })
+        log(`[auto-update-checker] Package removed: ${pkgDir}`)
+        packageRemoved = true
+      }
     }
 
     lockRemoved = removeFromBunLock(packageName)
