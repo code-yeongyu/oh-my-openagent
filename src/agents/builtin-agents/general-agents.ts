@@ -4,6 +4,7 @@ import type { CategoryConfig, GitMasterConfig } from "../../config/schema"
 import type { BrowserAutomationProvider } from "../../config/schema"
 import type { AvailableAgent } from "../dynamic-agent-prompt-builder"
 import { AGENT_MODEL_REQUIREMENTS, isModelAvailable } from "../../shared"
+import type { ModelRequirement } from "../../shared/model-requirements"
 import { buildAgent, isFactory } from "../agent-builder"
 import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
@@ -52,7 +53,10 @@ export function collectPendingBuiltinAgents(input: {
 
     const override = agentOverrides[agentName]
       ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
-    const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
+    const baseRequirement = AGENT_MODEL_REQUIREMENTS[agentName]
+    const requirement: ModelRequirement | undefined = override?.fallbackChain
+      ? { ...baseRequirement, fallbackChain: override.fallbackChain }
+      : baseRequirement
 
     // Check if agent requires a specific model
     if (requirement?.requiresModel && availableModels) {

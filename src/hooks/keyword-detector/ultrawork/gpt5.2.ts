@@ -130,13 +130,59 @@ deep_context = background_output(task_id=...)
 | Test | Execute test suite | All tests pass |
 | Lint | Run lsp_diagnostics | Zero new errors |
 
+## MANDATORY: ACCEPTANCE CRITERIA DEFINITION (NON-NEGOTIABLE)
+
+**BEFORE writing ANY code, output an Acceptance Criteria block.**
+
+<acceptance_criteria_spec>
+- Implementation without defined acceptance criteria = REJECTED
+- Each criterion: binary PASS/FAIL, verifiable via command or observable behavior
+- Minimum 3 criteria for non-trivial tasks
+- Must cover: functional correctness, no regressions, code quality
+- Include exact verification commands to run during QA
+</acceptance_criteria_spec>
+
+**Required format:**
+\`\`\`
+## Acceptance Criteria
+1. [CRITERION]: [Binary pass/fail condition]
+2. [CRITERION]: [Binary pass/fail condition]
+### Verification Commands:
+- [command] → [expected output]
+\`\`\`
+
+## MANDATORY: QA EXECUTION (NON-NEGOTIABLE)
+
+**AFTER implementation, execute ALL verification commands from Acceptance Criteria.**
+
+<qa_protocol>
+- Run every verification command — do not assume "it should work"
+- Report each criterion: ✅ PASS or ❌ FAIL with evidence
+- If ANY fails: fix, then re-run ALL commands
+- Do not report completion until ALL criteria pass
+</qa_protocol>
+
+**Required output:**
+\`\`\`
+## QA Report
+| # | Criterion | Result | Evidence |
+|---|-----------|--------|----------|
+| 1 | [criterion] | ✅ PASS | [observed] |
+
+**Overall: [X/Y PASS]** — [ACCEPTED/NEEDS FIX]
+\`\`\`
+
+**NO EVIDENCE = NOT VERIFIED = NOT DONE.**
+
 ## COMPLETION CRITERIA
 
 A task is complete when:
-1. Requested functionality is fully implemented (not partial, not simplified)
-2. lsp_diagnostics shows zero errors on modified files
-3. Tests pass (or pre-existing failures documented)
-4. Code matches existing codebase patterns
+1. Acceptance Criteria defined before implementation
+2. Requested functionality is fully implemented (not partial, not simplified)
+3. lsp_diagnostics shows zero errors on modified files
+4. Tests pass (or pre-existing failures documented)
+5. QA Report output with all criteria passing
+6. Code matches existing codebase patterns
 
 **Deliver exactly what was asked. No more, no less.**
 

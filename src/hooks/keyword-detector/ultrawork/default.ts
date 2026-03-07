@@ -175,6 +175,48 @@ task(category="bullet-time", load_skills=["git-master"])
 
 ---
 
+## MANDATORY: ACCEPTANCE CRITERIA DEFINITION (NON-NEGOTIABLE)
+
+**BEFORE writing ANY code, you MUST output an Acceptance Criteria block.**
+
+This is NOT optional. Implementation without defined acceptance criteria = REJECTED.
+
+### Required Format:
+\`\`\`
+## Acceptance Criteria
+1. [CRITERION]: [Observable, binary pass/fail condition]
+2. [CRITERION]: [Observable, binary pass/fail condition]
+...
+### Verification Commands:
+- [Exact command to run] → [Expected output]
+- [Exact command to run] → [Expected output]
+\`\`\`
+
+### Rules:
+- Each criterion MUST be binary (PASS or FAIL — no "mostly works")
+- Each criterion MUST be verifiable via a specific command or observable behavior
+- Minimum 3 criteria for any non-trivial task
+- Criteria MUST cover: functional correctness, no regressions, code quality (typecheck/lint)
+- Include verification commands that will be executed during QA
+
+### Example:
+\`\`\`
+## Acceptance Criteria
+1. User registration endpoint returns 201 on valid input
+2. Duplicate email returns 409 with error message
+3. All existing tests pass (bun test)
+4. TypeScript typecheck passes (bun run typecheck)
+5. No new lint errors introduced
+### Verification Commands:
+- bun test → All tests pass, 0 failures
+- bun run typecheck → Exit code 0, no errors
+- curl -X POST /api/register ... → 201 Created
+\`\`\`
+
+**FAILURE TO OUTPUT ACCEPTANCE CRITERIA = YOU MUST STOP AND DEFINE THEM.**
+
+---
+
 ## EXECUTION RULES
 - **TODO**: Track EVERY step. Mark complete IMMEDIATELY after each.
 - **PARALLEL**: Fire independent agent calls simultaneously via task(run_in_background=true) - NEVER wait sequentially.
@@ -188,66 +230,39 @@ task(category="bullet-time", load_skills=["git-master"])
 3. Use Plan agent with gathered context to create detailed work breakdown
 4. Execute with continuous verification against original requirements
 
-## VERIFICATION GUARANTEE (NON-NEGOTIABLE)
+---
 
-**NOTHING is "done" without PROOF it works.**
+## MANDATORY: QA EXECUTION (NON-NEGOTIABLE)
 
-### Pre-Implementation: Define Success Criteria
+**AFTER implementation, you MUST execute ALL verification commands from your Acceptance Criteria.**
 
-BEFORE writing ANY code, you MUST define:
+This is NOT optional. Claiming completion without QA execution = REJECTED.
 
-| Criteria Type | Description | Example |
-|---------------|-------------|---------|
-| **Functional** | What specific behavior must work | "Button click triggers API call" |
-| **Observable** | What can be measured/seen | "Console shows 'success', no errors" |
-| **Pass/Fail** | Binary, no ambiguity | "Returns 200 OK" not "should work" |
-
-Write these criteria explicitly. Share with user if scope is non-trivial.
-
-### Test Plan Template (MANDATORY for non-trivial tasks)
+### QA Protocol:
+1. **Run every verification command** listed in your Acceptance Criteria
+2. **Report results** for each criterion: ✅ PASS or ❌ FAIL
+3. **If ANY criterion fails**: Fix the issue, re-run ALL verification commands
+4. **Output a QA Report** in this exact format:
 
 \`\`\`
-## Test Plan
-### Objective: [What we're verifying]
-### Prerequisites: [Setup needed]
-### Test Cases:
-1. [Test Name]: [Input] → [Expected Output] → [How to verify]
-2. ...
-### Success Criteria: ALL test cases pass
-### How to Execute: [Exact commands/steps]
+## QA Report
+| # | Criterion | Result | Evidence |
+|---|-----------|--------|----------|
+| 1 | [criterion] | ✅ PASS | [what you observed] |
+| 2 | [criterion] | ❌ FAIL | [error output] |
+| 3 | [criterion] | ✅ PASS | [what you observed] |
+
+**Overall: [X/Y PASS]** — [ACCEPTED if all pass / NEEDS FIX if any fail]
 \`\`\`
 
-### Execution & Evidence Requirements
+### Rules:
+- You MUST actually RUN the commands — not just say "it should work"
+- You MUST show evidence (command output, test results)
+- If ANY criterion fails, you MUST fix and re-run ALL criteria
+- You MUST NOT report completion until ALL criteria pass
+- If you cannot achieve a criterion, explain WHY and propose an alternative
 
-| Phase | Action | Required Evidence |
-|-------|--------|-------------------|
-| **Build** | Run build command | Exit code 0, no errors |
-| **Test** | Execute test suite | All tests pass (screenshot/output) |
-| **Manual Verify** | Test the actual feature | Demonstrate it works (describe what you observed) |
-| **Regression** | Ensure nothing broke | Existing tests still pass |
-
-**WITHOUT evidence = NOT verified = NOT done.**
-
-### TDD Workflow (when test infrastructure exists)
-
-1. **SPEC**: Define what "working" means (success criteria above)
-2. **RED**: Write failing test → Run it → Confirm it FAILS
-3. **GREEN**: Write minimal code → Run test → Confirm it PASSES
-4. **REFACTOR**: Clean up → Tests MUST stay green
-5. **VERIFY**: Run full test suite, confirm no regressions
-6. **EVIDENCE**: Report what you ran and what output you saw
-
-### Verification Anti-Patterns (BLOCKING)
-
-| Violation | Why It Fails |
-|-----------|--------------|
-| "It should work now" | No evidence. Run it. |
-| "I added the tests" | Did they pass? Show output. |
-| "Fixed the bug" | How do you know? What did you test? |
-| "Implementation complete" | Did you verify against success criteria? |
-| Skipping test execution | Tests exist to be RUN, not just written |
-
-**CLAIM NOTHING WITHOUT PROOF. EXECUTE. VERIFY. SHOW EVIDENCE.**
+**NO EVIDENCE = NOT VERIFIED = NOT DONE.**
 
 ## ZERO TOLERANCE FAILURES
 - **NO Scope Reduction**: Never make "demo", "skeleton", "simplified", "basic" versions - deliver FULL implementation

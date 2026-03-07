@@ -42,6 +42,7 @@ export function createMatrixLoopHook(
 		checkSessionExists,
 		sessionRecovery,
 		loopState,
+		verification: options?.verification,
 	})
 
 	return {

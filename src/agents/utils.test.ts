@@ -1224,15 +1224,85 @@ describe("Deadlock prevention - fetchAvailableModels must not receive client", (
     expect(agents.keymaker.variant).toBe("high")
   })
 
-  test("Keymaker uses default variant when no user override provided", async () => {
-    // #given - no variant override in config
+   test("Keymaker uses default variant when no user override provided", async () => {
+     // #given - no variant override in config
+     const overrides = {}
+ 
+     // #when
+     const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+ 
+     // #then - default "medium" variant is applied
+     expect(agents.keymaker).toBeDefined()
+     expect(agents.keymaker.variant).toBe("medium")
+   })
+})
+
+describe("createBuiltinAgents with fallbackChain override", () => {
+  test("agent with fallbackChain override uses override chain for model resolution", async () => {
+    // #given - merovingian default chain starts with gpt-5.2, override starts with gemini-3-flash
+    const customFallbackChain = [
+      { providers: ["google", "opencode"], model: "gemini-3-flash" },
+      { providers: ["openai"], model: "gpt-5-nano" },
+    ]
+    const overrides = {
+      merovingian: { fallbackChain: customFallbackChain },
+    }
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["google/gemini-3-flash", "openai/gpt-5-nano"])
+    )
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
+
+      // #then - should resolve to first entry in override chain
+      expect(agents.merovingian).toBeDefined()
+      expect(agents.merovingian.model).toBe("google/gemini-3-flash")
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("agent without fallbackChain override uses default AGENT_MODEL_REQUIREMENTS chain", async () => {
+    // #given - no fallbackChain override, merovingian default chain starts with gpt-5.2
     const overrides = {}
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["openai/gpt-5.2"])
+    )
 
-    // #when
-    const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL)
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
 
-    // #then - default "medium" variant is applied
-    expect(agents.keymaker).toBeDefined()
-    expect(agents.keymaker.variant).toBe("medium")
+      // #then - should resolve to default chain's first entry (gpt-5.2)
+      expect(agents.merovingian).toBeDefined()
+      expect(agents.merovingian.model).toBe("openai/gpt-5.2")
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  test("fallbackChain override preserves other requirement fields like requiresModel", async () => {
+    // #given - operator has no requiresModel in default, override only changes fallbackChain
+    const customFallbackChain = [
+      { providers: ["anthropic"], model: "claude-sonnet-4-6" },
+    ]
+    const overrides = {
+      operator: { fallbackChain: customFallbackChain },
+    }
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(
+      new Set(["anthropic/claude-sonnet-4-6"])
+    )
+
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], overrides, undefined, TEST_DEFAULT_MODEL, undefined, undefined, [], {})
+
+      // #then - should use override chain model
+      expect(agents.operator).toBeDefined()
+      expect(agents.operator.model).toBe("anthropic/claude-sonnet-4-6")
+    } finally {
+      fetchSpy.mockRestore()
+    }
   })
 })

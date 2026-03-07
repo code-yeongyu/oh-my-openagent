@@ -968,6 +968,207 @@ Original task: Build something`
     })
   })
 
+  describe("completion verification", () => {
+    let sessionCreateCalls: Array<{ parentID?: string; title?: string }>
+    let verificationMessages: Array<{ info?: { role?: string }; parts?: Array<{ type: string; text?: string }> }>
+    let sessionDeleteCalls: Array<{ id: string }>
+
+    function createVerificationMockPluginInput() {
+      sessionCreateCalls = []
+      verificationMessages = []
+      sessionDeleteCalls = []
+
+      return {
+        client: {
+          session: {
+            prompt: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
+              promptCalls.push({
+                sessionID: opts.path.id,
+                text: opts.body.parts[0].text,
+              })
+              return {}
+            },
+            promptAsync: async (opts: { path: { id: string }; body: { parts: Array<{ type: string; text: string }> } }) => {
+              promptCalls.push({
+                sessionID: opts.path.id,
+                text: opts.body.parts[0].text,
+              })
+              return {}
+            },
+            messages: async (opts: { path: { id: string } }) => {
+              messagesCalls.push({ sessionID: opts.path.id })
+              if (opts.path.id === "verify-session-1") {
+                return { data: verificationMessages }
+              }
+              return mockMessagesApiResponseShape === "array" ? mockSessionMessages : { data: mockSessionMessages }
+            },
+            create: async (opts: { body: { parentID?: string; title?: string } }) => {
+              sessionCreateCalls.push({ parentID: opts.body.parentID, title: opts.body.title })
+              return { data: { id: "verify-session-1" } }
+            },
+            delete: async (opts: { path: { id: string } }) => {
+              sessionDeleteCalls.push({ id: opts.path.id })
+              return {}
+            },
+          },
+          tui: {
+            showToast: async (opts: { body: { title: string; message: string; variant: string } }) => {
+              toastCalls.push({
+                title: opts.body.title,
+                message: opts.body.message,
+                variant: opts.body.variant,
+              })
+              return {}
+            },
+          },
+        },
+        directory: TEST_DIR,
+      } as unknown as Parameters<typeof createMatrixLoopHook>[0]
+    }
+
+    //#given ultrawork loop with verification enabled and completion detected
+    //#when session goes idle
+    //#then verifyCompletion is called before clearing state
+    test("should call verification before clearing state on ultrawork completion", async () => {
+      mockSessionMessages = [
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "<promise>DONE</promise>" }] },
+      ]
+      const mockInput = createVerificationMockPluginInput()
+      verificationMessages = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "<verification>PASS</verification>" }],
+        },
+      ]
+      const hook = createMatrixLoopHook(mockInput, {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+        verification: { enabled: true, timeoutMs: 1000 },
+      })
+      hook.startLoop("session-123", "Build API", { ultrawork: true })
+
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      expect(sessionCreateCalls.length).toBe(1)
+      expect(hook.getState()).toBeNull()
+      expect(toastCalls.some((t) => t.title === "ULTRAWORK LOOP COMPLETE!")).toBe(true)
+    })
+
+    //#given verification returns verified=true
+    //#when completion flow runs
+    //#then state is cleared and success toast shown
+    test("should clear state and show toast when verification passes", async () => {
+      mockSessionMessages = [
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "<promise>DONE</promise>" }] },
+      ]
+      const mockInput = createVerificationMockPluginInput()
+      verificationMessages = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "<verification>PASS</verification>" }],
+        },
+      ]
+      const hook = createMatrixLoopHook(mockInput, {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+        verification: { enabled: true, timeoutMs: 1000 },
+      })
+      hook.startLoop("session-123", "Build API")
+
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      expect(hook.getState()).toBeNull()
+      expect(toastCalls.some((t) => t.title === "Matrix Loop Complete!")).toBe(true)
+    })
+
+    //#given verification returns verified=false
+    //#when completion flow runs
+    //#then state is NOT cleared, iteration increments, continuation injected with feedback
+    test("should NOT clear state when verification fails, inject continuation with feedback", async () => {
+      mockSessionMessages = [
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "<promise>DONE</promise>" }] },
+      ]
+      const mockInput = createVerificationMockPluginInput()
+      verificationMessages = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "<verification>FAIL: Tests are not passing</verification>" }],
+        },
+      ]
+      const hook = createMatrixLoopHook(mockInput, {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+        verification: { enabled: true, timeoutMs: 1000 },
+      })
+      hook.startLoop("session-123", "Build API")
+
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      expect(hook.getState()).not.toBeNull()
+      expect(hook.getState()?.iteration).toBe(2)
+      expect(hook.getState()?.verification_failed_count).toBe(1)
+      const continuationPrompt = promptCalls.find((p) => p.sessionID === "session-123")
+      expect(continuationPrompt).toBeDefined()
+      expect(continuationPrompt!.text).toContain("Tests are not passing")
+    })
+
+    //#given verification fails maxRetries times
+    //#when completion flow runs
+    //#then state is force-cleared with warning toast
+    test("should force-clear state after maxRetries verification failures", async () => {
+      mockSessionMessages = [
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "<promise>DONE</promise>" }] },
+      ]
+      const mockInput = createVerificationMockPluginInput()
+      verificationMessages = [
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "<verification>FAIL: Still broken</verification>" }],
+        },
+      ]
+      const hook = createMatrixLoopHook(mockInput, {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+        verification: { enabled: true, maxRetries: 2, timeoutMs: 1000 },
+      })
+      hook.startLoop("session-123", "Build API")
+
+      const state = hook.getState()!
+      state.verification_failed_count = 2
+      writeState(TEST_DIR, state)
+
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      expect(hook.getState()).toBeNull()
+      expect(toastCalls.some((t) => t.variant === "warning" && t.message.includes("verification"))).toBe(true)
+    })
+
+    //#given regular (non-ultrawork) loop with verification not explicitly enabled
+    //#when completion detected
+    //#then verification is skipped (disabled by default for non-ultrawork)
+    test("should skip verification for regular loops when not explicitly enabled", async () => {
+      mockSessionMessages = [
+        { info: { role: "assistant" }, parts: [{ type: "text", text: "<promise>DONE</promise>" }] },
+      ]
+      const hook = createMatrixLoopHook(createVerificationMockPluginInput(), {
+        getTranscriptPath: () => join(TEST_DIR, "nonexistent.jsonl"),
+      })
+      hook.startLoop("session-123", "Build API")
+
+      await hook.event({
+        event: { type: "session.idle", properties: { sessionID: "session-123" } },
+      })
+
+      expect(sessionCreateCalls.length).toBe(0)
+      expect(hook.getState()).toBeNull()
+      expect(toastCalls.some((t) => t.title === "Matrix Loop Complete!")).toBe(true)
+    })
+  })
+
   describe("API timeout protection", () => {
     test("should not hang when session.messages() throws", async () => {
       // given - API that throws (simulates timeout error)

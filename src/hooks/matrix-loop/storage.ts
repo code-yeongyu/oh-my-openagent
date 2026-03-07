@@ -40,6 +40,10 @@ export function readState(directory: string, customPath?: string): MatrixLoopSta
       return str.replace(/^["']|["']$/g, "")
     }
 
+    const verificationFailedCount = data.verification_failed_count !== undefined
+      ? Number(data.verification_failed_count)
+      : undefined
+
     return {
       active: isActive,
       iteration: iterationNum,
@@ -49,6 +53,7 @@ export function readState(directory: string, customPath?: string): MatrixLoopSta
       prompt: body.trim(),
       session_id: data.session_id ? stripQuotes(data.session_id) : undefined,
       ultrawork: data.ultrawork === true || data.ultrawork === "true" ? true : undefined,
+      verification_failed_count: verificationFailedCount && !isNaN(verificationFailedCount) ? verificationFailedCount : undefined,
     }
   } catch {
     return null
@@ -70,13 +75,14 @@ export function writeState(
 
     const sessionIdLine = state.session_id ? `session_id: "${state.session_id}"\n` : ""
     const ultraworkLine = state.ultrawork !== undefined ? `ultrawork: ${state.ultrawork}\n` : ""
+    const verificationLine = state.verification_failed_count !== undefined ? `verification_failed_count: ${state.verification_failed_count}\n` : ""
     const content = `---
 active: ${state.active}
 iteration: ${state.iteration}
 max_iterations: ${state.max_iterations}
 completion_promise: "${state.completion_promise}"
 started_at: "${state.started_at}"
-${sessionIdLine}${ultraworkLine}---
+${sessionIdLine}${ultraworkLine}${verificationLine}---
 ${state.prompt}
 `
 

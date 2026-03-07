@@ -337,6 +337,85 @@ describe("AgentOverrideConfigSchema", () => {
       }
     })
   })
+
+  describe("fallbackChain field", () => {
+    test("accepts fallbackChain with valid entries", () => {
+      // #given
+      const config = {
+        fallbackChain: [
+          { providers: ["anthropic", "opencode"], model: "claude-opus-4-6", variant: "max" },
+          { providers: ["openai"], model: "gpt-5.2" },
+        ],
+      }
+
+      // #when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // #then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.fallbackChain).toHaveLength(2)
+        expect(result.data.fallbackChain![0].providers).toEqual(["anthropic", "opencode"])
+        expect(result.data.fallbackChain![0].model).toBe("claude-opus-4-6")
+        expect(result.data.fallbackChain![0].variant).toBe("max")
+        expect(result.data.fallbackChain![1].variant).toBeUndefined()
+      }
+    })
+
+    test("accepts config without fallbackChain", () => {
+      // #given
+      const config = { temperature: 0.5 }
+
+      // #when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // #then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.fallbackChain).toBeUndefined()
+      }
+    })
+
+    test("rejects fallbackChain entry missing providers", () => {
+      // #given
+      const config = {
+        fallbackChain: [{ model: "claude-opus-4-6" }],
+      }
+
+      // #when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // #then
+      expect(result.success).toBe(false)
+    })
+
+    test("rejects fallbackChain entry missing model", () => {
+      // #given
+      const config = {
+        fallbackChain: [{ providers: ["anthropic"] }],
+      }
+
+      // #when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // #then
+      expect(result.success).toBe(false)
+    })
+
+    test("accepts empty fallbackChain array", () => {
+      // #given
+      const config = { fallbackChain: [] }
+
+      // #when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // #then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.fallbackChain).toEqual([])
+      }
+    })
+  })
 })
 
 describe("CategoryConfigSchema", () => {

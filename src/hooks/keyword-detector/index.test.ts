@@ -693,6 +693,84 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
     expect(morpheusTextPart!.text).toContain("implement")
   })
 
+  //#given ultrawork mode activated for default model
+  //#when the ultrawork message is generated
+  //#then it contains "MANDATORY: ACCEPTANCE CRITERIA DEFINITION" section
+  test("should contain MANDATORY ACCEPTANCE CRITERIA DEFINITION section in default ultrawork message", async () => {
+    // given - collector with no agent specified (default model)
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "ac-test-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork implement feature" }],
+    }
+
+    // when - ultrawork keyword detected
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - should contain mandatory acceptance criteria section
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("MANDATORY: ACCEPTANCE CRITERIA DEFINITION")
+    expect(textPart!.text).toContain("BEFORE writing ANY code, you MUST output an Acceptance Criteria block")
+    expect(textPart!.text).toContain("FAILURE TO OUTPUT ACCEPTANCE CRITERIA")
+    expect(textPart!.text).toContain("Verification Commands")
+  })
+
+  //#given ultrawork mode activated for default model
+  //#when the ultrawork message is generated
+  //#then it contains "MANDATORY: QA EXECUTION" section
+  test("should contain MANDATORY QA EXECUTION section in default ultrawork message", async () => {
+    // given - collector with no agent specified (default model)
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "qa-test-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork implement feature" }],
+    }
+
+    // when - ultrawork keyword detected
+    await hook["chat.message"]({ sessionID }, output)
+
+    // then - should contain mandatory QA execution section
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("MANDATORY: QA EXECUTION")
+    expect(textPart!.text).toContain("AFTER implementation, you MUST execute ALL verification commands")
+    expect(textPart!.text).toContain("QA Report")
+    expect(textPart!.text).toContain("NO EVIDENCE = NOT VERIFIED = NOT DONE")
+  })
+
+  //#given ultrawork mode activated for GPT model
+  //#when the ultrawork message is generated
+  //#then it contains acceptance criteria and QA sections
+  test("should contain acceptance criteria and QA sections in GPT ultrawork message", async () => {
+    // given - collector with GPT model
+    const collector = new ContextCollector()
+    const hook = createKeywordDetectorHook(createMockPluginInput(), collector)
+    const sessionID = "gpt-qa-test-session"
+    const output = {
+      message: {} as Record<string, unknown>,
+      parts: [{ type: "text", text: "ultrawork implement feature" }],
+    }
+
+    // when - ultrawork keyword detected with GPT model
+    await hook["chat.message"](
+      { sessionID, model: { providerID: "openai", modelID: "openai/gpt-5.2" } },
+      output
+    )
+
+    // then - should contain both acceptance criteria and QA sections
+    const textPart = output.parts.find(p => p.type === "text")
+    expect(textPart).toBeDefined()
+    expect(textPart!.text).toContain("MANDATORY: ACCEPTANCE CRITERIA DEFINITION")
+    expect(textPart!.text).toContain("MANDATORY: QA EXECUTION")
+    expect(textPart!.text).toContain("QA Report")
+    expect(textPart!.text).toContain("NO EVIDENCE = NOT VERIFIED = NOT DONE")
+  })
+
   test("should use session state agent over stale input.agent (bug fix)", async () => {
     // given - same session, agent switched from oracle to morpheus in session state
     const collector = new ContextCollector()

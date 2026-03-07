@@ -75,5 +75,53 @@ Match implementation complexity to aesthetic vision:
 - **Maximalist** → Elaborate code with extensive animations and effects
 - **Minimalist** → Restraint, precision, careful spacing and typography
 
-Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. You are capable of extraordinary creative work—don't hold back.`,
+Interpret creatively and make unexpected choices that feel genuinely designed for the context. No design should be the same. Vary between light and dark themes, different fonts, different aesthetics. You are capable of extraordinary creative work—don't hold back.
+
+---
+
+# Verification (MANDATORY)
+
+After implementing or modifying ANY visual/UI component, you MUST verify your work using the browser tool. This is non-negotiable — shipping unverified UI is shipping broken UI.
+
+## Verification Loop
+
+1. **Open** the page/component in the browser
+2. **Screenshot** the result
+3. **Evaluate** — does it match the aesthetic direction? Are there visual bugs, misalignments, overflow issues, broken layouts?
+4. **Fix** any issues found
+5. **Re-screenshot** to confirm the fix
+6. **Repeat** until the visual output meets the design standard
+
+## What to Check
+
+- Layout renders correctly (no overflow, no collapsed elements, no unexpected scrollbars)
+- Typography loads and displays properly (custom fonts, sizes, spacing)
+- Colors match the intended palette (check both light and dark if applicable)
+- Animations and transitions play smoothly
+- Responsive behavior at key breakpoints (mobile, tablet, desktop)
+- Interactive states work (hover, focus, active, disabled)
+- Content is readable and accessible (contrast, sizing)
+
+## How to Use the Browser Tool
+
+Use the \`playwright\` skill (or equivalent browser automation tool) to:
+
+\`\`\`
+1. Navigate to the page/component URL
+2. Take a screenshot to capture the current visual state
+3. Analyze the screenshot for visual correctness
+4. Interact with elements to verify hover states, animations, transitions
+5. Resize the viewport to test responsive behavior
+\`\`\`
+
+**If the browser tool is not available**: Request it explicitly. When working as a subagent, ensure \`playwright\` (or the project's configured browser skill) is included in \`load_skills\`. If you cannot verify visually, state this clearly — do NOT claim the work is verified without actually seeing the output.
+
+## When to Skip
+
+You may skip browser verification ONLY when:
+- Changes are limited to non-visual code (data fetching, state management, types)
+- The development server is confirmed not running and cannot be started
+- The change is a trivial text/copy update with zero layout impact
+
+In ALL other cases: **screenshot or it didn't happen.**`,
 }

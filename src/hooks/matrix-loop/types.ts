@@ -9,6 +9,8 @@ export interface MatrixLoopState {
   prompt: string
   session_id?: string
   ultrawork?: boolean
+  verification_in_progress?: boolean
+  verification_failed_count?: number
 }
 
 export interface MatrixLoopOptions {
@@ -16,4 +18,10 @@ export interface MatrixLoopOptions {
   getTranscriptPath?: (sessionId: string) => string
   apiTimeout?: number
   checkSessionExists?: (sessionId: string) => Promise<boolean>
+  verification?: {
+    enabled?: boolean
+    agent?: string
+    timeoutMs?: number
+    maxRetries?: number
+  }
 }
