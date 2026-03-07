@@ -334,8 +334,8 @@ describe("createEventHandler - model fallback", () => {
 
     //#then - second fallback entry applied (chain advanced)
     expect(second.message["model"]).toEqual({
-      providerID: "zai-coding-plan",
-      modelID: "glm-5",
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
     })
     expect(second.message["variant"]).toBeUndefined()
     expect(abortCalls).toEqual([sessionID, sessionID])

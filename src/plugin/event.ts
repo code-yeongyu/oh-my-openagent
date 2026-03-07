@@ -97,6 +97,11 @@ function extractProviderModelFromErrorMessage(message: string): { providerID?: s
 
   return {};
 }
+
+function isCompactionAgent(agent: string): boolean {
+  return agent.toLowerCase() === "compaction";
+}
+
 type EventInput = Parameters<NonNullable<NonNullable<CreatedHooks["writeExistingFileGuard"]>["event"]>>[0];
 export function createEventHandler(args: {
   ctx: PluginContext;
@@ -261,7 +266,7 @@ export function createEventHandler(args: {
       const agent = info?.agent as string | undefined;
       const role = info?.role as string | undefined;
       if (sessionID && role === "user") {
-        if (agent) {
+        if (agent && !isCompactionAgent(agent)) {
           updateSessionAgent(sessionID, agent);
         }
         const providerID = info?.providerID as string | undefined;

@@ -1,6 +1,7 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
 import { DEFAULT_SYNC_POLL_TIMEOUT_MS, getTimingConfig } from "./timing"
+import { buildTaskPrompt } from "./prompt-builder"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
@@ -20,9 +21,10 @@ export async function executeUnstableAgentTask(
   const { manager, client, syncPollTimeoutMs } = executorCtx
 
   try {
+    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse)
     const task = await manager.launch({
       description: args.description,
-      prompt: args.prompt,
+      prompt: effectivePrompt,
       agent: agentToUse,
       parentSessionID: parentContext.sessionID,
       parentMessageID: parentContext.messageID,
