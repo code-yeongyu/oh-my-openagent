@@ -90,7 +90,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "opencode"],
-        model: "gpt-5.3-codex",
+        model: "gpt-5.4",
         variant: "medium",
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
