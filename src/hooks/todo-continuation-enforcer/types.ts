@@ -27,8 +27,10 @@ export interface SessionState {
   isRecovering?: boolean
   countdownStartedAt?: number
   abortDetectedAt?: number
+  lastIncompleteCount?: number
   lastInjectedAt?: number
   inFlight?: boolean
+  stagnationCount: number
   consecutiveFailures: number
 }
 
