@@ -409,6 +409,123 @@ describe("atlas hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
+    describe("completion gate output ordering", () => {
+      const COMPLETION_GATE_SESSION = "completion-gate-order-test"
+
+      beforeEach(() => {
+        setupMessageStorage(COMPLETION_GATE_SESSION, "atlas")
+      })
+
+      afterEach(() => {
+        cleanupMessageStorage(COMPLETION_GATE_SESSION)
+      })
+
+      test("should include completion gate before Subagent Response in transformed boulder output", async () => {
+        // given - Atlas caller with boulder state
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["session-1"],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const hook = createAtlasHook(createMockPluginInput())
+        const output = {
+          title: "Sisyphus Task",
+          output: "Task completed successfully",
+          metadata: {},
+        }
+
+        // when
+        await hook["tool.execute.after"](
+          { tool: "task", sessionID: COMPLETION_GATE_SESSION },
+          output
+        )
+
+        // then - completion gate should appear BEFORE Subagent Response
+        const subagentResponseIndex = output.output.indexOf("**Subagent Response:**")
+        const completionGateIndex = output.output.indexOf("COMPLETION GATE")
+
+        expect(completionGateIndex).toBeGreaterThanOrEqual(0)
+        expect(subagentResponseIndex).toBeGreaterThanOrEqual(0)
+        expect(completionGateIndex).toBeLessThan(subagentResponseIndex)
+      })
+
+      test("should include completion gate before verification phase text", async () => {
+        // given - Atlas caller with boulder state
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["session-1"],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const hook = createAtlasHook(createMockPluginInput())
+        const output = {
+          title: "Sisyphus Task",
+          output: "Task completed successfully",
+          metadata: {},
+        }
+
+        // when
+        await hook["tool.execute.after"](
+          { tool: "task", sessionID: COMPLETION_GATE_SESSION },
+          output
+        )
+
+        // then - completion gate should appear BEFORE verification phase text
+        const completionGateIndex = output.output.indexOf("COMPLETION GATE")
+        const lyingIndex = output.output.indexOf("LYING")
+        const phase1Index = output.output.indexOf("PHASE 1")
+
+        expect(completionGateIndex).toBeGreaterThanOrEqual(0)
+        expect(lyingIndex).toBeGreaterThanOrEqual(0)
+        expect(completionGateIndex).toBeLessThan(lyingIndex)
+        if (phase1Index !== -1) {
+          expect(completionGateIndex).toBeLessThan(phase1Index)
+        }
+      })
+
+      test("should not contain old STEP 7 MARK COMPLETION IN PLAN FILE text", async () => {
+        // given - Atlas caller with boulder state
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["session-1"],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const hook = createAtlasHook(createMockPluginInput())
+        const output = {
+          title: "Sisyphus Task",
+          output: "Task completed successfully",
+          metadata: {},
+        }
+
+        // when
+        await hook["tool.execute.after"](
+          { tool: "task", sessionID: COMPLETION_GATE_SESSION },
+          output
+        )
+
+        // then - old STEP 7 MARK COMPLETION IN PLAN FILE should be absent
+        expect(output.output).not.toContain("STEP 7: MARK COMPLETION IN PLAN FILE")
+        expect(output.output).not.toContain("MARK COMPLETION IN PLAN FILE")
+      })
+    })
+
     describe("Write/Edit tool direct work reminder", () => {
       const ORCHESTRATOR_SESSION = "orchestrator-write-test"
 

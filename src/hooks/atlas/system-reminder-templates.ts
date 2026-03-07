@@ -33,9 +33,8 @@ export const BOULDER_CONTINUATION_PROMPT = `${createSystemDirective(SystemDirect
 You have an active work plan with incomplete tasks. Continue working.
 
 RULES:
-- **FIRST**: Read the plan file NOW to check exact current progress — count remaining \`- [ ]\` tasks
+- **FIRST**: Read the plan file NOW. If the last completed task is still unchecked, mark it \`- [x]\` IMMEDIATELY before anything else
 - Proceed without asking for permission
-- Change \`- [ ]\` to \`- [x]\` in the plan file when done
 - Use the notepad at .sisyphus/notepads/{PLAN_NAME}/ to record learnings
 - Do not stop until all tasks are complete
 - If blocked, document the blocker and move to the next task`

@@ -313,7 +313,7 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="Task 3..
 - Instruct subagent to append findings (never overwrite)
 
 **Paths**:
-- Plan: \`.sisyphus/plans/{name}.md\` (READ ONLY)
+- Plan: \`.sisyphus/plans/{name}.md\` (you may EDIT to mark checkboxes)
 - Notepad: \`.sisyphus/notepads/{name}/\` (READ/APPEND)
 </notepad_protocol>
 
@@ -348,6 +348,7 @@ Your job is to CATCH THEM. Assume every claim is false until YOU personally veri
 - Use lsp_diagnostics, grep, glob
 - Manage todos
 - Coordinate and verify
+- **EDIT \`.sisyphus\/plans\/*.md\` to change \`- [ ]\` to \`- [x]\` after verified task completion**
 
 **YOU DELEGATE**:
 - All code writing/editing
@@ -376,15 +377,19 @@ Your job is to CATCH THEM. Assume every claim is false until YOU personally veri
 - Store and reuse session_id for retries
 </critical_rules>
 
-<user_updates_spec>
-- Send brief updates (1-2 sentences) only when:
-  - Starting a new major phase
-  - Discovering something that changes the plan
-- Avoid narrating routine tool calls
-- Each update must include a concrete outcome ("Found X", "Verified Y", "Delegated Z")
-- Keep updates varied in structure — don't start each the same way
-- Do NOT expand task scope; if you notice new work, call it out as optional
-</user_updates_spec>
+<post_delegation_rule>
+## POST-DELEGATION RULE (MANDATORY)
+
+After EVERY verified task() completion, you MUST:
+
+1. **EDIT the plan checkbox**: Change \`- [ ]\` to \`- [x]\` for the completed task in \`.sisyphus/plans/{plan-name}.md\`
+
+2. **READ the plan to confirm**: Read \`.sisyphus/plans/{plan-name}.md\` and verify the checkbox count changed (fewer \`- [ ]\` remaining)
+
+3. **MUST NOT call a new task()** before completing steps 1 and 2 above
+
+This ensures accurate progress tracking. Skip this and you lose visibility into what remains.
+</post_delegation_rule>
 `;
 
 export function getGptAtlasPrompt(): string {
