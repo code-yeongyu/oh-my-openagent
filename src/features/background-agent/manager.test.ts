@@ -224,6 +224,12 @@ function stubNotifyParentSession(manager: BackgroundManager): void {
   ;(manager as unknown as { notifyParentSession: () => Promise<void> }).notifyParentSession = async () => {}
 }
 
+async function flushBackgroundNotifications(): Promise<void> {
+  for (let i = 0; i < 6; i++) {
+    await Promise.resolve()
+  }
+}
+
 function createToastRemoveTaskTracker(): { removeTaskCalls: string[]; resetToastManager: () => void } {
   _resetTaskToastManagerForTesting()
   const toastManager = initTaskToastManager({
@@ -1306,11 +1312,20 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(abortedSessionIDs).toEqual(["session-1"])
   })
 
-  test("should clean pendingByParent even when notifyParentSession throws", async () => {
+  test("should clean pendingByParent even when promptAsync notification fails", async () => {
     // given
-    ;(manager as unknown as { notifyParentSession: () => Promise<void> }).notifyParentSession = async () => {
-      throw new Error("notify failed")
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async () => {
+          throw new Error("notify failed")
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
     }
+    manager.shutdown()
+    manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
 
     const task: BackgroundTask = {
       id: "task-pending-cleanup",
@@ -1424,7 +1439,7 @@ describe("BackgroundManager.tryCompleteTask", () => {
     // then
     expect(rejectedCount).toBe(0)
     expect(promptBodies.length).toBe(2)
-    expect(promptBodies.some((b) => b.noReply === false)).toBe(true)
+    expect(promptBodies.filter((body) => body.noReply === false)).toHaveLength(1)
   })
 })
 
@@ -1932,7 +1947,6 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
     test("should cancel running task and release concurrency", async () => {
       // given
       const manager = createBackgroundManager()
-      stubNotifyParentSession(manager)
 
       const concurrencyManager = getConcurrencyManager(manager)
       const concurrencyKey = "test-provider/test-model"
@@ -2890,7 +2904,7 @@ describe("BackgroundManager.shutdown session abort", () => {
 })
 
 describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
-  test("should cancel descendant tasks when parent session is deleted", () => {
+  test("should cancel descendant tasks and keep them until delayed cleanup", async () => {
     // given
     const manager = createBackgroundManager()
     const parentSessionID = "session-parent"
@@ -2937,21 +2951,26 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
       properties: { info: { id: parentSessionID } },
     })
 
+    await flushBackgroundNotifications()
+
     // then
-    expect(taskMap.has(childTask.id)).toBe(false)
-    expect(taskMap.has(siblingTask.id)).toBe(false)
-    expect(taskMap.has(grandchildTask.id)).toBe(false)
+    expect(taskMap.has(childTask.id)).toBe(true)
+    expect(taskMap.has(siblingTask.id)).toBe(true)
+    expect(taskMap.has(grandchildTask.id)).toBe(true)
     expect(taskMap.has(unrelatedTask.id)).toBe(true)
     expect(childTask.status).toBe("cancelled")
     expect(siblingTask.status).toBe("cancelled")
     expect(grandchildTask.status).toBe("cancelled")
     expect(pendingByParent.get(parentSessionID)).toBeUndefined()
     expect(pendingByParent.get("session-child")).toBeUndefined()
+    expect(getCompletionTimers(manager).has(childTask.id)).toBe(true)
+    expect(getCompletionTimers(manager).has(siblingTask.id)).toBe(true)
+    expect(getCompletionTimers(manager).has(grandchildTask.id)).toBe(true)
 
     manager.shutdown()
   })
 
-  test("should remove tasks from toast manager when session is deleted", () => {
+  test("should remove cancelled tasks from toast manager while preserving delayed cleanup", async () => {
     //#given
     const { removeTaskCalls, resetToastManager } = createToastRemoveTaskTracker()
     const manager = createBackgroundManager()
@@ -2980,9 +2999,13 @@ describe("BackgroundManager.handleEvent - session.deleted cascade", () => {
       properties: { info: { id: parentSessionID } },
     })
 
+    await flushBackgroundNotifications()
+
     //#then
     expect(removeTaskCalls).toContain(childTask.id)
     expect(removeTaskCalls).toContain(grandchildTask.id)
+    expect(getCompletionTimers(manager).has(childTask.id)).toBe(true)
+    expect(getCompletionTimers(manager).has(grandchildTask.id)).toBe(true)
 
     manager.shutdown()
     resetToastManager()
@@ -3045,7 +3068,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
     return task
   }
 
-  test("sets task to error, releases concurrency, and cleans up", async () => {
+  test("sets task to error, releases concurrency, and keeps it until delayed cleanup", async () => {
     //#given
     const manager = createBackgroundManager()
     const concurrencyManager = getConcurrencyManager(manager)
@@ -3078,18 +3101,21 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       },
     })
 
+    await flushBackgroundNotifications()
+
     //#then
     expect(task.status).toBe("error")
     expect(task.error).toBe("Model not found: kimi-for-coding/k2p5.")
     expect(task.completedAt).toBeInstanceOf(Date)
     expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)
-    expect(getTaskMap(manager).has(task.id)).toBe(false)
+    expect(getTaskMap(manager).has(task.id)).toBe(true)
     expect(getPendingByParent(manager).get(task.parentSessionID)).toBeUndefined()
+    expect(getCompletionTimers(manager).has(task.id)).toBe(true)
 
     manager.shutdown()
   })
 
-  test("removes errored task from toast manager", () => {
+  test("should remove errored task from toast manager while preserving delayed cleanup", async () => {
     //#given
     const { removeTaskCalls, resetToastManager } = createToastRemoveTaskTracker()
     const manager = createBackgroundManager()
@@ -3111,8 +3137,11 @@ describe("BackgroundManager.handleEvent - session.error", () => {
       },
     })
 
+    await flushBackgroundNotifications()
+
     //#then
     expect(removeTaskCalls).toContain(task.id)
+    expect(getCompletionTimers(manager).has(task.id)).toBe(true)
 
     manager.shutdown()
     resetToastManager()
@@ -3518,7 +3547,7 @@ describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
     expect(completionTimers.size).toBe(0)
   })
 
-  test("should cancel timer when task is deleted via session.deleted", () => {
+  test("should preserve cleanup timer when terminal task session is deleted", () => {
     // given
     const manager = createBackgroundManager()
     const task: BackgroundTask = {
@@ -3547,7 +3576,7 @@ describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
     })
 
     // then
-    expect(completionTimers.has(task.id)).toBe(false)
+    expect(completionTimers.has(task.id)).toBe(true)
 
     manager.shutdown()
   })
