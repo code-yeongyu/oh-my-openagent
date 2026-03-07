@@ -96,6 +96,16 @@ describe("sisyphus-task", () => {
       expect(category.model).toBe("openai/gpt-5.3-codex")
       expect(category.variant).toBe("medium")
     })
+
+    test("unspecified-high category uses explicit high model", () => {
+      // given
+      const category = DEFAULT_CATEGORIES["unspecified-high"]
+
+      // when / #then
+      expect(category).toBeDefined()
+      expect(category.model).toBe("openai/gpt-5.4-high")
+      expect(category.variant).toBeUndefined()
+    })
   })
 
   describe("CATEGORY_PROMPT_APPENDS", () => {
@@ -981,7 +991,7 @@ describe("sisyphus-task", () => {
       })
     })
 
-    test("DEFAULT_CATEGORIES variant passes to background WITHOUT userCategories", async () => {
+    test("DEFAULT_CATEGORIES explicit high model passes to background WITHOUT userCategories", async () => {
       // given - NO userCategories, testing DEFAULT_CATEGORIES only
       const { createDelegateTask } = require("./tools")
       let launchInput: any
@@ -1026,7 +1036,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - unspecified-high has variant: "max" in DEFAULT_CATEGORIES
+      // when - unspecified-high uses the explicit high model in DEFAULT_CATEGORIES
       await tool.execute(
         {
           description: "Test unspecified-high default variant",
@@ -1038,15 +1048,14 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - variant MUST be "max" from DEFAULT_CATEGORIES
+      // then - the explicit high model should be passed without a separate variant
       expect(launchInput.model).toEqual({
         providerID: "openai",
-        modelID: "gpt-5.4",
-        variant: "high",
+        modelID: "gpt-5.4-high",
       })
     }, { timeout: 20000 })
 
-     test("DEFAULT_CATEGORIES variant passes to sync session.prompt WITHOUT userCategories", async () => {
+     test("DEFAULT_CATEGORIES explicit high model passes to sync session.prompt WITHOUT userCategories", async () => {
        // given - NO userCategories, testing DEFAULT_CATEGORIES for sync mode
        const { createDelegateTask } = require("./tools")
        let promptBody: any
@@ -1087,7 +1096,7 @@ describe("sisyphus-task", () => {
         abort: new AbortController().signal,
       }
 
-      // when - unspecified-high has variant: "max" in DEFAULT_CATEGORIES
+      // when - unspecified-high uses the explicit high model in DEFAULT_CATEGORIES
       await tool.execute(
         {
           description: "Test unspecified-high sync variant",
@@ -1099,12 +1108,12 @@ describe("sisyphus-task", () => {
         toolContext
       )
 
-      // then - variant MUST be "max" from DEFAULT_CATEGORIES (passed as separate field)
+      // then - the explicit high model should be passed without a separate variant
       expect(promptBody.model).toEqual({
         providerID: "openai",
-        modelID: "gpt-5.4",
+        modelID: "gpt-5.4-high",
       })
-      expect(promptBody.variant).toBe("high")
+      expect(promptBody.variant).toBeUndefined()
     }, { timeout: 20000 })
   })
 

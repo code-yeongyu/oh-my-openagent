@@ -190,7 +190,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
-    "unspecified-high": { "model": "openai/gpt-5.4", "variant": "high" },
+    "unspecified-high": { "model": "openai/gpt-5.4-high" },
     "visual-engineering": {
       "model": "google/gemini-3.1-pro",
       "variant": "high",

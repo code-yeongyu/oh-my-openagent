@@ -100,7 +100,7 @@ Here's a practical starting configuration:
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
 
     // unspecified-high — complex work
-    "unspecified-high": { "model": "openai/gpt-5.4", "variant": "high" },
+    "unspecified-high": { "model": "openai/gpt-5.4-high" },
 
     // writing — docs/prose
     "writing": { "model": "google/gemini-3-flash" },
