@@ -23,7 +23,7 @@ import {
 
 export { resolveCategoryConfig } from "./categories"
 export type { SyncSessionCreatedEvent, DelegateTaskToolOptions, BuildSystemContentInput } from "./types"
-export { buildSystemContent } from "./prompt-builder"
+export { buildSystemContent, buildTaskPrompt } from "./prompt-builder"
 
 export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefinition {
   const { userCategories } = options

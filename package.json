@@ -1,6 +1,6 @@
 {
   "name": "oh-my-opencode",
-  "version": "3.10.0",
+  "version": "3.11.0",
   "description": "The Best AI Agent Harness - Batteries-Included OpenCode Plugin with Multi-Model Orchestration, Parallel Background Agents, and Crafted LSP/AST Tools",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -26,6 +26,7 @@
     "build:binaries": "bun run script/build-binaries.ts",
     "build:schema": "bun run script/build-schema.ts",
     "clean": "rm -rf dist",
+    "prepare": "bun run build",
     "postinstall": "node postinstall.mjs",
     "prepublishOnly": "bun run clean && bun run build",
     "typecheck": "tsc --noEmit",
@@ -44,20 +45,20 @@
   "license": "SUL-1.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/code-yeongyu/oh-my-opencode.git"
+    "url": "git+https://github.com/code-yeongyu/oh-my-openagent.git"
   },
   "bugs": {
-    "url": "https://github.com/code-yeongyu/oh-my-opencode/issues"
+    "url": "https://github.com/code-yeongyu/oh-my-openagent/issues"
   },
-  "homepage": "https://github.com/code-yeongyu/oh-my-opencode#readme",
+  "homepage": "https://github.com/code-yeongyu/oh-my-openagent#readme",
   "dependencies": {
     "@ast-grep/cli": "^0.40.0",
     "@ast-grep/napi": "^0.40.0",
     "@clack/prompts": "^0.11.0",
     "@code-yeongyu/comment-checker": "^0.7.0",
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "@opencode-ai/plugin": "^1.1.19",
-    "@opencode-ai/sdk": "^1.1.19",
+    "@opencode-ai/plugin": "^1.2.16",
+    "@opencode-ai/sdk": "^1.2.17",
     "commander": "^14.0.2",
     "detect-libc": "^2.0.0",
     "diff": "^8.0.3",
@@ -75,17 +76,20 @@
     "typescript": "^5.7.3"
   },
   "optionalDependencies": {
-    "oh-my-opencode-darwin-arm64": "3.10.0",
-    "oh-my-opencode-darwin-x64": "3.10.0",
-    "oh-my-opencode-darwin-x64-baseline": "3.10.0",
-    "oh-my-opencode-linux-arm64": "3.10.0",
-    "oh-my-opencode-linux-arm64-musl": "3.10.0",
-    "oh-my-opencode-linux-x64": "3.10.0",
-    "oh-my-opencode-linux-x64-baseline": "3.10.0",
-    "oh-my-opencode-linux-x64-musl": "3.10.0",
-    "oh-my-opencode-linux-x64-musl-baseline": "3.10.0",
-    "oh-my-opencode-windows-x64": "3.10.0",
-    "oh-my-opencode-windows-x64-baseline": "3.10.0"
+    "oh-my-opencode-darwin-arm64": "3.11.0",
+    "oh-my-opencode-darwin-x64": "3.11.0",
+    "oh-my-opencode-darwin-x64-baseline": "3.11.0",
+    "oh-my-opencode-linux-arm64": "3.11.0",
+    "oh-my-opencode-linux-arm64-musl": "3.11.0",
+    "oh-my-opencode-linux-x64": "3.11.0",
+    "oh-my-opencode-linux-x64-baseline": "3.11.0",
+    "oh-my-opencode-linux-x64-musl": "3.11.0",
+    "oh-my-opencode-linux-x64-musl-baseline": "3.11.0",
+    "oh-my-opencode-windows-x64": "3.11.0",
+    "oh-my-opencode-windows-x64-baseline": "3.11.0"
+  },
+  "overrides": {
+    "@opencode-ai/sdk": "^1.2.17"
   },
   "trustedDependencies": [
     "@ast-grep/cli",

@@ -409,6 +409,123 @@ describe("atlas hook", () => {
       cleanupMessageStorage(sessionID)
     })
 
+    describe("completion gate output ordering", () => {
+      const COMPLETION_GATE_SESSION = "completion-gate-order-test"
+
+      beforeEach(() => {
+        setupMessageStorage(COMPLETION_GATE_SESSION, "atlas")
+      })
+
+      afterEach(() => {
+        cleanupMessageStorage(COMPLETION_GATE_SESSION)
+      })
+
+      test("should include completion gate before Subagent Response in transformed boulder output", async () => {
+        // given - Atlas caller with boulder state
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["session-1"],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const hook = createAtlasHook(createMockPluginInput())
+        const output = {
+          title: "Sisyphus Task",
+          output: "Task completed successfully",
+          metadata: {},
+        }
+
+        // when
+        await hook["tool.execute.after"](
+          { tool: "task", sessionID: COMPLETION_GATE_SESSION },
+          output
+        )
+
+        // then - completion gate should appear BEFORE Subagent Response
+        const subagentResponseIndex = output.output.indexOf("**Subagent Response:**")
+        const completionGateIndex = output.output.indexOf("COMPLETION GATE")
+
+        expect(completionGateIndex).toBeGreaterThanOrEqual(0)
+        expect(subagentResponseIndex).toBeGreaterThanOrEqual(0)
+        expect(completionGateIndex).toBeLessThan(subagentResponseIndex)
+      })
+
+      test("should include completion gate before verification phase text", async () => {
+        // given - Atlas caller with boulder state
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["session-1"],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const hook = createAtlasHook(createMockPluginInput())
+        const output = {
+          title: "Sisyphus Task",
+          output: "Task completed successfully",
+          metadata: {},
+        }
+
+        // when
+        await hook["tool.execute.after"](
+          { tool: "task", sessionID: COMPLETION_GATE_SESSION },
+          output
+        )
+
+        // then - completion gate should appear BEFORE verification phase text
+        const completionGateIndex = output.output.indexOf("COMPLETION GATE")
+        const lyingIndex = output.output.indexOf("LYING")
+        const phase1Index = output.output.indexOf("PHASE 1")
+
+        expect(completionGateIndex).toBeGreaterThanOrEqual(0)
+        expect(lyingIndex).toBeGreaterThanOrEqual(0)
+        expect(completionGateIndex).toBeLessThan(lyingIndex)
+        if (phase1Index !== -1) {
+          expect(completionGateIndex).toBeLessThan(phase1Index)
+        }
+      })
+
+      test("should not contain old STEP 7 MARK COMPLETION IN PLAN FILE text", async () => {
+        // given - Atlas caller with boulder state
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: ["session-1"],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const hook = createAtlasHook(createMockPluginInput())
+        const output = {
+          title: "Sisyphus Task",
+          output: "Task completed successfully",
+          metadata: {},
+        }
+
+        // when
+        await hook["tool.execute.after"](
+          { tool: "task", sessionID: COMPLETION_GATE_SESSION },
+          output
+        )
+
+        // then - old STEP 7 MARK COMPLETION IN PLAN FILE should be absent
+        expect(output.output).not.toContain("STEP 7: MARK COMPLETION IN PLAN FILE")
+        expect(output.output).not.toContain("MARK COMPLETION IN PLAN FILE")
+      })
+    })
+
     describe("Write/Edit tool direct work reminder", () => {
       const ORCHESTRATOR_SESSION = "orchestrator-write-test"
 
@@ -1418,6 +1535,213 @@ describe("atlas hook", () => {
 
       // then - should continue because start-work updated session agent to atlas
       expect(mockInput._promptMock).toHaveBeenCalled()
+    })
+
+    describe("delayed retry timer (abort-stuck fix)", () => {
+      const capturedTimers = new Map<number, { callback: Function; cleared: boolean }>()
+      let nextFakeId = 99000
+      const originalSetTimeout = globalThis.setTimeout
+      const originalClearTimeout = globalThis.clearTimeout
+
+      beforeEach(() => {
+        capturedTimers.clear()
+        nextFakeId = 99000
+
+        globalThis.setTimeout = ((callback: Function, delay?: number, ...args: unknown[]) => {
+          const normalized = typeof delay === "number" ? delay : 0
+          if (normalized >= 5000) {
+            const id = nextFakeId++
+            capturedTimers.set(id, { callback: () => callback(...args), cleared: false })
+            return id as unknown as ReturnType<typeof setTimeout>
+          }
+          return originalSetTimeout(callback as Parameters<typeof originalSetTimeout>[0], delay)
+        }) as unknown as typeof setTimeout
+
+        globalThis.clearTimeout = ((id?: number | ReturnType<typeof setTimeout>) => {
+          if (typeof id === "number" && capturedTimers.has(id)) {
+            capturedTimers.get(id)!.cleared = true
+            capturedTimers.delete(id)
+            return
+          }
+          originalClearTimeout(id as Parameters<typeof originalClearTimeout>[0])
+        }) as unknown as typeof clearTimeout
+      })
+
+      afterEach(() => {
+        globalThis.setTimeout = originalSetTimeout
+        globalThis.clearTimeout = originalClearTimeout
+      })
+
+      async function firePendingTimers(): Promise<void> {
+        for (const [id, entry] of capturedTimers) {
+          if (!entry.cleared) {
+            capturedTimers.delete(id)
+            await entry.callback()
+          }
+        }
+        await flushMicrotasks()
+      }
+
+      test("should schedule delayed retry when cooldown blocks idle for incomplete boulder", async () => {
+        // given - boulder with incomplete plan
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        // when - first idle injects, second idle within cooldown schedules retry timer
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        // then - fire pending timer and verify retry
+        await firePendingTimers()
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(2)
+      })
+
+      test("should not schedule duplicate retry timers for rapid idle events", async () => {
+        // given - boulder with incomplete plan
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        // when - first idle injects, then 3 rapid idles within cooldown
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        // then - only one retry fires despite multiple cooldown-blocked idles
+        await firePendingTimers()
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(2)
+      })
+
+      test("should not retry if plan completes before timer fires", async () => {
+        // given - boulder with incomplete plan
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        // when - first idle injects, second schedules retry, then plan completes before timer fires
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        writeFileSync(planPath, "# Plan\n- [x] Task 1\n- [x] Task 2")
+
+        // then - retry sees complete plan and bails out
+        await firePendingTimers()
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      })
+
+      test("should cleanup pending retry timer on session.deleted", async () => {
+        // given - boulder with incomplete plan, schedule retry timer
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        // when - delete session before timer fires
+        await hook.handler({
+          event: { type: "session.deleted", properties: { info: { id: MAIN_SESSION_ID } } },
+        })
+
+        // then - timer was cleared, prompt called only once
+        await firePendingTimers()
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      })
+
+      test("should cleanup pending retry timer on session.compacted", async () => {
+        // given - boulder with incomplete plan, schedule retry timer
+        const planPath = join(TEST_DIR, "test-plan.md")
+        writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [x] Task 2")
+
+        const state: BoulderState = {
+          active_plan: planPath,
+          started_at: "2026-01-02T10:00:00Z",
+          session_ids: [MAIN_SESSION_ID],
+          plan_name: "test-plan",
+        }
+        writeBoulderState(TEST_DIR, state)
+
+        const mockInput = createMockPluginInput()
+        const hook = createAtlasHook(mockInput)
+
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+        await hook.handler({
+          event: { type: "session.idle", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        // when - compact session before timer fires
+        await hook.handler({
+          event: { type: "session.compacted", properties: { sessionID: MAIN_SESSION_ID } },
+        })
+
+        // then - timer was cleared, prompt called only once
+        await firePendingTimers()
+        expect(mockInput._promptMock).toHaveBeenCalledTimes(1)
+      })
     })
   })
 })

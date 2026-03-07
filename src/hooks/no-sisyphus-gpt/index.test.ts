@@ -43,10 +43,31 @@ describe("no-sisyphus-gpt hook", () => {
     expect(showToast.mock.calls[0]?.[0]).toMatchObject({
       body: {
         title: "NEVER Use Sisyphus with GPT",
-        message: expect.stringContaining("For GPT models, always use Hephaestus."),
+        message: expect.stringContaining("For GPT models (other than 5.4), always use Hephaestus."),
         variant: "error",
       },
     })
+  })
+
+  test("does not show toast for gpt-5.4 model (Sisyphus has specialized support)", async () => {
+    // given - sisyphus with gpt-5.4 model (should be allowed)
+    const showToast = spyOn({ fn: async () => ({}) }, "fn")
+    const hook = createNoSisyphusGptHook({
+      client: { tui: { showToast } },
+    } as any)
+
+    const output = createOutput()
+
+    // when - chat.message runs with gpt-5.4
+    await hook["chat.message"]?.({
+      sessionID: "ses_gpt54",
+      agent: SISYPHUS_DISPLAY,
+      model: { providerID: "openai", modelID: "gpt-5.4" },
+    }, output)
+
+    // then - no toast, agent NOT switched to Hephaestus
+    expect(showToast).toHaveBeenCalledTimes(0)
+    expect(output.message.agent).toBeUndefined()
   })
 
   test("does not show toast for non-gpt model", async () => {
@@ -83,7 +104,7 @@ describe("no-sisyphus-gpt hook", () => {
     await hook["chat.message"]?.({
       sessionID: "ses_3",
       agent: HEPHAESTUS_DISPLAY,
-      model: { providerID: "openai", modelID: "gpt-5.2" },
+      model: { providerID: "openai", modelID: "gpt-5.4" },
     }, output)
 
     // then - no toast
@@ -105,7 +126,7 @@ describe("no-sisyphus-gpt hook", () => {
     // when - chat.message runs without input.agent
     await hook["chat.message"]?.({
       sessionID: "ses_4",
-      model: { providerID: "openai", modelID: "gpt-5.2" },
+      model: { providerID: "openai", modelID: "gpt-4o" },
     }, output)
 
     // then - toast shown via session-agent fallback

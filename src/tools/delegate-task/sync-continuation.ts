@@ -11,6 +11,7 @@ import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
+import { buildTaskPrompt } from "./prompt-builder"
 
 export async function executeSyncContinuation(
   args: DelegateTaskArgs,
@@ -32,22 +33,7 @@ export async function executeSyncContinuation(
     })
   }
 
-  const syncContMeta = {
-    title: `Continue: ${args.description}`,
-    metadata: {
-      prompt: args.prompt,
-      load_skills: args.load_skills,
-      description: args.description,
-      run_in_background: args.run_in_background,
-      sessionId: args.session_id,
-      sync: true,
-      command: args.command,
-    },
-  }
-  await ctx.metadata?.(syncContMeta)
-  if (ctx.callID) {
-    storeToolMetadata(ctx.sessionID, ctx.callID, syncContMeta)
-  }
+  let syncContMeta: { title: string; metadata: Record<string, unknown> } | undefined
 
   let resumeAgent: string | undefined
   let resumeModel: { providerID: string; modelID: string } | undefined
@@ -78,7 +64,26 @@ export async function executeSyncContinuation(
       resumeVariant = resumeMessage?.model?.variant
     }
 
+    syncContMeta = {
+      title: `Continue: ${args.description}`,
+      metadata: {
+        prompt: args.prompt,
+        load_skills: args.load_skills,
+        description: args.description,
+        run_in_background: args.run_in_background,
+        sessionId: args.session_id,
+        sync: true,
+        command: args.command,
+        model: resumeModel,
+      },
+    }
+    await ctx.metadata?.(syncContMeta)
+    if (ctx.callID) {
+      storeToolMetadata(ctx.sessionID, ctx.callID, syncContMeta)
+    }
+
     const allowTask = isPlanFamily(resumeAgent)
+    const effectivePrompt = buildTaskPrompt(args.prompt, resumeAgent)
     const tools = {
       ...(resumeAgent ? getAgentToolRestrictions(resumeAgent) : {}),
       task: allowTask,
@@ -94,7 +99,7 @@ export async function executeSyncContinuation(
         ...(resumeModel !== undefined ? { model: resumeModel } : {}),
         ...(resumeVariant !== undefined ? { variant: resumeVariant } : {}),
         tools,
-        parts: [{ type: "text", text: args.prompt }],
+        parts: [{ type: "text", text: effectivePrompt }],
       },
     })
    } catch (promptError) {

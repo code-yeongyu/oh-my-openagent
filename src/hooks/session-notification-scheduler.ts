@@ -9,6 +9,8 @@ type SessionNotificationConfig = {
   idleConfirmationDelay: number
   skipIfIncompleteTodos: boolean
   maxTrackedSessions: number
+  /** Grace period in ms to ignore late-arriving activity events after scheduling (default: 100) */
+  activityGracePeriodMs?: number
 }
 
 export function createIdleNotificationScheduler(options: {
@@ -24,6 +26,9 @@ export function createIdleNotificationScheduler(options: {
   const sessionActivitySinceIdle = new Set<string>()
   const notificationVersions = new Map<string, number>()
   const executingNotifications = new Set<string>()
+  const scheduledAt = new Map<string, number>()
+
+  const activityGracePeriodMs = options.config.activityGracePeriodMs ?? 100
 
   function cleanupOldSessions(): void {
     const maxSessions = options.config.maxTrackedSessions
@@ -43,6 +48,10 @@ export function createIdleNotificationScheduler(options: {
       const sessionsToRemove = Array.from(executingNotifications).slice(0, executingNotifications.size - maxSessions)
       sessionsToRemove.forEach((id) => executingNotifications.delete(id))
     }
+    if (scheduledAt.size > maxSessions) {
+      const sessionsToRemove = Array.from(scheduledAt.keys()).slice(0, scheduledAt.size - maxSessions)
+      sessionsToRemove.forEach((id) => scheduledAt.delete(id))
+    }
   }
 
   function cancelPendingNotification(sessionID: string): void {
@@ -51,11 +60,17 @@ export function createIdleNotificationScheduler(options: {
       clearTimeout(timer)
       pendingTimers.delete(sessionID)
     }
+    scheduledAt.delete(sessionID)
     sessionActivitySinceIdle.add(sessionID)
     notificationVersions.set(sessionID, (notificationVersions.get(sessionID) ?? 0) + 1)
   }
 
   function markSessionActivity(sessionID: string): void {
+    const scheduledTime = scheduledAt.get(sessionID)
+    if (scheduledTime && Date.now() - scheduledTime < activityGracePeriodMs) {
+      return
+    }
+
     cancelPendingNotification(sessionID)
     if (!executingNotifications.has(sessionID)) {
       notifiedSessions.delete(sessionID)
@@ -65,22 +80,26 @@ export function createIdleNotificationScheduler(options: {
   async function executeNotification(sessionID: string, version: number): Promise<void> {
     if (executingNotifications.has(sessionID)) {
       pendingTimers.delete(sessionID)
+      scheduledAt.delete(sessionID)
       return
     }
 
     if (notificationVersions.get(sessionID) !== version) {
       pendingTimers.delete(sessionID)
+      scheduledAt.delete(sessionID)
       return
     }
 
     if (sessionActivitySinceIdle.has(sessionID)) {
       sessionActivitySinceIdle.delete(sessionID)
       pendingTimers.delete(sessionID)
+      scheduledAt.delete(sessionID)
       return
     }
 
     if (notifiedSessions.has(sessionID)) {
       pendingTimers.delete(sessionID)
+      scheduledAt.delete(sessionID)
       return
     }
 
@@ -113,6 +132,7 @@ export function createIdleNotificationScheduler(options: {
     } finally {
       executingNotifications.delete(sessionID)
       pendingTimers.delete(sessionID)
+      scheduledAt.delete(sessionID)
       if (sessionActivitySinceIdle.has(sessionID)) {
         notifiedSessions.delete(sessionID)
         sessionActivitySinceIdle.delete(sessionID)
@@ -126,6 +146,7 @@ export function createIdleNotificationScheduler(options: {
     if (executingNotifications.has(sessionID)) return
 
     sessionActivitySinceIdle.delete(sessionID)
+    scheduledAt.set(sessionID, Date.now())
 
     const currentVersion = (notificationVersions.get(sessionID) ?? 0) + 1
     notificationVersions.set(sessionID, currentVersion)
@@ -144,6 +165,7 @@ export function createIdleNotificationScheduler(options: {
     sessionActivitySinceIdle.delete(sessionID)
     notificationVersions.delete(sessionID)
     executingNotifications.delete(sessionID)
+    scheduledAt.delete(sessionID)
   }
 
   return {

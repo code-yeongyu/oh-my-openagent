@@ -1,5 +1,6 @@
 import type { DelegateTaskArgs, OpencodeClient } from "./types"
 import { isPlanFamily } from "./constants"
+import { buildTaskPrompt } from "./prompt-builder"
 import {
   promptSyncWithModelSuggestionRetry,
   promptWithModelSuggestionRetry,
@@ -43,6 +44,7 @@ export async function sendSyncPrompt(
   deps: SendSyncPromptDeps = sendSyncPromptDeps
 ): Promise<string | null> {
   const allowTask = isPlanFamily(input.agentToUse)
+  const effectivePrompt = buildTaskPrompt(input.args.prompt, input.agentToUse)
   const tools = {
     task: allowTask,
     call_omo_agent: true,
@@ -57,7 +59,7 @@ export async function sendSyncPrompt(
       agent: input.agentToUse,
       system: input.systemContent,
       tools,
-      parts: [createInternalAgentTextPart(input.args.prompt)],
+      parts: [createInternalAgentTextPart(effectivePrompt)],
       ...(input.categoryModel
         ? { model: { providerID: input.categoryModel.providerID, modelID: input.categoryModel.modelID } }
         : {}),

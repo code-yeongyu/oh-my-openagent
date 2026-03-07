@@ -2078,7 +2078,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         description: "Task 2",
         prompt: "Do something else",
         agent: "test-agent",
-        model: { providerID: "openai", modelID: "gpt-5.2" },
+        model: { providerID: "openai", modelID: "gpt-5.4" },
         parentSessionID: "parent-session",
         parentMessageID: "parent-message",
       }

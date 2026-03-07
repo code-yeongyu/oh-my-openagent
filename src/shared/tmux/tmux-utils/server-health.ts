@@ -10,7 +10,7 @@ export async function isServerRunning(serverUrl: string): Promise<boolean> {
 		return true
 	}
 
-	const healthUrl = new URL("/health", serverUrl).toString()
+	const healthUrl = new URL("/global/health", serverUrl).toString()
 	const timeoutMs = 3000
 	const maxAttempts = 2
 
