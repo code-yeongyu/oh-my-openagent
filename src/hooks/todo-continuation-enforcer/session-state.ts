@@ -10,9 +10,17 @@ interface TrackedSessionState {
   lastAccessedAt: number
 }
 
+export interface ContinuationProgressUpdate {
+  previousIncompleteCount?: number
+  stagnationCount: number
+  hasProgressed: boolean
+}
+
 export interface SessionStateStore {
   getState: (sessionID: string) => SessionState
   getExistingState: (sessionID: string) => SessionState | undefined
+  trackContinuationProgress: (sessionID: string, incompleteCount: number) => ContinuationProgressUpdate
+  resetContinuationProgress: (sessionID: string) => void
   cancelCountdown: (sessionID: string) => void
   cleanup: (sessionID: string) => void
   cancelAllCountdowns: () => void
@@ -46,6 +54,7 @@ export function createSessionStateStore(): SessionStateStore {
     }
 
     const state: SessionState = {
+      stagnationCount: 0,
       consecutiveFailures: 0,
     }
     sessions.set(sessionID, { state, lastAccessedAt: Date.now() })
@@ -59,6 +68,57 @@ export function createSessionStateStore(): SessionStateStore {
       return existing.state
     }
     return undefined
+  }
+
+  function trackContinuationProgress(
+    sessionID: string,
+    incompleteCount: number
+  ): ContinuationProgressUpdate {
+    const state = getState(sessionID)
+    const previousIncompleteCount = state.lastIncompleteCount
+
+    state.lastIncompleteCount = incompleteCount
+
+    if (previousIncompleteCount === undefined) {
+      state.stagnationCount = 0
+      return {
+        previousIncompleteCount,
+        stagnationCount: state.stagnationCount,
+        hasProgressed: false,
+      }
+    }
+
+    if (incompleteCount < previousIncompleteCount) {
+      state.stagnationCount = 0
+      return {
+        previousIncompleteCount,
+        stagnationCount: state.stagnationCount,
+        hasProgressed: true,
+      }
+    }
+
+    if (state.lastInjectedAt === undefined) {
+      return {
+        previousIncompleteCount,
+        stagnationCount: state.stagnationCount,
+        hasProgressed: false,
+      }
+    }
+
+    state.stagnationCount += 1
+    return {
+      previousIncompleteCount,
+      stagnationCount: state.stagnationCount,
+      hasProgressed: false,
+    }
+  }
+
+  function resetContinuationProgress(sessionID: string): void {
+    const state = getExistingState(sessionID)
+    if (!state) return
+
+    state.lastIncompleteCount = undefined
+    state.stagnationCount = 0
   }
 
   function cancelCountdown(sessionID: string): void {
@@ -100,6 +160,8 @@ export function createSessionStateStore(): SessionStateStore {
   return {
     getState,
     getExistingState,
+    trackContinuationProgress,
+    resetContinuationProgress,
     cancelCountdown,
     cleanup,
     cancelAllCountdowns,
