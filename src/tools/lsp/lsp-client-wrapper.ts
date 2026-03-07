@@ -1,6 +1,6 @@
 import { extname, resolve } from "path"
 import { fileURLToPath } from "node:url"
-import { existsSync } from "fs"
+import { existsSync, statSync } from "fs"
 
 import { LSPClient, lspManager } from "./client"
 import { findServerForExtension } from "./config"
@@ -31,6 +31,13 @@ export function findWorkspaceRoot(filePath: string): string {
 
 export function uriToPath(uri: string): string {
   return fileURLToPath(uri)
+}
+
+export function isDirectoryPath(filePath: string): boolean {
+  if (!existsSync(filePath)) {
+    return false
+  }
+  return statSync(filePath).isDirectory()
 }
 
 export function formatServerLookupError(result: Exclude<ServerLookupResult, { status: "found" }>): string {
@@ -70,6 +77,14 @@ export function formatServerLookupError(result: Exclude<ServerLookupResult, { st
 
 export async function withLspClient<T>(filePath: string, fn: (client: LSPClient) => Promise<T>): Promise<T> {
   const absPath = resolve(filePath)
+
+  if (isDirectoryPath(absPath)) {
+    throw new Error(
+      `Directory paths are not supported by this LSP tool. ` +
+        `Use lsp_diagnostics with the 'extension' parameter for directory diagnostics.`
+    )
+  }
+
   const ext = extname(absPath)
   const result = findServerForExtension(ext)
 
