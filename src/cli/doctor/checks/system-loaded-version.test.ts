@@ -4,7 +4,11 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { PACKAGE_NAME } from "../constants"
-import { getLoadedPluginVersion, getSuggestedInstallTag } from "./system-loaded-version"
+
+const systemLoadedVersionModulePath = "./system-loaded-version?system-loaded-version-test"
+
+const { getLoadedPluginVersion, getSuggestedInstallTag }: typeof import("./system-loaded-version") =
+  await import(systemLoadedVersionModulePath)
 
 const originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
 const originalXdgCacheHome = process.env.XDG_CACHE_HOME
