@@ -113,7 +113,8 @@ export type BuiltinAgentName =
   | "multimodal-looker"
   | "metis"
   | "momus"
-  | "atlas";
+  | "atlas"
+  | "sisyphus-junior";
 
 export type OverridableAgentName = "build" | BuiltinAgentName;
 
