@@ -124,8 +124,8 @@ describe("resolveVariantForModel", () => {
     expect(variant).toBe("medium")
   })
 
-  test("returns undefined for provider not in sisyphus chain", () => {
-    // #given openai is not in sisyphus fallback chain anymore
+  test("returns medium for openai/gpt-5.4 in sisyphus chain", () => {
+    // #given openai/gpt-5.4 is now in sisyphus fallback chain with variant medium
     const config = {} as OhMyOpenCodeConfig
     const model = { providerID: "openai", modelID: "gpt-5.4" }
 
@@ -133,7 +133,7 @@ describe("resolveVariantForModel", () => {
     const variant = resolveVariantForModel(config, "sisyphus", model)
 
     // then
-    expect(variant).toBeUndefined()
+    expect(variant).toBe("medium")
   })
 
   test("returns undefined for provider not in chain", () => {

@@ -10,7 +10,7 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 
 | Agent | Model | Temp | Mode | Fallback Chain | Purpose |
 |-------|-------|------|------|----------------|---------|
-| **Sisyphus** | claude-opus-4-6 max | 0.1 | all | glm-5 → big-pickle | Main orchestrator, plans + delegates |
+| **Sisyphus** | claude-opus-4-6 max | 0.1 | all | k2p5 → kimi-k2.5 → gpt-5.4 medium → glm-5 → big-pickle | Main orchestrator, plans + delegates |
 | **Hephaestus** | gpt-5.3-codex medium | 0.1 | all | gpt-5.4 medium (copilot) | Autonomous deep worker |
 | **Oracle** | gpt-5.4 high | 0.1 | subagent | gemini-3.1-pro high → claude-opus-4-6 max | Read-only consultation |
 | **Librarian** | gemini-3-flash | 0.1 | subagent | minimax-m2.5-free → big-pickle | External docs/code search |
