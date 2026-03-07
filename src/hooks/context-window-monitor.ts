@@ -7,6 +7,7 @@ const CONTEXT_WARNING_THRESHOLD = 0.70
 
 type ModelCacheStateLike = {
   anthropicContext1MEnabled: boolean
+  modelContextLimitsCache?: Map<string, number>
 }
 
 function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
@@ -32,6 +33,7 @@ interface TokenInfo {
 
 interface CachedTokenState {
   providerID: string
+  modelID: string
   tokens: TokenInfo
 }
 
@@ -57,13 +59,19 @@ export function createContextWindowMonitorHook(
     const cached = tokenCache.get(sessionID)
     if (!cached) return
 
-    if (!isAnthropicProvider(cached.providerID)) return
+    const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(
+      `${cached.providerID}/${cached.modelID}`
+    )
+    const actualLimit =
+      cachedLimit ??
+      (isAnthropicProvider(cached.providerID) ? getAnthropicActualLimit(modelCacheState) : null)
+
+    if (!actualLimit) return
 
     const lastTokens = cached.tokens
     const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
 
-    const actualUsagePercentage =
-      totalInputTokens / getAnthropicActualLimit(modelCacheState)
+    const actualUsagePercentage = totalInputTokens / actualLimit
 
     if (actualUsagePercentage < CONTEXT_WARNING_THRESHOLD) return
 
@@ -95,6 +103,7 @@ export function createContextWindowMonitorHook(
         role?: string
         sessionID?: string
         providerID?: string
+        modelID?: string
         finish?: boolean
         tokens?: TokenInfo
       } | undefined
@@ -104,6 +113,7 @@ export function createContextWindowMonitorHook(
 
       tokenCache.set(info.sessionID, {
         providerID: info.providerID,
+        modelID: info.modelID ?? "",
         tokens: info.tokens,
       })
     }
