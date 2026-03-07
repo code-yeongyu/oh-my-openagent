@@ -293,6 +293,10 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 
 Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.
 
+### Deprecated model remapping
+
+- The resolver now rewrites retired Anthropic aliases such as `claude-3-5-haiku-20241022`, `haiku-3.5`, and the bare `haiku` shortcut to `anthropic/claude-haiku-4-5`, which Anthropic’s Feb 19, 2026 release notes list as the supported replacement for the Haiku 3.5 snapshot. This keeps `/start-work` and other execution flows running even when you haven’t yet edited your config to the new model ID. <https://platform.claude.com/docs/en/release-notes/overview>
+
 ---
 
 ## Task System
