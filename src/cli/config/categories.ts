@@ -94,7 +94,7 @@ async function editCategory(
 
     if (p.isCancel(description)) return false
 
-    const finalDescription = description.trim() || undefined
+    const finalDescription = description?.trim() || undefined
 
     if (!state.config.categories) state.config.categories = {}
     const categoriesMutable = state.config.categories as MutableCategories

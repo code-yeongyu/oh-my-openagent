@@ -64,7 +64,7 @@ async function editRootDefaults(state: ConfigEditorState): Promise<void> {
 
   if (p.isCancel(model)) return
 
-  const finalModel = model.trim() || undefined
+  const finalModel = model?.trim() || undefined
   state.config.default_run_agent = finalModel
   state.modified = true
 
