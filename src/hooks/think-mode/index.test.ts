@@ -153,3 +153,70 @@ describe("createThinkModeHook", () => {
     expect(output.message.model).toBeUndefined()
   })
 })
+
+describe("think-mode: regression tests for issue #2382", () => {
+  const sessionID = "regression-2382"
+
+  beforeEach(() => {
+    clearThinkModeState(sessionID)
+  })
+
+  it("does NOT activate think mode for conversational Korean '고민' (to worry/ponder)", async () => {
+    // given — a real user sentence that triggered the bug:
+    // "너와 인공지능 엔진에게 이미지와 참조 자료를 어떻게 전달할지 고민하고 있었는데"
+    const hook = createThinkModeHook()
+    const input = createHookInput({
+      sessionID,
+      providerID: "opencode",
+      modelID: "gpt-5-nano",
+    })
+    const output = createHookOutput(
+      "너와 인공지능 엔진에게 이미지와 참조 자료를 어떻게 전달할지 고민하고 있었는데"
+    )
+
+    // when
+    await hook["chat.message"](input, output)
+
+    // then — model must NOT be upgraded; '고민' is conversational, not a reasoning directive
+    expect(output.message.variant).toBeUndefined()
+    expect(output.message.model).toBeUndefined()
+  })
+
+  it("does NOT upgrade gpt-5-nano even when think keyword IS present", async () => {
+    // given — gpt-5-nano has no -high variant on Zen; upgrading it causes Model not found
+    const hook = createThinkModeHook()
+    const input = createHookInput({
+      sessionID,
+      providerID: "opencode",
+      modelID: "gpt-5-nano",
+    })
+    const output = createHookOutput("신중하게 검토해줘")
+
+    // when
+    await hook["chat.message"](input, output)
+
+    // then — no high variant exists for gpt-5-nano, so model stays unchanged
+    expect(output.message.model).toBeUndefined()
+  })
+
+  it("still activates think mode for explicit Korean reasoning directive '생각해줘'", async () => {
+    // given — explicit reasoning request should still trigger think mode on capable models
+    const hook = createThinkModeHook()
+    const input = createHookInput({
+      sessionID,
+      providerID: "anthropic",
+      modelID: "claude-opus-4-6",
+    })
+    const output = createHookOutput("이 문제 깊이 생각해줘")
+
+    // when
+    await hook["chat.message"](input, output)
+
+    // then — explicit directive on a capable model should still upgrade
+    expect(output.message.variant).toBe("high")
+    expect(output.message.model).toEqual({
+      providerID: "anthropic",
+      modelID: "claude-opus-4-6-high",
+    })
+  })
+})

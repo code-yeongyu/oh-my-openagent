@@ -69,6 +69,13 @@ describe("think-mode switcher", () => {
         expect(getHighVariant("llama-3-70b")).toBeNull()
         expect(getHighVariant("mistral-large")).toBeNull()
       })
+
+      it("should return null for gpt-5-nano (no reasoning variant on Zen)", () => {
+        // given gpt-5-nano — a lightweight model with no high variant on OpenCode Zen
+        // see: https://github.com/code-yeongyu/oh-my-openagent/issues/2382
+        expect(getHighVariant("gpt-5-nano")).toBeNull()
+        expect(getHighVariant("opencode/gpt-5-nano")).toBeNull()
+      })
     })
   })
 

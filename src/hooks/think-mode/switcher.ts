@@ -50,9 +50,11 @@ const HIGH_VARIANT_MAP: Record<string, string> = {
    "gemini-3-1-pro-low": "gemini-3-1-pro-high",
    "gemini-3-flash": "gemini-3-flash-high",
   // GPT-5
+  // NOTE: gpt-5-nano is intentionally excluded — it is a lightweight nano model
+  // that does not have a reasoning/high-effort variant on the OpenCode Zen provider.
+  // Mapping it to gpt-5-nano-high causes a "Model not found" error.
   "gpt-5": "gpt-5-high",
   "gpt-5-mini": "gpt-5-mini-high",
-  "gpt-5-nano": "gpt-5-nano-high",
   "gpt-5-pro": "gpt-5-pro-high",
   "gpt-5-chat-latest": "gpt-5-chat-latest-high",
   // GPT-5.1

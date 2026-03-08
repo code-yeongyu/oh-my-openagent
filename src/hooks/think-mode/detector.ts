@@ -1,7 +1,11 @@
 const ENGLISH_PATTERNS = [/\bultrathink\b/i, /\bthink\b/i]
 
 const MULTILINGUAL_KEYWORDS = [
-  "생각", "고민", "검토", "제대로",
+  // Korean: intentionally use only explicit reasoning-request forms.
+  // "고민" (“to worry/ponder”) is excluded — it is a common conversational word
+  // that fires think mode on everyday sentences like "어떻게 할지 고민하고 있었는데".
+  // Only "생각해줘" / "깊이 생각" style explicit directives should trigger think mode.
+  "생각해줘", "깊이 생각", "신중하게 검토", "제대로",
   "思考", "考虑", "考慮",
   "思考", "考え", "熟考",
   "सोच", "विचार",
