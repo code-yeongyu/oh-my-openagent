@@ -29,4 +29,5 @@ export interface SessionState {
   lastContinuationInjectedAt?: number
   promptFailureCount: number
   lastFailureAt?: number
+  pendingRetryTimer?: ReturnType<typeof setTimeout>
 }

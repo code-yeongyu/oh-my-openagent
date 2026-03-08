@@ -14,14 +14,14 @@ npx oh-my-opencode
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `install` | Interactive setup wizard |
-| `doctor` | Environment diagnostics and health checks |
-| `run` | OpenCode session runner |
-| `mcp oauth` | MCP OAuth authentication management |
-| `auth` | Google Antigravity OAuth authentication |
-| `get-local-version` | Display local version information |
+| Command             | Description                               |
+| ------------------- | ----------------------------------------- |
+| `install`           | Interactive setup wizard                  |
+| `doctor`            | Environment diagnostics and health checks |
+| `run`               | OpenCode session runner                   |
+| `mcp oauth`         | MCP OAuth authentication management       |
+| `auth`              | Google Antigravity OAuth authentication   |
+| `get-local-version` | Display local version information         |
 
 ---
 
@@ -44,10 +44,10 @@ bunx oh-my-opencode install
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--no-tui` | Run in non-interactive mode without TUI (for CI/CD environments) |
-| `--verbose` | Display detailed logs |
+| Option      | Description                                                      |
+| ----------- | ---------------------------------------------------------------- |
+| `--no-tui`  | Run in non-interactive mode without TUI (for CI/CD environments) |
+| `--verbose` | Display detailed logs                                            |
 
 ---
 
@@ -63,22 +63,22 @@ bunx oh-my-opencode doctor
 
 ### Diagnostic Categories
 
-| Category | Check Items |
-|----------|-------------|
-| **Installation** | OpenCode version (>= 1.0.150), plugin registration status |
-| **Configuration** | Configuration file validity, JSONC parsing |
-| **Authentication** | Anthropic, OpenAI, Google API key validity |
-| **Dependencies** | Bun, Node.js, Git installation status |
-| **Tools** | LSP server status, MCP server status |
-| **Updates** | Latest version check |
+| Category           | Check Items                                               |
+| ------------------ | --------------------------------------------------------- |
+| **Installation**   | OpenCode version (>= 1.0.150), plugin registration status |
+| **Configuration**  | Configuration file validity, JSONC parsing                |
+| **Authentication** | Anthropic, OpenAI, Google API key validity                |
+| **Dependencies**   | Bun, Node.js, Git installation status                     |
+| **Tools**          | LSP server status, MCP server status                      |
+| **Updates**        | Latest version check                                      |
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
+| Option              | Description                                                      |
+| ------------------- | ---------------------------------------------------------------- |
 | `--category <name>` | Check specific category only (e.g., `--category authentication`) |
-| `--json` | Output results in JSON format |
-| `--verbose` | Include detailed information |
+| `--json`            | Output results in JSON format                                    |
+| `--verbose`         | Include detailed information                                     |
 
 ### Example Output
 
@@ -124,19 +124,19 @@ bunx oh-my-opencode run [prompt]
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--enforce-completion` | Keep session active until all TODOs are completed |
-| `--timeout <seconds>` | Set maximum execution time |
-| `--agent <name>` | Specify agent to use |
-| `--directory <path>` | Set working directory |
-| `--port <number>` | Set port for session |
-| `--attach` | Attach to existing session |
-| `--json` | Output in JSON format |
-| `--no-timestamp` | Disable timestamped output |
-| `--session-id <id>` | Resume existing session |
-| `--on-complete <action>` | Action on completion |
-| `--verbose` | Enable verbose logging |
+| Option                   | Description                                       |
+| ------------------------ | ------------------------------------------------- |
+| `--enforce-completion`   | Keep session active until all TODOs are completed |
+| `--timeout <seconds>`    | Set maximum execution time                        |
+| `--agent <name>`         | Specify agent to use                              |
+| `--directory <path>`     | Set working directory                             |
+| `--port <number>`        | Set port for session                              |
+| `--attach`               | Attach to existing session                        |
+| `--json`                 | Output in JSON format                             |
+| `--no-timestamp`         | Disable timestamped output                        |
+| `--session-id <id>`      | Resume existing session                           |
+| `--on-complete <action>` | Action on completion                              |
+| `--verbose`              | Enable verbose logging                            |
 
 ---
 
@@ -162,34 +162,15 @@ bunx oh-my-opencode mcp oauth status [server-name]
 
 ### Options
 
-| Option | Description |
-|--------|-------------|
-| `--server-url <url>` | MCP server URL (required for login) |
-| `--client-id <id>` | OAuth client ID (optional if server supports Dynamic Client Registration) |
-| `--scopes <scopes>` | Comma-separated OAuth scopes |
+| Option               | Description                                                               |
+| -------------------- | ------------------------------------------------------------------------- |
+| `--server-url <url>` | MCP server URL (required for login)                                       |
+| `--client-id <id>`   | OAuth client ID (optional if server supports Dynamic Client Registration) |
+| `--scopes <scopes>`  | Comma-separated OAuth scopes                                              |
 
 ### Token Storage
 
 Tokens are stored in `~/.config/opencode/mcp-oauth.json` with `0600` permissions (owner read/write only). Key format: `{serverHost}/{resource}`.
-
----
-
-## auth
-
-Manages Google Antigravity OAuth authentication. Required for using Gemini models.
-
-### Usage
-
-```bash
-# Login
-bunx oh-my-opencode auth login
-
-# Logout
-bunx oh-my-opencode auth logout
-
-# Check current status
-bunx oh-my-opencode auth status
-```
 
 ---
 
@@ -215,7 +196,7 @@ Configuration files support **JSONC (JSON with Comments)** format. You can use c
   /* Category customization */
   "categories": {
     "visual-engineering": {
-      "model": "google/gemini-3-pro",
+      "model": "google/gemini-3.1-pro",
     },
   },
 }
@@ -291,25 +272,25 @@ src/cli/
 Create `src/cli/doctor/checks/my-check.ts`:
 
 ```typescript
-import type { DoctorCheck } from "../types"
+import type { DoctorCheck } from "../types";
 
 export const myCheck: DoctorCheck = {
   name: "my-check",
   category: "environment",
   check: async () => {
     // Check logic
-    const isOk = await someValidation()
+    const isOk = await someValidation();
 
     return {
       status: isOk ? "pass" : "fail",
       message: isOk ? "Everything looks good" : "Something is wrong",
-    }
+    };
   },
-}
+};
 ```
 
 Register in `src/cli/doctor/checks/index.ts`:
 
 ```typescript
-export { myCheck } from "./my-check"
+export { myCheck } from "./my-check";
 ```

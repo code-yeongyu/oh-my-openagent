@@ -33,6 +33,7 @@ export async function executeBackgroundContinuation(
         run_in_background: args.run_in_background,
         sessionId: task.sessionID,
         command: args.command,
+        model: task.model ? { providerID: task.model.providerID, modelID: task.model.modelID } : undefined,
       },
     }
     await ctx.metadata?.(bgContMeta)

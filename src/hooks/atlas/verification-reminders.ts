@@ -1,7 +1,37 @@
 import { VERIFICATION_REMINDER } from "./system-reminder-templates"
 
+export function buildCompletionGate(planName: string, sessionId: string): string {
+  return `
+**COMPLETION GATE — DO NOT PROCEED UNTIL THIS IS DONE**
+
+Your completion will NOT be recorded until you complete ALL of the following:
+
+1. **Edit** the plan file \`.sisyphus/plans/${planName}.md\`:
+   - Change \`- [ ]\` to \`- [x]\` for the completed task
+   - Use \`Edit\` tool to modify the checkbox
+
+2. **Read** the plan file AGAIN:
+   \`\`\`
+   Read(".sisyphus/plans/${planName}.md")
+   \`\`\`
+   - Verify the checkbox count changed (more \`- [x]\` than before)
+
+3. **DO NOT call \`task()\` again** until you have completed steps 1 and 2 above.
+
+If anything fails while closing this out, resume the same session immediately:
+\`\`\`typescript
+task(session_id="${sessionId}", prompt="fix: checkbox not recorded correctly")
+\`\`\`
+
+**Your completion is NOT tracked until the checkbox is marked in the plan file.**
+
+**VERIFICATION_REMINDER**`
+}
+
 function buildVerificationReminder(sessionId: string): string {
-  return `${VERIFICATION_REMINDER}
+  return `**VERIFICATION_REMINDER**
+
+${VERIFICATION_REMINDER}
 
 ---
 
@@ -15,20 +45,21 @@ export function buildOrchestratorReminder(
   planName: string,
   progress: { total: number; completed: number },
   sessionId: string,
-  autoCommit: boolean = true
+  autoCommit: boolean = true,
+  includeCompletionGate: boolean = true
 ): string {
   const remaining = progress.total - progress.completed
-  
+
   const commitStep = autoCommit
     ? `
-**STEP 8: COMMIT ATOMIC UNIT**
+**STEP 7: COMMIT ATOMIC UNIT**
 
 - Stage ONLY the verified changes
 - Commit with clear message describing what was done
 `
     : ""
 
-  const nextStepNumber = autoCommit ? 9 : 8
+  const nextStepNumber = autoCommit ? 8 : 7
 
   return `
 ---
@@ -37,7 +68,9 @@ export function buildOrchestratorReminder(
 
 ---
 
-${buildVerificationReminder(sessionId)}
+${includeCompletionGate ? `${buildCompletionGate(planName, sessionId)}
+
+` : ""}${buildVerificationReminder(sessionId)}
 
 **STEP 5: READ SUBAGENT NOTEPAD (LEARNINGS, ISSUES, PROBLEMS)**
 
@@ -64,22 +97,13 @@ Read(".sisyphus/plans/${planName}.md")
 Count exactly: how many \`- [ ]\` remain? How many \`- [x]\` completed?
 This is YOUR ground truth. Use it to decide what comes next.
 
-**STEP 7: MARK COMPLETION IN PLAN FILE (IMMEDIATELY)**
-
-RIGHT NOW - Do not delay. Verification passed → Mark IMMEDIATELY.
-
-Update the plan file \`.sisyphus/plans/${planName}.md\`:
-- Change \`- [ ]\` to \`- [x]\` for the completed task
-- Use \`Edit\` tool to modify the checkbox
-
-**DO THIS BEFORE ANYTHING ELSE. Unmarked = Untracked = Lost progress.**
 ${commitStep}
 **STEP ${nextStepNumber}: PROCEED TO NEXT TASK**
 
 - Read the plan file AGAIN to identify the next \`- [ ]\` task
 - Start immediately - DO NOT STOP
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **${remaining} tasks remain. Keep bouldering.**`
 }

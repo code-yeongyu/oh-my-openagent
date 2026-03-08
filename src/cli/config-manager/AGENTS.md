@@ -1,6 +1,6 @@
 # src/cli/config-manager/ — CLI Installation Utilities
 
-**Generated:** 2026-03-02
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 

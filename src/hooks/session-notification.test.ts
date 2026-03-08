@@ -195,8 +195,9 @@ describe("session-notification", () => {
     setMainSession(mainSessionID)
 
     const hook = createSessionNotification(createMockPluginInput(), {
-      idleConfirmationDelay: 100, // Long delay
+      idleConfirmationDelay: 100,
       skipIfIncompleteTodos: false,
+      activityGracePeriodMs: 0,
     })
 
     // when - session goes idle
@@ -272,6 +273,7 @@ describe("session-notification", () => {
     const hook = createSessionNotification(createMockPluginInput(), {
       idleConfirmationDelay: 50,
       skipIfIncompleteTodos: false,
+      activityGracePeriodMs: 0,
     })
 
     // when - session goes idle, then message.updated fires
@@ -306,6 +308,7 @@ describe("session-notification", () => {
     const hook = createSessionNotification(createMockPluginInput(), {
       idleConfirmationDelay: 50,
       skipIfIncompleteTodos: false,
+      activityGracePeriodMs: 0,
     })
 
     // when - session goes idle, then tool.execute.before fires
@@ -425,6 +428,67 @@ describe("session-notification", () => {
     expect(tnCall).toBeUndefined()
   })
 
+  test("should fall back to osascript when terminal-notifier execution fails", async () => {
+    // given - terminal-notifier exists but invocation fails
+    spyOn(sender, "sendSessionNotification").mockRestore()
+    const notifyCalls: string[] = []
+    const mockCtx = {
+      $: async (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
+        const cmdStr = typeof cmd === "string"
+          ? cmd
+          : cmd.reduce((acc, part, index) => `${acc}${part}${String(values[index] ?? "")}`, "")
+        notifyCalls.push(cmdStr)
+
+        if (cmdStr.includes("terminal-notifier")) {
+          throw new Error("terminal-notifier failed")
+        }
+
+        return { stdout: "", stderr: "", exitCode: 0 }
+      },
+    } as any
+    spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
+    spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
+
+    // when - sendSessionNotification is called directly on darwin
+    await sender.sendSessionNotification(mockCtx, "darwin", "Test Title", "Test Message")
+
+    // then - osascript fallback should be attempted after terminal-notifier failure
+    const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
+    const osascriptCall = notifyCalls.find(c => c.includes("osascript"))
+    expect(tnCall).toBeDefined()
+    expect(osascriptCall).toBeDefined()
+  })
+
+  test("should invoke terminal-notifier without array interpolation", async () => {
+    // given - shell interpolation rejects array values
+    spyOn(sender, "sendSessionNotification").mockRestore()
+    const notifyCalls: string[] = []
+    const mockCtx = {
+      $: async (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
+        if (values.some(Array.isArray)) {
+          throw new Error("array interpolation unsupported")
+        }
+
+        const commandString = typeof cmd === "string"
+          ? cmd
+          : cmd.reduce((acc, part, index) => `${acc}${part}${String(values[index] ?? "")}`, "")
+        notifyCalls.push(commandString)
+        return { stdout: "", stderr: "", exitCode: 0 }
+      },
+    } as any
+    spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
+    spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
+
+    // when - terminal-notifier command is executed
+    await sender.sendSessionNotification(mockCtx, "darwin", "Test Title", "Test Message")
+
+    // then - terminal-notifier succeeds directly and fallback is not used
+    const tnCall = notifyCalls.find(c => c.includes("terminal-notifier"))
+    const osascriptCall = notifyCalls.find(c => c.includes("osascript"))
+    expect(tnCall).toBeDefined()
+    expect(osascriptCall).toBeUndefined()
+  })
+
   test("should use terminal-notifier without -activate when __CFBundleIdentifier is not set", async () => {
     // given - terminal-notifier available but no bundle ID
     spyOn(sender, "sendSessionNotification").mockRestore()
@@ -447,5 +511,76 @@ describe("session-notification", () => {
         process.env.__CFBundleIdentifier = originalEnv
       }
     }
+  })
+
+  test("should ignore activity events within grace period", async () => {
+    // given - main session is set
+    const mainSessionID = "main-grace"
+    setMainSession(mainSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {
+      idleConfirmationDelay: 50,
+      skipIfIncompleteTodos: false,
+      activityGracePeriodMs: 100,
+    })
+
+    // when - session goes idle
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    // when - activity happens immediately (within grace period)
+    await hook({
+      event: {
+        type: "tool.execute.before",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    // Wait for idle delay to pass
+    await new Promise((resolve) => setTimeout(resolve, 100))
+
+    // then - notification SHOULD be sent (activity was within grace period, ignored)
+    expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
+  })
+
+  test("should cancel notification for activity after grace period", async () => {
+    // given - main session is set
+    const mainSessionID = "main-grace-cancel"
+    setMainSession(mainSessionID)
+
+    const hook = createSessionNotification(createMockPluginInput(), {
+      idleConfirmationDelay: 200,
+      skipIfIncompleteTodos: false,
+      activityGracePeriodMs: 50,
+    })
+
+    // when - session goes idle
+    await hook({
+      event: {
+        type: "session.idle",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    // when - wait for grace period to pass
+    await new Promise((resolve) => setTimeout(resolve, 60))
+
+    // when - activity happens after grace period
+    await hook({
+      event: {
+        type: "tool.execute.before",
+        properties: { sessionID: mainSessionID },
+      },
+    })
+
+    // Wait for original delay to pass
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // then - notification should NOT be sent (activity cancelled it after grace period)
+    expect(notificationCalls).toHaveLength(0)
   })
 })

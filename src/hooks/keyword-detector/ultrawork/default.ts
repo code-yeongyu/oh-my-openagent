@@ -202,7 +202,7 @@ BEFORE writing ANY code, you MUST define:
 | **Observable** | What can be measured/seen | "Console shows 'success', no errors" |
 | **Pass/Fail** | Binary, no ambiguity | "Returns 200 OK" not "should work" |
 
-Write these criteria explicitly. Share with user if scope is non-trivial.
+Write these criteria explicitly. **Record them in your TODO/Task items.** Each task MUST include a "QA: [how to verify]" field. These criteria are your CONTRACT — work toward them, verify against them.
 
 ### Test Plan Template (MANDATORY for non-trivial tasks)
 
@@ -227,6 +227,32 @@ Write these criteria explicitly. Share with user if scope is non-trivial.
 | **Regression** | Ensure nothing broke | Existing tests still pass |
 
 **WITHOUT evidence = NOT verified = NOT done.**
+
+<MANUAL_QA_MANDATE>
+### YOU MUST EXECUTE MANUAL QA YOURSELF. THIS IS NOT OPTIONAL.
+
+**YOUR FAILURE MODE**: You finish coding, run lsp_diagnostics, and declare "done" without actually TESTING the feature. lsp_diagnostics catches type errors, NOT functional bugs. Your work is NOT verified until you MANUALLY test it.
+
+**WHAT MANUAL QA MEANS — execute ALL that apply:**
+
+| If your change... | YOU MUST... |
+|---|---|
+| Adds/modifies a CLI command | Run the command with Bash. Show the output. |
+| Changes build output | Run the build. Verify the output files exist and are correct. |
+| Modifies API behavior | Call the endpoint. Show the response. |
+| Changes UI rendering | Describe what renders. Use a browser tool if available. |
+| Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |
+| Modifies config handling | Load the config. Verify it parses correctly. |
+
+**UNACCEPTABLE QA CLAIMS:**
+- "This should work" — RUN IT.
+- "The types check out" — Types don't catch logic bugs. RUN IT.
+- "lsp_diagnostics is clean" — That's a TYPE check, not a FUNCTIONAL check. RUN IT.
+- "Tests pass" — Tests cover known cases. Does the ACTUAL FEATURE work as the user expects? RUN IT.
+
+**You have Bash, you have tools. There is ZERO excuse for not running manual QA.**
+**Manual QA is the FINAL gate before reporting completion. Skip it and your work is INCOMPLETE.**
+</MANUAL_QA_MANDATE>
 
 ### TDD Workflow (when test infrastructure exists)
 
