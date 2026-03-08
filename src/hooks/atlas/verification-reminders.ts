@@ -62,6 +62,11 @@ export function buildOrchestratorReminder(
 
 The user has disabled auto-commits (\`start_work.auto_commit: false\`).
 Changes will NOT be committed automatically.
+
+**IMPORTANT: Inform the user now:**
+- State clearly that no commits were made
+- Summarize what changes were completed
+- Ask if they want to commit manually or enable auto-commit
 `
 
   const nextStepNumber = 8

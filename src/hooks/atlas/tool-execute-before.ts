@@ -27,8 +27,8 @@ export function createToolExecuteBeforeHandler(input: {
       const filePath = (toolOutput.args.filePath ?? toolOutput.args.path ?? toolOutput.args.file) as string | undefined
       if (filePath && !isSisyphusPath(filePath)) {
         // Store filePath for use in tool.execute.after
-        if (toolInput.callID) {
-          pendingFilePaths.set(toolInput.callID, filePath)
+        if (toolInput.callID && toolInput.sessionID) {
+          pendingFilePaths.set(`${toolInput.sessionID}:${toolInput.callID}`, filePath)
         }
         const warning = ORCHESTRATOR_DELEGATION_REQUIRED.replace("$FILE_PATH", filePath)
         toolOutput.message = (toolOutput.message || "") + warning
@@ -44,8 +44,8 @@ export function createToolExecuteBeforeHandler(input: {
     // Store filePath for Read tools (for plan transformation in tool.execute.after)
     if (toolInput.tool === "read" || toolInput.tool === "Read") {
       const filePath = (toolOutput.args.filePath ?? toolOutput.args.path ?? toolOutput.args.file) as string | undefined
-      if (filePath && toolInput.callID) {
-        pendingFilePaths.set(toolInput.callID, filePath)
+      if (filePath && toolInput.callID && toolInput.sessionID) {
+        pendingFilePaths.set(`${toolInput.sessionID}:${toolInput.callID}`, filePath)
       }
       return
     }

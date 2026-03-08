@@ -1,5 +1,37 @@
 import { describe, expect, test } from "bun:test"
-import { transformPlanCommitFields } from "./plan-commit-transform"
+import { isPlanPath, transformPlanCommitFields } from "./plan-commit-transform"
+
+describe("isPlanPath", () => {
+  describe("#given a valid plan path", () => {
+    test("#when path is .sisyphus/plans/test.md #then returns true", () => {
+      expect(isPlanPath(".sisyphus/plans/test.md")).toBe(true)
+    })
+
+    test("#when path has full path /project/.sisyphus/plans/test.md #then returns true", () => {
+      expect(isPlanPath("/project/.sisyphus/plans/test.md")).toBe(true)
+    })
+
+    test("#when path uses backslashes #then returns true", () => {
+      expect(isPlanPath("C:\\project\\.sisyphus\\plans\\test.md")).toBe(true)
+    })
+  })
+
+  describe("#given a path with .sisyphus as substring (false-positive prevention)", () => {
+    test("#when path is foo.sisyphus-backup/plans/test.md #then returns false", () => {
+      expect(isPlanPath("foo.sisyphus-backup/plans/test.md")).toBe(false)
+    })
+
+    test("#when path is my.sisyphus/plans/test.md #then returns false", () => {
+      expect(isPlanPath("my.sisyphus/plans/test.md")).toBe(false)
+    })
+  })
+
+  describe("#given undefined or empty path", () => {
+    test("#when path is undefined #then returns false", () => {
+      expect(isPlanPath(undefined)).toBe(false)
+    })
+  })
+})
 
 describe("transformPlanCommitFields", () => {
   describe("#given content with Commit: YES", () => {
@@ -49,6 +81,14 @@ Commit: NO (user disabled auto-commits)
 ## Task 3
 Commit: NO (user disabled auto-commits)
 `)
+    })
+  })
+
+  describe("#given content with ReCommit: YES (word boundary check)", () => {
+    test("#when transformed #then ReCommit is NOT transformed", () => {
+      const content = "ReCommit: YES"
+      const result = transformPlanCommitFields(content)
+      expect(result).toBe("ReCommit: YES")
     })
   })
 

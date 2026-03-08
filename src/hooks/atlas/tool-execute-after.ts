@@ -48,9 +48,12 @@ export function createToolExecuteAfterHandler(input: {
     }
 
     if (isWriteOrEditToolName(toolInput.tool)) {
-      let filePath = toolInput.callID ? pendingFilePaths.get(toolInput.callID) : undefined
-      if (toolInput.callID) {
-        pendingFilePaths.delete(toolInput.callID)
+      const mapKey = toolInput.sessionID && toolInput.callID
+        ? `${toolInput.sessionID}:${toolInput.callID}`
+        : toolInput.callID
+      let filePath = mapKey ? pendingFilePaths.get(mapKey) : undefined
+      if (mapKey) {
+        pendingFilePaths.delete(mapKey)
       }
       if (!filePath) {
         filePath = toolOutput.metadata?.filePath as string | undefined
@@ -68,9 +71,12 @@ export function createToolExecuteAfterHandler(input: {
 
     if (toolInput.tool === "read" || toolInput.tool === "Read") {
       // Always cleanup pendingFilePaths to prevent memory leak
-      let filePath = toolInput.callID ? pendingFilePaths.get(toolInput.callID) : undefined
-      if (toolInput.callID) {
-        pendingFilePaths.delete(toolInput.callID)
+      const mapKey = toolInput.sessionID && toolInput.callID
+        ? `${toolInput.sessionID}:${toolInput.callID}`
+        : toolInput.callID
+      let filePath = mapKey ? pendingFilePaths.get(mapKey) : undefined
+      if (mapKey) {
+        pendingFilePaths.delete(mapKey)
       }
       if (!filePath) {
         filePath = extractFilePath(toolOutput.metadata)
