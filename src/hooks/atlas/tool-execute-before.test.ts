@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { transformPlanCommitFields } from "./tool-execute-before"
+import { transformPlanCommitFields } from "./plan-commit-transform"
 
 describe("transformPlanCommitFields", () => {
   describe("#given content with Commit: YES", () => {

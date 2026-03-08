@@ -7,32 +7,14 @@ import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./syste
 import { isSisyphusPath } from "./sisyphus-path"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 
-/**
- * Check if a path is a plan file inside .sisyphus/plans/
- */
-export function isPlanPath(filePath: string | undefined): boolean {
-  if (!filePath) return false
-  return /\.sisyphus[/\\]plans[/\\].*\.md$/.test(filePath)
-}
-
-/**
- * Transform Commit fields in plan content when autoCommit is disabled.
- * Converts "Commit: YES" and "Commit: NO" to "Commit: NO (user disabled auto-commits)"
- * Uses negative lookahead to ensure idempotency (won't re-transform already-transformed content).
- */
-export function transformPlanCommitFields(content: string): string {
-  return content.replace(/Commit:\s*(YES|NO)(?!\s*\(user disabled auto-commits\))/g, "Commit: NO (user disabled auto-commits)")
-}
-
 export function createToolExecuteBeforeHandler(input: {
   ctx: PluginInput
   pendingFilePaths: Map<string, string>
-  autoCommit: boolean
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
   toolOutput: { args: Record<string, unknown>; message?: string }
 ) => Promise<void> {
-  const { ctx, pendingFilePaths, autoCommit } = input
+  const { ctx, pendingFilePaths } = input
 
   return async (toolInput, toolOutput): Promise<void> => {
     if (!(await isCallerOrchestrator(toolInput.sessionID, ctx.client))) {

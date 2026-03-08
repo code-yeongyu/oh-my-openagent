@@ -9,7 +9,7 @@ import { isSisyphusPath } from "./sisyphus-path"
 import { extractSessionIdFromOutput } from "./subagent-session-id"
 import { buildCompletionGate, buildOrchestratorReminder, buildStandaloneVerificationReminder } from "./verification-reminders"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
-import { isPlanPath, transformPlanCommitFields } from "./tool-execute-before"
+import { isPlanPath, transformPlanCommitFields } from "./plan-commit-transform"
 import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 
 /**
