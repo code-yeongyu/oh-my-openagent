@@ -57,8 +57,7 @@
 
 > "oh-my-opencode kullanın, asla geri dönmeyeceksiniz" <br/>- [d0t3ch](https://x.com/d0t3ch/status/2001685618200580503)
 
-> "Bunu bu kadar harika yapan şeyin tam olarak ne olduğunu henüz ifade edemedim ama geliştirme deneyimi tamamen farklı bir boyuta ulaştı." - [
-苔硯:こけすずり](https://x.com/kokesuzuri/status/2008532913961529372?s=20)
+> "Bunu bu kadar harika yapan şeyin tam olarak ne olduğunu henüz ifade edemedim ama geliştirme deneyimi tamamen farklı bir boyuta ulaştı." - [苔硯:こけすずり](https://x.com/kokesuzuri/status/2008532913961529372?s=20)
 
 > "Bu hafta sonu bir minecraft/souls-like benzeri bir şey inşa etmek için open code, oh my opencode ve supermemory ile deneyler yapıyorum."
 > "Ben öğle yemeğinden sonra yürüyüşe çıkarken ona çömelme animasyonları eklemesini söyledim. [Video]" - [MagiMetal](https://x.com/MagiMetal/status/2005374704178373023)
@@ -202,7 +201,7 @@ Yetenekler kendi MCP sunucularını getirir. İstek üzerine çalışır, görev
 
 Donanım (harness) problemi gerçektir. Çoğu ajan hatası modelden kaynaklanmaz. Düzenleme aracından kaynaklanır.
 
-> *\"Bu araçların hiçbiri modele değiştirmek istediği satırlar için kararlı, doğrulanabilir bir tanımlayıcı sunmaz... Hepsi modelin zaten gördüğü içeriği yeniden üretmesine dayanır. Başaramadığında -ki sık sık başaramazlar- kullanıcı modeli suçlar.\"*
+> *"Bu araçların hiçbiri modele değiştirmek istediği satırlar için kararlı, doğrulanabilir bir tanımlayıcı sunmaz... Hepsi modelin zaten gördüğü içeriği yeniden üretmesine dayanır. Başaramadığında -ki sık sık başaramazlar- kullanıcı modeli suçlar."*
 >
 > <br/>- [Can Bölük, The Harness Problem](https://blog.can.ac/2026/02/12/the-harness-problem/)
 
@@ -263,11 +262,11 @@ oh-my-opencode'u kaldırmak için:
 
 1. **Eklentiyi OpenCode yapılandırmanızdan kaldırın**
 
-   `~/.config/opencode/opencode.json` (veya `opencode.jsonc`) dosyasını düzenleyin ve `plugin` dizisinden `\"oh-my-opencode\"` ifadesini kaldırın:
+   `~/.config/opencode/opencode.json` (veya `opencode.jsonc`) dosyasını düzenleyin ve `plugin` dizisinden `"oh-my-opencode"` ifadesini kaldırın:
 
    ```bash
    # jq kullanarak
-   jq '.plugin = [.plugin[] | select(. != \"oh-my-opencode\")]' \\\
+   jq '.plugin = [.plugin[] | select(. != "oh-my-opencode")]' \\
        ~/.config/opencode/opencode.json > /tmp/oc.json && \\\
        mv /tmp/oc.json ~/.config/opencode/opencode.json
    ```
@@ -304,7 +303,7 @@ Tam [Özellikler Dokümantasyonu'na](docs/reference/features.md) bakın.
 - **Claude Code Uyumluluğu**: Tam kanca sistemi, komutlar, yetenekler, ajanlar, MCP'ler
 - **Yerleşik MCP'ler**: web araması (Exa), dokümanlar (context7), GitHub araması (grep_app)
 - **Oturum Araçları**: Oturum geçmişini listeleyin, okuyun, arayın ve analiz edin
-- **Verimlilik Özellikleri**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode ve daha fazı
+- **Verimlilik Özellikleri**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode ve daha fazlası
 - **Model Kurulumu**: Ajan-model eşleştirmesi [Kurulum Kılavuzu](docs/guide/installation.md#step-5-understand-your-model-setup) içinde yer almaktadır
 
 ## Yapılandırma
@@ -314,7 +313,7 @@ Görüş sahibi varsayılanlar, isterseniz ayarlanabilir.
 [Yapılandırma Dokümantasyonu'na](docs/reference/configuration.md) bakın.
 
 **Hızlı Bakış:**
-- **Yapılandırma Konumları**: `.opencode/oh-my-opencode.jsonc` veya `.opencode/oh-my-opencode.json` (proje), `~/.config/opencode/oh-my-opencode.jsonc` or `~/.config/opencode/oh-my-opencode.json` (kullanıcı)
+- **Yapılandırma Konumları**: `.opencode/oh-my-opencode.jsonc` veya `.opencode/oh-my-opencode.json` (proje), `~/.config/opencode/oh-my-opencode.jsonc` veya `~/.config/opencode/oh-my-opencode.json` (kullanıcı)
 - **JSONC Desteği**: Yorumlar ve sondaki virgüller desteklenir
 - **Ajanlar**: Herhangi bir ajan için modelleri, sıcaklıkları, istemleri ve izinleri geçersiz kılın
 - **Yerleşik Yetenekler**: `playwright` (tarayıcı otomasyonu), `git-master` (atomik commit'ler)
