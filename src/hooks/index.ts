@@ -31,6 +31,9 @@ export { createRalphLoopHook, type RalphLoopHook } from "./ralph-loop";
 export { createNoSisyphusGptHook } from "./no-sisyphus-gpt";
 export { createNoHephaestusNonGptHook } from "./no-hephaestus-non-gpt";
 export { createAutoSlashCommandHook } from "./auto-slash-command";
+export { createSkillUsageTrackerHook } from "./skill-usage-tracker"
+export { createSkillBoomerangHook } from "./skill-boomerang"
+export { createTaskReflectionSuggesterHook } from "./task-reflection-suggester";
 export { createEditErrorRecoveryHook } from "./edit-error-recovery";
 
 export { createPrometheusMdOnlyHook } from "./prometheus-md-only";
@@ -43,6 +46,7 @@ export { createQuestionLabelTruncatorHook } from "./question-label-truncator";
 export { createStopContinuationGuardHook, type StopContinuationGuard } from "./stop-continuation-guard";
 export { createCompactionContextInjector } from "./compaction-context-injector";
 export { createCompactionTodoPreserverHook } from "./compaction-todo-preserver";
+export { createCompactionSkillInjector } from "./compaction-skill-injector";
 export { createUnstableAgentBabysitterHook } from "./unstable-agent-babysitter";
 export { createPreemptiveCompactionHook } from "./preemptive-compaction";
 export { createTasksTodowriteDisablerHook } from "./tasks-todowrite-disabler";

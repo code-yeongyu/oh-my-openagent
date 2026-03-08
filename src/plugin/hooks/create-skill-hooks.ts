@@ -3,12 +3,15 @@ import type { HookName, OhMyOpenCodeConfig } from "../../config"
 import type { LoadedSkill } from "../../features/opencode-skill-loader/types"
 import type { PluginContext } from "../types"
 
-import { createAutoSlashCommandHook, createCategorySkillReminderHook } from "../../hooks"
+import { createAutoSlashCommandHook, createCategorySkillReminderHook, createSkillBoomerangHook, createSkillUsageTrackerHook, createTaskReflectionSuggesterHook } from "../../hooks"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 
 export type SkillHooks = {
   categorySkillReminder: ReturnType<typeof createCategorySkillReminderHook> | null
   autoSlashCommand: ReturnType<typeof createAutoSlashCommandHook> | null
+  skillUsageTracker: ReturnType<typeof createSkillUsageTrackerHook> | null
+  taskReflectionSuggester: ReturnType<typeof createTaskReflectionSuggesterHook> | null
+  skillBoomerang: ReturnType<typeof createSkillBoomerangHook> | null
 }
 
 export function createSkillHooks(args: {
@@ -45,5 +48,20 @@ export function createSkillHooks(args: {
         }))
     : null
 
-  return { categorySkillReminder, autoSlashCommand }
+  const skillUsageTracker = isHookEnabled("skill-usage-tracker")
+    ? safeHook("skill-usage-tracker", () =>
+        createSkillUsageTrackerHook(mergedSkills))
+    : null
+
+  const taskReflectionSuggester = isHookEnabled("task-reflection-suggester")
+    ? safeHook("task-reflection-suggester", () =>
+        createTaskReflectionSuggesterHook())
+    : null
+
+  const skillBoomerang = isHookEnabled("skill-boomerang")
+    ? safeHook("skill-boomerang", () =>
+        createSkillBoomerangHook(mergedSkills))
+    : null
+
+  return { categorySkillReminder, autoSlashCommand, skillUsageTracker, taskReflectionSuggester, skillBoomerang }
 }

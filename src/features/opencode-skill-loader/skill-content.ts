@@ -9,3 +9,4 @@ export {
 	resolveSkillContentAsync,
 	resolveMultipleSkillsAsync,
 } from "./skill-template-resolver"
+export { listSkillSubdirFiles, readSkillSubdirFile } from "./skill-subdir-files"

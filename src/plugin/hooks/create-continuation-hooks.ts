@@ -8,6 +8,7 @@ import {
   createStopContinuationGuardHook,
   createCompactionContextInjector,
   createCompactionTodoPreserverHook,
+  createCompactionSkillInjector,
   createAtlasHook,
 } from "../../hooks"
 import { safeCreateHook } from "../../shared/safe-create-hook"
@@ -17,6 +18,7 @@ export type ContinuationHooks = {
   stopContinuationGuard: ReturnType<typeof createStopContinuationGuardHook> | null
   compactionContextInjector: ReturnType<typeof createCompactionContextInjector> | null
   compactionTodoPreserver: ReturnType<typeof createCompactionTodoPreserverHook> | null
+  compactionSkillInjector: ReturnType<typeof createCompactionSkillInjector> | null
   todoContinuationEnforcer: ReturnType<typeof createTodoContinuationEnforcer> | null
   unstableAgentBabysitter: ReturnType<typeof createUnstableAgentBabysitter> | null
   backgroundNotificationHook: ReturnType<typeof createBackgroundNotificationHook> | null
@@ -61,6 +63,14 @@ export function createContinuationHooks(args: {
 
   const compactionTodoPreserver = isHookEnabled("compaction-todo-preserver")
     ? safeHook("compaction-todo-preserver", () => createCompactionTodoPreserverHook(ctx))
+    : null
+
+  const compactionSkillInjector = isHookEnabled("compaction-skill-injector")
+    ? safeHook("compaction-skill-injector", () =>
+        createCompactionSkillInjector(
+          (opts) => import("../../features/opencode-skill-loader/skill-content").then((m) => m.getAllSkills(opts)),
+          ctx.directory,
+        ))
     : null
 
   const todoContinuationEnforcer = isHookEnabled("todo-continuation-enforcer")
@@ -119,6 +129,7 @@ export function createContinuationHooks(args: {
     stopContinuationGuard,
     compactionContextInjector,
     compactionTodoPreserver,
+    compactionSkillInjector,
     todoContinuationEnforcer,
     unstableAgentBabysitter,
     backgroundNotificationHook,

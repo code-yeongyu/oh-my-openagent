@@ -3,7 +3,7 @@ import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import { TOOL_DESCRIPTION_NO_SKILLS, TOOL_DESCRIPTION_PREFIX } from "./constants"
 import type { SkillArgs, SkillInfo, SkillLoadOptions } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
-import { getAllSkills, extractSkillTemplate } from "../../features/opencode-skill-loader/skill-content"
+import { getAllSkills, extractSkillTemplate, listSkillSubdirFiles, readSkillSubdirFile } from "../../features/opencode-skill-loader/skill-content"
 import { injectGitMasterConfig } from "../../features/opencode-skill-loader/skill-content"
 import type { SkillMcpManager, SkillMcpClientInfo, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { Tool, Resource, Prompt } from "@modelcontextprotocol/sdk/types.js"
@@ -19,6 +19,12 @@ const scopePriority: Record<string, number> = {
   plugin: 1,
   config: 1,
   builtin: 1,
+}
+
+const skillToolCacheResetters = new Set<() => void>()
+
+export function clearSkillToolCaches(): void {
+  for (const reset of skillToolCacheResetters) reset()
 }
 
 function loadedSkillToInfo(skill: LoadedSkill): SkillInfo {
@@ -186,6 +192,10 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
   let cachedSkills: LoadedSkill[] | null = null
   let cachedCommands: CommandInfo[] | null = options.commands ?? null
   let cachedDescription: string | null = null
+  const resetCaches = (): void => {
+    cachedDescription = null
+  }
+  skillToolCacheResetters.add(resetCaches)
 
   const getSkills = async (): Promise<LoadedSkill[]> => {
     if (options.skills) return options.skills
@@ -233,6 +243,10 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
         .string()
         .optional()
         .describe("Optional arguments or context for command invocation. Example: name='publish', user_message='patch'"),
+      file: tool.schema
+        .string()
+        .optional()
+        .describe("Optional path to a specific file within the skill directory (e.g., 'references/api.md'). If omitted, the main skill instructions are returned. Use skill(name='my-skill', file='list') to list available files."),
     },
     async execute(args: SkillArgs, ctx?: { agent?: string }) {
       const skills = await getSkills()
@@ -246,6 +260,19 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
       if (matchedSkill) {
         if (matchedSkill.definition.agent && (!ctx?.agent || matchedSkill.definition.agent !== ctx.agent)) {
           throw new Error(`Skill "${matchedSkill.name}" is restricted to agent "${matchedSkill.definition.agent}"`)
+        }
+
+        const skillDir = matchedSkill.resolvedPath
+        if (args.file && skillDir) {
+          if (args.file === "list") {
+            const files = await listSkillSubdirFiles(skillDir)
+            if (files.length === 0) {
+              return `## Skill: ${matchedSkill.name} — Files\n\nNo additional files found in this skill directory.`
+            }
+            return `## Skill: ${matchedSkill.name} — Files\n\n${files.map(f => `- ${f}`).join("\n")}`
+          }
+          const content = await readSkillSubdirFile(skillDir, args.file)
+          return `## Skill: ${matchedSkill.name} — ${args.file}\n\n${content}`
         }
 
         let body = await extractSkillBody(matchedSkill)

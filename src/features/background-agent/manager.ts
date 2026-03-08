@@ -17,6 +17,7 @@ import {
 } from "../../shared"
 import { setSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { ConcurrencyManager } from "./concurrency"
 import type { BackgroundTaskConfig, TmuxConfig } from "../../config/schema"
 import { isInsideTmux } from "../../shared/tmux"
@@ -351,7 +352,7 @@ export class BackgroundManager {
     promptWithModelSuggestionRetry(this.client, {
       path: { id: sessionID },
       body: {
-        agent: input.agent,
+        agent: getAgentDisplayName(input.agent),
         ...(launchModel ? { model: launchModel } : {}),
         ...(launchVariant ? { variant: launchVariant } : {}),
         system: input.skillContent,
@@ -625,7 +626,7 @@ export class BackgroundManager {
     this.client.session.promptAsync({
       path: { id: existingTask.sessionID },
       body: {
-        agent: existingTask.agent,
+        agent: getAgentDisplayName(existingTask.agent),
         ...(resumeModel ? { model: resumeModel } : {}),
         ...(resumeVariant ? { variant: resumeVariant } : {}),
         tools: (() => {
