@@ -7920,3 +7920,79 @@ describe("BackgroundManager attempt lifecycle bindings", () => {
     manager.shutdown()
   })
 })
+
+describe("BackgroundManager.cancelTask - skipNotification cleanup", () => {
+  test("should schedule delayed cleanup when cancelling with skipNotification", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    stubNotifyParentSession(manager)
+    const task = createMockTask({
+      id: "task-cancel-skip-cleanup",
+      sessionID: "session-cancel-skip-cleanup",
+      parentSessionID: "parent-cancel-skip-cleanup",
+      status: "running",
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    //#when
+    const cancelled = await manager.cancelTask(task.id, {
+      source: "test",
+      skipNotification: true,
+    })
+
+    //#then
+    expect(cancelled).toBe(true)
+    expect(task.status).toBe("cancelled")
+    expect(getTaskMap(manager).has(task.id)).toBe(true)
+    expect(getCompletionTimers(manager).has(task.id)).toBe(true)
+
+    manager.shutdown()
+  })
+})
+
+describe("BackgroundManager.notifyParentSession - error status text", () => {
+  test("should label errored task as FAILED WITH ERROR, not CANCELLED", async () => {
+    //#given
+    let capturedBody: Record<string, unknown> | undefined
+    const client = {
+      session: {
+        prompt: async () => ({}),
+        promptAsync: async (args: { body: Record<string, unknown> }) => {
+          capturedBody = args.body
+          return {}
+        },
+        abort: async () => ({}),
+        messages: async () => ({ data: [] }),
+      },
+    }
+    const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
+    const task: BackgroundTask = {
+      id: "task-error-status-text",
+      sessionID: "session-error-status-text",
+      parentSessionID: "parent-session",
+      parentMessageID: "msg-1",
+      description: "errored task",
+      prompt: "test",
+      agent: "explore",
+      status: "error",
+      error: "Something went wrong",
+      startedAt: new Date(),
+      completedAt: new Date(),
+    }
+    getTaskMap(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionID, new Set([task.id, "still-running"]))
+
+    //#when
+    await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
+      .notifyParentSession(task)
+
+    //#then
+    expect(capturedBody).toBeDefined()
+    const parts = capturedBody?.parts as Array<{ text?: string }> | undefined
+    const notificationText = parts?.[0]?.text ?? ""
+    expect(notificationText).toContain("FAILED WITH ERROR")
+    expect(notificationText).not.toContain("CANCELLED")
+
+    manager.shutdown()
+  })
+})

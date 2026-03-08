@@ -2425,7 +2425,7 @@ The task was re-queued on a fallback model after a retryable failure.
       : task.status === "interrupt"
         ? "INTERRUPTED"
         : task.status === "error"
-          ? "ERROR"
+          ? "FAILED WITH ERROR"
           : "CANCELLED"
     const notification = buildBackgroundTaskNotificationText({
       task,
