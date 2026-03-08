@@ -858,7 +858,7 @@ The fallback retry session is now created and can be inspected directly.
     const launchTools = {
       task: false,
       call_omo_agent: true,
-      question: true,
+      question: false,
       ...getAgentToolRestrictions(input.agent, {
         includeTeamToolDenylist: input.teamRunId === undefined,
       }),
@@ -1316,7 +1316,7 @@ The fallback retry session is now created and can be inspected directly.
             const tools = {
               task: false,
               call_omo_agent: true,
-              question: true,
+              question: false,
               ...getAgentToolRestrictions(existingTask.agent, {
                 includeTeamToolDenylist: existingTask.teamRunId === undefined,
               }),
