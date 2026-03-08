@@ -73,7 +73,7 @@ Questions to consider when extracting:
 
 # PHASE 3: FORMAT OUTPUT
 
-Generate a handoff summary using this exact format:
+Generate a handoff summary. WRITE the summary to .matrix/handoff.md using the Write tool. Use this exact format:
 
 \`\`\`
 HANDOFF CONTEXT
@@ -131,6 +131,8 @@ CONTEXT FOR CONTINUATION
 - [References to documentation if relevant]
 \`\`\`
 
+Write this content to .matrix/handoff.md using the Write tool. This file will be automatically loaded when a new session starts.
+
 Rules for the summary:
 - Plain text with bullets
 - No markdown headers with # (use the format above with dashes)
@@ -144,18 +146,19 @@ Rules for the summary:
 
 # PHASE 4: PROVIDE INSTRUCTIONS
 
-After generating the summary, instruct the user:
+After writing the file, inform the user:
 
 \`\`\`
 ---
 
-TO CONTINUE IN A NEW SESSION:
+HANDOFF COMPLETE:
 
+Context saved to .matrix/handoff.md
+
+To continue in a new session:
 1. Press 'n' in OpenCode TUI to open a new session, or run 'opencode' in a new terminal
-2. Paste the HANDOFF CONTEXT above as your first message
-3. Add your request: "Continue from the handoff context above. [Your next task]"
-
-The new session will have all context needed to continue seamlessly.
+2. Your context will be loaded automatically — no copy-paste needed
+3. Start with your next task: "Continue from where I left off. [Your next task]"
 \`\`\`
 
 ---
@@ -163,7 +166,7 @@ The new session will have all context needed to continue seamlessly.
 # IMPORTANT CONSTRAINTS
 
 - DO NOT attempt to programmatically create new sessions (no API available to agents)
-- DO provide a self-contained summary that works without access to this session
+- DO provide a self-contained summary in the .matrix/handoff.md file
 - DO include workspace-relative file paths
 - DO NOT include sensitive information (API keys, credentials, secrets)
 - DO NOT exceed 10 files in the KEY FILES section
