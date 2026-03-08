@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { getOpenCodeCacheDir } from "../../shared/data-path"
 import { log } from "../../shared/logger"
 import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
@@ -18,6 +19,14 @@ export async function runBunInstall(): Promise<boolean> {
 
 export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
   const cacheDir = getOpenCodeCacheDir()
+  const packageJsonPath = `${cacheDir}/package.json`
+
+  if (!existsSync(packageJsonPath)) {
+    return {
+      success: false,
+      error: `Workspace not initialized: ${packageJsonPath} not found. OpenCode should create this on first run.`,
+    }
+  }
 
   try {
     const proc = spawnWithWindowsHide(["bun", "install"], {
@@ -43,7 +52,7 @@ export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
       return {
         success: false,
         timedOut: true,
-        error: `bun install timed out after ${BUN_INSTALL_TIMEOUT_SECONDS} seconds. Try running manually: cd ${cacheDir} && bun i`,
+        error: `bun install timed out after ${BUN_INSTALL_TIMEOUT_SECONDS} seconds. Try running manually: cd "${cacheDir}" && bun i`,
       }
     }
 
