@@ -66,7 +66,8 @@ export function detectCurrentConfig(): DetectedConfig {
     return result
   }
 
-  result.hasGemini = plugins.some((p) => p.startsWith("opencode-antigravity-auth"))
+  const providers = openCodeConfig.provider as Record<string, unknown> | undefined
+  result.hasGemini = providers ? "google" in providers : false
 
   const { hasOpenAI, hasOpencodeZen, hasZaiCodingPlan, hasKimiForCoding } = detectProvidersFromOmoConfig()
   result.hasOpenAI = hasOpenAI

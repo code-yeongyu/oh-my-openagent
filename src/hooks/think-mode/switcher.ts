@@ -25,7 +25,7 @@ import { normalizeModelID } from "../../shared"
  * @example
  * extractModelPrefix("vertex_ai/claude-sonnet-4-6") // { prefix: "vertex_ai/", base: "claude-sonnet-4-6" }
  * extractModelPrefix("claude-sonnet-4-6") // { prefix: "", base: "claude-sonnet-4-6" }
- * extractModelPrefix("openai/gpt-5.2") // { prefix: "openai/", base: "gpt-5.2" }
+ * extractModelPrefix("openai/gpt-5.4") // { prefix: "openai/", base: "gpt-5.4" }
  */
 function extractModelPrefix(modelID: string): { prefix: string; base: string } {
   const slashIndex = modelID.indexOf("/")
@@ -61,10 +61,10 @@ const HIGH_VARIANT_MAP: Record<string, string> = {
   "gpt-5-1-codex": "gpt-5-1-codex-high",
   "gpt-5-1-codex-mini": "gpt-5-1-codex-mini-high",
   "gpt-5-1-codex-max": "gpt-5-1-codex-max-high",
-  // GPT-5.2
-  "gpt-5-2": "gpt-5-2-high",
-  "gpt-5-2-chat-latest": "gpt-5-2-chat-latest-high",
-  "gpt-5-2-pro": "gpt-5-2-pro-high",
+  // GPT-5.4
+  "gpt-5-4": "gpt-5-4-high",
+  "gpt-5-4-chat-latest": "gpt-5-4-chat-latest-high",
+  "gpt-5-4-pro": "gpt-5-4-pro-high",
   // Antigravity (Google)
   "antigravity-gemini-3-1-pro": "antigravity-gemini-3-1-pro-high",
   "antigravity-gemini-3-flash": "antigravity-gemini-3-flash-high",
@@ -97,4 +97,3 @@ export function isAlreadyHighVariant(modelID: string): boolean {
   const { base } = extractModelPrefix(normalized)
   return ALREADY_HIGH.has(base) || base.endsWith("-high")
 }
-

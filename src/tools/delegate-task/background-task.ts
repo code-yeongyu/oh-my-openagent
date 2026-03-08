@@ -2,6 +2,7 @@ import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { getTimingConfig } from "./timing"
+import { buildTaskPrompt } from "./prompt-builder"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
@@ -20,9 +21,10 @@ export async function executeBackgroundTask(
   const { manager } = executorCtx
 
   try {
+    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse)
     const task = await manager.launch({
       description: args.description,
-      prompt: args.prompt,
+      prompt: effectivePrompt,
       agent: agentToUse,
       parentSessionID: parentContext.sessionID,
       parentMessageID: parentContext.messageID,
@@ -56,36 +58,39 @@ export async function executeBackgroundTask(
       SessionCategoryRegistry.register(sessionId, args.category)
     }
 
+    const metadata = {
+      prompt: args.prompt,
+      agent: task.agent,
+      category: args.category,
+      load_skills: args.load_skills,
+      description: args.description,
+      run_in_background: args.run_in_background,
+      command: args.command,
+      ...(sessionId ? { sessionId } : {}),
+      ...(categoryModel ? { model: { providerID: categoryModel.providerID, modelID: categoryModel.modelID } } : {}),
+    }
+
     const unstableMeta = {
       title: args.description,
-      metadata: {
-        prompt: args.prompt,
-        agent: task.agent,
-        category: args.category,
-        load_skills: args.load_skills,
-        description: args.description,
-        run_in_background: args.run_in_background,
-        sessionId: sessionId ?? "pending",
-        command: args.command,
-      },
+      metadata,
     }
     await ctx.metadata?.(unstableMeta)
     if (ctx.callID) {
       storeToolMetadata(ctx.sessionID, ctx.callID, unstableMeta)
     }
 
+    const taskMetadataBlock = sessionId
+      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${sessionId}\nbackground_task_id: ${task.id}\n</task_metadata>`
+      : ""
+
     return `Background task launched.
 
-Task ID: ${task.id}
+Background Task ID: ${task.id}
 Description: ${task.description}
 Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
-System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.
-
-<task_metadata>
-session_id: ${sessionId}
-</task_metadata>`
+System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.${taskMetadataBlock}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch background task",

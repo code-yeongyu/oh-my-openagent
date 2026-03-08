@@ -1,10 +1,10 @@
-# oh-my-opencode — OpenCode Plugin
+# oh-my-opencode — O P E N C O D E Plugin
 
-**Generated:** 2026-03-02 | **Commit:** 1c2caa09 | **Branch:** dev
+**Generated:** 2026-03-06 | **Commit:** 7fe44024 | **Branch:** dev
 
 ## OVERVIEW
 
-OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 46 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1243 TypeScript files, 155k LOC.
+OpenCode plugin (npm: `oh-my-opencode`) that extends Claude Code (OpenCode fork) with multi-agent orchestration, 46 lifecycle hooks, 26 tools, skill/command/MCP systems, and Claude Code compatibility. 1268 TypeScript files, 160k LOC.
 
 ## STRUCTURE
 
@@ -46,6 +46,7 @@ OhMyOpenCodePlugin(ctx)
 | `tool` | 26 registered tools |
 | `chat.message` | First-message variant, session setup, keyword detection |
 | `chat.params` | Anthropic effort level adjustment |
+| `chat.headers` | Copilot x-initiator header injection |
 | `event` | Session lifecycle (created, deleted, idle, error) |
 | `tool.execute.before` | Pre-tool hooks (file guard, label truncator, rules injector) |
 | `tool.execute.after` | Post-tool hooks (output truncation, metadata store) |
@@ -73,6 +74,12 @@ OhMyOpenCodePlugin(ctx)
 Project (.opencode/oh-my-opencode.jsonc)  →  User (~/.config/opencode/oh-my-opencode.jsonc)  →  Defaults
 ```
 
+- `agents`, `categories`, `claude_code`: deep merged recursively
+- `disabled_*` arrays: Set union (concatenated + deduplicated)
+- All other fields: override replaces base value
+- Zod `safeParse()` fills defaults for omitted fields
+- `migrateConfigFile()` transforms legacy keys automatically
+
 Fields: agents (14 overridable, 21 fields each), categories (8 built-in + custom), disabled_* arrays (agents, hooks, mcps, skills, commands, tools), 19 feature-specific configs.
 
 ## THREE-TIER MCP SYSTEM
@@ -85,15 +92,19 @@ Fields: agents (14 overridable, 21 fields each), categories (8 built-in + custom
 
 ## CONVENTIONS
 
+- **Runtime**: Bun only — never use npm/yarn
+- **TypeScript**: strict mode, ESNext, bundler moduleResolution, `bun-types` (never `@types/node`)
 - **Test pattern**: Bun test (`bun:test`), co-located `*.test.ts`, given/when/then style (nested describe with `#given`/`#when`/`#then` prefixes)
+- **CI test split**: mock-heavy tests run in isolation (separate `bun test` processes), rest in batch
 - **Factory pattern**: `createXXX()` for all tools, hooks, agents
 - **Hook tiers**: Session (23) → Tool-Guard (10) → Transform (4) → Continuation (7) → Skill (2)
 - **Agent modes**: `primary` (respects UI model) vs `subagent` (own fallback chain) vs `all`
-- **Model resolution**: 3-step: override → category-default → provider-fallback → system-default
+- **Model resolution**: 4-step: override → category-default → provider-fallback → system-default
 - **Config format**: JSONC with comments, Zod v4 validation, snake_case keys
 - **File naming**: kebab-case for all files/directories
 - **Module structure**: index.ts barrel exports, no catch-all files (utils.ts, helpers.ts banned), 200 LOC soft limit
 - **Imports**: relative within module, barrel imports across modules (`import { log } from "./shared"`)
+- **No path aliases**: no `@/` — relative imports only
 
 ## ANTI-PATTERNS
 
@@ -101,16 +112,21 @@ Fields: agents (14 overridable, 21 fields each), categories (8 built-in + custom
 - Never suppress lint/type errors
 - Never add emojis to code/comments unless user explicitly asks
 - Never commit unless explicitly requested
+- Never run `bun publish` directly — use GitHub Actions
+- Never modify `package.json` version locally
 - Test: given/when/then — never use Arrange-Act-Assert comments
 - Comments: avoid AI-generated comment patterns (enforced by comment-checker hook)
 - Never create catch-all files (`utils.ts`, `helpers.ts`, `service.ts`)
 - Empty catch blocks `catch(e) {}` — always handle errors
+- Never use em dashes (—), en dashes (–), or AI filler phrases in generated content
+- index.ts is entry point ONLY — never dump business logic there
 
 ## COMMANDS
 
 ```bash
 bun test                    # Bun test suite
 bun run build              # Build plugin (ESM + declarations + schema)
+bun run build:all          # Build + platform binaries
 bun run typecheck           # tsc --noEmit
 bunx oh-my-opencode install # Interactive setup
 bunx oh-my-opencode doctor  # Health diagnostics
@@ -121,10 +137,12 @@ bunx oh-my-opencode run     # Non-interactive session
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| ci.yml | push/PR | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
-| publish.yml | manual | Version bump, npm publish, platform binaries, GitHub release, merge to dev |
-| publish-platform.yml | called | 12 platform binaries via bun compile (darwin/linux/windows) |
-| sisyphus-agent.yml | @mention | AI agent handles issues/PRs |
+| ci.yml | push/PR to master/dev | Tests (split: mock-heavy isolated + batch), typecheck, build, schema auto-commit |
+| publish.yml | manual dispatch | Version bump, npm publish, platform binaries, GitHub release, merge to master |
+| publish-platform.yml | called by publish | 12 platform binaries via bun compile (darwin/linux/windows) |
+| sisyphus-agent.yml | @mention / dispatch | AI agent handles issues/PRs |
+| cla.yml | issue_comment/PR | CLA assistant for contributors |
+| lint-workflows.yml | push to .github/ | actionlint + shellcheck on workflow files |
 
 ## NOTES
 
@@ -135,3 +153,5 @@ bunx oh-my-opencode run     # Non-interactive session
 - Config migration runs automatically on legacy keys (agent names, hook names, model versions)
 - Build: bun build (ESM) + tsc --emitDeclarationOnly, externals: @ast-grep/napi
 - Test setup: `test-setup.ts` preloaded via bunfig.toml, mock-heavy tests run in isolation in CI
+- 98 barrel export files (index.ts) establish module boundaries
+- Architecture rules enforced via `.sisyphus/rules/modular-code-enforcement.md`

@@ -247,7 +247,34 @@ task(
 **ANTI-PATTERN (will produce poor results):**
 \`\`\`typescript
 task(category="...", load_skills=[], run_in_background=false, prompt="...")  // Empty load_skills without justification
-\`\`\``
+\`\`\`
+
+---
+
+### Category Domain Matching (ZERO TOLERANCE)
+
+Every delegation MUST use the category that matches the task's domain. Mismatched categories produce measurably worse output because each category runs on a model optimized for that specific domain.
+
+**VISUAL WORK = ALWAYS \`visual-engineering\`. NO EXCEPTIONS.**
+
+Any task involving UI, UX, CSS, styling, layout, animation, design, or frontend components MUST go to \`visual-engineering\`. Never delegate visual work to \`quick\`, \`unspecified-*\`, or any other category.
+
+\`\`\`typescript
+// CORRECT: Visual work → visual-engineering category
+task(category="visual-engineering", load_skills=["frontend-ui-ux"], prompt="Redesign the sidebar layout with new spacing...")
+
+// WRONG: Visual work in wrong category — WILL PRODUCE INFERIOR RESULTS
+task(category="quick", load_skills=[], prompt="Redesign the sidebar layout with new spacing...")
+\`\`\`
+
+| Task Domain | MUST Use Category |
+|---|---|
+| UI, styling, animations, layout, design | \`visual-engineering\` |
+| Hard logic, architecture decisions, algorithms | \`ultrabrain\` |
+| Autonomous research + end-to-end implementation | \`deep\` |
+| Single-file typo, trivial config change | \`quick\` |
+
+**When in doubt about category, it is almost never \`quick\` or \`unspecified-*\`. Match the domain.**`
 }
 
 export function buildOracleSection(agents: AvailableAgent[]): string {
@@ -349,21 +376,38 @@ Multi-step task? **ALWAYS consult Plan Agent first.** Do NOT start implementatio
 Plan Agent returns a structured work breakdown with parallel execution opportunities. Follow it.`
 }
 
-export function buildDeepParallelSection(model: string, categories: AvailableCategory[]): string {
+export function buildParallelDelegationSection(model: string, categories: AvailableCategory[]): string {
   const isNonClaude = !model.toLowerCase().includes('claude')
-  const hasDeepCategory = categories.some(c => c.name === 'deep')
+  const hasDelegationCategory = categories.some(c => c.name === 'deep' || c.name === 'unspecified-high')
 
-  if (!isNonClaude || !hasDeepCategory) return ""
+  if (!isNonClaude || !hasDelegationCategory) return ""
 
-  return `### Deep Parallel Delegation
+  return `### DECOMPOSE AND DELEGATE — YOU ARE NOT AN IMPLEMENTER
 
-Delegate EVERY independent unit to a \`deep\` agent in parallel (\`run_in_background=true\`).
-If a task decomposes into 4 independent units, spawn 4 agents simultaneously — not 1 at a time.
+**YOUR FAILURE MODE: You attempt to do work yourself instead of decomposing and delegating.** When you implement directly, the result is measurably worse than when specialized subagents do it. Subagents have domain-specific configurations, loaded skills, and tuned prompts that you lack.
 
-1. Decompose the implementation into independent work units
-2. Assign one \`deep\` agent per unit — all via \`run_in_background=true\`
-3. Give each agent a clear GOAL with success criteria, not step-by-step instructions
-4. Collect all results, integrate, verify coherence across units`
+**MANDATORY — for ANY implementation task:**
+
+1. **ALWAYS decompose** the task into independent work units. No exceptions. Even if the task "feels small", decompose it.
+2. **ALWAYS delegate** EACH unit to a \`deep\` or \`unspecified-high\` agent in parallel (\`run_in_background=true\`).
+3. **NEVER work sequentially.** If 4 independent units exist, spawn 4 agents simultaneously. Not 1 at a time. Not 2 then 2.
+4. **NEVER implement directly** when delegation is possible. You write prompts, not code.
+
+**YOUR PROMPT TO EACH AGENT MUST INCLUDE:**
+- GOAL with explicit success criteria (what "done" looks like)
+- File paths and constraints (where to work, what not to touch)
+- Existing patterns to follow (reference specific files the agent should read)
+- Clear scope boundary (what is IN scope, what is OUT of scope)
+
+**Vague delegation = failed delegation.** If your prompt to the subagent is shorter than 5 lines, it is too vague.
+
+| You Want To Do | You MUST Do Instead |
+|---|---|
+| Write code yourself | Delegate to \`deep\` or \`unspecified-high\` agent |
+| Handle 3 changes sequentially | Spawn 3 agents in parallel |
+| "Quickly fix this one thing" | Still delegate — your "quick fix" is slower and worse than a subagent's |
+
+**Your value is orchestration, decomposition, and quality control. Delegating with crystal-clear prompts IS your work.**`
 }
 
 export function buildUltraworkSection(

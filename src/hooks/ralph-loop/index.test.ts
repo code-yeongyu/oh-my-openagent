@@ -1078,7 +1078,7 @@ Original task: Build something`
       expect(messagesCalls.length).toBe(1)
     })
 
-    test("should show ultrawork completion toast", async () => {
+    test("should require oracle verification toast for ultrawork completion promise", async () => {
       // given - hook with ultrawork mode and completion in transcript
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
       const hook = createRalphLoopHook(createMockPluginInput(), {
@@ -1090,10 +1090,9 @@ Original task: Build something`
       // when - idle event triggered
       await hook.event({ event: { type: "session.idle", properties: { sessionID: "test-id" } } })
 
-      // then - ultrawork toast shown
-      const completionToast = toastCalls.find(t => t.title === "ULTRAWORK LOOP COMPLETE!")
-      expect(completionToast).toBeDefined()
-      expect(completionToast!.message).toMatch(/JUST ULW ULW!/)
+      const verificationToast = toastCalls.find(t => t.title === "ULTRAWORK LOOP")
+      expect(verificationToast).toBeDefined()
+      expect(verificationToast!.message).toMatch(/Oracle verification is now required/)
     })
 
     test("should show regular completion toast when ultrawork disabled", async () => {

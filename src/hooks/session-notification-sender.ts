@@ -44,12 +44,15 @@ export async function sendSessionNotification(
       const terminalNotifierPath = await getTerminalNotifierPath()
       if (terminalNotifierPath) {
         const bundleId = process.env.__CFBundleIdentifier
-        const args = [terminalNotifierPath, "-title", title, "-message", message]
-        if (bundleId) {
-          args.push("-activate", bundleId)
+        try {
+          if (bundleId) {
+            await ctx.$`${terminalNotifierPath} -title ${title} -message ${message} -activate ${bundleId}`
+          } else {
+            await ctx.$`${terminalNotifierPath} -title ${title} -message ${message}`
+          }
+          break
+        } catch {
         }
-        await ctx.$`${args}`.catch(() => {})
-        break
       }
 
       // Fallback: osascript (click may open Finder instead of terminal)

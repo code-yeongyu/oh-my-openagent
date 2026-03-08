@@ -1,21 +1,21 @@
 # src/ — Plugin Source
 
-**Generated:** 2026-03-02
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 
-Root source directory. Entry point `index.ts` orchestrates 4-step initialization: config → managers → tools → hooks → plugin interface.
+Entry point `index.ts` orchestrates 5-step initialization: loadConfig → createManagers → createTools → createHooks → createPluginInterface.
 
 ## KEY FILES
 
 | File | Purpose |
 |------|---------|
 | `index.ts` | Plugin entry, exports `OhMyOpenCodePlugin` |
-| `plugin-config.ts` | JSONC parse, multi-level merge (user → project → defaults), Zod validation |
+| `plugin-config.ts` | JSONC parse, multi-level merge, Zod v4 validation |
 | `create-managers.ts` | TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler |
-| `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry |
-| `create-hooks.ts` | 3-tier hook composition: Core(37) + Continuation(7) + Skill(2) |
-| `plugin-interface.ts` | Assembles 8 OpenCode hook handlers into PluginInterface |
+| `create-tools.ts` | SkillContext + AvailableCategories + ToolRegistry (26 tools) |
+| `create-hooks.ts` | 3-tier: Core(37) + Continuation(7) + Skill(2) = 46 hooks |
+| `plugin-interface.ts` | 8 OpenCode hook handlers: config, tool, chat.message, chat.params, chat.headers, event, tool.execute.before, tool.execute.after |
 
 ## CONFIG LOADING
 
@@ -33,9 +33,9 @@ loadPluginConfig(directory, ctx)
 ```
 createHooks()
   ├─→ createCoreHooks()           # 37 hooks
-  │   ├─ createSessionHooks()     # 23: contextWindowMonitor, thinkMode, ralphLoop, modelFallback, runtimeFallback, noSisyphusGpt, noHephaestusNonGpt, anthropicEffort...
+  │   ├─ createSessionHooks()     # 23: contextWindowMonitor, thinkMode, ralphLoop, modelFallback, runtimeFallback, noSisyphusGpt, noHephaestusNonGpt, anthropicEffort, intentGate...
   │   ├─ createToolGuardHooks()   # 10: commentChecker, rulesInjector, writeExistingFileGuard, jsonErrorRecovery, hashlineReadEnhancer...
   │   └─ createTransformHooks()   # 4: claudeCodeHooks, keywordDetector, contextInjector, thinkingBlockValidator
-  ├─→ createContinuationHooks()   # 7: todoContinuationEnforcer, atlas, stopContinuationGuard...
+  ├─→ createContinuationHooks()   # 7: todoContinuationEnforcer, atlas, stopContinuationGuard, ralphLoopActivator...
   └─→ createSkillHooks()          # 2: categorySkillReminder, autoSlashCommand
 ```

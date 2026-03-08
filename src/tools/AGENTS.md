@@ -1,6 +1,6 @@
 # src/tools/ — 26 Tools Across 15 Directories
 
-**Generated:** 2026-03-02
+**Generated:** 2026-03-06
 
 ## OVERVIEW
 
@@ -35,7 +35,7 @@
 
 | Tool | Factory | Parameters |
 |------|---------|------------|
-| `background_output` | `createBackgroundOutput` | task_id, block, timeout, full_session, include_thinking, message_limit |
+| `background_output` | `createBackgroundOutput` | task_id, block, timeout, full_session, include_thinking, message_limit, since_message_id, thinking_max_chars |
 | `background_cancel` | `createBackgroundCancel` | taskId, all |
 
 ### LSP Refactoring (6) — Direct ToolDefinition
@@ -97,7 +97,7 @@
 | artistry | gemini-3.1-pro high | Creative approaches |
 | quick | claude-haiku-4-5 | Trivial tasks |
 | unspecified-low | claude-sonnet-4-6 | Moderate effort |
-| unspecified-high | claude-opus-4-6 max | High effort |
+| unspecified-high | gpt-5.4 high | High effort |
 | writing | kimi-k2p5 | Documentation |
 
 ## HOW TO ADD A TOOL
