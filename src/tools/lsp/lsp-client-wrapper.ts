@@ -6,10 +6,21 @@ import { LSPClient, lspManager } from "./client"
 import { findServerForExtension } from "./config"
 import type { ServerLookupResult } from "./types"
 
+export function isDirectoryPath(filePath: string): boolean {
+  if (!existsSync(filePath)) {
+    return false
+  }
+  return statSync(filePath).isDirectory()
+}
+
+export function uriToPath(uri: string): string {
+  return fileURLToPath(uri)
+}
+
 export function findWorkspaceRoot(filePath: string): string {
   let dir = resolve(filePath)
 
-  if (!existsSync(dir) || !require("fs").statSync(dir).isDirectory()) {
+  if (!existsSync(dir) || !isDirectoryPath(dir)) {
     dir = require("path").dirname(dir)
   }
 
@@ -27,17 +38,6 @@ export function findWorkspaceRoot(filePath: string): string {
   }
 
   return require("path").dirname(resolve(filePath))
-}
-
-export function uriToPath(uri: string): string {
-  return fileURLToPath(uri)
-}
-
-export function isDirectoryPath(filePath: string): boolean {
-  if (!existsSync(filePath)) {
-    return false
-  }
-  return statSync(filePath).isDirectory()
 }
 
 export function formatServerLookupError(result: Exclude<ServerLookupResult, { status: "found" }>): string {

@@ -84,6 +84,15 @@ export async function aggregateDiagnosticsForDirectory(
   const wasCapped = allFiles.length > maxFiles
   const filesToProcess = allFiles.slice(0, maxFiles)
 
+  if (filesToProcess.length === 0) {
+    return [
+      `Directory: ${absDir}`,
+      `Extension: ${extension}`,
+      `Files scanned: 0`,
+      `No files found with extension "${extension}".`,
+    ].join("\n")
+  }
+
   const root = findWorkspaceRoot(absDir)
 
   const allDiagnostics: Diagnostic[] = []
