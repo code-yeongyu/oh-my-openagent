@@ -3861,7 +3861,7 @@
           "type": "object",
           "properties": {
             "enabled": {
-              "default": true,
+              "default": false,
               "type": "boolean"
             },
             "contextMode": {
