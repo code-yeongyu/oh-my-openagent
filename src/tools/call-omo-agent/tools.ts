@@ -14,6 +14,7 @@ import { CONFIG_BASENAME } from "../../shared/plugin-identity"
 import { parseModelString } from "../delegate-task/model-string-parser"
 import { executeBackground } from "./background-executor"
 import { executeSync } from "./sync-executor"
+import { resolveCallableAgents } from "./agent-resolver"
 
 function resolveModelAndFallbackChain(args: {
   subagentType: string
@@ -83,39 +84,57 @@ export function createCallOmoAgent(
   userCategories?: CategoriesConfig,
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
-    (name) => `- ${name}: Specialized agent for ${name} tasks`
-  ).join("\n")
-  const description = CALL_OMO_AGENT_DESCRIPTION.replace("{agents}", agentDescriptions)
+    (name) => `- ${name}: Specialized agent for ${name} tasks`,
+  ).join("\n");
+  const description = CALL_OMO_AGENT_DESCRIPTION.replace(
+    "{agents}",
+    agentDescriptions,
+  );
 
   return tool({
     description,
     args: {
-      description: tool.schema.string().describe("A short (3-5 words) description of the task"),
-      prompt: tool.schema.string().describe("The task for the agent to perform"),
+      description: tool.schema
+        .string()
+        .describe("A short (3-5 words) description of the task"),
+      prompt: tool.schema
+        .string()
+        .describe("The task for the agent to perform"),
       subagent_type: tool.schema
         .string()
-        .describe("The type of specialized agent to use for this task (explore or librarian only)"),
+        .describe(
+          "The agent to invoke. Supports built-in agents and any custom agents registered at runtime.",
+        ),
       run_in_background: tool.schema
         .boolean()
-        .describe("REQUIRED. true: run asynchronously (use background_output to get results), false: run synchronously and wait for completion"),
-      session_id: tool.schema.string().describe("Existing Task session to continue").optional(),
+        .describe(
+          "REQUIRED. true: run asynchronously (use background_output to get results), false: run synchronously and wait for completion",
+        ),
+      session_id: tool.schema
+        .string()
+        .describe("Existing Task session to continue")
+        .optional(),
     },
     async execute(args: CallOmoAgentArgs, toolContext) {
-      const toolCtx = toolContext as ToolContextWithMetadata
-      log(`[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`)
+      const toolCtx = toolContext as ToolContextWithMetadata;
+      log(
+        `[call_omo_agent] Starting with agent: ${args.subagent_type}, background: ${args.run_in_background}`,
+      );
+
+      const callableAgents = await resolveCallableAgents(ctx.client);
 
       // Strip ZWSP and case-insensitive agent validation - allows "Explore", "EXPLORE", "explore" etc.
       const strippedAgentType = stripInvisibleAgentCharacters(args.subagent_type)
       if (
-        !ALLOWED_AGENTS.some(
+        !callableAgents.some(
           (name) => name.toLowerCase() === strippedAgentType.toLowerCase(),
         )
       ) {
-        return `Error: Invalid agent type "${args.subagent_type}". Only ${ALLOWED_AGENTS.join(", ")} are allowed.`
+        return `Error: Invalid agent type "${args.subagent_type}". Only ${callableAgents.join(", ")} are allowed.`;
       }
 
-      const normalizedAgent = strippedAgentType.toLowerCase() as AllowedAgentType
-      args = { ...args, subagent_type: normalizedAgent }
+      const normalizedAgent = strippedAgentType.toLowerCase();
+      args = { ...args, subagent_type: normalizedAgent };
 
       // Check if agent is disabled
       if (disabledAgents.some((disabled) => stripInvisibleAgentCharacters(disabled).toLowerCase() === normalizedAgent)) {
@@ -130,7 +149,7 @@ export function createCallOmoAgent(
 
       if (args.run_in_background) {
         if (args.session_id) {
-          return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`
+          return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`;
         }
         return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain, resolvedModel)
       }
@@ -148,5 +167,5 @@ export function createCallOmoAgent(
 
       return await executeSync(args, toolCtx, ctx, undefined, fallbackChain, undefined, resolvedModel)
     },
-  })
+  });
 }

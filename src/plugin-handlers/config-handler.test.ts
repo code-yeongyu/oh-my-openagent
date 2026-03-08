@@ -69,6 +69,8 @@ beforeEach(async () => {
 
   spyOn(agentLoader, "loadUserAgents" as any).mockReturnValue({})
   spyOn(agentLoader, "loadProjectAgents" as any).mockReturnValue({})
+  spyOn(agentLoader, "loadOpencodeGlobalAgents" as any).mockReturnValue({})
+  spyOn(agentLoader, "loadOpencodeProjectAgents" as any).mockReturnValue({})
 
   spyOn(mcpLoader, "loadMcpConfigs" as any).mockResolvedValue({ servers: {} })
   setAdditionalAllowedMcpEnvVarsSpy = spyOn(mcpLoader, "setAdditionalAllowedMcpEnvVars").mockImplementation(() => {})
@@ -118,6 +120,8 @@ afterEach(() => {
   ;(skillLoader.discoverOpencodeProjectSkills as any)?.mockRestore?.()
   ;(agentLoader.loadUserAgents as any)?.mockRestore?.()
   ;(agentLoader.loadProjectAgents as any)?.mockRestore?.()
+  ;(agentLoader.loadOpencodeGlobalAgents as any)?.mockRestore?.()
+  ;(agentLoader.loadOpencodeProjectAgents as any)?.mockRestore?.()
   ;(mcpLoader.loadMcpConfigs as any)?.mockRestore?.()
   setAdditionalAllowedMcpEnvVarsSpy?.mockRestore()
   ;(pluginLoader.loadAllPluginComponents as any)?.mockRestore?.()
@@ -1594,5 +1598,175 @@ describe("disable_omo_env pass-through", () => {
       ? lastCall[lastCall.length - 1]
       : undefined
     expect(disableOmoEnv).toBe(false)
+  })
+})
+
+describe("Agent merge priority — project-local overrides global", () => {
+  test("project-local Claude agent overrides global Claude agent with same name", async () => {
+    // #given — same agent name in both global (user) and project scopes
+    ;(agentLoader.loadUserAgents as any).mockReturnValue({
+      "my-custom-agent": {
+        description: "(user) global version",
+        mode: "subagent",
+        prompt: "I am the global agent",
+      },
+    })
+    ;(agentLoader.loadProjectAgents as any).mockReturnValue({
+      "my-custom-agent": {
+        description: "(project) project version",
+        mode: "subagent",
+        prompt: "I am the project agent",
+      },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then — project version wins
+    const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
+    expect(agentConfig["my-custom-agent"]?.description).toBe("(project) project version")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the project agent")
+  })
+
+  test("opencode project agent overrides opencode global agent with same name", async () => {
+    // #given — same agent name in opencode global vs opencode project
+    ;(agentLoader.loadOpencodeGlobalAgents as any).mockReturnValue({
+      "my-custom-agent": {
+        description: "(opencode) global version",
+        mode: "subagent",
+        prompt: "I am the opencode global agent",
+      },
+    })
+    ;(agentLoader.loadOpencodeProjectAgents as any).mockReturnValue({
+      "my-custom-agent": {
+        description: "(opencode-project) project version",
+        mode: "subagent",
+        prompt: "I am the opencode project agent",
+      },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then — opencode project version wins over opencode global
+    const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
+    expect(agentConfig["my-custom-agent"]?.description).toBe("(opencode-project) project version")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the opencode project agent")
+  })
+
+  test("project Claude agent overrides opencode global agent with same name", async () => {
+    // #given — project-scope Claude agent vs global-scope opencode agent
+    ;(agentLoader.loadOpencodeGlobalAgents as any).mockReturnValue({
+      "my-custom-agent": {
+        description: "(opencode) global version",
+        mode: "subagent",
+        prompt: "I am the opencode global agent",
+      },
+    })
+    ;(agentLoader.loadProjectAgents as any).mockReturnValue({
+      "my-custom-agent": {
+        description: "(project) project version",
+        mode: "subagent",
+        prompt: "I am the project Claude agent",
+      },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then — project-scope wins over global-scope regardless of format
+    const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
+    expect(agentConfig["my-custom-agent"]?.description).toBe("(project) project version")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the project Claude agent")
+  })
+
+  test("plugin agents have lowest priority — overridden by all other sources", async () => {
+    // #given — same agent in plugin, global, and project scopes
+    ;(pluginLoader.loadAllPluginComponents as any).mockResolvedValue({
+      commands: {},
+      skills: {},
+      agents: {
+        "my-custom-agent": {
+          description: "plugin version",
+          mode: "subagent",
+          prompt: "I am the plugin agent",
+        },
+      },
+      mcpServers: {},
+      hooksConfigs: [],
+      plugins: [],
+      errors: [],
+    })
+    ;(agentLoader.loadUserAgents as any).mockReturnValue({
+      "my-custom-agent": {
+        description: "(user) global version",
+        mode: "subagent",
+        prompt: "I am the user agent",
+      },
+    })
+
+    const pluginConfig: OhMyOpenCodeConfig = {}
+    const config: Record<string, unknown> = {
+      model: "anthropic/claude-opus-4-6",
+      agent: {},
+    }
+    const handler = createConfigHandler({
+      ctx: { directory: "/tmp" },
+      pluginConfig,
+      modelCacheState: {
+        anthropicContext1MEnabled: false,
+        modelContextLimitsCache: new Map(),
+      },
+    })
+
+    // #when
+    await handler(config)
+
+    // #then — user (global) agent overrides plugin agent
+    const agentConfig = config.agent as Record<string, { description?: string; prompt?: string }>
+    expect(agentConfig["my-custom-agent"]?.description).toBe("(user) global version")
+    expect(agentConfig["my-custom-agent"]?.prompt).toBe("I am the user agent")
   })
 })

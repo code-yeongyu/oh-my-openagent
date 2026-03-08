@@ -5,6 +5,7 @@ import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
 import type { AgentScope, AgentFrontmatter, ClaudeCodeAgentConfig, LoadedAgent } from "./types"
 import { mapClaudeModelToOpenCode } from "./claude-model-mapper"
+import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
 
 function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
   if (!toolsStr) return undefined
@@ -87,6 +88,29 @@ export function loadUserAgents(): Record<string, ClaudeCodeAgentConfig> {
 export function loadProjectAgents(directory?: string): Record<string, ClaudeCodeAgentConfig> {
   const projectAgentsDir = join(directory ?? process.cwd(), ".claude", "agents")
   const agents = loadAgentsFromDir(projectAgentsDir, "project")
+
+  const result: Record<string, ClaudeCodeAgentConfig> = {}
+  for (const agent of agents) {
+    result[agent.name] = agent.config
+  }
+  return result
+}
+
+export function loadOpencodeGlobalAgents(): Record<string, ClaudeCodeAgentConfig> {
+  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const opencodeAgentsDir = join(configDir, "agents")
+  const agents = loadAgentsFromDir(opencodeAgentsDir, "opencode")
+
+  const result: Record<string, ClaudeCodeAgentConfig> = {}
+  for (const agent of agents) {
+    result[agent.name] = agent.config
+  }
+  return result
+}
+
+export function loadOpencodeProjectAgents(directory?: string): Record<string, ClaudeCodeAgentConfig> {
+  const opencodeProjectDir = join(directory ?? process.cwd(), ".opencode", "agents")
+  const agents = loadAgentsFromDir(opencodeProjectDir, "opencode-project")
 
   const result: Record<string, ClaudeCodeAgentConfig> = {}
   for (const agent of agents) {

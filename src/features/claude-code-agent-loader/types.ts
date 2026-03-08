@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 
-export type AgentScope = "user" | "project"
+export type AgentScope = "user" | "project" | "opencode" | "opencode-project"
 
 export type ClaudeCodeAgentConfig = Omit<AgentConfig, "model"> & {
   model?: string | { providerID: string; modelID: string }

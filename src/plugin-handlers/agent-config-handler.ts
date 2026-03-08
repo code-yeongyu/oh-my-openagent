@@ -14,7 +14,7 @@ import {
   discoverProjectClaudeSkills,
   discoverUserClaudeSkills,
 } from "../features/opencode-skill-loader";
-import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent-loader";
+import { loadProjectAgents, loadUserAgents, loadOpencodeGlobalAgents, loadOpencodeProjectAgents } from "../features/claude-code-agent-loader";
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
@@ -139,6 +139,9 @@ export async function applyAgentConfig(params: {
     disableOmoEnv,
   );
 
+  const opencodeGlobalAgents = loadOpencodeGlobalAgents();
+  const opencodeProjectAgents = loadOpencodeProjectAgents(params.ctx.directory);
+
   const disabledAgentNames = new Set(
     (migratedDisabledAgents ?? []).map(a => a.toLowerCase())
   );
@@ -257,6 +260,14 @@ export async function applyAgentConfig(params: {
       pluginAgents,
       protectedBuiltinAgentNames,
     );
+    const filteredOpencodeGlobalAgents = filterProtectedAgentOverrides(
+      opencodeGlobalAgents,
+      protectedBuiltinAgentNames,
+    );
+    const filteredOpencodeProjectAgents = filterProtectedAgentOverrides(
+      opencodeProjectAgents,
+      protectedBuiltinAgentNames,
+    );
 
     params.config.agent = {
       ...agentConfig,
@@ -265,9 +276,12 @@ export async function applyAgentConfig(params: {
           ([key]) => key !== "sisyphus" && key !== "hephaestus" && key !== "atlas",
         ),
       ),
-      ...filterDisabledAgents(filteredUserAgents),
-      ...filterDisabledAgents(filteredProjectAgents),
+      // Precedence: later entries override earlier (project > global > user > plugin)
       ...filterDisabledAgents(filteredPluginAgents),
+      ...filterDisabledAgents(filteredUserAgents),
+      ...filterDisabledAgents(filteredOpencodeGlobalAgents),
+      ...filterDisabledAgents(filteredProjectAgents),
+      ...filterDisabledAgents(filteredOpencodeProjectAgents),
       ...filteredConfigAgents,
       build: { ...migratedBuild, mode: "subagent", hidden: true },
       ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
@@ -288,6 +302,14 @@ export async function applyAgentConfig(params: {
       pluginAgents,
       protectedBuiltinAgentNames,
     );
+    const filteredOpencodeGlobalAgents = filterProtectedAgentOverrides(
+      opencodeGlobalAgents,
+      protectedBuiltinAgentNames,
+    );
+    const filteredOpencodeProjectAgents = filterProtectedAgentOverrides(
+      opencodeProjectAgents,
+      protectedBuiltinAgentNames,
+    );
 
     const defaultedConfigAgents = configAgent
       ? Object.fromEntries(
@@ -302,9 +324,12 @@ export async function applyAgentConfig(params: {
 
     params.config.agent = {
       ...builtinAgents,
-      ...filterDisabledAgents(filteredUserAgents),
-      ...filterDisabledAgents(filteredProjectAgents),
+      // Precedence: later entries override earlier (project > global > user > plugin)
       ...filterDisabledAgents(filteredPluginAgents),
+      ...filterDisabledAgents(filteredUserAgents),
+      ...filterDisabledAgents(filteredOpencodeGlobalAgents),
+      ...filterDisabledAgents(filteredProjectAgents),
+      ...filterDisabledAgents(filteredOpencodeProjectAgents),
       ...defaultedConfigAgents,
     };
   }
