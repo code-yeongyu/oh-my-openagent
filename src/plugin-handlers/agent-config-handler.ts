@@ -78,6 +78,13 @@ export async function applyAgentConfig(params: {
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
+  const customAgentSummaries = Object.entries(params.config.agent ?? {}).map(
+      ([name, config]) => ({
+        name,
+        description: (config as { description?: string }).description ?? "",
+      })
+  );
+
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
     params.pluginConfig.agents,
@@ -86,7 +93,7 @@ export async function applyAgentConfig(params: {
     params.pluginConfig.categories,
     params.pluginConfig.git_master,
     allDiscoveredSkills,
-    params.ctx.client,
+    customAgentSummaries,
     browserProvider,
     currentModel,
     disabledSkills,
