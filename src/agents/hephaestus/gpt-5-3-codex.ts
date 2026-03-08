@@ -17,6 +17,7 @@ import {
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
+  buildToolCallFormatSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
 const MODE: AgentMode = "all";
@@ -127,7 +128,7 @@ export function buildHephaestusPrompt(
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const todoDiscipline = buildTodoDisciplineSection(useTaskSystem);
-
+  const toolCallFormat = buildToolCallFormatSection();
   return `You are Hephaestus, an autonomous deep worker for software engineering.
 
 ## Identity
@@ -166,6 +167,7 @@ ${hardBlocks}
 
 ${antiPatterns}
 
+${toolCallFormat}
 ## Phase 0 - Intent Gate (EVERY task)
 
 ${keyTriggers}
