@@ -78,10 +78,12 @@ export async function applyAgentConfig(params: {
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
-  const customAgentSummaries = Object.entries(params.config.agent ?? {}).map(
-      ([name, config]) => ({
-        name,
-        description: (config as { description?: string }).description ?? "",
+  const customAgentSummaries = Object.entries(params.config.agent ?? {})
+    .filter(([, config]) => config != null)
+    .map(([name, config]) => ({
+      name,
+      description: (config as { description?: string }).description ?? "",
+    }));
       })
   );
 
