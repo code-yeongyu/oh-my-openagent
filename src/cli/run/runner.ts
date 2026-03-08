@@ -11,7 +11,6 @@ import { pollForCompletion } from "./poll-for-completion"
 import { loadAgentProfileColors } from "./agent-profile-colors"
 import { suppressRunInput } from "./stdin-suppression"
 import { createTimestampedStdoutController } from "./timestamp-output"
-import { preflightConfig, displayPreflightResults } from "../../shared/preflight"
 
 export { resolveRunAgent }
 
@@ -46,12 +45,7 @@ export async function run(options: RunOptions): Promise<number> {
   timestampOutput?.enable()
 
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
-
-  // Preflight check: validate and auto-switch models before session starts
-  const preflightResult = preflightConfig(pluginConfig)
-  displayPreflightResults(preflightResult)
-
-  const resolvedAgent = resolveRunAgent(options, preflightResult.config)
+  const resolvedAgent = resolveRunAgent(options, pluginConfig)
   const abortController = new AbortController()
 
   try {
