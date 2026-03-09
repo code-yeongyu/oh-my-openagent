@@ -84,8 +84,6 @@ export async function applyAgentConfig(params: {
       name,
       description: (config as { description?: string }).description ?? "",
     }));
-      })
-  );
 
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
