@@ -39,13 +39,16 @@ async function invalidateOpenCodePluginCache() {
   const targets = [
     join(cacheBase, "node_modules", "oh-my-opencode"),
     join(cacheBase, "bun.lock"),
+    join(cacheBase, "bun.lockb"),
   ];
 
   for (const target of targets) {
     try {
       await rm(target, { recursive: true, force: true });
-    } catch {
-      // Cache may not exist yet (fresh install) - safe to ignore
+    } catch (error) {
+      // force: true already handles ENOENT (missing files).
+      // Real errors (EPERM, EBUSY) indicate the cache could not be cleared.
+      console.warn(`⚠ oh-my-opencode: failed to clear cache at ${target}: ${error.message}`);
     }
   }
 }
