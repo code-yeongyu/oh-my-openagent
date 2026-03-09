@@ -16,7 +16,7 @@ function createCatalog(agents: Array<{ name: string; mode?: string }>): TaskAgen
   return {
     all,
     callable: all.filter((a) => a.mode !== "primary"),
-    primary: all.filter((a) => a.mode === "primary"),
+    primary: all.filter((a) => a.mode === "primary" || a.mode === "all"),
   }
 }
 
@@ -63,7 +63,7 @@ describe("getTaskAgentCatalog", () => {
     expect(result).not.toBeNull()
     expect(result!.all).toHaveLength(5)
     expect(result!.callable).toHaveLength(3) // explore, oracle, librarian
-    expect(result!.primary).toHaveLength(2) // sisyphus, prometheus
+    expect(result!.primary).toHaveLength(3) // sisyphus, prometheus, librarian
 
     const callableNames = result!.callable.map((a) => a.name)
     expect(callableNames).toContain("explore")
@@ -73,6 +73,7 @@ describe("getTaskAgentCatalog", () => {
     const primaryNames = result!.primary.map((a) => a.name)
     expect(primaryNames).toContain("sisyphus")
     expect(primaryNames).toContain("prometheus")
+    expect(primaryNames).toContain("librarian")
   })
 
   test("callable excludes mode=primary agents", async () => {
@@ -90,6 +91,24 @@ describe("getTaskAgentCatalog", () => {
     expect(result).not.toBeNull()
     expect(result!.callable.every((a) => a.mode !== "primary")).toBe(true)
     expect(result!.callable.map((a) => a.name)).not.toContain("sisyphus")
+  })
+
+  test("includes mode:'all' agents in both callable and primary buckets", async () => {
+    //#given
+    const mockAgents = [
+      { name: "sisyphus", mode: "primary" },
+      { name: "explore", mode: "subagent" },
+      { name: "librarian", mode: "all" },
+    ]
+    const client = createMockClient(async () => ({ data: mockAgents }))
+
+    //#when
+    const result = await getTaskAgentCatalog(client)
+
+    //#then
+    expect(result).not.toBeNull()
+    expect(result!.callable).toContainEqual(expect.objectContaining({ name: "librarian" }))
+    expect(result!.primary).toContainEqual(expect.objectContaining({ name: "librarian" }))
   })
 })
 
@@ -189,6 +208,22 @@ describe("matchAgentByName", () => {
     expect(result).not.toBeNull()
     expect(result!.canonicalName).toBe("hephaestus")
   })
+
+  test("matches display-name catalog entry by config key input", () => {
+    //#given
+    const catalog = createCatalog([
+      { name: "Hephaestus (Deep Agent)" },
+      { name: "explore" },
+    ])
+
+    //#when
+    const result = matchAgentByName("hephaestus", catalog)
+
+    //#then
+    expect(result).not.toBeNull()
+    expect(result!.canonicalName).toBe("Hephaestus (Deep Agent)")
+    expect(result!.agent.name).toBe("Hephaestus (Deep Agent)")
+  })
 })
 
 describe("matchPrimaryAgentByName", () => {
@@ -243,5 +278,20 @@ describe("matchPrimaryAgentByName", () => {
     //#then
     expect(result).not.toBeNull()
     expect(result!.canonicalName).toBe("sisyphus")
+  })
+
+  test("matches display-name catalog entry by config key input", () => {
+    //#given
+    const catalog = createCatalog([
+      { name: "Sisyphus (Ultraworker)", mode: "primary" },
+      { name: "explore" },
+    ])
+
+    //#when
+    const result = matchPrimaryAgentByName("sisyphus", catalog)
+
+    //#then
+    expect(result).not.toBeNull()
+    expect(result!.canonicalName).toBe("Sisyphus (Ultraworker)")
   })
 })

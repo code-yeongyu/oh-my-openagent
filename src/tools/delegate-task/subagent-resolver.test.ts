@@ -64,7 +64,7 @@ describe("resolveSubagentExecution", () => {
     expect(result.error).toBe('Failed to fetch agent catalog for "oracle"')
   })
 
-  test("returns delegation error when pre-fetched catalog is null", async () => {
+  test("fails open when pre-fetched catalog is null", async () => {
     //#given
     const args = createBaseArgs({ subagent_type: "review" })
     const executorCtx = createExecutorContext(async () => {
@@ -76,9 +76,9 @@ describe("resolveSubagentExecution", () => {
     const result = await resolveSubagentExecution(args, executorCtx, "sisyphus", "deep", null)
 
     //#then
-    expect(result.agentToUse).toBe("")
+    expect(result.agentToUse).toBe("review")
     expect(result.categoryModel).toBeUndefined()
-    expect(result.error).toBe('Failed to fetch agent catalog for "review"')
+    expect(result.error).toBeUndefined()
     expect(agentsSpy).not.toHaveBeenCalled()
   })
 

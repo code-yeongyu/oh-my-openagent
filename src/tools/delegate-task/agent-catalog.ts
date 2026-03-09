@@ -35,7 +35,7 @@ export async function getTaskAgentCatalog(
     return {
       all: agents,
       callable: agents.filter((a) => a.mode !== "primary"),
-      primary: agents.filter((a) => a.mode === "primary"),
+      primary: agents.filter((a) => a.mode === "primary" || a.mode === "all"),
     }
   } catch {
     return null
@@ -60,7 +60,7 @@ export function matchAgentByName(
 
   const matchedAgent = catalog.callable.find(
     (agent) =>
-      agent.name.toLowerCase() === lowerConfigKey
+      getAgentConfigKey(agent.name).toLowerCase() === lowerConfigKey
   )
 
   if (!matchedAgent) {
@@ -91,7 +91,7 @@ export function matchPrimaryAgentByName(
 
   const matchedAgent = catalog.primary.find(
     (agent) =>
-      agent.name.toLowerCase() === lowerConfigKey
+      getAgentConfigKey(agent.name).toLowerCase() === lowerConfigKey
   )
 
   if (!matchedAgent) {

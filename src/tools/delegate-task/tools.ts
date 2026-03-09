@@ -143,6 +143,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       // Only fetch catalog when resolver actually needs it (not for continuations/explicit categories)
       const needsCatalog = !args.session_id?.trim() && !args.category?.trim()
       const agentCatalog = needsCatalog ? await getTaskAgentCatalog(options.client) : null
+      const originalSubagentType = args.subagent_type
       const target = resolveTaskTarget(args, availableCategories, agentCatalog)
 
       // Handle resolution errors
@@ -155,7 +156,6 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
         // No mutation needed for continuation
       } else if (target.kind === "category") {
         args.category = target.name
-        const originalSubagentType = args.subagent_type
         args.subagent_type = undefined
         if (target.correctedFrom === "subagent_type") {
           log("[task] corrected subagent_type to category", {
