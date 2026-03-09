@@ -116,7 +116,7 @@ export function buildExploreSection(agents: AvailableAgent[]): string {
 
   return `### Explore Agent = Contextual Grep
 
-Use it as a **peer tool**, not a fallback. Fire liberally.
+Use it as a **peer tool**, not a fallback. Fire liberally for discovery, not for files you already know.
 
 **Use Direct Tools when:**
 ${avoidWhen.map((w) => `- ${w}`).join("\n")}
