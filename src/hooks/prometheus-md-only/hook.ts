@@ -1,11 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { HOOK_NAME, BLOCKED_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
+import { HOOK_NAME, BLOCKED_TOOLS, BASH_TOOLS, BLOCKED_BASH_TOOLS, PLANNING_CONSULT_WARNING, PROMETHEUS_WORKFLOW_REMINDER } from "./constants"
 import { log } from "../../shared/logger"
 import { SYSTEM_DIRECTIVE_PREFIX } from "../../shared/system-directive"
 import { getAgentDisplayName } from "../../shared/agent-display-names"
 import { getAgentFromSession } from "./agent-resolution"
 import { isPrometheusAgent } from "./agent-matcher"
 import { isAllowedFile } from "./path-policy"
+import { analyzeBashCommand } from "./bash-command-policy"
 
 const TASK_TOOLS = ["task", "call_omo_agent"]
 
@@ -33,6 +34,36 @@ export function createPrometheusMdOnlyHook(ctx: PluginInput) {
             tool: toolName,
             agent: agentName,
           })
+        }
+        return
+      }
+
+      if (BLOCKED_BASH_TOOLS.includes(toolName)) {
+        log(`[${HOOK_NAME}] Blocked: interactive_bash is not available for Prometheus`, {
+          sessionID: input.sessionID,
+          tool: toolName,
+          agent: agentName,
+        })
+        throw new Error(
+          `[${HOOK_NAME}] interactive_bash is not available for Prometheus. Use bash with simple commands instead.`
+        )
+      }
+
+      if (BASH_TOOLS.includes(toolName)) {
+        const command = output.args.command as string | undefined
+        if (!command) {
+          return
+        }
+        const result = analyzeBashCommand(command, ctx.directory)
+        if (!result.allowed) {
+          log(`[${HOOK_NAME}] Blocked bash command for Prometheus`, {
+            sessionID: input.sessionID,
+            tool: toolName,
+            command,
+            reason: result.reason,
+            agent: agentName,
+          })
+          throw new Error(result.reason)
         }
         return
       }

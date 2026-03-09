@@ -11,6 +11,10 @@ export const ALLOWED_PATH_PREFIX = ".sisyphus"
 
 export const BLOCKED_TOOLS = ["Write", "Edit", "write", "edit"]
 
+export const BASH_TOOLS = ["bash", "Bash"]
+
+export const BLOCKED_BASH_TOOLS = ["interactive_bash"]
+
 export const PLANNING_CONSULT_WARNING = `
 
 ---
