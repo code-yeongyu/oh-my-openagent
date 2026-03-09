@@ -71,7 +71,7 @@ export function detectDelegateTaskError(output: string): DetectedError | null {
 
   // Fallback: if no known pattern matched but output contains error indicators,
   // return unknown_delegate_task_error for retry eligibility
-  if (output.includes("[ERROR]") || output.includes("Invalid arguments:")) {
+  if (output.startsWith("[ERROR]") || output.includes("Invalid arguments:")) {
     return {
       errorType: "unknown_delegate_task_error",
       originalOutput: output,
