@@ -28,26 +28,13 @@ function getLibcFamily() {
 }
 
 /**
- * Resolve the platform-appropriate opencode cache directory.
+ * Resolve the opencode cache directory.
  *
- * opencode (a Go binary) uses os.UserCacheDir() which maps to:
- *   - Linux:   $XDG_CACHE_HOME/opencode  or  ~/.cache/opencode
- *   - macOS:   ~/Library/Caches/opencode
- *   - Windows: %LOCALAPPDATA%/opencode
+ * opencode uses xdg-basedir on all platforms, so the cache path is always
+ * $XDG_CACHE_HOME/opencode (defaults to ~/.cache/opencode).
  */
 function getOpenCodeCacheDir() {
-  const home = homedir();
-
-  if (process.platform === "darwin") {
-    return join(home, "Library", "Caches", "opencode");
-  }
-
-  if (process.platform === "win32") {
-    return join(process.env.LOCALAPPDATA || join(home, "AppData", "Local"), "opencode");
-  }
-
-  // Linux and other Unix-like: respect XDG_CACHE_HOME
-  return join(process.env.XDG_CACHE_HOME || join(home, ".cache"), "opencode");
+  return join(process.env.XDG_CACHE_HOME || join(homedir(), ".cache"), "opencode");
 }
 
 /**
@@ -55,7 +42,7 @@ function getOpenCodeCacheDir() {
  *
  * opencode installs plugins into its cache with a separate bun.lock.
  * When a user runs `bun install -g oh-my-opencode`, only the global copy is updated
- * while the cached copy remains stale. Removing the cached module and lockfile forces
+ * while the cached copy remains stale. Removing the cached module forces
  * opencode to re-resolve "oh-my-opencode@latest" on next startup.
  */
 async function invalidateOpenCodePluginCache() {
@@ -65,20 +52,14 @@ async function invalidateOpenCodePluginCache() {
     return;
   }
 
-  const targets = [
-    join(cacheBase, "node_modules", "oh-my-opencode"),
-    join(cacheBase, "bun.lock"),
-    join(cacheBase, "bun.lockb"),
-  ];
+  const target = join(cacheBase, "node_modules", "oh-my-opencode");
 
-  for (const target of targets) {
-    try {
-      await rm(target, { recursive: true, force: true });
-    } catch (error) {
-      // force: true already handles ENOENT (missing files).
-      // Real errors (EPERM, EBUSY) indicate the cache could not be cleared.
-      console.warn(`⚠ oh-my-opencode: failed to clear cache at ${target}: ${error.message}`);
-    }
+  try {
+    await rm(target, { recursive: true, force: true });
+  } catch (error) {
+    // force: true already handles ENOENT (missing files).
+    // Real errors (EPERM, EBUSY) indicate the cache could not be cleared.
+    console.warn(`⚠ oh-my-opencode: failed to clear cache at ${target}: ${error.message}`);
   }
 }
 
