@@ -846,6 +846,39 @@ describe("atlas hook", () => {
       expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
+    test("should append subagent session to boulder before injecting continuation", async () => {
+      // given - active boulder plan with another registered session and current session tracked as subagent
+      const subagentSessionID = "subagent-session-456"
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+      subagentSessions.add(subagentSessionID)
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when - subagent session goes idle before parent task output appends it
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: subagentSessionID },
+        },
+      })
+
+      // then - session is registered into boulder and continuation is injected
+      expect(readBoulderState(TEST_DIR)?.session_ids).toContain(subagentSessionID)
+      expect(mockInput._promptMock).toHaveBeenCalled()
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.path.id).toBe(subagentSessionID)
+    })
+
     test("should inject when registered boulder session has incomplete tasks even if last agent differs", async () => {
       cleanupMessageStorage(MAIN_SESSION_ID)
       setupMessageStorage(MAIN_SESSION_ID, "hephaestus")

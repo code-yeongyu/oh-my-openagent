@@ -1,11 +1,10 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { getPlanProgress, readBoulderState } from "../../features/boulder-state"
-import { getSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
+import { appendSessionId, getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import type { BoulderState, PlanProgress } from "../../features/boulder-state"
+import { subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
-import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
-import { getLastAgentFromSession } from "./session-last-agent"
 import type { AtlasHookOptions, SessionState } from "./types"
 
 const CONTINUATION_COOLDOWN_MS = 5000
@@ -19,23 +18,42 @@ function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions
     : false
 }
 
-function shouldSkipForAgentMismatch(input: {
-  isBoulderSession: boolean
-  sessionAgent: string | undefined
-  lastAgent: string | null
-  requiredAgent: string
-}): boolean {
-  if (input.isBoulderSession) {
-    return false
+function resolveActiveBoulderSession(input: {
+  directory: string
+  sessionID: string
+}): {
+  boulderState: BoulderState
+  progress: PlanProgress
+  appendedSession: boolean
+} | null {
+  const boulderState = readBoulderState(input.directory)
+  if (!boulderState) {
+    return null
   }
 
-  const effectiveAgent = input.sessionAgent ?? input.lastAgent ?? ""
-  const lastAgentKey = getAgentConfigKey(effectiveAgent)
-  const requiredAgentKey = getAgentConfigKey(input.requiredAgent)
-  const lastAgentMatchesRequired = lastAgentKey === requiredAgentKey
-  const allowSisyphusForAtlasBoulder = requiredAgentKey === "atlas" && lastAgentKey === "sisyphus"
+  const progress = getPlanProgress(boulderState.active_plan)
+  if (progress.isComplete) {
+    return { boulderState, progress, appendedSession: false }
+  }
 
-  return !lastAgentMatchesRequired && !allowSisyphusForAtlasBoulder
+  if (boulderState.session_ids.includes(input.sessionID)) {
+    return { boulderState, progress, appendedSession: false }
+  }
+
+  if (!subagentSessions.has(input.sessionID)) {
+    return null
+  }
+
+  const updatedBoulderState = appendSessionId(input.directory, input.sessionID)
+  if (!updatedBoulderState?.session_ids.includes(input.sessionID)) {
+    return null
+  }
+
+  return {
+    boulderState: updatedBoulderState,
+    progress,
+    appendedSession: true,
+  }
 }
 
 async function injectContinuation(input: {
@@ -117,12 +135,26 @@ export async function handleAtlasSessionIdle(input: {
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
 
-  const boulderState = readBoulderState(ctx.directory)
-  const isBoulderSession = boulderState?.session_ids?.includes(sessionID) ?? false
-  const isBackgroundTaskSession = subagentSessions.has(sessionID)
-  if (!isBackgroundTaskSession && !isBoulderSession) {
-    log(`[${HOOK_NAME}] Skipped: not boulder or background task session`, { sessionID })
+  const activeBoulderSession = resolveActiveBoulderSession({
+    directory: ctx.directory,
+    sessionID,
+  })
+  if (!activeBoulderSession) {
+    log(`[${HOOK_NAME}] Skipped: session not registered in active boulder`, { sessionID })
     return
+  }
+
+  const { boulderState, progress, appendedSession } = activeBoulderSession
+  if (progress.isComplete) {
+    log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
+    return
+  }
+
+  if (appendedSession) {
+    log(`[${HOOK_NAME}] Appended subagent session to boulder during idle`, {
+      sessionID,
+      plan: boulderState.plan_name,
+    })
   }
 
   const sessionState = getState(sessionID)
@@ -155,37 +187,8 @@ export async function handleAtlasSessionIdle(input: {
     return
   }
 
-  if (!boulderState) {
-    log(`[${HOOK_NAME}] No active boulder`, { sessionID })
-    return
-  }
-
   if (options?.isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
-    return
-  }
-
-  const sessionAgent = getSessionAgent(sessionID)
-  const lastAgent = await getLastAgentFromSession(sessionID, ctx.client)
-  if (
-    shouldSkipForAgentMismatch({
-      isBoulderSession,
-      sessionAgent,
-      lastAgent,
-      requiredAgent: boulderState.agent ?? "atlas",
-    })
-  ) {
-    log(`[${HOOK_NAME}] Skipped: last agent does not match boulder agent`, {
-      sessionID,
-      lastAgent: sessionAgent ?? lastAgent ?? "unknown",
-      requiredAgent: boulderState.agent ?? "atlas",
-    })
-    return
-  }
-
-  const progress = getPlanProgress(boulderState.active_plan)
-  if (progress.isComplete) {
-    log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
     return
   }
 
