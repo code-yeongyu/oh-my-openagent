@@ -75,4 +75,70 @@ describe("resolveCategoryExecution", () => {
 		expect(result.error).toContain("Unknown category")
 		expect(result.error).toContain("definitely-not-a-real-category-xyz123")
 	})
+
+	test("detects gemini models as unstable via registry", async () => {
+		//#given
+		const args = {
+			category: "visual-engineering",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		const inheritedModel = "gemini-3.1-pro"
+		const systemDefaultModel = "anthropic/claude-sonnet-4-6"
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, inheritedModel, systemDefaultModel)
+
+		//#then
+		expect(result.isUnstableAgent).toBe(true)
+	})
+
+	test("detects kimi models as unstable via registry", async () => {
+		//#given
+		const args = {
+			category: "writing",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		const inheritedModel = "kimi-k2.5"
+		const systemDefaultModel = "anthropic/claude-sonnet-4-6"
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, inheritedModel, systemDefaultModel)
+
+		//#then
+		expect(result.isUnstableAgent).toBe(true)
+	})
+
+	test("does not mark claude models as unstable", async () => {
+		//#given
+		const args = {
+			category: "quick",
+			prompt: "test prompt",
+			description: "Test task",
+			run_in_background: false,
+			load_skills: [],
+			blockedBy: undefined,
+			enableSkillTools: false,
+		}
+		const executorCtx = createMockExecutorContext()
+		const inheritedModel = "claude-opus-4-6"
+		const systemDefaultModel = "anthropic/claude-sonnet-4-6"
+
+		//#when
+		const result = await resolveCategoryExecution(args, executorCtx, inheritedModel, systemDefaultModel)
+
+		//#then
+		expect(result.isUnstableAgent).toBe(false)
+	})
 })

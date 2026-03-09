@@ -19,6 +19,8 @@ export type ModelResolutionRequest = {
   policy?: {
     fallbackChain?: FallbackEntry[]
     systemDefaultModel?: string
+    profileName?: string
+    agentName?: string
   }
 }
 
@@ -48,14 +50,14 @@ export function resolveModelPipeline(
 
   const normalizedUiModel = normalizeModel(intent?.uiSelectedModel)
   if (normalizedUiModel) {
-    log("Model resolved via UI selection", { model: normalizedUiModel })
-    return { model: normalizedUiModel, provenance: "override" }
+    log("[model-resolution] override: " + normalizedUiModel + " (source: uiSelected)")
+    return { model: normalizedUiModel, provenance: "override", reason: "UI-selected model override" }
   }
 
   const normalizedUserModel = normalizeModel(intent?.userModel)
   if (normalizedUserModel) {
-    log("Model resolved via config override", { model: normalizedUserModel })
-    return { model: normalizedUserModel, provenance: "override" }
+    log("[model-resolution] override: " + normalizedUserModel + " (source: userModel)")
+    return { model: normalizedUserModel, provenance: "override", reason: "User-configured model override" }
   }
 
   const normalizedCategoryDefault = normalizeModel(intent?.categoryDefaultModel)
@@ -66,32 +68,24 @@ export function resolveModelPipeline(
       const providerHint = parts.length >= 2 ? [parts[0]] : undefined
       const match = fuzzyMatchModel(normalizedCategoryDefault, availableModels, providerHint)
       if (match) {
-        log("Model resolved via category default (fuzzy matched)", {
-          original: normalizedCategoryDefault,
-          matched: match,
-        })
-        return { model: match, provenance: "category-default", attempted }
+        log("[model-resolution] category-default: " + match)
+        return { model: match, provenance: "category-default", attempted, reason: "Category default model (fuzzy matched)" }
       }
     } else {
       const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       if (connectedProviders === null) {
-        log("Model resolved via category default (no cache, first run)", {
-          model: normalizedCategoryDefault,
-        })
-        return { model: normalizedCategoryDefault, provenance: "category-default", attempted }
+        log("[model-resolution] category-default: " + normalizedCategoryDefault)
+        return { model: normalizedCategoryDefault, provenance: "category-default", attempted, reason: "Category default model (no provider cache)" }
       }
       const parts = normalizedCategoryDefault.split("/")
       if (parts.length >= 2) {
         const provider = parts[0]
-        if (connectedProviders.includes(provider)) {
-          const modelName = parts.slice(1).join("/")
-          const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
-          log("Model resolved via category default (connected provider)", {
-            model: transformedModel,
-            original: normalizedCategoryDefault,
-          })
-          return { model: transformedModel, provenance: "category-default", attempted }
-        }
+         if (connectedProviders.includes(provider)) {
+           const modelName = parts.slice(1).join("/")
+           const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
+           log("[model-resolution] category-default: " + transformedModel)
+           return { model: transformedModel, provenance: "category-default", attempted, reason: "Category default model (connected provider)" }
+         }
       }
     }
     log("Category default model not available, falling through to fallback chain", {
@@ -112,12 +106,12 @@ export function resolveModelPipeline(
           const parts = model.split("/")
           if (parts.length >= 2) {
             const provider = parts[0]
-            if (connectedSet.has(provider)) {
-              const modelName = parts.slice(1).join("/")
-              const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
-              log("Model resolved via user fallback_models (connected provider)", { model: transformedModel, original: model })
-              return { model: transformedModel, provenance: "provider-fallback", attempted }
-            }
+             if (connectedSet.has(provider)) {
+               const modelName = parts.slice(1).join("/")
+               const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
+               log("[model-resolution] provider-fallback: " + transformedModel + " (tried: " + attempted.join(", ") + ")")
+               return { model: transformedModel, provenance: "provider-fallback", attempted, reason: "User fallback model (connected provider)" }
+             }
           }
         }
         log("No connected provider found in user fallback_models, falling through to hardcoded chain")
@@ -127,11 +121,11 @@ export function resolveModelPipeline(
         attempted.push(model)
         const parts = model.split("/")
         const providerHint = parts.length >= 2 ? [parts[0]] : undefined
-        const match = fuzzyMatchModel(model, availableModels, providerHint)
-        if (match) {
-          log("Model resolved via user fallback_models (availability confirmed)", { model: model, match })
-          return { model: match, provenance: "provider-fallback", attempted }
-        }
+         const match = fuzzyMatchModel(model, availableModels, providerHint)
+         if (match) {
+           log("[model-resolution] provider-fallback: " + match + " (tried: " + attempted.join(", ") + ")")
+           return { model: match, provenance: "provider-fallback", attempted, reason: "User fallback model (availability confirmed)" }
+         }
       }
       log("No available model found in user fallback_models, falling through to hardcoded chain")
     }
@@ -147,21 +141,18 @@ export function resolveModelPipeline(
       } else {
         for (const entry of fallbackChain) {
           for (const provider of entry.providers) {
-            if (connectedSet.has(provider)) {
-              const transformedModelId = transformModelForProvider(provider, entry.model)
-              const model = `${provider}/${transformedModelId}`
-              log("Model resolved via fallback chain (connected provider)", {
-                provider,
-                model: transformedModelId,
-                variant: entry.variant,
-              })
-              return {
-                model,
-                provenance: "provider-fallback",
-                variant: entry.variant,
-                attempted,
-              }
-            }
+             if (connectedSet.has(provider)) {
+               const transformedModelId = transformModelForProvider(provider, entry.model)
+               const model = `${provider}/${transformedModelId}`
+               log("[model-resolution] provider-fallback: " + model + " (tried: " + attempted.join(", ") + ")")
+               return {
+                 model,
+                 provenance: "provider-fallback",
+                 variant: entry.variant,
+                 attempted,
+                 reason: "Fallback chain model (connected provider)",
+               }
+             }
           }
         }
         log("No connected provider found in fallback chain, falling through to system default")
@@ -170,47 +161,40 @@ export function resolveModelPipeline(
       for (const entry of fallbackChain) {
         for (const provider of entry.providers) {
           const fullModel = `${provider}/${entry.model}`
-          const match = fuzzyMatchModel(fullModel, availableModels, [provider])
-          if (match) {
-            log("Model resolved via fallback chain (availability confirmed)", {
-              provider,
-              model: entry.model,
-              match,
-              variant: entry.variant,
-            })
-            return {
-              model: match,
-              provenance: "provider-fallback",
-              variant: entry.variant,
-              attempted,
-            }
-          }
+           const match = fuzzyMatchModel(fullModel, availableModels, [provider])
+           if (match) {
+             log("[model-resolution] provider-fallback: " + match + " (tried: " + attempted.join(", ") + ")")
+             return {
+               model: match,
+               provenance: "provider-fallback",
+               variant: entry.variant,
+               attempted,
+               reason: "Fallback chain model (availability confirmed)",
+             }
+           }
         }
 
-        const crossProviderMatch = fuzzyMatchModel(entry.model, availableModels)
-        if (crossProviderMatch) {
-          log("Model resolved via fallback chain (cross-provider fuzzy match)", {
-            model: entry.model,
-            match: crossProviderMatch,
-            variant: entry.variant,
-          })
-          return {
-            model: crossProviderMatch,
-            provenance: "provider-fallback",
-            variant: entry.variant,
-            attempted,
-          }
-        }
+         const crossProviderMatch = fuzzyMatchModel(entry.model, availableModels)
+         if (crossProviderMatch) {
+           log("[model-resolution] provider-fallback: " + crossProviderMatch + " (tried: " + attempted.join(", ") + ")")
+           return {
+             model: crossProviderMatch,
+             provenance: "provider-fallback",
+             variant: entry.variant,
+             attempted,
+             reason: "Fallback chain model (cross-provider fuzzy match)",
+           }
+         }
       }
       log("No available model found in fallback chain, falling through to system default")
     }
   }
 
   if (systemDefaultModel === undefined) {
-    log("No model resolved - systemDefaultModel not configured")
+    log("[model-resolution] no model resolved - systemDefaultModel not configured")
     return undefined
   }
 
-  log("Model resolved via system default", { model: systemDefaultModel })
-  return { model: systemDefaultModel, provenance: "system-default", attempted }
+  log("[model-resolution] system-default: " + systemDefaultModel)
+  return { model: systemDefaultModel, provenance: "system-default", attempted, reason: "System default model (ultimate fallback)" }
 }
