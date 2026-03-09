@@ -391,6 +391,31 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(releaseMock).toHaveBeenCalledWith("anthropic/claude-opus-4-6")
     expect(task.concurrencyKey).toBeUndefined()
   })
+
+  it("should invoke interruption callback immediately when stale task is cancelled", async () => {
+    //#given
+    const task = createRunningTask({
+      progress: {
+        toolCalls: 1,
+        lastUpdate: new Date(Date.now() - 200_000),
+      },
+    })
+    const onTaskInterrupted = mock(() => {})
+
+    //#when
+    await checkAndInterruptStaleTasks({
+      tasks: [task],
+      client: mockClient as never,
+      config: { staleTimeoutMs: 180_000 },
+      concurrencyManager: mockConcurrencyManager as never,
+      notifyParentSession: mockNotify,
+      onTaskInterrupted,
+    })
+
+    //#then
+    expect(task.status).toBe("cancelled")
+    expect(onTaskInterrupted).toHaveBeenCalledWith(task)
+  })
 })
 
 describe("pruneStaleTasksAndNotifications", () => {

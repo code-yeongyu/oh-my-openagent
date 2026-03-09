@@ -1334,6 +1334,33 @@ describe("BackgroundManager.tryCompleteTask", () => {
     expect(getPendingByParent(manager).get(task.parentSessionID)).toBeUndefined()
   })
 
+  test("should remove toast tracking before notifying completed task", async () => {
+    // given
+    const { removeTaskCalls, resetToastManager } = createToastRemoveTaskTracker()
+
+    const task: BackgroundTask = {
+      id: "task-toast-complete",
+      sessionID: "session-toast-complete",
+      parentSessionID: "parent-toast-complete",
+      parentMessageID: "msg-1",
+      description: "toast completion task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    try {
+      // when
+      await tryCompleteTaskForTest(manager, task)
+
+      // then
+      expect(removeTaskCalls).toContain(task.id)
+    } finally {
+      resetToastManager()
+    }
+  })
+
   test("should avoid overlapping promptAsync calls when tasks complete concurrently", async () => {
     // given
     type PromptAsyncBody = Record<string, unknown> & { noReply?: boolean }
