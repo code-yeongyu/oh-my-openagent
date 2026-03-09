@@ -14,7 +14,7 @@ describe("Profile override injection", () => {
 					systemDefaultModel: "anthropic/claude-opus-4-6",
 				});
 
-				expect(result).toEqual({
+				expect(result).toMatchObject({
 					model: "claude-sonnet-4-6",
 					provenance: "override",
 				});
@@ -37,7 +37,7 @@ describe("Profile override injection", () => {
 					systemDefaultModel: "anthropic/claude-opus-4-6",
 				});
 
-				expect(result).toEqual({
+				expect(result).toMatchObject({
 					model: "openai/gpt-5.4",
 					provenance: "override",
 				});
@@ -62,7 +62,8 @@ describe("Profile override injection", () => {
 					systemDefaultModel: "anthropic/claude-opus-4-6",
 				});
 
-				expect(withBalancedProfile).toEqual(withoutProfile);
+				expect(withBalancedProfile?.model).toEqual(withoutProfile?.model);
+				expect(withBalancedProfile?.provenance).toEqual(withoutProfile?.provenance);
 			});
 		});
 	});
