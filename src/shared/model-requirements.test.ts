@@ -44,19 +44,19 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(last.model).toBe("big-pickle")
   })
 
-  test("librarian has valid fallbackChain with glm-4.7 as primary", () => {
-    // given - librarian agent requirement
-    const librarian = AGENT_MODEL_REQUIREMENTS["operator"]
+  test("operator has valid fallbackChain with glm-4.7-free as primary", () => {
+    // given - operator agent requirement
+    const operator = AGENT_MODEL_REQUIREMENTS["operator"]
 
-    // when - accessing librarian requirement
-    // then - fallbackChain exists with glm-4.7 as first entry
-    expect(librarian).toBeDefined()
-    expect(librarian.fallbackChain).toBeArray()
-    expect(librarian.fallbackChain.length).toBeGreaterThan(0)
+    // when - accessing operator requirement
+    // then - fallbackChain exists with glm-4.7-free (free tier) as first entry
+    expect(operator).toBeDefined()
+    expect(operator.fallbackChain).toBeArray()
+    expect(operator.fallbackChain.length).toBeGreaterThan(0)
 
-    const primary = librarian.fallbackChain[0]
-    expect(primary.providers[0]).toBe("zai-coding-plan")
-    expect(primary.model).toBe("glm-4.7")
+    const primary = operator.fallbackChain[0]
+    expect(primary.providers[0]).toBe("opencode")
+    expect(primary.model).toBe("glm-4.7-free")
   })
 
   test("explore has valid fallbackChain with grok-code-fast-1 as primary", () => {
