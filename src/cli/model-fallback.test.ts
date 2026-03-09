@@ -344,15 +344,16 @@ describe("generateModelConfig", () => {
       expect(result.agents?.explore?.model).toBe("anthropic/claude-haiku-4-5")
     })
 
-    test("explore uses gpt-5-nano when only OpenAI available", () => {
+    test("explore uses OpenAI model when only OpenAI available", () => {
       // #given only OpenAI is available
       const config = createConfig({ hasOpenAI: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then explore should use gpt-5-nano (fallback)
-      expect(result.agents?.explore?.model).toBe("opencode/gpt-5-nano")
+      // #then explore should use native OpenAI model
+      expect(result.agents?.explore?.model).toBe("openai/gpt-5.4")
+      expect(result.agents?.explore?.variant).toBe("medium")
     })
 
     test("explore uses gpt-5-mini when only Copilot available", () => {

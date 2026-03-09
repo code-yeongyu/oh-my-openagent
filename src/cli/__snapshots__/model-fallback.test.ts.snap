@@ -195,14 +195,16 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "explore": {
-      "model": "opencode/gpt-5-nano",
+      "model": "openai/gpt-5.4",
+      "variant": "medium",
     },
     "hephaestus": {
       "model": "openai/gpt-5.3-codex",
       "variant": "medium",
     },
     "librarian": {
-      "model": "opencode/glm-4.7-free",
+      "model": "openai/gpt-5.4",
+      "variant": "medium",
     },
     "metis": {
       "model": "openai/gpt-5.4",
@@ -230,12 +232,17 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
     },
   },
   "categories": {
+    "artistry": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+    },
     "deep": {
       "model": "openai/gpt-5.3-codex",
       "variant": "medium",
     },
     "quick": {
-      "model": "opencode/glm-4.7-free",
+      "model": "openai/gpt-5.3-codex",
+      "variant": "low",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.3-codex",
@@ -250,10 +257,12 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "visual-engineering": {
-      "model": "opencode/glm-4.7-free",
+      "model": "openai/gpt-5.4",
+      "variant": "high",
     },
     "writing": {
-      "model": "opencode/glm-4.7-free",
+      "model": "openai/gpt-5.4",
+      "variant": "medium",
     },
   },
 }
@@ -268,14 +277,16 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "explore": {
-      "model": "opencode/gpt-5-nano",
+      "model": "openai/gpt-5.4",
+      "variant": "medium",
     },
     "hephaestus": {
       "model": "openai/gpt-5.3-codex",
       "variant": "medium",
     },
     "librarian": {
-      "model": "opencode/glm-4.7-free",
+      "model": "openai/gpt-5.4",
+      "variant": "medium",
     },
     "metis": {
       "model": "openai/gpt-5.4",
@@ -303,12 +314,17 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
     },
   },
   "categories": {
+    "artistry": {
+      "model": "openai/gpt-5.4",
+      "variant": "xhigh",
+    },
     "deep": {
       "model": "openai/gpt-5.3-codex",
       "variant": "medium",
     },
     "quick": {
-      "model": "opencode/glm-4.7-free",
+      "model": "openai/gpt-5.3-codex",
+      "variant": "low",
     },
     "ultrabrain": {
       "model": "openai/gpt-5.3-codex",
@@ -323,10 +339,12 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "visual-engineering": {
-      "model": "opencode/glm-4.7-free",
+      "model": "openai/gpt-5.4",
+      "variant": "high",
     },
     "writing": {
-      "model": "opencode/glm-4.7-free",
+      "model": "openai/gpt-5.4",
+      "variant": "medium",
     },
   },
 }
