@@ -1,36 +1,17 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
 import { join } from "path"
 import os from "os"
 
+import * as configModule from "./config"
+import { lspManager } from "./lsp-server"
+import { isDirectoryPath } from "./lsp-client-wrapper"
+import { aggregateDiagnosticsForDirectory } from "./directory-diagnostics"
 import type { Diagnostic } from "./types"
 
 const diagnosticsMock = mock(async (_filePath: string) => ({ items: [] as Diagnostic[] }))
 const getClientMock = mock(async () => ({ diagnostics: diagnosticsMock }))
 const releaseClientMock = mock(() => {})
-
-mock.module("./config", () => ({
-  findServerForExtension: (extension: string) => ({
-    status: "found" as const,
-    server: {
-      id: "test-server",
-      command: ["test-server"],
-      extensions: [extension],
-      priority: 1,
-    },
-  }),
-  getLanguageId: () => "typescript",
-}))
-
-mock.module("./lsp-server", () => ({
-  lspManager: {
-    getClient: getClientMock,
-    releaseClient: releaseClientMock,
-  },
-}))
-
-const { isDirectoryPath } = await import("./lsp-client-wrapper")
-const { aggregateDiagnosticsForDirectory } = await import("./directory-diagnostics")
 
 function createDiagnostic(message: string): Diagnostic {
   return {
@@ -49,6 +30,22 @@ describe("directory diagnostics", () => {
     diagnosticsMock.mockImplementation(async (_filePath: string) => ({ items: [] }))
     getClientMock.mockClear()
     releaseClientMock.mockClear()
+
+    spyOn(configModule, "findServerForExtension").mockReturnValue({
+      status: "found",
+      server: {
+        id: "test-server",
+        command: ["test-server"],
+        extensions: [".ts"],
+        priority: 1,
+      },
+    })
+    spyOn(lspManager, "getClient").mockImplementation(getClientMock)
+    spyOn(lspManager, "releaseClient").mockImplementation(releaseClientMock)
+  })
+
+  afterEach(() => {
+    mock.restore()
   })
 
   describe("isDirectoryPath", () => {
