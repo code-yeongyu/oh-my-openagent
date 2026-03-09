@@ -48,7 +48,7 @@ export function getPrometheusPromptSource(model?: string): PrometheusPromptSourc
 
 /**
  * Gets the appropriate Prometheus prompt based on model.
- * GPT models → GPT-5.2 optimized prompt (XML-tagged, principle-driven)
+ * GPT models → GPT-5.4 optimized prompt (XML-tagged, principle-driven)
  * Gemini models → Gemini-optimized prompt (aggressive tool-call enforcement, thinking checkpoints)
  * Default (Claude, etc.) → Claude-optimized prompt (modular sections)
  */

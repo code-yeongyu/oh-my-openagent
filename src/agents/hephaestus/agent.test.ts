@@ -39,8 +39,8 @@ describe("getHephaestusPromptSource", () => {
 
   test("returns 'gpt' for generic GPT models", () => {
     // given
-    const model1 = "openai/gpt-5.2";
-    const model2 = "github-copilot/gpt-5.2";
+    const model1 = "openai/gpt-4o";
+    const model2 = "github-copilot/gpt-4o";
     const model3 = "openai/gpt-4o";
 
     // when
@@ -111,7 +111,7 @@ describe("getHephaestusPrompt", () => {
 
   test("generic GPT model returns generic GPT prompt", () => {
     // given
-    const model = "openai/gpt-5.2";
+    const model = "openai/gpt-4o";
 
     // when
     const prompt = getHephaestusPrompt(model);

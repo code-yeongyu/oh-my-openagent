@@ -32,11 +32,11 @@ describe("think-mode switcher", () => {
       })
 
       it("should handle dots in GPT version numbers", () => {
-        // given a GPT model ID with dot format (gpt-5.2)
-        const variant = getHighVariant("gpt-5.2")
+        // given a GPT model ID with dot format (gpt-5.4)
+        const variant = getHighVariant("gpt-5.4")
 
         // then should return high variant
-        expect(variant).toBe("gpt-5-2-high")
+        expect(variant).toBe("gpt-5-4-high")
       })
 
       it("should handle dots in GPT-5.1 codex variants", () => {
@@ -60,7 +60,7 @@ describe("think-mode switcher", () => {
       it("should return null for already-high variants", () => {
         // given model IDs that are already high variants
         expect(getHighVariant("claude-opus-4-6-high")).toBeNull()
-        expect(getHighVariant("gpt-5-2-high")).toBeNull()
+        expect(getHighVariant("gpt-5-4-high")).toBeNull()
         expect(getHighVariant("gemini-3-1-pro-high")).toBeNull()
       })
 
@@ -76,20 +76,20 @@ describe("think-mode switcher", () => {
     it("should detect -high suffix", () => {
       // given model IDs with -high suffix
       expect(isAlreadyHighVariant("claude-opus-4-6-high")).toBe(true)
-      expect(isAlreadyHighVariant("gpt-5-2-high")).toBe(true)
+      expect(isAlreadyHighVariant("gpt-5-4-high")).toBe(true)
       expect(isAlreadyHighVariant("gemini-3.1-pro-high")).toBe(true)
     })
 
     it("should detect -high suffix after normalization", () => {
       // given model IDs with dots that end in -high
-      expect(isAlreadyHighVariant("gpt-5.2-high")).toBe(true)
+      expect(isAlreadyHighVariant("gpt-5.4-high")).toBe(true)
     })
 
     it("should return false for base models", () => {
       // given base model IDs without -high suffix
       expect(isAlreadyHighVariant("claude-opus-4-6")).toBe(false)
       expect(isAlreadyHighVariant("claude-opus-4.6")).toBe(false)
-      expect(isAlreadyHighVariant("gpt-5.2")).toBe(false)
+      expect(isAlreadyHighVariant("gpt-5.4")).toBe(false)
       expect(isAlreadyHighVariant("gemini-3.1-pro")).toBe(false)
     })
 
@@ -111,10 +111,10 @@ describe("think-mode switcher", () => {
 
       it("should preserve openai/ prefix when getting high variant", () => {
         // given a model ID with openai/ prefix
-        const variant = getHighVariant("openai/gpt-5-2")
+        const variant = getHighVariant("openai/gpt-5-4")
 
         // then should return high variant with prefix preserved
-        expect(variant).toBe("openai/gpt-5-2-high")
+        expect(variant).toBe("openai/gpt-5-4-high")
       })
 
       it("should handle prefixes with dots in version numbers", () => {
@@ -141,7 +141,7 @@ describe("think-mode switcher", () => {
       it("should return null for already-high prefixed models", () => {
         // given prefixed model IDs that are already high
         expect(getHighVariant("vertex_ai/claude-opus-4-6-high")).toBeNull()
-        expect(getHighVariant("openai/gpt-5-2-high")).toBeNull()
+        expect(getHighVariant("openai/gpt-5-4-high")).toBeNull()
       })
     })
 
@@ -149,20 +149,20 @@ describe("think-mode switcher", () => {
       it("should detect -high suffix in prefixed models", () => {
         // given prefixed model IDs with -high suffix
         expect(isAlreadyHighVariant("vertex_ai/claude-opus-4-6-high")).toBe(true)
-        expect(isAlreadyHighVariant("openai/gpt-5-2-high")).toBe(true)
+        expect(isAlreadyHighVariant("openai/gpt-5-4-high")).toBe(true)
         expect(isAlreadyHighVariant("custom/gemini-3.1-pro-high")).toBe(true)
       })
 
       it("should return false for prefixed base models", () => {
         // given prefixed base model IDs without -high suffix
         expect(isAlreadyHighVariant("vertex_ai/claude-opus-4-6")).toBe(false)
-        expect(isAlreadyHighVariant("openai/gpt-5-2")).toBe(false)
+        expect(isAlreadyHighVariant("openai/gpt-5-4")).toBe(false)
       })
 
       it("should handle prefixed models with dots", () => {
         // given prefixed model IDs with dots
-        expect(isAlreadyHighVariant("vertex_ai/gpt-5.2")).toBe(false)
-        expect(isAlreadyHighVariant("vertex_ai/gpt-5.2-high")).toBe(true)
+        expect(isAlreadyHighVariant("vertex_ai/gpt-5.4")).toBe(false)
+        expect(isAlreadyHighVariant("vertex_ai/gpt-5.4-high")).toBe(true)
       })
     })
 })

@@ -5,7 +5,7 @@
  * Category-spawned executor with domain-specific configurations.
  *
  * Routing:
- * 1. GPT models (openai/*, github-copilot/gpt-*) -> gpt.ts (GPT-5.2 optimized)
+ * 1. GPT models (openai/*, github-copilot/gpt-*) -> gpt.ts (GPT-5.4 optimized)
  * 2. Gemini models (google/*, google-vertex/*) -> gemini.ts (Gemini-optimized)
  * 3. Default (Claude, etc.) -> default.ts (Claude-optimized)
  */

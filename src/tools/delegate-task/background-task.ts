@@ -2,6 +2,7 @@ import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { getTimingConfig } from "./timing"
+import { buildTaskPrompt } from "./prompt-builder"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
@@ -20,9 +21,10 @@ export async function executeBackgroundTask(
   const { manager } = executorCtx
 
   try {
+    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse)
     const task = await manager.launch({
       description: args.description,
-      prompt: args.prompt,
+      prompt: effectivePrompt,
       agent: agentToUse,
       parentSessionID: parentContext.sessionID,
       parentMessageID: parentContext.messageID,

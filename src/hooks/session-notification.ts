@@ -24,6 +24,8 @@ interface SessionNotificationConfig {
   /** Maximum number of sessions to track before cleanup (default: 100) */
   maxTrackedSessions?: number
   enforceMainSessionFilter?: boolean
+  /** Grace period in ms to ignore late-arriving activity events after scheduling (default: 100) */
+  activityGracePeriodMs?: number
 }
 export function createSessionNotification(
   ctx: PluginInput,
