@@ -2,14 +2,46 @@ import { tool, type PluginInput, type ToolDefinition } from "@opencode-ai/plugin
 import { ALLOWED_AGENTS, CALL_OMO_AGENT_DESCRIPTION } from "./constants"
 import type { AllowedAgentType, CallOmoAgentArgs, ToolContextWithMetadata } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
+import type { CategoriesConfig, AgentOverrides } from "../../config/schema"
+import type { FallbackEntry } from "../../shared/model-requirements"
+import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { getAgentConfigKey } from "../../shared/agent-display-names"
+import { normalizeFallbackModels } from "../../shared/model-resolver"
+import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
 import { log } from "../../shared"
 import { executeBackground } from "./background-executor"
 import { executeSync } from "./sync-executor"
 
+function resolveFallbackChainForCallOmoAgent(args: {
+  subagentType: string
+  agentOverrides?: AgentOverrides
+  userCategories?: CategoriesConfig
+}): FallbackEntry[] | undefined {
+  const { subagentType, agentOverrides, userCategories } = args
+  const agentConfigKey = getAgentConfigKey(subagentType)
+  const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentConfigKey]
+
+  const agentOverride = agentOverrides?.[agentConfigKey as keyof AgentOverrides]
+    ?? (agentOverrides
+      ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
+      : undefined)
+
+  const normalizedFallbackModels = normalizeFallbackModels(
+    agentOverride?.fallback_models
+    ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.fallback_models : undefined)
+  )
+  const defaultProviderID = agentRequirement?.fallbackChain?.[0]?.providers?.[0] ?? "opencode"
+  const configuredFallbackChain = buildFallbackChainFromModels(normalizedFallbackModels, defaultProviderID)
+
+  return configuredFallbackChain ?? agentRequirement?.fallbackChain
+}
+
 export function createCallOmoAgent(
   ctx: PluginInput,
   backgroundManager: BackgroundManager,
-  disabledAgents: string[] = []
+  disabledAgents: string[] = [],
+  agentOverrides?: AgentOverrides,
+  userCategories?: CategoriesConfig,
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`
@@ -50,14 +82,20 @@ export function createCallOmoAgent(
         return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your oh-my-opencode.json to use it.`
       }
 
+      const fallbackChain = resolveFallbackChainForCallOmoAgent({
+        subagentType: args.subagent_type,
+        agentOverrides,
+        userCategories,
+      })
+
       if (args.run_in_background) {
         if (args.session_id) {
           return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`
         }
-        return await executeBackground(args, toolCtx, backgroundManager, ctx.client)
+        return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain)
       }
 
-      return await executeSync(args, toolCtx, ctx)
+      return await executeSync(args, toolCtx, ctx, undefined, fallbackChain)
     },
   })
 }
