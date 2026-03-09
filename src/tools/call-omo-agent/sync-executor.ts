@@ -1,7 +1,9 @@
 import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
+import type { FallbackEntry } from "../../shared/model-requirements"
 import { getAgentToolRestrictions } from "../../shared"
+import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { createOrGetSession } from "./session-creator"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
@@ -14,12 +16,14 @@ type ExecuteSyncDeps = {
   createOrGetSession: typeof createOrGetSession
   waitForCompletion: typeof waitForCompletion
   processMessages: typeof processMessages
+  setSessionFallbackChain: typeof setSessionFallbackChain
 }
 
 const defaultDeps: ExecuteSyncDeps = {
   createOrGetSession,
   waitForCompletion,
   processMessages,
+  setSessionFallbackChain,
 }
 
 export async function executeSync(
@@ -32,9 +36,14 @@ export async function executeSync(
     metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   },
   ctx: PluginInput,
-  deps: ExecuteSyncDeps = defaultDeps
+  deps: ExecuteSyncDeps = defaultDeps,
+  fallbackChain?: FallbackEntry[],
 ): Promise<string> {
   const { sessionID } = await deps.createOrGetSession(args, toolContext, ctx)
+
+  if (fallbackChain && fallbackChain.length > 0) {
+    deps.setSessionFallbackChain(sessionID, fallbackChain)
+  }
 
   await toolContext.metadata?.({
     title: args.description,
