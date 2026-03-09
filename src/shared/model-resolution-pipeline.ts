@@ -9,6 +9,7 @@ export type ModelResolutionRequest = {
   intent?: {
     uiSelectedModel?: string
     userModel?: string
+    userVariant?: string
     userFallbackModels?: string[]
     categoryDefaultModel?: string
   }
@@ -50,14 +51,16 @@ export function resolveModelPipeline(
 
   const normalizedUiModel = normalizeModel(intent?.uiSelectedModel)
   if (normalizedUiModel) {
-    log("[model-resolution] override: " + normalizedUiModel + " (source: uiSelected)")
+    const agentPrefix = policy?.agentName ? `Agent ${policy.agentName} ` : ""
+    log(`[model-resolution] ${agentPrefix}resolved to ${normalizedUiModel} via uiSelected override`)
     return { model: normalizedUiModel, provenance: "override", reason: "UI-selected model override" }
   }
 
   const normalizedUserModel = normalizeModel(intent?.userModel)
   if (normalizedUserModel) {
-    log("[model-resolution] override: " + normalizedUserModel + " (source: userModel)")
-    return { model: normalizedUserModel, provenance: "override", reason: "User-configured model override" }
+    const agentPrefix = policy?.agentName ? `Agent ${policy.agentName} ` : ""
+    log(`[model-resolution] ${agentPrefix}resolved to ${normalizedUserModel} via userModel override`)
+    return { model: normalizedUserModel, provenance: "override", variant: intent?.userVariant, reason: "User-configured model override" }
   }
 
   const normalizedCategoryDefault = normalizeModel(intent?.categoryDefaultModel)
