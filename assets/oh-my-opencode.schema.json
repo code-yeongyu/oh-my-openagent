@@ -3287,6 +3287,14 @@
       },
       "additionalProperties": false
     },
+    "model_profile": {
+      "type": "string",
+      "enum": [
+        "premium",
+        "balanced",
+        "economy"
+      ]
+    },
     "sisyphus_agent": {
       "type": "object",
       "properties": {
