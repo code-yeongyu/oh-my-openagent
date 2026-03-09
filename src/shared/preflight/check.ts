@@ -39,12 +39,14 @@ export function runAgentSanityCheck(config: OhMyOpenCodeConfig): SanityCheckResu
               path: `agents.${agentName}.model`,
               level: "warn",
               message: `"${trimmedModel}" has invalid format (expected: provider/model)`,
+              kind: "invalid-model-format",
             })
           } else if (!cache.models.has(trimmedModel)) {
             issues.push({
               path: `agents.${agentName}.model`,
               level: "warn",
               message: `"${trimmedModel}" not found in model cache`,
+              kind: "model-not-in-cache",
             })
           }
         }
@@ -70,12 +72,14 @@ export function runAgentSanityCheck(config: OhMyOpenCodeConfig): SanityCheckResu
             path: `agents.${agentName}.fallback_models`,
             level: "warn",
             message: `"${fallback}" has invalid format (expected: provider/model)`,
+            kind: "fallback-invalid-format",
           })
         } else if (!cache.models.has(fallback)) {
           issues.push({
             path: `agents.${agentName}.fallback_models`,
             level: "warn",
             message: `"${fallback}" not found in model cache`,
+            kind: "fallback-not-in-cache",
           })
         }
       }
@@ -90,6 +94,7 @@ export function runAgentSanityCheck(config: OhMyOpenCodeConfig): SanityCheckResu
           path: `agents.${agentName}.fallback_models`,
           level: "warn",
           message: `agent "${agentName}" has model/category configured but no fallback_models`,
+          kind: "missing-fallback",
         })
       }
 
@@ -101,6 +106,7 @@ export function runAgentSanityCheck(config: OhMyOpenCodeConfig): SanityCheckResu
             path: `agents.${agentName}.category`,
             level: "warn",
             message: `references unknown category "${trimmedCategory}"`,
+            kind: "unknown-category",
           })
         }
       }
@@ -126,12 +132,14 @@ export function runAgentSanityCheck(config: OhMyOpenCodeConfig): SanityCheckResu
               path: `categories.${categoryName}.model`,
               level: "warn",
               message: `"${trimmedModel}" has invalid format (expected: provider/model)`,
+              kind: "invalid-model-format",
             })
           } else if (!cache.models.has(trimmedModel)) {
             issues.push({
               path: `categories.${categoryName}.model`,
               level: "warn",
               message: `"${trimmedModel}" not found in model cache`,
+              kind: "model-not-in-cache",
             })
           }
         }

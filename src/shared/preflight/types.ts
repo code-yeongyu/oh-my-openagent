@@ -1,9 +1,18 @@
 export type SanityLevel = "info" | "warn" | "error"
 
+export type SanityIssueKind =
+  | "model-not-in-cache"
+  | "invalid-model-format"
+  | "missing-fallback"
+  | "unknown-category"
+  | "fallback-not-in-cache"
+  | "fallback-invalid-format"
+
 export interface SanityIssue {
   path: string
   level: SanityLevel
   message: string
+  kind: SanityIssueKind
 }
 
 export interface ConfiguredModelRef {
