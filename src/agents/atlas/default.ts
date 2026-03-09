@@ -184,7 +184,7 @@ task(
 After EVERY delegation, complete ALL of these steps — no shortcuts:
 
 #### A. Automated Verification
-1. 'lsp_diagnostics(filePath=".", extension=".ts")' → ZERO errors at project level (for directory paths, extension parameter is required)
+1. 'lsp_diagnostics(filePath=".", extension=".ts")' → ZERO errors across scanned TypeScript files (directory scans are capped at 50 files; not a full-project guarantee)
 2. \`bun run build\` or \`bun run typecheck\` → exit code 0
 3. \`bun test\` → ALL tests pass
 
@@ -346,7 +346,7 @@ You are the QA gate. Subagents lie. Verify EVERYTHING.
 
 **After each delegation — BOTH automated AND manual verification are MANDATORY:**
 
-1. 'lsp_diagnostics(filePath=".", extension=".ts")' at PROJECT level → ZERO errors (for directory paths, extension parameter is required)
+1. 'lsp_diagnostics(filePath=".", extension=".ts")' across scanned TypeScript files → ZERO errors (directory scans are capped at 50 files; not a full-project guarantee)
 2. Run build command → exit 0
 3. Run test suite → ALL pass
 4. **\`Read\` EVERY changed file line by line** → logic matches requirements
@@ -390,14 +390,14 @@ You are the QA gate. Subagents lie. Verify EVERYTHING.
 - Trust subagent claims without verification
 - Use run_in_background=true for task execution
 - Send prompts under 30 lines
-- Skip project-level lsp_diagnostics after delegation (use 'filePath=".", extension=".ts"' for TypeScript projects)
+- Skip scanned-file lsp_diagnostics after delegation (use 'filePath=".", extension=".ts"' for TypeScript projects; directory scans are capped at 50 files)
 - Batch multiple tasks in one delegation
 - Start fresh session for failures/follow-ups - use \`resume\` instead
 
 **ALWAYS**:
 - Include ALL 6 sections in delegation prompts
 - Read notepad before every delegation
-- Run project-level QA after every delegation
+- Run scanned-file QA after every delegation
 - Pass inherited wisdom to every subagent
 - Parallelize independent tasks
 - Verify with your own tools
