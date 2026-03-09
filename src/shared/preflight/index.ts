@@ -1,3 +1,4 @@
 export { runAgentSanityCheck } from "./check"
 export { displaySanityCheck } from "./render"
-export type { SanityCheckResult, SanityIssue, ConfiguredModelRef } from "./types"
+export { runLiveProbes, probeModelViaApi } from "./live-probe"
+export type { SanityCheckResult, SanityIssue, ConfiguredModelRef, ProbeResult } from "./types"

@@ -61,6 +61,23 @@ export async function run(options: RunOptions): Promise<number> {
       signal: abortController.signal,
     })
 
+    // Optional: Live API probe for configured models
+    // Only runs if cache-check found issues or OPENCODE_LIVE_PROBE=1
+    if (sanityResult.hasWarnings || process.env.OPENCODE_LIVE_PROBE === "1") {
+      const { runLiveProbes } = await import("../../shared/preflight/live-probe")
+      const modelsToProbe = sanityResult.checkedModels.map(m => m.model)
+      if (modelsToProbe.length > 0) {
+        console.log(pc.dim("Running live API probe..."))
+        const probeResults = await runLiveProbes(client, modelsToProbe)
+        for (const result of probeResults) {
+          if (!result.ok) {
+            const level = result.shouldFallback ? pc.yellow("WARN") : pc.red("ERROR")
+            console.log(`${level}: ${result.model} - ${result.error}`)
+          }
+        }
+      }
+    }
+
     const cleanup = () => {
       serverCleanup()
     }

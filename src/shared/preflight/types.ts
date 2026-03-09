@@ -23,3 +23,7 @@ export interface ModelCache {
   models: Set<string>
   providers: Set<string>
 }
+
+export type ProbeResult =
+  | { ok: true; model: string }
+  | { ok: false; model: string; error: string; shouldFallback: boolean }
