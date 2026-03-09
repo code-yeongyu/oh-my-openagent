@@ -11,6 +11,11 @@ import type { Diagnostic } from "./types"
 
 const SKIP_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".next", "out"])
 
+type FileDiagnostic = {
+  filePath: string
+  diagnostic: Diagnostic
+}
+
 function collectFilesWithExtension(dir: string, extension: string, maxFiles: number): string[] {
   const files: string[] = []
 
@@ -95,7 +100,7 @@ export async function aggregateDiagnosticsForDirectory(
 
   const root = findWorkspaceRoot(absDir)
 
-  const allDiagnostics: Diagnostic[] = []
+  const allDiagnostics: FileDiagnostic[] = []
   const fileErrors: { file: string; error: string }[] = []
 
   let client: LSPClient
@@ -106,7 +111,12 @@ export async function aggregateDiagnosticsForDirectory(
       try {
         const result = await client.diagnostics(file)
         const filtered = filterDiagnosticsBySeverity(result.items, severity)
-        allDiagnostics.push(...filtered)
+        allDiagnostics.push(
+          ...filtered.map((diagnostic) => ({
+            filePath: file,
+            diagnostic,
+          }))
+        )
       } catch (e) {
         fileErrors.push({
           file,
@@ -138,8 +148,8 @@ export async function aggregateDiagnosticsForDirectory(
 
   if (displayDiagnostics.length > 0) {
     lines.push("")
-    for (const diag of displayDiagnostics) {
-      lines.push(formatDiagnostic(diag))
+    for (const { filePath, diagnostic } of displayDiagnostics) {
+      lines.push(`${filePath}: ${formatDiagnostic(diagnostic)}`)
     }
     if (wasDiagCapped) {
       lines.push(

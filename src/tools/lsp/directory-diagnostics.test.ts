@@ -1,12 +1,56 @@
-import { describe, expect, it } from "bun:test"
+import { beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs"
 import { join } from "path"
 import os from "os"
 
-import { isDirectoryPath } from "./lsp-client-wrapper"
-import { aggregateDiagnosticsForDirectory } from "./directory-diagnostics"
+import type { Diagnostic } from "./types"
+
+const diagnosticsMock = mock(async (_filePath: string) => ({ items: [] as Diagnostic[] }))
+const getClientMock = mock(async () => ({ diagnostics: diagnosticsMock }))
+const releaseClientMock = mock(() => {})
+
+mock.module("./config", () => ({
+  findServerForExtension: (extension: string) => ({
+    status: "found" as const,
+    server: {
+      id: "test-server",
+      command: ["test-server"],
+      extensions: [extension],
+      priority: 1,
+    },
+  }),
+  getLanguageId: () => "typescript",
+}))
+
+mock.module("./lsp-server", () => ({
+  lspManager: {
+    getClient: getClientMock,
+    releaseClient: releaseClientMock,
+  },
+}))
+
+const { isDirectoryPath } = await import("./lsp-client-wrapper")
+const { aggregateDiagnosticsForDirectory } = await import("./directory-diagnostics")
+
+function createDiagnostic(message: string): Diagnostic {
+  return {
+    message,
+    severity: 1,
+    range: {
+      start: { line: 0, character: 0 },
+      end: { line: 0, character: 1 },
+    },
+  }
+}
 
 describe("directory diagnostics", () => {
+  beforeEach(() => {
+    diagnosticsMock.mockReset()
+    diagnosticsMock.mockImplementation(async (_filePath: string) => ({ items: [] }))
+    getClientMock.mockClear()
+    releaseClientMock.mockClear()
+  })
+
   describe("isDirectoryPath", () => {
     it("returns true for existing directory", () => {
       const tmp = mkdtempSync(join(os.tmpdir(), "omo-isdir-"))
@@ -51,6 +95,28 @@ describe("directory diagnostics", () => {
       await expect(aggregateDiagnosticsForDirectory(nonExistent, ".ts")).rejects.toThrow(
         "Directory does not exist"
       )
+    })
+
+    it("#given diagnostics from multiple files #when aggregating directory diagnostics #then each entry includes the source file path", async () => {
+      const tmp = mkdtempSync(join(os.tmpdir(), "omo-aggr-files-"))
+      try {
+        const firstFile = join(tmp, "first.ts")
+        const secondFile = join(tmp, "second.ts")
+
+        writeFileSync(firstFile, "export const first = true\n")
+        writeFileSync(secondFile, "export const second = true\n")
+
+        diagnosticsMock.mockImplementation(async (filePath: string) => ({
+          items: [createDiagnostic(`problem in ${filePath}`)],
+        }))
+
+        const result = await aggregateDiagnosticsForDirectory(tmp, ".ts")
+
+        expect(result).toContain(`${firstFile}: error at 1:0: problem in ${firstFile}`)
+        expect(result).toContain(`${secondFile}: error at 1:0: problem in ${secondFile}`)
+      } finally {
+        rmSync(tmp, { recursive: true, force: true })
+      }
     })
   })
 })
