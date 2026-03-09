@@ -58,6 +58,41 @@ describe("getServerBaseUrl", () => {
     // then
     expect(result).toBeNull()
   })
+
+  it("returns baseUrl from client.client.getConfig().baseUrl (v2 SDK)", () => {
+    // given
+    const mockClient = {
+      client: {
+        getConfig: () => ({ baseUrl: "https://v2-api.example.com" }),
+      },
+    }
+
+    // when
+    const result = getServerBaseUrl(mockClient)
+
+    // then
+    expect(result).toBe("https://v2-api.example.com")
+  })
+
+  it("returns baseUrl from client.session.client.getConfig().baseUrl (v2 SDK session path)", () => {
+    // given
+    const mockClient = {
+      _client: {
+        getConfig: () => ({}),
+      },
+      session: {
+        client: {
+          getConfig: () => ({ baseUrl: "https://v2-session.example.com" }),
+        },
+      },
+    }
+
+    // when
+    const result = getServerBaseUrl(mockClient)
+
+    // then
+    expect(result).toBe("https://v2-session.example.com")
+  })
 })
 
 describe("patchPart", () => {

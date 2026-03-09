@@ -1,17 +1,6 @@
 import { getServerBasicAuthHeader } from "./opencode-server-auth"
 import { log } from "./logger"
-import { isRecord } from "./record-type-guard"
-
-type UnknownRecord = Record<string, unknown>
-
-function getInternalClient(client: unknown): UnknownRecord | null {
-  if (!isRecord(client)) {
-    return null
-  }
-
-  const internal = client["_client"]
-  return isRecord(internal) ? internal : null
-}
+import { getInternalClient, isRecord } from "./sdk-internal-client"
 
 export function getServerBaseUrl(client: unknown): string | null {
   // Try client._client.getConfig().baseUrl
@@ -29,12 +18,12 @@ export function getServerBaseUrl(client: unknown): string | null {
     }
   }
 
-  // Try client.session._client.getConfig().baseUrl
+  // Try client.session._client.getConfig().baseUrl (v1) or client.session.client.getConfig().baseUrl (v2)
   if (isRecord(client)) {
     const session = client["session"]
     if (isRecord(session)) {
-      const internal = session["_client"]
-      if (isRecord(internal)) {
+      const internal = getInternalClient(session)
+      if (internal) {
         const getConfig = internal["getConfig"]
         if (typeof getConfig === "function") {
           const config = getConfig()

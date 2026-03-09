@@ -12,7 +12,7 @@ import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
-import { injectServerAuthIntoClient, log } from "./shared"
+import { injectServerAuthIntoClient, injectServerBaseUrlIntoClient, log } from "./shared"
 import { startTmuxCheck } from "./tools"
 
 let activePluginDispose: PluginDispose | null = null
@@ -23,6 +23,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   })
+
+  // Inject correct server baseUrl to ensure SDK client uses dynamic port
+  // Priority: ctx.serverUrl > fallback to existing client baseUrl
+  if (ctx.serverUrl) {
+    injectServerBaseUrlIntoClient(ctx.client, ctx.serverUrl.toString())
+  }
 
   injectServerAuthIntoClient(ctx.client)
   startTmuxCheck()

@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
-import { log, normalizeSDKResponse } from "../../shared"
+import { log, normalizeSDKResponse, getServerBaseUrl } from "../../shared"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
@@ -72,12 +72,34 @@ export class TmuxSessionManager {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
     this.deps = deps
-    const defaultPort = process.env.OPENCODE_PORT ?? "4096"
-    try {
-      this.serverUrl = ctx.serverUrl?.toString() ?? `http://localhost:${defaultPort}`
-    } catch {
-      this.serverUrl = `http://localhost:${defaultPort}`
+
+    // Get server URL with priority: ctx.serverUrl > client.baseUrl > env var > hardcoded default
+    let serverUrl: string | null = null
+
+    // Priority 1: ctx.serverUrl (provided by plugin framework)
+    if (ctx.serverUrl) {
+      serverUrl = ctx.serverUrl.origin
     }
+
+    // Priority 2: Extract from client's internal config (dynamic port)
+    if (!serverUrl) {
+      serverUrl = getServerBaseUrl(ctx.client)
+    }
+
+    // Priority 3: Environment variable
+    if (!serverUrl) {
+      const envPort = process.env.OPENCODE_PORT
+      if (envPort) {
+        serverUrl = `http://localhost:${envPort}`
+      }
+    }
+    
+    // Priority 4: Hardcoded default (fallback only)
+    if (!serverUrl) {
+      serverUrl = "http://localhost:4096"
+    }
+    
+    this.serverUrl = serverUrl
     this.sourcePaneId = deps.getCurrentPaneId()
     this.pollingManager = new TmuxPollingManager(
       this.client,
