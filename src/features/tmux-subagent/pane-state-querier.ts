@@ -27,7 +27,7 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
     return null
   }
 
-  const lines = stdout.trim().split("\n").filter(Boolean)
+  const lines = stdout.trim().replace(/\r/g, "").split("\n").filter(Boolean)
   if (lines.length === 0) return null
 
   let windowWidth = 0
@@ -36,10 +36,10 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
 
   for (const line of lines) {
 		const fields = line.split("\t")
-		if (fields.length < 9) continue
+		if (fields.length < 8) continue
 
 		const [paneId, widthStr, heightStr, leftStr, topStr, activeStr, windowWidthStr, windowHeightStr] = fields
-		const title = fields.slice(8).join("\t")
+		const title = fields.length > 8 ? fields.slice(8).join("\t") : ""
     const width = parseInt(widthStr, 10)
     const height = parseInt(heightStr, 10)
     const left = parseInt(leftStr, 10)
