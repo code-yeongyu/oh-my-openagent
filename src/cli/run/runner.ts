@@ -2,6 +2,7 @@ import pc from "picocolors"
 import type { RunOptions, RunContext } from "./types"
 import { createEventState, processEvents, serializeError } from "./events"
 import { loadPluginConfig } from "../../plugin-config"
+import { runAgentSanityCheck, displaySanityCheck } from "../../shared/preflight"
 import { createServerConnection } from "./server-connection"
 import { resolveSession } from "./session-resolver"
 import { createJsonOutputManager } from "./json-output"
@@ -45,6 +46,11 @@ export async function run(options: RunOptions): Promise<number> {
   timestampOutput?.enable()
 
   const pluginConfig = loadPluginConfig(directory, { command: "run" })
+
+  // Run sanity check on agent models (cache-only, no network)
+  const sanityResult = runAgentSanityCheck(pluginConfig)
+  displaySanityCheck(sanityResult)
+
   const resolvedAgent = resolveRunAgent(options, pluginConfig)
   const abortController = new AbortController()
 
