@@ -223,7 +223,7 @@ export class BackgroundManager {
 
         await this.concurrencyManager.acquire(key)
 
-        if (item.task.status === "cancelled" || item.task.status === "error") {
+        if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
           this.concurrencyManager.release(key)
           queue.shift()
           continue
@@ -233,9 +233,10 @@ export class BackgroundManager {
           await this.startTask(item)
         } catch (error) {
           log("[background-agent] Error starting task:", error)
-          // Release concurrency slot if startTask failed and didn't release it itself
-          // This prevents slot leaks when errors occur after acquire but before task.concurrencyKey is set
-          if (!item.task.concurrencyKey) {
+          if (item.task.concurrencyKey) {
+            this.concurrencyManager.release(item.task.concurrencyKey)
+            item.task.concurrencyKey = undefined
+          } else {
             this.concurrencyManager.release(key)
           }
         }
