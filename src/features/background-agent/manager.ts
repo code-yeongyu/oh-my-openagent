@@ -47,6 +47,7 @@ import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
+import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -384,6 +385,8 @@ export class BackgroundManager {
           existingTask.concurrencyKey = undefined
         }
 
+        removeTaskToastTracking(existingTask.id)
+
         // Abort the session to prevent infinite polling hang
         this.client.session.abort({
           path: { id: sessionID },
@@ -652,6 +655,8 @@ export class BackgroundManager {
         this.concurrencyManager.release(existingTask.concurrencyKey)
         existingTask.concurrencyKey = undefined
       }
+
+      removeTaskToastTracking(existingTask.id)
 
       // Abort the session to prevent infinite polling hang
       if (existingTask.sessionID) {
@@ -1104,11 +1109,9 @@ export class BackgroundManager {
       SessionCategoryRegistry.remove(task.sessionID)
     }
 
+    removeTaskToastTracking(task.id)
+
     if (options?.skipNotification) {
-      const toastManager = getTaskToastManager()
-      if (toastManager) {
-        toastManager.removeTask(task.id)
-      }
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
       return true
     }
@@ -1193,6 +1196,8 @@ export class BackgroundManager {
     task.status = "completed"
     task.completedAt = new Date()
     this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+
+    removeTaskToastTracking(task.id)
 
     // Release concurrency BEFORE any async operations to prevent slot leaks
     if (task.concurrencyKey) {
@@ -1439,6 +1444,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           this.concurrencyManager.release(task.concurrencyKey)
           task.concurrencyKey = undefined
         }
+        removeTaskToastTracking(task.id)
         this.cleanupPendingByParent(task)
         if (wasPending) {
           const key = task.model
