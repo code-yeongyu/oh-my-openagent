@@ -2,6 +2,7 @@ import { join } from "path"
 import { homedir } from "os"
 import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
+import { discoverInstalledPlugins, discoverPluginSkills } from "../claude-code-plugin-loader"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { LoadedSkill } from "./types"
 import { skillsToCommandDefinitionRecord } from "./skill-definition-record"
@@ -35,11 +36,12 @@ export async function loadOpencodeProjectSkills(directory?: string): Promise<Rec
 
 export interface DiscoverSkillsOptions {
   includeClaudeCodePaths?: boolean
+  includePlugins?: boolean
   directory?: string
 }
 
 export async function discoverAllSkills(directory?: string): Promise<LoadedSkill[]> {
-  const [opencodeProjectSkills, opencodeGlobalSkills, projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] =
+  const [opencodeProjectSkills, opencodeGlobalSkills, projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills, pluginSkills] =
     await Promise.all([
       discoverOpencodeProjectSkills(directory),
       discoverOpencodeGlobalSkills(),
@@ -47,9 +49,9 @@ export async function discoverAllSkills(directory?: string): Promise<LoadedSkill
       discoverUserClaudeSkills(),
       discoverProjectAgentsSkills(directory),
       discoverGlobalAgentsSkills(),
+      Promise.resolve(discoverSkillsFromPlugins()),
     ])
 
-  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents)
   return deduplicateSkillsByName([
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
@@ -57,20 +59,21 @@ export async function discoverAllSkills(directory?: string): Promise<LoadedSkill
     ...agentsProjectSkills,
     ...userSkills,
     ...agentsGlobalSkills,
+    ...pluginSkills,
   ])
 }
 
 export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promise<LoadedSkill[]> {
-  const { includeClaudeCodePaths = true, directory } = options
+  const { includeClaudeCodePaths = true, includePlugins = true, directory } = options
 
-  const [opencodeProjectSkills, opencodeGlobalSkills] = await Promise.all([
+  const [opencodeProjectSkills, opencodeGlobalSkills, pluginSkills] = await Promise.all([
     discoverOpencodeProjectSkills(directory),
     discoverOpencodeGlobalSkills(),
+    includePlugins ? Promise.resolve(discoverSkillsFromPlugins()) : Promise.resolve([]),
   ])
 
   if (!includeClaudeCodePaths) {
-    // Priority: opencode-project > opencode
-    return deduplicateSkillsByName([...opencodeProjectSkills, ...opencodeGlobalSkills])
+    return deduplicateSkillsByName([...opencodeProjectSkills, ...opencodeGlobalSkills, ...pluginSkills])
   }
 
   const [projectSkills, userSkills, agentsProjectSkills, agentsGlobalSkills] = await Promise.all([
@@ -80,7 +83,6 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     discoverGlobalAgentsSkills(),
   ])
 
-  // Priority: opencode-project > opencode > project (.claude + .agents) > user (.claude + .agents)
   return deduplicateSkillsByName([
     ...opencodeProjectSkills,
     ...opencodeGlobalSkills,
@@ -88,7 +90,13 @@ export async function discoverSkills(options: DiscoverSkillsOptions = {}): Promi
     ...agentsProjectSkills,
     ...userSkills,
     ...agentsGlobalSkills,
+    ...pluginSkills,
   ])
+}
+
+function discoverSkillsFromPlugins(): LoadedSkill[] {
+  const { plugins } = discoverInstalledPlugins()
+  return discoverPluginSkills(plugins)
 }
 
 export async function getSkillByName(name: string, options: DiscoverSkillsOptions = {}): Promise<LoadedSkill | undefined> {
