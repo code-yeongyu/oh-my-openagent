@@ -46,6 +46,15 @@ function formatAgentStatus(state: ConfigEditorState, agentName: string): string 
     parts.push(`fallback: ${color.dim(agent.fallback_models[0])}${agent.fallback_models.length > 1 ? " +" + (agent.fallback_models.length - 1) : ""}`)
   }
 
+  if (agent.permission) {
+    const hasBash = agent.permission.bash !== undefined
+    const hasEdit = agent.permission.edit !== undefined
+    const hasWebfetch = agent.permission.webfetch !== undefined
+    if (hasBash || hasEdit || hasWebfetch) {
+      parts.push(`perm: ${color.green("✓")}`)
+    }
+  }
+
   if (parts.length === 0) {
     return color.dim("no settings")
   }

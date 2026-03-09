@@ -38,7 +38,8 @@ export async function selectModelWithCacheLoader(message: string, initialValue?:
       ]
     })
     
-    if (p.isCancel(provider) || provider === "__back__") return selectModelWithCacheLoader(message, initialValue)
+    if (p.isCancel(provider)) return provider
+    if (provider === "__back__") return selectModelWithCacheLoader(message, initialValue)
 
     const models = providerMap[provider as string]
     const model = await p.select({
@@ -49,7 +50,8 @@ export async function selectModelWithCacheLoader(message: string, initialValue?:
       ]
     })
 
-    if (p.isCancel(model) || model === "__back__") return selectModelWithCacheLoader(message, initialValue)
+    if (p.isCancel(model)) return model
+    if (model === "__back__") return selectModelWithCacheLoader(message, initialValue)
     
     return model
   }

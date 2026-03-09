@@ -28,9 +28,29 @@ async function setModelForAllAgents(state: ConfigEditorState): Promise<void> {
     if (p.isCancel(custom)) return
     finalModel = custom.trim()
   } else if (model === "__clear__") {
-    // Handling clear if supported, or just ignore. 
-    // Usually bulk set to specific model.
-    // Let's assume user wants to set a specific model.
+    const confirm = await p.confirm({
+      message: `Clear model for all ${AGENT_NAMES.length} agents?`,
+      initialValue: false,
+    })
+
+    if (p.isCancel(confirm) || !confirm) {
+      p.log.info("Cancelled")
+      return
+    }
+
+    const s = p.spinner()
+    s.start("Clearing models for all agents...")
+
+    if (!state.config.agents) state.config.agents = {}
+    const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
+
+    for (const agentName of AGENT_NAMES) {
+      if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
+      delete agentsMutable[agentName].model
+    }
+
+    state.modified = true
+    s.stop(`Cleared models for all agents ${color.green("[OK]")}`)
     return
   } else {
     finalModel = model as string
