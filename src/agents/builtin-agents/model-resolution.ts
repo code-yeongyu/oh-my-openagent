@@ -25,17 +25,20 @@ export function applyModelResolution(input: {
 	} = input;
 	let resolvedUserModel = userModel;
 
+	let resolvedVariant: string | undefined;
+
 	if (!resolvedUserModel && profileName && agentName) {
 		const profileOverride = getProfileOverride(profileName, agentName);
 		if (profileOverride) {
 			resolvedUserModel = profileOverride.model;
+			resolvedVariant = profileOverride.variant;
 		}
 	}
 
 	return resolveModelPipeline({
-		intent: { uiSelectedModel, userModel: resolvedUserModel },
+		intent: { uiSelectedModel, userModel: resolvedUserModel, userVariant: resolvedVariant },
 		constraints: { availableModels },
-		policy: { fallbackChain: requirement?.fallbackChain, systemDefaultModel },
+		policy: { fallbackChain: requirement?.fallbackChain, systemDefaultModel, profileName, agentName },
 	});
 }
 
