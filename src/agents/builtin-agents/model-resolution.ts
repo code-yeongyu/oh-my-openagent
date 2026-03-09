@@ -1,31 +1,54 @@
-import { resolveModelPipeline } from "../../shared"
-import { transformModelForProvider } from "../../shared/provider-model-id-transform"
+import { resolveModelPipeline } from "../../shared";
+import type { ProfileName } from "../../shared/model-registry";
+import { getProfileOverride } from "../../shared/model-registry";
+import { transformModelForProvider } from "../../shared/provider-model-id-transform";
 
 export function applyModelResolution(input: {
-  uiSelectedModel?: string
-  userModel?: string
-  requirement?: { fallbackChain?: { providers: string[]; model: string; variant?: string }[] }
-  availableModels: Set<string>
-  systemDefaultModel?: string
+	uiSelectedModel?: string;
+	userModel?: string;
+	profileName?: ProfileName;
+	agentName?: string;
+	requirement?: {
+		fallbackChain?: { providers: string[]; model: string; variant?: string }[];
+	};
+	availableModels: Set<string>;
+	systemDefaultModel?: string;
 }) {
-  const { uiSelectedModel, userModel, requirement, availableModels, systemDefaultModel } = input
-  return resolveModelPipeline({
-    intent: { uiSelectedModel, userModel },
-    constraints: { availableModels },
-    policy: { fallbackChain: requirement?.fallbackChain, systemDefaultModel },
-  })
+	const {
+		uiSelectedModel,
+		userModel,
+		profileName,
+		agentName,
+		requirement,
+		availableModels,
+		systemDefaultModel,
+	} = input;
+	let resolvedUserModel = userModel;
+
+	if (!resolvedUserModel && profileName && agentName) {
+		const profileOverride = getProfileOverride(profileName, agentName);
+		if (profileOverride) {
+			resolvedUserModel = profileOverride.model;
+		}
+	}
+
+	return resolveModelPipeline({
+		intent: { uiSelectedModel, userModel: resolvedUserModel },
+		constraints: { availableModels },
+		policy: { fallbackChain: requirement?.fallbackChain, systemDefaultModel },
+	});
 }
 
 export function getFirstFallbackModel(requirement?: {
-  fallbackChain?: { providers: string[]; model: string; variant?: string }[]
+	fallbackChain?: { providers: string[]; model: string; variant?: string }[];
 }) {
-  const entry = requirement?.fallbackChain?.[0]
-  if (!entry || entry.providers.length === 0) return undefined
-  const provider = entry.providers[0]
-  const transformedModel = transformModelForProvider(provider, entry.model)
-  return {
-    model: `${provider}/${transformedModel}`,
-    provenance: "provider-fallback" as const,
-    variant: entry.variant,
-  }
+	const entry = requirement?.fallbackChain?.[0];
+	if (!entry || entry.providers.length === 0) return undefined;
+	const provider = entry.providers[0];
+	const transformedModel = transformModelForProvider(provider, entry.model);
+	return {
+		model: `${provider}/${transformedModel}`,
+		provenance: "provider-fallback" as const,
+		variant: entry.variant,
+	};
 }

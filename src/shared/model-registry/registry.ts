@@ -164,6 +164,18 @@ export const MODEL_REGISTRY: ModelRegistry = {
     isUnstable: true,
     family: "minimax",
   },
+  "abab-5": {
+    name: "Minimax ABAB 5",
+    providers: ["opencode"],
+    capabilities: ["code-generation", "instruction-following"],
+    tier: "economy",
+    speed: "fast",
+    costPer1MInputTokens: 0,
+    costPer1MOutputTokens: 0,
+    contextWindow: 200000,
+    isUnstable: true,
+    family: "minimax",
+  },
   "grok-code-fast-1": {
     name: "Grok Code Fast 1",
     providers: ["github-copilot"],

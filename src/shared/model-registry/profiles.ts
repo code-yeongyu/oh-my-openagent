@@ -15,6 +15,8 @@ export const PROFILE_PRESETS: Record<ProfileName, Record<string, ProfileOverride
     momus: { model: "gemini-3.1-pro", variant: "medium" },
     prometheus: { model: "gpt-5.4", variant: "medium" },
     "multimodal-looker": { model: "gemini-3-flash" },
+    ultrabrain: { model: "gpt-5.4", variant: "medium" },
+    deep: { model: "gpt-5.4" },
   },
 }
 
