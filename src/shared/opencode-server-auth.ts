@@ -1,4 +1,6 @@
 import { log } from "./logger"
+import type { UnknownRecord } from "./sdk-internal-client"
+import { getInternalClient, isRecord } from "./sdk-internal-client"
 
 /**
  * Builds HTTP Basic Auth header from environment variables.
@@ -17,12 +19,6 @@ export function getServerBasicAuthHeader(): string | undefined {
   return `Basic ${token}`
 }
 
-type UnknownRecord = Record<string, unknown>
-
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === "object" && value !== null
-}
-
 function isRequestFetch(value: unknown): value is (request: Request) => Promise<Response> {
   return typeof value === "function"
 }
@@ -36,15 +32,6 @@ function wrapRequestFetch(
     headers.set("Authorization", auth)
     return baseFetch(new Request(request, { headers }))
   }
-}
-
-function getInternalClient(client: unknown): UnknownRecord | null {
-  if (!isRecord(client)) {
-    return null
-  }
-
-  const internal = client["_client"]
-  return isRecord(internal) ? internal : null
 }
 
 function tryInjectViaSetConfigHeaders(internal: UnknownRecord, auth: string): boolean {
@@ -186,5 +173,63 @@ export function injectServerAuthIntoClient(client: unknown): void {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     log("[opencode-server-auth] Failed to inject server auth", { message })
+  }
+}
+
+/**
+ * Injects/updates the server baseUrl in the OpenCode SDK client.
+ *
+ * This ensures the SDK client uses the correct server URL (dynamic port) instead of
+ * any hardcoded default. Uses the same setConfig() API as auth injection.
+ *
+ * @param client - The SDK client to update
+ * @param serverUrl - The correct server URL to use
+ */
+export function injectServerBaseUrlIntoClient(client: unknown, serverUrl: string): void {
+  try {
+    let injected = false
+
+    const internal = getInternalClient(client)
+    if (internal) {
+      const setConfig = internal["setConfig"]
+      if (typeof setConfig === "function") {
+        setConfig({ baseUrl: serverUrl })
+        log("[opencode-server-auth] Updated client baseUrl", { serverUrl })
+        injected = true
+      }
+    }
+
+    // Also inject into session subclient if it exists (mirrors getServerBaseUrl fallback path)
+    if (isRecord(client)) {
+      const session = client["session"]
+      if (isRecord(session)) {
+        const sessionInternal = getInternalClient(session)
+        if (sessionInternal) {
+          const setConfig = sessionInternal["setConfig"]
+          if (typeof setConfig === "function") {
+            setConfig({ baseUrl: serverUrl })
+            log("[opencode-server-auth] Updated session client baseUrl", { serverUrl })
+            injected = true
+          }
+        }
+      }
+    }
+
+    // Fallback: try to set baseUrl directly on client if it has setConfig
+    if (!injected && isRecord(client)) {
+      const setConfig = client["setConfig"]
+      if (typeof setConfig === "function") {
+        setConfig({ baseUrl: serverUrl })
+        log("[opencode-server-auth] Updated client baseUrl (top-level)", { serverUrl })
+        injected = true
+      }
+    }
+
+    if (!injected) {
+      log("[opencode-server-auth] Could not update client baseUrl - incompatible client structure")
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    log("[opencode-server-auth] Failed to inject server baseUrl", { message, serverUrl })
   }
 }

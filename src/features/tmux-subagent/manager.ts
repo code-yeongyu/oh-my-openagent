@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
 import type { TrackedSession, CapacityConfig, WindowState } from "./types"
-import { log, normalizeSDKResponse } from "../../shared"
+import { log, normalizeSDKResponse, getServerBaseUrl } from "../../shared"
 import {
   isInsideTmux as defaultIsInsideTmux,
   getCurrentPaneId as defaultGetCurrentPaneId,
@@ -72,12 +72,28 @@ export class TmuxSessionManager {
     this.client = ctx.client
     this.tmuxConfig = tmuxConfig
     this.deps = deps
-    const defaultPort = process.env.OPENCODE_PORT ?? "4096"
-    try {
-      this.serverUrl = ctx.serverUrl?.toString() ?? `http://localhost:${defaultPort}`
-    } catch {
-      this.serverUrl = `http://localhost:${defaultPort}`
+    let serverUrl: string | null = null
+
+    if (ctx.serverUrl) {
+      serverUrl = ctx.serverUrl.origin
     }
+
+    if (!serverUrl) {
+      serverUrl = getServerBaseUrl(ctx.client)
+    }
+
+    if (!serverUrl) {
+      const envPort = process.env.OPENCODE_PORT
+      if (envPort) {
+        serverUrl = `http://localhost:${envPort}`
+      }
+    }
+
+    if (!serverUrl) {
+      serverUrl = "http://localhost:4096"
+    }
+
+    this.serverUrl = serverUrl
     this.sourcePaneId = deps.getCurrentPaneId()
     this.pollingManager = new TmuxPollingManager(
       this.client,

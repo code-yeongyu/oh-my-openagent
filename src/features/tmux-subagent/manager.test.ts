@@ -78,9 +78,10 @@ const trackedSessions = new Set<string>()
 function createMockContext(overrides?: {
   sessionStatusResult?: { data?: Record<string, { type: string }> }
   sessionMessagesResult?: { data?: unknown[] }
+  serverUrl?: URL | undefined
 }) {
   return {
-    serverUrl: new URL('http://localhost:4096'),
+    serverUrl: overrides && 'serverUrl' in overrides ? overrides.serverUrl : new URL('http://localhost:4096'),
     client: {
       session: {
         status: mock(async () => {
@@ -225,6 +226,59 @@ describe('TmuxSessionManager', () => {
 
       // then
       expect(manager).toBeDefined()
+    })
+
+    test('uses dynamic port from ctx.serverUrl instead of hardcoded 4096', async () => {
+      // given - server running on dynamic port 55535 (not 4096)
+      const dynamicPort = 55535
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext({ serverUrl: new URL(`http://localhost:${dynamicPort}`) })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+
+      // when
+      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+      // then - should use dynamic port, not hardcoded 4096
+      const serverUrl = (manager as any).serverUrl as string
+      expect(serverUrl).toContain(`:${dynamicPort}`)
+      expect(serverUrl).not.toContain('4096')
+    })
+
+    test('falls back to OPENCODE_PORT env var when ctx.serverUrl is undefined', async () => {
+      // given - ctx.serverUrl is undefined, but OPENCODE_PORT is set
+      const originalPort = process.env.OPENCODE_PORT
+      const { TmuxSessionManager } = await import('./manager')
+      const ctx = createMockContext({ serverUrl: undefined })
+      const config: TmuxConfig = {
+        enabled: true,
+        layout: 'main-vertical',
+        main_pane_size: 60,
+        main_pane_min_width: 80,
+        agent_pane_min_width: 40,
+      }
+
+      try {
+        process.env.OPENCODE_PORT = '8080'
+        // when
+        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+
+        // then - should use env var port, not hardcoded 4096
+        const serverUrl = (manager as any).serverUrl as string
+        expect(serverUrl).toBe('http://localhost:8080')
+        expect(serverUrl).not.toContain('4096')
+      } finally {
+        if (originalPort !== undefined) {
+          process.env.OPENCODE_PORT = originalPort
+        } else {
+          delete process.env.OPENCODE_PORT
+        }
+      }
     })
   })
 
