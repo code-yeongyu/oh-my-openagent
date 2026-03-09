@@ -108,6 +108,11 @@ describe("resolveSubagentExecution", () => {
 
   test("uses agent override fallback_models for subagent runtime fallback chain", async () => {
     //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { quotio: ["claude-haiku-4-5"] },
+      connected: ["quotio"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -131,10 +136,16 @@ describe("resolveSubagentExecution", () => {
       { providers: ["quotio"], model: "gpt-5.2", variant: undefined },
       { providers: ["quotio"], model: "glm-5", variant: "max" },
     ])
+    cacheSpy.mockRestore()
   })
 
   test("uses category fallback_models when agent override points at category", async () => {
     //#given
+    const cacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue({
+      models: { anthropic: ["claude-haiku-4-5"] },
+      connected: ["anthropic"],
+      updatedAt: "2026-03-03T00:00:00.000Z",
+    })
     const args = createBaseArgs({ subagent_type: "explore" })
     const executorCtx = createExecutorContext(
       async () => ([
@@ -162,5 +173,6 @@ describe("resolveSubagentExecution", () => {
     expect(result.fallbackChain).toEqual([
       { providers: ["anthropic"], model: "claude-haiku-4-5", variant: undefined },
     ])
+    cacheSpy.mockRestore()
   })
 })

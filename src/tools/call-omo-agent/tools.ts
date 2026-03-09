@@ -82,19 +82,20 @@ export function createCallOmoAgent(
         return `Error: Agent "${normalizedAgent}" is disabled via disabled_agents configuration. Remove it from disabled_agents in your oh-my-opencode.json to use it.`
       }
 
+      const fallbackChain = resolveFallbackChainForCallOmoAgent({
+        subagentType: args.subagent_type,
+        agentOverrides,
+        userCategories,
+      })
+
       if (args.run_in_background) {
         if (args.session_id) {
           return `Error: session_id is not supported in background mode. Use run_in_background=false to continue an existing session.`
         }
-        const fallbackChain = resolveFallbackChainForCallOmoAgent({
-          subagentType: args.subagent_type,
-          agentOverrides,
-          userCategories,
-        })
         return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain)
       }
 
-      return await executeSync(args, toolCtx, ctx)
+      return await executeSync(args, toolCtx, ctx, undefined, fallbackChain)
     },
   })
 }

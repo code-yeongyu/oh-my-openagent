@@ -1,10 +1,15 @@
-import { afterEach, describe, expect, test } from "bun:test"
+declare const require: (name: string) => any
+const { afterEach, describe, expect, mock, test } = require("bun:test")
+
+mock.module("../shared/connected-providers-cache", () => ({
+  readConnectedProvidersCache: () => null,
+  readProviderModelsCache: () => null,
+}))
 
 import { createEventHandler } from "./event"
 import { createChatMessageHandler } from "./chat-message"
 import { _resetForTesting, setMainSession } from "../features/claude-code-session-state"
 import { createModelFallbackHook, clearPendingModelFallback } from "../hooks/model-fallback/hook"
-
 describe("createEventHandler - model fallback", () => {
   const createHandler = (args?: { hooks?: any; pluginConfig?: any }) => {
     const abortCalls: string[] = []
@@ -207,10 +212,10 @@ describe("createEventHandler - model fallback", () => {
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toMatchObject({
-      modelID: "claude-opus-4-6",
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
     })
-    expect(["anthropic", "quotio", "opencode"]).toContain((output.message["model"] as { providerID?: string })?.providerID)
-    expect(output.message["variant"]).toBe("max")
+    expect(output.message["variant"]).toBeUndefined()
   })
 
   test("does not spam abort/prompt when session.status retry countdown updates", async () => {
@@ -533,20 +538,19 @@ describe("createEventHandler - model fallback", () => {
     //#when - first retry cycle
     const first = await triggerRetryCycle()
 
-    //#then - first fallback entry applied (prefers current provider when available)
+    //#then - first fallback entry applied (no-op skip: claude-opus-4-6 matches current model after normalization)
     expect(first.message["model"]).toMatchObject({
-      modelID: "claude-opus-4-6",
+      providerID: "kimi-for-coding",
+      modelID: "k2p5",
     })
-    expect(["anthropic", "quotio", "opencode"]).toContain((first.message["model"] as { providerID?: string })?.providerID)
-    expect(first.message["variant"]).toBe("max")
+    expect(first.message["variant"]).toBeUndefined()
 
     //#when - second retry cycle
     const second = await triggerRetryCycle()
 
-    //#then - second fallback entry applied (chain advanced)
-    expect(second.message["model"]).toEqual({
-      providerID: "kimi-for-coding",
-      modelID: "k2p5",
+    //#then - second fallback entry applied (chain advanced past k2p5)
+    expect(second.message["model"]).toMatchObject({
+      modelID: "kimi-k2.5",
     })
     expect((second.message["model"] as { providerID?: string })?.providerID).toBeTruthy()
     expect(second.message["variant"]).toBeUndefined()
