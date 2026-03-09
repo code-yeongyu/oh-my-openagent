@@ -361,7 +361,7 @@ Subagents CLAIM "done" when:
 - Trust subagent claims without verification
 - Use run_in_background=true for task execution
 - Send prompts under 30 lines
-- Skip project-level lsp_diagnostics
+- Skip project-level lsp_diagnostics (use 'filePath=".", extension=".ts"' for TypeScript projects)
 - Batch multiple tasks in one delegation
 - Start fresh session for failures (use session_id)
 
