@@ -3,6 +3,7 @@
 // and invalidate opencode's plugin cache so the new version is picked up on next launch.
 
 import { createRequire } from "node:module";
+import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -27,15 +28,43 @@ function getLibcFamily() {
 }
 
 /**
+ * Resolve the platform-appropriate opencode cache directory.
+ *
+ * opencode (a Go binary) uses os.UserCacheDir() which maps to:
+ *   - Linux:   $XDG_CACHE_HOME/opencode  or  ~/.cache/opencode
+ *   - macOS:   ~/Library/Caches/opencode
+ *   - Windows: %LOCALAPPDATA%/opencode
+ */
+function getOpenCodeCacheDir() {
+  const home = homedir();
+
+  if (process.platform === "darwin") {
+    return join(home, "Library", "Caches", "opencode");
+  }
+
+  if (process.platform === "win32") {
+    return join(process.env.LOCALAPPDATA || join(home, "AppData", "Local"), "opencode");
+  }
+
+  // Linux and other Unix-like: respect XDG_CACHE_HOME
+  return join(process.env.XDG_CACHE_HOME || join(home, ".cache"), "opencode");
+}
+
+/**
  * Invalidate opencode's plugin cache so the updated version is resolved on next launch.
  *
- * opencode installs plugins into ~/.cache/opencode/node_modules/ with its own bun.lock.
+ * opencode installs plugins into its cache with a separate bun.lock.
  * When a user runs `bun install -g oh-my-opencode`, only the global copy is updated
  * while the cached copy remains stale. Removing the cached module and lockfile forces
  * opencode to re-resolve "oh-my-opencode@latest" on next startup.
  */
 async function invalidateOpenCodePluginCache() {
-  const cacheBase = join(homedir(), ".cache", "opencode");
+  const cacheBase = getOpenCodeCacheDir();
+
+  if (!existsSync(cacheBase)) {
+    return;
+  }
+
   const targets = [
     join(cacheBase, "node_modules", "oh-my-opencode"),
     join(cacheBase, "bun.lock"),
@@ -92,4 +121,6 @@ async function main() {
   await invalidateOpenCodePluginCache();
 }
 
-main();
+main().catch(() => {
+  // Postinstall must never fail the install process.
+});
