@@ -42,8 +42,11 @@ function getOpenCodeCacheDir() {
  *
  * opencode installs plugins into its cache with a separate bun.lock.
  * When a user runs `bun install -g oh-my-opencode`, only the global copy is updated
- * while the cached copy remains stale. Removing the cached module forces
- * opencode to re-resolve "oh-my-opencode@latest" on next startup.
+ * while the cached copy remains stale. Removing the cached module and lockfiles
+ * forces opencode to re-resolve "oh-my-opencode@latest" on next startup.
+ *
+ * The lockfiles must also be deleted because bun would otherwise reinstall the
+ * exact pinned (stale) version from the lock entry instead of resolving latest.
  */
 async function invalidateOpenCodePluginCache() {
   const cacheBase = getOpenCodeCacheDir();
@@ -52,14 +55,20 @@ async function invalidateOpenCodePluginCache() {
     return;
   }
 
-  const target = join(cacheBase, "node_modules", "oh-my-opencode");
+  const targets = [
+    join(cacheBase, "node_modules", "oh-my-opencode"),
+    join(cacheBase, "bun.lock"),
+    join(cacheBase, "bun.lockb"),
+  ];
 
-  try {
-    await rm(target, { recursive: true, force: true });
-  } catch (error) {
-    // force: true already handles ENOENT (missing files).
-    // Real errors (EPERM, EBUSY) indicate the cache could not be cleared.
-    console.warn(`⚠ oh-my-opencode: failed to clear cache at ${target}: ${error.message}`);
+  for (const target of targets) {
+    try {
+      await rm(target, { recursive: true, force: true });
+    } catch (error) {
+      // force: true already handles ENOENT (missing files).
+      // Real errors (EPERM, EBUSY) indicate the cache could not be cleared.
+      console.warn(`⚠ oh-my-opencode: failed to clear cache at ${target}: ${error.message}`);
+    }
   }
 }
 
