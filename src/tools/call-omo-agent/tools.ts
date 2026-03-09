@@ -42,6 +42,7 @@ export function createCallOmoAgent(
   disabledAgents: string[] = [],
   agentOverrides?: AgentOverrides,
   userCategories?: CategoriesConfig,
+  syncPollTimeoutMs?: number,
 ): ToolDefinition {
   const agentDescriptions = ALLOWED_AGENTS.map(
     (name) => `- ${name}: Specialized agent for ${name} tasks`
@@ -95,7 +96,7 @@ export function createCallOmoAgent(
         return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain)
       }
 
-      return await executeSync(args, toolCtx, ctx, undefined, fallbackChain)
+      return await executeSync(args, toolCtx, ctx, undefined, fallbackChain, { syncPollTimeoutMs })
     },
   })
 }
