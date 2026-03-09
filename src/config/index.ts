@@ -1,3 +1,6 @@
+export { expandProfile, PROFILE_NAMES } from "./profiles"
+export type { ProfileName } from "./profiles"
+
 export {
   MatrixxConfigSchema,
   AgentOverrideConfigSchema,

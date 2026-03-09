@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { MatrixxConfigSchema, type MatrixxConfig } from "./config";
+import { expandProfile, PROFILE_NAMES } from "./config/profiles";
 import {
   log,
   deepMerge,
@@ -171,9 +172,10 @@ export function loadPluginConfig(
     config = mergeConfigs(config, projectConfig);
   }
 
-  config = {
-    ...config,
-  };
+  if (config.profile && PROFILE_NAMES.includes(config.profile)) {
+    const profileDefaults = expandProfile(config.profile) as MatrixxConfig;
+    config = mergeConfigs(profileDefaults, config);
+  }
 
   log("Final merged config", {
     agents: config.agents,
