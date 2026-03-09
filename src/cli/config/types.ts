@@ -17,7 +17,7 @@ export type BashPermissionValue = "ask" | "allow" | "deny"
 export type BashPermission = BashPermissionValue | Record<string, BashPermissionValue>
 
 export interface AgentConfigExtended extends AgentOverrideConfig {
-  fallback_model?: string
+  fallback_models?: string[]
 }
 
 export type AgentOverridesExtended = Partial<Record<string, AgentConfigExtended>>

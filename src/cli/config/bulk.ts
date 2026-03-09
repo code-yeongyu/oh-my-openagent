@@ -5,7 +5,7 @@ import type { ConfigEditorState, BashPermissionValue } from "./types"
 import { AGENT_NAMES } from "./types"
 import { selectModelWithCacheLoader } from "./ui-utils"
 
-type ExtendedAgentConfig = AgentOverrideConfig & { fallback_model?: string }
+type ExtendedAgentConfig = AgentOverrideConfig & { fallback_models?: string[] }
 
 function getAgentsRecord(state: ConfigEditorState): Record<string, ExtendedAgentConfig> {
   return (state.config.agents ?? {}) as Record<string, ExtendedAgentConfig>
@@ -101,7 +101,11 @@ async function setFallbackForAllAgents(state: ConfigEditorState): Promise<void> 
 
   for (const agentName of AGENT_NAMES) {
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
-    agentsMutable[agentName].fallback_model = finalModel
+    if (finalModel) {
+      agentsMutable[agentName].fallback_models = [finalModel]
+    } else {
+      delete agentsMutable[agentName].fallback_models
+    }
   }
 
   state.modified = true

@@ -5,7 +5,7 @@ import type { ConfigEditorState, AgentName, BashPermissionValue, BashCommand } f
 import { AGENT_NAMES, BASH_COMMANDS } from "./types"
 import { selectModelWithCacheLoader } from "./ui-utils"
 
-type ExtendedAgentConfig = AgentOverrideConfig & { fallback_model?: string }
+type ExtendedAgentConfig = AgentOverrideConfig & { fallback_models?: string[] }
 
 const SYMBOLS = {
   check: color.green("[OK]"),
@@ -42,8 +42,8 @@ function formatAgentStatus(state: ConfigEditorState, agentName: string): string 
     parts.push(`cat: ${color.yellow(agent.category)}`)
   }
 
-  if (agent.fallback_model) {
-    parts.push(`fallback: ${color.dim(agent.fallback_model)}`)
+  if (agent.fallback_models?.length) {
+    parts.push(`fallback: ${color.dim(agent.fallback_models[0])}${agent.fallback_models.length > 1 ? " +" + (agent.fallback_models.length - 1) : ""}`)
   }
 
   if (parts.length === 0) {
@@ -66,7 +66,7 @@ async function editAgentField(
     options: [
       { value: "model", label: "Model", hint: agent.model ? `current: ${agent.model}` : "not set" },
       { value: "category", label: "Category", hint: agent.category ? `current: ${agent.category}` : "not set" },
-      { value: "fallback_model", label: "Fallback Model", hint: agent.fallback_model ? `current: ${agent.fallback_model}` : "not set" },
+      { value: "fallback_model", label: "Fallback Model", hint: agent.fallback_models?.length ? `current: ${agent.fallback_models[0]}${agent.fallback_models.length > 1 ? " +" + (agent.fallback_models.length - 1) : ""}` : "not set" },
       { value: "permissions", label: "Permissions", hint: agent.permission ? "configured" : "not set" },
       { value: "back", label: "Back to agent list" },
     ],
@@ -146,9 +146,10 @@ async function editAgentField(
   }
 
   if (field === "fallback_model") {
+    const currentFallback = agent.fallback_models?.[0]
     const model = await selectModelWithCacheLoader(
       `Select fallback model for "${agentName}":`,
-      agent.fallback_model
+      currentFallback
     )
 
     if (p.isCancel(model)) return false
@@ -159,7 +160,7 @@ async function editAgentField(
     } else if (model === "__custom__") {
       const custom = await p.text({
         message: "Enter custom fallback model:",
-        initialValue: agent.fallback_model ?? "",
+        initialValue: currentFallback ?? "",
       })
       if (p.isCancel(custom)) return false
       finalFallback = custom
@@ -170,7 +171,11 @@ async function editAgentField(
     if (!state.config.agents) state.config.agents = {}
     const agentsMutable = state.config.agents as Record<string, ExtendedAgentConfig>
     if (!agentsMutable[agentName]) agentsMutable[agentName] = {}
-    agentsMutable[agentName].fallback_model = finalFallback
+    if (finalFallback) {
+      agentsMutable[agentName].fallback_models = [finalFallback]
+    } else {
+      delete agentsMutable[agentName].fallback_models
+    }
     state.modified = true
 
     p.log.success(`Updated fallback model for "${agentName}" to ${finalFallback ?? "(none)"}`)
@@ -239,7 +244,7 @@ async function editAgentField(
         const currentPerms = isSimpleValue ? undefined : existingBash as Record<string, BashPermissionValue> | undefined
         const defaultValue: BashPermissionValue = isSimpleValue ? (existingBash as BashPermissionValue) : "ask"
 
-        const newPerms: Record<string, BashPermissionValue> = {}
+        const newPerms: Record<string, BashPermissionValue> = { ...currentPerms }
 
         for (const cmd of BASH_COMMANDS) {
           const current = currentPerms?.[cmd] ?? defaultValue

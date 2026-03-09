@@ -36,7 +36,7 @@ export function checkFallbackWarnings(state: ConfigEditorState): ValidationWarni
 
     const hasModel = agent.model && agent.model.length > 0
     const hasCategory = agent.category && agent.category.length > 0
-    const hasFallback = agent.fallback_model && agent.fallback_model.length > 0
+    const hasFallback = agent.fallback_models && agent.fallback_models.length > 0
 
     if ((hasModel || hasCategory) && !hasFallback) {
       warnings.push({

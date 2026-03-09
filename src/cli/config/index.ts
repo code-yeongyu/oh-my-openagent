@@ -1,6 +1,7 @@
 import * as p from "@clack/prompts"
 import color from "picocolors"
-import { existsSync, readFileSync, writeFileSync, renameSync, copyFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync, renameSync, copyFileSync, mkdirSync } from "node:fs"
+import { dirname } from "node:path"
 import { getConfigContext } from "../config-manager"
 import { parseJsonc } from "../../shared"
 import type { OhMyOpenCodeConfig } from "../../config/schema"
@@ -44,6 +45,12 @@ function createBackupWithCopy(configPath: string): string | null {
 
 function writeConfigAtomically(configPath: string, config: OhMyOpenCodeConfig): boolean {
   try {
+    // Ensure parent directory exists
+    const parentDir = dirname(configPath)
+    if (!existsSync(parentDir)) {
+      mkdirSync(parentDir, { recursive: true })
+    }
+
     const tempPath = `${configPath}.tmp`
     writeFileSync(tempPath, JSON.stringify(config, null, 2) + "\n")
     renameSync(tempPath, configPath)
