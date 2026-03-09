@@ -50,30 +50,47 @@ export function runAgentSanityCheck(config: OhMyOpenCodeConfig): SanityCheckResu
         }
       }
 
-      // Check fallback_model
-      if ((agent as { fallback_model?: string }).fallback_model) {
-        const fallback = (agent as { fallback_model?: string }).fallback_model!.trim()
-        if (fallback) {
-          checkedModels.push({
-            path: `agents.${agentName}.fallback_model`,
-            model: fallback,
-            type: "fallback",
-          })
+      // Check fallback_models (array)
+      const fallbackModels = Array.isArray((agent as { fallback_models?: unknown }).fallback_models)
+        ? ((agent as { fallback_models?: unknown }).fallback_models as unknown[])
+            .filter((v): v is string => typeof v === "string")
+            .map((v) => v.trim())
+            .filter(Boolean)
+        : []
 
-          if (!isValidModelFormat(fallback)) {
-            issues.push({
-              path: `agents.${agentName}.fallback_model`,
-              level: "warn",
-              message: `"${fallback}" has invalid format (expected: provider/model)`,
-            })
-          } else if (!cache.models.has(fallback)) {
-            issues.push({
-              path: `agents.${agentName}.fallback_model`,
-              level: "warn",
-              message: `"${fallback}" not found in model cache`,
-            })
-          }
+      for (const fallback of fallbackModels) {
+        checkedModels.push({
+          path: `agents.${agentName}.fallback_models`,
+          model: fallback,
+          type: "fallback",
+        })
+
+        if (!isValidModelFormat(fallback)) {
+          issues.push({
+            path: `agents.${agentName}.fallback_models`,
+            level: "warn",
+            message: `"${fallback}" has invalid format (expected: provider/model)`,
+          })
+        } else if (!cache.models.has(fallback)) {
+          issues.push({
+            path: `agents.${agentName}.fallback_models`,
+            level: "warn",
+            message: `"${fallback}" not found in model cache`,
+          })
         }
+      }
+
+      // Check for missing fallback_models when model/category is set
+      const hasModel = agent.model && typeof agent.model === "string" && agent.model.trim().length > 0
+      const hasCategory = agent.category && typeof agent.category === "string" && agent.category.trim().length > 0
+      const hasFallback = fallbackModels.length > 0
+
+      if ((hasModel || hasCategory) && !hasFallback) {
+        issues.push({
+          path: `agents.${agentName}.fallback_models`,
+          level: "warn",
+          message: `agent "${agentName}" has model/category configured but no fallback_models`,
+        })
       }
 
       // Check category reference
