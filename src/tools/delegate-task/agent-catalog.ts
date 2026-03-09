@@ -42,13 +42,9 @@ export async function getTaskAgentCatalog(
   }
 }
 
-/**
- * Matches an agent name against the catalog using canonical name resolution.
- * Returns the matched agent with its canonical name from the catalog.
- */
-export function matchAgentByName(
+function matchAgentInList(
   name: string,
-  catalog: TaskAgentCatalog
+  agentList: AgentInfo[]
 ): AgentMatch | null {
   const trimmedName = name.trim()
   if (!trimmedName) {
@@ -58,7 +54,7 @@ export function matchAgentByName(
   const configKey = getAgentConfigKey(trimmedName)
   const lowerConfigKey = configKey.toLowerCase()
 
-  const matchedAgent = catalog.callable.find(
+  const matchedAgent = agentList.find(
     (agent) =>
       getAgentConfigKey(agent.name).toLowerCase() === lowerConfigKey
   )
@@ -74,6 +70,17 @@ export function matchAgentByName(
 }
 
 /**
+ * Matches an agent name against the catalog using canonical name resolution.
+ * Returns the matched agent with its canonical name from the catalog.
+ */
+export function matchAgentByName(
+  name: string,
+  catalog: TaskAgentCatalog
+): AgentMatch | null {
+  return matchAgentInList(name, catalog.callable)
+}
+
+/**
  * Matches an agent name against primary agents in the catalog.
  * Returns the matched primary agent with its canonical name.
  */
@@ -81,25 +88,5 @@ export function matchPrimaryAgentByName(
   name: string,
   catalog: TaskAgentCatalog
 ): AgentMatch | null {
-  const trimmedName = name.trim()
-  if (!trimmedName) {
-    return null
-  }
-
-  const configKey = getAgentConfigKey(trimmedName)
-  const lowerConfigKey = configKey.toLowerCase()
-
-  const matchedAgent = catalog.primary.find(
-    (agent) =>
-      getAgentConfigKey(agent.name).toLowerCase() === lowerConfigKey
-  )
-
-  if (!matchedAgent) {
-    return null
-  }
-
-  return {
-    agent: matchedAgent,
-    canonicalName: matchedAgent.name,
-  }
+  return matchAgentInList(name, catalog.primary)
 }
