@@ -48,17 +48,16 @@ export function resolveModelPipeline(
   const availableModels = constraints.availableModels
   const fallbackChain = policy?.fallbackChain
   const systemDefaultModel = policy?.systemDefaultModel
+  const agentPrefix = policy?.agentName ? `Agent ${policy.agentName} ` : ""
 
   const normalizedUiModel = normalizeModel(intent?.uiSelectedModel)
   if (normalizedUiModel) {
-    const agentPrefix = policy?.agentName ? `Agent ${policy.agentName} ` : ""
     log(`[model-resolution] ${agentPrefix}resolved to ${normalizedUiModel} via uiSelected override`)
     return { model: normalizedUiModel, provenance: "override", reason: "UI-selected model override" }
   }
 
   const normalizedUserModel = normalizeModel(intent?.userModel)
   if (normalizedUserModel) {
-    const agentPrefix = policy?.agentName ? `Agent ${policy.agentName} ` : ""
     log(`[model-resolution] ${agentPrefix}resolved to ${normalizedUserModel} via userModel override`)
     return { model: normalizedUserModel, provenance: "override", variant: intent?.userVariant, reason: "User-configured model override" }
   }
@@ -71,13 +70,13 @@ export function resolveModelPipeline(
       const providerHint = parts.length >= 2 ? [parts[0]] : undefined
       const match = fuzzyMatchModel(normalizedCategoryDefault, availableModels, providerHint)
       if (match) {
-        log("[model-resolution] category-default: " + match)
+        log(`[model-resolution] ${agentPrefix}category-default: ` + match)
         return { model: match, provenance: "category-default", attempted, reason: "Category default model (fuzzy matched)" }
       }
     } else {
       const connectedProviders = constraints.connectedProviders ?? connectedProvidersCache.readConnectedProvidersCache()
       if (connectedProviders === null) {
-        log("[model-resolution] category-default: " + normalizedCategoryDefault)
+        log(`[model-resolution] ${agentPrefix}category-default: ` + normalizedCategoryDefault)
         return { model: normalizedCategoryDefault, provenance: "category-default", attempted, reason: "Category default model (no provider cache)" }
       }
       const parts = normalizedCategoryDefault.split("/")
@@ -86,7 +85,7 @@ export function resolveModelPipeline(
          if (connectedProviders.includes(provider)) {
            const modelName = parts.slice(1).join("/")
            const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
-           log("[model-resolution] category-default: " + transformedModel)
+           log(`[model-resolution] ${agentPrefix}category-default: ` + transformedModel)
            return { model: transformedModel, provenance: "category-default", attempted, reason: "Category default model (connected provider)" }
          }
       }
@@ -112,7 +111,7 @@ export function resolveModelPipeline(
              if (connectedSet.has(provider)) {
                const modelName = parts.slice(1).join("/")
                const transformedModel = `${provider}/${transformModelForProvider(provider, modelName)}`
-               log("[model-resolution] provider-fallback: " + transformedModel + " (tried: " + attempted.join(", ") + ")")
+               log(`[model-resolution] ${agentPrefix}provider-fallback: ` + transformedModel + " (tried: " + attempted.join(", ") + ")")
                return { model: transformedModel, provenance: "provider-fallback", attempted, reason: "User fallback model (connected provider)" }
              }
           }
@@ -126,7 +125,7 @@ export function resolveModelPipeline(
         const providerHint = parts.length >= 2 ? [parts[0]] : undefined
          const match = fuzzyMatchModel(model, availableModels, providerHint)
          if (match) {
-           log("[model-resolution] provider-fallback: " + match + " (tried: " + attempted.join(", ") + ")")
+           log(`[model-resolution] ${agentPrefix}provider-fallback: ` + match + " (tried: " + attempted.join(", ") + ")")
            return { model: match, provenance: "provider-fallback", attempted, reason: "User fallback model (availability confirmed)" }
          }
       }
@@ -147,7 +146,7 @@ export function resolveModelPipeline(
              if (connectedSet.has(provider)) {
                const transformedModelId = transformModelForProvider(provider, entry.model)
                const model = `${provider}/${transformedModelId}`
-               log("[model-resolution] provider-fallback: " + model + " (tried: " + attempted.join(", ") + ")")
+               log(`[model-resolution] ${agentPrefix}provider-fallback: ` + model + " (tried: " + attempted.join(", ") + ")")
                return {
                  model,
                  provenance: "provider-fallback",
@@ -166,7 +165,7 @@ export function resolveModelPipeline(
           const fullModel = `${provider}/${entry.model}`
            const match = fuzzyMatchModel(fullModel, availableModels, [provider])
            if (match) {
-             log("[model-resolution] provider-fallback: " + match + " (tried: " + attempted.join(", ") + ")")
+             log(`[model-resolution] ${agentPrefix}provider-fallback: ` + match + " (tried: " + attempted.join(", ") + ")")
              return {
                model: match,
                provenance: "provider-fallback",
@@ -179,7 +178,7 @@ export function resolveModelPipeline(
 
          const crossProviderMatch = fuzzyMatchModel(entry.model, availableModels)
          if (crossProviderMatch) {
-           log("[model-resolution] provider-fallback: " + crossProviderMatch + " (tried: " + attempted.join(", ") + ")")
+           log(`[model-resolution] ${agentPrefix}provider-fallback: ` + crossProviderMatch + " (tried: " + attempted.join(", ") + ")")
            return {
              model: crossProviderMatch,
              provenance: "provider-fallback",
@@ -194,10 +193,10 @@ export function resolveModelPipeline(
   }
 
   if (systemDefaultModel === undefined) {
-    log("[model-resolution] no model resolved - systemDefaultModel not configured")
+    log(`[model-resolution] ${agentPrefix}no model resolved - systemDefaultModel not configured`)
     return undefined
   }
 
-  log("[model-resolution] system-default: " + systemDefaultModel)
+  log(`[model-resolution] ${agentPrefix}system-default: ` + systemDefaultModel)
   return { model: systemDefaultModel, provenance: "system-default", attempted, reason: "System default model (ultimate fallback)" }
 }

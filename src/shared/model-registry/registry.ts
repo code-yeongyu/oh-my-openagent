@@ -1,5 +1,13 @@
 import type { ModelRegistry } from "./types"
 
+function deriveUnstableFamilies(registry: ModelRegistry): Set<string> {
+	const families = new Set<string>()
+	for (const entry of Object.values(registry)) {
+		if (entry.isUnstable && entry.family) families.add(entry.family)
+	}
+	return families
+}
+
 export const MODEL_REGISTRY: ModelRegistry = {
   "claude-opus-4-6": {
     name: "Claude Opus 4.6",
@@ -200,4 +208,17 @@ export const MODEL_REGISTRY: ModelRegistry = {
     isUnstable: false,
     family: "big-pickle",
 	},
+}
+
+const UNSTABLE_FAMILIES = deriveUnstableFamilies(MODEL_REGISTRY)
+
+export function isModelUnstable(modelID: string | undefined): boolean {
+	if (!modelID) return false
+	const entry = MODEL_REGISTRY[modelID]
+	if (entry) return entry.isUnstable === true
+	const lower = modelID.toLowerCase()
+	for (const family of UNSTABLE_FAMILIES) {
+		if (lower.includes(family)) return true
+	}
+	return false
 }

@@ -1,5 +1,5 @@
 export type { ModelCapability, ModelTier, SpeedClass, ModelEntry, ModelRegistry } from "./types"
-export { MODEL_REGISTRY } from "./registry"
+export { MODEL_REGISTRY, isModelUnstable } from "./registry"
 export type { ProfileName, ProfileOverride } from "./profiles"
 export { PROFILE_PRESETS, DEFAULT_PROFILE, getProfileOverride } from "./profiles"
 export type { CostLabel, CostEstimate } from "./cost-estimation"

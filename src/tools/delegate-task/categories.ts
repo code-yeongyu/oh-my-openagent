@@ -95,8 +95,16 @@ export function resolveCategoryConfig(
 		return null;
 	}
 
+	const profileOverride = resolveProfileCategoryModel({
+		categoryName,
+		defaultModel: defaultConfig?.model,
+		modelProfile,
+		userModel: userConfig?.model,
+		availableModels,
+	});
+
 	const categoryReq = CATEGORY_MODEL_REQUIREMENTS[categoryName];
-	if (categoryReq?.requiresModel && availableModels && !hasExplicitUserConfig) {
+	if (categoryReq?.requiresModel && availableModels && !hasExplicitUserConfig && !profileOverride.model) {
 		if (!isModelAvailable(categoryReq.requiresModel, availableModels)) {
 			log(
 				`[resolveCategoryConfig] Category ${categoryName} requires ${categoryReq.requiresModel} but not available`,
@@ -109,14 +117,6 @@ export function resolveCategoryConfig(
 	if (!defaultConfig && !userConfig) {
 		return null;
 	}
-
-	const profileOverride = resolveProfileCategoryModel({
-		categoryName,
-		defaultModel: defaultConfig?.model,
-		modelProfile,
-		userModel: userConfig?.model,
-		availableModels,
-	});
 
 	const model = resolveModel({
 		userModel: userConfig?.model ?? profileOverride.model,

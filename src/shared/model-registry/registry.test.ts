@@ -3,7 +3,7 @@ import {
 	AGENT_MODEL_REQUIREMENTS,
 	CATEGORY_MODEL_REQUIREMENTS,
 } from "../model-requirements"
-import { MODEL_REGISTRY } from "./registry"
+import { MODEL_REGISTRY, isModelUnstable } from "./registry"
 
 const UNSTABLE_MODELS = [
 	"gemini-3.1-pro",
@@ -76,6 +76,33 @@ describe("MODEL_REGISTRY", () => {
 
 			// then
 			expect(missingFlags).toEqual([])
+		})
+	})
+
+	describe("#given isModelUnstable function", () => {
+		test("#when checking known registry model #then uses registry entry", () => {
+			expect(isModelUnstable("gemini-3.1-pro")).toBe(true)
+			expect(isModelUnstable("claude-opus-4-6")).toBe(false)
+		})
+
+		test("#when checking unlisted model with unstable family name #then falls back to substring match", () => {
+			expect(isModelUnstable("gemini-3.1-pro-preview")).toBe(true)
+			expect(isModelUnstable("kimi-k3-experimental")).toBe(true)
+			expect(isModelUnstable("minimax-m3-turbo")).toBe(true)
+		})
+
+		test("#when checking case variants #then matches case-insensitively", () => {
+			expect(isModelUnstable("GEMINI-3.1-PRO")).toBe(true)
+			expect(isModelUnstable("Kimi-K2.5")).toBe(true)
+		})
+
+		test("#when checking stable unlisted model #then returns false", () => {
+			expect(isModelUnstable("gpt-6-turbo")).toBe(false)
+			expect(isModelUnstable("claude-next")).toBe(false)
+		})
+
+		test("#when input is undefined #then returns false", () => {
+			expect(isModelUnstable(undefined)).toBe(false)
 		})
 	})
 

@@ -1,6 +1,6 @@
 import type { ModelFallbackInfo } from "../../features/task-toast-manager/types";
 import { mergeCategories } from "../../shared/merge-categories";
-import { MODEL_REGISTRY } from "../../shared/model-registry";
+import { isModelUnstable } from "../../shared/model-registry";
 import type { FallbackEntry } from "../../shared/model-requirements";
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements";
 import { getAvailableModelsForDelegateTask } from "./available-models";
@@ -213,9 +213,8 @@ Available categories: ${categoryNames.join(", ")}`,
 		: undefined;
 	const isUnstableAgent =
 		resolved.config.is_unstable_agent === true ||
-		[actualModelID, configModelID].some((m) =>
-			m ? MODEL_REGISTRY[m]?.isUnstable === true : false,
-		);
+		isModelUnstable(actualModelID) ||
+		isModelUnstable(configModelID);
 
 	return {
 		agentToUse: SISYPHUS_JUNIOR_AGENT,
