@@ -246,10 +246,11 @@ Each agent prompt should include:
 
 Background result collection:
 1. Launch parallel agents → receive task_ids
-2. Continue immediate work
-3. System sends \`<system-reminder>\` on completion → call \`background_output(task_id="...")\`
-4. If results aren't ready: end your response. The notification triggers your next turn.
-5. Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+2. If you have DIFFERENT independent work → do it now
+3. Otherwise → **END YOUR RESPONSE.**
+4. System sends \`<system-reminder>\` on completion → triggers your next turn
+5. Collect via \`background_output(task_id="...")\`
+6. Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
 
 Stop searching when: you have enough context, same info repeating, 2 iterations with no new data, or direct answer found.
 </explore>`;
