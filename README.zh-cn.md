@@ -1,3 +1,9 @@
+> [!WARNING]
+> **临时通知（本周）：维护者响应延迟说明**
+>
+> 核心维护者 Q 因受伤，本周 issue/PR 回复和发布可能会延迟。
+> 感谢你的耐心与支持。
+
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)

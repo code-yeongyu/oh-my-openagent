@@ -1,3 +1,9 @@
+> [!WARNING]
+> **一時的なお知らせ（今週）: メンテナー対応遅延のお知らせ**
+>
+> コアメンテナーのQが負傷したため、今週は Issue/PR への返信とリリースが遅れる可能性があります。
+> ご理解とご支援に感謝します。
+
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
