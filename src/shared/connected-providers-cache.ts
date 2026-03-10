@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs"
 import { join } from "path"
 import { log } from "./logger"
 import { getOmoOpenCodeCacheDir } from "./data-path"
+import { readUserConfiguredModels } from "./opencode-config-reader"
 
 const CONNECTED_PROVIDERS_CACHE_FILE = "connected-providers.json"
 const PROVIDER_MODELS_CACHE_FILE = "provider-models.json"
@@ -169,14 +170,31 @@ export async function updateConnectedProvidersCache(client: {
 
 		writeConnectedProvidersCache(connected)
 
+		const userConfiguredModels = readUserConfiguredModels()
 		const modelsByProvider: Record<string, string[]> = {}
 		const allProviders = result.data?.all ?? []
 
 		for (const provider of allProviders) {
 			if (provider.models) {
-				const modelIds = Object.keys(provider.models)
-				if (modelIds.length > 0) {
-					modelsByProvider[provider.id] = modelIds
+				const allModelIds = Object.keys(provider.models)
+				
+				if (userConfiguredModels?.has(provider.id)) {
+					const whitelist = userConfiguredModels.get(provider.id)!
+					const filteredModelIds = allModelIds.filter(modelId => whitelist.has(modelId))
+					
+					if (filteredModelIds.length > 0) {
+						modelsByProvider[provider.id] = filteredModelIds
+						log("[connected-providers-cache] Filtered models by user config", {
+							provider: provider.id,
+							total: allModelIds.length,
+							filtered: filteredModelIds.length,
+							kept: filteredModelIds,
+						})
+					}
+				} else {
+					if (allModelIds.length > 0) {
+						modelsByProvider[provider.id] = allModelIds
+					}
 				}
 			}
 		}
