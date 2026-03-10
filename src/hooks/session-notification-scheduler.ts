@@ -67,7 +67,11 @@ export function createIdleNotificationScheduler(options: {
 
   function markSessionActivity(sessionID: string): void {
     const scheduledTime = scheduledAt.get(sessionID)
-    if (scheduledTime && Date.now() - scheduledTime < activityGracePeriodMs) {
+    if (
+      activityGracePeriodMs > 0 &&
+      scheduledTime !== undefined &&
+      Date.now() - scheduledTime <= activityGracePeriodMs
+    ) {
       return
     }
 
