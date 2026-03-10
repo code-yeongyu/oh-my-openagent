@@ -1,4 +1,8 @@
 export function transformModelForProvider(provider: string, model: string): string {
+	// Ollama uses model:tag format (e.g., llama3.2:8b) which requires no transformation
+	if (provider === "ollama") {
+		return model
+	}
 	if (provider === "github-copilot") {
 		return model
 			.replace("claude-opus-4-6", "claude-opus-4.6")
