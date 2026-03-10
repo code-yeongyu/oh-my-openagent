@@ -26,8 +26,8 @@ export async function executeOnCompleteHook(options: {
         DURATION_MS: String(durationMs),
         MESSAGE_COUNT: String(messageCount),
       },
-      stdout: "inherit",
-      stderr: "inherit",
+      stdout: "pipe",
+      stderr: "pipe",
     })
 
     const hookExitCode = await proc.exited

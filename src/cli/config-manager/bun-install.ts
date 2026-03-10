@@ -31,8 +31,8 @@ export async function runBunInstallWithDetails(): Promise<BunInstallResult> {
   try {
     const proc = spawnWithWindowsHide(["bun", "install"], {
       cwd: cacheDir,
-      stdout: "inherit",
-      stderr: "inherit",
+      stdout: "pipe",
+      stderr: "pipe",
     })
 
     let timeoutId: ReturnType<typeof setTimeout>
