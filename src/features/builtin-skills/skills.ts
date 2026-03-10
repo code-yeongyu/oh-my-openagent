@@ -31,6 +31,7 @@ import {
   dslTestingSkill,
   dslValidationSkill,
   dslCompositionSkill,
+  documentReaderSkill,
 } from "./skills/index"
 
 export interface CreateBuiltinSkillsOptions {
@@ -50,7 +51,7 @@ export function createBuiltinSkills(options: CreateBuiltinSkillsOptions = {}): B
     browserSkill = playwrightSkill
   }
 
-  const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill, dslCoreSkill, dslGrammarSkill, dslCodegenSkill, dslMetamodelSkill, dslToolingSkill, dslTextxEcosystemSkill, dslPyecoreAdvancedSkill, dslModelTransformationSkill, dslTestingSkill, dslValidationSkill, dslCompositionSkill, euHorizonSkill, academicReviewSkill, deliverableWritingSkill, projectManagementSkill, technicalLeadSkill, academicWritingSkill, researchMethodologySkill, literatureReviewSkill, grantWritingSkill, scientificPresentationSkill, dataManagementPlanSkill, ipExploitationSkill]
+  const skills = [browserSkill, frontendUiUxSkill, gitMasterSkill, devBrowserSkill, dslCoreSkill, dslGrammarSkill, dslCodegenSkill, dslMetamodelSkill, dslToolingSkill, dslTextxEcosystemSkill, dslPyecoreAdvancedSkill, dslModelTransformationSkill, dslTestingSkill, dslValidationSkill, dslCompositionSkill, euHorizonSkill, academicReviewSkill, deliverableWritingSkill, projectManagementSkill, technicalLeadSkill, academicWritingSkill, researchMethodologySkill, literatureReviewSkill, grantWritingSkill, scientificPresentationSkill, dataManagementPlanSkill, ipExploitationSkill, documentReaderSkill]
 
   if (!disabledSkills) {
     return skills

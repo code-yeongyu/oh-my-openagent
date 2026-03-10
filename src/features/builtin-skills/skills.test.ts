@@ -80,7 +80,7 @@ describe("createBuiltinSkills", () => {
 		}
 	})
 
-	test("returns exactly 27 skills regardless of provider", () => {
+	test("returns exactly 28 skills regardless of provider", () => {
 		// given
 
 		// when
@@ -88,8 +88,8 @@ describe("createBuiltinSkills", () => {
 		const agentBrowserSkills = createBuiltinSkills({ browserProvider: "agent-browser" })
 
 		// then
-		expect(defaultSkills).toHaveLength(27)
-		expect(agentBrowserSkills).toHaveLength(27)
+		expect(defaultSkills).toHaveLength(28)
+		expect(agentBrowserSkills).toHaveLength(28)
 	})
 
 	test("should exclude playwright when it is in disabledSkills", () => {
@@ -105,7 +105,7 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("git-master")
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("dsl-core")
-		expect(skills.length).toBe(26)
+		expect(skills.length).toBe(27)
 	})
 
 	test("should exclude multiple skills when they are in disabledSkills", () => {
@@ -121,13 +121,13 @@ describe("createBuiltinSkills", () => {
 		expect(skills.map((s) => s.name)).toContain("frontend-ui-ux")
 		expect(skills.map((s) => s.name)).toContain("dev-browser")
 		expect(skills.map((s) => s.name)).toContain("dsl-core")
-		expect(skills.length).toBe(25)
+		expect(skills.length).toBe(26)
 	})
 
 	test("should return an empty array when all skills are disabled", () => {
 		// #given
 		const options = {
-			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser", "dsl-core", "dsl-grammar", "dsl-codegen", "dsl-metamodel", "dsl-tooling", "dsl-textx-ecosystem", "dsl-pyecore-advanced", "dsl-model-transformation", "dsl-testing", "dsl-validation", "dsl-composition", "eu-horizon", "academic-review", "deliverable-writing", "project-management", "technical-lead", "academic-writing", "research-methodology", "literature-review", "grant-writing", "scientific-presentation", "data-management-plan", "ip-exploitation"]),
+			disabledSkills: new Set(["playwright", "frontend-ui-ux", "git-master", "dev-browser", "dsl-core", "dsl-grammar", "dsl-codegen", "dsl-metamodel", "dsl-tooling", "dsl-textx-ecosystem", "dsl-pyecore-advanced", "dsl-model-transformation", "dsl-testing", "dsl-validation", "dsl-composition", "eu-horizon", "academic-review", "deliverable-writing", "project-management", "technical-lead", "academic-writing", "research-methodology", "literature-review", "grant-writing", "scientific-presentation", "data-management-plan", "ip-exploitation", "document-reader"]),
 		}
 
 		// #when
@@ -145,7 +145,7 @@ describe("createBuiltinSkills", () => {
 		const skills = createBuiltinSkills(options)
 
 		// #then
-		expect(skills.length).toBe(27)
+		expect(skills.length).toBe(28)
 	})
 
 	test("returns playwright-cli skill when browserProvider is 'playwright-cli'", () => {
