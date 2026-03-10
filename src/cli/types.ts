@@ -10,6 +10,8 @@ export interface InstallArgs {
   opencodeZen?: BooleanArg
   zaiCodingPlan?: BooleanArg
   kimiForCoding?: BooleanArg
+  minimaxCnCodingPlan?: BooleanArg
+  minimaxIoCodingPlan?: BooleanArg
   skipAuth?: boolean
 }
 
@@ -22,6 +24,8 @@ export interface InstallConfig {
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
+  hasMinimaxCnCodingPlan: boolean
+  hasMinimaxIoCodingPlan: boolean
 }
 
 export interface ConfigMergeResult {
@@ -40,4 +44,6 @@ export interface DetectedConfig {
   hasOpencodeZen: boolean
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
+  hasMinimaxCnCodingPlan: boolean
+  hasMinimaxIoCodingPlan: boolean
 }

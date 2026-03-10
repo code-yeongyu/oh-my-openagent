@@ -38,6 +38,8 @@ export function formatConfigSummary(config: InstallConfig): string {
   lines.push(formatProvider("OpenCode Zen", config.hasOpencodeZen, "opencode/ models"))
   lines.push(formatProvider("Z.ai Coding Plan", config.hasZaiCodingPlan, "Librarian/Multimodal"))
   lines.push(formatProvider("Kimi For Coding", config.hasKimiForCoding, "Sisyphus/Prometheus fallback"))
+  lines.push(formatProvider("MiniMax CN Coding Plan", config.hasMinimaxCnCodingPlan, "Fast coding fallback"))
+  lines.push(formatProvider("MiniMax IO Coding Plan", config.hasMinimaxIoCodingPlan, "Fast coding fallback"))
 
   lines.push("")
   lines.push(color.dim("─".repeat(40)))
@@ -147,6 +149,14 @@ export function validateNonTuiArgs(args: InstallArgs): { valid: boolean; errors:
     errors.push(`Invalid --kimi-for-coding value: ${args.kimiForCoding} (expected: no, yes)`)
   }
 
+  if (args.minimaxCnCodingPlan !== undefined && !["no", "yes"].includes(args.minimaxCnCodingPlan)) {
+    errors.push(`Invalid --minimax-cn-coding-plan value: ${args.minimaxCnCodingPlan} (expected: no, yes)`)
+  }
+
+  if (args.minimaxIoCodingPlan !== undefined && !["no", "yes"].includes(args.minimaxIoCodingPlan)) {
+    errors.push(`Invalid --minimax-io-coding-plan value: ${args.minimaxIoCodingPlan} (expected: no, yes)`)
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
@@ -160,6 +170,8 @@ export function argsToConfig(args: InstallArgs): InstallConfig {
     hasOpencodeZen: args.opencodeZen === "yes",
     hasZaiCodingPlan: args.zaiCodingPlan === "yes",
     hasKimiForCoding: args.kimiForCoding === "yes",
+    hasMinimaxCnCodingPlan: args.minimaxCnCodingPlan === "yes",
+    hasMinimaxIoCodingPlan: args.minimaxIoCodingPlan === "yes",
   }
 }
 
@@ -171,6 +183,8 @@ export function detectedToInitialValues(detected: DetectedConfig): {
   opencodeZen: BooleanArg
   zaiCodingPlan: BooleanArg
   kimiForCoding: BooleanArg
+  minimaxCnCodingPlan: BooleanArg
+  minimaxIoCodingPlan: BooleanArg
 } {
   let claude: ClaudeSubscription = "no"
   if (detected.hasClaude) {
@@ -185,5 +199,7 @@ export function detectedToInitialValues(detected: DetectedConfig): {
     opencodeZen: detected.hasOpencodeZen ? "yes" : "no",
     zaiCodingPlan: detected.hasZaiCodingPlan ? "yes" : "no",
     kimiForCoding: detected.hasKimiForCoding ? "yes" : "no",
+    minimaxCnCodingPlan: detected.hasMinimaxCnCodingPlan ? "yes" : "no",
+    minimaxIoCodingPlan: detected.hasMinimaxIoCodingPlan ? "yes" : "no",
   }
 }

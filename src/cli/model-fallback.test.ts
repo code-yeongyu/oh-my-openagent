@@ -13,6 +13,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasOpencodeZen: false,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
+    hasMinimaxCnCodingPlan: false,
     ...overrides,
   }
 }
@@ -198,6 +199,17 @@ describe("generateModelConfig", () => {
       // #then should use ZAI_MODEL for librarian
       expect(result).toMatchSnapshot()
     })
+
+    test("uses MiniMax model for explore when only MiniMax Coding Plan is available", () => {
+      // #given only MiniMax Coding Plan is available
+      const config = createConfig({ hasMinimaxCnCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should use MiniMax model for explore
+      expect(result.agents?.explore?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    })
   })
 
   describe("mixed provider scenarios", () => {
@@ -366,6 +378,17 @@ describe("generateModelConfig", () => {
       // #then explore should use gpt-5-mini (Copilot fallback)
       expect(result.agents?.explore?.model).toBe("github-copilot/gpt-5-mini")
     })
+
+    test("multimodal-looker uses MiniMax when only MiniMax Coding Plan is available", () => {
+      // #given only MiniMax Coding Plan is available
+      const config = createConfig({ hasMinimaxCnCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then multimodal-looker should use MiniMax
+      expect(result.agents?.["multimodal-looker"]?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    })
   })
 
   describe("Sisyphus agent special cases", () => {
@@ -395,6 +418,17 @@ describe("generateModelConfig", () => {
 
       // #then
       expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
+    })
+
+    test("Sisyphus resolves to MiniMax when only MiniMax Coding Plan is available", () => {
+      // #given
+      const config = createConfig({ hasMinimaxCnCodingPlan: true })
+
+      // #when
+      const result = generateModelConfig(config)
+
+      // #then
+      expect(result.agents?.sisyphus?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
     })
 
     test("Sisyphus resolves to gpt-5.4 medium when only OpenAI is available", () => {

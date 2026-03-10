@@ -100,6 +100,26 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   })
   if (!kimiForCoding) return null
 
+  const minimaxCnCodingPlan = await selectOrCancel({
+    message: "Do you have a MiniMax CN Coding Plan subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "MiniMax M2.5 for fast coding fallback (CN)" },
+    ],
+    initialValue: initial.minimaxCnCodingPlan,
+  })
+  if (!minimaxCnCodingPlan) return null
+
+  const minimaxIoCodingPlan = await selectOrCancel({
+    message: "Do you have a MiniMax.io Coding Plan subscription?",
+    options: [
+      { value: "no", label: "No", hint: "Will use other configured providers" },
+      { value: "yes", label: "Yes", hint: "MiniMax M2.5 for fast coding fallback (IO)" },
+    ],
+    initialValue: initial.minimaxIoCodingPlan,
+  })
+  if (!minimaxIoCodingPlan) return null
+
   return {
     hasClaude: claude !== "no",
     isMax20: claude === "max20",
@@ -109,5 +129,7 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasOpencodeZen: opencodeZen === "yes",
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
+    hasMinimaxCnCodingPlan: minimaxCnCodingPlan === "yes",
+    hasMinimaxIoCodingPlan: minimaxIoCodingPlan === "yes",
   }
 }

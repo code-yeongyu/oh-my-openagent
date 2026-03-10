@@ -31,6 +31,8 @@ program
   .option("--opencode-zen <value>", "OpenCode Zen access: no, yes (default: no)")
   .option("--zai-coding-plan <value>", "Z.ai Coding Plan subscription: no, yes (default: no)")
   .option("--kimi-for-coding <value>", "Kimi For Coding subscription: no, yes (default: no)")
+  .option("--minimax-cn-coding-plan <value>", "MiniMax CN Coding Plan subscription: no, yes (default: no)")
+  .option("--minimax-io-coding-plan <value>", "MiniMax.io Coding Plan subscription: no, yes (default: no)")
   .option("--skip-auth", "Skip authentication setup hints")
   .addHelpText("after", `
 Examples:
@@ -38,14 +40,16 @@ Examples:
   $ bunx oh-my-opencode install --no-tui --claude=max20 --openai=yes --gemini=yes --copilot=no
   $ bunx oh-my-opencode install --no-tui --claude=no --gemini=no --copilot=yes --opencode-zen=yes
 
-Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
+Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi > MiniMax):
   Claude        Native anthropic/ models (Opus, Sonnet, Haiku)
   OpenAI        Native openai/ models (GPT-5.4 for Oracle)
   Gemini        Native google/ models (Gemini 3 Pro, Flash)
   Copilot       github-copilot/ models (fallback)
   OpenCode Zen  opencode/ models (opencode/claude-opus-4-6, etc.)
    Z.ai          zai-coding-plan/glm-5 (visual-engineering fallback)
-  Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
+   Kimi          kimi-for-coding/k2p5 (Sisyphus/Prometheus fallback)
+   MiniMax CN    minimax-cn-coding-plan/MiniMax-M2.5-highspeed (fast coding)
+   MiniMax IO   minimax-io/MiniMax-M2.5-highspeed (fast coding)
 `)
   .action(async (options) => {
     const args: InstallArgs = {
@@ -57,6 +61,8 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
       opencodeZen: options.opencodeZen,
       zaiCodingPlan: options.zaiCodingPlan,
       kimiForCoding: options.kimiForCoding,
+      minimaxCnCodingPlan: options.minimaxCnCodingPlan,
+      minimaxIoCodingPlan: options.minimaxIoCodingPlan,
       skipAuth: options.skipAuth ?? false,
     }
     const exitCode = await install(args)
@@ -64,9 +70,9 @@ Model Providers (Priority: Native > Copilot > OpenCode Zen > Z.ai > Kimi):
   })
 
 program
-   .command("run <message>")
-   .allowUnknownOption()
-   .passThroughOptions()
+  .command("run <message>")
+  .allowUnknownOption()
+  .passThroughOptions()
   .description("Run opencode with todo/background task completion enforcement")
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
   .option("-d, --directory <path>", "Working directory")
