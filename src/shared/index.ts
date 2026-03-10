@@ -45,6 +45,7 @@ export type {
 export * from "./model-availability"
 export * from "./fallback-model-availability"
 export * from "./connected-providers-cache"
+export * from "./opencode-config-reader"
 export * from "./session-utils"
 export * from "./tmux"
 export * from "./model-suggestion-retry"
