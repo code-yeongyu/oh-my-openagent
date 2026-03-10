@@ -34,7 +34,8 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.copilot ||
     avail.zai ||
     avail.kimiForCoding ||
-    avail.opencodeGo
+    avail.opencodeGo ||
+    (avail.ollama ?? false)
   if (!hasAnyProvider) {
     return {
       $schema: SCHEMA_URL,
