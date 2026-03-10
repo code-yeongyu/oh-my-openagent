@@ -36,7 +36,7 @@ interface CachedTokenState {
 }
 
 function isAnthropicProvider(providerID: string): boolean {
-  return providerID === "anthropic" || providerID === "google-vertex-anthropic"
+  return providerID === "anthropic" || providerID.startsWith("google-vertex-anthropic")
 }
 
 export function createContextWindowMonitorHook(

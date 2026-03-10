@@ -3,7 +3,7 @@ import { log, normalizeModelID } from "../../shared"
 const OPUS_4_6_PATTERN = /claude-opus-4[-.]6/i
 
 function isClaudeProvider(providerID: string, modelID: string): boolean {
-  if (["anthropic", "google-vertex-anthropic", "opencode"].includes(providerID)) return true
+  if (providerID === "anthropic" || providerID.startsWith("google-vertex-anthropic") || providerID === "opencode") return true
   if (providerID === "github-copilot" && modelID.toLowerCase().includes("claude")) return true
   return false
 }
