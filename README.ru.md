@@ -1,3 +1,9 @@
+> [!WARNING]
+> **Временное уведомление (на этой неделе): сниженная доступность мейнтейнера**
+>
+> Ключевой мейнтейнер Q получил травму, поэтому на этой неделе ответы по issue/PR и релизы могут задерживаться.
+> Спасибо за терпение и поддержку.
+
 > [!NOTE]
 >
 > [![Sisyphus Labs - Sisyphus is the agent that codes like your team.](./.github/assets/sisyphuslabs.png?v=2)](https://sisyphuslabs.ai)
