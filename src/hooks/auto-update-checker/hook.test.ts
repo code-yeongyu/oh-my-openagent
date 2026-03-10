@@ -6,8 +6,13 @@ const mockUpdateAndShowConnectedProvidersCacheStatus = mock(async () => {})
 const mockShowLocalDevToast = mock(async () => {})
 const mockShowVersionToast = mock(async () => {})
 const mockRunBackgroundUpdateCheck = mock(async () => {})
+const mockRunModelSchedulerCycle = mock(async () => null)
+const mockGetModelSchedulerIntervalMs = mock(() => 3600000)
 const mockGetCachedVersion = mock(() => "3.6.0")
 const mockGetLocalDevVersion = mock<(directory: string) => string | null>(() => null)
+
+const intervalCallbacks: Array<() => void> = []
+const originalSetInterval = globalThis.setInterval
 
 mock.module("./hook/config-errors-toast", () => ({
   showConfigErrorsIfAny: mockShowConfigErrorsIfAny,
@@ -25,6 +30,11 @@ mock.module("./hook/connected-providers-status", () => ({
 mock.module("./hook/startup-toasts", () => ({
   showLocalDevToast: mockShowLocalDevToast,
   showVersionToast: mockShowVersionToast,
+}))
+
+mock.module("../../features/model-scheduler", () => ({
+  runModelSchedulerCycle: mockRunModelSchedulerCycle,
+  getModelSchedulerIntervalMs: mockGetModelSchedulerIntervalMs,
 }))
 
 mock.module("./hook/background-update-check", () => ({
@@ -61,15 +71,27 @@ beforeEach(() => {
   mockShowLocalDevToast.mockClear()
   mockShowVersionToast.mockClear()
   mockRunBackgroundUpdateCheck.mockClear()
+  mockRunModelSchedulerCycle.mockClear()
+  mockGetModelSchedulerIntervalMs.mockClear()
   mockGetCachedVersion.mockClear()
   mockGetLocalDevVersion.mockClear()
 
   mockGetCachedVersion.mockReturnValue("3.6.0")
   mockGetLocalDevVersion.mockReturnValue(null)
+  mockGetModelSchedulerIntervalMs.mockReturnValue(3600000)
+
+  globalThis.setInterval = (((handler: TimerHandler) => {
+    if (typeof handler === "function") {
+      intervalCallbacks.push(handler)
+    }
+    return { unref: () => {} } as unknown as number
+  }) as typeof setInterval)
 })
 
 afterEach(() => {
   delete process.env.OPENCODE_CLI_RUN_MODE
+  intervalCallbacks.length = 0
+  globalThis.setInterval = originalSetInterval
 })
 
 describe("createAutoUpdateCheckerHook", () => {
@@ -100,6 +122,7 @@ describe("createAutoUpdateCheckerHook", () => {
     expect(mockShowLocalDevToast).not.toHaveBeenCalled()
     expect(mockShowVersionToast).not.toHaveBeenCalled()
     expect(mockRunBackgroundUpdateCheck).not.toHaveBeenCalled()
+    expect(mockRunModelSchedulerCycle).not.toHaveBeenCalled()
   })
 
   it("runs all startup checks on normal session.created", async () => {
@@ -119,8 +142,10 @@ describe("createAutoUpdateCheckerHook", () => {
     expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
     expect(mockUpdateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
     expect(mockShowModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
+    expect(mockRunModelSchedulerCycle).toHaveBeenCalledTimes(1)
     expect(mockShowVersionToast).toHaveBeenCalledTimes(1)
     expect(mockRunBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
+    expect(intervalCallbacks).toHaveLength(1)
   })
 
   it("ignores subagent sessions (parentID present)", async () => {
@@ -144,6 +169,7 @@ describe("createAutoUpdateCheckerHook", () => {
     expect(mockShowLocalDevToast).not.toHaveBeenCalled()
     expect(mockShowVersionToast).not.toHaveBeenCalled()
     expect(mockRunBackgroundUpdateCheck).not.toHaveBeenCalled()
+    expect(mockRunModelSchedulerCycle).not.toHaveBeenCalled()
   })
 
   it("runs only once (hasChecked guard)", async () => {
@@ -168,6 +194,7 @@ describe("createAutoUpdateCheckerHook", () => {
     expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
     expect(mockUpdateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
     expect(mockShowModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
+    expect(mockRunModelSchedulerCycle).toHaveBeenCalledTimes(1)
     expect(mockShowVersionToast).toHaveBeenCalledTimes(1)
     expect(mockRunBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
   })
@@ -190,6 +217,7 @@ describe("createAutoUpdateCheckerHook", () => {
     expect(mockShowConfigErrorsIfAny).toHaveBeenCalledTimes(1)
     expect(mockUpdateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
     expect(mockShowModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
+    expect(mockRunModelSchedulerCycle).toHaveBeenCalledTimes(1)
     expect(mockShowLocalDevToast).toHaveBeenCalledTimes(1)
     expect(mockShowVersionToast).not.toHaveBeenCalled()
     expect(mockRunBackgroundUpdateCheck).not.toHaveBeenCalled()
@@ -215,6 +243,7 @@ describe("createAutoUpdateCheckerHook", () => {
     expect(mockShowLocalDevToast).not.toHaveBeenCalled()
     expect(mockShowVersionToast).not.toHaveBeenCalled()
     expect(mockRunBackgroundUpdateCheck).not.toHaveBeenCalled()
+    expect(mockRunModelSchedulerCycle).not.toHaveBeenCalled()
   })
 
   it("passes correct toast message with sisyphus enabled", async () => {

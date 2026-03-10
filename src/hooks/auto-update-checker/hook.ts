@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared/logger"
+import { getModelSchedulerIntervalMs, runModelSchedulerCycle } from "../../features/model-scheduler"
 import { getCachedVersion, getLocalDevVersion } from "./checker"
 import type { AutoUpdateCheckerOptions } from "./types"
 import { runBackgroundUpdateCheck } from "./hook/background-update-check"
@@ -9,7 +10,7 @@ import { showModelCacheWarningIfNeeded } from "./hook/model-cache-warning"
 import { showLocalDevToast, showVersionToast } from "./hook/startup-toasts"
 
 export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdateCheckerOptions = {}) {
-  const { showStartupToast = true, isSisyphusEnabled = false, autoUpdate = true } = options
+  const { showStartupToast = true, isSisyphusEnabled = false, autoUpdate = true, modelScheduler } = options
   const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true"
 
   const getToastMessage = (isUpdate: boolean, latestVersion?: string): string => {
@@ -24,6 +25,21 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
   }
 
   let hasChecked = false
+  let schedulerStarted = false
+
+  const startSchedulerLoop = () => {
+    if (schedulerStarted) return
+    schedulerStarted = true
+
+    const intervalMs = getModelSchedulerIntervalMs(modelScheduler)
+    const interval = setInterval(() => {
+      runModelSchedulerCycle(ctx, modelScheduler).catch((error) => {
+        log("[auto-update-checker] model scheduler interval failed:", error)
+      })
+    }, intervalMs)
+
+    interval.unref?.()
+  }
 
   return {
     event: ({ event }: { event: { type: string; properties?: unknown } }) => {
@@ -44,6 +60,14 @@ export function createAutoUpdateCheckerHook(ctx: PluginInput, options: AutoUpdat
         await showConfigErrorsIfAny(ctx)
         await updateAndShowConnectedProvidersCacheStatus(ctx)
         await showModelCacheWarningIfNeeded(ctx)
+
+        if (modelScheduler?.preflight_on_session_created ?? true) {
+          await runModelSchedulerCycle(ctx, modelScheduler).catch((error) => {
+            log("[auto-update-checker] model scheduler preflight failed:", error)
+          })
+        }
+
+        startSchedulerLoop()
 
         if (localDevVersion) {
           if (showStartupToast) {
