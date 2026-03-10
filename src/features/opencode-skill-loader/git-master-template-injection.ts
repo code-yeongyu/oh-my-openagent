@@ -19,7 +19,7 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 		const footerText =
 			typeof commitFooter === "string"
 				? commitFooter
-				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-opencode)"
+				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)"
 		sections.push("1. **Footer in commit body:**")
 		sections.push("```")
 		sections.push(footerText)
@@ -39,7 +39,7 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 		const footerText =
 			typeof commitFooter === "string"
 				? commitFooter
-				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-opencode)"
+				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)"
 		sections.push("**Example (both enabled):**")
 		sections.push("```bash")
 		sections.push(
@@ -50,7 +50,7 @@ export function injectGitMasterConfig(template: string, config?: GitMasterConfig
 		const footerText =
 			typeof commitFooter === "string"
 				? commitFooter
-				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-opencode)"
+				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)"
 		sections.push("**Example:**")
 		sections.push("```bash")
 		sections.push(`git commit -m "{Commit Message}" -m "${footerText}"`)
