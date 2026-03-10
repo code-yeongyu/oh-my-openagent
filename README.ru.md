@@ -77,7 +77,7 @@ English | 한국어 | 日本語 | 简体中文 | Русский
 
 ```
 Install and configure oh-my-opencode by following the instructions here:
-https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/master/docs/guide/installation.md
+https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
 Или прочитайте руководство по установке, но серьёзно — пусть агент сделает это за вас. Люди ошибаются в конфигах.
@@ -87,7 +87,7 @@ https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/master
 Загрузите руководство по установке и следуйте ему:
 
 ```bash
-curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/master/docs/guide/installation.md
+curl -s https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
 ------
