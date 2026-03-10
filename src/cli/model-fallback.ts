@@ -5,6 +5,7 @@ import {
 import type { InstallConfig } from "./types"
 
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
+import { applyOpenAiOnlyModelCatalog, isOpenAiOnlyAvailability } from "./openai-only-model-catalog"
 import { toProviderAvailability } from "./provider-availability"
 import {
 	getSisyphusFallbackChain,
@@ -122,11 +123,15 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     }
   }
 
-  return {
+  const generatedConfig: GeneratedOmoConfig = {
     $schema: SCHEMA_URL,
     agents,
     categories,
   }
+
+  return isOpenAiOnlyAvailability(avail)
+    ? applyOpenAiOnlyModelCatalog(generatedConfig)
+    : generatedConfig
 }
 
 export function shouldShowChatGPTOnlyWarning(config: InstallConfig): boolean {

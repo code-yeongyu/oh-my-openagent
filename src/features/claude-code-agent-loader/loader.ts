@@ -44,7 +44,7 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
 
        const config: AgentConfig = {
          description: formattedDescription,
-         mode: "subagent",
+         mode: data.mode || "subagent",
          prompt: body.trim(),
        }
 

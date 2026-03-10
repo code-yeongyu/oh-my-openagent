@@ -116,7 +116,7 @@ export function buildExploreSection(agents: AvailableAgent[]): string {
 
   return `### Explore Agent = Contextual Grep
 
-Use it as a **peer tool**, not a fallback. Fire liberally.
+Use it as a **peer tool**, not a fallback. Fire liberally for discovery, not for files you already know.
 
 **Use Direct Tools when:**
 ${avoidWhen.map((w) => `- ${w}`).join("\n")}
@@ -341,6 +341,23 @@ export function buildAntiPatternsSection(): string {
   return `## Anti-Patterns (BLOCKING violations)
 
 ${patterns.join("\n")}`
+}
+
+export function buildToolCallFormatSection(): string {
+  return `## Tool Call Format (CRITICAL)
+
+**ALWAYS use the native tool calling mechanism. NEVER output tool calls as text.**
+
+When you need to call a tool:
+1. Use the tool call interface provided by the system
+2. Do NOT write tool calls as plain text like \`assistant to=functions.XXX\`
+3. Do NOT output JSON directly in your text response
+4. The system handles tool call formatting automatically
+
+**CORRECT**: Invoke the tool through the tool call interface
+**WRONG**: Writing \`assistant to=functions.todowrite\` or \`json\n{...}\` as text
+
+Your tool calls are processed automatically. Just invoke the tool - do not format the call yourself.`
 }
 
 export function buildNonClaudePlannerSection(model: string): string {

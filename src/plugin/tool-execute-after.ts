@@ -56,8 +56,8 @@ export function createToolExecuteAfterHandler(args: {
       }
     }
 
-    await hooks.claudeCodeHooks?.["tool.execute.after"]?.(input, output)
     await hooks.toolOutputTruncator?.["tool.execute.after"]?.(input, output)
+    await hooks.claudeCodeHooks?.["tool.execute.after"]?.(input, output)
     await hooks.preemptiveCompaction?.["tool.execute.after"]?.(input, output)
     await hooks.contextWindowMonitor?.["tool.execute.after"]?.(input, output)
     await hooks.commentChecker?.["tool.execute.after"]?.(input, output)
