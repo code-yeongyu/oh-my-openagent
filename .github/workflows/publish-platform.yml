@@ -82,6 +82,15 @@ jobs:
           cd packages/${{ matrix.platform }}
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
+      - name: Update version in root package.json
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          VERSION="${{ inputs.version }}"
+          # Update root package.json version (CLI reads from here at compile time)
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          # Update optionalDependencies versions to match
+          jq --arg v "$VERSION" '.optionalDependencies = (.optionalDependencies | to_entries | map(.value = $v) | from_entries)' package.json > tmp.json && mv tmp.json package.json
+
       - name: Pre-download baseline compile target
         if: steps.check.outputs.skip != 'true' && endsWith(matrix.platform, '-baseline')
         shell: bash

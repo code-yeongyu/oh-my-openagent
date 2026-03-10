@@ -247,8 +247,36 @@ jobs:
       - name: Restore package.json
         if: steps.check.outputs.skip != 'true'
         run: |
+          VERSION="${{ steps.version.outputs.version }}"
           # Restore original package name
           jq '.name = "oh-my-opencode"' package.json > tmp.json && mv tmp.json package.json
+          # Restore optionalDependencies to oh-my-opencode naming
+          jq --arg v "$VERSION" '.optionalDependencies = {
+            "oh-my-opencode-darwin-arm64": $v,
+            "oh-my-opencode-darwin-x64": $v,
+            "oh-my-opencode-darwin-x64-baseline": $v,
+            "oh-my-opencode-linux-arm64": $v,
+            "oh-my-opencode-linux-arm64-musl": $v,
+            "oh-my-opencode-linux-x64": $v,
+            "oh-my-opencode-linux-x64-baseline": $v,
+            "oh-my-opencode-linux-x64-musl": $v,
+            "oh-my-opencode-linux-x64-musl-baseline": $v,
+            "oh-my-opencode-windows-x64": $v,
+            "oh-my-opencode-windows-x64-baseline": $v
+          }' package.json > tmp.json && mv tmp.json package.json
+
+      - name: Git commit and tag
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add package.json packages/*/package.json
+          git diff --cached --quiet || git commit -m "release: v${{ steps.version.outputs.version }}"
+          git tag -f "v${{ steps.version.outputs.version }}"
+          git push origin --tags --force
+          git push origin HEAD
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   trigger-platform:
     runs-on: ubuntu-latest
