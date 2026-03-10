@@ -549,6 +549,42 @@ describe("generateModelConfig", () => {
     })
   })
 
+  describe("Ollama provider", () => {
+    test("uses Ollama models when only Ollama is available (not ULTIMATE_FALLBACK)", () => {
+      // #given only Ollama is available
+      const config = createConfig({ hasOllama: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then should use Ollama models, not ULTIMATE_FALLBACK
+      expect(result.agents?.sisyphus?.model).not.toBe("opencode/glm-4.7-free")
+      expect(result.agents?.sisyphus?.model).toBe("ollama/llama3.1:70b")
+    })
+
+    test("returns ULTIMATE_FALLBACK when Ollama is false and no cloud providers", () => {
+      // #given no providers are available (hasOllama explicitly false)
+      const config = createConfig({ hasOllama: false })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then oracle should use ULTIMATE_FALLBACK (sisyphus is excluded from fallback path)
+      expect(result.agents?.oracle?.model).toBe("opencode/glm-4.7-free")
+    })
+
+    test("cloud providers take priority over Ollama when both available", () => {
+      // #given both Claude and Ollama are available
+      const config = createConfig({ hasClaude: true, isMax20: true, hasOllama: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then sisyphus should use Claude, not Ollama
+      expect(result.agents?.sisyphus?.model).toBe("anthropic/claude-opus-4-6")
+    })
+  })
+
   describe("schema URL", () => {
     test("always includes correct schema URL", () => {
       // #given any config
