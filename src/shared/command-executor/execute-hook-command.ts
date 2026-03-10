@@ -71,7 +71,9 @@ export async function executeHookCommand(
       stderr += data.toString();
     });
 
-    proc.stdin?.on("error", () => {});
+    proc.stdin?.on("error", (stdinErr) => {
+      // Ignore stdin errors - process may have already exited
+    });
     proc.stdin?.write(stdin);
     proc.stdin?.end();
 
@@ -100,13 +102,16 @@ export async function executeHookCommand(
         if (!isWin32 && proc.pid) {
           try {
             process.kill(-proc.pid, signal);
-          } catch {
+          } catch (pgErr) {
+            // Process group kill failed, try direct kill
             proc.kill(signal);
           }
         } else {
           proc.kill(signal);
         }
-      } catch {}
+      } catch (killErr) {
+        // Process may already be dead
+      }
     };
 
     const timeoutTimer = setTimeout(() => {

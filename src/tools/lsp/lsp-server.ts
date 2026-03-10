@@ -77,7 +77,9 @@ class LSPServerManager {
         // Stale init can permanently block subsequent calls (e.g., LSP process hang)
         try {
           await managed.client.stop();
-        } catch {}
+        } catch (stopErr) {
+          // Ignore stop errors during stale init cleanup
+        }
         this.clients.delete(key);
         managed = undefined;
       }
@@ -86,11 +88,13 @@ class LSPServerManager {
       if (managed.initPromise) {
         try {
           await managed.initPromise;
-        } catch {
+        } catch (initErr) {
           // Failed init should not keep the key blocked forever.
           try {
             await managed.client.stop();
-          } catch {}
+          } catch (stopErr) {
+            // Ignore stop errors after failed init
+          }
           this.clients.delete(key);
           managed = undefined;
         }
@@ -104,7 +108,9 @@ class LSPServerManager {
         }
         try {
           await managed.client.stop();
-        } catch {}
+        } catch (stopErr) {
+          // Ignore stop errors when cleaning up dead client
+        }
         this.clients.delete(key);
       }
     }
@@ -130,7 +136,9 @@ class LSPServerManager {
       this.clients.delete(key);
       try {
         await client.stop();
-      } catch {}
+      } catch (stopErr) {
+        // Ignore stop errors after init failure
+      }
       throw error;
     }
     const m = this.clients.get(key);

@@ -109,7 +109,9 @@ export class LSPClientTransport {
             this.stderrBuffer.shift()
           }
         }
-      } catch {}
+      } catch (err) {
+        // Silently ignore stderr read errors - stream may close during process shutdown
+      }
     }
     read()
   }
@@ -157,7 +159,9 @@ export class LSPClientTransport {
       try {
         this.sendNotification("shutdown", {})
         this.sendNotification("exit")
-      } catch {}
+      } catch (err) {
+        // Ignore shutdown errors - connection may already be closed
+      }
       this.connection.dispose()
       this.connection = null
     }
@@ -184,9 +188,13 @@ export class LSPClientTransport {
             proc.kill("SIGKILL")
             // Wait briefly for SIGKILL to take effect
             await Promise.race([proc.exited, new Promise<void>((resolve) => setTimeout(resolve, 1000))])
-          } catch {}
+          } catch (sigkillErr) {
+            // SIGKILL may fail if process already terminated
+          }
         }
-      } catch {}
+      } catch (stopErr) {
+        // Process cleanup errors are logged but don't prevent cleanup
+      }
     }
     this.processExited = true
     this.diagnosticsStore.clear()

@@ -61,7 +61,9 @@ function wrapNodeProcess(proc: ChildProcess): SpawnedProcess {
         }
 
         proc.kill(signal)
-      } catch {}
+      } catch (killErr) {
+        // Process may already be dead
+      }
     },
   }
 }
