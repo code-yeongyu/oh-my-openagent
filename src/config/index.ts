@@ -9,6 +9,8 @@ export type {
   McpName,
   AgentName,
   HookName,
+  ModelSchedulerConfig,
+  ModelSchedulerMode,
   BuiltinCommandName,
   SisyphusAgentConfig,
   ExperimentalConfig,

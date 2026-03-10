@@ -3702,6 +3702,62 @@
       },
       "additionalProperties": false
     },
+    "model_scheduler": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "interval_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "observe",
+            "dry-run",
+            "active"
+          ]
+        },
+        "preflight_on_session_created": {
+          "type": "boolean"
+        },
+        "failure_threshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "recovery_threshold": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "agent_cooldown_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1440
+        },
+        "protect_manual_routing": {
+          "type": "boolean"
+        },
+        "probe_enabled": {
+          "type": "boolean"
+        },
+        "probe_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 300000
+        },
+        "probe_max_latency_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 300000
+        }
+      },
+      "additionalProperties": false
+    },
     "babysitting": {
       "type": "object",
       "properties": {
