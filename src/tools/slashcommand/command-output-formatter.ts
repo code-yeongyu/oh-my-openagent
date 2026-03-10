@@ -48,6 +48,8 @@ export async function formatLoadedCommand(
   const resolvedContent = await resolveCommandsInText(withFileReferences)
 
   let finalContent = resolvedContent.trim()
+  const args = userMessage ?? ""
+  finalContent = finalContent.replace(/\$ARGUMENTS/g, args)
   if (userMessage) {
     finalContent = finalContent.replace(/\$\{user_message\}/g, userMessage)
   }
