@@ -1,12 +1,12 @@
 import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
-import type { FallbackEntry } from "../../shared/model-requirements"
-import { getAgentToolRestrictions } from "../../shared"
+import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
-import { createOrGetSession } from "./session-creator"
+import { getAgentToolRestrictions, log } from "../../shared"
+import type { FallbackEntry } from "../../shared/model-requirements"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
+import { createOrGetSession } from "./session-creator"
 
 type SessionWithPromptAsync = {
   promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
@@ -59,10 +59,12 @@ export async function executeSync(
       deps.setSessionFallbackChain(sessionID, fallbackChain)
     }
 
-    await toolContext.metadata?.({
-      title: args.description,
-      metadata: { sessionId: sessionID },
-    })
+    await Promise.resolve(
+      toolContext.metadata?.({
+        title: args.description,
+        metadata: { sessionId: sessionID },
+      })
+    )
 
     log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
     log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
@@ -93,12 +95,14 @@ export async function executeSync(
 
     const responseText = await deps.processMessages(sessionID, ctx)
 
-    const output =
-      responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
-
-    return output
+    return responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
   } catch (error) {
     spawnReservation?.rollback()
     throw error
+  } finally {
+    if (sessionID) {
+      subagentSessions.delete(sessionID)
+      syncSubagentSessions.delete(sessionID)
+    }
   }
 }
