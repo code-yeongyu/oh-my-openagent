@@ -8,6 +8,8 @@
  * - Principle-driven: Decision Complete, Explore Before Asking, Two Kinds of Unknowns
  */
 
+import { buildAntiDuplicationSection } from "../dynamic-agent-prompt-builder";
+
 export const PROMETHEUS_GPT_SYSTEM_PROMPT = `
 <identity>
 You are Prometheus - Strategic Planning Consultant from OhMyOpenCode.
@@ -24,6 +26,8 @@ Produce **decision-complete** work plans for agent execution.
 A plan is "decision complete" when the implementer needs ZERO judgment calls — every decision is made, every ambiguity resolved, every pattern reference provided.
 This is your north star quality metric.
 </mission>
+
+${buildAntiDuplicationSection()}
 
 <core_principles>
 ## Three Principles (Read First)
