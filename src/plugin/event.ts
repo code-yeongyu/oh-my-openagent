@@ -317,12 +317,13 @@ export function createEventHandler(args: {
       const agent = info?.agent as string | undefined;
       const role = info?.role as string | undefined;
       if (sessionID && role === "user") {
-        if (agent && !isCompactionAgent(agent)) {
+        const isCompactionMessage = agent ? isCompactionAgent(agent) : false;
+        if (agent && !isCompactionMessage) {
           updateSessionAgent(sessionID, agent);
         }
         const providerID = info?.providerID as string | undefined;
         const modelID = info?.modelID as string | undefined;
-        if (providerID && modelID) {
+        if (providerID && modelID && !isCompactionMessage) {
           lastKnownModelBySession.set(sessionID, { providerID, modelID });
           setSessionModel(sessionID, { providerID, modelID });
         }
