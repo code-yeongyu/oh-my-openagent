@@ -2,8 +2,13 @@ import type { BackgroundManager } from "../../features/background-agent"
 import type { BackgroundTask } from "../../features/background-agent/types"
 import type { CouncilMemberConfig } from "../../config/schema/athena"
 import { parseModelString } from "../delegate-task/model-string-parser"
-import { COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents"
+import {
+  ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX,
+  buildCouncilMemberAgentKey,
+  COUNCIL_MEMBER_KEY_PREFIX,
+} from "../../agents/builtin-agents/council-member-agents"
 import { normalizeMemberId } from "../../shared/member-id-normalizer"
+import { COUNCIL_DEFAULTS } from "../../agents/athena/constants"
 
 export interface CouncilLaunchContext {
   parentSessionID: string
@@ -14,6 +19,12 @@ export interface CouncilLaunchContext {
 interface LaunchOutcome {
   member: CouncilMemberConfig
   task: BackgroundTask
+}
+
+function getCouncilMemberKeyPrefix(parentAgent?: string): string {
+  return parentAgent?.toLowerCase().includes("athena-junior")
+    ? ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX
+    : COUNCIL_MEMBER_KEY_PREFIX
 }
 
 /**
@@ -32,7 +43,10 @@ export async function launchCouncilMember(
   }
 
   const normalizedName = normalizeMemberId(member.name)
-  const agentKey = `${COUNCIL_MEMBER_KEY_PREFIX}${normalizedName}`
+  const agentKey = buildCouncilMemberAgentKey(
+    normalizedName,
+    getCouncilMemberKeyPrefix(context.parentAgent)
+  )
   const memberName = member.name ?? member.model
 
   const task = await manager.launch({

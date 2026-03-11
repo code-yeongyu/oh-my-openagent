@@ -3,6 +3,7 @@ import { launchCouncilMember } from "./council-launcher"
 import type { CouncilLaunchContext } from "./council-launcher"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CouncilMemberConfig } from "../../config/schema/athena"
+import { ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents"
 
 const makeManager = (overrides?: Partial<BackgroundManager>): BackgroundManager =>
   ({
@@ -91,6 +92,27 @@ describe("launchCouncilMember", () => {
     })
   })
 
+  describe("#given Athena-Junior launched the council member", () => {
+    describe("#when launched successfully", () => {
+      it("#then uses the Athena-Junior council key prefix", async () => {
+        const manager = makeManager()
+        const member: CouncilMemberConfig = {
+          name: "Claude Opus",
+          model: "anthropic/claude-opus-4-6",
+        }
+        const context: CouncilLaunchContext = {
+          ...makeContext(),
+          parentAgent: "athena-junior",
+        }
+
+        await launchCouncilMember(member, "analyze this", manager, context)
+
+        const launchArgs = (manager.launch as ReturnType<typeof mock>).mock.calls[0][0]
+        expect(launchArgs.agent).toBe(`${ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX}claude_opus`)
+      })
+    })
+  })
+
   describe("#given a member without a variant", () => {
     describe("#when launched", () => {
       it("#then does not include variant in the model config", async () => {
@@ -108,13 +130,13 @@ describe("launchCouncilMember", () => {
 
   describe("#given a member with an invalid model format (no slash)", () => {
     describe("#when launched", () => {
-      it("#then throws an error about invalid model format", async () => {
+      it("#then throws an error about invalid model format", () => {
         const manager = makeManager()
         const member: CouncilMemberConfig = {
           name: "Bad Model",
           model: "not-a-valid-model",
         }
-        await expect(launchCouncilMember(member, "prompt", manager, makeContext())).rejects.toThrow(
+        expect(launchCouncilMember(member, "prompt", manager, makeContext())).rejects.toThrow(
           'Invalid model format: "not-a-valid-model"',
         )
       })
@@ -123,13 +145,13 @@ describe("launchCouncilMember", () => {
 
   describe("#given a member with an empty model string", () => {
     describe("#when launched", () => {
-      it("#then throws an error about invalid model format", async () => {
+      it("#then throws an error about invalid model format", () => {
         const manager = makeManager()
         const member: CouncilMemberConfig = {
           name: "Empty Model",
           model: "",
         }
-        await expect(launchCouncilMember(member, "prompt", manager, makeContext())).rejects.toThrow(
+        expect(launchCouncilMember(member, "prompt", manager, makeContext())).rejects.toThrow(
           "Invalid model format",
         )
       })

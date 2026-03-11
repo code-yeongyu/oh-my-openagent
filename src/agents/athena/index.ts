@@ -1,6 +1,7 @@
 export { createAthenaAgent } from "./agent"
 export { createAthenaJuniorAgent, ATHENA_JUNIOR_PROMPT_METADATA } from "./athena-junior-agent"
 export { createCouncilMemberAgent, COUNCIL_MEMBER_PROMPT, COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM } from "./council-member-agent"
+export type { CouncilMemberAgentMode } from "./council-member-agent"
 export { COUNCIL_INTENT_ADDENDUMS } from "./council-intent-addendums"
 export {
   buildAthenaRuntimeGuidance,

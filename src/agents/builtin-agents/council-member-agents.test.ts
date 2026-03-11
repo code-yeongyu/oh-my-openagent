@@ -64,6 +64,31 @@ describe("council-member-agents", () => {
     expect(result.agents).toHaveProperty("Council: codex_gpt")
   })
 
+  test("registers solo-mode council members with finish-only runtime tool access", () => {
+    //#given
+    const config = {
+      members: [
+        { model: "openai/gpt-5.3-codex", name: "GPT" },
+        { model: "anthropic/claude-opus-4-6", name: "Claude" },
+      ],
+      retry_on_fail: 0,
+      retry_failed_if_others_finished: false,
+      cancel_retrying_on_quorum: true,
+      stuck_threshold_seconds: 120,
+      member_max_running_seconds: 1800,
+    }
+
+    //#when
+    const result = registerCouncilMemberAgents(config, "solo")
+    const tools = result.agents["Council: gpt"].tools as Record<string, boolean>
+
+    //#then
+    expect(tools.finish_task).toBe(true)
+    expect(tools.background_wait).toBe(true)
+    expect(tools.read).toBe(false)
+    expect(tools.call_omo_agent).toBe(false)
+  })
+
   test("returns empty when valid members below 2", () => {
     //#given - one valid model, one invalid (no slash separator)
     const config = {

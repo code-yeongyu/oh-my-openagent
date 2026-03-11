@@ -1,19 +1,30 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { CouncilConfig, CouncilMemberConfig } from "../../config/schema/athena"
-import { createCouncilMemberAgent } from "../athena"
+import { createCouncilMemberAgent, type CouncilMemberAgentMode } from "../athena"
 import { parseModelString } from "../../tools/delegate-task/model-string-parser"
 import { log } from "../../shared/logger"
 import { normalizeMemberId } from "../../shared/member-id-normalizer"
 
 /** Prefix used for all dynamically-registered council member agent keys. */
 export const COUNCIL_MEMBER_KEY_PREFIX = "Council: "
+export const ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX = "Athena-Junior Council: "
+
+export function buildCouncilMemberAgentKey(
+  memberName: string,
+  keyPrefix = COUNCIL_MEMBER_KEY_PREFIX
+): string {
+  return `${keyPrefix}${memberName}`
+}
 
 /**
  * Generates a stable agent registration key from a council member's name.
  */
-function getCouncilMemberAgentKey(member: CouncilMemberConfig): string {
+function getCouncilMemberAgentKey(
+  member: CouncilMemberConfig,
+  keyPrefix = COUNCIL_MEMBER_KEY_PREFIX
+): string {
   const normalizedName = normalizeMemberId(member.name)
-  return `${COUNCIL_MEMBER_KEY_PREFIX}${normalizedName}`
+  return buildCouncilMemberAgentKey(normalizedName, keyPrefix)
 }
 
 /**
@@ -24,7 +35,9 @@ function getCouncilMemberAgentKey(member: CouncilMemberConfig): string {
 type SkippedMember = { name: string; reason: string }
 
 export function registerCouncilMemberAgents(
-  councilConfig: CouncilConfig
+  councilConfig: CouncilConfig,
+  mode: CouncilMemberAgentMode = "delegation",
+  keyPrefix = COUNCIL_MEMBER_KEY_PREFIX
 ): { agents: Record<string, AgentConfig>; registeredKeys: string[]; skippedMembers: SkippedMember[] } {
   const agents: Record<string, AgentConfig> = {}
   const registeredKeys: string[] = []
@@ -42,7 +55,7 @@ export function registerCouncilMemberAgents(
       continue
     }
 
-    const key = getCouncilMemberAgentKey(member)
+    const key = getCouncilMemberAgentKey(member, keyPrefix)
     const nameNormalized = normalizeMemberId(member.name)
 
     if (registeredNamesNormalized.has(nameNormalized)) {
@@ -57,7 +70,7 @@ export function registerCouncilMemberAgents(
       continue
     }
 
-    const config = createCouncilMemberAgent(member.model)
+    const config = createCouncilMemberAgent(member.model, mode)
     const description = `Council member: ${member.name} (${parsed.providerID}/${parsed.modelID}). Independent read-only code analyst for Athena council. (OhMyOpenCode)`
 
     agents[key] = {

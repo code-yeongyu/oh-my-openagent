@@ -29,9 +29,13 @@ import { maybeCreateSisyphusConfig } from "./builtin-agents/sisyphus-agent"
 import { maybeCreateHephaestusConfig } from "./builtin-agents/hephaestus-agent"
 import { maybeCreateAtlasConfig } from "./builtin-agents/atlas-agent"
 import { buildCustomAgentMetadata, parseRegisteredAgentSummaries } from "./custom-agent-summaries"
-import { registerCouncilMemberAgents } from "./builtin-agents/council-member-agents"
+import {
+  ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX,
+  registerCouncilMemberAgents,
+} from "./builtin-agents/council-member-agents"
 import { applyMissingCouncilGuard } from "./builtin-agents/athena-council-guard"
 import type { CouncilConfig } from "../config/schema/athena"
+import type { CouncilMemberAgentMode } from "./athena"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -214,6 +218,20 @@ export async function createBuiltinAgents(
     const { agents: councilAgents, registeredKeys, skippedMembers } = registerCouncilMemberAgents(councilConfig)
     for (const [key, config] of Object.entries(councilAgents)) {
       result[key] = config
+    }
+
+    if (result["athena-junior"]) {
+      const juniorMode: CouncilMemberAgentMode =
+        athenaNonInteractiveConfig?.non_interactive_mode === "solo" ? "solo" : "delegation"
+      const { agents: athenaJuniorCouncilAgents } = registerCouncilMemberAgents(
+        councilConfig,
+        juniorMode,
+        ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX
+      )
+
+      for (const [key, config] of Object.entries(athenaJuniorCouncilAgents)) {
+        result[key] = { ...config, hidden: true }
+      }
     }
 
     if (registeredKeys.length > 0) {

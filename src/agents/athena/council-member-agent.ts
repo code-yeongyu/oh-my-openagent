@@ -4,6 +4,60 @@ import type { AgentMode } from "../types"
 import { createAgentToolAllowlist } from "../../shared"
 
 const MODE: AgentMode = "subagent"
+export type CouncilMemberAgentMode = "solo" | "delegation"
+type ToolConfig = Record<string, boolean>
+
+const DIRECT_EXPLORATION_TOOLS = [
+  "read",
+  "grep",
+  "glob",
+  "lsp_goto_definition",
+  "lsp_find_references",
+  "lsp_symbols",
+  "lsp_diagnostics",
+  "ast_grep_search",
+] as const
+
+const DELEGATION_RUNTIME_TOOLS = [
+  "call_omo_agent",
+  "background_output",
+  "background_wait",
+  "background_cancel",
+] as const
+
+const delegationToolConfig: ToolConfig = {
+  "*": false,
+  ...Object.fromEntries(DIRECT_EXPLORATION_TOOLS.map((tool) => [tool, true])),
+  ...Object.fromEntries(DELEGATION_RUNTIME_TOOLS.map((tool) => [tool, true])),
+  todowrite: false,
+  todoread: false,
+}
+
+const soloToolConfig: ToolConfig = {
+  "*": false,
+  finish_task: true,
+  background_wait: true,
+  ...Object.fromEntries(DIRECT_EXPLORATION_TOOLS.map((tool) => [tool, false])),
+  call_omo_agent: false,
+  background_output: false,
+  background_cancel: false,
+  todowrite: false,
+  todoread: false,
+}
+
+function createPermissionFromToolConfig(toolConfig: ToolConfig): NonNullable<AgentConfig["permission"]> {
+  const enabledTools = Object.entries(toolConfig)
+    .filter(([tool, enabled]) => tool !== "*" && enabled)
+    .map(([tool]) => tool)
+  const restrictions = createAgentToolAllowlist(enabledTools)
+
+  for (const [tool, enabled] of Object.entries(toolConfig)) {
+    if (tool === "*") continue
+    restrictions.permission[tool] = enabled ? "allow" : "deny"
+  }
+
+  return restrictions.permission
+}
 
 export const COUNCIL_MEMBER_PROMPT = `You are an independent analyst in a multi-model analysis council. Your role is to provide thorough, evidence-based analysis.
 
@@ -70,44 +124,22 @@ background_output(task_id="<id>")
 - If you decide to form your final response before background tasks finishes, cancel any remaining pending tasks with \`background_cancel\`
 `
 
-export function createCouncilMemberAgent(model: string): AgentConfig {
-  // Allow-list: only read-only analysis tools + optional delegation.
-  // Everything else is denied via `*: deny`.
-  // TodoWrite/TodoRead explicitly denied to prevent uncompletable todo loops.
-  const restrictions = createAgentToolAllowlist([
-    "read",
-    "grep",
-    "glob",
-    "lsp_goto_definition",
-    "lsp_find_references",
-    "lsp_symbols",
-    "lsp_diagnostics",
-    "ast_grep_search",
-    // call_omo_agent is included in both solo and delegation modes.
-    // Solo mode restricts its use via prompt instruction (COUNCIL_SOLO_ADDENDUM)
-    // rather than tool-level restriction. This is intentional — tool-level
-    // restriction would require separate agent configs per mode.
-    "call_omo_agent",
-    "background_output",
-    "background_wait",
-    "background_cancel",
-  ])
+export function createCouncilMemberAgent(
+  model: string,
+  mode: CouncilMemberAgentMode = "delegation"
+): AgentConfig {
+  const toolConfig = mode === "solo" ? soloToolConfig : delegationToolConfig
+  const permission = createPermissionFromToolConfig(toolConfig)
 
-  // Explicitly deny TodoWrite/TodoRead even though `*: deny` should catch them.
-  // Built-in OpenCode tools may bypass the wildcard deny.
-  restrictions.permission.todowrite = "deny"
-  restrictions.permission.todoread = "deny"
-
-  const base = {
+  return {
     description:
       "Independent code analyst for Athena multi-model council. Read-only, evidence-based analysis. (Council Member - OhMyOpenCode)",
     mode: MODE,
     model,
     temperature: 0.1,
     prompt: COUNCIL_MEMBER_PROMPT,
-    ...restrictions,
+    tools: { ...toolConfig },
+    permission,
   }
-
-  return base
 }
 createCouncilMemberAgent.mode = MODE

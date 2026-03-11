@@ -84,48 +84,90 @@ describe("createCouncilMemberAgent", () => {
         expect(agent.mode).toBe("subagent")
       })
 
-      it("#then has tool restrictions with permission object", () => {
-        expect(agent.permission).toBeDefined()
+      it("#then has runtime tool restrictions", () => {
+        expect(agent.tools).toBeDefined()
       })
 
-      it("#then allows read tool", () => {
-        const perm = agent.permission as Record<string, string>
-        expect(perm.read).toBe("allow")
+      it("#then allows read tool in delegation mode", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.read).toBe(true)
       })
 
-      it("#then allows grep tool", () => {
-        const perm = agent.permission as Record<string, string>
-        expect(perm.grep).toBe("allow")
+      it("#then allows grep tool in delegation mode", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.grep).toBe(true)
       })
 
-      it("#then allows glob tool", () => {
-        const perm = agent.permission as Record<string, string>
-        expect(perm.glob).toBe("allow")
+      it("#then allows glob tool in delegation mode", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.glob).toBe(true)
       })
 
-      it("#then allows lsp_goto_definition tool", () => {
-        const perm = agent.permission as Record<string, string>
-        expect(perm.lsp_goto_definition).toBe("allow")
+      it("#then allows lsp_goto_definition tool in delegation mode", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.lsp_goto_definition).toBe(true)
       })
 
-      it("#then allows ast_grep_search tool", () => {
-        const perm = agent.permission as Record<string, string>
-        expect(perm.ast_grep_search).toBe("allow")
+      it("#then allows ast_grep_search tool in delegation mode", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.ast_grep_search).toBe(true)
       })
 
       it("#then denies all other tools via wildcard", () => {
-        const perm = agent.permission as Record<string, string>
-        expect(perm["*"]).toBe("deny")
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools["*"]).toBe(false)
       })
 
       it("#then explicitly denies todowrite", () => {
-        const perm = agent.permission as Record<string, string>
-        expect(perm.todowrite).toBe("deny")
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.todowrite).toBe(false)
       })
 
       it("#then explicitly denies todoread", () => {
-        const perm = agent.permission as Record<string, string>
-        expect(perm.todoread).toBe("deny")
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.todoread).toBe(false)
+      })
+
+      it("#then allows delegation tools by default", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.call_omo_agent).toBe(true)
+        expect(tools.background_output).toBe(true)
+        expect(tools.background_wait).toBe(true)
+        expect(tools.background_cancel).toBe(true)
+      })
+    })
+
+    describe("#when creating a solo-mode council member agent", () => {
+      const agent = createCouncilMemberAgent("openai/gpt-5-nano", "solo")
+
+      it("#then only allows finish_task and background_wait", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools["*"]).toBe(false)
+        expect(tools.finish_task).toBe(true)
+        expect(tools.background_wait).toBe(true)
+      })
+
+      it("#then denies direct exploration and delegation tools at runtime", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.read).toBe(false)
+        expect(tools.grep).toBe(false)
+        expect(tools.glob).toBe(false)
+        expect(tools.ast_grep_search).toBe(false)
+        expect(tools.call_omo_agent).toBe(false)
+        expect(tools.background_output).toBe(false)
+        expect(tools.background_cancel).toBe(false)
+      })
+    })
+
+    describe("#when creating a delegation-mode council member agent", () => {
+      const agent = createCouncilMemberAgent("openai/gpt-5-nano", "delegation")
+
+      it("#then allows delegation-specific runtime tools", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.call_omo_agent).toBe(true)
+        expect(tools.background_output).toBe(true)
+        expect(tools.background_wait).toBe(true)
+        expect(tools.background_cancel).toBe(true)
       })
     })
   })

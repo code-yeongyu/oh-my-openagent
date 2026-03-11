@@ -4,7 +4,10 @@
  * true = tool allowed, false = tool denied.
  */
 
-import { COUNCIL_MEMBER_KEY_PREFIX } from "../agents/builtin-agents/council-member-agents"
+import {
+  ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX,
+  COUNCIL_MEMBER_KEY_PREFIX,
+} from "../agents/builtin-agents/council-member-agents"
 
 const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   write: false,
@@ -12,6 +15,43 @@ const EXPLORATION_AGENT_DENYLIST: Record<string, boolean> = {
   task: false,
   call_omo_agent: false,
   switch_agent: false,
+}
+
+const COUNCIL_MEMBER_DELEGATION_RESTRICTIONS: Record<string, boolean> = {
+  "*": false,
+  read: true,
+  grep: true,
+  glob: true,
+  lsp_goto_definition: true,
+  lsp_find_references: true,
+  lsp_symbols: true,
+  lsp_diagnostics: true,
+  ast_grep_search: true,
+  call_omo_agent: true,
+  background_output: true,
+  background_wait: true,
+  background_cancel: true,
+  todowrite: false,
+  todoread: false,
+}
+
+const COUNCIL_MEMBER_SOLO_RESTRICTIONS: Record<string, boolean> = {
+  "*": false,
+  finish_task: true,
+  background_wait: true,
+  read: false,
+  grep: false,
+  glob: false,
+  lsp_goto_definition: false,
+  lsp_find_references: false,
+  lsp_symbols: false,
+  lsp_diagnostics: false,
+  ast_grep_search: false,
+  call_omo_agent: false,
+  background_output: false,
+  background_cancel: false,
+  todowrite: false,
+  todoread: false,
 }
 
 const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
@@ -62,32 +102,18 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
 
   // NOTE: Athena/council tool restrictions are also defined in:
   // - src/agents/athena/agent.ts (AgentConfig permission format)
-  // - src/agents/athena/council-member-agent.ts (AgentConfig permission format — allow-list)
+  // - src/agents/athena/council-member-agent.ts (AgentConfig tools + permission)
   // - src/plugin-handlers/tool-config-handler.ts (allow/deny string format)
   // Keep all three in sync when modifying.
-  // Council members use an allow-list: read-only analysis + optional call_omo_agent delegation.
-  // TodoWrite/TodoRead explicitly denied to prevent uncompletable todo loops.
-  // Prompt file lives in .sisyphus/tmp/ (inside project) so no external_directory needed.
-  "council-member": {
-    "*": false,
-    read: true,
-    grep: true,
-    glob: true,
-    lsp_goto_definition: true,
-    lsp_find_references: true,
-    lsp_symbols: true,
-    lsp_diagnostics: true,
-    ast_grep_search: true,
-    call_omo_agent: true,
-    background_output: true,
-    background_wait: true,
-    background_cancel: true,
-    todowrite: false,
-    todoread: false,
-  },
+  "council-member": COUNCIL_MEMBER_DELEGATION_RESTRICTIONS,
+  "athena-junior-council-member": COUNCIL_MEMBER_SOLO_RESTRICTIONS,
 }
 
 export function getAgentToolRestrictions(agentName: string): Record<string, boolean> {
+  if (agentName.startsWith(ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX)) {
+    return AGENT_RESTRICTIONS["athena-junior-council-member"] ?? {}
+  }
+
   if (agentName.startsWith(COUNCIL_MEMBER_KEY_PREFIX)) {
     return AGENT_RESTRICTIONS["council-member"] ?? {}
   }
