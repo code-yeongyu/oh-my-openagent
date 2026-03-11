@@ -2,7 +2,15 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { isCompactionAgent, findNearestMessageExcludingCompaction } from "./compaction-aware-message-resolver"
+import {
+  isCompactionAgent,
+  findNearestMessageExcludingCompaction,
+  resolvePromptContextFromSessionMessages,
+} from "./compaction-aware-message-resolver"
+import {
+  clearCompactionAgentConfigCheckpoint,
+  setCompactionAgentConfigCheckpoint,
+} from "../../shared/compaction-agent-config-checkpoint"
 
 describe("isCompactionAgent", () => {
   describe("#given agent name variations", () => {
@@ -65,6 +73,7 @@ describe("findNearestMessageExcludingCompaction", () => {
 
   afterEach(() => {
     rmSync(tempDir, { force: true, recursive: true })
+    clearCompactionAgentConfigCheckpoint("ses_checkpoint")
   })
 
   describe("#given directory with messages", () => {
@@ -185,6 +194,66 @@ describe("findNearestMessageExcludingCompaction", () => {
       // then
       expect(result).not.toBeNull()
       expect(result?.agent).toBe("newer")
+    })
+
+    test("merges partial metadata from multiple recent messages", () => {
+      // given
+      writeFileSync(
+        join(tempDir, "003.json"),
+        JSON.stringify({ model: { providerID: "anthropic", modelID: "claude-opus-4-1" } }),
+      )
+      writeFileSync(join(tempDir, "002.json"), JSON.stringify({ agent: "atlas" }))
+      writeFileSync(join(tempDir, "001.json"), JSON.stringify({ tools: { bash: true } }))
+
+      // when
+      const result = findNearestMessageExcludingCompaction(tempDir)
+
+      // then
+      expect(result).toEqual({
+        agent: "atlas",
+        model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+        tools: { bash: true },
+      })
+    })
+
+    test("fills missing metadata from compaction checkpoint", () => {
+      // given
+      setCompactionAgentConfigCheckpoint("ses_checkpoint", {
+        agent: "sisyphus",
+        model: { providerID: "openai", modelID: "gpt-5" },
+      })
+      writeFileSync(join(tempDir, "001.json"), JSON.stringify({ tools: { bash: true } }))
+
+      // when
+      const result = findNearestMessageExcludingCompaction(tempDir, "ses_checkpoint")
+
+      // then
+      expect(result).toEqual({
+        agent: "sisyphus",
+        model: { providerID: "openai", modelID: "gpt-5" },
+        tools: { bash: true },
+      })
+    })
+  })
+})
+
+describe("resolvePromptContextFromSessionMessages", () => {
+  test("merges partial prompt context from recent SDK messages", () => {
+    // given
+    const messages = [
+      { info: { agent: "atlas" } },
+      { info: { model: { providerID: "anthropic", modelID: "claude-opus-4-1" } } },
+      { info: { tools: { bash: true } } },
+    ]
+
+    // when
+    const result = resolvePromptContextFromSessionMessages(messages)
+
+    // then
+    expect(result).toEqual({
+      agent: "atlas",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+      tools: { bash: true },
     })
   })
 })
