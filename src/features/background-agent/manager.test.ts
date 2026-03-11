@@ -2036,6 +2036,28 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       // then
       await expect(result).rejects.toThrow("background_task.maxDescendants=1")
     })
+
+    test("should consume descendant quota for reserved sync spawns", async () => {
+      // given
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      await manager.reserveSubagentSpawn("session-root")
+
+      // when
+      const result = manager.assertCanSpawn("session-root")
+
+      // then
+      await expect(result).rejects.toThrow("background_task.maxDescendants=1")
+    })
   })
 
   describe("pending task can be cancelled", () => {
