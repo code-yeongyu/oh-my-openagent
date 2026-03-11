@@ -14,6 +14,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasMinimaxCnCodingPlan: false,
+    hasMinimaxIoCodingPlan: false,
     ...overrides,
   }
 }
@@ -388,6 +389,89 @@ describe("generateModelConfig", () => {
 
       // #then multimodal-looker should use MiniMax
       expect(result.agents?.["multimodal-looker"]?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    })
+  })
+
+  describe("MiniMax fallback coverage", () => {
+    test("prometheus resolves to MiniMax when only MiniMax CN is available", () => {
+      // #given only MiniMax CN Coding Plan is available
+      const config = createConfig({ hasMinimaxCnCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then prometheus should use MiniMax
+      expect(result.agents?.prometheus?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    })
+
+    test("metis resolves to MiniMax when only MiniMax CN is available", () => {
+      // #given only MiniMax CN Coding Plan is available
+      const config = createConfig({ hasMinimaxCnCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then metis should use MiniMax
+      expect(result.agents?.metis?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    })
+
+    test("atlas resolves to MiniMax when only MiniMax CN is available", () => {
+      // #given only MiniMax CN Coding Plan is available
+      const config = createConfig({ hasMinimaxCnCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then atlas should use MiniMax
+      expect(result.agents?.atlas?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    })
+
+    test("visual-engineering resolves to MiniMax when only MiniMax CN is available", () => {
+      // #given only MiniMax CN Coding Plan is available
+      const config = createConfig({ hasMinimaxCnCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then visual-engineering should use MiniMax
+      expect(result.categories?.["visual-engineering"]?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    })
+
+    test("unspecified-high resolves to MiniMax when only MiniMax CN is available with isMax20", () => {
+      // #given only MiniMax CN Coding Plan is available with Max 20 plan
+      const config = createConfig({ hasMinimaxCnCodingPlan: true, isMax20: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then unspecified-high should use MiniMax
+      expect(result.categories?.["unspecified-high"]?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    })
+
+    test("writing resolves to MiniMax when only MiniMax CN is available", () => {
+      // #given only MiniMax CN Coding Plan is available
+      const config = createConfig({ hasMinimaxCnCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then writing should use MiniMax
+      expect(result.categories?.writing?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
+    })
+
+    test("MiniMax IO is used when only MiniMax IO is available", () => {
+      // #given only MiniMax IO is available
+      const config = createConfig({ hasMinimaxIoCodingPlan: true })
+
+      // #when generateModelConfig is called
+      const result = generateModelConfig(config)
+
+      // #then agents and categories should use MiniMax IO
+      expect(result.agents?.sisyphus?.model).toBe("minimax-io/MiniMax-M2.5-highspeed")
+      expect(result.agents?.prometheus?.model).toBe("minimax-io/MiniMax-M2.5-highspeed")
+      expect(result.agents?.metis?.model).toBe("minimax-io/MiniMax-M2.5-highspeed")
+      expect(result.agents?.atlas?.model).toBe("minimax-io/MiniMax-M2.5-highspeed")
+      expect(result.categories?.writing?.model).toBe("minimax-io/MiniMax-M2.5-highspeed")
     })
   })
 

@@ -94,6 +94,8 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
       {
         providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.4",
@@ -113,6 +115,8 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
       {
         providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.4",
@@ -147,6 +151,8 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   atlas: {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-sonnet-4-5",
@@ -175,6 +181,8 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
         variant: "max",
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
     ],
   },
   ultrabrain: {
@@ -279,12 +287,16 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
       },
       { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
       { providers: ["opencode"], model: "kimi-k2.5" },
     ],
   },
   writing: {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "k2p5" },
+      { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
