@@ -8,6 +8,7 @@ import {
   CONTINUATION_COOLDOWN_MS,
   FAILURE_RESET_WINDOW_MS,
   MAX_CONSECUTIVE_FAILURES,
+  MAX_STAGNATION_COUNT,
 } from "./constants"
 
 type TimerCallback = (...args: any[]) => void
@@ -626,6 +627,57 @@ describe("todo-continuation-enforcer", () => {
     const sessionID = "main-max-consecutive-failures"
     setMainSession(sessionID)
     const mockInput = createMockPluginInput()
+    const incompleteCounts = [5, 4, 5, 4, 5, 4]
+    let todoCallCount = 0
+    mockInput.client.session.todo = async () => {
+      const countIndex = Math.min(Math.floor(todoCallCount / 2), incompleteCounts.length - 1)
+      const incompleteCount = incompleteCounts[countIndex] ?? incompleteCounts[incompleteCounts.length - 1] ?? 1
+      todoCallCount += 1
+      return {
+        data: Array.from({ length: incompleteCount }, (_, index) => ({
+          id: String(index + 1),
+          content: `Task ${index + 1}`,
+          status: "pending",
+          priority: "high",
+        })),
+      }
+    }
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      if (index < MAX_CONSECUTIVE_FAILURES - 1) {
+        await fakeTimers.advanceClockBy(1_000_000)
+      }
+    }
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES)
+  }, { timeout: 30000 })
+
+  test("should not stop retries early for unchanged todos when injections keep failing", async () => {
+    //#given
+    const sessionID = "main-unchanged-todos-max-failures"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({
+      data: [
+        { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      ],
+    })
     mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
       promptCalls.push({
         sessionID: opts.path.id,
@@ -657,6 +709,21 @@ describe("todo-continuation-enforcer", () => {
     const sessionID = "main-recovery-after-max-failures"
     setMainSession(sessionID)
     const mockInput = createMockPluginInput()
+    const incompleteCounts = [5, 4, 5, 4, 5, 4, 5]
+    let todoCallCount = 0
+    mockInput.client.session.todo = async () => {
+      const countIndex = Math.min(Math.floor(todoCallCount / 2), incompleteCounts.length - 1)
+      const incompleteCount = incompleteCounts[countIndex] ?? incompleteCounts[incompleteCounts.length - 1] ?? 1
+      todoCallCount += 1
+      return {
+        data: Array.from({ length: incompleteCount }, (_, index) => ({
+          id: String(index + 1),
+          content: `Task ${index + 1}`,
+          status: "pending",
+          priority: "high",
+        })),
+      }
+    }
     mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
       promptCalls.push({
         sessionID: opts.path.id,
@@ -753,7 +820,7 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(3)
   }, { timeout: 30000 })
 
-  test("should keep injecting even when todos remain unchanged across cycles", async () => {
+  test("should stop injecting after max stagnation cycles when todos remain unchanged across cycles", async () => {
     //#given
     const sessionID = "main-no-stagnation-cap"
     setMainSession(sessionID)
@@ -784,8 +851,8 @@ describe("todo-continuation-enforcer", () => {
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
 
-    //#then — all 5 injections should fire (no stagnation cap)
-    expect(promptCalls).toHaveLength(5)
+    // then
+    expect(promptCalls).toHaveLength(MAX_STAGNATION_COUNT)
   }, { timeout: 60000 })
 
   test("should skip idle handling while injection is in flight", async () => {
