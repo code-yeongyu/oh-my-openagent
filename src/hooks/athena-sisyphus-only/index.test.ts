@@ -1,4 +1,7 @@
-import { describe, expect, it } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it } from "bun:test"
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
 import { isAllowedPath } from "./path-policy"
 import { isAthenaAgent } from "./agent-matcher"
 
@@ -64,6 +67,61 @@ describe("athena-sisyphus-only hook", () => {
       it("#then allows absolute path within .sisyphus/", () => {
         const absPath = `${WORKSPACE_ROOT}/.sisyphus/plans/test.md`
         expect(isAllowedPath(absPath, WORKSPACE_ROOT)).toBe(true)
+      })
+    })
+
+    describe("#when checking symlink rejection", () => {
+      let tempWorkspaceRoot: string
+
+      beforeEach(async () => {
+        tempWorkspaceRoot = await mkdtemp(join(tmpdir(), "athena-sisyphus-only-"))
+        await mkdir(join(tempWorkspaceRoot, ".sisyphus", "tmp"), { recursive: true })
+        await mkdir(join(tempWorkspaceRoot, "outside", "nested"), { recursive: true })
+      })
+
+      afterEach(async () => {
+        await rm(tempWorkspaceRoot, { recursive: true, force: true })
+      })
+
+      it("#then rejects symlink inside .sisyphus/tmp/ pointing outside workspace", async () => {
+        const outsideFile = join(tempWorkspaceRoot, "outside", "secret.md")
+        const symlinkPath = join(tempWorkspaceRoot, ".sisyphus", "tmp", "escape.md")
+
+        await writeFile(outsideFile, "secret", "utf-8")
+        await symlink(outsideFile, symlinkPath)
+
+        expect(isAllowedPath(symlinkPath, tempWorkspaceRoot)).toBe(false)
+      })
+
+      it("#then rejects symlink inside .sisyphus/ pointing to /etc/passwd", async () => {
+        const symlinkPath = join(tempWorkspaceRoot, ".sisyphus", "passwd-link")
+
+        await symlink("/etc/passwd", symlinkPath)
+
+        expect(isAllowedPath(symlinkPath, tempWorkspaceRoot)).toBe(false)
+      })
+
+      it("#then allows a regular file inside .sisyphus/tmp/", async () => {
+        const regularFile = join(tempWorkspaceRoot, ".sisyphus", "tmp", "prompt.md")
+
+        await writeFile(regularFile, "prompt", "utf-8")
+
+        expect(isAllowedPath(regularFile, tempWorkspaceRoot)).toBe(true)
+      })
+
+      it("#then rejects a path with .. traversal", () => {
+        expect(isAllowedPath(".sisyphus/tmp/../../outside/secret.md", tempWorkspaceRoot)).toBe(false)
+      })
+
+      it("#then rejects nested symlinks that escape workspace", async () => {
+        const outsideNestedDir = join(tempWorkspaceRoot, "outside", "nested")
+        const nestedFile = join(outsideNestedDir, "secret.md")
+        const linkedDir = join(tempWorkspaceRoot, ".sisyphus", "tmp", "linked-dir")
+
+        await writeFile(nestedFile, "secret", "utf-8")
+        await symlink(outsideNestedDir, linkedDir)
+
+        expect(isAllowedPath(join(linkedDir, "secret.md"), tempWorkspaceRoot)).toBe(false)
       })
     })
   })
