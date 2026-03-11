@@ -77,7 +77,6 @@ export async function applyAgentConfig(params: {
   const disabledSkills = new Set<string>(params.pluginConfig.disabled_skills ?? []);
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
-
   const athenaCouncilConfig = params.pluginConfig.agents?.athena?.council
   const athenaConfig = params.pluginConfig.agents?.athena
   const athenaNonInteractiveConfig = {
@@ -85,6 +84,21 @@ export async function applyAgentConfig(params: {
     non_interactive_members: athenaConfig?.non_interactive_members,
     non_interactive_member_list: athenaConfig?.non_interactive_member_list,
   }
+  const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
+  const userAgents = includeClaudeAgents ? loadUserAgents() : {};
+  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
+  const rawPluginAgents = params.pluginComponents.agents;
+
+  const customAgentSummaries = [
+    ...Object.entries(userAgents),
+    ...Object.entries(projectAgents),
+    ...Object.entries(rawPluginAgents).filter(([, config]) => config !== undefined),
+  ].map(([name, config]) => ({
+    name,
+    description: typeof (config as Record<string, unknown>)?.description === "string"
+      ? (config as Record<string, unknown>).description as string
+      : "",
+  }));
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
     params.pluginConfig.agents,
@@ -93,7 +107,7 @@ export async function applyAgentConfig(params: {
     params.pluginConfig.categories,
     params.pluginConfig.git_master,
     allDiscoveredSkills,
-    params.ctx.client,
+    customAgentSummaries,
     browserProvider,
     currentModel,
     disabledSkills,
@@ -104,11 +118,6 @@ export async function applyAgentConfig(params: {
     athenaNonInteractiveConfig,
   );
 
-  const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
-  const userAgents = includeClaudeAgents ? loadUserAgents() : {};
-  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
-
-  const rawPluginAgents = params.pluginComponents.agents;
   const pluginAgents = Object.fromEntries(
     Object.entries(rawPluginAgents).map(([key, value]) => [
       key,
@@ -208,23 +217,47 @@ export async function applyAgentConfig(params: {
         )
       : undefined;
 
+    // Collect all builtin agent names to prevent user/project .md files from overriding them
+    const builtinAgentNames = new Set([
+      ...Object.keys(agentConfig),
+      ...Object.keys(builtinAgents),
+    ]);
+
+    // Filter user/project agents that duplicate builtin agents (they have mode: "subagent" hardcoded
+    // in loadAgentsFromDir which would incorrectly override the builtin mode: "primary")
+    const filteredUserAgents = Object.fromEntries(
+      Object.entries(userAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    );
+    const filteredProjectAgents = Object.fromEntries(
+      Object.entries(projectAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    );
+
     params.config.agent = {
       ...agentConfig,
       ...Object.fromEntries(
         Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus"),
       ),
-      ...filterDisabledAgents(userAgents),
-      ...filterDisabledAgents(projectAgents),
+      ...filterDisabledAgents(filteredUserAgents),
+      ...filterDisabledAgents(filteredProjectAgents),
       ...filterDisabledAgents(pluginAgents),
       ...filteredConfigAgents,
       build: { ...migratedBuild, mode: "subagent", hidden: true },
       ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
     };
   } else {
+    // Filter user/project agents that duplicate builtin agents
+    const builtinAgentNames = new Set(Object.keys(builtinAgents));
+    const filteredUserAgents = Object.fromEntries(
+      Object.entries(userAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    );
+    const filteredProjectAgents = Object.fromEntries(
+      Object.entries(projectAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    );
+
     params.config.agent = {
       ...builtinAgents,
-      ...filterDisabledAgents(userAgents),
-      ...filterDisabledAgents(projectAgents),
+      ...filterDisabledAgents(filteredUserAgents),
+      ...filterDisabledAgents(filteredProjectAgents),
       ...filterDisabledAgents(pluginAgents),
       ...configAgent,
     };

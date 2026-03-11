@@ -11,6 +11,65 @@ import { appendTranscriptEntry, getTranscriptPath } from "../transcript"
 import type { PluginConfig } from "../types"
 import { isHookDisabled } from "../../../shared"
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function getStringValue(record: Record<string, unknown>, key: string): string | undefined {
+	const value = record[key]
+	return typeof value === "string" && value.length > 0 ? value : undefined
+}
+
+function getNumberValue(record: Record<string, unknown>, key: string): number | undefined {
+	const value = record[key]
+	return typeof value === "number" ? value : undefined
+}
+
+function buildTranscriptToolOutput(outputText: string, metadata: unknown): Record<string, unknown> {
+	const compactOutput: Record<string, unknown> = { output: outputText }
+	if (!isRecord(metadata)) {
+		return compactOutput
+	}
+
+	const filePath = getStringValue(metadata, "filePath")
+		?? getStringValue(metadata, "path")
+		?? getStringValue(metadata, "file")
+	if (filePath) {
+		compactOutput.filePath = filePath
+	}
+
+	const sessionId = getStringValue(metadata, "sessionId")
+	if (sessionId) {
+		compactOutput.sessionId = sessionId
+	}
+
+	const agent = getStringValue(metadata, "agent")
+	if (agent) {
+		compactOutput.agent = agent
+	}
+
+	for (const key of ["noopEdits", "deduplicatedEdits", "firstChangedLine"] as const) {
+		const value = getNumberValue(metadata, key)
+		if (value !== undefined) {
+			compactOutput[key] = value
+		}
+	}
+
+	const filediff = metadata.filediff
+	if (isRecord(filediff)) {
+		const additions = getNumberValue(filediff, "additions")
+		const deletions = getNumberValue(filediff, "deletions")
+		if (additions !== undefined || deletions !== undefined) {
+			compactOutput.filediff = {
+				...(additions !== undefined ? { additions } : {}),
+				...(deletions !== undefined ? { deletions } : {}),
+			}
+		}
+	}
+
+	return compactOutput
+}
+
 export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginConfig) {
 	return async (
 		input: { tool: string; sessionID: string; callID: string },
@@ -25,17 +84,12 @@ export function createToolExecuteAfterHandler(ctx: PluginInput, config: PluginCo
 
 		const cachedInput = getToolInput(input.sessionID, input.tool, input.callID) || {}
 
-		const metadata = output.metadata as Record<string, unknown> | undefined
-		const hasMetadata =
-			metadata && typeof metadata === "object" && Object.keys(metadata).length > 0
-		const toolOutput = hasMetadata ? metadata : { output: output.output }
-
 		appendTranscriptEntry(input.sessionID, {
 			type: "tool_result",
 			timestamp: new Date().toISOString(),
 			tool_name: input.tool,
 			tool_input: cachedInput,
-			tool_output: toolOutput,
+			tool_output: buildTranscriptToolOutput(output.output, output.metadata),
 		})
 
 		if (isHookDisabled(config, "PostToolUse")) {

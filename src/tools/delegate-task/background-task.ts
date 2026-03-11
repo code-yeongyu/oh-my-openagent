@@ -8,6 +8,7 @@ import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { COUNCIL_DEFAULTS } from "../../agents/athena/constants"
+import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 
 export async function executeBackgroundTask(
   args: DelegateTaskArgs,
@@ -39,6 +40,7 @@ export async function executeBackgroundTask(
       skillContent: systemContent,
       category: args.category,
       writeOutputToFile: args.write_output_to_file,
+      sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
     })
 
     // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up

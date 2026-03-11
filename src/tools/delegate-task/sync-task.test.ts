@@ -110,6 +110,65 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(deleteCalls[0]).toBe("ses_test_12345678")
   })
 
+  test("rolls back reserved descendant quota when sync session creation fails", async () => {
+    const mockClient = {
+      session: {
+        create: async () => ({ data: { id: "ses_test_12345678" } }),
+      },
+    }
+
+    const { executeSyncTask } = require("./sync-task")
+
+    const commit = mock(() => 1)
+    const rollback = mock(() => {})
+    const reserveSubagentSpawn = mock(async () => ({
+      spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
+      descendantCount: 1,
+      commit,
+      rollback,
+    }))
+
+    const deps = {
+      createSyncSession: async () => ({ ok: false as const, error: "Failed to create session" }),
+      sendSyncPrompt: async () => null,
+      pollSyncSession: async () => null,
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      manager: { reserveSubagentSpawn },
+      client: mockClient,
+      directory: "/tmp",
+      onSyncSessionCreated: null,
+    }
+
+    const args = {
+      prompt: "test prompt",
+      description: "test task",
+      category: "test",
+      load_skills: [],
+      run_in_background: false,
+      command: null,
+    }
+
+    //#when
+    const result = await executeSyncTask(args, mockCtx, mockExecutorCtx, {
+      sessionID: "parent-session",
+    }, "test-agent", undefined, undefined, undefined, undefined, deps)
+
+    //#then
+    expect(result).toBe("Failed to create session")
+    expect(reserveSubagentSpawn).toHaveBeenCalledWith("parent-session")
+    expect(commit).toHaveBeenCalledTimes(0)
+    expect(rollback).toHaveBeenCalledTimes(1)
+  })
+
   test("cleans up toast and subagentSessions when pollSyncSession returns error", async () => {
     const mockClient = {
       session: {
@@ -182,7 +241,18 @@ describe("executeSyncTask - cleanup on error paths", () => {
       metadata: () => {},
     }
 
+    const commit = mock(() => 1)
+    const rollback = mock(() => {})
+
     const mockExecutorCtx = {
+      manager: {
+        reserveSubagentSpawn: mock(async () => ({
+          spawnContext: { rootSessionID: "parent-session", parentDepth: 0, childDepth: 1 },
+          descendantCount: 1,
+          commit,
+          rollback,
+        })),
+      },
       client: mockClient,
       directory: "/tmp",
       onSyncSessionCreated: null,
@@ -204,9 +274,14 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     //#then - should complete and cleanup resources
     expect(result).toContain("Task completed")
+    expect(mockExecutorCtx.manager.reserveSubagentSpawn).toHaveBeenCalledWith("parent-session")
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(rollback).toHaveBeenCalledTimes(0)
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("sync_ses_test")
     expect(deleteCalls.length).toBe(1)
     expect(deleteCalls[0]).toBe("ses_test_12345678")
   })
 })
+
+export {}

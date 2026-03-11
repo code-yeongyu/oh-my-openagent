@@ -17,6 +17,7 @@ import {
 } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { hasUnansweredQuestion } from "./pending-question-detection"
+import { shouldStopForStagnation } from "./stagnation-detection"
 import { getIncompleteCount } from "./todo"
 import type { MessageInfo, ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
@@ -29,6 +30,7 @@ export async function handleSessionIdle(args: {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  shouldSkipContinuation?: (sessionID: string) => boolean
 }): Promise<void> {
   const {
     ctx,
@@ -37,6 +39,7 @@ export async function handleSessionIdle(args: {
     backgroundManager,
     skipAgents = DEFAULT_SKIP_AGENTS,
     isContinuationStopped,
+    shouldSkipContinuation,
   } = args
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
@@ -94,12 +97,14 @@ export async function handleSessionIdle(args: {
   }
 
   if (!todos || todos.length === 0) {
+    sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] No todos`, { sessionID })
     return
   }
 
   const incompleteCount = getIncompleteCount(todos)
   if (incompleteCount === 0) {
+    sessionStateStore.resetContinuationProgress(sessionID)
     log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
     return
   }
@@ -185,6 +190,16 @@ export async function handleSessionIdle(args: {
 
   if (isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
+    return
+  }
+
+  if (shouldSkipContinuation?.(sessionID)) {
+    log(`[${HOOK_NAME}] Skipped: another continuation hook already injected`, { sessionID })
+    return
+  }
+
+  const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, incompleteCount, todos)
+  if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
     return
   }
 

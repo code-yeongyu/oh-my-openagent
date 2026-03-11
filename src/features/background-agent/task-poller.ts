@@ -11,6 +11,16 @@ import {
   MIN_RUNTIME_BEFORE_STALE_MS,
   TASK_TTL_MS,
 } from "./constants"
+import { removeTaskToastTracking } from "./remove-task-toast-tracking"
+
+const TERMINAL_TASK_TTL_MS = 30 * 60 * 1000
+
+const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
+  "completed",
+  "error",
+  "cancelled",
+  "interrupt",
+])
 
 const TTL_EXEMPT_AGENTS = new Set(["athena-junior"])
 
@@ -21,8 +31,29 @@ export function pruneStaleTasksAndNotifications(args: {
 }): void {
   const { tasks, notifications, onTaskPruned } = args
   const now = Date.now()
+  const tasksWithPendingNotifications = new Set<string>()
+
+  for (const queued of notifications.values()) {
+    for (const task of queued) {
+      tasksWithPendingNotifications.add(task.id)
+    }
+  }
 
   for (const [taskId, task] of tasks.entries()) {
+    if (TERMINAL_TASK_STATUSES.has(task.status)) {
+      if (tasksWithPendingNotifications.has(taskId)) continue
+
+      const completedAt = task.completedAt?.getTime()
+      if (!completedAt) continue
+
+      const age = now - completedAt
+      if (age <= TERMINAL_TASK_TTL_MS) continue
+
+      removeTaskToastTracking(taskId)
+      tasks.delete(taskId)
+      continue
+    }
+
     const timestamp = task.status === "pending"
       ? task.queuedAt?.getTime()
       : task.startedAt?.getTime()
@@ -73,8 +104,17 @@ export async function checkAndInterruptStaleTasks(args: {
   concurrencyManager: ConcurrencyManager
   notifyParentSession: (task: BackgroundTask) => Promise<void>
   sessionStatuses?: SessionStatusMap
+  onTaskInterrupted?: (task: BackgroundTask) => void
 }): Promise<void> {
-  const { tasks, client, config, concurrencyManager, notifyParentSession, sessionStatuses } = args
+  const {
+    tasks,
+    client,
+    config,
+    concurrencyManager,
+    notifyParentSession,
+    sessionStatuses,
+    onTaskInterrupted = (task) => removeTaskToastTracking(task.id),
+  } = args
   const staleTimeoutMs = config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
   const now = Date.now()
 
@@ -105,6 +145,8 @@ export async function checkAndInterruptStaleTasks(args: {
         task.concurrencyKey = undefined
       }
 
+      onTaskInterrupted(task)
+
       client.session.abort({ path: { id: sessionID } }).catch(() => {})
       log(`[background-agent] Task ${task.id} interrupted: no progress since start`)
 
@@ -133,6 +175,8 @@ export async function checkAndInterruptStaleTasks(args: {
       concurrencyManager.release(task.concurrencyKey)
       task.concurrencyKey = undefined
     }
+
+    onTaskInterrupted(task)
 
     client.session.abort({ path: { id: sessionID } }).catch(() => {})
     log(`[background-agent] Task ${task.id} interrupted: stale timeout`)

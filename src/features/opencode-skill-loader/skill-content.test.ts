@@ -228,6 +228,7 @@ describe("resolveMultipleSkillsAsync", () => {
 			gitMasterConfig: {
 				commit_footer: false,
 				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
 			},
 		}
 
@@ -249,6 +250,7 @@ describe("resolveMultipleSkillsAsync", () => {
 			gitMasterConfig: {
 				commit_footer: true,
 				include_co_authored_by: true,
+				git_env_prefix: "GIT_MASTER=1",
 			},
 		}
 
@@ -269,6 +271,7 @@ describe("resolveMultipleSkillsAsync", () => {
 			gitMasterConfig: {
 				commit_footer: true,
 				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
 			},
 		}
 
@@ -302,6 +305,7 @@ describe("resolveMultipleSkillsAsync", () => {
 			gitMasterConfig: {
 				commit_footer: false,
 				include_co_authored_by: true,
+				git_env_prefix: "GIT_MASTER=1",
 			},
 		}
 
@@ -322,6 +326,7 @@ describe("resolveMultipleSkillsAsync", () => {
 			gitMasterConfig: {
 				commit_footer: customFooter,
 				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
 			},
 		}
 
@@ -341,6 +346,7 @@ describe("resolveMultipleSkillsAsync", () => {
 			gitMasterConfig: {
 				commit_footer: true,
 				include_co_authored_by: false,
+				git_env_prefix: "GIT_MASTER=1",
 			},
 		}
 

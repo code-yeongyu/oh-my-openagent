@@ -169,8 +169,8 @@ describe("keyword-detector session filtering", () => {
       output
     )
 
-    // then - ultrawork should still work (variant set to max)
-    expect(output.message.variant).toBe("max")
+    // then - ultrawork should still work without forcing a new variant
+    expect(output.message.variant).toBeUndefined()
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 
@@ -214,12 +214,12 @@ describe("keyword-detector session filtering", () => {
       output
     )
 
-    // then - all keywords should work
-    expect(output.message.variant).toBe("max")
+    // then - all keywords should work without forcing a new variant
+    expect(output.message.variant).toBeUndefined()
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 
-  test("should override existing variant when ultrawork keyword is used", async () => {
+  test("should preserve existing runtime variant when ultrawork keyword is used", async () => {
     // given - main session set with pre-existing variant from TUI
     setMainSession("main-123")
 
@@ -236,8 +236,8 @@ describe("keyword-detector session filtering", () => {
       output
     )
 
-    // then - ultrawork should override TUI variant to max
-    expect(output.message.variant).toBe("max")
+    // then - ultrawork should preserve the already resolved runtime variant
+    expect(output.message.variant).toBe("low")
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 })
@@ -311,8 +311,8 @@ describe("keyword-detector word boundary", () => {
       output
     )
 
-    // then - ultrawork should be triggered
-    expect(output.message.variant).toBe("max")
+    // then - ultrawork should be triggered without forcing max
+    expect(output.message.variant).toBeUndefined()
     expect(toastCalls).toContain("Ultrawork Mode Activated")
   })
 

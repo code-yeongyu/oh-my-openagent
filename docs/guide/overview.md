@@ -16,7 +16,7 @@ Paste this into your LLM agent session:
 
 ```
 Install and configure oh-my-opencode by following the instructions here:
-https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/refs/heads/dev/docs/guide/installation.md
+https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/refs/heads/dev/docs/guide/installation.md
 ```
 
 Or read the full [Installation Guide](./installation.md) for manual setup, provider authentication, and troubleshooting.
@@ -101,7 +101,7 @@ Use Hephaestus when you need deep architectural reasoning, complex debugging acr
 
 - **Multi-model orchestration.** Pure Codex is single-model. OmO routes different tasks to different models automatically. GPT for deep reasoning. Gemini for frontend. Haiku for speed. The right brain for the right job.
 - **Background agents.** Fire 5+ agents in parallel. Something Codex simply cannot do. While one agent writes code, another researches patterns, another checks documentation. Like a real dev team.
-- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` gets GPT-5.3 Codex. `quick` gets Haiku. No manual juggling.
+- **Category system.** Tasks are routed by intent, not model name. `visual-engineering` gets Gemini. `ultrabrain` gets GPT-5.4. `quick` gets Haiku. No manual juggling.
 - **Accumulated wisdom.** Subagents learn from previous results. Conventions discovered in task 1 are passed to task 5. Mistakes made early aren't repeated. The system gets smarter as it works.
 
 ### Prometheus: The Strategic Planner
@@ -168,7 +168,7 @@ You can override specific agents or categories in your config:
 
 ```jsonc
 {
-  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json",
+  "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
 
   "agents": {
     // Main orchestrator: Claude Opus or Kimi K2.5 work best
@@ -193,13 +193,13 @@ You can override specific agents or categories in your config:
     },
 
     // General high-effort work
-    "unspecified-high": { "model": "openai/gpt-5.4", "variant": "high" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
 
     // Quick tasks: use the cheapest models
     "quick": { "model": "anthropic/claude-haiku-4-5" },
 
-    // Deep reasoning: GPT-5.3-codex
-    "ultrabrain": { "model": "openai/gpt-5.3-codex", "variant": "xhigh" },
+    // Deep reasoning: GPT-5.4
+    "ultrabrain": { "model": "openai/gpt-5.4", "variant": "xhigh" },
   },
 }
 ```

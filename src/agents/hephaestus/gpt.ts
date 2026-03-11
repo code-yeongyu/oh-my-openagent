@@ -16,6 +16,7 @@ import {
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
+  buildAntiDuplicationSection,
 } from "../dynamic-agent-prompt-builder";
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
@@ -109,7 +110,7 @@ Asking the user is the LAST resort after exhausting creative alternatives.
 - Run verification (lint, tests, build) WITHOUT asking
 - Make decisions. Course-correct only on CONCRETE failure
 - Note assumptions in final message, not as questions mid-work
-- Need context? Fire explore/librarian in background IMMEDIATELY — keep working while they search
+- Need context? Fire explore/librarian in background IMMEDIATELY — continue only with non-overlapping work while they search
 
 ## Hard Constraints
 
@@ -194,10 +195,12 @@ task(subagent_type="librarian", run_in_background=true, load_skills=[], descript
 - Fire 2-5 explore agents in parallel for any non-trivial codebase question
 - Parallelize independent file reads — don't read files one at a time
 - NEVER use \`run_in_background=false\` for explore/librarian
-- Continue your work immediately after launching background agents
+- Continue only with non-overlapping work after launching background agents
 - Collect results with \`background_output(task_id="...")\` when needed
 - BEFORE final answer, cancel DISPOSABLE tasks individually
 - **NEVER use \`background_cancel(all=true)\`**
+
+${buildAntiDuplicationSection()}
 
 ### Search Stop Conditions
 

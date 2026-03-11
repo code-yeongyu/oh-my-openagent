@@ -57,10 +57,20 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
   return async (props: Record<string, unknown> | undefined) => {
     const info = props?.info as Record<string, unknown> | undefined
     const sessionID = info?.sessionID as string | undefined
-    const retrySignalResult = extractAutoRetrySignal(info)
-    const retrySignal = retrySignalResult?.signal
     const timeoutEnabled = config.timeout_seconds > 0
-    const parts = props?.parts as Array<{ type?: string; text?: string }> | undefined
+    const eventParts = props?.parts as Array<{ type?: string; text?: string }> | undefined
+    const infoParts = info?.parts as Array<{ type?: string; text?: string }> | undefined
+    const parts = eventParts && eventParts.length > 0 ? eventParts : infoParts
+    const retrySignalResult = extractAutoRetrySignal(info)
+    const partsText = (parts ?? [])
+      .filter((p) => typeof p?.text === "string")
+      .map((p) => (p.text ?? "").trim())
+      .filter((text) => text.length > 0)
+      .join("\n")
+    const retrySignalFromParts = partsText
+      ? extractAutoRetrySignal({ message: partsText, status: partsText, summary: partsText })?.signal
+      : undefined
+    const retrySignal = retrySignalResult?.signal ?? retrySignalFromParts
     const errorContentResult = containsErrorContent(parts)
     const error = info?.error ?? 
       (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined) ??

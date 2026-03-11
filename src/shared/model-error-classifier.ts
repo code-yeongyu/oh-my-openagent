@@ -36,6 +36,11 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "rate_limit",
   "rate limit",
   "quota",
+  "quota will reset after",
+  "usage limit has been reached",
+  "all credentials for model",
+  "cooling down",
+  "exhausted your capacity",
   "not found",
   "unavailable",
   "insufficient",
@@ -50,10 +55,35 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "timeout",
   "service unavailable",
   "internal_server_error",
+  "free usage",
+  "usage exceeded",
+  "credit",
+  "balance",
+  "temporarily unavailable",
+  "try again",
   "503",
   "502",
   "504",
+  "429",
+  "529",
 ]
+
+const AUTO_RETRY_GATE_PATTERNS = [
+  "rate limit",
+  "quota",
+  "usage limit",
+  "limit reached",
+  "cooling down",
+  "credentials for model",
+  "exhausted your capacity",
+]
+
+function hasProviderAutoRetrySignal(message: string): boolean {
+  if (!message.includes("retrying in")) {
+    return false
+  }
+  return AUTO_RETRY_GATE_PATTERNS.some((pattern) => message.includes(pattern))
+}
 
 export interface ErrorInfo {
   name?: string
@@ -79,6 +109,9 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
 
   // Check message patterns for unknown errors
   const msg = error.message?.toLowerCase() ?? ""
+  if (hasProviderAutoRetrySignal(msg)) {
+    return true
+  }
   return RETRYABLE_MESSAGE_PATTERNS.some((pattern) => msg.includes(pattern))
 }
 
@@ -115,7 +148,8 @@ export function hasMoreFallbacks(
  * Selects the best provider for a fallback entry.
  * Priority:
  * 1) First connected provider in the entry's provider preference order
- * 2) First provider listed in the fallback entry (when cache is missing)
+ * 2) Preferred provider when connected (and entry providers are unavailable)
+ * 3) First provider listed in the fallback entry
  */
 export function selectFallbackProvider(
   providers: string[],
@@ -124,10 +158,18 @@ export function selectFallbackProvider(
   const connectedProviders = readConnectedProvidersCache()
   if (connectedProviders) {
     const connectedSet = new Set(connectedProviders.map(p => p.toLowerCase()))
+
     for (const provider of providers) {
       if (connectedSet.has(provider.toLowerCase())) {
         return provider
       }
+    }
+
+    if (
+      preferredProviderID &&
+      connectedSet.has(preferredProviderID.toLowerCase())
+    ) {
+      return preferredProviderID
     }
   }
 

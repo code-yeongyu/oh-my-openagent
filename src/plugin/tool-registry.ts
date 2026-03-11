@@ -36,6 +36,7 @@ import { log } from "../shared"
 
 import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"
+import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
 
 export type ToolRegistryResult = {
   filteredTools: ToolsRecord
@@ -52,7 +53,13 @@ export function createToolRegistry(args: {
   const { ctx, pluginConfig, managers, skillContext, availableCategories } = args
 
   const backgroundTools = createBackgroundTools(managers.backgroundManager, ctx.client)
-  const callOmoAgent = createCallOmoAgent(ctx, managers.backgroundManager, pluginConfig.disabled_agents ?? [])
+  const callOmoAgent = createCallOmoAgent(
+    ctx,
+    managers.backgroundManager,
+    pluginConfig.disabled_agents ?? [],
+    pluginConfig.agents,
+    pluginConfig.categories,
+  )
 
   const isMultimodalLookerEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "multimodal-looker",
@@ -152,6 +159,10 @@ export function createToolRegistry(args: {
       councilConfig: pluginConfig.agents?.athena?.council,
       directory: ctx.directory,
     }),
+  }
+
+  for (const toolDefinition of Object.values(allTools)) {
+    normalizeToolArgSchemas(toolDefinition)
   }
 
   const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)
