@@ -58,6 +58,7 @@ export interface SkillMcpManagerState {
   cleanupHandlers: ProcessCleanupHandler[]
   idleTimeoutMs: number
   shutdownGeneration: number
+  inFlightConnections: Map<string, number>
 }
 
 export interface SkillMcpClientConnectionParams {

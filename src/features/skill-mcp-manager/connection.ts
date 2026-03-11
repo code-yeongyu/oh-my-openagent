@@ -29,6 +29,7 @@ export async function getOrCreateClient(params: {
 
   const expandedConfig = expandEnvVarsInObject(config)
   let currentConnectionPromise!: Promise<Client>
+  state.inFlightConnections.set(info.sessionID, (state.inFlightConnections.get(info.sessionID) ?? 0) + 1)
   currentConnectionPromise = (async () => {
     const disconnectGenAtStart = state.disconnectedSessions.get(info.sessionID) ?? 0
     const shutdownGenAtStart = state.shutdownGeneration
@@ -63,6 +64,13 @@ export async function getOrCreateClient(params: {
   } finally {
     if (state.pendingConnections.get(clientKey) === currentConnectionPromise) {
       state.pendingConnections.delete(clientKey)
+    }
+    const remaining = (state.inFlightConnections.get(info.sessionID) ?? 1) - 1
+    if (remaining <= 0) {
+      state.inFlightConnections.delete(info.sessionID)
+      state.disconnectedSessions.delete(info.sessionID)
+    } else {
+      state.inFlightConnections.set(info.sessionID, remaining)
     }
   }
 }

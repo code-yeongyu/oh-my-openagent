@@ -25,6 +25,7 @@ function createState(): SkillMcpManagerState {
     cleanupHandlers: [],
     idleTimeoutMs: 5 * 60 * 1000,
     shutdownGeneration: 0,
+    inFlightConnections: new Map(),
   }
 
   trackedStates.push(state)
