@@ -103,8 +103,15 @@ export async function runBunInstallWithDetails(options?: RunBunInstallOptions): 
         log("[cli/install] Failed to kill timed out bun install process:", err)
       }
 
-      await proc.exited
-      logCapturedOutputOnFailure(outputMode, await outputPromise)
+      if (outputMode === "pipe") {
+        void outputPromise
+          .then((output) => {
+            logCapturedOutputOnFailure(outputMode, output)
+          })
+          .catch((err) => {
+            log("[bun-install] Failed to read captured output after timeout:", err)
+          })
+      }
 
       return {
         success: false,
