@@ -3,8 +3,10 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
-import { createFallbackState, prepareFallback } from "./fallback-state"
+import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
+import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
+import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 
 export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof extractAutoRetrySignal) {
   return async (
@@ -154,22 +156,13 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       }
 
       if (!state) {
-        let initialModel = model
-        if (!initialModel) {
-          const detectedAgent = resolvedAgent
-          const agentConfig = detectedAgent
-            ? pluginConfig?.agents?.[detectedAgent as keyof typeof pluginConfig.agents]
-            : undefined
-          const agentModel = agentConfig?.model as string | undefined
-          if (agentModel) {
-            log(`[${HOOK_NAME}] Derived model from agent config for message.updated`, {
-              sessionID,
-              agent: detectedAgent,
-              model: agentModel,
-            })
-            initialModel = agentModel
-          }
-        }
+        const initialModel = resolveFallbackBootstrapModel({
+          sessionID,
+          source: "message.updated",
+          eventModel: model,
+          resolvedAgent,
+          pluginConfig,
+        })
 
         if (!initialModel) {
           log(`[${HOOK_NAME}] message.updated missing model info, cannot fallback`, {
@@ -203,24 +196,13 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         }
       }
 
-      const result = prepareFallback(sessionID, state, fallbackModels, config)
-
-      if (result.success && config.notify_on_fallback) {
-        await deps.ctx.client.tui
-          .showToast({
-            body: {
-              title: "Model Fallback",
-              message: `Switching to ${result.newModel?.split("/").pop() || result.newModel} for next request`,
-              variant: "warning",
-              duration: 5000,
-            },
-          })
-          .catch(() => {})
-      }
-
-      if (result.success && result.newModel) {
-        await helpers.autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "message.updated")
-      }
+      await dispatchFallbackRetry(deps, helpers, {
+        sessionID,
+        state,
+        fallbackModels,
+        resolvedAgent,
+        source: "message.updated",
+      })
     }
   }
 }
