@@ -116,7 +116,7 @@ export class BackgroundManager {
   private config?: BackgroundTaskConfig
   private tmuxEnabled: boolean
   private onSubagentSessionCreated?: OnSubagentSessionCreated
-  private onShutdown?: () => void
+  private onShutdown?: () => void | Promise<void>
 
   private queuesByKey: Map<string, QueueItem[]> = new Map()
   private processingKeys: Set<string> = new Set()
@@ -134,7 +134,7 @@ export class BackgroundManager {
     options?: {
       tmuxConfig?: TmuxConfig
       onSubagentSessionCreated?: OnSubagentSessionCreated
-      onShutdown?: () => void
+      onShutdown?: () => void | Promise<void>
       enableParentSessionNotifications?: boolean
     }
   ) {
@@ -1702,7 +1702,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
    * Cancels all pending concurrency waiters and clears timers.
    * Should be called when the plugin is unloaded.
    */
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     if (this.shutdownTriggered) return
     this.shutdownTriggered = true
     log("[background-agent] Shutting down BackgroundManager")
@@ -1720,7 +1720,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     // Notify shutdown listeners (e.g., tmux cleanup)
     if (this.onShutdown) {
       try {
-        this.onShutdown()
+        await this.onShutdown()
       } catch (error) {
         log("[background-agent] Error in onShutdown callback:", error)
       }

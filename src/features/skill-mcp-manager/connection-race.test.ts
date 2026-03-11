@@ -142,7 +142,7 @@ describe("getOrCreateClient disconnect race", () => {
     expect(createdTransports[0]?.close).toHaveBeenCalledTimes(1)
   })
 
-  it("#given session A in disconnectedSessions #when new connection is requested for session A #then session A is removed from disconnectedSessions and connection proceeds normally", async () => {
+  it("#given session A in disconnectedSessions #when new connection is requested for session A #then connection proceeds normally and disconnectedSessions entry is retained for pending race protection", async () => {
     const state = createState()
     const info = createClientInfo("session-a")
     const clientKey = createClientKey(info)
