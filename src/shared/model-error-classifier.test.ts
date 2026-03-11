@@ -82,4 +82,26 @@ describe("model-error-classifier", () => {
     //#then
     expect(provider).toBe("provider-x")
   })
+
+  test("treats FreeUsageLimitError (lowercase) as retryable by name", () => {
+    //#given
+    const error = { name: "FreeUsageLimitError" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
+
+  test("treats freeusagelimiterror (lowercase name) as retryable by name", () => {
+    //#given
+    const error = { name: "freeusagelimiterror" }
+
+    //#when
+    const result = shouldRetryError(error)
+
+    //#then
+    expect(result).toBe(true)
+  })
 })
