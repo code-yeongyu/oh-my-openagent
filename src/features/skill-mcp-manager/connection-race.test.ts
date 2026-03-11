@@ -80,6 +80,7 @@ function createState(): SkillMcpManagerState {
     cleanupHandlers: [],
     idleTimeoutMs: 5 * 60 * 1000,
     shutdownGeneration: 0,
+    inFlightConnections: new Map(),
   }
 
   trackedStates.push(state)
@@ -136,13 +137,13 @@ describe("getOrCreateClient disconnect race", () => {
     await expect(clientPromise).rejects.toThrow(/disconnected during MCP connection setup/)
     expect(state.clients.has(clientKey)).toBe(false)
     expect(state.pendingConnections.has(clientKey)).toBe(false)
-    expect(state.disconnectedSessions.has(info.sessionID)).toBe(true)
+    expect(state.disconnectedSessions.has(info.sessionID)).toBe(false)
     expect(createdClients).toHaveLength(1)
     expect(createdClients[0]?.close).toHaveBeenCalledTimes(1)
     expect(createdTransports[0]?.close).toHaveBeenCalledTimes(1)
   })
 
-  it("#given session A in disconnectedSessions #when new connection is requested for session A #then connection proceeds normally and disconnectedSessions entry is retained for pending race protection", async () => {
+  it("#given session A in disconnectedSessions #when new connection completes with no remaining pending #then disconnectedSessions entry is cleaned up", async () => {
     const state = createState()
     const info = createClientInfo("session-a")
     const clientKey = createClientKey(info)
@@ -150,7 +151,7 @@ describe("getOrCreateClient disconnect race", () => {
 
     const client = await getOrCreateClient({ state, clientKey, info, config: stdioConfig })
 
-    expect(state.disconnectedSessions.has(info.sessionID)).toBe(true)
+    expect(state.disconnectedSessions.has(info.sessionID)).toBe(false)
     expect(state.clients.get(clientKey)?.client).toBe(client)
     expect(createdClients[0]?.close).not.toHaveBeenCalled()
   })
@@ -210,5 +211,6 @@ describe("getOrCreateClient multi-key disconnect race", () => {
 
     expect(state.clients.has(clientKey1)).toBe(false)
     expect(state.clients.has(clientKey2)).toBe(false)
+    expect(state.disconnectedSessions.has("session-a")).toBe(false)
   })
 })

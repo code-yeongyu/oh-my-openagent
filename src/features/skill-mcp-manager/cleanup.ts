@@ -134,6 +134,7 @@ export async function disconnectAll(state: SkillMcpManagerState): Promise<void> 
   state.clients.clear()
   state.pendingConnections.clear()
   state.disconnectedSessions.clear()
+  state.inFlightConnections.clear()
   state.authProviders.clear()
 
   for (const managed of clients) {

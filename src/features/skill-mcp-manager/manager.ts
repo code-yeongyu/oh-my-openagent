@@ -17,6 +17,7 @@ export class SkillMcpManager {
     cleanupHandlers: [],
     idleTimeoutMs: 5 * 60 * 1000,
     shutdownGeneration: 0,
+    inFlightConnections: new Map(),
   }
 
   private getClientKey(info: SkillMcpClientInfo): string {

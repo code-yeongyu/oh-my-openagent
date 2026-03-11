@@ -1,3 +1,5 @@
+import { log } from "./shared"
+
 export type PluginDispose = () => Promise<void>
 
 export function createPluginDispose(args: {
@@ -19,9 +21,21 @@ export function createPluginDispose(args: {
     }
 
     disposePromise = (async (): Promise<void> => {
-      await backgroundManager.shutdown()
-      await skillMcpManager.disconnectAll()
-      disposeHooks()
+      try {
+        await backgroundManager.shutdown()
+      } catch (error) {
+        log("[plugin-dispose] backgroundManager.shutdown() error:", error)
+      }
+      try {
+        await skillMcpManager.disconnectAll()
+      } catch (error) {
+        log("[plugin-dispose] skillMcpManager.disconnectAll() error:", error)
+      }
+      try {
+        disposeHooks()
+      } catch (error) {
+        log("[plugin-dispose] disposeHooks() error:", error)
+      }
     })()
 
     await disposePromise

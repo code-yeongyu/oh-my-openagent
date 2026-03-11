@@ -116,4 +116,60 @@ describe("createPluginDispose", () => {
     expect(disconnectAllSpy).toHaveBeenCalledTimes(1)
     expect(disposeHooksSpy).toHaveBeenCalledTimes(1)
   })
+
+  test("#given backgroundManager.shutdown() throws #when dispose() is called #then skillMcpManager.disconnectAll() and disposeHooks() are still called", async () => {
+    // given
+    const backgroundManager = {
+      shutdown: async (): Promise<void> => {
+        throw new Error("shutdown failed")
+      },
+    }
+    const skillMcpManager = {
+      disconnectAll: async (): Promise<void> => {},
+    }
+    const disposeHooksCalls: number[] = []
+    const disconnectAllSpy = spyOn(skillMcpManager, "disconnectAll")
+    const dispose = createPluginDispose({
+      backgroundManager,
+      skillMcpManager,
+      disposeHooks: (): void => {
+        disposeHooksCalls.push(1)
+      },
+    })
+
+    // when
+    await dispose()
+
+    // then
+    expect(disconnectAllSpy).toHaveBeenCalledTimes(1)
+    expect(disposeHooksCalls).toHaveLength(1)
+  })
+
+  test("#given skillMcpManager.disconnectAll() throws #when dispose() is called #then disposeHooks() is still called", async () => {
+    // given
+    const backgroundManager = {
+      shutdown: async (): Promise<void> => {},
+    }
+    const skillMcpManager = {
+      disconnectAll: async (): Promise<void> => {
+        throw new Error("disconnectAll failed")
+      },
+    }
+    const disposeHooksCalls: number[] = []
+    const shutdownSpy = spyOn(backgroundManager, "shutdown")
+    const dispose = createPluginDispose({
+      backgroundManager,
+      skillMcpManager,
+      disposeHooks: (): void => {
+        disposeHooksCalls.push(1)
+      },
+    })
+
+    // when
+    await dispose()
+
+    // then
+    expect(shutdownSpy).toHaveBeenCalledTimes(1)
+    expect(disposeHooksCalls).toHaveLength(1)
+  })
 })
