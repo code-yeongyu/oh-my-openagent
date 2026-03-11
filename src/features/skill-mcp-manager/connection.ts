@@ -14,6 +14,7 @@ export async function getOrCreateClient(params: {
   config: ClaudeCodeMcpServer
 }): Promise<Client> {
   const { state, clientKey, info, config } = params
+  state.disconnectedSessions.delete(info.sessionID)
 
   const existing = state.clients.get(clientKey)
   if (existing) {
@@ -28,14 +29,26 @@ export async function getOrCreateClient(params: {
   }
 
   const expandedConfig = expandEnvVarsInObject(config)
-  const connectionPromise = createClient({ state, clientKey, info, config: expandedConfig })
+  const connectionPromise = (async () => {
+    const client = await createClient({ state, clientKey, info, config: expandedConfig })
+
+    if (state.disconnectedSessions.has(info.sessionID)) {
+      await forceReconnect(state, clientKey)
+      throw new Error(`Session "${info.sessionID}" disconnected during MCP connection setup.`)
+    }
+
+    return client
+  })()
+
   state.pendingConnections.set(clientKey, connectionPromise)
 
   try {
     const client = await connectionPromise
     return client
   } finally {
-    state.pendingConnections.delete(clientKey)
+    if (state.pendingConnections.get(clientKey) === connectionPromise) {
+      state.pendingConnections.delete(clientKey)
+    }
   }
 }
 

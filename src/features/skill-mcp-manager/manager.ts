@@ -10,6 +10,7 @@ export class SkillMcpManager {
   private readonly state: SkillMcpManagerState = {
     clients: new Map(),
     pendingConnections: new Map(),
+    disconnectedSessions: new Set(),
     authProviders: new Map(),
     cleanupRegistered: false,
     cleanupInterval: null,
