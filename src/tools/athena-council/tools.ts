@@ -1,14 +1,49 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { existsSync, realpathSync } from "node:fs"
 import { readFile } from "node:fs/promises"
-import { resolve, sep } from "node:path"
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CouncilConfig, CouncilMemberConfig } from "../../config/schema/athena"
 import { launchCouncilMember, type CouncilLaunchContext } from "./council-launcher"
 import type { AthenaCouncilToolArgs, LaunchedMemberInfo, AthenaCouncilResult } from "./types"
+import { resolveSymlink } from "../../shared/file-utils"
 import { log } from "../../shared/logger"
 
 const SESSION_WAIT_INTERVAL_MS = 100
 const SESSION_WAIT_TIMEOUT_MS = 30_000
+
+function normalizeCanonicalPath(pathValue: string): string {
+  return pathValue.startsWith("/private/var/") ? pathValue.slice("/private".length) : pathValue
+}
+
+function toCanonicalPath(absolutePath: string): string {
+  try {
+    return normalizeCanonicalPath(realpathSync.native(absolutePath))
+  } catch (error) {
+    const pathError = error as NodeJS.ErrnoException
+    if (pathError.code !== "ENOENT") {
+      return normalizeCanonicalPath(resolveSymlink(absolutePath))
+    }
+
+    const absoluteDir = dirname(absolutePath)
+    if (absoluteDir === absolutePath) {
+      return resolve(absolutePath)
+    }
+
+    if (existsSync(absoluteDir)) {
+      return join(normalizeCanonicalPath(resolveSymlink(absoluteDir)), basename(absolutePath))
+    }
+
+    return join(toCanonicalPath(absoluteDir), basename(absolutePath))
+  }
+}
+
+function isPathEscaping(expectedRoot: string, targetPath: string): boolean {
+  const canonicalExpectedRoot = toCanonicalPath(expectedRoot)
+  const canonicalTargetPath = toCanonicalPath(targetPath)
+  const rel = relative(canonicalExpectedRoot, canonicalTargetPath)
+  return rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)
+}
 
 function buildToolDescription(councilConfig: CouncilConfig | undefined): string {
   const memberList = councilConfig?.members.length
@@ -128,8 +163,7 @@ export function createAthenaCouncilTool(args: {
       let promptContent: string
       try {
         const resolvedPath = resolve(directory, toolArgs.prompt_file)
-        const expectedPrefix = `${resolve(directory, ".sisyphus/tmp")}${sep}`
-        if (!resolvedPath.startsWith(expectedPrefix)) {
+        if (isPathEscaping(resolve(directory, ".sisyphus", "tmp"), resolvedPath)) {
           return `Invalid prompt_file path: expected path within .sisyphus/tmp/, got: ${toolArgs.prompt_file}`
         }
         promptContent = await readFile(resolvedPath, "utf-8")

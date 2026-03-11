@@ -1,5 +1,7 @@
 import { readFile, writeFile, rename, unlink } from "node:fs/promises"
-import { join, isAbsolute, resolve, relative } from "node:path"
+import { existsSync, realpathSync } from "node:fs"
+import { basename, dirname, join, isAbsolute, resolve, relative } from "node:path"
+import { resolveSymlink } from "../../shared/file-utils"
 import { log } from "../../shared/logger"
 
 export const TASK_ID_PATTERN = /^[a-zA-Z0-9_-]+$/
@@ -22,8 +24,34 @@ export function extractAgentFromFrontmatter(content: string): string | null {
   return agentLine ? agentLine[1].trim() : null
 }
 
+function normalizeCanonicalPath(pathValue: string): string {
+  return pathValue.startsWith("/private/var/") ? pathValue.slice("/private".length) : pathValue
+}
+
+function toCanonicalPath(absolutePath: string): string {
+  try {
+    return normalizeCanonicalPath(realpathSync.native(absolutePath))
+  } catch (error) {
+    const pathError = error as NodeJS.ErrnoException
+    if (pathError.code !== "ENOENT") {
+      return normalizeCanonicalPath(resolveSymlink(absolutePath))
+    }
+
+    const absoluteDir = dirname(absolutePath)
+    if (absoluteDir === absolutePath) {
+      return resolve(absolutePath)
+    }
+
+    if (existsSync(absoluteDir)) {
+      return join(normalizeCanonicalPath(resolveSymlink(absoluteDir)), basename(absolutePath))
+    }
+
+    return join(toCanonicalPath(absoluteDir), basename(absolutePath))
+  }
+}
+
 export function isPathEscaping(expectedRoot: string, targetPath: string): boolean {
-  const rel = relative(expectedRoot, targetPath)
+  const rel = relative(toCanonicalPath(expectedRoot), toCanonicalPath(targetPath))
   return rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)
 }
 
