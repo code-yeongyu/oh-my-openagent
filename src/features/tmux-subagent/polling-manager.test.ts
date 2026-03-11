@@ -12,6 +12,8 @@ describe("TmuxPollingManager overlap", () => {
       description: "test",
       createdAt: new Date(),
       lastSeenAt: new Date(),
+      closePending: false,
+      closeRetryCount: 0,
     })
 
     let activeCalls = 0
