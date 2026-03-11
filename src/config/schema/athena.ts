@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { COUNCIL_DEFAULTS } from "../../agents/athena/constants"
 import { parseModelString } from "../../tools/delegate-task/model-string-parser"
+import { FallbackModelsSchema } from "./fallback-models"
 
 /** Validates model string format: "provider/model-id" (e.g., "openai/gpt-5.3-codex"). */
 const ModelStringSchema = z
@@ -18,6 +19,7 @@ export const CouncilMemberSchema = z.object({
     message: "Council member name must contain only letters, numbers, spaces, hyphens, and dots",
   }),
   temperature: z.number().min(0).max(2).optional(),
+  fallback_models: FallbackModelsSchema.optional(),
 }).strict()
 
 export const CouncilConfigSchema = z.object({

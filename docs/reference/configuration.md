@@ -413,8 +413,6 @@ Control what tools an agent can use:
 
 Domain-specific model delegation used by the `task()` tool. When Sisyphus delegates work, it picks a category, not a model name.
 
-Available agents: `sisyphus`, `hephaestus`, `prometheus`, `athena`, `athena-junior`, `oracle`, `librarian`, `explore`, `multimodal-looker`, `metis`, `momus`, `atlas`
-
 #### Built-in Categories
 
 | Category             | Default Model                   | Description                                    |

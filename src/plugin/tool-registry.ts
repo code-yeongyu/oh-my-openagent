@@ -68,6 +68,9 @@ export function createToolRegistry(args: {
   const isAthenaEnabled = !(pluginConfig.disabled_agents ?? []).some(
     (agent) => agent.toLowerCase() === "athena",
   )
+  const isAthenaJuniorEnabled = !(pluginConfig.disabled_agents ?? []).some(
+    (agent) => agent.toLowerCase() === "athena-junior",
+  )
 
   const delegateTask = createDelegateTask({
     manager: managers.backgroundManager,
@@ -155,7 +158,7 @@ export function createToolRegistry(args: {
     interactive_bash,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
-    ...(isAthenaEnabled ? {
+    ...(isAthenaEnabled || isAthenaJuniorEnabled ? {
       prepare_council_prompt: createPrepareCouncilPromptTool(ctx.directory),
       council_finalize: createCouncilFinalize(ctx.directory),
       athena_council: createAthenaCouncilTool({
