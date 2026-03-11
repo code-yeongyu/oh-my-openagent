@@ -56,7 +56,7 @@
     "@ast-grep/napi": "^0.40.0",
     "@clack/prompts": "^0.11.0",
     "@code-yeongyu/comment-checker": "^0.7.0",
-    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@opencode-ai/plugin": "^1.2.16",
     "@opencode-ai/sdk": "^1.2.17",
     "commander": "^14.0.2",
@@ -89,7 +89,12 @@
     "oh-my-opencode-windows-x64-baseline": "3.11.0"
   },
   "overrides": {
-    "@opencode-ai/sdk": "^1.2.17"
+    "@opencode-ai/sdk": "^1.2.17",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@hono/node-server": "^1.19.10",
+    "hono": "^4.12.5",
+    "ajv": "^8.18.0",
+    "qs": "^6.15.0"
   },
   "trustedDependencies": [
     "@ast-grep/cli",
