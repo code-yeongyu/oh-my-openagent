@@ -1,6 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { CouncilConfig, CouncilMemberConfig } from "../../config/schema/athena"
-import { createCouncilMemberAgent, type CouncilMemberAgentMode } from "../athena"
+import { createCouncilMemberAgent } from "../athena"
+import type { CouncilMemberAgentMode } from "../athena/council-member-agent"
 import { parseModelString } from "../../tools/delegate-task/model-string-parser"
 import { log } from "../../shared/logger"
 import { normalizeMemberId } from "../../shared/member-id-normalizer"

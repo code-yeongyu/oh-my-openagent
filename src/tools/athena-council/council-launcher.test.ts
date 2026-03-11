@@ -4,6 +4,7 @@ import type { CouncilLaunchContext } from "./council-launcher"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CouncilMemberConfig } from "../../config/schema/athena"
 import { ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents"
+import { COUNCIL_DEFAULTS } from "../../agents/athena/constants"
 
 const makeManager = (overrides?: Partial<BackgroundManager>): BackgroundManager =>
   ({
@@ -154,6 +155,22 @@ describe("launchCouncilMember", () => {
         expect(launchCouncilMember(member, "prompt", manager, makeContext())).rejects.toThrow(
           "Invalid model format",
         )
+      })
+    })
+  })
+
+  describe("#given a council member is launched", () => {
+    describe("#when launched", () => {
+      it("#then uses COUNCIL_MEMBER_TTL_MS (2 hours) for the task TTL", async () => {
+        const manager = makeManager()
+        const member: CouncilMemberConfig = {
+          name: "Claude Opus",
+          model: "anthropic/claude-opus-4-6",
+        }
+        await launchCouncilMember(member, "analyze this", manager, makeContext())
+        const launchArgs = (manager.launch as ReturnType<typeof mock>).mock.calls[0][0]
+        expect(launchArgs.ttl).toBe(COUNCIL_DEFAULTS.COUNCIL_MEMBER_TTL_MS)
+        expect(launchArgs.ttl).toBe(2 * 60 * 60 * 1000) // 2 hours in milliseconds
       })
     })
   })

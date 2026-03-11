@@ -35,7 +35,7 @@ import {
 } from "./builtin-agents/council-member-agents"
 import { applyMissingCouncilGuard } from "./builtin-agents/athena-council-guard"
 import type { CouncilConfig } from "../config/schema/athena"
-import type { CouncilMemberAgentMode } from "./athena"
+import type { CouncilMemberAgentMode } from "./athena/council-member-agent"
 
 type AgentSource = AgentFactory | AgentConfig
 

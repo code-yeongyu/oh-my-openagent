@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, mock, spyOn } from "bun:test"
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -6,11 +6,12 @@ import { join } from "node:path"
 import * as dataPath from "./data-path"
 import { shouldRetryError, selectFallbackProvider } from "./model-error-classifier"
 
-describe("model-error-classifier", () => {
+describe.serial("model-error-classifier", () => {
   let cacheDirSpy: ReturnType<typeof spyOn>
   let testCacheDir: string
 
   beforeEach(() => {
+    mock.restore()
     testCacheDir = mkdtempSync(join(tmpdir(), "omo-model-error-"))
     cacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(testCacheDir)
     if (existsSync(testCacheDir)) {

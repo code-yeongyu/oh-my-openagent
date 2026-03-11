@@ -1,15 +1,16 @@
-import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, mock, spyOn } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 import * as dataPath from "./data-path"
 import { updateConnectedProvidersCache, readProviderModelsCache } from "./connected-providers-cache"
 
-describe("updateConnectedProvidersCache", () => {
+describe.serial("updateConnectedProvidersCache", () => {
 	let cacheDirSpy: ReturnType<typeof spyOn>
 	let testCacheDir: string
 
 	beforeEach(() => {
+		mock.restore()
 		testCacheDir = mkdtempSync(join(tmpdir(), "omo-connected-providers-"))
 		cacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(testCacheDir)
 		if (existsSync(testCacheDir)) {

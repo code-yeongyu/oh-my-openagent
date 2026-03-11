@@ -1,5 +1,5 @@
 declare const require: (name: string) => any
-const { describe, it, expect, beforeEach, afterEach, beforeAll, spyOn } = require("bun:test")
+const { describe, it, expect, beforeEach, afterEach, beforeAll, mock, spyOn } = require("bun:test")
 import { mkdtempSync, writeFileSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
@@ -35,22 +35,20 @@ beforeAll(async () => {
 
 describe("fetchAvailableModels", () => {
   let tempDir: string
-	let originalXdgCache: string | undefined
-
+  let openCodeCacheDirSpy: ReturnType<typeof spyOn>
+  let omoCacheDirSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
+    mock.restore()
     __resetModelCache()
     tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
-		originalXdgCache = process.env.XDG_CACHE_HOME
-		process.env.XDG_CACHE_HOME = tempDir
+    openCodeCacheDirSpy = spyOn(dataPath, "getOpenCodeCacheDir").mockReturnValue(join(tempDir, "opencode"))
+    omoCacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(join(tempDir, "oh-my-opencode"))
   })
 
   afterEach(() => {
-    if (originalXdgCache !== undefined) {
-			process.env.XDG_CACHE_HOME = originalXdgCache
-		} else {
-			delete process.env.XDG_CACHE_HOME
-		}
+    openCodeCacheDirSpy.mockRestore()
+    omoCacheDirSpy.mockRestore()
     rmSync(tempDir, { recursive: true, force: true })
   })
 
@@ -483,23 +481,22 @@ describe("getConnectedProviders", () => {
 	})
 })
 
-describe("fetchAvailableModels with connected providers filtering", () => {
+describe.serial("fetchAvailableModels with connected providers filtering", () => {
 	let tempDir: string
-	let originalXdgCache: string | undefined
+	let openCodeCacheDirSpy: ReturnType<typeof spyOn>
+	let omoCacheDirSpy: ReturnType<typeof spyOn>
 
 	beforeEach(() => {
+		mock.restore()
 		__resetModelCache()
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
-		originalXdgCache = process.env.XDG_CACHE_HOME
-		process.env.XDG_CACHE_HOME = tempDir
+		openCodeCacheDirSpy = spyOn(dataPath, "getOpenCodeCacheDir").mockReturnValue(join(tempDir, "opencode"))
+		omoCacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(join(tempDir, "oh-my-opencode"))
 	})
 
 	afterEach(() => {
-		if (originalXdgCache !== undefined) {
-			process.env.XDG_CACHE_HOME = originalXdgCache
-		} else {
-			delete process.env.XDG_CACHE_HOME
-		}
+		openCodeCacheDirSpy.mockRestore()
+		omoCacheDirSpy.mockRestore()
 		rmSync(tempDir, { recursive: true, force: true })
 	})
 
@@ -650,12 +647,13 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 	})
 })
 
-describe("fetchAvailableModels with provider-models cache (whitelist-filtered)", () => {
+describe.serial("fetchAvailableModels with provider-models cache (whitelist-filtered)", () => {
 	let tempDir: string
 	let openCodeCacheDirSpy: ReturnType<typeof spyOn>
 	let omoCacheDirSpy: ReturnType<typeof spyOn>
 
 	beforeEach(() => {
+		mock.restore()
 		__resetModelCache()
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
 		openCodeCacheDirSpy = spyOn(dataPath, "getOpenCodeCacheDir").mockReturnValue(join(tempDir, "opencode"))
@@ -875,11 +873,12 @@ describe("isModelAvailable", () => {
 	})
 })
 
-describe("fallback model availability", () => {
+describe.serial("fallback model availability", () => {
 	let tempDir: string
 	let omoCacheDirSpy: ReturnType<typeof spyOn>
 
 	beforeEach(() => {
+		mock.restore()
 		// given
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
 		omoCacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(join(tempDir, "oh-my-opencode"))

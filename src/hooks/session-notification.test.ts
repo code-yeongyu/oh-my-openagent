@@ -1,11 +1,11 @@
-const { describe, expect, test, beforeEach, afterEach, spyOn } = require("bun:test")
+const { describe, expect, test, beforeEach, afterEach, mock, spyOn } = require("bun:test")
 
 import { createSessionNotification } from "./session-notification"
 import { setMainSession, subagentSessions, _resetForTesting } from "../features/claude-code-session-state"
 import * as utils from "./session-notification-utils"
 import * as sender from "./session-notification-sender"
 
-describe("session-notification", () => {
+describe.serial("session-notification", () => {
   let notificationCalls: string[]
 
   function createMockPluginInput() {
@@ -31,9 +31,10 @@ describe("session-notification", () => {
   }
 
   beforeEach(() => {
-    _resetForTesting()
+    mock.restore()
     notificationCalls = []
-    
+    _resetForTesting()
+    subagentSessions.clear()
     spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
     spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
     spyOn(utils, "getPowershellPath").mockResolvedValue("powershell")
@@ -541,7 +542,7 @@ describe("session-notification", () => {
     })
 
     // Wait for the idle delay to pass with extra margin for busy CI/full-suite timing.
-    await new Promise((resolve) => setTimeout(resolve, 150))
+    await new Promise((resolve) => setTimeout(resolve, 250))
 
     // then - notification SHOULD be sent (activity was within grace period, ignored)
     expect(notificationCalls.length).toBeGreaterThanOrEqual(1)

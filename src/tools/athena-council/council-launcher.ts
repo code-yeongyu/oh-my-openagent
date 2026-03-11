@@ -62,6 +62,7 @@ export async function launchCouncilMember(
       modelID: parsed.modelID,
       ...(member.variant ? { variant: member.variant } : {}),
     },
+    ttl: COUNCIL_DEFAULTS.COUNCIL_MEMBER_TTL_MS,
   })
 
   return { member, task }

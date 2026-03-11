@@ -36,7 +36,8 @@ export function pruneStaleTasksAndNotifications(args: {
     // Council members are their own background tasks with their own TTLs.
     if (TTL_EXEMPT_AGENTS.has(task.agent.toLowerCase())) continue
 
-    if (age <= TASK_TTL_MS) continue
+    const taskTTL = task.ttl ?? TASK_TTL_MS
+    if (age <= taskTTL) continue
 
     const errorMessage = task.status === "pending"
       ? "Task timed out while queued (30 minutes)"
@@ -54,7 +55,8 @@ export function pruneStaleTasksAndNotifications(args: {
     const validNotifications = queued.filter((task) => {
       if (!task.startedAt) return false
       const age = now - task.startedAt.getTime()
-      return age <= TASK_TTL_MS
+      const taskTTL = task.ttl ?? TASK_TTL_MS
+      return age <= taskTTL
     })
 
     if (validNotifications.length === 0) {
