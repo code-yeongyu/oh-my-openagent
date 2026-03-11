@@ -81,7 +81,7 @@ async function cleanupIdleClients(state: SkillMcpManagerState): Promise<void> {
     }
   }
 
-  if (state.clients.size === 0) {
+  if (state.clients.size === 0 && state.pendingConnections.size === 0) {
     stopCleanupTimer(state)
     unregisterProcessCleanup(state)
   }
@@ -119,7 +119,7 @@ export async function disconnectSession(state: SkillMcpManagerState, sessionID: 
     state.pendingConnections.delete(key)
   }
 
-  if (state.clients.size === 0) {
+  if (state.clients.size === 0 && state.pendingConnections.size === 0) {
     stopCleanupTimer(state)
     unregisterProcessCleanup(state)
   }
@@ -127,6 +127,7 @@ export async function disconnectSession(state: SkillMcpManagerState, sessionID: 
 
 export async function disconnectAll(state: SkillMcpManagerState): Promise<void> {
   state.shutdownGeneration++
+  state.disposed = true
   stopCleanupTimer(state)
   unregisterProcessCleanup(state)
 

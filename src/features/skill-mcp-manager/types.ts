@@ -59,6 +59,7 @@ export interface SkillMcpManagerState {
   idleTimeoutMs: number
   shutdownGeneration: number
   inFlightConnections: Map<string, number>
+  disposed: boolean
 }
 
 export interface SkillMcpClientConnectionParams {
