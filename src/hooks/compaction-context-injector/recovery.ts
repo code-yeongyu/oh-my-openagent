@@ -10,6 +10,7 @@ import {
   createExpectedRecoveryPromptConfig,
   isPromptConfigRecovered,
 } from "./recovery-prompt-config"
+import { validateCheckpointModel } from "./validated-model"
 import {
   resolveLatestSessionPromptConfig,
   resolveSessionPromptConfig,
@@ -34,10 +35,6 @@ export function createRecoveryLogic(
     if (!checkpoint?.agent) {
       return false
     }
-    const checkpointWithAgent = {
-      ...checkpoint,
-      agent: checkpoint.agent,
-    }
 
     const tailState = getTailState(sessionID)
     const now = Date.now()
@@ -46,6 +43,25 @@ export function createRecoveryLogic(
     }
 
     const currentPromptConfig = await resolveSessionPromptConfig(ctx, sessionID)
+    const validatedCheckpointModel = validateCheckpointModel(
+      checkpoint.model,
+      currentPromptConfig.model,
+    )
+    const { model: checkpointModel, ...checkpointWithoutModel } = checkpoint
+    const checkpointWithAgent = {
+      ...checkpointWithoutModel,
+      agent: checkpoint.agent,
+      ...(validatedCheckpointModel ? { model: validatedCheckpointModel } : {}),
+    }
+
+    if (checkpointModel && !validatedCheckpointModel) {
+      log(`[compaction-context-injector] Ignoring checkpoint model that disagrees with current prompt config`, {
+        sessionID,
+        checkpointModel,
+        currentModel: currentPromptConfig.model,
+      })
+    }
+
     const expectedPromptConfig = createExpectedRecoveryPromptConfig(
       checkpointWithAgent,
       currentPromptConfig,
