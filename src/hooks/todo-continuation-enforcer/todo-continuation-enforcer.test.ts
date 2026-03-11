@@ -1706,6 +1706,27 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(0)
   })
 
+  test("should not inject when shouldSkipContinuation returns true", async () => {
+    // given - session already handled by another continuation hook
+    const sessionID = "main-skip-other-continuation"
+    setMainSession(sessionID)
+
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
+      shouldSkipContinuation: (id) => id === sessionID,
+    })
+
+    // when - session goes idle
+    await hook.handler({
+      event: { type: "session.idle", properties: { sessionID } },
+    })
+
+    await fakeTimers.advanceBy(3000)
+
+    // then - no countdown toast or continuation injection
+    expect(toastCalls).toHaveLength(0)
+    expect(promptCalls).toHaveLength(0)
+  })
+
   test("should not inject when isContinuationStopped becomes true during countdown", async () => {
     // given - session where continuation is not stopped at idle time but stops during countdown
     const sessionID = "main-race-condition"

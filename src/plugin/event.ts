@@ -170,6 +170,7 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input));
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input));
     await Promise.resolve(hooks.sessionNotification?.(input));
+    await Promise.resolve(hooks.gptPermissionContinuation?.handler?.(input));
     await Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input));
     await Promise.resolve(hooks.unstableAgentBabysitter?.event?.(input));
     await Promise.resolve(hooks.contextWindowMonitor?.event?.(input));

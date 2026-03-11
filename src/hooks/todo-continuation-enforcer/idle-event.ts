@@ -29,6 +29,7 @@ export async function handleSessionIdle(args: {
   backgroundManager?: BackgroundManager
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
+  shouldSkipContinuation?: (sessionID: string) => boolean
 }): Promise<void> {
   const {
     ctx,
@@ -37,6 +38,7 @@ export async function handleSessionIdle(args: {
     backgroundManager,
     skipAgents = DEFAULT_SKIP_AGENTS,
     isContinuationStopped,
+    shouldSkipContinuation,
   } = args
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
@@ -183,6 +185,11 @@ export async function handleSessionIdle(args: {
 
   if (isContinuationStopped?.(sessionID)) {
     log(`[${HOOK_NAME}] Skipped: continuation stopped for session`, { sessionID })
+    return
+  }
+
+  if (shouldSkipContinuation?.(sessionID)) {
+    log(`[${HOOK_NAME}] Skipped: another continuation hook already injected`, { sessionID })
     return
   }
 
