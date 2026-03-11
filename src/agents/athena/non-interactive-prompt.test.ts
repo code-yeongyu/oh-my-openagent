@@ -120,9 +120,9 @@ describe("ATHENA_NON_INTERACTIVE_PROMPT", () => {
   })
 
   describe("#given the workflow section", () => {
-    describe("#when checking for all 12 steps", () => {
-      it("#then contains Step 1 through Step 12", () => {
-        for (let step = 1; step <= 12; step++) {
+    describe("#when checking for all 11 steps", () => {
+      it("#then contains Step 1 through Step 11", () => {
+        for (let step = 1; step <= 11; step++) {
           expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain(`Step ${step}:`)
         }
       })

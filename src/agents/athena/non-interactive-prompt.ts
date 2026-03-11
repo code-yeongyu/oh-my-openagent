@@ -94,17 +94,12 @@ Use the latest athena_council retryRules and quorumRules as the source of truth 
 - council_finalize extracts responses, writes archives, returns structured JSON with archive_dir and members array.
 - Read each member's archive_file using Read tool for synthesis input.
 
-### Step 7: Detect failed or stuck members.
-- Stuck: session_state == "idle" AND last_activity_s > {STUCK_THRESHOLD_SECONDS}
-- Error/cancelled: status == "error" or "cancelled"
-- Completed: status == "completed" — process in Step 6
-
-### Step 8: Verify completed members have valid responses.
+### Step 7: Verify completed members have valid responses.
 - has_response: true AND response_complete: true → use for synthesis
 - has_response: true AND response_complete: false → treat as failed
 - has_response: false → treat as failed
 
-### Step 9: Retry failed members (if configured).
+### Step 8: Retry failed members (if configured).
 - retryRules shape:
 ${RETRY_RULES_CONTRACT}
 - quorumRules shape:
@@ -123,20 +118,20 @@ If retryRules.maxRetries > 0 and failed members exist:
 - If retry_failed_if_others_finished is true, only retry after all non-failed members have completed.
 - If cancel_retrying_on_quorum is true, stop retrying once quorum (quorumRules.minResponses successful members) is met.
 - If retryRules.maxRetries is 0, no failed members remain, or retry budget is exhausted, do NOT re-launch members.
-- If Step 6 (council_finalize) has already executed for the current task IDs, proceed to Step 10.
+- If Step 6 (council_finalize) has already executed for the current task IDs, proceed to Step 9.
 - Otherwise, return to Step 5 and continue tracking until Step 6 can run for the current task IDs.
 
-### Step 10: Synthesize using council_finalize runtime guidance.
+### Step 9: Synthesize using council_finalize runtime guidance.
 - Preconditions: Step 6 (council_finalize) has executed for the current task IDs and archive data is available.
 - Read every member's archive_file with Read tool.
 - Apply the injected <athena_runtime_guidance> from council_finalize.
 - Track agreement/disagreement across members.
 - Flag single-member points as lower confidence.
 
-### Step 11: Persist synthesis.
+### Step 10: Persist synthesis.
 - Write full synthesis to {archive_dir}/synthesis.md.
 
-### Step 12: Return structured result.
+### Step 11: Return structured result.
 - Output the <athena_council_result> JSON (see output contract below).
 </workflow>
 
@@ -170,7 +165,19 @@ ${COUNCIL_FAILURE_METADATA_CONTRACT}
   "confidence": "high" | "medium" | "low",
   "archive_dir": "{path to archive directory}",
   "dissenting_views": ["{view1}", ...],
-  "failure_metadata": [{ "failure_type": "network_error" | "timeout_error" | "validation_error" | "quorum_error" }]
+  "failure_metadata": [
+    {
+      "failure_type": "network_error" | "timeout_error" | "validation_error" | "quorum_error",
+      "message": "string (optional, for network_error)",
+      "retryable": "boolean (optional, for network_error)",
+      "duration": "number (optional, for timeout_error)",
+      "threshold": "number (optional, for timeout_error)",
+      "field": "string (optional, for validation_error)",
+      "value": "string (optional, for validation_error)",
+      "responses": "number (optional, for quorum_error)",
+      "required": "number (optional, for quorum_error)"
+    }
+  ]
 }
 </athena_council_result>
 

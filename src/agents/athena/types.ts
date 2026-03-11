@@ -173,7 +173,17 @@ export function buildNonInteractiveModeValidationLines(): string {
 }
 
 export function buildRetryRulesContract(rules: RetryRules = createRetryRules()): string {
-  return JSON.stringify(rules, null, 2)
+  const contract = JSON.stringify(rules, null, 2)
+  const documentation = `
+${contract}
+
+IMPORTANT: For network_error failures, also check the 'retryable' field in the failure_metadata:
+- Only retry network_error if both conditions are met:
+  1. failure_type is in retryableErrors (e.g., "network_error")
+  2. For network_error specifically: retryable field is true
+- If retryable is false, do NOT retry even if network_error is in retryableErrors.
+`
+  return documentation.trim()
 }
 
 export function buildQuorumRulesContract(rules: QuorumRules = createQuorumRules()): string {

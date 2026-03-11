@@ -5,6 +5,7 @@ import {
 import type { InstallConfig } from "./types"
 
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
+import type { CouncilConfig } from "../config/schema/athena"
 import { applyOpenAiOnlyModelCatalog, isOpenAiOnlyAvailability } from "./openai-only-model-catalog"
 import { toProviderAvailability } from "./provider-availability"
 import {
@@ -127,7 +128,11 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
   const councilMembers = generateCouncilMembers(avail)
   if (councilMembers.length >= 2) {
     const athenaAgent = agents.athena ?? {}
-    agents.athena = { ...athenaAgent, council: { members: councilMembers } } as AgentConfig
+    const athenaWithCouncil: AgentConfig & { council: CouncilConfig } = {
+      ...athenaAgent,
+      council: { members: councilMembers },
+    } as AgentConfig & { council: CouncilConfig }
+    agents.athena = athenaWithCouncil
   }
 
   const generatedConfig: GeneratedOmoConfig = {
