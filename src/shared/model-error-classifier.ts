@@ -55,9 +55,17 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "timeout",
   "service unavailable",
   "internal_server_error",
+  "free usage",
+  "usage exceeded",
+  "credit",
+  "balance",
+  "temporarily unavailable",
+  "try again",
   "503",
   "502",
   "504",
+  "429",
+  "529",
 ]
 
 const AUTO_RETRY_GATE_PATTERNS = [
