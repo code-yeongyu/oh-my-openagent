@@ -418,14 +418,15 @@ Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 Disable built-in hooks via `disabled_hooks`:
 
 ```json
-{ "disabled_hooks": ["comment-checker", "agent-usage-reminder"] }
+{ "disabled_hooks": ["comment-checker", "gpt-permission-continuation"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`
+Available hooks: `gpt-permission-continuation`, `todo-continuation-enforcer`, `context-window-monitor`, `session-recovery`, `session-notification`, `comment-checker`, `grep-output-truncator`, `tool-output-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `anthropic-context-window-limit-recovery`, `rules-injector`, `background-notification`, `auto-update-checker`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `compaction-context-injector`, `thinking-block-validator`, `claude-code-hooks`, `ralph-loop`, `preemptive-compaction`, `auto-slash-command`, `sisyphus-junior-notepad`, `no-sisyphus-gpt`, `start-work`, `runtime-fallback`
 
 **Notes:**
 
 - `directory-agents-injector` — auto-disabled on OpenCode 1.1.37+ (native AGENTS.md support)
+- `gpt-permission-continuation` — resumes GPT sessions only when the last assistant reply ends with a permission-seeking tail like `If you want, ...`. Disable it if you prefer GPT sessions to wait for explicit user follow-up.
 - `no-sisyphus-gpt` — **do not disable**. It blocks incompatible GPT models for Sisyphus while allowing the dedicated GPT-5.4 prompt path.
 - `startup-toast` is a sub-feature of `auto-update-checker`. Disable just the toast by adding `startup-toast` to `disabled_hooks`.
 

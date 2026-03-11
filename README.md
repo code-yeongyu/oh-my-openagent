@@ -310,7 +310,7 @@ See full [Features Documentation](docs/reference/features.md).
 - **Claude Code Compatibility**: Full hook system, commands, skills, agents, MCPs
 - **Built-in MCPs**: websearch (Exa), context7 (docs), grep_app (GitHub search)
 - **Session Tools**: List, read, search, and analyze session history
-- **Productivity Features**: Ralph Loop, Todo Enforcer, Comment Checker, Think Mode, and more
+- **Productivity Features**: Ralph Loop, Todo Enforcer, GPT permission-tail continuation, Comment Checker, Think Mode, and more
 - **Model Setup**: Agent-model matching is built into the [Installation Guide](docs/guide/installation.md#step-5-understand-your-model-setup)
 
 ## Configuration
@@ -327,7 +327,7 @@ See [Configuration Documentation](docs/reference/configuration.md).
 - **Sisyphus Agent**: Main orchestrator with Prometheus (Planner) and Metis (Plan Consultant)
 - **Background Tasks**: Configure concurrency limits per provider/model
 - **Categories**: Domain-specific task delegation (`visual`, `business-logic`, custom)
-- **Hooks**: 25+ built-in hooks, all configurable via `disabled_hooks`
+- **Hooks**: 25+ built-in hooks, including `gpt-permission-continuation`, all configurable via `disabled_hooks`
 - **MCPs**: Built-in websearch (Exa), context7 (docs), grep_app (GitHub search)
 - **LSP**: Full LSP support with refactoring tools
 - **Experimental**: Aggressive truncation, auto-resume, and more
