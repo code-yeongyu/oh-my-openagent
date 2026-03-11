@@ -1,5 +1,6 @@
 export { run } from "./runner"
 export { resolveRunAgent } from "./agent-resolver"
+export { resolveRunModel } from "./model-resolver"
 export { createServerConnection } from "./server-connection"
 export { resolveSession } from "./session-resolver"
 export { createJsonOutputManager } from "./json-output"

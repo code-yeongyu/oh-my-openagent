@@ -7,6 +7,7 @@ import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { getSessionTools } from "../../shared/session-tools-store"
 import { normalizeSDKResponse } from "../../shared"
+import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
 
 export async function executeUnstableAgentTask(
   args: DelegateTaskArgs,
@@ -35,6 +36,7 @@ export async function executeUnstableAgentTask(
       skills: args.load_skills.length > 0 ? args.load_skills : undefined,
       skillContent: systemContent,
       category: args.category,
+      sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
     })
 
     const timing = getTimingConfig()

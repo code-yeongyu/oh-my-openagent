@@ -1,10 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { join, basename } from "path"
-import type { AgentConfig } from "@opencode-ai/sdk"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { getClaudeConfigDir } from "../../shared"
-import type { AgentScope, AgentFrontmatter, LoadedAgent } from "./types"
+import type { AgentScope, AgentFrontmatter, ClaudeCodeAgentConfig, LoadedAgent } from "./types"
+import { mapClaudeModelToOpenCode } from "./claude-model-mapper"
 
 function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefined {
   if (!toolsStr) return undefined
@@ -42,10 +42,13 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
 
        const formattedDescription = `(${scope}) ${originalDescription}`
 
-       const config: AgentConfig = {
+       const mappedModelOverride = mapClaudeModelToOpenCode(data.model)
+
+       const config: ClaudeCodeAgentConfig = {
          description: formattedDescription,
          mode: data.mode || "subagent",
          prompt: body.trim(),
+         ...(mappedModelOverride ? { model: mappedModelOverride } : {}),
        }
 
        const toolsConfig = parseToolsConfig(data.tools)
@@ -67,22 +70,22 @@ function loadAgentsFromDir(agentsDir: string, scope: AgentScope): LoadedAgent[] 
   return agents
 }
 
-export function loadUserAgents(): Record<string, AgentConfig> {
+export function loadUserAgents(): Record<string, ClaudeCodeAgentConfig> {
   const userAgentsDir = join(getClaudeConfigDir(), "agents")
   const agents = loadAgentsFromDir(userAgentsDir, "user")
 
-  const result: Record<string, AgentConfig> = {}
+  const result: Record<string, ClaudeCodeAgentConfig> = {}
   for (const agent of agents) {
     result[agent.name] = agent.config
   }
   return result
 }
 
-export function loadProjectAgents(directory?: string): Record<string, AgentConfig> {
+export function loadProjectAgents(directory?: string): Record<string, ClaudeCodeAgentConfig> {
   const projectAgentsDir = join(directory ?? process.cwd(), ".claude", "agents")
   const agents = loadAgentsFromDir(projectAgentsDir, "project")
 
-  const result: Record<string, AgentConfig> = {}
+  const result: Record<string, ClaudeCodeAgentConfig> = {}
   for (const agent of agents) {
     result[agent.name] = agent.config
   }

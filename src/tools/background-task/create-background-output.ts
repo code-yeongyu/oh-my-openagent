@@ -87,7 +87,6 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
 
         const shouldBlock = args.block === true
         const timeoutMs = Math.min(args.timeout ?? 60000, 600000)
-        const fullSession = args.full_session ?? true
 
         let resolvedTask = task
 
@@ -123,6 +122,10 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         }
 
         const isActive = isTaskActiveStatus(resolvedTask.status)
+        const fullSessionProvided = args.full_session !== undefined
+        const fullSession = fullSessionProvided
+          ? (args.full_session ?? true)
+          : true
         const includeThinking = isActive || (args.include_thinking ?? false)
         const includeToolResults = isActive || (args.include_tool_results ?? false)
 

@@ -1,8 +1,9 @@
 declare const require: (name: string) => any
-const { describe, it, expect, beforeEach, afterEach, beforeAll } = require("bun:test")
-import { mkdtempSync, writeFileSync, rmSync } from "fs"
+const { describe, it, expect, beforeEach, afterEach, beforeAll, spyOn } = require("bun:test")
+import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
+import * as connectedProvidersCache from "./connected-providers-cache"
 
 let __resetModelCache: () => void
 let fetchAvailableModels: (client?: unknown, options?: { connectedProviders?: string[] | null }) => Promise<Set<string>>
@@ -33,25 +34,27 @@ beforeAll(async () => {
 })
 
 describe("fetchAvailableModels", () => {
-  let tempDir: string
+	let tempDir: string
 	let originalXdgCache: string | undefined
+	let providerModelsCacheSpy: { mockRestore(): void } | undefined
 
-
-  beforeEach(() => {
-    __resetModelCache()
-    tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
+	beforeEach(() => {
+		__resetModelCache()
+		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
 		originalXdgCache = process.env.XDG_CACHE_HOME
 		process.env.XDG_CACHE_HOME = tempDir
-  })
+		providerModelsCacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
+	})
 
-  afterEach(() => {
-    if (originalXdgCache !== undefined) {
+	afterEach(() => {
+		providerModelsCacheSpy?.mockRestore()
+		if (originalXdgCache !== undefined) {
 			process.env.XDG_CACHE_HOME = originalXdgCache
 		} else {
 			delete process.env.XDG_CACHE_HOME
 		}
-    rmSync(tempDir, { recursive: true, force: true })
-  })
+		rmSync(tempDir, { recursive: true, force: true })
+	})
 
   function writeModelsCache(data: Record<string, any>) {
     const cacheDir = join(tempDir, "opencode")
@@ -485,15 +488,18 @@ describe("getConnectedProviders", () => {
 describe("fetchAvailableModels with connected providers filtering", () => {
 	let tempDir: string
 	let originalXdgCache: string | undefined
+	let providerModelsCacheSpy: { mockRestore(): void } | undefined
 
 	beforeEach(() => {
 		__resetModelCache()
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
 		originalXdgCache = process.env.XDG_CACHE_HOME
 		process.env.XDG_CACHE_HOME = tempDir
+		providerModelsCacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
 	})
 
 	afterEach(() => {
+		providerModelsCacheSpy?.mockRestore()
 		if (originalXdgCache !== undefined) {
 			process.env.XDG_CACHE_HOME = originalXdgCache
 		} else {
@@ -652,15 +658,24 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 describe("fetchAvailableModels with provider-models cache (whitelist-filtered)", () => {
 	let tempDir: string
 	let originalXdgCache: string | undefined
+	let providerModelsCacheSpy: { mockRestore(): void } | undefined
 
 	beforeEach(() => {
 		__resetModelCache()
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
 		originalXdgCache = process.env.XDG_CACHE_HOME
 		process.env.XDG_CACHE_HOME = tempDir
+		providerModelsCacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(() => {
+			const cacheFile = join(tempDir, "oh-my-opencode", "provider-models.json")
+			if (!existsSync(cacheFile)) {
+				return null
+			}
+			return JSON.parse(readFileSync(cacheFile, "utf-8"))
+		})
 	})
 
 	afterEach(() => {
+		providerModelsCacheSpy?.mockRestore()
 		if (originalXdgCache !== undefined) {
 			process.env.XDG_CACHE_HOME = originalXdgCache
 		} else {
@@ -878,21 +893,23 @@ describe("isModelAvailable", () => {
 
 describe("fallback model availability", () => {
 	let tempDir: string
-	let originalXdgCache: string | undefined
+	let connectedProvidersCacheSpy: { mockRestore(): void } | undefined
 
 	beforeEach(() => {
 		// given
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
-		originalXdgCache = process.env.XDG_CACHE_HOME
-		process.env.XDG_CACHE_HOME = tempDir
+		connectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(() => {
+			const cacheFile = join(tempDir, "oh-my-opencode", "connected-providers.json")
+			if (!existsSync(cacheFile)) {
+				return null
+			}
+			const cache = JSON.parse(readFileSync(cacheFile, "utf-8")) as { connected?: string[] }
+			return Array.isArray(cache.connected) ? cache.connected : null
+		})
 	})
 
 	afterEach(() => {
-		if (originalXdgCache !== undefined) {
-			process.env.XDG_CACHE_HOME = originalXdgCache
-		} else {
-			delete process.env.XDG_CACHE_HOME
-		}
+		connectedProvidersCacheSpy?.mockRestore()
 		rmSync(tempDir, { recursive: true, force: true })
 	})
 

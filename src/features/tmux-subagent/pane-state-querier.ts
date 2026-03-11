@@ -1,5 +1,6 @@
 import { spawn } from "bun"
 import type { WindowState, TmuxPaneInfo } from "./types"
+import { parsePaneStateOutput } from "./pane-state-parser"
 import { getTmuxPath } from "../../tools/interactive-bash/tmux-path-resolver"
 import { log } from "../../shared"
 
@@ -27,31 +28,17 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
     return null
   }
 
-  const lines = stdout.trim().replace(/\r/g, "").split("\n").filter(Boolean)
-  if (lines.length === 0) return null
-
-  let windowWidth = 0
-  let windowHeight = 0
-  const panes: TmuxPaneInfo[] = []
-
-  for (const line of lines) {
-		const fields = line.split("\t")
-		if (fields.length < 8) continue
-
-		const [paneId, widthStr, heightStr, leftStr, topStr, activeStr, windowWidthStr, windowHeightStr] = fields
-		const title = fields.length > 8 ? fields.slice(8).join("\t") : ""
-    const width = parseInt(widthStr, 10)
-    const height = parseInt(heightStr, 10)
-    const left = parseInt(leftStr, 10)
-    const top = parseInt(topStr, 10)
-    const isActive = activeStr === "1"
-    windowWidth = parseInt(windowWidthStr, 10)
-    windowHeight = parseInt(windowHeightStr, 10)
-
-    if (!isNaN(width) && !isNaN(left) && !isNaN(height) && !isNaN(top)) {
-      panes.push({ paneId, width, height, left, top, title, isActive })
-    }
+  const parsedPaneState = parsePaneStateOutput(stdout)
+  if (!parsedPaneState) {
+    log("[pane-state-querier] failed to parse pane state output", {
+      sourcePaneId,
+    })
+    return null
   }
+
+  const { panes } = parsedPaneState
+  const windowWidth = parsedPaneState.windowWidth
+  const windowHeight = parsedPaneState.windowHeight
 
   panes.sort((a, b) => a.left - b.left || a.top - b.top)
 

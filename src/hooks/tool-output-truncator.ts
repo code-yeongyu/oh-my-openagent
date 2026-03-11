@@ -27,7 +27,10 @@ const TOOL_SPECIFIC_MAX_TOKENS: Record<string, number> = {
 }
 
 interface ToolOutputTruncatorOptions {
-  modelCacheState?: { anthropicContext1MEnabled: boolean }
+  modelCacheState?: {
+    anthropicContext1MEnabled: boolean
+    modelContextLimitsCache?: Map<string, number>
+  }
   experimental?: ExperimentalConfig
 }
 
