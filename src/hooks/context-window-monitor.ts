@@ -62,12 +62,12 @@ export function createContextWindowMonitorHook(
     const cached = tokenCache.get(sessionID)
     if (!cached) return
 
-    const cachedLimit = modelCacheState?.modelContextLimitsCache?.get(
-      `${cached.providerID}/${cached.modelID}`
-    )
-    const actualLimit =
-      cachedLimit ??
-      (isAnthropicProvider(cached.providerID) ? getAnthropicActualLimit(modelCacheState) : null)
+    const modelSpecificLimit = !isAnthropicProvider(cached.providerID)
+      ? modelCacheState?.modelContextLimitsCache?.get(`${cached.providerID}/${cached.modelID}`)
+      : undefined
+    const actualLimit = isAnthropicProvider(cached.providerID)
+      ? getAnthropicActualLimit(modelCacheState)
+      : modelSpecificLimit
 
     if (!actualLimit) return
 
