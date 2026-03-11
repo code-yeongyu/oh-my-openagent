@@ -1,30 +1,31 @@
-import type { GitMasterConfig } from "../../config/schema"
+import { assertValidGitEnvPrefix, type GitMasterConfig } from "../../config/schema"
+
+const BASH_CODE_BLOCK_PATTERN = /```bash\r?\n([\s\S]*?)```/g
+const LEADING_GIT_COMMAND_PATTERN = /^([ \t]*(?:[A-Za-z_][A-Za-z0-9_]*=[^ \t]+\s+)*)git(?=[ \t]|$)/gm
+const INLINE_GIT_COMMAND_PATTERN = /([;&|()][ \t]*)git(?=[ \t]|$)/g
 
 export function injectGitMasterConfig(template: string, config?: GitMasterConfig): string {
 	const commitFooter = config?.commit_footer ?? true
 	const includeCoAuthoredBy = config?.include_co_authored_by ?? true
-	const gitEnvPrefix = config?.git_env_prefix ?? "GIT_MASTER=1"
+	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
 
 	let result = gitEnvPrefix ? injectGitEnvPrefix(template, gitEnvPrefix) : template
 
-	if (!commitFooter && !includeCoAuthoredBy) {
-		return result
+	if (commitFooter || includeCoAuthoredBy) {
+		const injection = buildCommitFooterInjection(commitFooter, includeCoAuthoredBy, gitEnvPrefix)
+		const insertionPoint = result.indexOf("```\n</execution>")
+
+		result =
+			insertionPoint !== -1
+				? result.slice(0, insertionPoint) +
+					"```\n\n" +
+					injection +
+					"\n</execution>" +
+					result.slice(insertionPoint + "```\n</execution>".length)
+				: result + "\n\n" + injection
 	}
 
-	const injection = buildCommitFooterInjection(commitFooter, includeCoAuthoredBy, gitEnvPrefix)
-
-	const insertionPoint = result.indexOf("```\n</execution>")
-	if (insertionPoint !== -1) {
-		return (
-			result.slice(0, insertionPoint) +
-			"```\n\n" +
-			injection +
-			"\n</execution>" +
-			result.slice(insertionPoint + "```\n</execution>".length)
-		)
-	}
-
-	return result + "\n\n" + injection
+	return gitEnvPrefix ? prefixGitCommandsInBashCodeBlocks(result, gitEnvPrefix) : result
 }
 
 function injectGitEnvPrefix(template: string, prefix: string): string {
@@ -61,6 +62,18 @@ function injectGitEnvPrefix(template: string, prefix: string): string {
 	}
 
 	return envPrefixSection + "\n\n---\n\n" + template
+}
+
+function prefixGitCommandsInBashCodeBlocks(template: string, prefix: string): string {
+	return template.replace(BASH_CODE_BLOCK_PATTERN, (block, codeBlock: string) => {
+		return block.replace(codeBlock, prefixGitCommandsInCodeBlock(codeBlock, prefix))
+	})
+}
+
+function prefixGitCommandsInCodeBlock(codeBlock: string, prefix: string): string {
+	return codeBlock
+		.replace(LEADING_GIT_COMMAND_PATTERN, `$1${prefix} git`)
+		.replace(INLINE_GIT_COMMAND_PATTERN, `$1${prefix} git`)
 }
 
 function buildCommitFooterInjection(
