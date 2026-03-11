@@ -1149,6 +1149,7 @@ export class BackgroundManager {
     if (!parentSessionID) return
     if (this.getTasksByParentSession(parentSessionID).length > 0) return
     this.taskHistory.clearSession(parentSessionID)
+    this.completedTaskSummaries.delete(parentSessionID)
   }
 
   private scheduleTaskRemoval(taskId: string): void {
@@ -1170,6 +1171,7 @@ export class BackgroundManager {
           SessionCategoryRegistry.remove(task.sessionID)
         }
         log("[background-agent] Removed completed task from memory:", taskId)
+        this.clearTaskHistoryWhenParentTasksGone(task?.parentSessionID)
       }
     }, TASK_CLEANUP_DELAY_MS)
 

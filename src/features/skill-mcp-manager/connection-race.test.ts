@@ -73,12 +73,13 @@ function createState(): SkillMcpManagerState {
   const state: SkillMcpManagerState = {
     clients: new Map(),
     pendingConnections: new Map(),
-    disconnectedSessions: new Set(),
+    disconnectedSessions: new Map(),
     authProviders: new Map(),
     cleanupRegistered: false,
     cleanupInterval: null,
     cleanupHandlers: [],
     idleTimeoutMs: 5 * 60 * 1000,
+    shutdownGeneration: 0,
   }
 
   trackedStates.push(state)
@@ -145,11 +146,11 @@ describe("getOrCreateClient disconnect race", () => {
     const state = createState()
     const info = createClientInfo("session-a")
     const clientKey = createClientKey(info)
-    state.disconnectedSessions.add(info.sessionID)
+    state.disconnectedSessions.set(info.sessionID, 1)
 
     const client = await getOrCreateClient({ state, clientKey, info, config: stdioConfig })
 
-    expect(state.disconnectedSessions.has(info.sessionID)).toBe(false)
+    expect(state.disconnectedSessions.has(info.sessionID)).toBe(true)
     expect(state.clients.get(clientKey)?.client).toBe(client)
     expect(createdClients[0]?.close).not.toHaveBeenCalled()
   })
@@ -161,5 +162,53 @@ describe("getOrCreateClient disconnect race", () => {
     expect(state.disconnectedSessions.has("session-a")).toBe(false)
     expect(state.pendingConnections.size).toBe(0)
     expect(state.clients.size).toBe(0)
+  })
+})
+
+describe("getOrCreateClient disconnectAll race", () => {
+  it("#given pending connection #when disconnectAll() is called before connection completes #then client is not added to state.clients", async () => {
+    const state = createState()
+    const info = createClientInfo("session-a")
+    const clientKey = createClientKey(info)
+    const pendingConnect = createDeferred<void>()
+    pendingConnects.push(pendingConnect)
+
+    const clientPromise = getOrCreateClient({ state, clientKey, info, config: stdioConfig })
+    expect(state.pendingConnections.has(clientKey)).toBe(true)
+
+    await disconnectAll(state)
+    pendingConnect.resolve(undefined)
+
+    await expect(clientPromise).rejects.toThrow(/connection completed after shutdown/)
+    expect(state.clients.has(clientKey)).toBe(false)
+  })
+})
+
+describe("getOrCreateClient multi-key disconnect race", () => {
+  it("#given 2 pending connections for session A #when disconnectSession(A) before both complete #then both old connections are rejected", async () => {
+    const state = createState()
+    const infoKey1 = createClientInfo("session-a")
+    const infoKey2 = { ...createClientInfo("session-a"), serverName: "server-2" }
+    const clientKey1 = createClientKey(infoKey1)
+    const clientKey2 = `${infoKey2.sessionID}:${infoKey2.skillName}:${infoKey2.serverName}`
+    const pendingConnect1 = createDeferred<void>()
+    const pendingConnect2 = createDeferred<void>()
+    pendingConnects.push(pendingConnect1)
+    pendingConnects.push(pendingConnect2)
+
+    const promise1 = getOrCreateClient({ state, clientKey: clientKey1, info: infoKey1, config: stdioConfig })
+    const promise2 = getOrCreateClient({ state, clientKey: clientKey2, info: infoKey2, config: stdioConfig })
+    expect(state.pendingConnections.size).toBe(2)
+
+    await disconnectSession(state, "session-a")
+
+    pendingConnect1.resolve(undefined)
+    await expect(promise1).rejects.toThrow(/disconnected during MCP connection setup/)
+
+    pendingConnect2.resolve(undefined)
+    await expect(promise2).rejects.toThrow(/disconnected during MCP connection setup/)
+
+    expect(state.clients.has(clientKey1)).toBe(false)
+    expect(state.clients.has(clientKey2)).toBe(false)
   })
 })

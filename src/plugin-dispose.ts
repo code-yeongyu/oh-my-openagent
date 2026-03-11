@@ -7,12 +7,9 @@ export function createPluginDispose(args: {
   skillMcpManager: {
     disconnectAll: () => Promise<void>
   }
-  tmuxSessionManager: {
-    cleanup: () => Promise<void>
-  }
   disposeHooks: () => void
 }): PluginDispose {
-  const { backgroundManager, skillMcpManager, tmuxSessionManager, disposeHooks } = args
+  const { backgroundManager, skillMcpManager, disposeHooks } = args
   let disposePromise: Promise<void> | null = null
 
   return async (): Promise<void> => {
@@ -23,10 +20,7 @@ export function createPluginDispose(args: {
 
     disposePromise = (async (): Promise<void> => {
       backgroundManager.shutdown()
-      await Promise.all([
-        skillMcpManager.disconnectAll(),
-        tmuxSessionManager.cleanup(),
-      ])
+      await skillMcpManager.disconnectAll()
       disposeHooks()
     })()
 
