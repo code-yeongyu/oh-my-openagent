@@ -29,7 +29,12 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
   }
 
   const parsedPaneState = parsePaneStateOutput(stdout)
-  if (!parsedPaneState) return null
+  if (!parsedPaneState) {
+    log("[pane-state-querier] failed to parse pane state output", {
+      sourcePaneId,
+    })
+    return null
+  }
 
   const { panes } = parsedPaneState
   const windowWidth = parsedPaneState.windowWidth
