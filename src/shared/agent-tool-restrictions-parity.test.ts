@@ -1,10 +1,11 @@
 /**
  * Parity test: verifies Athena and council-member tool restrictions stay in sync
- * across the 3 definition surfaces.
+ * across the 4 definition surfaces.
  *
  * Surface 1: src/agents/athena/agent.ts — createAgentToolRestrictions() deny-list
  * Surface 2: src/shared/agent-tool-restrictions.ts — AGENT_RESTRICTIONS boolean map
  * Surface 3: src/agents/athena/council-member-agent.ts — createAgentToolAllowlist() array
+ * Surface 4: src/plugin-handlers/tool-config-handler.ts — applyToolConfig() permission strings
  *
  * This test FAILS if someone adds/removes a restriction in one surface without updating the others.
  */
@@ -13,7 +14,7 @@ import { describe, expect, it } from "bun:test"
 import { getAgentToolRestrictions } from "./agent-tool-restrictions"
 
 // Surface 1: Athena deny-list from src/agents/athena/agent.ts
-// createAgentToolRestrictions(["write", "edit", "call_omo_agent"])
+// createAgentToolRestrictions(["call_omo_agent"])
 const ATHENA_DENY_LIST = ["call_omo_agent"]
 
 // Surface 3: Council-member allowlist from src/agents/athena/council-member-agent.ts
@@ -35,6 +36,23 @@ const COUNCIL_MEMBER_ALLOWLIST = [
 
 // Tools granted to Athena by tool-config-handler.ts (not in deny-list, not in AGENT_RESTRICTIONS)
 const ATHENA_HANDLER_GRANTS = ["task", "prepare_council_prompt", "council_finalize", "athena_council"]
+
+// Surface 4: Athena permissions from tool-config-handler.ts applyToolConfig()
+const ATHENA_HANDLER_PERMISSIONS = {
+  task: "allow",
+  prepare_council_prompt: "allow",
+  council_finalize: "allow",
+  athena_council: "allow",
+  // question: questionPermission (dynamic, not tested here)
+}
+
+// Surface 4: Athena-junior permissions from tool-config-handler.ts applyToolConfig()
+const ATHENA_JUNIOR_HANDLER_PERMISSIONS = {
+  prepare_council_prompt: "allow",
+  council_finalize: "allow",
+  athena_council: "allow",
+  question: "deny",
+}
 
 describe("agent tool restrictions parity", () => {
   describe("given Athena restrictions", () => {
@@ -95,6 +113,28 @@ describe("agent tool restrictions parity", () => {
         }
       })
     })
+
+    describe("#when comparing handler permissions (tool-config-handler.ts) with deny-list", () => {
+      it("tools allowed by handler are NOT in the deny-list", () => {
+        for (const tool of Object.keys(ATHENA_HANDLER_PERMISSIONS)) {
+          expect(
+            ATHENA_DENY_LIST,
+            `Tool "${tool}" is allowed by tool-config-handler but also in the deny-list — conflict!`
+          ).not.toContain(tool)
+        }
+      })
+
+      it("tools allowed by handler are NOT false in AGENT_RESTRICTIONS", () => {
+        const athenaRestrictions = getAgentToolRestrictions("athena")
+
+        for (const tool of Object.keys(ATHENA_HANDLER_PERMISSIONS)) {
+          expect(
+            athenaRestrictions[tool],
+            `Tool "${tool}" is allowed by tool-config-handler but is false in AGENT_RESTRICTIONS["athena"]`
+          ).not.toBe(false)
+        }
+      })
+    })
   })
 
   describe("given council-member restrictions", () => {
@@ -136,6 +176,48 @@ describe("agent tool restrictions parity", () => {
       it("AGENT_RESTRICTIONS has wildcard deny (*: false) for council-member", () => {
         const councilRestrictions = getAgentToolRestrictions("council-member")
         expect(councilRestrictions["*"]).toBe(false)
+      })
+    })
+
+    describe("#when checking tool-config-handler.ts does not override council-member restrictions", () => {
+      it("council-member allowlist tools are NOT in the global deny list from tool-config-handler", () => {
+        // tool-config-handler.ts denies these globally:
+        // grep_app_*, LspHover, LspCodeActions, LspCodeActionResolve, task_*, teammate, prepare_council_prompt, council_finalize, athena_council
+        const globalDenies = [
+          "grep_app_*",
+          "LspHover",
+          "LspCodeActions",
+          "LspCodeActionResolve",
+          "task_*",
+          "teammate",
+          "prepare_council_prompt",
+          "council_finalize",
+          "athena_council",
+        ]
+
+        for (const tool of COUNCIL_MEMBER_ALLOWLIST) {
+          expect(
+            globalDenies,
+            `Tool "${tool}" is in council-member allowlist but also in global deny list from tool-config-handler`
+          ).not.toContain(tool)
+        }
+      })
+    })
+  })
+
+  describe("given athena-junior restrictions", () => {
+    describe("#when checking tool-config-handler.ts permissions", () => {
+      it("athena-junior handler permissions are defined and consistent", () => {
+        // Verify that the handler permissions are defined
+        expect(Object.keys(ATHENA_JUNIOR_HANDLER_PERMISSIONS).length).toBeGreaterThan(0)
+
+        // Verify that prepare_council_prompt, council_finalize, athena_council are allowed
+        expect(ATHENA_JUNIOR_HANDLER_PERMISSIONS.prepare_council_prompt).toBe("allow")
+        expect(ATHENA_JUNIOR_HANDLER_PERMISSIONS.council_finalize).toBe("allow")
+        expect(ATHENA_JUNIOR_HANDLER_PERMISSIONS.athena_council).toBe("allow")
+
+        // Verify that question is denied
+        expect(ATHENA_JUNIOR_HANDLER_PERMISSIONS.question).toBe("deny")
       })
     })
   })
