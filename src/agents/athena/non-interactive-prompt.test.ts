@@ -53,8 +53,8 @@ describe("ATHENA_NON_INTERACTIVE_PROMPT", () => {
         expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{MEMBER_MAX_RUNNING_SECONDS}")
       })
 
-      it("#then contains BACKGROUND_WAIT_TIMEOUT_MS placeholder", () => {
-        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{BACKGROUND_WAIT_TIMEOUT_MS}")
+      it("#then contains MEMBER_WAIT_TIMEOUT_MS placeholder", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{MEMBER_WAIT_TIMEOUT_MS}")
       })
 
       it("#then contains runtime_config section tag", () => {

@@ -214,10 +214,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
       "metis",
       "momus",
       "atlas",
-      "sisyphus-junior",
       "athena",
       "athena-junior",
       "council-member",
+      "sisyphus-junior",
     ]
 
     // when - checking AGENT_MODEL_REQUIREMENTS

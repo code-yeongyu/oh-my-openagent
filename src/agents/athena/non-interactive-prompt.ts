@@ -16,7 +16,7 @@ retry_failed_if_others_finished: {RETRY_FAILED_IF_OTHERS_FINISHED}
 cancel_retrying_on_quorum: {CANCEL_RETRYING_ON_QUORUM}
 stuck_threshold_seconds: {STUCK_THRESHOLD_SECONDS}
 member_max_running_seconds: {MEMBER_MAX_RUNNING_SECONDS}
-background_wait_timeout_ms: {BACKGROUND_WAIT_TIMEOUT_MS}
+background_wait_timeout_ms: {MEMBER_WAIT_TIMEOUT_MS}
 </runtime_config>
 
 <registered_council_members>
@@ -63,7 +63,7 @@ athena_council launches all members in parallel and returns JSON with task IDs.
 Track every task_id from the response for use in Step 5.
 
 ### Step 5: Track progress with background_wait.
-- Call background_wait(task_ids=[...all task IDs...], timeout={BACKGROUND_WAIT_TIMEOUT_MS}).
+- Call background_wait(task_ids=[...all task IDs...], timeout={MEMBER_WAIT_TIMEOUT_MS}).
 - Parse returned metadata JSON for member states.
 - If a member's elapsed runtime exceeds {MEMBER_MAX_RUNNING_SECONDS}, mark as failed (timeout).
 - If a member is idle and last_activity_s > {STUCK_THRESHOLD_SECONDS}, mark as failed (stuck).

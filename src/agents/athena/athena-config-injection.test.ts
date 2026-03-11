@@ -183,8 +183,8 @@ describe("Non-interactive prompt config injection placeholders", () => {
         expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{NON_INTERACTIVE_MEMBER_LIST}")
       })
 
-      it("#then contains {BACKGROUND_WAIT_TIMEOUT_MS} placeholder", () => {
-        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{BACKGROUND_WAIT_TIMEOUT_MS}")
+      it("#then contains {MEMBER_WAIT_TIMEOUT_MS} placeholder", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("{MEMBER_WAIT_TIMEOUT_MS}")
       })
     })
   })

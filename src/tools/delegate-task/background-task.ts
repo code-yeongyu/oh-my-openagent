@@ -84,12 +84,13 @@ export async function executeBackgroundTask(
 
     const waitInstruction = isLongRunningCouncil
       ? `This task was automatically backgrounded because council sessions are long-running.
-Use \`background_wait(task_ids=["${task.id}"], timeout=${COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS})\` to block until completion, then \`background_output(task_id="${task.id}")\` to retrieve the result.
-Do NOT poll background_output repeatedly \u2014 background_wait will return when the task finishes. Note: all timeouts are in milliseconds (ms).`
+Use \`background_wait(task_ids=["${task.id}"], timeout=${COUNCIL_DEFAULTS.MEMBER_WAIT_TIMEOUT_MS})\` to block until completion, then \`background_output(task_id="${task.id}")\` to retrieve the result.
+Do NOT poll background_output repeatedly - background_wait will return when the task finishes. Note: all timeouts are in milliseconds (ms).`
       : `System notifies on completion. Use \`background_output\` with task_id="${task.id}" to check.`
+
     const taskMetadataBlock = sessionId
-      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\nbackground_task_id: ${task.id}\n</task_metadata>`
-      : `\n\n<task_metadata>\nbackground_task_id: ${task.id}\n</task_metadata>`
+      ? `\n\n<task_metadata>\nsession_id: ${sessionId}\ntask_id: ${sessionId}\nbackground_task_id: ${task.id}\n</task_metadata>`
+      : ""
 
     return `Background task launched.
 
@@ -98,8 +99,7 @@ Description: ${task.description}
 Agent: ${task.agent}${args.category ? ` (category: ${args.category})` : ""}
 Status: ${task.status}
 
-${waitInstruction}
-${taskMetadataBlock}`
+${waitInstruction}${taskMetadataBlock}`
   } catch (error) {
     return formatDetailedError(error, {
       operation: "Launch background task",

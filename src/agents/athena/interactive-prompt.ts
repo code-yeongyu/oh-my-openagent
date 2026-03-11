@@ -167,7 +167,7 @@ Bake the classified intent into your prepare_council_prompt call (Step 5.1).
 {BULK_LAUNCH_STEP_5_2}
 
 ### Step 6: Track progress with background_wait (metadata only):
-- After launching all members, call background_wait(task_ids=[...all task IDs...], timeout=${COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS}).
+- After launching all members, call background_wait(task_ids=[...all task IDs...], timeout=${COUNCIL_DEFAULTS.MEMBER_WAIT_TIMEOUT_MS}).
 - background_wait returns metadata-only JSON. Parse it to understand member states.
 - The JSON structure contains: progress (done/total/bar), members (array with status, session_state, last_activity_s), completed_tasks (array of {task_id, description, status, duration_s, session_id, output_file_path}), remaining_task_ids, timeout, aborted.
 - IMPORTANT: completed_tasks is an ARRAY of metadata objects — it contains NO result payloads.

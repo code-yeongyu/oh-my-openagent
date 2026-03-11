@@ -261,7 +261,7 @@ Track every task_id from the response for use in Step 6.`
           .replace(/\{CANCEL_RETRYING_ON_QUORUM\}/g, String(cancelOnQuorum))
           .replace(/\{STUCK_THRESHOLD_SECONDS\}/g, String(stuckThreshold))
           .replace(/\{MEMBER_MAX_RUNNING_SECONDS\}/g, String(memberMaxRunning))
-          .replace(/\{BACKGROUND_WAIT_TIMEOUT_MS\}/g, String(COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS))
+          .replace(/\{MEMBER_WAIT_TIMEOUT_MS\}/g, String(COUNCIL_DEFAULTS.MEMBER_WAIT_TIMEOUT_MS))
           .replace(/\{BULK_LAUNCH_STEP_5_2\}/g, step5_2Content)
         athenaPrompt += resilienceConfig
         result["athena"] = { ...result["athena"], prompt: athenaPrompt }
@@ -278,7 +278,7 @@ Track every task_id from the response for use in Step 6.`
           .replace(/\{NON_INTERACTIVE_MODE\}/g, athenaNonInteractiveConfig?.non_interactive_mode ?? "delegation")
           .replace(/\{NON_INTERACTIVE_MEMBERS\}/g, athenaNonInteractiveConfig?.non_interactive_members ?? "all")
           .replace(/\{NON_INTERACTIVE_MEMBER_LIST\}/g, JSON.stringify(athenaNonInteractiveConfig?.non_interactive_member_list ?? []))
-          .replace(/\{BACKGROUND_WAIT_TIMEOUT_MS\}/g, String(COUNCIL_DEFAULTS.BACKGROUND_WAIT_TIMEOUT_MS))
+          .replace(/\{MEMBER_WAIT_TIMEOUT_MS\}/g, String(COUNCIL_DEFAULTS.MEMBER_WAIT_TIMEOUT_MS))
         athenaJuniorPrompt += resilienceConfig
         result["athena-junior"] = { ...result["athena-junior"], prompt: athenaJuniorPrompt }
       }

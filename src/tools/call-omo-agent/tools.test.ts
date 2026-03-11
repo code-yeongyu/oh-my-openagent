@@ -100,6 +100,26 @@ describe("createCallOmoAgent", () => {
     expect(result).not.toContain("disabled via disabled_agents")
   })
 
+  test("should accept athena-junior as a valid agent type", async () => {
+    //#given
+    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
+    const executeFunc = toolDef.execute as Function
+
+    //#when
+    const result = await executeFunc(
+      {
+        description: "Test",
+        prompt: "Test prompt",
+        subagent_type: "athena-junior",
+        run_in_background: true,
+      },
+      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
+    )
+
+    //#then
+    expect(result).not.toContain("Invalid agent type")
+  })
+
   test("uses agent override fallback_models when launching background subagent", async () => {
     //#given
     const launch = mock(() => Promise.resolve({
@@ -142,25 +162,5 @@ describe("createCallOmoAgent", () => {
       { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
       { providers: ["openai"], model: "gpt-5.2", variant: "high" },
     ])
-  })
-
-  test("should accept athena-junior as a valid agent type", async () => {
-    //#given
-    const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
-    const executeFunc = toolDef.execute as Function
-
-    //#when
-    const result = await executeFunc(
-      {
-        description: "Test",
-        prompt: "Test prompt",
-        subagent_type: "athena-junior",
-        run_in_background: true,
-      },
-      { sessionID: "test", messageID: "msg", agent: "test", abort: new AbortController().signal }
-    )
-
-    //#then
-    expect(result).not.toContain("Invalid agent type")
   })
 })
