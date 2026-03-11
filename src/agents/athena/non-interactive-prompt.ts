@@ -114,6 +114,7 @@ If retryRules.maxRetries > 0 and failed members exist:
 3. Call council_finalize again to collect retried results.
 4. Continue retrying until retry count exhausted or quorum met.
 - Retry only failures that match retryRules.retryableErrors.
+- For network_error failures, also check the retryable field in failure_metadata — only retry if retryable is true.
 - If retry_failed_if_others_finished is false, retry opportunistically as soon as failures are detected while others are still running.
 - If retry_failed_if_others_finished is true, only retry after all non-failed members have completed.
 - If cancel_retrying_on_quorum is true, stop retrying once quorum (quorumRules.minResponses successful members) is met.
