@@ -1,4 +1,5 @@
-import { describe, test, expect } from "bun:test"
+declare const require: (name: string) => any
+const { describe, test, expect } = require("bun:test")
 import { buildFallbackChainFromModels, parseFallbackModelEntry } from "./fallback-chain-from-models"
 
 describe("fallback-chain-from-models", () => {
@@ -28,6 +29,21 @@ describe("fallback-chain-from-models", () => {
     expect(parsed).toEqual({
       providers: ["quotio"],
       model: "glm-5",
+      variant: undefined,
+    })
+  })
+
+  test("uses opencode as absolute fallback provider when context provider is missing", () => {
+    //#given
+    const fallbackModel = "gemini-3-flash"
+
+    //#when
+    const parsed = parseFallbackModelEntry(fallbackModel, undefined)
+
+    //#then
+    expect(parsed).toEqual({
+      providers: ["opencode"],
+      model: "gemini-3-flash",
       variant: undefined,
     })
   })
