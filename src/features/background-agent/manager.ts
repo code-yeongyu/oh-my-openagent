@@ -908,13 +908,12 @@ export class BackgroundManager {
       }
 
       this.cleanupPendingByParent(task)
-      this.tasks.delete(task.id)
-      this.clearTaskHistoryWhenParentTasksGone(task.parentSessionID)
       this.clearNotificationsForTask(task.id)
       const toastManager = getTaskToastManager()
       if (toastManager) {
         toastManager.removeTask(task.id)
       }
+      this.scheduleTaskRemoval(task.id)
       if (task.sessionID) {
         SessionCategoryRegistry.remove(task.sessionID)
       }

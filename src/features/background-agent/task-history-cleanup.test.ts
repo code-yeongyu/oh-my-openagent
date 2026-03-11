@@ -112,7 +112,7 @@ describe("task history cleanup", () => {
     managerUnderTest = undefined
   })
 
-  test("#given BackgroundManager with stale tasks for one parent #when pruneStaleTasksAndNotifications() runs #then only that parent's history is removed", () => {
+  test("#given BackgroundManager with stale tasks for one parent #when pruneStaleTasksAndNotifications() runs #then history is preserved until delayed cleanup", () => {
     // given
     const manager = createManager()
     managerUnderTest = manager
@@ -136,7 +136,7 @@ describe("task history cleanup", () => {
     pruneStaleTasksAndNotificationsForTest(manager)
 
     // then
-    expect(manager.taskHistory.getByParentSession("parent-1")).toHaveLength(0)
+    expect(manager.taskHistory.getByParentSession("parent-1")).toHaveLength(1)
     expect(manager.taskHistory.getByParentSession("parent-2")).toHaveLength(1)
   })
 })
