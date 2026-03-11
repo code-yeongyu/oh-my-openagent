@@ -125,7 +125,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         const fullSessionProvided = args.full_session !== undefined
         const fullSession = fullSessionProvided
           ? (args.full_session ?? true)
-          : !isActive
+          : true
         const includeThinking = isActive || (args.include_thinking ?? false)
         const includeToolResults = isActive || (args.include_tool_results ?? false)
 
