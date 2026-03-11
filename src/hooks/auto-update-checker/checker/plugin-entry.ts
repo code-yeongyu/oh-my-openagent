@@ -11,7 +11,7 @@ export interface PluginEntryInfo {
   configPath: string
 }
 
-const EXACT_SEMVER_REGEX = /^\d+\.\d+\.\d+(-[\w.]+)?$/
+const EXACT_SEMVER_REGEX = /^\d+\.\d+\.\d+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/
 
 export function findPluginEntry(directory: string): PluginEntryInfo | null {
   for (const configPath of getConfigPaths(directory)) {
