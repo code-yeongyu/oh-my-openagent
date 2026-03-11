@@ -29,15 +29,23 @@ function formatTranscript(
     const timeA = a.info?.time
     const timeB = b.info?.time
     
-    // Handle numeric timestamps (milliseconds)
-    if (typeof timeA === "object" && typeof timeB === "object") {
-      return (timeA?.created ?? 0) - (timeB?.created ?? 0)
+    // Normalize both timestamps to epoch milliseconds
+    const getEpochMs = (time: string | { created?: number } | undefined): number => {
+      if (time === null || time === undefined) {
+        return 0
+      }
+      if (typeof time === "object" && time.created !== undefined) {
+        return time.created
+      }
+      if (typeof time === "string") {
+        return new Date(time).getTime()
+      }
+      return 0
     }
     
-    // Handle string timestamps
-    const timeAStr = String(timeA ?? "")
-    const timeBStr = String(timeB ?? "")
-    return timeAStr.localeCompare(timeBStr)
+    const msA = getEpochMs(timeA)
+    const msB = getEpochMs(timeB)
+    return msA - msB
   })
 
   const lines: string[] = []

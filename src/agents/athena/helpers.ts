@@ -134,13 +134,15 @@ export function registerAndConfigureAthenaCouncil(
   }
 
   // Register Athena-Junior council members if Athena-Junior is enabled
+  let juniorRegisteredKeys: string[] = []
   if (result["athena-junior"]) {
     const juniorMode = resolveAthenaNonInteractiveMode(athenaNonInteractiveConfig?.non_interactive_mode)
-    const { agents: athenaJuniorCouncilAgents } = registerCouncilMemberAgents(
+    const { agents: athenaJuniorCouncilAgents, registeredKeys: juniorKeys } = registerCouncilMemberAgents(
       councilConfig,
       juniorMode,
       ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX,
     )
+    juniorRegisteredKeys = juniorKeys
 
     for (const [key, config] of Object.entries(athenaJuniorCouncilAgents)) {
       result[key] = { ...config, hidden: true }
@@ -169,8 +171,9 @@ export function registerAndConfigureAthenaCouncil(
       }
     }
 
-    if (result["athena-junior"]) {
-      const athenaJuniorPrompt = (result["athena-junior"].prompt ?? "") + councilTaskInstructions
+    if (result["athena-junior"] && juniorRegisteredKeys.length > 0) {
+      const juniorCouncilTaskInstructions = buildCouncilTaskInstructions(juniorRegisteredKeys, skippedMembers)
+      const athenaJuniorPrompt = (result["athena-junior"].prompt ?? "") + juniorCouncilTaskInstructions
       result["athena-junior"] = {
         ...result["athena-junior"],
         prompt: applyCouncilConfigToAthenaJuniorPrompt(athenaJuniorPrompt, promptConfig),

@@ -34,6 +34,21 @@ const COUNCIL_MEMBER_ALLOWLIST = [
   "background_cancel",
 ]
 
+// Surface 3: Council-member solo allowlist from src/agents/athena/council-member-agent.ts
+// soloToolConfig enables exploration tools but not delegation tools
+const COUNCIL_MEMBER_SOLO_ALLOWLIST = [
+  "read",
+  "grep",
+  "glob",
+  "lsp_goto_definition",
+  "lsp_find_references",
+  "lsp_symbols",
+  "lsp_diagnostics",
+  "ast_grep_search",
+  "finish_task",
+  "background_wait",
+]
+
 // Tools granted to Athena by tool-config-handler.ts (not in deny-list, not in AGENT_RESTRICTIONS)
 const ATHENA_HANDLER_GRANTS = ["task", "prepare_council_prompt", "council_finalize", "athena_council"]
 
@@ -201,6 +216,54 @@ describe("agent tool restrictions parity", () => {
             `Tool "${tool}" is in council-member allowlist but also in global deny list from tool-config-handler`
           ).not.toContain(tool)
         }
+      })
+    })
+
+    describe("#when comparing solo allowlist (council-member-agent.ts) with boolean map (agent-tool-restrictions.ts)", () => {
+      it("every tool in the solo allowlist has a matching true entry in AGENT_RESTRICTIONS", () => {
+        const councilSoloRestrictions = getAgentToolRestrictions("athena-junior-council-member")
+
+        for (const tool of COUNCIL_MEMBER_SOLO_ALLOWLIST) {
+          expect(
+            councilSoloRestrictions[tool],
+            `Tool "${tool}" is in the solo allowlist (council-member-agent.ts) but not true in AGENT_RESTRICTIONS["athena-junior-council-member"]`
+          ).toBe(true)
+        }
+      })
+
+      it("every true entry in AGENT_RESTRICTIONS solo is in the solo allowlist", () => {
+        const councilSoloRestrictions = getAgentToolRestrictions("athena-junior-council-member")
+        const allowedInMap = Object.entries(councilSoloRestrictions)
+          .filter(([key, value]) => key !== "*" && value === true)
+          .map(([key]) => key)
+
+        for (const tool of allowedInMap) {
+          expect(
+            COUNCIL_MEMBER_SOLO_ALLOWLIST,
+            `Tool "${tool}" is true in AGENT_RESTRICTIONS["athena-junior-council-member"] but missing from solo allowlist (council-member-agent.ts)`
+          ).toContain(tool)
+        }
+      })
+
+      it("solo allowlist and AGENT_RESTRICTIONS solo true-entries have the same length", () => {
+        const councilSoloRestrictions = getAgentToolRestrictions("athena-junior-council-member")
+        const allowedInMap = Object.entries(councilSoloRestrictions)
+          .filter(([key, value]) => key !== "*" && value === true)
+          .map(([key]) => key)
+
+        expect(allowedInMap.length).toBe(COUNCIL_MEMBER_SOLO_ALLOWLIST.length)
+      })
+
+      it("AGENT_RESTRICTIONS has wildcard deny (*: false) for council-member solo", () => {
+        const councilSoloRestrictions = getAgentToolRestrictions("athena-junior-council-member")
+        expect(councilSoloRestrictions["*"]).toBe(false)
+      })
+
+      it("solo mode denies delegation tools (call_omo_agent, background_output, background_cancel)", () => {
+        const councilSoloRestrictions = getAgentToolRestrictions("athena-junior-council-member")
+        expect(councilSoloRestrictions.call_omo_agent).toBe(false)
+        expect(councilSoloRestrictions.background_output).toBe(false)
+        expect(councilSoloRestrictions.background_cancel).toBe(false)
       })
     })
   })

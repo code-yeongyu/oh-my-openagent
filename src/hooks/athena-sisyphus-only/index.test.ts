@@ -70,6 +70,18 @@ describe("athena-sisyphus-only hook", () => {
         const absPath = `${WORKSPACE_ROOT}/.sisyphus/plans/test.md`
         expect(isAllowedPath(absPath, WORKSPACE_ROOT)).toBe(true)
       })
+
+      it("#then allows .sisyphus/plans/foo.md when .sisyphus doesn't exist yet (bootstrap)", () => {
+        expect(isAllowedPath(".sisyphus/plans/foo.md", WORKSPACE_ROOT)).toBe(true)
+      })
+
+      it("#then blocks ../etc/passwd even when .sisyphus doesn't exist", () => {
+        expect(isAllowedPath("../etc/passwd", WORKSPACE_ROOT)).toBe(false)
+      })
+
+      it("#then blocks ../../etc/passwd path traversal", () => {
+        expect(isAllowedPath("../../etc/passwd", WORKSPACE_ROOT)).toBe(false)
+      })
     })
 
     describe("#when checking symlink rejection", () => {

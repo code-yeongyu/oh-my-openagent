@@ -37,7 +37,7 @@ const soloToolConfig: ToolConfig = {
   "*": false,
   finish_task: true,
   background_wait: true,
-  ...Object.fromEntries(DIRECT_EXPLORATION_TOOLS.map((tool) => [tool, false])),
+  ...Object.fromEntries(DIRECT_EXPLORATION_TOOLS.map((tool) => [tool, true])),
   call_omo_agent: false,
   background_output: false,
   background_cancel: false,

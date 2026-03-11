@@ -263,4 +263,71 @@ describe("writeTaskOutput", () => {
       expect(firstIdx).toBeLessThan(secondIdx)
     })
   })
+
+  describe("#given messages with mixed timestamp types (object and string)", () => {
+    it("#then sorts messages correctly by converting to epoch milliseconds", async () => {
+      const client = {
+        session: {
+          messages: async () => [
+            {
+              id: "msg_1",
+              info: { role: "assistant", time: "2024-01-01T00:00:02Z" },
+              parts: [{ type: "text", text: "Second message" }],
+            },
+            {
+              id: "msg_0",
+              info: { role: "user", time: { created: 1704067200000 } }, // 2024-01-01T00:00:00Z
+              parts: [{ type: "text", text: "First message" }],
+            },
+          ],
+        },
+      } as BackgroundOutputClient
+
+      const task = createMockTask()
+      const result = await writeTaskOutput(task, client, ".")
+
+      const content = await readFile(result!, "utf-8")
+      const firstIdx = content.indexOf("First message")
+      const secondIdx = content.indexOf("Second message")
+      expect(firstIdx).toBeLessThan(secondIdx)
+    })
+  })
+
+  describe("#given messages with null or undefined timestamps", () => {
+    it("#then sorts null/undefined timestamps to the beginning without throwing", async () => {
+      const client = {
+        session: {
+          messages: async () => [
+            {
+              id: "msg_2",
+              info: { role: "assistant", time: "2024-01-01T00:00:02Z" },
+              parts: [{ type: "text", text: "Third message" }],
+            },
+            {
+              id: "msg_0",
+              info: { role: "user", time: undefined },
+              parts: [{ type: "text", text: "First message" }],
+            },
+            {
+              id: "msg_1",
+              info: { role: "assistant", time: null as any },
+              parts: [{ type: "text", text: "Second message" }],
+            },
+          ],
+        },
+      } as BackgroundOutputClient
+
+      const task = createMockTask()
+      const result = await writeTaskOutput(task, client, ".")
+
+      const content = await readFile(result!, "utf-8")
+      const firstIdx = content.indexOf("First message")
+      const secondIdx = content.indexOf("Second message")
+      const thirdIdx = content.indexOf("Third message")
+      
+      // Null/undefined should sort to beginning
+      expect(firstIdx).toBeLessThan(thirdIdx)
+      expect(secondIdx).toBeLessThan(thirdIdx)
+    })
+  })
 })

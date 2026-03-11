@@ -60,6 +60,12 @@ export function isAllowedPath(filePath: string, workspaceRoot: string): boolean 
     return false
   }
 
+  // Allow bootstrap writes when nearest existing path is workspace root itself
+  // and the target path is within .sisyphus subtree
+  if (realExistingPath === realWorkspaceRoot) {
+    return isWithinSisyphusSubtree(resolved, realWorkspaceRoot)
+  }
+
   if (!isWithinSisyphusSubtree(realExistingPath, realWorkspaceRoot)) {
     return false
   }

@@ -157,6 +157,25 @@ describe("createCouncilMemberAgent", () => {
         expect(tools.background_output).toBe(false)
         expect(tools.background_cancel).toBe(false)
       })
+
+      it("#then enables exploration tools for solo analysis (read, grep, glob, LSP, ast_grep)", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.read).toBe(true)
+        expect(tools.grep).toBe(true)
+        expect(tools.glob).toBe(true)
+        expect(tools.lsp_goto_definition).toBe(true)
+        expect(tools.lsp_find_references).toBe(true)
+        expect(tools.lsp_symbols).toBe(true)
+        expect(tools.lsp_diagnostics).toBe(true)
+        expect(tools.ast_grep_search).toBe(true)
+      })
+
+      it("#then denies delegation tools (call_omo_agent, background_output, background_cancel)", () => {
+        const tools = agent.tools as Record<string, boolean>
+        expect(tools.call_omo_agent).toBe(false)
+        expect(tools.background_output).toBe(false)
+        expect(tools.background_cancel).toBe(false)
+      })
     })
 
     describe("#when creating a delegation-mode council member agent", () => {
