@@ -198,23 +198,47 @@ export async function applyAgentConfig(params: {
         )
       : undefined;
 
+    // Collect all builtin agent names to prevent user/project .md files from overriding them
+    const builtinAgentNames = new Set([
+      ...Object.keys(agentConfig),
+      ...Object.keys(builtinAgents),
+    ]);
+
+    // Filter user/project agents that duplicate builtin agents (they have mode: "subagent" hardcoded
+    // in loadAgentsFromDir which would incorrectly override the builtin mode: "primary")
+    const filteredUserAgents = Object.fromEntries(
+      Object.entries(userAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    );
+    const filteredProjectAgents = Object.fromEntries(
+      Object.entries(projectAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    );
+
     params.config.agent = {
       ...agentConfig,
       ...Object.fromEntries(
         Object.entries(builtinAgents).filter(([key]) => key !== "sisyphus"),
       ),
-      ...filterDisabledAgents(userAgents),
-      ...filterDisabledAgents(projectAgents),
+      ...filterDisabledAgents(filteredUserAgents),
+      ...filterDisabledAgents(filteredProjectAgents),
       ...filterDisabledAgents(pluginAgents),
       ...filteredConfigAgents,
       build: { ...migratedBuild, mode: "subagent", hidden: true },
       ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
     };
   } else {
+    // Filter user/project agents that duplicate builtin agents
+    const builtinAgentNames = new Set(Object.keys(builtinAgents));
+    const filteredUserAgents = Object.fromEntries(
+      Object.entries(userAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    );
+    const filteredProjectAgents = Object.fromEntries(
+      Object.entries(projectAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    );
+
     params.config.agent = {
       ...builtinAgents,
-      ...filterDisabledAgents(userAgents),
-      ...filterDisabledAgents(projectAgents),
+      ...filterDisabledAgents(filteredUserAgents),
+      ...filterDisabledAgents(filteredProjectAgents),
       ...filterDisabledAgents(pluginAgents),
       ...configAgent,
     };

@@ -64,4 +64,26 @@ describe("executeBackground", () => {
     expect(result).toContain("interrupt")
     expect(result).toContain("test-task-id")
   })
+
+  test("passes fallbackChain to background manager launch", async () => {
+    //#given
+    const fallbackChain = [
+      { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
+      { providers: ["openai"], model: "gpt-5.2", variant: "high" },
+    ]
+    launchMock.mockResolvedValueOnce({
+      id: "test-task-id",
+      sessionID: "sub-session",
+      description: "Test task",
+      agent: "test-agent",
+      status: "pending",
+    })
+
+    //#when
+    await executeBackground(testArgs, testContext, mockManager, mockClient, fallbackChain)
+
+    //#then
+    const launchArgs = launchMock.mock.calls.at(-1)?.[0]
+    expect(launchArgs.fallbackChain).toEqual(fallbackChain)
+  })
 })

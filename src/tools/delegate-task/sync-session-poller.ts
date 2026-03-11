@@ -6,6 +6,22 @@ import { normalizeSDKResponse } from "../../shared"
 
 const NON_TERMINAL_FINISH_REASONS = new Set(["tool-calls", "unknown"])
 
+function wait(milliseconds: number): Promise<void> {
+  const sharedBuffer = new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT)
+  const typedArray = new Int32Array(sharedBuffer)
+  const result = Atomics.waitAsync(typedArray, 0, 0, milliseconds)
+  return result.async ? result.value.then(() => undefined) : Promise.resolve()
+}
+
+function abortSyncSession(client: OpencodeClient, sessionID: string, reason: string): void {
+  log("[task] Aborting sync session", { sessionID, reason })
+  void client.session.abort({
+    path: { id: sessionID },
+  }).catch((error: unknown) => {
+    log("[task] Failed to abort sync session", { sessionID, reason, error: String(error) })
+  })
+}
+
 export function isSessionComplete(messages: SessionMessage[]): boolean {
   let lastUser: SessionMessage | undefined
   let lastAssistant: SessionMessage | undefined
@@ -46,11 +62,12 @@ export async function pollSyncSession(
   while (Date.now() - pollStart < maxPollTimeMs) {
     if (ctx.abort?.aborted) {
       log("[task] Aborted by user", { sessionID: input.sessionID })
+      abortSyncSession(client, input.sessionID, "parent_abort")
       if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
       return `Task aborted.\n\nSession ID: ${input.sessionID}`
     }
 
-    await new Promise(resolve => setTimeout(resolve, syncTiming.POLL_INTERVAL_MS))
+    await wait(syncTiming.POLL_INTERVAL_MS)
     pollCount++
 
     let statusResult: { data?: Record<string, { type: string }> }
@@ -118,6 +135,7 @@ export async function pollSyncSession(
   if (Date.now() - pollStart >= maxPollTimeMs) {
     timedOut = true
     log("[task] Poll timeout reached", { sessionID: input.sessionID, pollCount })
+    abortSyncSession(client, input.sessionID, "poll_timeout")
   }
 
   return timedOut ? `Poll timeout reached after ${maxPollTimeMs}ms for session ${input.sessionID}` : null
