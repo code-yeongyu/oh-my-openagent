@@ -1,10 +1,9 @@
 import { existsSync, readdirSync, readFileSync } from "fs"
 import { basename, join } from "path"
-import type { AgentConfig } from "@opencode-ai/sdk"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { isMarkdownFile } from "../../shared/file-utils"
 import { log } from "../../shared/logger"
-import type { AgentFrontmatter } from "../claude-code-agent-loader/types"
+import type { AgentFrontmatter, ClaudeCodeAgentConfig } from "../claude-code-agent-loader/types"
 import { mapClaudeModelToOpenCode } from "../claude-code-agent-loader/claude-model-mapper"
 import type { LoadedPlugin } from "./types"
 
@@ -25,8 +24,8 @@ function parseToolsConfig(toolsStr?: string): Record<string, boolean> | undefine
   return result
 }
 
-export function loadPluginAgents(plugins: LoadedPlugin[]): Record<string, AgentConfig> {
-  const agents: Record<string, AgentConfig> = {}
+export function loadPluginAgents(plugins: LoadedPlugin[]): Record<string, ClaudeCodeAgentConfig> {
+  const agents: Record<string, ClaudeCodeAgentConfig> = {}
 
   for (const plugin of plugins) {
     if (!plugin.agentsDir || !existsSync(plugin.agentsDir)) continue
@@ -47,13 +46,13 @@ export function loadPluginAgents(plugins: LoadedPlugin[]): Record<string, AgentC
         const originalDescription = data.description || ""
         const formattedDescription = `(plugin: ${plugin.name}) ${originalDescription}`
 
-        const mappedModel = mapClaudeModelToOpenCode(data.model)
+        const mappedModelOverride = mapClaudeModelToOpenCode(data.model)
 
-        const config: AgentConfig = {
+        const config: ClaudeCodeAgentConfig = {
           description: formattedDescription,
           mode: "subagent",
           prompt: body.trim(),
-          ...(mappedModel && { model: mappedModel }),
+          ...(mappedModelOverride ? { model: mappedModelOverride } : {}),
         }
 
         const toolsConfig = parseToolsConfig(data.tools)
