@@ -95,6 +95,14 @@ export function createCallOmoAgent(
         return await executeBackground(args, toolCtx, backgroundManager, ctx.client, fallbackChain)
       }
 
+      if (!args.session_id) {
+        try {
+          await backgroundManager.assertCanSpawn(toolCtx.sessionID)
+        } catch (error) {
+          return `Error: ${error instanceof Error ? error.message : String(error)}`
+        }
+      }
+
       return await executeSync(args, toolCtx, ctx, undefined, fallbackChain)
     },
   })
