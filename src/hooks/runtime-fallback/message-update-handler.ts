@@ -52,7 +52,9 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
 
 export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { ctx, config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult } = deps
-  const checkVisibleResponse = hasVisibleAssistantResponse(extractAutoRetrySignal)
+  const checkVisibleResponse = hasVisibleAssistantResponse((info) =>
+    extractAutoRetrySignal(info, config.retry_on_message_patterns)
+  )
 
   return async (props: Record<string, unknown> | undefined) => {
     const info = props?.info as Record<string, unknown> | undefined
@@ -61,14 +63,17 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
     const eventParts = props?.parts as Array<{ type?: string; text?: string }> | undefined
     const infoParts = info?.parts as Array<{ type?: string; text?: string }> | undefined
     const parts = eventParts && eventParts.length > 0 ? eventParts : infoParts
-    const retrySignalResult = extractAutoRetrySignal(info)
+    const retrySignalResult = extractAutoRetrySignal(info, config.retry_on_message_patterns)
     const partsText = (parts ?? [])
       .filter((p) => typeof p?.text === "string")
       .map((p) => (p.text ?? "").trim())
       .filter((text) => text.length > 0)
       .join("\n")
     const retrySignalFromParts = partsText
-      ? extractAutoRetrySignal({ message: partsText, status: partsText, summary: partsText })?.signal
+      ? extractAutoRetrySignal(
+          { message: partsText, status: partsText, summary: partsText },
+          config.retry_on_message_patterns
+        )?.signal
       : undefined
     const retrySignal = retrySignalResult?.signal ?? retrySignalFromParts
     const errorContentResult = containsErrorContent(parts)
@@ -134,7 +139,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         errorType: classifyErrorType(error),
       })
 
-      if (!isRetryableError(error, config.retry_on_errors)) {
+      if (!isRetryableError(error, config.retry_on_errors, config.retry_on_message_patterns)) {
         log(`[${HOOK_NAME}] message.updated error not retryable, skipping fallback`, {
           sessionID,
           statusCode: extractStatusCode(error, config.retry_on_errors),

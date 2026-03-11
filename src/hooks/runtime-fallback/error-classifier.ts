@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, RETRYABLE_ERROR_PATTERNS } from "./constants"
+import { AUTO_RETRY_SIGNAL_KEYWORD_PATTERNS, DEFAULT_CONFIG, RETRYABLE_ERROR_PATTERNS } from "./constants"
 
 export function getErrorMessage(error: unknown): string {
   if (!error) return ""
@@ -99,13 +99,30 @@ export interface AutoRetrySignal {
   signal: string
 }
 
-export const AUTO_RETRY_PATTERNS: Array<(combined: string) => boolean> = [
-  (combined) => /retrying\s+in/i.test(combined),
-  (combined) =>
-    /(?:too\s+many\s+requests|quota\s*exceeded|quota\s+will\s+reset\s+after|usage\s+limit|rate\s+limit|limit\s+reached|all\s+credentials\s+for\s+model|cool(?:ing)?\s*down|exhausted\s+your\s+capacity)/i.test(combined),
-]
+function compilePatterns(patterns: string[]): RegExp[] {
+  const compiled: RegExp[] = []
+  for (const pattern of patterns) {
+    try {
+      compiled.push(new RegExp(pattern, "i"))
+    } catch {
+      continue
+    }
+  }
+  return compiled
+}
 
-export function extractAutoRetrySignal(info: Record<string, unknown> | undefined): AutoRetrySignal | undefined {
+function resolveAutoRetryKeywordPatterns(retryOnMessagePatterns: string[] = []): RegExp[] {
+  return compilePatterns([...AUTO_RETRY_SIGNAL_KEYWORD_PATTERNS, ...retryOnMessagePatterns])
+}
+
+function resolveRetryableMessagePatterns(retryOnMessagePatterns: string[] = []): RegExp[] {
+  return [...RETRYABLE_ERROR_PATTERNS, ...compilePatterns(retryOnMessagePatterns)]
+}
+
+export function extractAutoRetrySignal(
+  info: Record<string, unknown> | undefined,
+  retryOnMessagePatterns: string[] = []
+): AutoRetrySignal | undefined {
   if (!info) return undefined
 
   const candidates: string[] = []
@@ -125,7 +142,12 @@ export function extractAutoRetrySignal(info: Record<string, unknown> | undefined
   const combined = candidates.join("\n")
   if (!combined) return undefined
 
-  const isAutoRetry = AUTO_RETRY_PATTERNS.every((test) => test(combined))
+  const autoRetryPatterns: Array<(combined: string) => boolean> = [
+    (text) => /retrying\s+in/i.test(text),
+    (text) => resolveAutoRetryKeywordPatterns(retryOnMessagePatterns).some((pattern) => pattern.test(text)),
+  ]
+
+  const isAutoRetry = autoRetryPatterns.every((test) => test(combined))
   if (isAutoRetry) {
     return { signal: combined }
   }
@@ -148,7 +170,11 @@ export function containsErrorContent(
   return { hasError: false }
 }
 
-export function isRetryableError(error: unknown, retryOnErrors: number[]): boolean {
+export function isRetryableError(
+  error: unknown,
+  retryOnErrors: number[],
+  retryOnMessagePatterns: string[] = []
+): boolean {
   const statusCode = extractStatusCode(error, retryOnErrors)
   const message = getErrorMessage(error)
   const errorType = classifyErrorType(error)
@@ -165,5 +191,5 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
     return true
   }
 
-  return RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(message))
+  return resolveRetryableMessagePatterns(retryOnMessagePatterns).some((pattern) => pattern.test(message))
 }

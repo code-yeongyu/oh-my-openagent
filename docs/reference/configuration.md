@@ -567,6 +567,7 @@ Auto-switches to backup models on API errors.
   "runtime_fallback": {
     "enabled": true,
     "retry_on_errors": [400, 429, 503, 529],
+    "retry_on_message_patterns": ["no\\s+available\\s+accounts?"],
     "max_fallback_attempts": 3,
     "cooldown_seconds": 60,
     "timeout_seconds": 30,
@@ -579,6 +580,7 @@ Auto-switches to backup models on API errors.
 | ----------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `enabled`               | `false`             | Enable runtime fallback                                                                                                        |
 | `retry_on_errors`       | `[400,429,503,529]` | HTTP codes that trigger fallback. Also handles classified provider key errors.                                                 |
+| `retry_on_message_patterns` | `[]`            | Regex pattern strings matched against provider messages. Use this for provider-specific retry text that does not include status codes. |
 | `max_fallback_attempts` | `3`                 | Max fallback attempts per session (1–20)                                                                                       |
 | `cooldown_seconds`      | `60`                | Seconds before retrying a failed model                                                                                         |
 | `timeout_seconds`       | `30`                | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation and provider retry message detection.** |

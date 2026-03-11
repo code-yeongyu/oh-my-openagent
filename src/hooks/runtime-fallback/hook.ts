@@ -15,6 +15,7 @@ export function createRuntimeFallbackHook(
   const config = {
     enabled: options?.config?.enabled ?? DEFAULT_CONFIG.enabled,
     retry_on_errors: options?.config?.retry_on_errors ?? DEFAULT_CONFIG.retry_on_errors,
+    retry_on_message_patterns: options?.config?.retry_on_message_patterns ?? DEFAULT_CONFIG.retry_on_message_patterns,
     max_fallback_attempts: options?.config?.max_fallback_attempts ?? DEFAULT_CONFIG.max_fallback_attempts,
     cooldown_seconds: options?.config?.cooldown_seconds ?? DEFAULT_CONFIG.cooldown_seconds,
     timeout_seconds: options?.config?.timeout_seconds ?? DEFAULT_CONFIG.timeout_seconds,

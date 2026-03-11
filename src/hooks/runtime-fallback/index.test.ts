@@ -255,6 +255,41 @@ describe("runtime-fallback", () => {
       expect(errorLog).toBeDefined()
     })
 
+    test("should trigger fallback when custom retry_on_message_patterns matches", async () => {
+      const hook = createRuntimeFallbackHook(createMockPluginInput(), {
+        config: createMockConfig({
+          notify_on_fallback: false,
+          retry_on_message_patterns: ["no\\s+available\\s+accounts?"],
+        }),
+        pluginConfig: createMockPluginConfigWithCategoryFallback(["openai/gpt-5.4"]),
+      })
+      const sessionID = "test-session-custom-message-pattern"
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      await hook.event({
+        event: {
+          type: "session.created",
+          properties: { info: { id: sessionID, model: "anthropic/claude-opus-4-6" } },
+        },
+      })
+
+      await hook.event({
+        event: {
+          type: "session.error",
+          properties: {
+            sessionID,
+            error: {
+              message: "No available accounts: no available accounts [retrying in 25s attempt #5]",
+            },
+          },
+        },
+      })
+
+      const fallbackLog = logCalls.find((c) => c.msg.includes("Preparing fallback"))
+      expect(fallbackLog).toBeDefined()
+      expect(fallbackLog?.data).toMatchObject({ from: "anthropic/claude-opus-4-6", to: "openai/gpt-5.4" })
+    })
+
     test("should continue fallback chain when fallback model is not found", async () => {
       const hook = createRuntimeFallbackHook(createMockPluginInput(), {
         config: createMockConfig({ notify_on_fallback: false }),

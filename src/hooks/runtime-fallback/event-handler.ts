@@ -116,7 +116,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       errorType: classifyErrorType(error),
     })
 
-    if (!isRetryableError(error, config.retry_on_errors)) {
+    if (!isRetryableError(error, config.retry_on_errors, config.retry_on_message_patterns)) {
       log(`[${HOOK_NAME}] Error not retryable, skipping fallback`, {
         sessionID,
         retryable: false,
@@ -194,7 +194,10 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     if (!sessionID || status?.type !== "retry") return
 
     const retryMessage = typeof status.message === "string" ? status.message : ""
-    const retrySignal = extractAutoRetrySignal({ status: retryMessage, message: retryMessage })
+    const retrySignal = extractAutoRetrySignal(
+      { status: retryMessage, message: retryMessage },
+      config.retry_on_message_patterns
+    )
     if (!retrySignal) return
 
     const retryKey = `${extractRetryAttempt(status.attempt, retryMessage)}:${normalizeRetryStatusMessage(retryMessage)}`

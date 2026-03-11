@@ -57,4 +57,43 @@ describe("runtime-fallback error classifier", () => {
     //#then
     expect(signal).toBeUndefined()
   })
+
+  test("does not classify no-available-accounts without configured message pattern", () => {
+    //#given
+    const info = {
+      status: "No available accounts: no available accounts [retrying in 25s attempt #5]",
+    }
+
+    //#when
+    const signal = extractAutoRetrySignal(info)
+
+    //#then
+    expect(signal).toBeUndefined()
+  })
+
+  test("classifies no-available-accounts when configured message pattern is provided", () => {
+    //#given
+    const info = {
+      status: "No available accounts: no available accounts [retrying in 25s attempt #5]",
+    }
+
+    //#when
+    const signal = extractAutoRetrySignal(info, ["no\\s+available\\s+accounts?"])
+
+    //#then
+    expect(signal).toBeDefined()
+  })
+
+  test("treats configured message pattern matches as retryable errors", () => {
+    //#given
+    const error = {
+      message: "No available accounts for provider anthropic",
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 503, 529], ["no\\s+available\\s+accounts?"])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
 })

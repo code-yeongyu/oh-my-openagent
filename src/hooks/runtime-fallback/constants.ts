@@ -12,11 +12,24 @@ import type { RuntimeFallbackConfig } from "../../config"
 export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
   enabled: false,
   retry_on_errors: [429, 500, 502, 503, 504],
+  retry_on_message_patterns: [],
   max_fallback_attempts: 3,
   cooldown_seconds: 60,
   timeout_seconds: 30,
   notify_on_fallback: true,
 }
+
+export const AUTO_RETRY_SIGNAL_KEYWORD_PATTERNS = [
+  "too\\s+many\\s+requests",
+  "quota\\s*exceeded",
+  "quota\\s+will\\s+reset\\s+after",
+  "usage\\s+limit",
+  "rate\\s+limit",
+  "limit\\s+reached",
+  "all\\s+credentials\\s+for\\s+model",
+  "cool(?:ing)?\\s*down",
+  "exhausted\\s+your\\s+capacity",
+]
 
 /**
  * Error patterns that indicate rate limiting or temporary failures
