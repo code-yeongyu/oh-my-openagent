@@ -134,6 +134,15 @@ function getRetryPendingCloses(target: object): () => Promise<void> {
   return retryPendingCloses.bind(target)
 }
 
+function getCloseSessionById(target: object): (sessionId: string) => Promise<void> {
+  const closeSessionById = Reflect.get(target, "closeSessionById")
+  if (typeof closeSessionById !== "function") {
+    throw new Error("Expected closeSessionById method")
+  }
+
+  return closeSessionById.bind(target)
+}
+
 function createManager(
   TmuxSessionManager: typeof import("./manager").TmuxSessionManager,
 ): import("./manager").TmuxSessionManager {
@@ -218,5 +227,45 @@ describe("TmuxSessionManager zombie pane handling", () => {
     expect(sessions.has("ses_pending")).toBe(false)
     expect(mockQueryWindowState).not.toHaveBeenCalled()
     expect(mockExecuteAction).not.toHaveBeenCalled()
+  })
+
+  test("#given session with closePending true and closeRetryCount >= 3 #when closeSessionById called #then session is force-removed without retrying close", async () => {
+    // given
+    const { TmuxSessionManager } = await import("./manager")
+    const manager = createManager(TmuxSessionManager)
+    const sessions = getTrackedSessions(manager)
+    sessions.set(
+      "ses_pending",
+      createTrackedSession({ closePending: true, closeRetryCount: 3 }),
+    )
+
+    // when
+    await getCloseSessionById(manager)("ses_pending")
+
+    // then
+    expect(sessions.has("ses_pending")).toBe(false)
+    expect(mockQueryWindowState).not.toHaveBeenCalled()
+    expect(mockExecuteAction).not.toHaveBeenCalled()
+  })
+
+  test("#given close-pending session removed during async close #when retryPendingCloses fails #then it does not resurrect stale session state", async () => {
+    // given
+    const { TmuxSessionManager } = await import("./manager")
+    const manager = createManager(TmuxSessionManager)
+    const sessions = getTrackedSessions(manager)
+    sessions.set(
+      "ses_pending",
+      createTrackedSession({ closePending: true, closeRetryCount: 0 }),
+    )
+    mockExecuteAction.mockImplementationOnce(async () => {
+      sessions.delete("ses_pending")
+      return { success: false }
+    })
+
+    // when
+    await getRetryPendingCloses(manager)()
+
+    // then
+    expect(sessions.has("ses_pending")).toBe(false)
   })
 })

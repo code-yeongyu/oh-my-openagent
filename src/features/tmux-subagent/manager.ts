@@ -196,25 +196,30 @@ export class TmuxSessionManager {
         continue
       }
 
-      const nextRetryCount = tracked.closeRetryCount + 1
-      if (nextRetryCount >= MAX_CLOSE_RETRY_COUNT) {
-        log("[tmux-session-manager] force removing close-pending session after failed retry", {
-          sessionId: tracked.sessionId,
-          paneId: tracked.paneId,
-          closeRetryCount: nextRetryCount,
-        })
-        this.removeTrackedSession(tracked.sessionId)
+      const currentTracked = this.sessions.get(tracked.sessionId)
+      if (!currentTracked || !currentTracked.closePending) {
         continue
       }
 
-      this.sessions.set(tracked.sessionId, {
-        ...tracked,
+      const nextRetryCount = currentTracked.closeRetryCount + 1
+      if (nextRetryCount >= MAX_CLOSE_RETRY_COUNT) {
+        log("[tmux-session-manager] force removing close-pending session after failed retry", {
+          sessionId: currentTracked.sessionId,
+          paneId: currentTracked.paneId,
+          closeRetryCount: nextRetryCount,
+        })
+        this.removeTrackedSession(currentTracked.sessionId)
+        continue
+      }
+
+      this.sessions.set(currentTracked.sessionId, {
+        ...currentTracked,
         closePending: true,
         closeRetryCount: nextRetryCount,
       })
       log("[tmux-session-manager] retried close failed", {
-        sessionId: tracked.sessionId,
-        paneId: tracked.paneId,
+        sessionId: currentTracked.sessionId,
+        paneId: currentTracked.paneId,
         closeRetryCount: nextRetryCount,
       })
     }
@@ -641,6 +646,16 @@ export class TmuxSessionManager {
   private async closeSessionById(sessionId: string): Promise<void> {
     const tracked = this.sessions.get(sessionId)
     if (!tracked) return
+
+    if (tracked.closePending && tracked.closeRetryCount >= MAX_CLOSE_RETRY_COUNT) {
+      log("[tmux-session-manager] force removing close-pending session after max retries", {
+        sessionId,
+        paneId: tracked.paneId,
+        closeRetryCount: tracked.closeRetryCount,
+      })
+      this.removeTrackedSession(sessionId)
+      return
+    }
 
     log("[tmux-session-manager] closing session pane", {
       sessionId,
