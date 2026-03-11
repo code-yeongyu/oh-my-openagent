@@ -1746,6 +1746,32 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
      }
    }
 
+  function createMockClientWithSessionChain(
+      sessions: Record<string, { directory: string; parentID?: string }>,
+      options?: { sessionLookupError?: Error }
+    ) {
+      return {
+        session: {
+          create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
+          get: async ({ path }: { path: { id: string } }) => {
+            if (options?.sessionLookupError) {
+              throw options.sessionLookupError
+            }
+
+            return {
+              data: sessions[path.id] ?? { directory: "/test/dir" },
+            }
+          },
+          prompt: async () => ({}),
+          promptAsync: async () => ({}),
+          messages: async () => ({ data: [] }),
+          todo: async () => ({ data: [] }),
+          status: async () => ({ data: {} }),
+          abort: async () => ({}),
+        },
+      }
+    }
+
   beforeEach(() => {
     // given
     mockClient = createMockClient()
@@ -1939,6 +1965,151 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
       if (updatedTask?.startedAt && queuedAt) {
         expect(updatedTask.startedAt.getTime()).toBeGreaterThanOrEqual(queuedAt.getTime())
       }
+    })
+
+    test("should track rootSessionID and spawnDepth from the parent chain", async () => {
+      // given
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-depth-2": { directory: "/test/dir", parentID: "session-depth-1" },
+            "session-depth-1": { directory: "/test/dir", parentID: "session-root" },
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDepth: 3 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-depth-2",
+        parentMessageID: "parent-message",
+      }
+
+      // when
+      const task = await manager.launch(input)
+
+      // then
+      expect(task.rootSessionID).toBe("session-root")
+      expect(task.spawnDepth).toBe(3)
+    })
+
+    test("should block launches that exceed maxDepth", async () => {
+      // given
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-depth-3": { directory: "/test/dir", parentID: "session-depth-2" },
+            "session-depth-2": { directory: "/test/dir", parentID: "session-depth-1" },
+            "session-depth-1": { directory: "/test/dir", parentID: "session-root" },
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDepth: 3 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-depth-3",
+        parentMessageID: "parent-message",
+      }
+
+      // when
+      const result = manager.launch(input)
+
+      // then
+      await expect(result).rejects.toThrow("background_task.maxDepth=3")
+    })
+
+    test("should block launches when maxDescendants is reached", async () => {
+      // given
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      await manager.launch(input)
+
+      // when
+      const result = manager.launch(input)
+
+      // then
+      await expect(result).rejects.toThrow("background_task.maxDescendants=1")
+    })
+
+    test("should consume descendant quota for reserved sync spawns", async () => {
+      // given
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain({
+            "session-root": { directory: "/test/dir" },
+          }),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      await manager.reserveSubagentSpawn("session-root")
+
+      // when
+      const result = manager.assertCanSpawn("session-root")
+
+      // then
+      await expect(result).rejects.toThrow("background_task.maxDescendants=1")
+    })
+
+    test("should fail closed when session lineage lookup fails", async () => {
+      // given
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain(
+            {
+              "session-root": { directory: "/test/dir" },
+            },
+            { sessionLookupError: new Error("session lookup failed") }
+          ),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      // when
+      const result = manager.launch(input)
+
+      // then
+      await expect(result).rejects.toThrow("background_task.maxDescendants cannot be enforced safely")
     })
   })
 
