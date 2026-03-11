@@ -75,7 +75,7 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
             agent: task.agent,
             category: task.category,
             description: task.description,
-            sessionId: task.sessionID ?? "pending",
+            ...(task.sessionID ? { sessionId: task.sessionID } : {}),
           } as Record<string, unknown>,
         }
         ctx.metadata?.(meta)
