@@ -125,6 +125,22 @@ describe("getContextWindowUsage", () => {
     expect(usage?.remainingTokens).toBe(82144)
   })
 
+  it("returns null for non-anthropic providers without a cached limit", async () => {
+    // given
+    const ctx = createContextUsageMockContext(180000, {
+      providerID: "openai",
+      modelID: "gpt-5",
+    })
+
+    // when
+    const usage = await getContextWindowUsage(ctx as never, "ses_no_cached_limit", {
+      anthropicContext1MEnabled: false,
+    })
+
+    // then
+    expect(usage).toBeNull()
+  })
+
   describe("#given Anthropic provider with cached context limit and 1M mode enabled", () => {
     describe("#when context usage is resolved", () => {
       it("#then should ignore the cached limit and use the 1M Anthropic limit", async () => {

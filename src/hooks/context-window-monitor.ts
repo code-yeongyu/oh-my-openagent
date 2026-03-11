@@ -1,21 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import {
+  resolveActualContextLimit,
+  type ContextLimitModelCacheState,
+} from "../shared/context-limit-resolver"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
-const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000
 const CONTEXT_WARNING_THRESHOLD = 0.70
-
-type ModelCacheStateLike = {
-  anthropicContext1MEnabled: boolean
-  modelContextLimitsCache?: Map<string, number>
-}
-
-function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
-  return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
-    process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-    process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
-    ? 1_000_000
-    : DEFAULT_ANTHROPIC_ACTUAL_LIMIT
-}
 
 function createContextReminder(actualLimit: number): string {
   const limitTokens = actualLimit.toLocaleString()
@@ -40,13 +30,9 @@ interface CachedTokenState {
   tokens: TokenInfo
 }
 
-function isAnthropicProvider(providerID: string): boolean {
-  return providerID === "anthropic" || providerID === "google-vertex-anthropic"
-}
-
 export function createContextWindowMonitorHook(
   _ctx: PluginInput,
-  modelCacheState?: ModelCacheStateLike,
+  modelCacheState?: ContextLimitModelCacheState,
 ) {
   const remindedSessions = new Set<string>()
   const tokenCache = new Map<string, CachedTokenState>()
@@ -62,12 +48,11 @@ export function createContextWindowMonitorHook(
     const cached = tokenCache.get(sessionID)
     if (!cached) return
 
-    const modelSpecificLimit = !isAnthropicProvider(cached.providerID)
-      ? modelCacheState?.modelContextLimitsCache?.get(`${cached.providerID}/${cached.modelID}`)
-      : undefined
-    const actualLimit = isAnthropicProvider(cached.providerID)
-      ? getAnthropicActualLimit(modelCacheState)
-      : modelSpecificLimit
+    const actualLimit = resolveActualContextLimit(
+      cached.providerID,
+      cached.modelID,
+      modelCacheState,
+    )
 
     if (!actualLimit) return
 
