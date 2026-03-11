@@ -46,10 +46,12 @@ export async function executeSync(
   spawnReservation?: SpawnReservation,
 ): Promise<string> {
   let sessionID: string | undefined
+  let createdSessionForExecution = false
 
   try {
     const session = await deps.createOrGetSession(args, toolContext, ctx)
     sessionID = session.sessionID
+    createdSessionForExecution = session.isNew
 
     if (session.isNew) {
       spawnReservation?.commit()
@@ -100,7 +102,7 @@ export async function executeSync(
     spawnReservation?.rollback()
     throw error
   } finally {
-    if (sessionID) {
+    if (sessionID && createdSessionForExecution) {
       subagentSessions.delete(sessionID)
       syncSubagentSessions.delete(sessionID)
     }

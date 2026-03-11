@@ -131,4 +131,28 @@ describe("executeSync session cleanup", () => {
       expect(syncSubagentSessions.has(sessionID)).toBe(false)
     })
   })
+
+  describe("#given executeSync reuses an existing session", () => {
+    test("#when execution completes successfully #then the reused session stays tracked in both Sets", async () => {
+      // given
+      const sessionID = "ses-reused"
+      const args = { ...createArgs(), session_id: sessionID }
+      const toolContext = createToolContext()
+      const promptAsync = mock(async () => ({ data: {} }))
+      const deps = createDependencies({
+        createOrGetSession: mock(async () => ({ sessionID, isNew: false })),
+      })
+
+      subagentSessions.add(sessionID)
+      syncSubagentSessions.add(sessionID)
+
+      // when
+      const result = await executeSync(args, toolContext, createContext(promptAsync) as never, deps)
+
+      // then
+      expect(result).toContain(`session_id: ${sessionID}`)
+      expect(subagentSessions.has(sessionID)).toBe(true)
+      expect(syncSubagentSessions.has(sessionID)).toBe(true)
+    })
+  })
 })
