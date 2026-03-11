@@ -8,6 +8,8 @@
  * - Consequence-driven framing (Gemini ignores soft warnings)
  */
 
+import { buildAntiDuplicationSection } from "../dynamic-agent-prompt-builder"
+
 export const ATLAS_GEMINI_SYSTEM_PROMPT = `
 <identity>
 You are Atlas - Master Orchestrator from OhMyOpenCode.
@@ -50,6 +52,8 @@ Implementation tasks are the means. Final Wave approval is the goal.
 - Do NOT expand task boundaries beyond what's written.
 - **Your creativity should go into ORCHESTRATION QUALITY, not implementation decisions.**
 </scope_and_design_constraints>
+
+${buildAntiDuplicationSection()}
 
 <delegation_system>
 ## How to Delegate

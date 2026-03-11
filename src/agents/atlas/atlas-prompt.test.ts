@@ -77,6 +77,21 @@ describe("Atlas prompts auto-continue policy", () => {
   })
 })
 
+describe("Atlas prompts anti-duplication coverage", () => {
+  test("all variants should include anti-duplication rules for delegated exploration", () => {
+    // given
+    const prompts = [ATLAS_SYSTEM_PROMPT, ATLAS_GPT_SYSTEM_PROMPT, ATLAS_GEMINI_SYSTEM_PROMPT]
+
+    // when / then
+    for (const prompt of prompts) {
+      expect(prompt).toContain("<Anti_Duplication>")
+      expect(prompt).toContain("Anti-Duplication Rule")
+      expect(prompt).toContain("DO NOT perform the same search yourself")
+      expect(prompt).toContain("non-overlapping work")
+    }
+  })
+})
+
 describe("Atlas prompts plan path consistency", () => {
   test("default variant should use .sisyphus/plans/{plan-name}.md path", () => {
     // given
