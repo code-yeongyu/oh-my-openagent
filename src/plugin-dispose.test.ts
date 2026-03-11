@@ -7,7 +7,7 @@ describe("createPluginDispose", () => {
   test("#given plugin with active managers and hooks #when dispose() is called #then backgroundManager.shutdown() is called", async () => {
     // given
     const backgroundManager = {
-      shutdown: (): void => {},
+      shutdown: async (): Promise<void> => {},
     }
     const skillMcpManager = {
       disconnectAll: async (): Promise<void> => {},
@@ -29,7 +29,7 @@ describe("createPluginDispose", () => {
   test("#given plugin with active MCP connections #when dispose() is called #then skillMcpManager.disconnectAll() is called", async () => {
     // given
     const backgroundManager = {
-      shutdown: (): void => {},
+      shutdown: async (): Promise<void> => {},
     }
     const skillMcpManager = {
       disconnectAll: async (): Promise<void> => {},
@@ -64,7 +64,7 @@ describe("createPluginDispose", () => {
     const autoSlashCommandDisposeSpy = spyOn(autoSlashCommand, "dispose")
     const dispose = createPluginDispose({
       backgroundManager: {
-        shutdown: (): void => {},
+      shutdown: async (): Promise<void> => {},
       },
       skillMcpManager: {
         disconnectAll: async (): Promise<void> => {},
@@ -90,7 +90,7 @@ describe("createPluginDispose", () => {
   test("#given dispose already called #when dispose() called again #then no errors", async () => {
     // given
     const backgroundManager = {
-      shutdown: (): void => {},
+      shutdown: async (): Promise<void> => {},
     }
     const skillMcpManager = {
       disconnectAll: async (): Promise<void> => {},

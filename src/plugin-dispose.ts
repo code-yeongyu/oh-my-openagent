@@ -2,7 +2,7 @@ export type PluginDispose = () => Promise<void>
 
 export function createPluginDispose(args: {
   backgroundManager: {
-    shutdown: () => void
+    shutdown: () => void | Promise<void>
   }
   skillMcpManager: {
     disconnectAll: () => Promise<void>
@@ -19,7 +19,7 @@ export function createPluginDispose(args: {
     }
 
     disposePromise = (async (): Promise<void> => {
-      backgroundManager.shutdown()
+      await backgroundManager.shutdown()
       await skillMcpManager.disconnectAll()
       disposeHooks()
     })()

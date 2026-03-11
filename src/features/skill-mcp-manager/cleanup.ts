@@ -19,6 +19,7 @@ export function registerProcessCleanup(state: SkillMcpManagerState): void {
   state.cleanupRegistered = true
 
   const cleanup = async (): Promise<void> => {
+    state.shutdownGeneration++
     for (const managed of state.clients.values()) {
       await closeManagedClient(managed)
     }
