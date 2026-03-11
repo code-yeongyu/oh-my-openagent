@@ -1,5 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { runBunInstall } from "../../../cli/config-manager"
+import { runBunInstallWithDetails } from "../../../cli/config-manager"
 import { log } from "../../../shared/logger"
 import { invalidatePackage } from "../cache"
 import { PACKAGE_NAME } from "../constants"
@@ -13,7 +13,11 @@ function getPinnedVersionToastMessage(latestVersion: string): string {
 
 async function runBunInstallSafe(): Promise<boolean> {
   try {
-    return await runBunInstall()
+    const result = await runBunInstallWithDetails({ outputMode: "pipe" })
+    if (!result.success && result.error) {
+      log("[auto-update-checker] bun install error:", result.error)
+    }
+    return result.success
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     log("[auto-update-checker] bun install error:", errorMessage)

@@ -198,6 +198,28 @@ describe("syncCachePackageJsonToIntent", () => {
     })
   })
 
+  describe("#given cache package.json with other dependencies", () => {
+    it("#then other dependencies are preserved when updating plugin version", async () => {
+      const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+
+      const pluginInfo: PluginEntryInfo = {
+        entry: "oh-my-opencode@latest",
+        isPinned: false,
+        pinnedVersion: "latest",
+        configPath: "/tmp/opencode.json",
+      }
+
+      const result = syncCachePackageJsonToIntent(pluginInfo)
+
+      expect(result.synced).toBe(true)
+      expect(result.error).toBeNull()
+
+      const content = readFileSync(join(TEST_CACHE_DIR, "package.json"), "utf-8")
+      const pkg = JSON.parse(content) as { dependencies?: Record<string, string> }
+      expect(pkg.dependencies?.["other"]).toBe("1.0.0")
+    })
+  })
+
   describe("#given malformed JSON in cache package.json", () => {
     it("#then returns parse_error", async () => {
       cleanupTestCache()
