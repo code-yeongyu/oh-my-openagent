@@ -101,4 +101,36 @@ describe("createBuiltinAgents Athena-Junior council member mode propagation", ()
     expect(permission.read).toBe("allow")
     expect(permission.call_omo_agent).toBe("allow")
   })
+
+  it("defaults to delegation mode when Athena-Junior mode is omitted", async () => {
+    const agents = await createBuiltinAgents(
+      [],
+      {
+        athena: { model: TEST_DEFAULT_MODEL },
+        "athena-junior": { model: TEST_DEFAULT_MODEL },
+      },
+      undefined,
+      TEST_DEFAULT_MODEL,
+      undefined,
+      undefined,
+      [],
+      {},
+      undefined,
+      undefined,
+      undefined,
+      false,
+      TEST_COUNCIL_CONFIG,
+      false,
+      false,
+      {}
+    )
+
+    const agent = agents[`${ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX}alpha`]
+    const tools = agent.tools as Record<string, boolean>
+
+    expect(tools.read).toBe(true)
+    expect(tools.call_omo_agent).toBe(true)
+    expect(tools.background_output).toBe(true)
+    expect(tools.background_cancel).toBe(true)
+  })
 })

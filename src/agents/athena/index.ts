@@ -12,3 +12,20 @@ export type { CouncilIntent, CouncilGuidanceMode } from "./council-runtime-guida
 export { COUNCIL_DEFAULTS } from "./constants"
 export { ATHENA_INTERACTIVE_PROMPT } from "./interactive-prompt"
 export { ATHENA_NON_INTERACTIVE_PROMPT } from "./non-interactive-prompt"
+export {
+  buildCouncilFailureMetadataContract,
+  buildNonInteractiveModeValidationLines,
+  describeCouncilFailure,
+  resolveAthenaNonInteractiveMode,
+  validateAthenaNonInteractiveMode,
+} from "./types"
+export type {
+  AthenaNonInteractiveConfig,
+  AthenaNonInteractiveMembers,
+  AthenaNonInteractiveMode,
+  CouncilFailure,
+  NetworkError,
+  QuorumError,
+  TimeoutError,
+  ValidationError,
+} from "./types"

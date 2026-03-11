@@ -12,7 +12,13 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
-import { createAthenaAgent, createAthenaJuniorAgent, ATHENA_JUNIOR_PROMPT_METADATA, COUNCIL_DEFAULTS } from "./athena"
+import {
+  createAthenaAgent,
+  createAthenaJuniorAgent,
+  ATHENA_JUNIOR_PROMPT_METADATA,
+  COUNCIL_DEFAULTS,
+  resolveAthenaNonInteractiveMode,
+} from "./athena"
 import { createSisyphusJuniorAgentWithOverrides } from "./sisyphus-junior"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
@@ -35,7 +41,7 @@ import {
 } from "./builtin-agents/council-member-agents"
 import { applyMissingCouncilGuard } from "./builtin-agents/athena-council-guard"
 import type { CouncilConfig } from "../config/schema/athena"
-import type { CouncilMemberAgentMode } from "./athena/council-member-agent"
+import type { AthenaNonInteractiveConfig } from "./athena"
 
 type AgentSource = AgentFactory | AgentConfig
 
@@ -87,11 +93,7 @@ export async function createBuiltinAgents(
   councilConfig?: CouncilConfig,
   disableOmoEnv = false,
   bulkLaunch = false,
-  athenaNonInteractiveConfig?: {
-    non_interactive_mode?: string
-    non_interactive_members?: string
-    non_interactive_member_list?: string[]
-  },
+  athenaNonInteractiveConfig?: AthenaNonInteractiveConfig,
 ): Promise<Record<string, AgentConfig>> {
 
   const connectedProviders = readConnectedProvidersCache()
@@ -221,8 +223,9 @@ export async function createBuiltinAgents(
     }
 
     if (result["athena-junior"]) {
-      const juniorMode: CouncilMemberAgentMode =
-        athenaNonInteractiveConfig?.non_interactive_mode === "solo" ? "solo" : "delegation"
+      const juniorMode = resolveAthenaNonInteractiveMode(
+        athenaNonInteractiveConfig?.non_interactive_mode,
+      )
       const { agents: athenaJuniorCouncilAgents } = registerCouncilMemberAgents(
         councilConfig,
         juniorMode,

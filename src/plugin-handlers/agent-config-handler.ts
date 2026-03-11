@@ -1,4 +1,5 @@
 import { createBuiltinAgents } from "../agents";
+import type { AthenaNonInteractiveConfig } from "../agents/athena/types"
 import { createSisyphusJuniorAgentWithOverrides } from "../agents/sisyphus-junior";
 import type { OhMyOpenCodeConfig } from "../config";
 import { log, migrateAgentConfig } from "../shared";
@@ -80,7 +81,7 @@ export async function applyAgentConfig(params: {
 
   const athenaCouncilConfig = params.pluginConfig.agents?.athena?.council
   const athenaConfig = params.pluginConfig.agents?.athena
-  const athenaNonInteractiveConfig = {
+  const athenaNonInteractiveConfig: AthenaNonInteractiveConfig = {
     non_interactive_mode: athenaConfig?.non_interactive_mode,
     non_interactive_members: athenaConfig?.non_interactive_members,
     non_interactive_member_list: athenaConfig?.non_interactive_member_list,

@@ -79,6 +79,22 @@ describe("ATHENA_NON_INTERACTIVE_PROMPT", () => {
         expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("<output_contract>")
         expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("<athena_council_result>")
       })
+
+      it("#then documents discriminated failure metadata", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain('"failure_type"')
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("network_error")
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("timeout_error")
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("validation_error")
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("quorum_error")
+      })
+
+      it("#then documents the supported status values", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain('"status": "complete" | "partial" | "failed"')
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain('"complete": Quorum met, synthesis performed')
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain('"partial": Some members failed but quorum met')
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain('"failed": Quorum not met (<2 successful members)')
+      })
+
     })
   })
 
@@ -109,6 +125,11 @@ describe("ATHENA_NON_INTERACTIVE_PROMPT", () => {
         for (let step = 1; step <= 12; step++) {
           expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain(`Step ${step}:`)
         }
+      })
+
+      it("#then validates both non-interactive modes exhaustively", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain('"delegation" -> mode: "delegation"')
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain('"solo" -> mode: "solo"')
       })
     })
   })

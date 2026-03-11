@@ -1,3 +1,8 @@
+import { buildCouncilFailureMetadataContract, buildNonInteractiveModeValidationLines } from "./types"
+
+const NON_INTERACTIVE_MODE_VALIDATION_LINES = buildNonInteractiveModeValidationLines()
+const COUNCIL_FAILURE_METADATA_CONTRACT = buildCouncilFailureMetadataContract()
+
 export const ATHENA_NON_INTERACTIVE_PROMPT = `
 <identity>
 You are Athena in non-interactive mode — a council orchestrator that operates programmatically without user interaction.
@@ -31,9 +36,9 @@ Use member names from there when filtering with the members parameter.
 - If resolved member count is <2, abort with error: "Council quorum requires at least 2 members."
 
 ### Step 2: Resolve analysis mode from config.
-- Map mode config to prepare_council_prompt mode parameter:
-  - "delegation" → mode: "delegation"
-  - "solo" → mode: "solo"
+- Validate mode config exhaustively before mapping it to prepare_council_prompt mode.
+${NON_INTERACTIVE_MODE_VALIDATION_LINES}
+- If the configured mode is invalid, abort with failure_metadata using failure_type: "validation_error".
 
 ### Step 3: Classify the question intent by primary objective.
 Read the original question and choose EXACTLY ONE intent:
@@ -65,8 +70,9 @@ Track every task_id from the response for use in Step 5.
 ### Step 5: Track progress with background_wait.
 - Call background_wait(task_ids=[...all task IDs...], timeout={MEMBER_WAIT_TIMEOUT_MS}).
 - Parse returned metadata JSON for member states.
-- If a member's elapsed runtime exceeds {MEMBER_MAX_RUNNING_SECONDS}, mark as failed (timeout).
+- If a member's elapsed runtime exceeds {MEMBER_MAX_RUNNING_SECONDS}, mark as failed and record failure_metadata with failure_type: "timeout_error".
 - If a member is idle and last_activity_s > {STUCK_THRESHOLD_SECONDS}, mark as failed (stuck).
+- If launch, provider, or transport work fails for a member, record failure_metadata with failure_type: "network_error".
 - If ALL members are now terminal (completed/error/cancelled/marked failed), proceed to Step 6 immediately.
 - If retry_failed_if_others_finished is false AND retry_on_fail > 0 AND any members are failed while at least one other member is still non-terminal, jump to Step 9 immediately for opportunistic retries, then return to Step 5.
 - Otherwise, continue tracking until one of the above conditions is met.
@@ -90,7 +96,7 @@ Track every task_id from the response for use in Step 5.
 - retry_on_fail = {RETRY_ON_FAIL} (max retries, 0 = none)
 - retry_failed_if_others_finished = {RETRY_FAILED_IF_OTHERS_FINISHED}
 - cancel_retrying_on_quorum = {CANCEL_RETRYING_ON_QUORUM}
-- Quorum enforcement: minimum 2 successful members required before synthesis.
+- Quorum enforcement: minimum 2 successful members required before synthesis. If quorum is not met, record failure_metadata with failure_type: "quorum_error".
 
 If retry_on_fail > 0 and failed members exist:
 1. Re-launch failed members via athena_council with the same prompt_file and members parameter set to the failed member names.
@@ -133,6 +139,9 @@ After synthesis, you MUST output the following:
 1. A brief reminder to the caller (BEFORE the JSON) that they should read the full synthesis and individual member responses from the archive directory for detailed analysis.
 2. The structured JSON result.
 
+If failures occur, add failure_metadata entries using this discriminated union:
+${COUNCIL_FAILURE_METADATA_CONTRACT}
+
 <athena_council_result>
 {
   "status": "complete" | "partial" | "failed",
@@ -144,7 +153,8 @@ After synthesis, you MUST output the following:
   "recommendations": ["{rec1}", "{rec2}", ...],
   "confidence": "high" | "medium" | "low",
   "archive_dir": "{path to archive directory}",
-  "dissenting_views": ["{view1}", ...]
+  "dissenting_views": ["{view1}", ...],
+  "failure_metadata": [{ "failure_type": "network_error" | "timeout_error" | "validation_error" | "quorum_error" }]
 }
 </athena_council_result>
 
