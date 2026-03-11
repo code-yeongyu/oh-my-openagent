@@ -116,32 +116,44 @@ function findFirstStructuralOpenAfter(text: string, fromIdx: number): number {
 }
 
 function findLastStructuralOpenBefore(text: string, beforeIdx: number): number {
-  let searchFrom = beforeIdx
-  let nestedCloseCount = 0
+  const openStack: number[] = []
+  let lineStart = 0
 
-  while (searchFrom > 0) {
-    const openIdx = text.lastIndexOf(OPENING_TAG, searchFrom - 1)
-    const closeIdx = text.lastIndexOf(CLOSING_TAG, searchFrom - 1)
+  while (lineStart <= beforeIdx && lineStart < text.length) {
+    const nextNewline = text.indexOf("\n", lineStart)
+    const lineEnd = nextNewline === -1 ? text.length : nextNewline
+    const line = text.slice(lineStart, lineEnd)
 
-    if (openIdx === -1 && closeIdx === -1) return -1
+    let indentationEnd = 0
+    while (indentationEnd < line.length && (line[indentationEnd] === " " || line[indentationEnd] === "\t")) {
+      indentationEnd += 1
+    }
 
-    if (closeIdx > openIdx) {
-      if (isStructuralClose(text, closeIdx)) {
-        nestedCloseCount += 1
+    const structuralOpenIdx = line.startsWith(OPENING_TAG, indentationEnd) ? lineStart + indentationEnd : -1
+
+    const structuralCloseOffset = line.lastIndexOf(CLOSING_TAG)
+    let structuralCloseIdx = -1
+    if (structuralCloseOffset !== -1) {
+      const closeSuffix = line.slice(structuralCloseOffset + CLOSING_TAG.length)
+      if (closeSuffix.split("").every((ch) => ch === " " || ch === "\t" || ch === "\r")) {
+        structuralCloseIdx = lineStart + structuralCloseOffset
       }
-      searchFrom = closeIdx
-      continue
     }
 
-    if (!isStructuralOpen(text, openIdx)) {
-      searchFrom = openIdx
-      continue
+    if (structuralOpenIdx !== -1 && structuralOpenIdx < beforeIdx) {
+      openStack.push(structuralOpenIdx)
     }
 
-    if (nestedCloseCount === 0) return openIdx
-    nestedCloseCount -= 1
-    searchFrom = openIdx
+    if (structuralCloseIdx !== -1 && structuralCloseIdx < beforeIdx && openStack.length > 0) {
+      openStack.pop()
+    }
+
+    if (nextNewline === -1) {
+      break
+    }
+
+    lineStart = nextNewline + 1
   }
 
-  return -1
+  return openStack.at(-1) ?? -1
 }

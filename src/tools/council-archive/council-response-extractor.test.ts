@@ -1,5 +1,142 @@
 import { describe, expect, it } from "bun:test"
-import { extractCouncilResponse } from "./council-response-extractor"
+import { CLOSING_TAG, extractCouncilResponse, MIN_RESPONSE_LENGTH, OPENING_TAG } from "./council-response-extractor"
+
+function legacyExtractCouncilResponse(fullText: string) {
+  const lastCloseIdx = legacyFindLastStructuralClose(fullText)
+
+  if (lastCloseIdx === -1) {
+    const lastOpenIdx = legacyFindLastStructuralOpen(fullText)
+    if (lastOpenIdx === -1) {
+      return { has_response: false, response_complete: false, result: null }
+    }
+    const partial = fullText.slice(lastOpenIdx + OPENING_TAG.length).trim()
+    return { has_response: true, response_complete: false, result: partial || null }
+  }
+
+  const openAfterLastClose = legacyFindFirstStructuralOpenAfter(fullText, lastCloseIdx + CLOSING_TAG.length)
+  if (openAfterLastClose !== -1) {
+    const partial = fullText.slice(openAfterLastClose + OPENING_TAG.length).trim()
+    return { has_response: true, response_complete: false, result: partial || null }
+  }
+
+  const matchingOpenIdx = legacyFindLastStructuralOpenBefore(fullText, lastCloseIdx)
+  if (matchingOpenIdx === -1) {
+    return { has_response: false, response_complete: false, result: null }
+  }
+
+  const content = fullText.slice(matchingOpenIdx + OPENING_TAG.length, lastCloseIdx).trim()
+
+  if (content.length === 0) {
+    return { has_response: false, response_complete: true, result: content }
+  }
+
+  if (content.length < MIN_RESPONSE_LENGTH) {
+    return { has_response: true, response_complete: true, result: content }
+  }
+
+  return { has_response: true, response_complete: true, result: content }
+}
+
+function legacyIsStructuralOpen(text: string, idx: number): boolean {
+  if (idx === 0) return true
+  const prevNewline = text.lastIndexOf("\n", idx - 1)
+  const lineStart = prevNewline === -1 ? 0 : prevNewline + 1
+  const between = text.slice(lineStart, idx)
+  return between.split("").every((ch) => ch === " " || ch === "\t")
+}
+
+function legacyIsStructuralClose(text: string, idx: number): boolean {
+  const afterIdx = idx + CLOSING_TAG.length
+  if (afterIdx === text.length) return true
+  const nextNewline = text.indexOf("\n", afterIdx)
+  const lineEnd = nextNewline === -1 ? text.length : nextNewline
+  const between = text.slice(afterIdx, lineEnd)
+  return between.split("").every((ch) => ch === " " || ch === "\t" || ch === "\r")
+}
+
+function legacyFindLastStructuralClose(text: string): number {
+  let searchFrom = text.length
+  while (searchFrom >= 0) {
+    const idx = text.lastIndexOf(CLOSING_TAG, searchFrom - 1)
+    if (idx === -1) return -1
+    if (legacyIsStructuralClose(text, idx)) return idx
+    searchFrom = idx
+  }
+  return -1
+}
+
+function legacyFindLastStructuralOpen(text: string): number {
+  let searchFrom = text.length
+  while (searchFrom >= 0) {
+    const idx = text.lastIndexOf(OPENING_TAG, searchFrom - 1)
+    if (idx === -1) return -1
+    if (legacyIsStructuralOpen(text, idx)) return idx
+    searchFrom = idx
+  }
+  return -1
+}
+
+function legacyFindFirstStructuralOpenAfter(text: string, fromIdx: number): number {
+  let searchFrom = fromIdx
+  while (searchFrom < text.length) {
+    const idx = text.indexOf(OPENING_TAG, searchFrom)
+    if (idx === -1) return -1
+    if (legacyIsStructuralOpen(text, idx)) return idx
+    searchFrom = idx + OPENING_TAG.length
+  }
+  return -1
+}
+
+function legacyFindLastStructuralOpenBefore(text: string, beforeIdx: number): number {
+  let searchFrom = beforeIdx
+  let nestedCloseCount = 0
+
+  while (searchFrom > 0) {
+    const openIdx = text.lastIndexOf(OPENING_TAG, searchFrom - 1)
+    const closeIdx = text.lastIndexOf(CLOSING_TAG, searchFrom - 1)
+
+    if (openIdx === -1 && closeIdx === -1) return -1
+
+    if (closeIdx > openIdx) {
+      if (legacyIsStructuralClose(text, closeIdx)) {
+        nestedCloseCount += 1
+      }
+      searchFrom = closeIdx
+      continue
+    }
+
+    if (!legacyIsStructuralOpen(text, openIdx)) {
+      searchFrom = openIdx
+      continue
+    }
+
+    if (nestedCloseCount === 0) return openIdx
+    nestedCloseCount -= 1
+    searchFrom = openIdx
+  }
+
+  return -1
+}
+
+function measureAverageMs(fn: () => void, iterations: number): number {
+  for (let i = 0; i < 3; i++) {
+    fn()
+  }
+
+  const start = performance.now()
+  for (let i = 0; i < iterations; i++) {
+    fn()
+  }
+  return (performance.now() - start) / iterations
+}
+
+function buildNestedResponse(depth: number): string {
+  return [
+    ...Array.from({ length: depth }, () => OPENING_TAG),
+    "a".repeat(MIN_RESPONSE_LENGTH),
+    ...Array.from({ length: depth }, () => CLOSING_TAG),
+  ].join("\n")
+}
 
 describe("extractCouncilResponse", () => {
   describe("#given complete COUNCIL_MEMBER_RESPONSE tags", () => {
@@ -374,5 +511,26 @@ describe("extractCouncilResponse", () => {
     })
   })
 
-})
+  describe("#given deeply nested structural tags", () => {
+    it("#then preserves the same extraction result as the legacy matcher", () => {
+      const text = buildNestedResponse(200)
 
+      expect(extractCouncilResponse(text)).toEqual(legacyExtractCouncilResponse(text))
+    })
+
+    it("#then outperforms the legacy quadratic matcher on worst-case nesting", () => {
+      const text = buildNestedResponse(1200)
+      const iterations = 5
+
+      const optimizedMs = measureAverageMs(() => {
+        extractCouncilResponse(text)
+      }, iterations)
+      const legacyMs = measureAverageMs(() => {
+        legacyExtractCouncilResponse(text)
+      }, iterations)
+
+      expect(optimizedMs).toBeLessThan(legacyMs / 3)
+    }, 20000)
+  })
+
+})
