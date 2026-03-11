@@ -165,28 +165,78 @@ export function createEventHandler(args: {
   const lastHandledRetryStatusKey = new Map<string, string>();
   const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
 
+  // Event subscriptions: which event types each hook cares about.
+  // Hooks mapped to string[] only fire for those event types; "*" fires for all.
+  // Unlisted hooks default to "*" (backward compat).
+  const SESSION_LIFECYCLE = ["session.idle", "session.created", "session.deleted", "session.compacted", "session.status", "session.error", "session.updated"];
+  const MESSAGE_EVENTS = ["message.updated", "message.part.updated"];
+  const HOOK_SUBSCRIPTIONS: Record<string, string[] | "*"> = {
+    // ALL events including deltas (transcript tracking, streaming output monitoring)
+    claudeCodeHooks: "*",
+    interactiveBashSession: "*",
+    // Session lifecycle only
+    sessionNotification: SESSION_LIFECYCLE,
+    unstableAgentBabysitter: SESSION_LIFECYCLE,
+    runtimeFallback: SESSION_LIFECYCLE,
+    agentUsageReminder: SESSION_LIFECYCLE,
+    categorySkillReminder: SESSION_LIFECYCLE,
+    ralphLoop: SESSION_LIFECYCLE,
+    stopContinuationGuard: SESSION_LIFECYCLE,
+    backgroundNotificationHook: SESSION_LIFECYCLE,
+    autoUpdateChecker: SESSION_LIFECYCLE,
+    // Message events (no deltas)
+    contextWindowMonitor: [...MESSAGE_EVENTS, "session.status", "session.deleted"],
+    anthropicContextWindowLimitRecovery: MESSAGE_EVENTS,
+    compactionTodoPreserver: [...MESSAGE_EVENTS, "session.deleted", "session.compacted"],
+    writeExistingFileGuard: [...MESSAGE_EVENTS, "session.deleted"],
+    todoContinuationEnforcer: [...MESSAGE_EVENTS, "session.deleted"],
+    atlasHook: [...MESSAGE_EVENTS, "session.compacted"],
+    // Chat-level events
+    directoryAgentsInjector: ["session.created", "session.compacted", "message.updated"],
+    directoryReadmeInjector: ["session.created", "session.deleted", "session.compacted", "message.updated"],
+    rulesInjector: ["session.created", "session.compacted", "message.updated"],
+    thinkMode: ["session.created", "session.deleted", "message.updated"],
+  };
+
+  // Hooks that MUST be awaited (order-dependent or mutate state read by later hooks)
+  const AWAITED_HOOKS = new Set(["claudeCodeHooks", "stopContinuationGuard", "writeExistingFileGuard"]);
+
+  // Build dispatch entries once: [name, invokeFn, subscriptions]
+  type HookInvoker = (input: EventInput) => unknown;
+  const hookEntries: Array<[string, HookInvoker, string[] | "*"]> = ([
+    ["autoUpdateChecker", (i: EventInput) => hooks.autoUpdateChecker?.event?.(i)] as const,
+    ["claudeCodeHooks", (i: EventInput) => hooks.claudeCodeHooks?.event?.(i)] as const,
+    ["backgroundNotificationHook", (i: EventInput) => hooks.backgroundNotificationHook?.event?.(i)] as const,
+    ["sessionNotification", (i: EventInput) => hooks.sessionNotification?.(i)] as const,
+    ["todoContinuationEnforcer", (i: EventInput) => hooks.todoContinuationEnforcer?.handler?.(i)] as const,
+    ["unstableAgentBabysitter", (i: EventInput) => hooks.unstableAgentBabysitter?.event?.(i)] as const,
+    ["contextWindowMonitor", (i: EventInput) => hooks.contextWindowMonitor?.event?.(i)] as const,
+    ["directoryAgentsInjector", (i: EventInput) => hooks.directoryAgentsInjector?.event?.(i)] as const,
+    ["directoryReadmeInjector", (i: EventInput) => hooks.directoryReadmeInjector?.event?.(i)] as const,
+    ["rulesInjector", (i: EventInput) => hooks.rulesInjector?.event?.(i)] as const,
+    ["thinkMode", (i: EventInput) => hooks.thinkMode?.event?.(i)] as const,
+    ["anthropicContextWindowLimitRecovery", (i: EventInput) => hooks.anthropicContextWindowLimitRecovery?.event?.(i)] as const,
+    ["runtimeFallback", (i: EventInput) => hooks.runtimeFallback?.event?.(i)] as const,
+    ["agentUsageReminder", (i: EventInput) => hooks.agentUsageReminder?.event?.(i)] as const,
+    ["categorySkillReminder", (i: EventInput) => hooks.categorySkillReminder?.event?.(i)] as const,
+    ["interactiveBashSession", (i: EventInput) => hooks.interactiveBashSession?.event?.(i as EventInput)] as const,
+    ["ralphLoop", (i: EventInput) => hooks.ralphLoop?.event?.(i)] as const,
+    ["stopContinuationGuard", (i: EventInput) => hooks.stopContinuationGuard?.event?.(i)] as const,
+    ["compactionTodoPreserver", (i: EventInput) => hooks.compactionTodoPreserver?.event?.(i)] as const,
+    ["writeExistingFileGuard", (i: EventInput) => hooks.writeExistingFileGuard?.event?.(i)] as const,
+    ["atlasHook", (i: EventInput) => hooks.atlasHook?.handler?.(i)] as const,
+  ] as [string, HookInvoker][]).map(([name, fn]) => [name, fn, HOOK_SUBSCRIPTIONS[name] ?? "*"] as [string, HookInvoker, string[] | "*"]);
+
   const dispatchToHooks = async (input: EventInput): Promise<void> => {
-    await Promise.resolve(hooks.autoUpdateChecker?.event?.(input));
-    await Promise.resolve(hooks.claudeCodeHooks?.event?.(input));
-    await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input));
-    await Promise.resolve(hooks.sessionNotification?.(input));
-    await Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input));
-    await Promise.resolve(hooks.unstableAgentBabysitter?.event?.(input));
-    await Promise.resolve(hooks.contextWindowMonitor?.event?.(input));
-    await Promise.resolve(hooks.directoryAgentsInjector?.event?.(input));
-    await Promise.resolve(hooks.directoryReadmeInjector?.event?.(input));
-    await Promise.resolve(hooks.rulesInjector?.event?.(input));
-    await Promise.resolve(hooks.thinkMode?.event?.(input));
-    await Promise.resolve(hooks.anthropicContextWindowLimitRecovery?.event?.(input));
-    await Promise.resolve(hooks.runtimeFallback?.event?.(input));
-    await Promise.resolve(hooks.agentUsageReminder?.event?.(input));
-    await Promise.resolve(hooks.categorySkillReminder?.event?.(input));
-    await Promise.resolve(hooks.interactiveBashSession?.event?.(input as EventInput));
-    await Promise.resolve(hooks.ralphLoop?.event?.(input));
-    await Promise.resolve(hooks.stopContinuationGuard?.event?.(input));
-    await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input));
-    await Promise.resolve(hooks.writeExistingFileGuard?.event?.(input));
-    await Promise.resolve(hooks.atlasHook?.handler?.(input));
+    const eventType = input.event.type;
+    for (const [name, invoke, subs] of hookEntries) {
+      if (subs !== "*" && !subs.includes(eventType)) continue;
+      if (AWAITED_HOOKS.has(name)) {
+        await Promise.resolve(invoke(input));
+      } else {
+        Promise.resolve().then(() => invoke(input)).catch((err) => log("[hook] error:", { hook: name, error: err }));
+      }
+    }
   };
 
   const recentSyntheticIdles = new Map<string, number>();
