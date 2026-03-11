@@ -115,6 +115,7 @@ export async function createBuiltinAgents(
     browserProvider,
     uiSelectedModel,
     availableModels,
+    isFirstRunNoCache,
     disabledSkills,
     disableOmoEnv,
   })

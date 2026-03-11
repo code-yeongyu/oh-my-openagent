@@ -483,17 +483,23 @@ describe("createBuiltinAgents without systemDefaultModel", () => {
      cacheSpy.mockRestore?.()
    })
 
-   test("agents NOT created when no cache and no systemDefaultModel (first run without defaults)", async () => {
-     // #given
-     const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+  test("oracle is created on first run when no cache and no systemDefaultModel", async () => {
+    // #given
+    const cacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
+    const fetchSpy = spyOn(shared, "fetchAvailableModels").mockResolvedValue(new Set())
 
-     // #when
-     const agents = await createBuiltinAgents([], {}, undefined, undefined)
+    try {
+      // #when
+      const agents = await createBuiltinAgents([], {}, undefined, undefined)
 
-     // #then
-     expect(agents.oracle).toBeUndefined()
-     cacheSpy.mockRestore?.()
-   })
+      // #then
+      expect(agents.oracle).toBeDefined()
+      expect(agents.oracle.model).toBe("openai/gpt-5.4")
+    } finally {
+      fetchSpy.mockRestore()
+      cacheSpy.mockRestore()
+    }
+  })
 
   test("sisyphus created via connected cache fallback when all providers available", async () => {
     // #given
