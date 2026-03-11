@@ -1,6 +1,7 @@
 /// <reference path="../../../bun-test.d.ts" />
 
 import { describe, expect, it } from "bun:test"
+import { setCompactionAgentConfigCheckpoint } from "../../shared/compaction-agent-config-checkpoint"
 import { createCompactionContextInjector } from "./index"
 
 type SessionMessageResponse = Array<{
@@ -290,5 +291,70 @@ describe("createCompactionContextInjector recovery", () => {
 
     //#then
     expect(promptAsyncRecorder.calls.length).toBe(0)
+  })
+
+  it("falls back to the current non-compaction model when a checkpoint model is poisoned", async () => {
+    //#given
+    const sessionID = "ses_poisoned_checkpoint_model"
+    const promptAsyncRecorder = createPromptAsyncRecorder()
+    setCompactionAgentConfigCheckpoint(sessionID, {
+      agent: "atlas",
+      model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+      tools: { bash: true },
+    })
+    const ctx = createMockContext(
+      [
+        [
+          {
+            info: {
+              role: "user",
+              agent: "atlas",
+              model: { providerID: "openai", modelID: "gpt-5" },
+              tools: { bash: true },
+            },
+          },
+          {
+            info: {
+              role: "user",
+              agent: "compaction",
+              model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+            },
+          },
+        ],
+        [
+          {
+            info: {
+              role: "user",
+              agent: "compaction",
+              model: { providerID: "anthropic", modelID: "claude-opus-4-1" },
+            },
+          },
+        ],
+        [
+          {
+            info: {
+              role: "user",
+              agent: "atlas",
+              model: { providerID: "openai", modelID: "gpt-5" },
+              tools: { bash: true },
+            },
+          },
+        ],
+      ],
+      promptAsyncRecorder.promptAsync,
+    )
+    const injector = createCompactionContextInjector({ ctx })
+
+    //#when
+    await injector.event({
+      event: { type: "session.compacted", properties: { sessionID } },
+    })
+
+    //#then
+    expect(promptAsyncRecorder.calls.length).toBe(1)
+    expect(promptAsyncRecorder.calls[0]?.body.model).toEqual({
+      providerID: "openai",
+      modelID: "gpt-5",
+    })
   })
 })
