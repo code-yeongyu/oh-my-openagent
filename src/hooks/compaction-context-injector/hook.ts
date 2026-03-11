@@ -9,14 +9,21 @@ import { createInternalAgentTextPart } from "../../shared/internal-initiator-mar
 import { log } from "../../shared/logger"
 import { setSessionModel } from "../../shared/session-model-state"
 import { setSessionTools } from "../../shared/session-tools-store"
+import { COMPACTION_CONTEXT_PROMPT } from "./compaction-context-prompt"
 import {
-  createSystemDirective,
-  SystemDirectiveTypes,
-} from "../../shared/system-directive"
+  createExpectedRecoveryPromptConfig,
+  isPromptConfigRecovered,
+} from "./recovery-prompt-config"
 import {
   resolveLatestSessionPromptConfig,
   resolveSessionPromptConfig,
 } from "./session-prompt-config-resolver"
+import {
+  finalizeTrackedAssistantMessage,
+  shouldTreatAssistantPartAsOutput,
+  trackAssistantOutput,
+  type TailMonitorState,
+} from "./tail-monitor"
 
 const HOOK_NAME = "compaction-context-injector"
 const AGENT_RECOVERY_PROMPT = "[restore checkpointed session agent configuration after compaction]"
@@ -44,14 +51,6 @@ type CompactionContextClient = {
   directory: string
 }
 
-type TailMonitorState = {
-  currentMessageID?: string
-  currentHasText: boolean
-  consecutiveNoTextMessages: number
-  lastCompactedAt?: number
-  lastRecoveryAt?: number
-}
-
 export interface CompactionContextInjector {
   capture: (sessionID: string) => Promise<void>
   inject: (sessionID?: string) => string
@@ -66,81 +65,6 @@ function resolveSessionID(props?: Record<string, unknown>): string | undefined {
   return (props?.sessionID ??
     (props?.info as { id?: string } | undefined)?.id) as string | undefined
 }
-
-function finalizeTrackedAssistantMessage(state: TailMonitorState): number {
-  if (!state.currentMessageID) {
-    return state.consecutiveNoTextMessages
-  }
-
-  state.consecutiveNoTextMessages = state.currentHasText
-    ? 0
-    : state.consecutiveNoTextMessages + 1
-  state.currentMessageID = undefined
-  state.currentHasText = false
-
-  return state.consecutiveNoTextMessages
-}
-
-function trackAssistantText(state: TailMonitorState, messageID?: string): void {
-  if (messageID && !state.currentMessageID) {
-    state.currentMessageID = messageID
-  }
-
-  state.currentHasText = true
-  state.consecutiveNoTextMessages = 0
-}
-
-const COMPACTION_CONTEXT_PROMPT = `${createSystemDirective(SystemDirectiveTypes.COMPACTION_CONTEXT)}
-
-When summarizing this session, you MUST include the following sections in your summary:
-
-## 1. User Requests (As-Is)
-- List all original user requests exactly as they were stated
-- Preserve the user's exact wording and intent
-
-## 2. Final Goal
-- What the user ultimately wanted to achieve
-- The end result or deliverable expected
-
-## 3. Work Completed
-- What has been done so far
-- Files created/modified
-- Features implemented
-- Problems solved
-
-## 4. Remaining Tasks
-- What still needs to be done
-- Pending items from the original request
-- Follow-up tasks identified during the work
-
-## 5. Active Working Context (For Seamless Continuation)
-- **Files**: Paths of files currently being edited or frequently referenced
-- **Code in Progress**: Key code snippets, function signatures, or data structures under active development
-- **External References**: Documentation URLs, library APIs, or external resources being consulted
-- **State & Variables**: Important variable names, configuration values, or runtime state relevant to ongoing work
-
-## 6. Explicit Constraints (Verbatim Only)
-- Include ONLY constraints explicitly stated by the user or in existing AGENTS.md context
-- Quote constraints verbatim (do not paraphrase)
-- Do NOT invent, add, or modify constraints
-- If no explicit constraints exist, write "None"
-
-## 7. Agent Verification State (Critical for Reviewers)
-- **Current Agent**: What agent is running (momus, oracle, etc.)
-- **Verification Progress**: Files already verified/validated
-- **Pending Verifications**: Files still needing verification
-- **Previous Rejections**: If reviewer agent, what was rejected and why
-- **Acceptance Status**: Current state of review process
-
-This section is CRITICAL for reviewer agents (momus, oracle) to maintain continuity.
-
-## 8. Delegated Agent Sessions
-- List ALL background agent tasks spawned during this session
-- For each: agent name, category, status, description, and **session_id**
-- **RESUME, DON'T RESTART.** Each listed session retains full context. After compaction, use \`session_id\` to continue existing agent sessions instead of spawning new ones. This saves tokens, preserves learned context, and prevents duplicate work.
-
-This context is critical for maintaining continuity after compaction.
-`
 
 export function createCompactionContextInjector(options?: {
   ctx?: CompactionContextClient
@@ -157,7 +81,7 @@ export function createCompactionContextInjector(options?: {
     }
 
     const created: TailMonitorState = {
-      currentHasText: false,
+      currentHasOutput: false,
       consecutiveNoTextMessages: 0,
     }
     tailStates.set(sessionID, created)
@@ -176,6 +100,10 @@ export function createCompactionContextInjector(options?: {
     if (!checkpoint?.agent) {
       return false
     }
+    const checkpointWithAgent = {
+      ...checkpoint,
+      agent: checkpoint.agent,
+    }
 
     const tailState = getTailState(sessionID)
     const now = Date.now()
@@ -183,28 +111,27 @@ export function createCompactionContextInjector(options?: {
       return false
     }
 
+    const currentPromptConfig = await resolveSessionPromptConfig(ctx, sessionID)
+    const expectedPromptConfig = createExpectedRecoveryPromptConfig(
+      checkpointWithAgent,
+      currentPromptConfig,
+    )
+    const model = expectedPromptConfig.model
+    const tools = expectedPromptConfig.tools
+
     if (reason === "session.compacted") {
       const latestPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
-      const latestAgentMatchesCheckpoint =
-        typeof latestPromptConfig.agent === "string" &&
-        latestPromptConfig.agent.toLowerCase() === checkpoint.agent.toLowerCase() &&
-        !isCompactionAgent(latestPromptConfig.agent)
-
-      if (latestAgentMatchesCheckpoint && latestPromptConfig.model) {
+      if (isPromptConfigRecovered(latestPromptConfig, expectedPromptConfig)) {
         return false
       }
     }
-
-    const currentPromptConfig = await resolveSessionPromptConfig(ctx, sessionID)
-    const model = checkpoint.model ?? currentPromptConfig.model
-    const tools = checkpoint.tools ?? currentPromptConfig.tools
 
     try {
       await ctx.client.session.promptAsync({
         path: { id: sessionID },
         body: {
           noReply: true,
-          agent: checkpoint.agent,
+          agent: expectedPromptConfig.agent,
           ...(model ? { model } : {}),
           ...(tools ? { tools } : {}),
           parts: [createInternalAgentTextPart(AGENT_RECOVERY_PROMPT)],
@@ -212,7 +139,20 @@ export function createCompactionContextInjector(options?: {
         query: { directory: ctx.directory },
       })
 
-      updateSessionAgent(sessionID, checkpoint.agent)
+      const recoveredPromptConfig = await resolveLatestSessionPromptConfig(ctx, sessionID)
+      if (!isPromptConfigRecovered(recoveredPromptConfig, expectedPromptConfig)) {
+        log(`[${HOOK_NAME}] Re-injected agent config but recovery is still incomplete`, {
+          sessionID,
+          reason,
+          agent: expectedPromptConfig.agent,
+          model,
+          hasTools: !!tools,
+          recoveredPromptConfig,
+        })
+        return false
+      }
+
+      updateSessionAgent(sessionID, expectedPromptConfig.agent)
       if (model) {
         setSessionModel(sessionID, model)
       }
@@ -226,7 +166,7 @@ export function createCompactionContextInjector(options?: {
       log(`[${HOOK_NAME}] Re-injected checkpointed agent config`, {
         sessionID,
         reason,
-        agent: checkpoint.agent,
+        agent: expectedPromptConfig.agent,
         model,
       })
 
@@ -352,7 +292,7 @@ export function createCompactionContextInjector(options?: {
 
       if (tailState.currentMessageID !== info.id) {
         tailState.currentMessageID = info.id
-        tailState.currentHasText = false
+        tailState.currentHasOutput = false
       }
       return
     }
@@ -367,7 +307,7 @@ export function createCompactionContextInjector(options?: {
         return
       }
 
-      trackAssistantText(getTailState(sessionID), messageID)
+      trackAssistantOutput(getTailState(sessionID), messageID)
       return
     }
 
@@ -379,11 +319,11 @@ export function createCompactionContextInjector(options?: {
         text?: string
       } | undefined
 
-      if (!part?.sessionID || part.type !== "text" || !part.text?.trim()) {
+      if (!part?.sessionID || !shouldTreatAssistantPartAsOutput(part)) {
         return
       }
 
-      trackAssistantText(getTailState(part.sessionID), part.messageID)
+      trackAssistantOutput(getTailState(part.sessionID), part.messageID)
     }
   }
 
