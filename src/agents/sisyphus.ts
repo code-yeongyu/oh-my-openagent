@@ -37,6 +37,7 @@ import {
   buildAntiPatternsSection,
   buildParallelDelegationSection,
   buildNonClaudePlannerSection,
+  buildAntiDuplicationSection,
   categorizeTools,
 } from "./dynamic-agent-prompt-builder";
 
@@ -225,17 +226,21 @@ task(subagent_type="explore", run_in_background=true, load_skills=[], descriptio
 // Reference Grep (external)
 task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find JWT security docs", prompt="I'm implementing JWT auth and need current security best practices to choose token storage (httpOnly cookies vs localStorage) and set expiration policy. Find: OWASP auth guidelines, recommended token lifetimes, refresh token rotation strategies, common JWT vulnerabilities. Skip 'what is JWT' tutorials — production security guidance only.")
 task(subagent_type="librarian", run_in_background=true, load_skills=[], description="Find Express auth patterns", prompt="I'm building Express auth middleware and need production-quality patterns to structure my middleware chain. Find how established Express apps (1000+ stars) handle: middleware ordering, token refresh, role-based access control, auth error propagation. Skip basic tutorials — I need battle-tested patterns with proper error handling.")
+// Continue only with non-overlapping work. If none exists, end your response and wait for completion.
 // WRONG: Sequential or blocking
 result = task(..., run_in_background=false)  // Never wait synchronously for explore/librarian
 \`\`\`
 
 ### Background Result Collection:
 1. Launch parallel agents \u2192 receive task_ids
-2. If you have DIFFERENT independent work \u2192 do it now
-3. Otherwise \u2192 **END YOUR RESPONSE.**
-4. System sends \`<system-reminder>\` on completion \u2192 triggers your next turn
-5. Collect via \`background_output(task_id="...")\`
-6. Cleanup: Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+2. Continue only with non-overlapping work
+   - If you have DIFFERENT independent work \u2192 do it now
+   - Otherwise \u2192 **END YOUR RESPONSE.**
+3. System sends \`<system-reminder>\` on each task completion — then call \`background_output(task_id="...")\`
+4. Need results not yet ready? **End your response.** The notification will trigger your next turn.
+5. Cleanup: Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+
+${buildAntiDuplicationSection()}
 
 ### Search Stop Conditions
 
