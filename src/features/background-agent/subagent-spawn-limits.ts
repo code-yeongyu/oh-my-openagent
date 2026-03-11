@@ -36,10 +36,18 @@ export async function resolveSubagentSpawnContext(
 
     let nextParentSessionID: string | undefined
     try {
-      const session = await client.session.get({
+      const response = await client.session.get({
         path: { id: currentSessionID },
       })
-      nextParentSessionID = session.data?.parentID
+      if (response.error) {
+        throw new Error(String(response.error))
+      }
+
+      if (!response.data) {
+        throw new Error("No session data returned")
+      }
+
+      nextParentSessionID = response.data.parentID
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
       throw new Error(
