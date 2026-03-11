@@ -1,4 +1,4 @@
-import type { CategoryConfig, CategoriesConfig } from "../../config/schema"
+import type { AgentPermission, CategoryConfig, CategoriesConfig } from "../../config/schema"
 import { DEFAULT_CATEGORIES, CATEGORY_PROMPT_APPENDS } from "./constants"
 import { resolveModel } from "../../shared/model-resolver"
 import { isModelAvailable } from "../../shared/model-availability"
@@ -16,6 +16,8 @@ export interface ResolveCategoryConfigResult {
   config: CategoryConfig
   promptAppend: string
   model: string | undefined
+  steps?: number
+  permission?: AgentPermission
 }
 
 /**
@@ -63,6 +65,9 @@ export function resolveCategoryConfig(
     variant: userConfig?.variant ?? defaultConfig?.variant,
   }
 
+  const steps = userConfig?.steps ?? defaultConfig?.steps
+  const permission = userConfig?.permission ?? defaultConfig?.permission
+
   let promptAppend = defaultPromptAppend
   if (userConfig?.prompt_append) {
     promptAppend = defaultPromptAppend
@@ -70,5 +75,5 @@ export function resolveCategoryConfig(
       : userConfig.prompt_append
   }
 
-  return { config, promptAppend, model }
+  return { config, promptAppend, model, steps, permission }
 }

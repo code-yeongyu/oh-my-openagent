@@ -275,6 +275,9 @@
             "maxTokens": {
               "type": "number"
             },
+            "steps": {
+              "type": "number"
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -492,6 +495,9 @@
               "additionalProperties": false
             },
             "maxTokens": {
+              "type": "number"
+            },
+            "steps": {
               "type": "number"
             },
             "thinking": {
@@ -713,6 +719,9 @@
             "maxTokens": {
               "type": "number"
             },
+            "steps": {
+              "type": "number"
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -930,6 +939,9 @@
               "additionalProperties": false
             },
             "maxTokens": {
+              "type": "number"
+            },
+            "steps": {
               "type": "number"
             },
             "thinking": {
@@ -1154,6 +1166,9 @@
             "maxTokens": {
               "type": "number"
             },
+            "steps": {
+              "type": "number"
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -1371,6 +1386,9 @@
               "additionalProperties": false
             },
             "maxTokens": {
+              "type": "number"
+            },
+            "steps": {
               "type": "number"
             },
             "thinking": {
@@ -1592,6 +1610,9 @@
             "maxTokens": {
               "type": "number"
             },
+            "steps": {
+              "type": "number"
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -1809,6 +1830,9 @@
               "additionalProperties": false
             },
             "maxTokens": {
+              "type": "number"
+            },
+            "steps": {
               "type": "number"
             },
             "thinking": {
@@ -2030,6 +2054,9 @@
             "maxTokens": {
               "type": "number"
             },
+            "steps": {
+              "type": "number"
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -2247,6 +2274,9 @@
               "additionalProperties": false
             },
             "maxTokens": {
+              "type": "number"
+            },
+            "steps": {
               "type": "number"
             },
             "thinking": {
@@ -2468,6 +2498,9 @@
             "maxTokens": {
               "type": "number"
             },
+            "steps": {
+              "type": "number"
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -2685,6 +2718,9 @@
               "additionalProperties": false
             },
             "maxTokens": {
+              "type": "number"
+            },
+            "steps": {
               "type": "number"
             },
             "thinking": {
@@ -2906,6 +2942,9 @@
             "maxTokens": {
               "type": "number"
             },
+            "steps": {
+              "type": "number"
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -3125,6 +3164,9 @@
             "maxTokens": {
               "type": "number"
             },
+            "steps": {
+              "type": "number"
+            },
             "thinking": {
               "type": "object",
               "properties": {
@@ -3299,6 +3341,81 @@
           },
           "disable": {
             "type": "boolean"
+          },
+          "steps": {
+            "type": "number"
+          },
+          "permission": {
+            "type": "object",
+            "properties": {
+              "edit": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              },
+              "bash": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "ask",
+                      "allow",
+                      "deny"
+                    ]
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "enum": [
+                        "ask",
+                        "allow",
+                        "deny"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "webfetch": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              },
+              "task": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              },
+              "doom_loop": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              },
+              "external_directory": {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "allow",
+                  "deny"
+                ]
+              }
+            },
+            "additionalProperties": false
           }
         },
         "additionalProperties": false

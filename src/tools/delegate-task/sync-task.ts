@@ -10,6 +10,7 @@ import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 import { setSessionFallbackChain, clearSessionFallbackChain } from "../../hooks/model-fallback/hook"
+import type { AgentPermission } from "../../config/schema"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -21,6 +22,8 @@ export async function executeSyncTask(
   systemContent: string | undefined,
   modelInfo?: ModelFallbackInfo,
   fallbackChain?: import("../../shared/model-requirements").FallbackEntry[],
+  steps?: number,
+  permission?: AgentPermission,
   deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
   const { manager, client, directory, onSyncSessionCreated, syncPollTimeoutMs } = executorCtx
@@ -126,6 +129,8 @@ export async function executeSyncTask(
       categoryModel,
       toastManager,
       taskId,
+      steps,
+      permission,
     })
     if (promptError) {
       return promptError

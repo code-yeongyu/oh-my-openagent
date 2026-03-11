@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { FallbackModelsSchema } from "./fallback-models"
+import { AgentPermissionSchema } from "./internal/permission"
 
 export const CategoryConfigSchema = z.object({
   /** Human-readable description of the category's purpose. Shown in task prompt. */
@@ -25,6 +26,10 @@ export const CategoryConfigSchema = z.object({
   is_unstable_agent: z.boolean().optional(),
   /** Disable this category. Disabled categories are excluded from task delegation. */
   disable: z.boolean().optional(),
+  /** Maximum number of steps for this category. */
+  steps: z.number().optional(),
+  /** Agent permissions for this category. */
+  permission: AgentPermissionSchema.optional(),
 })
 
 export const BuiltinCategoryNameSchema = z.enum([

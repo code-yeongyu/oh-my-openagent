@@ -1,4 +1,5 @@
 import type { DelegateTaskArgs, OpencodeClient } from "./types"
+import type { AgentPermission } from "../../config/schema"
 import { isPlanFamily } from "./constants"
 import { buildTaskPrompt } from "./prompt-builder"
 import {
@@ -40,6 +41,8 @@ export async function sendSyncPrompt(
     categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
     toastManager: { removeTask: (id: string) => void } | null | undefined
     taskId: string | undefined
+    steps?: number
+    permission?: AgentPermission
   },
   deps: SendSyncPromptDeps = sendSyncPromptDeps
 ): Promise<string | null> {
@@ -64,6 +67,8 @@ export async function sendSyncPrompt(
         ? { model: { providerID: input.categoryModel.providerID, modelID: input.categoryModel.modelID } }
         : {}),
       ...(input.categoryModel?.variant ? { variant: input.categoryModel.variant } : {}),
+      ...(input.steps !== undefined ? { steps: input.steps } : {}),
+      ...(input.permission ? { permission: input.permission } : {}),
     },
   }
 

@@ -2,6 +2,7 @@ import type { ModelFallbackInfo } from "../../features/task-toast-manager/types"
 import type { DelegateTaskArgs } from "./types"
 import type { ExecutorContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
+import type { AgentPermission } from "../../config/schema"
 import { mergeCategories } from "../../shared/merge-categories"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
@@ -22,6 +23,8 @@ export interface CategoryResolutionResult {
   isUnstableAgent: boolean
   fallbackChain?: FallbackEntry[]  // For runtime retry on model errors
   error?: string
+  steps?: number
+  permission?: AgentPermission
 }
 
 export async function resolveCategoryExecution(
@@ -199,5 +202,7 @@ Available categories: ${categoryNames.join(", ")}`,
     actualModel,
     isUnstableAgent,
     fallbackChain: configuredFallbackChain ?? requirement?.fallbackChain,
+    steps: resolved.steps,
+    permission: resolved.permission,
   }
 }
