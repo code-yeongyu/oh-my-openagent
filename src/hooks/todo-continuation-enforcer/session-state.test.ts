@@ -19,6 +19,24 @@ describe("createSessionStateStore", () => {
     // given
     const sessionID = "ses-stagnation"
     const state = sessionStateStore.getState(sessionID)
+
+    // when
+    const firstUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2)
+    state.awaitingPostInjectionProgressCheck = true
+    const secondUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2)
+    state.awaitingPostInjectionProgressCheck = true
+    const thirdUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2)
+
+    // then
+    expect(firstUpdate.stagnationCount).toBe(0)
+    expect(secondUpdate.stagnationCount).toBe(1)
+    expect(thirdUpdate.stagnationCount).toBe(2)
+  })
+
+  test("given injection did not succeed, repeated incomplete counts do not track stagnation", () => {
+    // given
+    const sessionID = "ses-failed-injection"
+    const state = sessionStateStore.getState(sessionID)
     state.lastInjectedAt = Date.now()
 
     // when
@@ -28,8 +46,8 @@ describe("createSessionStateStore", () => {
 
     // then
     expect(firstUpdate.stagnationCount).toBe(0)
-    expect(secondUpdate.stagnationCount).toBe(1)
-    expect(thirdUpdate.stagnationCount).toBe(2)
+    expect(secondUpdate.stagnationCount).toBe(0)
+    expect(thirdUpdate.stagnationCount).toBe(0)
   })
 
   test("given incomplete count decreases, resets stagnation tracking", () => {
@@ -112,10 +130,13 @@ describe("createSessionStateStore", () => {
       { id: "2", content: "Task 2", status: "pending", priority: "medium" },
     ]
     sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+    state.awaitingPostInjectionProgressCheck = true
     sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+    state.awaitingPostInjectionProgressCheck = true
     sessionStateStore.trackContinuationProgress(sessionID, 2, progressedTodos)
 
     // when
+    state.awaitingPostInjectionProgressCheck = true
     const stagnatedAgainUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, progressedTodos)
 
     // then
