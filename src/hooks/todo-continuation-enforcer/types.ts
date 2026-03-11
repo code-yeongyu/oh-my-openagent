@@ -13,6 +13,7 @@ export interface TodoContinuationEnforcer {
   markRecovering: (sessionID: string) => void
   markRecoveryComplete: (sessionID: string) => void
   cancelAllCountdowns: () => void
+  dispose: () => void
 }
 
 export interface Todo {
