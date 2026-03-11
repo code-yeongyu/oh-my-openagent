@@ -7,6 +7,7 @@ const DEFAULT_TARGET_MAX_TOKENS = 50_000;
 
 type ModelCacheStateLike = {
 	anthropicContext1MEnabled: boolean;
+	modelContextLimitsCache?: Map<string, number>;
 }
 
 function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
@@ -17,8 +18,14 @@ function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number 
 		: DEFAULT_ANTHROPIC_ACTUAL_LIMIT;
 }
 
+function isAnthropicProvider(providerID: string): boolean {
+	return providerID === "anthropic" || providerID === "google-vertex-anthropic";
+}
+
 interface AssistantMessageInfo {
 	role: "assistant";
+	providerID?: string;
+	modelID?: string;
 	tokens: {
 		input: number;
 		output: number;
@@ -136,20 +143,35 @@ export async function getContextWindowUsage(
 			.map((m) => m.info as AssistantMessageInfo);
 
 		if (assistantMessages.length === 0) return null;
-
+		
 		const lastAssistant = assistantMessages[assistantMessages.length - 1];
-		const lastTokens = lastAssistant.tokens;
+		const lastTokens = lastAssistant?.tokens;
+		if (!lastAssistant || !lastTokens) return null;
+
+		const cachedLimit =
+			lastAssistant.providerID !== undefined && lastAssistant.modelID !== undefined
+				? modelCacheState?.modelContextLimitsCache?.get(
+					`${lastAssistant.providerID}/${lastAssistant.modelID}`,
+				)
+				: undefined;
+		const actualLimit =
+			cachedLimit ??
+			(lastAssistant.providerID !== undefined && isAnthropicProvider(lastAssistant.providerID)
+				? getAnthropicActualLimit(modelCacheState)
+				: null);
+
+		if (!actualLimit) return null;
+
 		const usedTokens =
 			(lastTokens?.input ?? 0) +
 			(lastTokens?.cache?.read ?? 0) +
 			(lastTokens?.output ?? 0);
-		const anthropicActualLimit = getAnthropicActualLimit(modelCacheState);
-		const remainingTokens = anthropicActualLimit - usedTokens;
+		const remainingTokens = actualLimit - usedTokens;
 
 		return {
 			usedTokens,
 			remainingTokens,
-			usagePercentage: usedTokens / anthropicActualLimit,
+			usagePercentage: usedTokens / actualLimit,
 		};
 	} catch {
 		return null;
