@@ -2,6 +2,7 @@ import {
   KEYWORD_DETECTORS,
   CODE_BLOCK_PATTERN,
   INLINE_CODE_PATTERN,
+  type KeywordDetector,
 } from "./constants"
 
 export interface DetectedKeyword {
@@ -13,9 +14,6 @@ export function removeCodeBlocks(text: string): string {
   return text.replace(CODE_BLOCK_PATTERN, "").replace(INLINE_CODE_PATTERN, "")
 }
 
-/**
- * Resolves message to string, handling both static strings and dynamic functions.
- */
 function resolveMessage(
   message: string | ((agentName?: string, modelID?: string) => string),
   agentName?: string,
@@ -24,17 +22,27 @@ function resolveMessage(
   return typeof message === "function" ? message(agentName, modelID) : message
 }
 
-export function detectKeywords(text: string, agentName?: string, modelID?: string): string[] {
+export function detectKeywords(
+  text: string,
+  agentName?: string,
+  modelID?: string,
+  detectors: KeywordDetector[] = KEYWORD_DETECTORS,
+): string[] {
   const textWithoutCode = removeCodeBlocks(text)
-  return KEYWORD_DETECTORS.filter(({ pattern }) =>
+  return detectors.filter(({ pattern }) =>
     pattern.test(textWithoutCode)
   ).map(({ message }) => resolveMessage(message, agentName, modelID))
 }
 
-export function detectKeywordsWithType(text: string, agentName?: string, modelID?: string): DetectedKeyword[] {
+export function detectKeywordsWithType(
+  text: string,
+  agentName?: string,
+  modelID?: string,
+  detectors: KeywordDetector[] = KEYWORD_DETECTORS,
+): DetectedKeyword[] {
   const textWithoutCode = removeCodeBlocks(text)
   const types: Array<"ultrawork" | "search" | "analyze"> = ["ultrawork", "search", "analyze"]
-  return KEYWORD_DETECTORS.map(({ pattern, message }, index) => ({
+  return detectors.map(({ pattern, message }, index) => ({
     matches: pattern.test(textWithoutCode),
     type: types[index],
     message: resolveMessage(message, agentName, modelID),
