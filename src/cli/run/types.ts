@@ -4,6 +4,7 @@ export type { OpencodeClient }
 export interface RunOptions {
   message: string
   agent?: string
+  model?: string
   timestamp?: boolean
   verbose?: boolean
   directory?: string
