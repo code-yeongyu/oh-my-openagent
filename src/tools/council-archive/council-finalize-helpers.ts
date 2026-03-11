@@ -22,7 +22,7 @@ export function absoluteToRelativePath(absolutePath: string): string {
   // Pattern: /Users/username/.../.sisyphus/ -> .sisyphus/
   const match = absolutePath.match(/\/\.sisyphus\//)
   if (match) {
-    return absolutePath.substring(match.index!)
+    return absolutePath.substring(match.index! + 1)
   }
   return absolutePath
 }

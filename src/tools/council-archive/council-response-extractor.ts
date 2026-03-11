@@ -35,11 +35,18 @@ export function extractCouncilResponse(fullText: string): CouncilResponseExtract
   }
 
   const content = fullText.slice(matchingOpenIdx + OPENING_TAG.length, lastCloseIdx).trim()
+  
+  // Empty or whitespace-only content is still rejected
+  if (content.length === 0) {
+    return { has_response: false, response_complete: true, result: content }
+  }
+  
+  // Non-empty content below threshold: warn but still process (softened enforcement)
   if (content.length < MIN_RESPONSE_LENGTH) {
     log(`[council-response-extractor] Short response (${content.length} chars, threshold: ${MIN_RESPONSE_LENGTH})`, { contentLength: content.length }, false)
-    // Still process the response despite being below threshold
     return { has_response: true, response_complete: true, result: content }
   }
+  
   return { has_response: true, response_complete: true, result: content }
 }
 

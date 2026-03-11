@@ -333,13 +333,13 @@ describe("extractCouncilResponse", () => {
   })
 
   describe("#given response with leading/trailing whitespace (99 chars after trim)", () => {
-    it("#then trims before checking MIN_RESPONSE_LENGTH and returns has_response false", () => {
+    it("#then trims before checking MIN_RESPONSE_LENGTH and returns has_response true (softened)", () => {
       const content = "a".repeat(99)
       const text = `<COUNCIL_MEMBER_RESPONSE>   ${content}   </COUNCIL_MEMBER_RESPONSE>`
       const result = extractCouncilResponse(text)
 
       expect(result).toEqual({
-        has_response: false,
+        has_response: true,
         response_complete: true,
         result: content,
       })
