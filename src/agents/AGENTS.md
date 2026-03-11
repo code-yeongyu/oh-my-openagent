@@ -1,4 +1,4 @@
-# src/agents/ - 14 Agent Definitions
+# src/agents/ - 13 Agent Definitions
 
 **Generated:** 2026-03-06
 
@@ -24,7 +24,6 @@ Agent factories following `createXXXAgent(model) → AgentConfig` pattern. Each 
 | **Athena** | claude-opus-4-6 max | 0.1 | primary | kimi-k2.5-free → glm-4.7 → glm-4.7-free → gpt-5.2 high → gemini-3-pro high | Interactive council orchestrator |
 | **Athena-Junior** | claude-opus-4-6 max | 0.1 | subagent | kimi-k2.5-free → glm-4.7 → glm-4.7-free → gpt-5.2 high → gemini-3-pro high | Non-interactive council orchestrator |
 | **Council-Member** | gpt-5-nano | 0.1 | subagent | NONE | Independent council analyst |
-| **Sisyphus-Junior** | claude-sonnet-4-6 | 0.1 | all | user-configurable | Category-spawned executor |
 
 ## TOOL RESTRICTIONS
 

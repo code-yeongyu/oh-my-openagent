@@ -215,7 +215,7 @@ Use `prompt_append` to add extra instructions without replacing the default syst
 
 You can also override settings for `Sisyphus` (the main orchestrator) and `build` (the default agent) using the same options.
 
-## Athena Council
+### Athena Council
 
 Athena is a multi-model council orchestrator. It launches multiple AI models to independently analyze the same question, then synthesizes their responses by agreement level. Requires at least 2 council members.
 
