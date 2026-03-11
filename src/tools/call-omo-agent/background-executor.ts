@@ -2,6 +2,7 @@ import type { CallOmoAgentArgs } from "./types"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
+import type { FallbackEntry } from "../../shared/model-requirements"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { getSessionAgent } from "../../features/claude-code-session-state"
 import { getMessageDir } from "./message-dir"
@@ -17,7 +18,8 @@ export async function executeBackground(
     metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   },
   manager: BackgroundManager,
-  client: PluginInput["client"]
+  client: PluginInput["client"],
+  fallbackChain?: FallbackEntry[],
 ): Promise<string> {
   try {
     const messageDir = getMessageDir(toolContext.sessionID)
@@ -48,6 +50,7 @@ export async function executeBackground(
       parentMessageID: toolContext.messageID,
       parentAgent,
       parentTools: getSessionTools(toolContext.sessionID),
+      fallbackChain,
     })
 
     const WAIT_FOR_SESSION_INTERVAL_MS = 50

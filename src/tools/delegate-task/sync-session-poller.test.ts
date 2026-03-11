@@ -223,8 +223,12 @@ describe("pollSyncSession", () => {
     test("returns abort message when signal is aborted", async () => {
       //#given
       const { pollSyncSession } = require("./sync-session-poller")
+      let abortCount = 0
       const mockClient = {
         session: {
+          abort: async () => {
+            abortCount++
+          },
           messages: async () => ({ data: [] }),
           status: async () => ({ data: {} }),
         },
@@ -241,6 +245,7 @@ describe("pollSyncSession", () => {
       //#then
       expect(result).toContain("Task aborted")
       expect(result).toContain("ses_abort")
+      expect(abortCount).toBe(1)
     })
   })
 
@@ -256,8 +261,12 @@ describe("pollSyncSession", () => {
         MAX_POLL_TIME_MS: 0,
       })
 
+      let abortCount = 0
       const mockClient = {
         session: {
+          abort: async () => {
+            abortCount++
+          },
           messages: async () => ({
             data: [
               { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
@@ -277,6 +286,7 @@ describe("pollSyncSession", () => {
 
       //#then - timeout returns error string
       expect(result).toBe("Poll timeout reached after 50ms for session ses_timeout")
+      expect(abortCount).toBe(1)
     })
   })
 

@@ -39,6 +39,12 @@ const pendingModelFallbacks = new Map<string, ModelFallbackState>()
 const lastToastKey = new Map<string, string>()
 const sessionFallbackChains = new Map<string, FallbackEntry[]>()
 
+function canonicalizeModelID(modelID: string): string {
+  return modelID
+    .toLowerCase()
+    .replace(/\./g, "-")
+}
+
 export function setSessionFallbackChain(sessionID: string, fallbackChain: FallbackEntry[] | undefined): void {
   if (!sessionID) return
   if (!fallbackChain || fallbackChain.length === 0) {
@@ -77,6 +83,11 @@ export function setPendingModelFallback(
   const existing = pendingModelFallbacks.get(sessionID)
 
   if (existing) {
+    if (existing.pending) {
+      log("[model-fallback] Pending fallback already armed for session: " + sessionID)
+      return false
+    }
+
     // Preserve progression across repeated session.error retries in same session.
     // We only mark the next turn as pending fallback application.
     existing.providerID = currentProviderID
@@ -140,13 +151,24 @@ export function getNextFallback(
     }
 
     const providerID = selectFallbackProvider(fallback.providers, state.providerID)
+    const modelID = transformModelForProvider(providerID, fallback.model)
+
+    const isNoOpFallback =
+      providerID.toLowerCase() === state.providerID.toLowerCase() &&
+      canonicalizeModelID(modelID) === canonicalizeModelID(state.modelID)
+
+    if (isNoOpFallback) {
+      log("[model-fallback] Skipping no-op fallback for session: " + sessionID + ", attempt: " + attemptCount + ", model: " + fallback.model)
+      continue
+    }
+
     state.pending = false
 
     log("[model-fallback] Using fallback for session: " + sessionID + ", attempt: " + attemptCount + ", model: " + fallback.model)
 
     return {
       providerID,
-      modelID: transformModelForProvider(providerID, fallback.model),
+      modelID,
       variant: fallback.variant,
     }
   }

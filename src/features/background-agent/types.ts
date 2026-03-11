@@ -1,4 +1,5 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
+import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
 
 export type BackgroundTaskStatus =
   | "pending"
@@ -72,6 +73,7 @@ export interface LaunchInput {
   skills?: string[]
   skillContent?: string
   category?: string
+  sessionPermission?: SessionPermissionRule[]
 }
 
 export interface ResumeInput {

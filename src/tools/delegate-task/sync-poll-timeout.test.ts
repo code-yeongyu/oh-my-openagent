@@ -13,9 +13,12 @@ function createMockCtx(aborted = false) {
   }
 }
 
-function createNeverCompleteClient(sessionID: string) {
+function createNeverCompleteClient(sessionID: string, onAbort?: () => void) {
   return {
     session: {
+      abort: async () => {
+        onAbort?.()
+      },
       messages: async () => ({
         data: [{ info: { id: "msg_001", role: "user", time: { created: 1000 } } }],
       }),
@@ -59,7 +62,10 @@ describe("syncPollTimeoutMs threading", () => {
     describe("#when custom timeout is provided", () => {
       test("#then custom timeout value is used", async () => {
         const { pollSyncSession } = require("./sync-session-poller")
-        const mockClient = createNeverCompleteClient("ses_custom")
+        let abortCount = 0
+        const mockClient = createNeverCompleteClient("ses_custom", () => {
+          abortCount++
+        })
 
         await withMockedDateNow(60_000, async () => {
           const result = await pollSyncSession(createMockCtx(), mockClient, {
@@ -70,6 +76,7 @@ describe("syncPollTimeoutMs threading", () => {
           }, 120_000)
 
           expect(result).toBe("Poll timeout reached after 120000ms for session ses_custom")
+          expect(abortCount).toBe(1)
         })
       })
     })

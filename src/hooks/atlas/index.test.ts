@@ -846,6 +846,71 @@ describe("atlas hook", () => {
       expect(mockInput._promptMock).not.toHaveBeenCalled()
     })
 
+    test("should append subagent session to boulder before injecting continuation", async () => {
+      // given - active boulder plan with another registered session and current session tracked as subagent
+      const subagentSessionID = "subagent-session-456"
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+      }
+      writeBoulderState(TEST_DIR, state)
+      subagentSessions.add(subagentSessionID)
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      // when - subagent session goes idle before parent task output appends it
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: subagentSessionID },
+        },
+      })
+
+      // then - session is registered into boulder and continuation is injected
+      expect(readBoulderState(TEST_DIR)?.session_ids).toContain(subagentSessionID)
+      expect(mockInput._promptMock).toHaveBeenCalled()
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.path.id).toBe(subagentSessionID)
+    })
+
+    test("should inject when registered boulder session has incomplete tasks even if last agent differs", async () => {
+      cleanupMessageStorage(MAIN_SESSION_ID)
+      setupMessageStorage(MAIN_SESSION_ID, "hephaestus")
+
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "test-plan",
+        agent: "atlas",
+      }
+      writeBoulderState(TEST_DIR, state)
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      expect(mockInput._promptMock).toHaveBeenCalled()
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
+      expect(callArgs.body.parts[0].text).toContain("2 remaining")
+    })
+
     test("should not inject when boulder plan is complete", async () => {
       // given - boulder state with complete plan
       const planPath = join(TEST_DIR, "complete-plan.md")
@@ -1083,10 +1148,9 @@ describe("atlas hook", () => {
        expect(mockInput._promptMock).toHaveBeenCalled()
      })
 
-     test("should not inject when last agent is non-sisyphus and does not match boulder agent", async () => {
-       // given - boulder explicitly set to atlas, last agent is hephaestus (unrelated agent)
-       const planPath = join(TEST_DIR, "test-plan.md")
-       writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+    test("should inject when registered atlas boulder session last agent does not match", async () => {
+      const planPath = join(TEST_DIR, "test-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
 
        const state: BoulderState = {
          active_plan: planPath,
@@ -1103,17 +1167,15 @@ describe("atlas hook", () => {
        const mockInput = createMockPluginInput()
        const hook = createAtlasHook(mockInput)
 
-       // when
-       await hook.handler({
-         event: {
-           type: "session.idle",
-           properties: { sessionID: MAIN_SESSION_ID },
-         },
-       })
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
 
-       // then - should NOT call prompt because hephaestus does not match atlas or sisyphus
-       expect(mockInput._promptMock).not.toHaveBeenCalled()
-     })
+      expect(mockInput._promptMock).toHaveBeenCalled()
+    })
 
      test("should inject when last agent matches boulder agent even if non-Atlas", async () => {
        // given - boulder state expects sisyphus and last agent is sisyphus

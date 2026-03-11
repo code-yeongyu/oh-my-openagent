@@ -5,6 +5,7 @@ import {
 import type { InstallConfig } from "./types"
 
 import type { AgentConfig, CategoryConfig, GeneratedOmoConfig } from "./model-fallback-types"
+import { applyOpenAiOnlyModelCatalog, isOpenAiOnlyAvailability } from "./openai-only-model-catalog"
 import { toProviderAvailability } from "./provider-availability"
 import {
 	getSisyphusFallbackChain,
@@ -19,7 +20,7 @@ export type { GeneratedOmoConfig } from "./model-fallback-types"
 const ZAI_MODEL = "zai-coding-plan/glm-4.7"
 
 const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
-const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-opencode/dev/assets/oh-my-opencode.schema.json"
+const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
 
 
 
@@ -122,11 +123,15 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     }
   }
 
-  return {
+  const generatedConfig: GeneratedOmoConfig = {
     $schema: SCHEMA_URL,
     agents,
     categories,
   }
+
+  return isOpenAiOnlyAvailability(avail)
+    ? applyOpenAiOnlyModelCatalog(generatedConfig)
+    : generatedConfig
 }
 
 export function shouldShowChatGPTOnlyWarning(config: InstallConfig): boolean {
