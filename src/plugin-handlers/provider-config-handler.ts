@@ -1,9 +1,30 @@
-import type { ModelCacheState } from "../plugin-state";
+import type { ModelCacheState, VisionCapableModel } from "../plugin-state";
+import { setVisionCapableModelsCache } from "../shared/vision-capable-models-cache"
 
 type ProviderConfig = {
   options?: { headers?: Record<string, string> };
-  models?: Record<string, { limit?: { context?: number } }>;
+  models?: Record<string, ProviderModelConfig>;
 };
+
+type ProviderModelConfig = {
+  limit?: { context?: number };
+  modalities?: {
+    input?: string[];
+  };
+  capabilities?: {
+    input?: {
+      image?: boolean;
+    };
+  };
+}
+
+function supportsImageInput(modelConfig: ProviderModelConfig | undefined): boolean {
+  if (modelConfig?.modalities?.input?.includes("image")) {
+    return true
+  }
+
+  return modelConfig?.capabilities?.input?.image === true
+}
 
 export function applyProviderConfig(params: {
   config: Record<string, unknown>;
@@ -17,6 +38,12 @@ export function applyProviderConfig(params: {
   params.modelCacheState.anthropicContext1MEnabled =
     anthropicBeta?.includes("context-1m") ?? false;
 
+  const visionCapableModelsCache = params.modelCacheState.visionCapableModelsCache
+    ?? new Map<string, VisionCapableModel>()
+  params.modelCacheState.visionCapableModelsCache = visionCapableModelsCache
+  visionCapableModelsCache.clear()
+  setVisionCapableModelsCache(visionCapableModelsCache)
+
   if (!providers) return;
 
   for (const [providerID, providerConfig] of Object.entries(providers)) {
@@ -24,6 +51,13 @@ export function applyProviderConfig(params: {
     if (!models) continue;
 
     for (const [modelID, modelConfig] of Object.entries(models)) {
+      if (supportsImageInput(modelConfig)) {
+        visionCapableModelsCache.set(
+          `${providerID}/${modelID}`,
+          { providerID, modelID },
+        )
+      }
+
       const contextLimit = modelConfig?.limit?.context;
       if (!contextLimit) continue;
 
