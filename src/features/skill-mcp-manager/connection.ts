@@ -29,8 +29,15 @@ export async function getOrCreateClient(params: {
   }
 
   const expandedConfig = expandEnvVarsInObject(config)
-  const connectionPromise = (async () => {
+  let currentConnectionPromise!: Promise<Client>
+  currentConnectionPromise = (async () => {
     const client = await createClient({ state, clientKey, info, config: expandedConfig })
+
+    const isStale = state.pendingConnections.has(clientKey) && state.pendingConnections.get(clientKey) !== currentConnectionPromise
+    if (isStale) {
+      try { await client.close() } catch {}
+      throw new Error(`Connection for "${info.sessionID}" was superseded by a newer connection attempt.`)
+    }
 
     if (state.disconnectedSessions.has(info.sessionID)) {
       await forceReconnect(state, clientKey)
@@ -40,13 +47,13 @@ export async function getOrCreateClient(params: {
     return client
   })()
 
-  state.pendingConnections.set(clientKey, connectionPromise)
+  state.pendingConnections.set(clientKey, currentConnectionPromise)
 
   try {
-    const client = await connectionPromise
+    const client = await currentConnectionPromise
     return client
   } finally {
-    if (state.pendingConnections.get(clientKey) === connectionPromise) {
+    if (state.pendingConnections.get(clientKey) === currentConnectionPromise) {
       state.pendingConnections.delete(clientKey)
     }
   }

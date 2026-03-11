@@ -125,7 +125,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
       input: CommandExecuteBeforeInput,
       output: CommandExecuteBeforeOutput
     ): Promise<void> => {
-      const commandKey = `${input.sessionID}:${input.command.toLowerCase()}`
+      const commandKey = `${input.sessionID}:${input.command.toLowerCase()}:${input.arguments || ""}`
       if (sessionProcessedCommandExecutions.has(commandKey)) {
         return
       }

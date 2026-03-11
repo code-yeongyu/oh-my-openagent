@@ -87,7 +87,16 @@ async function cleanupIdleClients(state: SkillMcpManagerState): Promise<void> {
 }
 
 export async function disconnectSession(state: SkillMcpManagerState, sessionID: string): Promise<void> {
-  state.disconnectedSessions.add(sessionID)
+  let hasPendingForSession = false
+  for (const key of state.pendingConnections.keys()) {
+    if (key.startsWith(`${sessionID}:`)) {
+      hasPendingForSession = true
+      break
+    }
+  }
+  if (hasPendingForSession) {
+    state.disconnectedSessions.add(sessionID)
+  }
   const keysToRemove: string[] = []
 
   for (const [key, managed] of state.clients.entries()) {

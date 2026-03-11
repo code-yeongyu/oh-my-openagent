@@ -16,6 +16,7 @@ describe("createPluginDispose", () => {
     const dispose = createPluginDispose({
       backgroundManager,
       skillMcpManager,
+      tmuxSessionManager: { cleanup: async (): Promise<void> => {} },
       disposeHooks: (): void => {},
     })
 
@@ -38,6 +39,7 @@ describe("createPluginDispose", () => {
     const dispose = createPluginDispose({
       backgroundManager,
       skillMcpManager,
+      tmuxSessionManager: { cleanup: async (): Promise<void> => {} },
       disposeHooks: (): void => {},
     })
 
@@ -69,6 +71,7 @@ describe("createPluginDispose", () => {
       skillMcpManager: {
         disconnectAll: async (): Promise<void> => {},
       },
+      tmuxSessionManager: { cleanup: async (): Promise<void> => {} },
       disposeHooks: (): void => {
         disposeCreatedHooks({
           runtimeFallback,
@@ -104,6 +107,7 @@ describe("createPluginDispose", () => {
     const dispose = createPluginDispose({
       backgroundManager,
       skillMcpManager,
+      tmuxSessionManager: { cleanup: async (): Promise<void> => {} },
       disposeHooks: disposeHooks.run,
     })
 
