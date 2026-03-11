@@ -85,7 +85,7 @@ describe("council-member-agents", () => {
     //#then
     expect(tools.finish_task).toBe(true)
     expect(tools.background_wait).toBe(true)
-    expect(tools.read).toBe(false)
+    expect(tools.read).toBe(true)
     expect(tools.call_omo_agent).toBe(false)
   })
 
