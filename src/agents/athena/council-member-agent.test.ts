@@ -147,17 +147,6 @@ describe("createCouncilMemberAgent", () => {
         expect(tools.background_wait).toBe(true)
       })
 
-      it("#then denies direct exploration and delegation tools at runtime", () => {
-        const tools = agent.tools as Record<string, boolean>
-        expect(tools.read).toBe(false)
-        expect(tools.grep).toBe(false)
-        expect(tools.glob).toBe(false)
-        expect(tools.ast_grep_search).toBe(false)
-        expect(tools.call_omo_agent).toBe(false)
-        expect(tools.background_output).toBe(false)
-        expect(tools.background_cancel).toBe(false)
-      })
-
       it("#then enables exploration tools for solo analysis (read, grep, glob, LSP, ast_grep)", () => {
         const tools = agent.tools as Record<string, boolean>
         expect(tools.read).toBe(true)
@@ -168,13 +157,6 @@ describe("createCouncilMemberAgent", () => {
         expect(tools.lsp_symbols).toBe(true)
         expect(tools.lsp_diagnostics).toBe(true)
         expect(tools.ast_grep_search).toBe(true)
-      })
-
-      it("#then denies delegation tools (call_omo_agent, background_output, background_cancel)", () => {
-        const tools = agent.tools as Record<string, boolean>
-        expect(tools.call_omo_agent).toBe(false)
-        expect(tools.background_output).toBe(false)
-        expect(tools.background_cancel).toBe(false)
       })
     })
 

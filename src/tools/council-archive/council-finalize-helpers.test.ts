@@ -289,6 +289,25 @@ describe("generateUniqueArchiveName", () => {
       expect(generateUniqueArchiveName(baseName, existing)).toBe("council-test-abc123-2")
     })
   })
+
+  describe("#given a base name at max length minus 1 with 10 collisions", () => {
+    it("#then throws an error because suffix would exceed max length", () => {
+      const baseName = "a".repeat(199) // 199 chars, leaves room for -1 but not -10
+      const existing = [
+        baseName,
+        `${baseName}-1`,
+        `${baseName}-2`,
+        `${baseName}-3`,
+        `${baseName}-4`,
+        `${baseName}-5`,
+        `${baseName}-6`,
+        `${baseName}-7`,
+        `${baseName}-8`,
+        `${baseName}-9`,
+      ]
+      expect(() => generateUniqueArchiveName(baseName, existing)).toThrow(/Archive name too long/)
+    })
+  })
 })
 
 describe("validateArchiveName", () => {

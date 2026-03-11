@@ -128,6 +128,10 @@ export function generateUniqueArchiveName(baseName: string, existingNames: strin
     counter++
     newName = `${baseName}-${counter}`
   }
+  
+  // Validate the final name doesn't exceed max length
+  validateArchiveName(newName)
+  
   return newName
 }
 

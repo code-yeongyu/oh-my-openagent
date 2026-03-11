@@ -25,8 +25,9 @@ describe("registerAndConfigureAthenaCouncil", () => {
         const result = registerAndConfigureAthenaCouncil(agents, mockCouncilConfig)
 
         const athenaPrompt = result["athena"].prompt ?? ""
-        expect(athenaPrompt).toContain("Council: Claude Opus 4.6")
-        expect(athenaPrompt).toContain("Council: Claude Sonnet 4")
+        // Names are normalized to snake_case
+        expect(athenaPrompt).toContain("Council: claude_opus_4.6")
+        expect(athenaPrompt).toContain("Council: claude_sonnet_4")
       })
 
       it("#then Athena-Junior prompt contains 'Athena-Junior Council: ' prefixed member names", () => {
@@ -38,8 +39,9 @@ describe("registerAndConfigureAthenaCouncil", () => {
         const result = registerAndConfigureAthenaCouncil(agents, mockCouncilConfig)
 
         const juniorPrompt = result["athena-junior"].prompt ?? ""
-        expect(juniorPrompt).toContain("Athena-Junior Council: Claude Opus 4.6")
-        expect(juniorPrompt).toContain("Athena-Junior Council: Claude Sonnet 4")
+        // Names are normalized to snake_case
+        expect(juniorPrompt).toContain("Athena-Junior Council: claude_opus_4.6")
+        expect(juniorPrompt).toContain("Athena-Junior Council: claude_sonnet_4")
       })
 
       it("#then Athena-Junior prompt does NOT contain 'Council: ' prefix (without Athena-Junior)", () => {
@@ -52,8 +54,8 @@ describe("registerAndConfigureAthenaCouncil", () => {
 
         const juniorPrompt = result["athena-junior"].prompt ?? ""
         // Should NOT contain the regular "Council: " prefix
-        expect(juniorPrompt).not.toContain("- \"Council: Claude Opus 4.6\"")
-        expect(juniorPrompt).not.toContain("- \"Council: Claude Sonnet 4\"")
+        expect(juniorPrompt).not.toContain("- \"Council: claude_opus_4.6\"")
+        expect(juniorPrompt).not.toContain("- \"Council: claude_sonnet_4\"")
       })
 
       it("#then Athena prompt still contains 'Council: ' prefix (unchanged)", () => {
@@ -66,8 +68,8 @@ describe("registerAndConfigureAthenaCouncil", () => {
 
         const athenaPrompt = result["athena"].prompt ?? ""
         // Should contain the regular "Council: " prefix
-        expect(athenaPrompt).toContain("- \"Council: Claude Opus 4.6\"")
-        expect(athenaPrompt).toContain("- \"Council: Claude Sonnet 4\"")
+        expect(athenaPrompt).toContain("- \"Council: claude_opus_4.6\"")
+        expect(athenaPrompt).toContain("- \"Council: claude_sonnet_4\"")
       })
     })
   })
