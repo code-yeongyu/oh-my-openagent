@@ -105,6 +105,7 @@ export function createSessionStateStore(): SessionStateStore {
       currentTodoStatusSignature !== undefined
       && trackedSession.lastTodoStatusSignature !== undefined
       && currentTodoStatusSignature !== trackedSession.lastTodoStatusSignature
+    const hadSuccessfulInjectionAwaitingProgressCheck = state.awaitingPostInjectionProgressCheck === true
 
     state.lastIncompleteCount = incompleteCount
     if (currentCompletedCount !== undefined) {
@@ -125,6 +126,7 @@ export function createSessionStateStore(): SessionStateStore {
 
     if (incompleteCount < previousIncompleteCount || hasCompletedMoreTodos || hasTodoStatusChanged) {
       state.stagnationCount = 0
+      state.awaitingPostInjectionProgressCheck = false
       return {
         previousIncompleteCount,
         stagnationCount: state.stagnationCount,
@@ -132,7 +134,7 @@ export function createSessionStateStore(): SessionStateStore {
       }
     }
 
-    if (state.lastInjectedAt === undefined) {
+    if (!hadSuccessfulInjectionAwaitingProgressCheck) {
       return {
         previousIncompleteCount,
         stagnationCount: state.stagnationCount,
@@ -140,6 +142,7 @@ export function createSessionStateStore(): SessionStateStore {
       }
     }
 
+    state.awaitingPostInjectionProgressCheck = false
     state.stagnationCount += 1
     return {
       previousIncompleteCount,
@@ -158,6 +161,7 @@ export function createSessionStateStore(): SessionStateStore {
 
     state.lastIncompleteCount = undefined
     state.stagnationCount = 0
+    state.awaitingPostInjectionProgressCheck = false
     trackedSession.lastCompletedCount = undefined
     trackedSession.lastTodoStatusSignature = undefined
   }

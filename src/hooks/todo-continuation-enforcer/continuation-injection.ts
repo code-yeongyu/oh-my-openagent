@@ -164,6 +164,7 @@ ${todoList}`
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
+      injectionState.awaitingPostInjectionProgressCheck = true
       injectionState.consecutiveFailures = 0
     }
   } catch (error) {

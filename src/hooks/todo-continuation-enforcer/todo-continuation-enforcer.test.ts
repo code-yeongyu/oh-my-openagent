@@ -668,6 +668,42 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES)
   }, { timeout: 30000 })
 
+  test("should not stop retries early for unchanged todos when injections keep failing", async () => {
+    //#given
+    const sessionID = "main-unchanged-todos-max-failures"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({
+      data: [
+        { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      ],
+    })
+    mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
+      promptCalls.push({
+        sessionID: opts.path.id,
+        agent: opts.body.agent,
+        model: opts.body.model,
+        text: opts.body.parts[0].text,
+      })
+      throw new Error("simulated auth failure")
+    }
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when
+    for (let index = 0; index < MAX_CONSECUTIVE_FAILURES; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      if (index < MAX_CONSECUTIVE_FAILURES - 1) {
+        await fakeTimers.advanceClockBy(1_000_000)
+      }
+    }
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then
+    expect(promptCalls).toHaveLength(MAX_CONSECUTIVE_FAILURES)
+  }, { timeout: 30000 })
+
   test("should resume retries after reset window when max failures reached", async () => {
     //#given
     const sessionID = "main-recovery-after-max-failures"
