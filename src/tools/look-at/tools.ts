@@ -148,11 +148,11 @@ Be thorough on what was requested, concise on everything else.
 If the requested information is not found, clearly state what is missing.`
 
       const { agentModel, agentVariant } = await resolveMultimodalLookerAgentMetadata(ctx)
-      if (!agentModel || !isVisionCapableResolvedModel(agentModel)) {
-        log("[look_at] No vision-capable multimodal-looker model resolved", {
+      if (agentModel && !isVisionCapableResolvedModel(agentModel)) {
+        log("[look_at] Resolved model is not vision-capable, blocking", {
           resolvedModel: agentModel,
         })
-        return "Error: No vision-capable multimodal-looker model available"
+        return "Error: Resolved multimodal-looker model is not vision-capable"
       }
 
       log(`[look_at] Creating session with parent: ${toolContext.sessionID}`)
@@ -204,7 +204,7 @@ Original error: ${createResult.error}`
               { type: "text", text: prompt },
               filePart,
             ],
-            model: { providerID: agentModel.providerID, modelID: agentModel.modelID },
+            ...(agentModel ? { model: { providerID: agentModel.providerID, modelID: agentModel.modelID } } : {}),
             ...(agentVariant ? { variant: agentVariant } : {}),
           },
         })
