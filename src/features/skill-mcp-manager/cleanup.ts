@@ -24,6 +24,7 @@ export function registerProcessCleanup(state: SkillMcpManagerState): void {
     }
     state.clients.clear()
     state.pendingConnections.clear()
+    state.disconnectedSessions.clear()
   }
 
   // Note: Node's 'exit' event is synchronous-only, so we rely on signal handlers for async cleanup.
@@ -81,10 +82,12 @@ async function cleanupIdleClients(state: SkillMcpManagerState): Promise<void> {
 
   if (state.clients.size === 0) {
     stopCleanupTimer(state)
+    unregisterProcessCleanup(state)
   }
 }
 
 export async function disconnectSession(state: SkillMcpManagerState, sessionID: string): Promise<void> {
+  state.disconnectedSessions.add(sessionID)
   const keysToRemove: string[] = []
 
   for (const [key, managed] of state.clients.entries()) {
@@ -96,12 +99,19 @@ export async function disconnectSession(state: SkillMcpManagerState, sessionID: 
     }
   }
 
+  for (const key of state.pendingConnections.keys()) {
+    if (key.startsWith(`${sessionID}:`)) {
+      keysToRemove.push(key)
+    }
+  }
+
   for (const key of keysToRemove) {
     state.pendingConnections.delete(key)
   }
 
   if (state.clients.size === 0) {
     stopCleanupTimer(state)
+    unregisterProcessCleanup(state)
   }
 }
 
@@ -112,6 +122,7 @@ export async function disconnectAll(state: SkillMcpManagerState): Promise<void> 
   const clients = Array.from(state.clients.values())
   state.clients.clear()
   state.pendingConnections.clear()
+  state.disconnectedSessions.clear()
   state.authProviders.clear()
 
   for (const managed of clients) {
