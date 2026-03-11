@@ -1,26 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin";
+import {
+	resolveActualContextLimit,
+	type ContextLimitModelCacheState,
+} from "./context-limit-resolver"
 import { normalizeSDKResponse } from "./normalize-sdk-response"
 
-const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 const DEFAULT_TARGET_MAX_TOKENS = 50_000;
-
-type ModelCacheStateLike = {
-	anthropicContext1MEnabled: boolean;
-	modelContextLimitsCache?: Map<string, number>;
-}
-
-function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number {
-	return (modelCacheState?.anthropicContext1MEnabled ?? false) ||
-		process.env.ANTHROPIC_1M_CONTEXT === "true" ||
-		process.env.VERTEX_ANTHROPIC_1M_CONTEXT === "true"
-		? 1_000_000
-		: DEFAULT_ANTHROPIC_ACTUAL_LIMIT;
-}
-
-function isAnthropicProvider(providerID: string): boolean {
-	return providerID === "anthropic" || providerID === "google-vertex-anthropic";
-}
 
 interface AssistantMessageInfo {
 	role: "assistant";
@@ -125,7 +111,7 @@ export function truncateToTokenLimit(
 export async function getContextWindowUsage(
 	ctx: PluginInput,
 	sessionID: string,
-	modelCacheState?: ModelCacheStateLike,
+	modelCacheState?: ContextLimitModelCacheState,
 ): Promise<{
 	usedTokens: number;
 	remainingTokens: number;
@@ -148,18 +134,14 @@ export async function getContextWindowUsage(
 		const lastTokens = lastAssistant?.tokens;
 		if (!lastAssistant || !lastTokens) return null;
 
-		const modelSpecificLimit =
-			lastAssistant.providerID !== undefined &&
-			lastAssistant.modelID !== undefined &&
-			!isAnthropicProvider(lastAssistant.providerID)
-				? modelCacheState?.modelContextLimitsCache?.get(
-					`${lastAssistant.providerID}/${lastAssistant.modelID}`,
-				)
-				: undefined;
 		const actualLimit =
-			lastAssistant.providerID !== undefined && isAnthropicProvider(lastAssistant.providerID)
-				? getAnthropicActualLimit(modelCacheState)
-				: modelSpecificLimit ?? null;
+			lastAssistant.providerID !== undefined
+				? resolveActualContextLimit(
+					lastAssistant.providerID,
+					lastAssistant.modelID ?? "",
+					modelCacheState,
+				)
+				: null;
 
 		if (!actualLimit) return null;
 
@@ -184,7 +166,7 @@ export async function dynamicTruncate(
 	sessionID: string,
 	output: string,
 	options: TruncationOptions = {},
-	modelCacheState?: ModelCacheStateLike,
+	modelCacheState?: ContextLimitModelCacheState,
 ): Promise<TruncationResult> {
 	if (typeof output !== 'string') {
 		return { result: String(output ?? ''), truncated: false };
@@ -219,7 +201,7 @@ export async function dynamicTruncate(
 
 export function createDynamicTruncator(
 	ctx: PluginInput,
-	modelCacheState?: ModelCacheStateLike,
+	modelCacheState?: ContextLimitModelCacheState,
 ) {
 	return {
 		truncate: (
