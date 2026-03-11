@@ -108,4 +108,24 @@ describe("disconnectSession cleanup registration", () => {
     expect(process.listenerCount("SIGINT")).toBe(signalIntCountBeforeRegister)
     expect(process.listenerCount("SIGTERM")).toBe(signalTermCountBeforeRegister)
   })
+
+  it("#given state with 1 client and pending connection for different session and cleanup registered #when disconnectSession removes last client but pendingConnections remain #then process cleanup handlers stay registered", async () => {
+    const state = createState()
+    const signalIntCountBeforeRegister = process.listenerCount("SIGINT")
+    const signalTermCountBeforeRegister = process.listenerCount("SIGTERM")
+    const pendingClient = createManagedClient("skill-pending").client
+
+    state.clients.set("session-1:skill-1:server-1", createManagedClient("skill-1"))
+    state.pendingConnections.set("session-2:skill-2:server-2", Promise.resolve(pendingClient))
+    registerProcessCleanup(state)
+
+    await disconnectSession(state, "session-1")
+
+    expect(state.clients.size).toBe(0)
+    expect(state.pendingConnections.size).toBe(1)
+    expect(state.cleanupRegistered).toBe(true)
+    expect(state.cleanupHandlers).toHaveLength(2)
+    expect(process.listenerCount("SIGINT")).toBe(signalIntCountBeforeRegister + 1)
+    expect(process.listenerCount("SIGTERM")).toBe(signalTermCountBeforeRegister + 1)
+  })
 })
