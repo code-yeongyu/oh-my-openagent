@@ -1,7 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { createSystemDirective, SystemDirectiveTypes } from "../shared/system-directive"
 
-const ANTHROPIC_DISPLAY_LIMIT = 1_000_000
 const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000
 const CONTEXT_WARNING_THRESHOLD = 0.70
 
@@ -18,11 +17,15 @@ function getAnthropicActualLimit(modelCacheState?: ModelCacheStateLike): number 
     : DEFAULT_ANTHROPIC_ACTUAL_LIMIT
 }
 
-const CONTEXT_REMINDER = `${createSystemDirective(SystemDirectiveTypes.CONTEXT_WINDOW_MONITOR)}
+function createContextReminder(actualLimit: number): string {
+  const limitTokens = actualLimit.toLocaleString()
 
-You are using Anthropic Claude with 1M context window.
-You have plenty of context remaining - do NOT rush or skip tasks.
+  return `${createSystemDirective(SystemDirectiveTypes.CONTEXT_WINDOW_MONITOR)}
+
+You are using a ${limitTokens}-token context window.
+You still have context remaining - do NOT rush or skip tasks.
 Complete your work thoroughly and methodically.`
+}
 
 interface TokenInfo {
   input: number
@@ -77,13 +80,12 @@ export function createContextWindowMonitorHook(
 
     remindedSessions.add(sessionID)
 
-    const displayUsagePercentage = totalInputTokens / ANTHROPIC_DISPLAY_LIMIT
-    const usedPct = (displayUsagePercentage * 100).toFixed(1)
-    const remainingPct = ((1 - displayUsagePercentage) * 100).toFixed(1)
+    const usedPct = (actualUsagePercentage * 100).toFixed(1)
+    const remainingPct = ((1 - actualUsagePercentage) * 100).toFixed(1)
     const usedTokens = totalInputTokens.toLocaleString()
-    const limitTokens = ANTHROPIC_DISPLAY_LIMIT.toLocaleString()
+    const limitTokens = actualLimit.toLocaleString()
 
-    output.output += `\n\n${CONTEXT_REMINDER}
+    output.output += `\n\n${createContextReminder(actualLimit)}
 [Context Status: ${usedPct}% used (${usedTokens}/${limitTokens} tokens), ${remainingPct}% remaining]`
   }
 

@@ -86,5 +86,8 @@ describe("context-window-monitor modelContextLimitsCache", () => {
 
     // then
     expect(output.output).toContain("context remaining")
+    expect(output.output).toContain("262,144-token context window")
+    expect(output.output).toContain("[Context Status: 72.5% used (190,000/262,144 tokens), 27.5% remaining]")
+    expect(output.output).not.toContain("1,000,000")
   })
 })
