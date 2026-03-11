@@ -95,7 +95,7 @@ export async function disconnectSession(state: SkillMcpManagerState, sessionID: 
     }
   }
   if (hasPendingForSession) {
-    state.disconnectedSessions.add(sessionID)
+    state.disconnectedSessions.set(sessionID, (state.disconnectedSessions.get(sessionID) ?? 0) + 1)
   }
   const keysToRemove: string[] = []
 
@@ -125,6 +125,7 @@ export async function disconnectSession(state: SkillMcpManagerState, sessionID: 
 }
 
 export async function disconnectAll(state: SkillMcpManagerState): Promise<void> {
+  state.shutdownGeneration++
   stopCleanupTimer(state)
   unregisterProcessCleanup(state)
 

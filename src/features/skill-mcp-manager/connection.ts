@@ -14,7 +14,6 @@ export async function getOrCreateClient(params: {
   config: ClaudeCodeMcpServer
 }): Promise<Client> {
   const { state, clientKey, info, config } = params
-  state.disconnectedSessions.delete(info.sessionID)
 
   const existing = state.clients.get(clientKey)
   if (existing) {
@@ -31,6 +30,9 @@ export async function getOrCreateClient(params: {
   const expandedConfig = expandEnvVarsInObject(config)
   let currentConnectionPromise!: Promise<Client>
   currentConnectionPromise = (async () => {
+    const disconnectGenAtStart = state.disconnectedSessions.get(info.sessionID) ?? 0
+    const shutdownGenAtStart = state.shutdownGeneration
+
     const client = await createClient({ state, clientKey, info, config: expandedConfig })
 
     const isStale = state.pendingConnections.has(clientKey) && state.pendingConnections.get(clientKey) !== currentConnectionPromise
@@ -39,7 +41,13 @@ export async function getOrCreateClient(params: {
       throw new Error(`Connection for "${info.sessionID}" was superseded by a newer connection attempt.`)
     }
 
-    if (state.disconnectedSessions.has(info.sessionID)) {
+    if (state.shutdownGeneration !== shutdownGenAtStart) {
+      try { await client.close() } catch {}
+      throw new Error(`Shutdown occurred during MCP connection for "${info.sessionID}"`)
+    }
+
+    const currentDisconnectGen = state.disconnectedSessions.get(info.sessionID) ?? 0
+    if (currentDisconnectGen > disconnectGenAtStart) {
       await forceReconnect(state, clientKey)
       throw new Error(`Session "${info.sessionID}" disconnected during MCP connection setup.`)
     }

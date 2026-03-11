@@ -51,12 +51,13 @@ export interface ProcessCleanupHandler {
 export interface SkillMcpManagerState {
   clients: Map<string, ManagedClient>
   pendingConnections: Map<string, Promise<Client>>
-  disconnectedSessions: Set<string>
+  disconnectedSessions: Map<string, number>
   authProviders: Map<string, McpOAuthProvider>
   cleanupRegistered: boolean
   cleanupInterval: ReturnType<typeof setInterval> | null
   cleanupHandlers: ProcessCleanupHandler[]
   idleTimeoutMs: number
+  shutdownGeneration: number
 }
 
 export interface SkillMcpClientConnectionParams {
