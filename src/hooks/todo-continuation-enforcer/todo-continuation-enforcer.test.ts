@@ -8,6 +8,7 @@ import {
   CONTINUATION_COOLDOWN_MS,
   FAILURE_RESET_WINDOW_MS,
   MAX_CONSECUTIVE_FAILURES,
+  MAX_NO_PROGRESS,
 } from "./constants"
 
 type TimerCallback = (...args: any[]) => void
@@ -626,6 +627,13 @@ describe("todo-continuation-enforcer", () => {
     const sessionID = "main-max-consecutive-failures"
     setMainSession(sessionID)
     const mockInput = createMockPluginInput()
+    let todoCallCount = 0
+    mockInput.client.session.todo = async () => {
+      todoCallCount++
+      return { data: [
+        { id: "1", content: `Task ${todoCallCount}`, status: "pending", priority: "high" },
+      ]}
+    }
     mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
       promptCalls.push({
         sessionID: opts.path.id,
@@ -657,6 +665,13 @@ describe("todo-continuation-enforcer", () => {
     const sessionID = "main-recovery-after-max-failures"
     setMainSession(sessionID)
     const mockInput = createMockPluginInput()
+    let todoCallCount = 0
+    mockInput.client.session.todo = async () => {
+      todoCallCount++
+      return { data: [
+        { id: "1", content: `Task ${todoCallCount}`, status: "pending", priority: "high" },
+      ]}
+    }
     mockInput.client.session.promptAsync = async (opts: PromptRequestOptions) => {
       promptCalls.push({
         sessionID: opts.path.id,
@@ -753,9 +768,9 @@ describe("todo-continuation-enforcer", () => {
     expect(promptCalls).toHaveLength(3)
   }, { timeout: 30000 })
 
-  test("should keep injecting even when todos remain unchanged across cycles", async () => {
+  test("should stop injecting after MAX_NO_PROGRESS with unchanged todos", async () => {
     //#given
-    const sessionID = "main-no-stagnation-cap"
+    const sessionID = "main-no-progress-detection"
     setMainSession(sessionID)
     const mockInput = createMockPluginInput()
     mockInput.client.session.todo = async () => ({ data: [
@@ -764,28 +779,79 @@ describe("todo-continuation-enforcer", () => {
     ]})
     const hook = createTodoContinuationEnforcer(mockInput, {})
 
-    //#when — 5 consecutive idle cycles with unchanged todos
-    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
-    await fakeTimers.advanceBy(2500, true)
+    //#when — MAX_NO_PROGRESS + 2 idle cycles with unchanged todos
+    for (let index = 0; index < MAX_NO_PROGRESS + 2; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    }
+
+    //#then — only MAX_NO_PROGRESS injections should fire, then stop
+    expect(promptCalls).toHaveLength(MAX_NO_PROGRESS)
+  }, { timeout: 60000 })
+
+  test("should reset no-progress counter when user sends a message", async () => {
+    //#given
+    const sessionID = "main-no-progress-user-reset"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    mockInput.client.session.todo = async () => ({ data: [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+    ]})
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when — exhaust no-progress limit
+    for (let index = 0; index < MAX_NO_PROGRESS + 1; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    }
+    expect(promptCalls).toHaveLength(MAX_NO_PROGRESS)
+
+    //#when — user sends a message (resets no-progress)
+    await hook.handler({
+      event: {
+        type: "message.updated",
+        properties: { info: { sessionID, role: "user" } },
+      },
+    })
     await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
 
+    //#when — idle again
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
+
+    //#then — injection resumes after user message reset
+    expect(promptCalls).toHaveLength(MAX_NO_PROGRESS + 1)
+  }, { timeout: 60000 })
+
+  test("should reset no-progress counter when todo fingerprint changes", async () => {
+    //#given
+    const sessionID = "main-no-progress-fingerprint-change"
+    setMainSession(sessionID)
+    const mockInput = createMockPluginInput()
+    let todoVersion = 1
+    mockInput.client.session.todo = async () => ({ data: [
+      { id: "1", content: `Task v${todoVersion}`, status: "pending", priority: "high" },
+    ]})
+    const hook = createTodoContinuationEnforcer(mockInput, {})
+
+    //#when — exhaust no-progress limit
+    for (let index = 0; index < MAX_NO_PROGRESS + 1; index++) {
+      await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+      await fakeTimers.advanceBy(2500, true)
+      await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
+    }
+    expect(promptCalls).toHaveLength(MAX_NO_PROGRESS)
+
+    //#when — todo content changes (simulating actual progress)
+    todoVersion = 2
     await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
-
-    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
-    await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
-
-    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
-    await fakeTimers.advanceBy(2500, true)
-    await fakeTimers.advanceClockBy(CONTINUATION_COOLDOWN_MS)
-
     await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
     await fakeTimers.advanceBy(2500, true)
 
-    //#then — all 5 injections should fire (no stagnation cap)
-    expect(promptCalls).toHaveLength(5)
+    //#then — injection resumes because fingerprint changed
+    expect(promptCalls).toHaveLength(MAX_NO_PROGRESS + 1)
   }, { timeout: 60000 })
 
   test("should skip idle handling while injection is in flight", async () => {

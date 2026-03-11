@@ -13,10 +13,11 @@ import {
   FAILURE_RESET_WINDOW_MS,
   HOOK_NAME,
   MAX_CONSECUTIVE_FAILURES,
+  MAX_NO_PROGRESS,
 } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { hasUnansweredQuestion } from "./pending-question-detection"
-import { getIncompleteCount } from "./todo"
+import { computeIncompleteFingerprint, getIncompleteCount } from "./todo"
 import type { MessageInfo, ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
 import { startCountdown } from "./countdown"
@@ -100,6 +101,23 @@ export async function handleSessionIdle(args: {
   const incompleteCount = getIncompleteCount(todos)
   if (incompleteCount === 0) {
     log(`[${HOOK_NAME}] All todos complete`, { sessionID, total: todos.length })
+    return
+  }
+
+  const currentFingerprint = computeIncompleteFingerprint(todos)
+  if (state.lastIncompleteFingerprint === currentFingerprint) {
+    state.noProgressCount = (state.noProgressCount ?? 0) + 1
+  } else {
+    state.noProgressCount = 0
+    state.lastIncompleteFingerprint = currentFingerprint
+  }
+
+  if (state.noProgressCount >= MAX_NO_PROGRESS) {
+    log(`[${HOOK_NAME}] Skipped: no progress after ${state.noProgressCount} attempts`, {
+      sessionID,
+      noProgressCount: state.noProgressCount,
+      maxNoProgress: MAX_NO_PROGRESS,
+    })
     return
   }
 
