@@ -158,7 +158,7 @@ describe("writeTaskOutput", () => {
   })
 
   describe("#given messages with reasoning parts", () => {
-    it("#then includes reasoning text in the transcript", async () => {
+    it("#then excludes reasoning text from the transcript", async () => {
       const client = createMockClient([
         {
           role: "assistant",
@@ -174,7 +174,7 @@ describe("writeTaskOutput", () => {
       const result = await writeTaskOutput(task, client, ".")
 
       const content = await readFile(result!, "utf-8")
-      expect(content).toContain("Let me think about this...")
+      expect(content).not.toContain("Let me think about this...")
       expect(content).toContain("Here is my answer.")
     })
   })
@@ -213,6 +213,54 @@ describe("writeTaskOutput", () => {
 
       const content = await readFile(result!, "utf-8")
       expect(content).toContain("completed_at: unknown")
+    })
+  })
+
+  describe("#given content with CRLF line endings", () => {
+    it("#then normalizes CRLF to LF in output", async () => {
+      const client = createMockClient([
+        {
+          role: "user",
+          time: "2026-02-27T10:00:00Z",
+          parts: [{ type: "text", text: "Test message" }],
+        },
+      ])
+      const task = createMockTask()
+
+      const result = await writeTaskOutput(task, client, ".")
+
+      const content = await readFile(result!, "utf-8")
+      expect(content).not.toContain("\r\n")
+      expect(content).toContain("\n")
+    })
+  })
+
+  describe("#given messages with numeric timestamps", () => {
+    it("#then sorts messages by numeric timestamp value", async () => {
+      const client = {
+        session: {
+          messages: async () => [
+            {
+              id: "msg_1",
+              info: { role: "assistant", time: { created: 1000 } },
+              parts: [{ type: "text", text: "Second message" }],
+            },
+            {
+              id: "msg_0",
+              info: { role: "user", time: { created: 500 } },
+              parts: [{ type: "text", text: "First message" }],
+            },
+          ],
+        },
+      } as BackgroundOutputClient
+
+      const task = createMockTask()
+      const result = await writeTaskOutput(task, client, ".")
+
+      const content = await readFile(result!, "utf-8")
+      const firstIdx = content.indexOf("First message")
+      const secondIdx = content.indexOf("Second message")
+      expect(firstIdx).toBeLessThan(secondIdx)
     })
   })
 })

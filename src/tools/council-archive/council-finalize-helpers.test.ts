@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
-import { slugify, toPosixPath, extractAgentFromFrontmatter, isPathEscaping, movePromptFile } from "./council-finalize-helpers"
+import { slugify, toPosixPath, extractAgentFromFrontmatter, isPathEscaping, movePromptFile, absoluteToRelativePath } from "./council-finalize-helpers"
 
 describe("slugify", () => {
   describe("#given an empty string", () => {
@@ -199,6 +199,53 @@ describe("movePromptFile", () => {
       const result = await movePromptFile("../../etc/passwd", tmpDir, absArchiveDir, relArchiveDir)
 
       expect(result).toBeUndefined()
+    })
+  })
+})
+
+describe("absoluteToRelativePath", () => {
+  describe("#given an absolute path with .sisyphus directory", () => {
+    it("#then converts to relative path starting with .sisyphus/", () => {
+      const absolutePath = "/Users/vacbo/Documents/Projects/athena-fix/.sisyphus/athena/council-test/output.md"
+      const result = absoluteToRelativePath(absolutePath)
+
+      expect(result).toBe(".sisyphus/athena/council-test/output.md")
+    })
+  })
+
+  describe("#given an absolute path with nested .sisyphus structure", () => {
+    it("#then extracts from first .sisyphus/ occurrence", () => {
+      const absolutePath = "/var/tmp/.sisyphus/tmp/prompt.md"
+      const result = absoluteToRelativePath(absolutePath)
+
+      expect(result).toBe(".sisyphus/tmp/prompt.md")
+    })
+  })
+
+  describe("#given a path without .sisyphus directory", () => {
+    it("#then returns the path unchanged", () => {
+      const absolutePath = "/Users/vacbo/Documents/Projects/athena-fix/src/index.ts"
+      const result = absoluteToRelativePath(absolutePath)
+
+      expect(result).toBe(absolutePath)
+    })
+  })
+
+  describe("#given a relative path", () => {
+    it("#then returns the path unchanged", () => {
+      const relativePath = ".sisyphus/athena/council-test/output.md"
+      const result = absoluteToRelativePath(relativePath)
+
+      expect(result).toBe(relativePath)
+    })
+  })
+
+  describe("#given a path with multiple .sisyphus occurrences", () => {
+    it("#then uses the first occurrence", () => {
+      const absolutePath = "/home/.sisyphus/data/.sisyphus/output.md"
+      const result = absoluteToRelativePath(absolutePath)
+
+      expect(result).toBe(".sisyphus/data/.sisyphus/output.md")
     })
   })
 })

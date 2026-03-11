@@ -17,6 +17,16 @@ export function toPosixPath(pathValue: string): string {
   return pathValue.replace(/\\/g, "/")
 }
 
+export function absoluteToRelativePath(absolutePath: string): string {
+  // Convert absolute paths to relative by removing leading directory structure
+  // Pattern: /Users/username/.../.sisyphus/ -> .sisyphus/
+  const match = absolutePath.match(/\/\.sisyphus\//)
+  if (match) {
+    return absolutePath.substring(match.index!)
+  }
+  return absolutePath
+}
+
 export function extractAgentFromFrontmatter(content: string): string | null {
   const fmMatch = content.match(/^---\n([\s\S]*?)\n---/)
   if (!fmMatch) return null

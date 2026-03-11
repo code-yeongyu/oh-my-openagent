@@ -36,6 +36,7 @@ export function formatMetaYaml(archiveName: string, createdAt: string, members: 
   lines.push("members:")
 
   for (const m of members) {
+    // Consistent key ordering for member entries
     lines.push(`  - task_id: ${quoteYamlValue(m.task_id)}`)
     lines.push(`    member: ${quoteYamlValue(m.member)}`)
     lines.push(`    member_slug: ${quoteYamlValue(m.member_slug)}`)

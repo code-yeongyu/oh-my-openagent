@@ -26,9 +26,18 @@ function formatTranscript(
   messages: Array<{ info?: { role?: string; time?: string | { created?: number } }; parts?: Array<{ type?: string; text?: string }> }>,
 ): string {
   const sorted = [...messages].sort((a, b) => {
-    const timeA = String(a.info?.time ?? "")
-    const timeB = String(b.info?.time ?? "")
-    return timeA.localeCompare(timeB)
+    const timeA = a.info?.time
+    const timeB = b.info?.time
+    
+    // Handle numeric timestamps (milliseconds)
+    if (typeof timeA === "object" && typeof timeB === "object") {
+      return (timeA?.created ?? 0) - (timeB?.created ?? 0)
+    }
+    
+    // Handle string timestamps
+    const timeAStr = String(timeA ?? "")
+    const timeBStr = String(timeB ?? "")
+    return timeAStr.localeCompare(timeBStr)
   })
 
   const lines: string[] = []
@@ -39,7 +48,7 @@ function formatTranscript(
     lines.push(`[${role}] ${time}`)
 
     for (const part of message.parts ?? []) {
-      if ((part.type === "text" || part.type === "reasoning") && part.text) {
+      if (part.type === "text" && part.text) {
         lines.push(part.text.trim())
       }
     }
@@ -73,7 +82,10 @@ export async function writeTaskOutput(
     const messages = extractMessages(messagesResult)
     const frontmatter = formatFrontmatter(task)
     const transcript = formatTranscript(messages)
-    const content = `${frontmatter}\n\n${transcript}`
+    let content = `${frontmatter}\n\n${transcript}`
+    
+    // Normalize CRLF to LF
+    content = content.replace(/\r\n/g, "\n")
 
     const outputPath = join(directory, OUTPUT_DIR, `${task.id}.md`)
     const tmpPath = `${outputPath}.tmp`

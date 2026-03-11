@@ -191,12 +191,12 @@ describe("extractCouncilResponse", () => {
   })
 
   describe("#given 99-char content between tags (below MIN_RESPONSE_LENGTH)", () => {
-    it("#then returns has_response false, response_complete true", () => {
+    it("#then returns has_response true (softened, not hard failure), response_complete true", () => {
       const content = "a".repeat(99)
       const result = extractCouncilResponse(`<COUNCIL_MEMBER_RESPONSE>${content}</COUNCIL_MEMBER_RESPONSE>`)
 
       expect(result).toEqual({
-        has_response: false,
+        has_response: true,
         response_complete: true,
         result: content,
       })

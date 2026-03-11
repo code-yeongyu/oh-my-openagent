@@ -1,3 +1,5 @@
+import { log } from "../../shared/logger"
+
 export const MIN_RESPONSE_LENGTH = 100
 
 export const OPENING_TAG = "<COUNCIL_MEMBER_RESPONSE>"
@@ -34,7 +36,9 @@ export function extractCouncilResponse(fullText: string): CouncilResponseExtract
 
   const content = fullText.slice(matchingOpenIdx + OPENING_TAG.length, lastCloseIdx).trim()
   if (content.length < MIN_RESPONSE_LENGTH) {
-    return { has_response: false, response_complete: true, result: content }
+    log(`[council-response-extractor] Short response (${content.length} chars, threshold: ${MIN_RESPONSE_LENGTH})`, { contentLength: content.length }, false)
+    // Still process the response despite being below threshold
+    return { has_response: true, response_complete: true, result: content }
   }
   return { has_response: true, response_complete: true, result: content }
 }

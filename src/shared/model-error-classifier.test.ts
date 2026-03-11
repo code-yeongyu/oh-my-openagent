@@ -1,30 +1,18 @@
 import { describe, expect, test, beforeEach, afterEach, mock, spyOn } from "bun:test"
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import * as dataPath from "./data-path"
+import * as connectedProvidersCache from "./connected-providers-cache"
 import { shouldRetryError, selectFallbackProvider } from "./model-error-classifier"
 
 describe.serial("model-error-classifier", () => {
-  let cacheDirSpy: ReturnType<typeof spyOn>
-  let testCacheDir: string
+  let connectedProvidersCacheSpy: ReturnType<typeof spyOn>
 
   beforeEach(() => {
     mock.restore()
-    testCacheDir = mkdtempSync(join(tmpdir(), "omo-model-error-"))
-    cacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(testCacheDir)
-    if (existsSync(testCacheDir)) {
-      rmSync(testCacheDir, { recursive: true })
-    }
-    mkdirSync(testCacheDir, { recursive: true })
+    connectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
   })
 
   afterEach(() => {
-    cacheDirSpy.mockRestore()
-    if (existsSync(testCacheDir)) {
-      rmSync(testCacheDir, { recursive: true })
-    }
+    connectedProvidersCacheSpy.mockRestore()
   })
 
   test("treats overloaded retry messages as retryable", () => {
@@ -54,10 +42,7 @@ describe.serial("model-error-classifier", () => {
 
   test("selectFallbackProvider prefers first connected provider in preference order", () => {
     //#given
-    writeFileSync(
-      join(testCacheDir, "connected-providers.json"),
-      JSON.stringify({ connected: ["anthropic", "nvidia"], updatedAt: new Date().toISOString() }, null, 2),
-    )
+    connectedProvidersCacheSpy.mockReturnValue(["anthropic", "nvidia"])
 
     //#when
     const provider = selectFallbackProvider(["anthropic", "nvidia"], "nvidia")
@@ -68,10 +53,7 @@ describe.serial("model-error-classifier", () => {
 
   test("selectFallbackProvider falls back to next connected provider when first is disconnected", () => {
     //#given
-    writeFileSync(
-      join(testCacheDir, "connected-providers.json"),
-      JSON.stringify({ connected: ["nvidia"], updatedAt: new Date().toISOString() }, null, 2),
-    )
+    connectedProvidersCacheSpy.mockReturnValue(["nvidia"])
 
     //#when
     const provider = selectFallbackProvider(["anthropic", "nvidia"])
@@ -92,10 +74,7 @@ describe.serial("model-error-classifier", () => {
 
   test("selectFallbackProvider uses connected preferred provider when fallback providers are unavailable", () => {
     //#given
-    writeFileSync(
-      join(testCacheDir, "connected-providers.json"),
-      JSON.stringify({ connected: ["provider-x"], updatedAt: new Date().toISOString() }, null, 2),
-    )
+    connectedProvidersCacheSpy.mockReturnValue(["provider-x"])
 
     //#when
     const provider = selectFallbackProvider(["provider-y"], "provider-x")

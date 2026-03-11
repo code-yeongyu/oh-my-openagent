@@ -1,9 +1,9 @@
-declare const require: (name: string) => any
-const { describe, it, expect, beforeEach, afterEach, beforeAll, mock, spyOn } = require("bun:test")
-import { mkdtempSync, writeFileSync, rmSync } from "fs"
+import { describe, it, expect, beforeEach, afterEach, beforeAll, mock, spyOn } from "bun:test"
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 import * as dataPath from "./data-path"
+import * as connectedProvidersCache from "./connected-providers-cache"
 
 let __resetModelCache: () => void
 let fetchAvailableModels: (client?: unknown, options?: { connectedProviders?: string[] | null }) => Promise<Set<string>>
@@ -54,7 +54,7 @@ describe("fetchAvailableModels", () => {
 
   function writeModelsCache(data: Record<string, any>) {
     const cacheDir = join(tempDir, "opencode")
-    require("fs").mkdirSync(cacheDir, { recursive: true })
+    mkdirSync(cacheDir, { recursive: true })
     writeFileSync(join(cacheDir, "models.json"), JSON.stringify(data))
   }
 
@@ -502,7 +502,7 @@ describe.serial("fetchAvailableModels with connected providers filtering", () =>
 
 	function writeModelsCache(data: Record<string, any>) {
 		const cacheDir = join(tempDir, "opencode")
-		require("fs").mkdirSync(cacheDir, { recursive: true })
+		mkdirSync(cacheDir, { recursive: true })
 		writeFileSync(join(cacheDir, "models.json"), JSON.stringify(data))
 	}
 
@@ -650,34 +650,32 @@ describe.serial("fetchAvailableModels with connected providers filtering", () =>
 describe.serial("fetchAvailableModels with provider-models cache (whitelist-filtered)", () => {
 	let tempDir: string
 	let openCodeCacheDirSpy: ReturnType<typeof spyOn>
-	let omoCacheDirSpy: ReturnType<typeof spyOn>
+	let providerModelsCacheSpy: ReturnType<typeof spyOn>
 
 	beforeEach(() => {
 		mock.restore()
 		__resetModelCache()
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
 		openCodeCacheDirSpy = spyOn(dataPath, "getOpenCodeCacheDir").mockReturnValue(join(tempDir, "opencode"))
-		omoCacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(join(tempDir, "oh-my-opencode"))
+		providerModelsCacheSpy = spyOn(connectedProvidersCache, "readProviderModelsCache").mockReturnValue(null)
 	})
 
 	afterEach(() => {
 		openCodeCacheDirSpy.mockRestore()
-		omoCacheDirSpy.mockRestore()
+		providerModelsCacheSpy.mockRestore()
 		rmSync(tempDir, { recursive: true, force: true })
 	})
 
-	function writeProviderModelsCache(data: { models: Record<string, string[] | any[]>; connected: string[] }) {
-		const cacheDir = join(tempDir, "oh-my-opencode")
-		require("fs").mkdirSync(cacheDir, { recursive: true })
-		writeFileSync(join(cacheDir, "provider-models.json"), JSON.stringify({
+	function setProviderModelsCache(data: { models: Record<string, string[] | any[]>; connected: string[] }) {
+		providerModelsCacheSpy.mockReturnValue({
 			...data,
-			updatedAt: new Date().toISOString()
-		}))
+			updatedAt: new Date().toISOString(),
+		})
 	}
 
 	function writeModelsCache(data: Record<string, any>) {
 		const cacheDir = join(tempDir, "opencode")
-		require("fs").mkdirSync(cacheDir, { recursive: true })
+		mkdirSync(cacheDir, { recursive: true })
 		writeFileSync(join(cacheDir, "models.json"), JSON.stringify(data))
 	}
 
@@ -685,7 +683,7 @@ describe.serial("fetchAvailableModels with provider-models cache (whitelist-filt
 	// when fetchAvailableModels called
 	// then uses provider-models cache instead of models.json
 	it("should prefer provider-models cache over models.json", async () => {
-		writeProviderModelsCache({
+		setProviderModelsCache({
 			models: {
 				opencode: ["big-pickle", "gpt-5-nano"],
 				anthropic: ["claude-opus-4-6"]
@@ -713,9 +711,8 @@ describe.serial("fetchAvailableModels with provider-models cache (whitelist-filt
 	// when fetchAvailableModels called
 	// then falls back to models.json so fuzzy matching can still work
 	it("should fall back to models.json when provider-models cache is empty", async () => {
-		writeProviderModelsCache({
-			models: {
-			},
+		setProviderModelsCache({
+			models: {},
 			connected: ["google"],
 		})
 		writeModelsCache({
@@ -752,7 +749,7 @@ describe.serial("fetchAvailableModels with provider-models cache (whitelist-filt
 	// when connectedProviders filters to subset
 	// then only returns models from connected providers
 	it("should filter by connectedProviders even with provider-models cache", async () => {
-		writeProviderModelsCache({
+		setProviderModelsCache({
 			models: {
 				opencode: ["big-pickle"],
 				anthropic: ["claude-opus-4-6"],
@@ -772,7 +769,7 @@ describe.serial("fetchAvailableModels with provider-models cache (whitelist-filt
 	})
 
 	it("should handle object[] format with metadata (Ollama-style)", async () => {
-		writeProviderModelsCache({
+		setProviderModelsCache({
 			models: {
 				ollama: [
 					{ id: "ministral-3:14b-32k-agent", provider: "ollama", context: 32768, output: 8192 },
@@ -792,7 +789,7 @@ describe.serial("fetchAvailableModels with provider-models cache (whitelist-filt
 	})
 
 	it("should handle mixed string[] and object[] formats across providers", async () => {
-		writeProviderModelsCache({
+		setProviderModelsCache({
 			models: {
 				anthropic: ["claude-opus-4-6", "claude-sonnet-4-6"],
 				ollama: [
@@ -815,7 +812,7 @@ describe.serial("fetchAvailableModels with provider-models cache (whitelist-filt
 	})
 
 	it("should skip invalid entries in object[] format", async () => {
-		writeProviderModelsCache({
+		setProviderModelsCache({
 			models: {
 				ollama: [
 					{ id: "valid-model", provider: "ollama" },
@@ -874,29 +871,16 @@ describe("isModelAvailable", () => {
 })
 
 describe.serial("fallback model availability", () => {
-	let tempDir: string
-	let omoCacheDirSpy: ReturnType<typeof spyOn>
+	let connectedProvidersCacheSpy: ReturnType<typeof spyOn>
 
 	beforeEach(() => {
 		mock.restore()
-		// given
-		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
-		omoCacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(join(tempDir, "oh-my-opencode"))
+		connectedProvidersCacheSpy = spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockReturnValue(null)
 	})
 
 	afterEach(() => {
-		omoCacheDirSpy.mockRestore()
-		rmSync(tempDir, { recursive: true, force: true })
+		connectedProvidersCacheSpy.mockRestore()
 	})
-
-	function writeConnectedProvidersCache(connected: string[]): void {
-		const cacheDir = join(tempDir, "oh-my-opencode")
-		require("fs").mkdirSync(cacheDir, { recursive: true })
-		writeFileSync(
-			join(cacheDir, "connected-providers.json"),
-			JSON.stringify({ connected, updatedAt: new Date().toISOString() }),
-		)
-	}
 
 	it("returns null for completely unknown model", () => {
 		// given
@@ -913,7 +897,7 @@ describe.serial("fallback model availability", () => {
 		// given
 		const fallbackChain = [{ providers: ["openai"], model: "gpt-5.4" }]
 		const availableModels = new Set(["anthropic/claude-opus-4-6"])
-		writeConnectedProvidersCache(["openai"])
+		connectedProvidersCacheSpy.mockReturnValue(["openai"])
 
 		// when
 		const result = isAnyFallbackModelAvailable(fallbackChain, availableModels)

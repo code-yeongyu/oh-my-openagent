@@ -158,10 +158,12 @@ describe("createCallOmoAgent", () => {
 
     //#then
     expect(launch).toHaveBeenCalledTimes(1)
-    const [launchArgs] = launch.mock.calls[0] as [
+    const launchCalls = launch.mock.calls as unknown as Array<[
       { fallbackChain?: Array<{ providers: string[]; model: string; variant: string | undefined }> },
-    ]
-    expect(launchArgs.fallbackChain).toEqual([
+    ]>
+    const launchArgs = launchCalls[0]?.[0]
+    expect(launchArgs).toBeDefined()
+    expect(launchArgs!.fallbackChain).toEqual([
       { providers: ["quotio"], model: "kimi-k2.5", variant: undefined },
       { providers: ["openai"], model: "gpt-5.2", variant: "high" },
     ])

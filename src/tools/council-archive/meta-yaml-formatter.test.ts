@@ -205,4 +205,53 @@ describe("formatMetaYaml", () => {
       expect(result).toContain('    member_slug: "oracle-slug "')
     })
   })
+
+  describe("#given multiple members with consistent key ordering", () => {
+    it("#then maintains consistent key order across all members", () => {
+      const members: MetaMember[] = [
+        {
+          task_id: "task-1",
+          member: "Oracle",
+          member_slug: "oracle",
+          task_output_path: "/path/oracle.txt",
+          archive_file: "oracle.md",
+          has_response: true,
+          response_complete: true,
+        },
+        {
+          task_id: "task-2",
+          member: "Librarian",
+          member_slug: "librarian",
+          task_output_path: "/path/librarian.txt",
+          archive_file: "librarian.md",
+          has_response: false,
+          response_complete: false,
+        },
+      ]
+
+      const result = formatMetaYaml("order-council", "2026-03-02T10:00:00Z", members)
+
+      // Verify key order for first member
+      const firstMemberStart = result.indexOf("  - task_id: task-1")
+      const firstMemberEnd = result.indexOf("  - task_id: task-2")
+      const firstMemberBlock = result.substring(firstMemberStart, firstMemberEnd)
+
+      const keyOrder = [
+        "task_id: task-1",
+        "member: Oracle",
+        "member_slug: oracle",
+        "task_output_path:",
+        "archive_file:",
+        "has_response:",
+        "response_complete:",
+      ]
+
+      let lastIndex = 0
+      for (const key of keyOrder) {
+        const idx = firstMemberBlock.indexOf(key)
+        expect(idx).toBeGreaterThan(lastIndex)
+        lastIndex = idx
+      }
+    })
+  })
 })
