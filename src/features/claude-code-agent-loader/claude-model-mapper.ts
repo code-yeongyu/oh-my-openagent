@@ -1,3 +1,4 @@
+import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { normalizeModelID } from "../../shared/model-normalization"
 
 const ANTHROPIC_PREFIX = "anthropic/"
@@ -8,7 +9,7 @@ const CLAUDE_CODE_ALIAS_MAP = new Map<string, string>([
   ["haiku", `${ANTHROPIC_PREFIX}claude-haiku-4-5`],
 ])
 
-export function mapClaudeModelToOpenCode(model: string | undefined): string | undefined {
+function mapClaudeModelString(model: string | undefined): string | undefined {
   if (!model) return undefined
 
   const trimmed = model.trim()
@@ -28,4 +29,11 @@ export function mapClaudeModelToOpenCode(model: string | undefined): string | un
   }
 
   return undefined
+}
+
+export function mapClaudeModelToOpenCode(
+  model: string | undefined
+): { providerID: string; modelID: string } | undefined {
+  const mappedModel = mapClaudeModelString(model)
+  return mappedModel ? normalizeModelFormat(mappedModel) : undefined
 }
