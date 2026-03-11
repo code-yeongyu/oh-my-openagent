@@ -1,4 +1,5 @@
-import { describe, it, expect, mock } from "bun:test"
+declare const require: (name: string) => any
+const { describe, it, expect, mock } = require("bun:test")
 
 import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications } from "./task-poller"
 import type { BackgroundTask } from "./types"
@@ -446,5 +447,39 @@ describe("pruneStaleTasksAndNotifications", () => {
 
     //#then
     expect(pruned).toContain("old-task")
+  })
+
+  it("should skip terminal tasks even when they exceeded TTL", () => {
+    //#given
+    const tasks = new Map<string, BackgroundTask>()
+    const oldStartedAt = new Date(Date.now() - 31 * 60 * 1000)
+    const terminalStatuses: BackgroundTask["status"][] = ["completed", "error", "cancelled", "interrupt"]
+
+    for (const status of terminalStatuses) {
+      tasks.set(status, {
+        id: status,
+        parentSessionID: "parent",
+        parentMessageID: "msg",
+        description: status,
+        prompt: status,
+        agent: "explore",
+        status,
+        startedAt: oldStartedAt,
+        completedAt: new Date(),
+      })
+    }
+
+    const pruned: string[] = []
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications: new Map<string, BackgroundTask[]>(),
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toEqual([])
+    expect(Array.from(tasks.keys())).toEqual(terminalStatuses)
   })
 })
