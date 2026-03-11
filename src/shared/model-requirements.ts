@@ -205,7 +205,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       {
         providers: ["openai", "opencode"],
-        model: "gpt-5.3-codex",
+        model: "gpt-5.4",
         variant: "xhigh",
       },
       {
@@ -289,14 +289,14 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   "unspecified-high": {
     fallbackChain: [
       {
-        providers: ["openai", "github-copilot", "opencode"],
-        model: "gpt-5.4",
-        variant: "high",
-      },
-      {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-opus-4-6",
         variant: "max",
+      },
+      {
+        providers: ["openai", "github-copilot", "opencode"],
+        model: "gpt-5.4",
+        variant: "high",
       },
       { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },

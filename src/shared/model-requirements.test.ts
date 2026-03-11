@@ -239,19 +239,19 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
 })
 
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
-  test("ultrabrain has valid fallbackChain with gpt-5.3-codex as primary", () => {
+  test("ultrabrain has valid fallbackChain with gpt-5.4 as primary", () => {
     // given - ultrabrain category requirement
     const ultrabrain = CATEGORY_MODEL_REQUIREMENTS["ultrabrain"]
 
     // when - accessing ultrabrain requirement
-    // then - fallbackChain exists with gpt-5.3-codex as first entry
+    // then - fallbackChain exists with gpt-5.4 as first entry
     expect(ultrabrain).toBeDefined()
     expect(ultrabrain.fallbackChain).toBeArray()
     expect(ultrabrain.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = ultrabrain.fallbackChain[0]
     expect(primary.variant).toBe("xhigh")
-    expect(primary.model).toBe("gpt-5.3-codex")
+    expect(primary.model).toBe("gpt-5.4")
     expect(primary.providers[0]).toBe("openai")
   })
 
@@ -326,20 +326,25 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("anthropic")
   })
 
-  test("unspecified-high has gpt-5.4 as primary", () => {
+  test("unspecified-high has claude-opus-4-6 as primary and gpt-5.4 as secondary", () => {
     // #given - unspecified-high category requirement
     const unspecifiedHigh = CATEGORY_MODEL_REQUIREMENTS["unspecified-high"]
 
     // #when - accessing unspecified-high requirement
-    // #then - gpt-5.4 is first
+    // #then - claude-opus-4-6 is first and gpt-5.4 is second
     expect(unspecifiedHigh).toBeDefined()
     expect(unspecifiedHigh.fallbackChain).toBeArray()
     expect(unspecifiedHigh.fallbackChain.length).toBeGreaterThan(1)
 
     const primary = unspecifiedHigh.fallbackChain[0]
-    expect(primary.model).toBe("gpt-5.4")
-    expect(primary.variant).toBe("high")
-    expect(primary.providers).toEqual(["openai", "github-copilot", "opencode"])
+    expect(primary.model).toBe("claude-opus-4-6")
+    expect(primary.variant).toBe("max")
+    expect(primary.providers).toEqual(["anthropic", "github-copilot", "opencode"])
+
+    const secondary = unspecifiedHigh.fallbackChain[1]
+    expect(secondary.model).toBe("gpt-5.4")
+    expect(secondary.variant).toBe("high")
+    expect(secondary.providers).toEqual(["openai", "github-copilot", "opencode"])
   })
 
   test("artistry has valid fallbackChain with gemini-3.1-pro as primary", () => {
