@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from "bun:test"
 import { join } from "node:path"
-import { slugify, toPosixPath, extractAgentFromFrontmatter, isPathEscaping, movePromptFile, absoluteToRelativePath } from "./council-finalize-helpers"
+import { slugify, toPosixPath, extractAgentFromFrontmatter, isPathEscaping, movePromptFile, absoluteToRelativePath, generateUniqueArchiveName, validateArchiveName } from "./council-finalize-helpers"
 
 describe("slugify", () => {
   describe("#given an empty string", () => {
@@ -246,6 +246,83 @@ describe("absoluteToRelativePath", () => {
       const result = absoluteToRelativePath(absolutePath)
 
       expect(result).toBe(".sisyphus/data/.sisyphus/output.md")
+    })
+  })
+})
+
+describe("generateUniqueArchiveName", () => {
+  describe("#given a name that does not exist in the list", () => {
+    it("#then returns the name unchanged", () => {
+      const baseName = "council-test-abc123"
+      const existing = ["council-other-def456", "council-another-ghi789"]
+      expect(generateUniqueArchiveName(baseName, existing)).toBe("council-test-abc123")
+    })
+  })
+
+  describe("#given a name that already exists", () => {
+    it("#then appends -1 suffix", () => {
+      const baseName = "council-test-abc123"
+      const existing = ["council-test-abc123"]
+      expect(generateUniqueArchiveName(baseName, existing)).toBe("council-test-abc123-1")
+    })
+  })
+
+  describe("#given a name with multiple collisions", () => {
+    it("#then increments counter until finding available name", () => {
+      const baseName = "council-test-abc123"
+      const existing = ["council-test-abc123", "council-test-abc123-1", "council-test-abc123-2"]
+      expect(generateUniqueArchiveName(baseName, existing)).toBe("council-test-abc123-3")
+    })
+  })
+
+  describe("#given an empty existing list", () => {
+    it("#then returns the base name unchanged", () => {
+      const baseName = "council-test-abc123"
+      expect(generateUniqueArchiveName(baseName, [])).toBe("council-test-abc123")
+    })
+  })
+
+  describe("#given a name with gaps in collision sequence", () => {
+    it("#then fills the first available gap", () => {
+      const baseName = "council-test-abc123"
+      const existing = ["council-test-abc123", "council-test-abc123-1", "council-test-abc123-3"]
+      expect(generateUniqueArchiveName(baseName, existing)).toBe("council-test-abc123-2")
+    })
+  })
+})
+
+describe("validateArchiveName", () => {
+  describe("#given a name within the max length", () => {
+    it("#then returns the name unchanged", () => {
+      const name = "council-test-abc123"
+      expect(validateArchiveName(name)).toBe(name)
+    })
+  })
+
+  describe("#given a name at exactly the max length", () => {
+    it("#then returns the name unchanged", () => {
+      const name = "a".repeat(200)
+      expect(validateArchiveName(name)).toBe(name)
+    })
+  })
+
+  describe("#given a name exceeding the max length", () => {
+    it("#then throws an error with the length details", () => {
+      const name = "a".repeat(201)
+      expect(() => validateArchiveName(name)).toThrow(/Archive name too long: 201 > 200/)
+    })
+  })
+
+  describe("#given a very long name", () => {
+    it("#then throws an error with correct length", () => {
+      const name = "a".repeat(500)
+      expect(() => validateArchiveName(name)).toThrow(/Archive name too long: 500 > 200/)
+    })
+  })
+
+  describe("#given an empty name", () => {
+    it("#then returns the empty name unchanged", () => {
+      expect(validateArchiveName("")).toBe("")
     })
   })
 })

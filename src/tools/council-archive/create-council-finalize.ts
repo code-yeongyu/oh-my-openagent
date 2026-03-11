@@ -3,7 +3,7 @@ import { writeFile, mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { randomBytes } from "node:crypto"
 import { extractCouncilResponse } from "./council-response-extractor"
-import { TASK_ID_PATTERN, slugify, toPosixPath, extractAgentFromFrontmatter, isPathEscaping, movePromptFile, cleanupPromptFile } from "./council-finalize-helpers"
+import { TASK_ID_PATTERN, slugify, toPosixPath, extractAgentFromFrontmatter, isPathEscaping, movePromptFile, cleanupPromptFile, generateUniqueArchiveName, validateArchiveName } from "./council-finalize-helpers"
 import { formatMetaYaml, type MetaMember } from "./meta-yaml-formatter"
 import {
   buildAthenaRuntimeGuidance,
@@ -83,7 +83,23 @@ export function createCouncilFinalize(
 
         const hexId = randomBytes(COUNCIL_DEFAULTS.ARCHIVE_ID_BYTES).toString("hex")
         const safeName = slugify(args.name) || "unnamed"
-        const archiveName = `council-${safeName}-${hexId}`
+        let archiveName = `council-${safeName}-${hexId}`
+        
+        // Validate archive name length
+        validateArchiveName(archiveName)
+        
+        // Check for existing archives and handle collisions
+        const athenaDir = join(base, ".sisyphus", "athena")
+        let existingArchives: string[] = []
+        try {
+          const { readdirSync } = await import("node:fs")
+          existingArchives = readdirSync(athenaDir).filter((name) => name.startsWith("council-"))
+        } catch (err) {
+          // Directory doesn't exist yet, no collisions possible
+        }
+        
+        archiveName = generateUniqueArchiveName(archiveName, existingArchives)
+        
         const relArchiveDir = join(".sisyphus", "athena", archiveName)
         const relArchiveDirForOutput = toPosixPath(relArchiveDir)
         const absArchiveDir = join(base, relArchiveDir)

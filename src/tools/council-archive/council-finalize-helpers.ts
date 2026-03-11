@@ -3,6 +3,7 @@ import { existsSync, realpathSync } from "node:fs"
 import { basename, dirname, join, isAbsolute, resolve, relative } from "node:path"
 import { resolveSymlink } from "../../shared/file-utils"
 import { log } from "../../shared/logger"
+import { COUNCIL_DEFAULTS } from "../../agents/athena"
 
 export const TASK_ID_PATTERN = /^[a-zA-Z0-9_-]+$/
 
@@ -114,4 +115,26 @@ export async function movePromptFile(
     log("[council-finalize] Failed to move prompt file", { promptFile: promptFilePath, error: String(err) }, true)
     return undefined
   }
+}
+
+export function generateUniqueArchiveName(baseName: string, existingNames: string[]): string {
+  if (!existingNames.includes(baseName)) {
+    return baseName
+  }
+
+  let counter = 1
+  let newName = `${baseName}-${counter}`
+  while (existingNames.includes(newName)) {
+    counter++
+    newName = `${baseName}-${counter}`
+  }
+  return newName
+}
+
+export function validateArchiveName(name: string): string {
+  const max = COUNCIL_DEFAULTS.ARCHIVE_NAME_MAX_LENGTH
+  if (name.length > max) {
+    throw new Error(`Archive name too long: ${name.length} > ${max}`)
+  }
+  return name
 }

@@ -13,6 +13,15 @@ export { COUNCIL_DEFAULTS } from "./constants"
 export { ATHENA_INTERACTIVE_PROMPT } from "./interactive-prompt"
 export { ATHENA_NON_INTERACTIVE_PROMPT } from "./non-interactive-prompt"
 export {
+  buildCouncilTaskInstructions,
+  buildStep5_2Individual,
+  buildStep5_2Bulk,
+  applyCouncilConfigToAthenaPrompt,
+  applyCouncilConfigToAthenaJuniorPrompt,
+  registerAndConfigureAthenaCouncil,
+} from "./helpers"
+export type { CouncilPromptConfig } from "./helpers"
+export {
   buildCouncilFailureMetadataContract,
   buildNonInteractiveModeValidationLines,
   buildQuorumRulesContract,
