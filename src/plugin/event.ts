@@ -174,6 +174,7 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input));
     await Promise.resolve(hooks.unstableAgentBabysitter?.event?.(input));
     await Promise.resolve(hooks.contextWindowMonitor?.event?.(input));
+    await Promise.resolve(hooks.preemptiveCompaction?.event?.(input));
     await Promise.resolve(hooks.directoryAgentsInjector?.event?.(input));
     await Promise.resolve(hooks.directoryReadmeInjector?.event?.(input));
     await Promise.resolve(hooks.rulesInjector?.event?.(input));
