@@ -15,7 +15,7 @@ export interface SyncResult {
   message?: string
 }
 
-const EXACT_SEMVER_REGEX = /^\d+\.\d+\.\d+(-[\w.]+)?$/
+const EXACT_SEMVER_REGEX = /^\d+\.\d+\.\d+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/
 
 function safeUnlink(filePath: string): void {
   try {
@@ -71,7 +71,7 @@ export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncR
   }
 
   const intentIsTag = !EXACT_SEMVER_REGEX.test(intentVersion.trim())
-  const currentIsSemver = EXACT_SEMVER_REGEX.test(currentVersion.trim())
+  const currentIsSemver = EXACT_SEMVER_REGEX.test(String(currentVersion).trim())
 
   if (intentIsTag && currentIsSemver) {
     log(
