@@ -32,3 +32,17 @@ export async function resolveSymlinkAsync(filePath: string): Promise<string> {
     return filePath
   }
 }
+
+export async function readFileWithContext(filePath: string, readContext: string): Promise<string> {
+  try {
+    return await fs.readFile(filePath, "utf-8")
+  } catch (error) {
+    const pathError = error as NodeJS.ErrnoException
+    const baseMessage = `${pathError.code === "ENOENT" ? "File not found" : "Failed to read file"}: ${filePath} (attempted read from ${readContext})`
+    const message = pathError.code === "ENOENT" || !pathError.message
+      ? baseMessage
+      : `${baseMessage}: ${pathError.message}`
+
+    throw new Error(message, { cause: error })
+  }
+}

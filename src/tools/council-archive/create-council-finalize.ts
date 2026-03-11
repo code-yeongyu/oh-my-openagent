@@ -1,5 +1,5 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
-import { readFile, writeFile, mkdir } from "node:fs/promises"
+import { writeFile, mkdir } from "node:fs/promises"
 import { join } from "node:path"
 import { randomBytes } from "node:crypto"
 import { extractCouncilResponse } from "./council-response-extractor"
@@ -11,6 +11,7 @@ import {
   resolveCouncilIntent,
   COUNCIL_DEFAULTS,
 } from "../../agents/athena"
+import { readFileWithContext } from "../../shared/file-utils"
 import type { CouncilGuidanceMode } from "../../agents/athena"
 import type { CouncilFinalizeArgs, CouncilMemberResult, CouncilFinalizeResult } from "./types"
 
@@ -88,13 +89,13 @@ export function createCouncilFinalize(
 
           let fileContent: string
           try {
-            fileContent = await readFile(absTaskOutput, "utf-8")
-          } catch {
+            fileContent = await readFileWithContext(absTaskOutput, "council archive")
+          } catch (error) {
             members.push({
               task_id: taskId,
               member: "unknown",
               has_response: false,
-              error: "Task output file not found",
+              error: error instanceof Error ? error.message : String(error),
             })
             metaMembers.push({
               task_id: taskId,
@@ -153,6 +154,11 @@ export function createCouncilFinalize(
         const absMetaFile = join(base, relMetaFile)
         const createdAt = new Date().toISOString()
         await writeFile(absMetaFile, formatMetaYaml(archiveName, createdAt, metaMembers, args.question, relPromptFile), "utf-8")
+        await writeFile(
+          join(absArchiveDir, "terminal-state.json"),
+          JSON.stringify({ status: "completed", timestamp: Date.now() }, null, 2) + "\n",
+          "utf-8",
+        )
 
         const result: CouncilFinalizeResult = {
           archive_dir: relArchiveDirForOutput,

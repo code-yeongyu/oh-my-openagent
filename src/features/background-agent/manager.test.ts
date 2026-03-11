@@ -1,5 +1,4 @@
-declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach } = require("bun:test")
+import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BackgroundTask, ResumeInput } from "./types"
@@ -1361,6 +1360,34 @@ describe("BackgroundManager.tryCompleteTask", () => {
     }
   })
 
+  test("should reset _isCompleting when completion throws", async () => {
+    // given
+    ;(manager as unknown as { markForNotification: () => void }).markForNotification = () => {
+      throw new Error("markForNotification failed")
+    }
+
+    const task: BackgroundTask = {
+      id: "task-reset-completing-flag",
+      sessionID: "session-reset-completing-flag",
+      parentSessionID: "parent-reset-completing-flag",
+      parentMessageID: "msg-1",
+      description: "completion cleanup task",
+      prompt: "test",
+      agent: "explore",
+      status: "running",
+      startedAt: new Date(),
+    }
+
+    try {
+      await tryCompleteTaskForTest(manager, task)
+      throw new Error("Expected tryCompleteTaskForTest to throw")
+    } catch (error) {
+      expect(error).toBeInstanceOf(Error)
+      expect((error as Error).message).toBe("markForNotification failed")
+    }
+    expect(task._isCompleting).toBe(false)
+  })
+
   test("should release task concurrencyKey when startTask throws after assigning it", async () => {
     // given
     const concurrencyKey = "anthropic/claude-opus-4-6"
@@ -1942,7 +1969,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      const task1 = await manager.launch(input)
+      await manager.launch(input)
       const task2 = await manager.launch(input)
 
       // Wait for first task to start
@@ -2000,7 +2027,7 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
         parentMessageID: "parent-message",
       }
 
-      const task1 = await manager.launch(input)
+      await manager.launch(input)
       const task2 = await manager.launch(input)
       const task3 = await manager.launch(input)
 
@@ -3694,7 +3721,6 @@ describe("BackgroundManager.handleEvent - early session.idle deferral", () => {
     const manager = new BackgroundManager({ client, directory: tmpdir() } as unknown as PluginInput)
     stubNotifyParentSession(manager)
 
-    const remainingMs = 1200
     const task: BackgroundTask = {
       id: "task-early-idle",
       sessionID,

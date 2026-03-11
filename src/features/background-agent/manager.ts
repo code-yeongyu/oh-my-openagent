@@ -1234,55 +1234,59 @@ export class BackgroundManager {
     if (task._isCompleting) return false
     task._isCompleting = true
 
-    // Write output to file if requested (before status flip)
-    if (task.writeOutputToFile) {
-      const filePath = await writeTaskOutput(task, this.client, this.directory)
-      if (filePath) task.outputFilePath = filePath
-    }
-
-    // Atomically mark as completed to prevent race conditions
-    task.status = "completed"
-    task.completedAt = new Date()
-    task.sessionState = undefined
-    this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
-    resetCouncilNudgeCount(task.id)
-
-    removeTaskToastTracking(task.id)
-
-    // Release concurrency BEFORE any async operations to prevent slot leaks
-    if (task.concurrencyKey) {
-      this.concurrencyManager.release(task.concurrencyKey)
-      task.concurrencyKey = undefined
-    }
-
-    this.markForNotification(task)
-
-    // Ensure pending tracking is cleaned up even if notification fails
-    this.cleanupPendingByParent(task)
-
-    const idleTimer = this.idleDeferralTimers.get(task.id)
-    if (idleTimer) {
-      clearTimeout(idleTimer)
-      this.idleDeferralTimers.delete(task.id)
-    }
-
-    if (task.sessionID) {
-      this.client.session.abort({
-        path: { id: task.sessionID },
-      }).catch(() => {})
-
-      SessionCategoryRegistry.remove(task.sessionID)
-    }
-
     try {
-      await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
-      log(`[background-agent] Task completed via ${source}:`, task.id)
-    } catch (err) {
-      log("[background-agent] Error in notifyParentSession:", { taskId: task.id, error: err })
-      // Concurrency already released, notification failed but task is complete
-    }
+      // Write output to file if requested (before status flip)
+      if (task.writeOutputToFile) {
+        const filePath = await writeTaskOutput(task, this.client, this.directory)
+        if (filePath) task.outputFilePath = filePath
+      }
 
-    return true
+      // Atomically mark as completed to prevent race conditions
+      task.status = "completed"
+      task.completedAt = new Date()
+      task.sessionState = undefined
+      this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+      resetCouncilNudgeCount(task.id)
+
+      removeTaskToastTracking(task.id)
+
+      // Release concurrency BEFORE any async operations to prevent slot leaks
+      if (task.concurrencyKey) {
+        this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined
+      }
+
+      this.markForNotification(task)
+
+      // Ensure pending tracking is cleaned up even if notification fails
+      this.cleanupPendingByParent(task)
+
+      const idleTimer = this.idleDeferralTimers.get(task.id)
+      if (idleTimer) {
+        clearTimeout(idleTimer)
+        this.idleDeferralTimers.delete(task.id)
+      }
+
+      if (task.sessionID) {
+        this.client.session.abort({
+          path: { id: task.sessionID },
+        }).catch(() => {})
+
+        SessionCategoryRegistry.remove(task.sessionID)
+      }
+
+      try {
+        await this.enqueueNotificationForParent(task.parentSessionID, () => this.notifyParentSession(task))
+        log(`[background-agent] Task completed via ${source}:`, task.id)
+      } catch (err) {
+        log("[background-agent] Error in notifyParentSession:", { taskId: task.id, error: err })
+        // Concurrency already released, notification failed but task is complete
+      }
+
+      return true
+    } finally {
+      task._isCompleting = false
+    }
   }
 
   private async notifyParentSession(task: BackgroundTask): Promise<void> {
@@ -1464,14 +1468,6 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         this.completionTimers.set(taskId, timer)
       }
     }
-  }
-
-  private formatDuration(start: Date, end?: Date): string {
-    return formatDuration(start, end)
-  }
-
-  private isAbortedSessionError(error: unknown): boolean {
-    return isAbortedSessionError(error)
   }
 
   private hasRunningTasks(): boolean {

@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, it, beforeEach, afterEach } from "bun:test"
-import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from "node:fs/promises"
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat, readdir } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createCouncilFinalize } from "./create-council-finalize"
@@ -153,6 +153,12 @@ describe("council archive integration flow", () => {
         expect(metaContent).toContain("has_response: true")
         expect(metaContent).toContain("response_complete: true")
 
+        const terminalState = JSON.parse(
+          await readFile(join(tmpDir, result.archive_dir, "terminal-state.json"), "utf-8"),
+        ) as { status: string; timestamp: number }
+        expect(terminalState.status).toBe("completed")
+        expect(typeof terminalState.timestamp).toBe("number")
+
         for (let i = 0; i < agents.length; i++) {
           const archiveContent = await readFile(join(tmpDir, result.members[i].archive_file!), "utf-8")
           expect(archiveContent).toBe(agents[i].response)
@@ -216,7 +222,7 @@ describe("council archive integration flow", () => {
 
   describe("#given 1 of 3 task output files is missing", () => {
     describe("#when finalize is called with all 3 task_ids", () => {
-      it("#then 2 members succeed and 1 has error 'Task output file not found'", async () => {
+      it("#then 2 members succeed and 1 has a descriptive file read error", async () => {
         await writeFile(
           join(tmpDir, ".sisyphus", "task-outputs", "bg_first.md"),
           mockTaskOutput("Council: First", "First analysis: This is a detailed analysis from First model covering the full scope of the council question."),
@@ -241,7 +247,9 @@ describe("council archive integration flow", () => {
         expect(result.members[0].archive_file).toBeDefined()
 
         expect(result.members[1].has_response).toBe(false)
-        expect(result.members[1].error).toBe("Task output file not found")
+        expect(result.members[1].error).toBe(
+          `File not found: ${join(tmpDir, ".sisyphus", "task-outputs", "bg_missing.md")} (attempted read from council archive)`,
+        )
         expect(result.members[1].member).toBe("unknown")
 
         expect(result.members[2].has_response).toBe(true)
@@ -321,6 +329,8 @@ describe("council archive integration flow", () => {
 
     describe("#when council finalize errors after prepare_council_prompt created a temp file", () => {
       it("#then finalize still removes the temp prompt file", async () => {
+        await mkdir(join(tmpDir, ".sisyphus", "athena"), { recursive: true })
+
         const prepareTool = createPrepareCouncilPromptTool(tmpDir)
         const prepareResult = await prepareTool.execute(
           { prompt: "Should cleanup run on finalize errors?", mode: "solo", intent: "FREEFORM" },
@@ -343,6 +353,7 @@ describe("council archive integration flow", () => {
 
         expect(result).toContain("Invalid intent")
         expect(await pathExists(promptFile)).toBe(false)
+        expect(await readdir(join(tmpDir, ".sisyphus", "athena"))).toEqual([])
       })
     })
 

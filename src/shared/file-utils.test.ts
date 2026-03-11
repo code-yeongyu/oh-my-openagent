@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test"
 import { mkdirSync, writeFileSync, symlinkSync, rmSync } from "fs"
 import { join } from "path"
 import { tmpdir } from "os"
-import { resolveSymlink, resolveSymlinkAsync, isSymbolicLink } from "./file-utils"
+import { resolveSymlink, resolveSymlinkAsync, isSymbolicLink, readFileWithContext } from "./file-utils"
 
 const testDir = join(tmpdir(), "file-utils-test-" + Date.now())
 
@@ -99,5 +99,15 @@ describe("isSymbolicLink", () => {
 
 	it("returns false for a non-existent path", () => {
 		expect(isSymbolicLink(join(testDir, "does-not-exist"))).toBe(false)
+	})
+})
+
+describe("readFileWithContext", () => {
+	it("includes the file path and read context when the file is missing", async () => {
+		const missingPath = join(testDir, "missing.md")
+
+		return expect(readFileWithContext(missingPath, "council archive")).rejects.toThrow(
+			`File not found: ${missingPath} (attempted read from council archive)`
+		)
 	})
 })
