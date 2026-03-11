@@ -124,4 +124,32 @@ describe("getContextWindowUsage", () => {
     expect(usage?.usagePercentage).toBeCloseTo(180000 / 262144)
     expect(usage?.remainingTokens).toBe(82144)
   })
+
+  describe("#given Anthropic provider with cached context limit and 1M mode enabled", () => {
+    describe("#when context usage is resolved", () => {
+      it("#then should ignore the cached limit and use the 1M Anthropic limit", async () => {
+        // given
+        delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+        delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+        const modelContextLimitsCache = new Map<string, number>()
+        modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 200000)
+
+        const ctx = createContextUsageMockContext(300000, {
+          providerID: "anthropic",
+          modelID: "claude-sonnet-4-5",
+        })
+
+        // when
+        const usage = await getContextWindowUsage(ctx as never, "ses_cached_anthropic_1m", {
+          anthropicContext1MEnabled: true,
+          modelContextLimitsCache,
+        })
+
+        // then
+        expect(usage?.usagePercentage).toBe(0.3)
+        expect(usage?.remainingTokens).toBe(700000)
+      })
+    })
+  })
 })
