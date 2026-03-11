@@ -114,7 +114,9 @@ export class LSPClientTransport {
     read()
   }
 
-  protected async sendRequest<T>(method: string, params?: unknown): Promise<T> {
+  protected sendRequest<T>(method: string): Promise<T>
+  protected sendRequest<T>(method: string, params: unknown): Promise<T>
+  protected async sendRequest<T>(method: string, ...args: [] | [unknown]): Promise<T> {
     if (!this.connection) throw new Error("LSP client not started")
 
     if (this.processExited || (this.proc && this.proc.exitCode !== null)) {
@@ -130,7 +132,7 @@ export class LSPClientTransport {
       }, this.REQUEST_TIMEOUT)
     })
 
-    const requestPromise = this.connection.sendRequest(method, params) as Promise<T>
+    const requestPromise = this.connection.sendRequest(method, ...args) as Promise<T>
 
     try {
       const result = await Promise.race([requestPromise, timeoutPromise])
@@ -142,10 +144,12 @@ export class LSPClientTransport {
     }
   }
 
-  protected sendNotification(method: string, params?: unknown): void {
+  protected sendNotification(method: string): void
+  protected sendNotification(method: string, params: unknown): void
+  protected sendNotification(method: string, ...args: [] | [unknown]): void {
     if (!this.connection) return
     if (this.processExited || (this.proc && this.proc.exitCode !== null)) return
-    this.connection.sendNotification(method, params)
+    this.connection.sendNotification(method, ...args)
   }
 
   isAlive(): boolean {
