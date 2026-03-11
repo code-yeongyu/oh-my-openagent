@@ -230,4 +230,22 @@ describe("getOrCreateClient multi-key disconnect race", () => {
     expect(state.clients.has(clientKey2)).toBe(false)
     expect(state.disconnectedSessions.has("session-a")).toBe(false)
   })
+
+  it("#given a superseded pending connection #when the old connection completes #then the stale client is removed from state.clients", async () => {
+    const state = createState()
+    const info = createClientInfo("session-a")
+    const clientKey = createClientKey(info)
+    const pendingConnect = createDeferred<void>()
+    const supersedingConnection = createDeferred<Awaited<ReturnType<typeof getOrCreateClient>>>()
+    pendingConnects.push(pendingConnect)
+
+    const clientPromise = getOrCreateClient({ state, clientKey, info, config: stdioConfig })
+    state.pendingConnections.set(clientKey, supersedingConnection.promise)
+
+    pendingConnect.resolve(undefined)
+
+    await expect(clientPromise).rejects.toThrow(/superseded by a newer connection attempt/)
+    expect(state.clients.has(clientKey)).toBe(false)
+    expect(createdClients[0]?.close).toHaveBeenCalledTimes(1)
+  })
 })

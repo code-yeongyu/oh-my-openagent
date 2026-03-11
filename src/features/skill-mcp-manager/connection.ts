@@ -42,6 +42,7 @@ export async function getOrCreateClient(params: {
 
     const isStale = state.pendingConnections.has(clientKey) && state.pendingConnections.get(clientKey) !== currentConnectionPromise
     if (isStale) {
+      state.clients.delete(clientKey)
       try { await client.close() } catch {}
       throw new Error(`Connection for "${info.sessionID}" was superseded by a newer connection attempt.`)
     }
