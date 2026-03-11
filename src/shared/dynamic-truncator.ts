@@ -148,17 +148,18 @@ export async function getContextWindowUsage(
 		const lastTokens = lastAssistant?.tokens;
 		if (!lastAssistant || !lastTokens) return null;
 
-		const cachedLimit =
-			lastAssistant.providerID !== undefined && lastAssistant.modelID !== undefined
+		const modelSpecificLimit =
+			lastAssistant.providerID !== undefined &&
+			lastAssistant.modelID !== undefined &&
+			!isAnthropicProvider(lastAssistant.providerID)
 				? modelCacheState?.modelContextLimitsCache?.get(
 					`${lastAssistant.providerID}/${lastAssistant.modelID}`,
 				)
 				: undefined;
 		const actualLimit =
-			cachedLimit ??
-			(lastAssistant.providerID !== undefined && isAnthropicProvider(lastAssistant.providerID)
+			lastAssistant.providerID !== undefined && isAnthropicProvider(lastAssistant.providerID)
 				? getAnthropicActualLimit(modelCacheState)
-				: null);
+				: modelSpecificLimit ?? null;
 
 		if (!actualLimit) return null;
 
