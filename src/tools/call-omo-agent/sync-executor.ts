@@ -19,6 +19,10 @@ type ExecuteSyncDeps = {
   setSessionFallbackChain: typeof setSessionFallbackChain
 }
 
+export type ExecuteSyncOptions = {
+  syncPollTimeoutMs?: number
+}
+
 const defaultDeps: ExecuteSyncDeps = {
   createOrGetSession,
   waitForCompletion,
@@ -38,6 +42,7 @@ export async function executeSync(
   ctx: PluginInput,
   deps: ExecuteSyncDeps = defaultDeps,
   fallbackChain?: FallbackEntry[],
+  options?: ExecuteSyncOptions,
 ): Promise<string> {
   const { sessionID } = await deps.createOrGetSession(args, toolContext, ctx)
 
@@ -75,7 +80,7 @@ export async function executeSync(
     return `Error: Failed to send prompt: ${errorMessage}\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
   }
 
-  await deps.waitForCompletion(sessionID, toolContext, ctx)
+  await deps.waitForCompletion(sessionID, toolContext, ctx, options?.syncPollTimeoutMs)
 
   const responseText = await deps.processMessages(sessionID, ctx)
 

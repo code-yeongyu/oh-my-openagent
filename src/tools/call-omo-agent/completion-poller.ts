@@ -11,13 +11,15 @@ export async function waitForCompletion(
     abort: AbortSignal
     metadata?: (input: { title?: string; metadata?: Record<string, unknown> }) => void
   },
-  ctx: PluginInput
+  ctx: PluginInput,
+  timeoutMs?: number
 ): Promise<void> {
   log(`[call_omo_agent] Polling for completion...`)
 
   // Poll for session completion
   const POLL_INTERVAL_MS = 500
-  const MAX_POLL_TIME_MS = 5 * 60 * 1000 // 5 minutes max
+  const DEFAULT_MAX_POLL_TIME_MS = 5 * 60 * 1000 // 5 minutes default
+  const MAX_POLL_TIME_MS = timeoutMs ?? DEFAULT_MAX_POLL_TIME_MS
   const pollStart = Date.now()
   let lastMsgCount = 0
   let stablePolls = 0
