@@ -32,6 +32,7 @@ import { log } from "../shared"
 
 import type { Managers } from "../create-managers"
 import type { SkillContext } from "./skill-context"
+import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
 
 export type ToolRegistryResult = {
   filteredTools: ToolsRecord
@@ -143,6 +144,10 @@ export function createToolRegistry(args: {
     interactive_bash,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
+  }
+
+  for (const toolDefinition of Object.values(allTools)) {
+    normalizeToolArgSchemas(toolDefinition)
   }
 
   const filteredTools = filterDisabledTools(allTools, pluginConfig.disabled_tools)
