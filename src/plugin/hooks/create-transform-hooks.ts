@@ -3,6 +3,7 @@ import type { PluginContext } from "../types"
 
 import {
   createClaudeCodeHooksHook,
+  createContextGcHook,
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
 } from "../../hooks"
@@ -17,6 +18,7 @@ export type TransformHooks = {
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
+  contextGc: ReturnType<typeof createContextGcHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -63,10 +65,19 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const contextGc = isHookEnabled("context-gc")
+    ? safeCreateHook(
+        "context-gc",
+        () => createContextGcHook(pluginConfig),
+        { enabled: safeHookEnabled },
+      )
+    : null
+
   return {
     claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
+    contextGc,
   }
 }

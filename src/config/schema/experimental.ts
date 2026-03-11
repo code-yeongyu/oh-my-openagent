@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { DynamicContextPruningConfigSchema } from "./dynamic-context-pruning"
+import { ContextGcConfigSchema } from "./context-gc"
 
 export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
@@ -21,6 +22,10 @@ export const ExperimentalConfigSchema = z.object({
   hashline_edit: z.boolean().optional(),
   /** Append fallback model info to session title when a runtime fallback occurs (default: false) */
   model_fallback_title: z.boolean().optional(),
+  /** Enable continuous context GC (HOT→WARM→COLD→GONE tiering) replacing emergency compaction (default: false) */
+  context_gc: z.boolean().optional(),
+  /** Context GC configuration */
+  context_gc_config: ContextGcConfigSchema.optional(),
 })
 
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>

@@ -3463,6 +3463,56 @@
         },
         "model_fallback_title": {
           "type": "boolean"
+        },
+        "context_gc": {
+          "type": "boolean"
+        },
+        "context_gc_config": {
+          "type": "object",
+          "properties": {
+            "hot_turns": {
+              "type": "number",
+              "minimum": 1
+            },
+            "warm_turns": {
+              "type": "number",
+              "minimum": 1
+            },
+            "cold_turns": {
+              "type": "number",
+              "minimum": 1
+            },
+            "gone_turns": {
+              "type": "number",
+              "minimum": 1
+            },
+            "min_hot_turns": {
+              "type": "number",
+              "minimum": 1
+            },
+            "max_gone_per_cycle": {
+              "type": "number",
+              "minimum": 1
+            },
+            "gc_trigger_pct": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 99
+            },
+            "gc_target_pct": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 99
+            },
+            "gc_cooldown_ms": {
+              "type": "number",
+              "minimum": 0
+            },
+            "brain_write_through": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
