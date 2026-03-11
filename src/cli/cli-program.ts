@@ -69,6 +69,7 @@ program
    .passThroughOptions()
   .description("Run opencode with todo/background task completion enforcement")
   .option("-a, --agent <name>", "Agent to use (default: from CLI/env/config, fallback: Sisyphus)")
+  .option("-m, --model <provider/model>", "Model override (e.g., anthropic/claude-sonnet-4)")
   .option("-d, --directory <path>", "Working directory")
   .option("-p, --port <port>", "Server port (attaches if port already in use)", parseInt)
   .option("--attach <url>", "Attach to existing opencode server URL")
@@ -86,6 +87,8 @@ Examples:
   $ bunx oh-my-opencode run --json "Fix the bug" | jq .sessionId
   $ bunx oh-my-opencode run --on-complete "notify-send Done" "Fix the bug"
   $ bunx oh-my-opencode run --session-id ses_abc123 "Continue the work"
+  $ bunx oh-my-opencode run --model anthropic/claude-sonnet-4 "Fix the bug"
+  $ bunx oh-my-opencode run --agent Sisyphus --model openai/gpt-5.4 "Implement feature X"
 
 Agent resolution order:
   1) --agent flag
@@ -108,6 +111,7 @@ Unlike 'opencode run', this command waits until:
     const runOptions: RunOptions = {
       message,
       agent: options.agent,
+      model: options.model,
       directory: options.directory,
       port: options.port,
       attach: options.attach,
