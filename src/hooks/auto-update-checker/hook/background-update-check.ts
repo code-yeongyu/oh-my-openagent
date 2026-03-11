@@ -4,7 +4,7 @@ import { log } from "../../../shared/logger"
 import { invalidatePackage } from "../cache"
 import { PACKAGE_NAME } from "../constants"
 import { extractChannel } from "../version-channel"
-import { findPluginEntry, getCachedVersion, getLatestVersion, revertPinnedVersion } from "../checker"
+import { findPluginEntry, getCachedVersion, getLatestVersion, revertPinnedVersion, syncCachePackageJsonToIntent } from "../checker"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
 function getPinnedVersionToastMessage(latestVersion: string): string {
@@ -64,6 +64,10 @@ export async function runBackgroundUpdateCheck(
     log(`[auto-update-checker] User-pinned version detected (${pluginInfo.entry}), skipping auto-update. Notification only.`)
     return
   }
+
+  // Sync cache package.json to match opencode.json intent before updating
+  // This handles the case where user switched from pinned version to tag (e.g., 3.10.0 -> @latest)
+  syncCachePackageJsonToIntent(pluginInfo)
 
   invalidatePackage(PACKAGE_NAME)
 
