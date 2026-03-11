@@ -92,12 +92,12 @@
 | Category | Model | Domain |
 |----------|-------|--------|
 | visual-engineering | gemini-3.1-pro high | Frontend, UI/UX |
-| ultrabrain | gpt-5.3-codex xhigh | Hard logic |
+| ultrabrain | gpt-5.4 xhigh | Hard logic |
 | deep | gpt-5.3-codex medium | Autonomous problem-solving |
 | artistry | gemini-3.1-pro high | Creative approaches |
 | quick | claude-haiku-4-5 | Trivial tasks |
 | unspecified-low | claude-sonnet-4-6 | Moderate effort |
-| unspecified-high | gpt-5.4 high | High effort |
+| unspecified-high | claude-opus-4-6 max | High effort |
 | writing | kimi-k2p5 | Documentation |
 
 ## HOW TO ADD A TOOL

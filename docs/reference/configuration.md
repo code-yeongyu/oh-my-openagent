@@ -100,7 +100,7 @@ Here's a practical starting configuration:
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
 
     // unspecified-high — complex work
-    "unspecified-high": { "model": "openai/gpt-5.4-high" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
 
     // writing — docs/prose
     "writing": { "model": "google/gemini-3-flash" },
@@ -225,12 +225,12 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | Category             | Default Model                   | Description                                    |
 | -------------------- | ------------------------------- | ---------------------------------------------- |
 | `visual-engineering` | `google/gemini-3.1-pro` (high)  | Frontend, UI/UX, design, animation             |
-| `ultrabrain`         | `openai/gpt-5.3-codex` (xhigh)  | Deep logical reasoning, complex architecture   |
+| `ultrabrain`         | `openai/gpt-5.4` (xhigh)        | Deep logical reasoning, complex architecture   |
 | `deep`               | `openai/gpt-5.3-codex` (medium) | Autonomous problem-solving, thorough research  |
 | `artistry`           | `google/gemini-3.1-pro` (high)  | Creative/unconventional approaches             |
 | `quick`              | `anthropic/claude-haiku-4-5`    | Trivial tasks, typo fixes, single-file changes |
 | `unspecified-low`    | `anthropic/claude-sonnet-4-6`   | General tasks, low effort                      |
-| `unspecified-high`   | `openai/gpt-5.4` (high)         | General tasks, high effort                     |
+| `unspecified-high`   | `anthropic/claude-opus-4-6` (max) | General tasks, high effort                   |
 | `writing`            | `google/gemini-3-flash`         | Documentation, prose, technical writing        |
 
 > **Note**: Built-in defaults only apply if the category is present in your config. Otherwise the system default model is used.
@@ -283,12 +283,12 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | Category               | Default Model       | Provider Priority                                              |
 | ---------------------- | ------------------- | -------------------------------------------------------------- |
 | **visual-engineering** | `gemini-3.1-pro`    | `gemini-3.1-pro` → `glm-5` → `claude-opus-4-6`                 |
-| **ultrabrain**         | `gpt-5.3-codex`     | `gpt-5.3-codex` → `gemini-3.1-pro` → `claude-opus-4-6`         |
+| **ultrabrain**         | `gpt-5.4`           | `gpt-5.4` → `gemini-3.1-pro` → `claude-opus-4-6`               |
 | **deep**               | `gpt-5.3-codex`     | `gpt-5.3-codex` → `claude-opus-4-6` → `gemini-3.1-pro`         |
 | **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`               |
 | **quick**              | `claude-haiku-4-5`  | `claude-haiku-4-5` → `gemini-3-flash` → `gpt-5-nano`           |
 | **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash`       |
-| **unspecified-high**   | `gpt-5.4`           | `gpt-5.4` → `claude-opus-4-6` → `glm-5` → `k2p5` → `kimi-k2.5` |
+| **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4` → `glm-5` → `k2p5` → `kimi-k2.5` |
 | **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6`                         |
 
 Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.
