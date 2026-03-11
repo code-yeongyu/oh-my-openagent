@@ -10,11 +10,8 @@ interface CachePackageJson {
 }
 
 export interface SyncResult {
-  /** Whether the package.json was successfully synced/updated */
   synced: boolean
-  /** Whether there was an error during sync (null if no error) */
   error: "file_not_found" | "plugin_not_in_deps" | "parse_error" | "write_error" | null
-  /** Human-readable message describing what happened */
   message?: string
 }
 
@@ -28,35 +25,13 @@ function safeUnlink(filePath: string): void {
   }
 }
 
-/**
- * Determine the version specifier to use in cache package.json based on opencode.json intent.
- *
- * - "oh-my-opencode" (no version) → "latest"
- * - "oh-my-opencode@latest" → "latest"
- * - "oh-my-opencode@next" → "next"
- * - "oh-my-opencode@3.10.0" → "3.10.0" (pinned, use as-is)
- */
 function getIntentVersion(pluginInfo: PluginEntryInfo): string {
   if (!pluginInfo.pinnedVersion) {
-    // No version specified in opencode.json, default to latest
     return "latest"
   }
   return pluginInfo.pinnedVersion
 }
 
-/**
- * Sync the cache package.json to match the opencode.json plugin intent.
- *
- * OpenCode pins resolved versions in cache package.json (e.g., "3.11.0" instead of "latest").
- * This causes issues when users switch from pinned to tag in opencode.json:
- * - User changes opencode.json from "oh-my-opencode@3.10.0" to "oh-my-opencode@latest"
- * - Cache package.json still has "3.10.0"
- * - bun install reinstalls 3.10.0 instead of resolving @latest
- *
- * This function updates cache package.json to match the user's intent before bun install.
- *
- * @returns SyncResult with synced status and any error information
- */
 export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncResult {
   const cachePackageJsonPath = path.join(CACHE_DIR, "package.json")
 
@@ -95,9 +70,6 @@ export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncR
     return { synced: false, error: null, message: `Already matches intent: ${intentVersion}` }
   }
 
-  // Check if this is a meaningful change:
-  // - If intent is a tag (latest, next, beta) and current is semver, we need to update
-  // - If both are semver but different, user explicitly changed versions
   const intentIsTag = !EXACT_SEMVER_REGEX.test(intentVersion.trim())
   const currentIsSemver = EXACT_SEMVER_REGEX.test(currentVersion.trim())
 

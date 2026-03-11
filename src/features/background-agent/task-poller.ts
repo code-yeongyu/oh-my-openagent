@@ -13,6 +13,15 @@ import {
 } from "./constants"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 
+const TERMINAL_TASK_TTL_MS = 30 * 60 * 1000
+
+const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
+  "completed",
+  "error",
+  "cancelled",
+  "interrupt",
+])
+
 export function pruneStaleTasksAndNotifications(args: {
   tasks: Map<string, BackgroundTask>
   notifications: Map<string, BackgroundTask[]>
@@ -20,8 +29,29 @@ export function pruneStaleTasksAndNotifications(args: {
 }): void {
   const { tasks, notifications, onTaskPruned } = args
   const now = Date.now()
+  const tasksWithPendingNotifications = new Set<string>()
+
+  for (const queued of notifications.values()) {
+    for (const task of queued) {
+      tasksWithPendingNotifications.add(task.id)
+    }
+  }
 
   for (const [taskId, task] of tasks.entries()) {
+    if (TERMINAL_TASK_STATUSES.has(task.status)) {
+      if (tasksWithPendingNotifications.has(taskId)) continue
+
+      const completedAt = task.completedAt?.getTime()
+      if (!completedAt) continue
+
+      const age = now - completedAt
+      if (age <= TERMINAL_TASK_TTL_MS) continue
+
+      removeTaskToastTracking(taskId)
+      tasks.delete(taskId)
+      continue
+    }
+
     const timestamp = task.status === "pending"
       ? task.queuedAt?.getTime()
       : task.startedAt?.getTime()

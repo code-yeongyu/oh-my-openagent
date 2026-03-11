@@ -16,7 +16,7 @@ const REPO = "ast-grep/ast-grep"
 
 // IMPORTANT: Update this when bumping @ast-grep/cli in package.json
 // This is only used as fallback when @ast-grep/cli package.json cannot be read
-const DEFAULT_VERSION = "0.40.0"
+const DEFAULT_VERSION = "0.41.1"
 
 function getAstGrepVersion(): string {
   try {

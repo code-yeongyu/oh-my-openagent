@@ -24,7 +24,10 @@ function resetContextLimitEnv(): void {
   }
 }
 
-function createContextUsageMockContext(inputTokens: number) {
+function createContextUsageMockContext(
+  inputTokens: number,
+  options?: { providerID?: string; modelID?: string; cacheRead?: number }
+) {
   return {
     client: {
       session: {
@@ -33,11 +36,13 @@ function createContextUsageMockContext(inputTokens: number) {
             {
               info: {
                 role: "assistant",
+                providerID: options?.providerID ?? "anthropic",
+                modelID: options?.modelID,
                 tokens: {
                   input: inputTokens,
                   output: 0,
                   reasoning: 0,
-                  cache: { read: 0, write: 0 },
+                  cache: { read: options?.cacheRead ?? 0, write: 0 },
                 },
               },
             },
@@ -98,5 +103,69 @@ describe("getContextWindowUsage", () => {
     //#then
     expect(usage?.usagePercentage).toBe(0.3)
     expect(usage?.remainingTokens).toBe(700000)
+  })
+
+  it("uses model-specific limit for non-anthropic providers when cached", async () => {
+    // given
+    const modelContextLimitsCache = new Map<string, number>()
+    modelContextLimitsCache.set("opencode/kimi-k2.5-free", 262144)
+    const ctx = createContextUsageMockContext(180000, {
+      providerID: "opencode",
+      modelID: "kimi-k2.5-free",
+    })
+
+    // when
+    const usage = await getContextWindowUsage(ctx as never, "ses_model_limit", {
+      anthropicContext1MEnabled: false,
+      modelContextLimitsCache,
+    })
+
+    // then
+    expect(usage?.usagePercentage).toBeCloseTo(180000 / 262144)
+    expect(usage?.remainingTokens).toBe(82144)
+  })
+
+  it("returns null for non-anthropic providers without a cached limit", async () => {
+    // given
+    const ctx = createContextUsageMockContext(180000, {
+      providerID: "openai",
+      modelID: "gpt-5",
+    })
+
+    // when
+    const usage = await getContextWindowUsage(ctx as never, "ses_no_cached_limit", {
+      anthropicContext1MEnabled: false,
+    })
+
+    // then
+    expect(usage).toBeNull()
+  })
+
+  describe("#given Anthropic provider with cached context limit and 1M mode enabled", () => {
+    describe("#when context usage is resolved", () => {
+      it("#then should ignore the cached limit and use the 1M Anthropic limit", async () => {
+        // given
+        delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
+        delete process.env[VERTEX_CONTEXT_ENV_KEY]
+
+        const modelContextLimitsCache = new Map<string, number>()
+        modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 200000)
+
+        const ctx = createContextUsageMockContext(300000, {
+          providerID: "anthropic",
+          modelID: "claude-sonnet-4-5",
+        })
+
+        // when
+        const usage = await getContextWindowUsage(ctx as never, "ses_cached_anthropic_1m", {
+          anthropicContext1MEnabled: true,
+          modelContextLimitsCache,
+        })
+
+        // then
+        expect(usage?.usagePercentage).toBe(0.3)
+        expect(usage?.remainingTokens).toBe(700000)
+      })
+    })
   })
 })

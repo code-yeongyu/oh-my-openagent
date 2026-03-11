@@ -26,10 +26,25 @@ export type SkillContext = {
   disabledSkills: Set<string>
 }
 
+const PROVIDER_GATED_SKILL_NAMES = new Set(["agent-browser", "playwright"])
+
 function mapScopeToLocation(scope: SkillScope): AvailableSkill["location"] {
   if (scope === "user" || scope === "opencode") return "user"
   if (scope === "project" || scope === "opencode-project") return "project"
   return "plugin"
+}
+
+function filterProviderGatedSkills(
+  skills: LoadedSkill[],
+  browserProvider: BrowserAutomationProvider,
+): LoadedSkill[] {
+  return skills.filter((skill) => {
+    if (!PROVIDER_GATED_SKILL_NAMES.has(skill.name)) {
+      return true
+    }
+
+    return skill.name === browserProvider
+  })
 }
 
 export async function createSkillContext(args: {
@@ -71,14 +86,34 @@ export async function createSkillContext(args: {
       discoverGlobalAgentsSkills(),
     ])
 
+  const filteredConfigSourceSkills = filterProviderGatedSkills(
+    configSourceSkills,
+    browserProvider,
+  )
+  const filteredUserSkills = filterProviderGatedSkills(userSkills, browserProvider)
+  const filteredGlobalSkills = filterProviderGatedSkills(globalSkills, browserProvider)
+  const filteredProjectSkills = filterProviderGatedSkills(projectSkills, browserProvider)
+  const filteredOpencodeProjectSkills = filterProviderGatedSkills(
+    opencodeProjectSkills,
+    browserProvider,
+  )
+  const filteredAgentsProjectSkills = filterProviderGatedSkills(
+    agentsProjectSkills,
+    browserProvider,
+  )
+  const filteredAgentsGlobalSkills = filterProviderGatedSkills(
+    agentsGlobalSkills,
+    browserProvider,
+  )
+
   const mergedSkills = mergeSkills(
     builtinSkills,
     pluginConfig.skills,
-    configSourceSkills,
-    [...userSkills, ...agentsGlobalSkills],
-    globalSkills,
-    [...projectSkills, ...agentsProjectSkills],
-    opencodeProjectSkills,
+    filteredConfigSourceSkills,
+    [...filteredUserSkills, ...filteredAgentsGlobalSkills],
+    filteredGlobalSkills,
+    [...filteredProjectSkills, ...filteredAgentsProjectSkills],
+    filteredOpencodeProjectSkills,
     { configDir: directory },
   )
 

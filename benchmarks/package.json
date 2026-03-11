@@ -11,9 +11,8 @@
     "bench:all": "bun run bench:basic && bun run bench:edge"
   },
   "dependencies": {
-    "ai": "^6.0.94",
-    "@ai-sdk/openai": "^1.3.0",
     "@friendliai/ai-provider": "^1.0.9",
+    "ai": "^6.0.94",
     "zod": "^4.1.0"
   }
 }
