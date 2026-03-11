@@ -1,5 +1,11 @@
-import type { PluginInput } from "@opencode-ai/plugin"
+/// <reference types="bun-types" />
+
+import type { BunInstallResult } from "../../../cli/config-manager"
 import { beforeEach, describe, expect, it, mock } from "bun:test"
+
+type PluginInput = {
+  directory: string
+}
 
 type PluginEntry = {
   entry: string
@@ -31,7 +37,7 @@ const mockSyncCachePackageJsonToIntent = mock((_pluginEntry: PluginEntry) => {
 const mockInvalidatePackage = mock((_packageName: string) => {
   operationOrder.push("invalidate")
 })
-const mockRunBunInstallWithDetails = mock(async () => ({ success: true }))
+const mockRunBunInstallWithDetails = mock(async (): Promise<BunInstallResult> => ({ success: true }))
 const mockShowUpdateAvailableToast = mock(
   async (_ctx: PluginInput, _latestVersion: string, _getToastMessage: ToastMessageGetter): Promise<void> => {}
 )
@@ -89,6 +95,13 @@ describe("runBackgroundUpdateCheck", () => {
     mockShowAutoUpdatedToast.mockReset()
 
     operationOrder.length = 0
+
+    mockSyncCachePackageJsonToIntent.mockImplementation((_pluginEntry: PluginEntry) => {
+      operationOrder.push("sync")
+    })
+    mockInvalidatePackage.mockImplementation((_packageName: string) => {
+      operationOrder.push("invalidate")
+    })
 
     pluginEntry = createPluginEntry()
     mockFindPluginEntry.mockReturnValue(pluginEntry)
