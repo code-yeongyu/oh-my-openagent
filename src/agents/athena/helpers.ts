@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import { COUNCIL_DEFAULTS, resolveAthenaNonInteractiveMode } from "./index"
-import { registerCouncilMemberAgents } from "../builtin-agents/council-member-agents"
+import { registerCouncilMemberAgents, ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX } from "../builtin-agents/council-member-agents"
 import { applyMissingCouncilGuard } from "../builtin-agents/athena-council-guard"
 import type { CouncilConfig } from "../../config/schema/athena"
 import type { AthenaNonInteractiveConfig } from "./types"
@@ -139,7 +139,7 @@ export function registerAndConfigureAthenaCouncil(
     const { agents: athenaJuniorCouncilAgents } = registerCouncilMemberAgents(
       councilConfig,
       juniorMode,
-      "athena-junior-council-member:",
+      ATHENA_JUNIOR_COUNCIL_MEMBER_KEY_PREFIX,
     )
 
     for (const [key, config] of Object.entries(athenaJuniorCouncilAgents)) {
