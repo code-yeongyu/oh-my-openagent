@@ -92,12 +92,25 @@ export function createPreemptiveCompactionHook(
     const cached = tokenCache.get(sessionID)
     if (!cached) return
 
-    const modelSpecificLimit = !isAnthropicProvider(cached.providerID)
+    const isAnthropic = isAnthropicProvider(cached.providerID)
+    const modelSpecificLimit = !isAnthropic
       ? modelCacheState?.modelContextLimitsCache?.get(`${cached.providerID}/${cached.modelID}`)
       : undefined
-    const actualLimit = isAnthropicProvider(cached.providerID)
-      ? getAnthropicActualLimit(modelCacheState)
-      : modelSpecificLimit ?? DEFAULT_ACTUAL_LIMIT
+
+    let actualLimit: number
+    if (isAnthropic) {
+      actualLimit = getAnthropicActualLimit(modelCacheState)
+    } else {
+      if (modelSpecificLimit === undefined) {
+        log("[preemptive-compaction] Skipping preemptive compaction: unknown context limit for model", {
+          providerID: cached.providerID,
+          modelID: cached.modelID,
+        })
+        return
+      }
+
+      actualLimit = modelSpecificLimit
+    }
 
     const lastTokens = cached.tokens
     const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
