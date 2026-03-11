@@ -135,6 +135,29 @@ describe("BackgroundManager pollRunningTasks", () => {
     })
   })
 
+  describe("#given polling finds an idle session", () => {
+    test("#when pollRunningTasks runs #then updates lastPolled but NOT lastUpdate", async () => {
+      //#given
+      const originalLastUpdate = new Date(Date.now() - 60_000)
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-idle-poll": { type: "idle" } } }),
+      })
+      const task = createRunningTask("ses-idle-poll")
+      task.progress!.lastUpdate = originalLastUpdate
+      injectTask(manager, task)
+
+      //#when
+      const poll = (manager as unknown as { pollRunningTasks: () => Promise<void> }).pollRunningTasks
+      await poll.call(manager)
+      manager.shutdown()
+
+      //#then
+      expect(task.progress!.lastUpdate.getTime()).toBe(originalLastUpdate.getTime())
+      expect(task.progress!.lastPolled).toBeDefined()
+      expect(task.progress!.lastPolled!.getTime()).toBeGreaterThan(originalLastUpdate.getTime())
+    })
+  })
+
   describe("#given a running task whose session status is busy", () => {
     test("#when pollRunningTasks runs #then keeps the task running", async () => {
       //#given

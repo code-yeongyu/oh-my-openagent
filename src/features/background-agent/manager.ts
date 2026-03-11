@@ -1573,7 +1573,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         // When sessionStatus is undefined, the session has completed and dropped
         // from the status response — fall through to completion detection.
         if (sessionStatus?.type === "idle" && task.progress) {
-          task.progress.lastUpdate = new Date()
+          task.progress.lastPolled = new Date()
         }
 
         if (sessionStatus && sessionStatus.type !== "idle") {

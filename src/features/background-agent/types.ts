@@ -12,6 +12,7 @@ export interface TaskProgress {
   toolCalls: number
   lastTool?: string
   lastUpdate: Date
+  lastPolled?: Date
   lastMessage?: string
   lastMessageAt?: Date
 }
