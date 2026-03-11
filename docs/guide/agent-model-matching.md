@@ -147,11 +147,11 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | Category             | When Used                  | Fallback Chain                               |
 | -------------------- | -------------------------- | -------------------------------------------- |
 | `visual-engineering` | Frontend, UI, CSS, design  | Gemini 3.1 Pro → GLM 5 → Claude Opus         |
-| `ultrabrain`         | Maximum reasoning needed   | GPT-5.3 Codex → Gemini 3.1 Pro → Claude Opus |
+| `ultrabrain`         | Maximum reasoning needed   | GPT-5.4 → Gemini 3.1 Pro → Claude Opus       |
 | `deep`               | Deep coding, complex logic | GPT-5.3 Codex → Claude Opus → Gemini 3.1 Pro |
 | `artistry`           | Creative, novel approaches | Gemini 3.1 Pro → Claude Opus → GPT-5.4       |
 | `quick`              | Simple, fast tasks         | Claude Haiku → Gemini Flash → GPT-5-Nano     |
-| `unspecified-high`   | General complex work       | GPT-5.4 → Claude Opus → GLM 5 → K2P5         |
+| `unspecified-high`   | General complex work       | Claude Opus → GPT-5.4 → GLM 5 → K2P5         |
 | `unspecified-low`    | General standard work      | Claude Sonnet → GPT-5.3 Codex → Gemini Flash |
 | `writing`            | Text, docs, prose          | Gemini Flash → Claude Sonnet                 |
 
@@ -190,7 +190,7 @@ See the [Orchestration System Guide](./orchestration.md) for how agents dispatch
   "categories": {
     "quick": { "model": "opencode/gpt-5-nano" },
     "unspecified-low": { "model": "anthropic/claude-sonnet-4-6" },
-    "unspecified-high": { "model": "openai/gpt-5.4-high" },
+    "unspecified-high": { "model": "anthropic/claude-opus-4-6", "variant": "max" },
     "visual-engineering": {
       "model": "google/gemini-3.1-pro",
       "variant": "high",
