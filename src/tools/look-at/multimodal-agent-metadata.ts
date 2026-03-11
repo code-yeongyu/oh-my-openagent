@@ -28,6 +28,19 @@ function getFullModelKey(model: AgentModel): string {
   return `${model.providerID}/${model.modelID}`
 }
 
+function isVisionCapableAgentModel(
+  agentModel: AgentModel | undefined,
+  visionCapableModels: Array<AgentModel>,
+): agentModel is AgentModel {
+  if (!agentModel) {
+    return false
+  }
+
+  return visionCapableModels.some((visionCapableModel) =>
+    getFullModelKey(visionCapableModel) === getFullModelKey(agentModel),
+  )
+}
+
 function parseAgentModel(model: string): AgentModel | undefined {
   const [providerID, ...modelIDParts] = model.split("/")
   const modelID = modelIDParts.join("/")
@@ -90,6 +103,10 @@ async function resolveDynamicAgentMetadata(
   })
 
   const agentModel = resolution ? parseAgentModel(resolution.model) : undefined
+  if (!isVisionCapableAgentModel(agentModel, visionCapableModels)) {
+    return {}
+  }
+
   return {
     agentModel,
     agentVariant: resolution?.variant,
@@ -113,22 +130,32 @@ export async function resolveMultimodalLookerAgentMetadata(
   try {
     const registeredMetadata = await resolveRegisteredAgentMetadata(ctx)
     const visionCapableModels = readVisionCapableModelsCache()
-
-    if (registeredMetadata.agentModel && visionCapableModels.length === 0) {
-      return registeredMetadata
-    }
+    const registeredModelIsVisionCapable = isVisionCapableAgentModel(
+      registeredMetadata.agentModel,
+      visionCapableModels,
+    )
 
     const dynamicMetadata = await resolveDynamicAgentMetadata(ctx, visionCapableModels)
 
-    if (isConfiguredVisionModel(registeredMetadata.agentModel, dynamicMetadata.agentModel)) {
-      return registeredMetadata
+    if (
+      registeredModelIsVisionCapable &&
+      isConfiguredVisionModel(registeredMetadata.agentModel, dynamicMetadata.agentModel)
+    ) {
+      return {
+        agentModel: registeredMetadata.agentModel,
+        agentVariant: registeredMetadata.agentVariant ?? dynamicMetadata.agentVariant,
+      }
     }
 
     if (dynamicMetadata.agentModel) {
       return dynamicMetadata
     }
 
-    return registeredMetadata
+    if (registeredModelIsVisionCapable) {
+      return registeredMetadata
+    }
+
+    return {}
   } catch (error) {
     log("[look_at] Failed to resolve multimodal-looker model info", error)
     return {}

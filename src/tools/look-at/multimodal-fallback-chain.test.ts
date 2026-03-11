@@ -1,3 +1,5 @@
+import { describe, expect, it } from "bun:test"
+
 describe("buildMultimodalLookerFallbackChain", () => {
   it("builds fallback chain from vision-capable models", async () => {
     // given
@@ -27,5 +29,21 @@ describe("buildMultimodalLookerFallbackChain", () => {
     expect(result.length).toBeGreaterThan(0)
     expect(result[0].model).toBe("gpt-5.4")
     expect(result[0].providers).toContain("openai")
+  })
+
+  it("preserves hardcoded variant metadata for cache-derived entries", async () => {
+    // given
+    const { buildMultimodalLookerFallbackChain } = await import("./multimodal-fallback-chain")
+    const visionCapableModels = [{ providerID: "openai", modelID: "gpt-5.4" }]
+
+    // when
+    const result = buildMultimodalLookerFallbackChain(visionCapableModels)
+
+    // then
+    expect(result[0]).toEqual({
+      providers: ["openai"],
+      model: "gpt-5.4",
+      variant: "medium",
+    })
   })
 })

@@ -8,6 +8,15 @@ function getFullModelKey(providerID: string, modelID: string): string {
   return `${providerID}/${modelID}`
 }
 
+function findHardcodedFallbackEntry(
+  providerID: string,
+  modelID: string,
+): FallbackEntry | undefined {
+  return MULTIMODAL_LOOKER_REQUIREMENT.fallbackChain.find((entry) =>
+    entry.model === modelID && entry.providers.includes(providerID),
+  )
+}
+
 export function isHardcodedMultimodalFallbackModel(model: VisionCapableModel): boolean {
   return MULTIMODAL_LOOKER_REQUIREMENT.fallbackChain.some((entry) =>
     entry.providers.some((providerID) =>
@@ -26,10 +35,16 @@ export function buildMultimodalLookerFallbackChain(
     const key = getFullModelKey(visionCapableModel.providerID, visionCapableModel.modelID)
     if (seen.has(key)) continue
 
+    const hardcodedEntry = findHardcodedFallbackEntry(
+      visionCapableModel.providerID,
+      visionCapableModel.modelID,
+    )
+
     seen.add(key)
     fallbackChain.push({
       providers: [visionCapableModel.providerID],
       model: visionCapableModel.modelID,
+      ...(hardcodedEntry?.variant ? { variant: hardcodedEntry.variant } : {}),
     })
   }
 
@@ -41,7 +56,9 @@ export function buildMultimodalLookerFallbackChain(
       continue
     }
 
-    providerModelKeys.forEach((key) => seen.add(key))
+    providerModelKeys.forEach((key) => {
+      seen.add(key)
+    })
     fallbackChain.push(entry)
   }
 
