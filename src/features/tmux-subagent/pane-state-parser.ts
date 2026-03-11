@@ -60,6 +60,7 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
   const height = parseInteger(heightString)
   const left = parseInteger(leftString)
   const top = parseInteger(topString)
+  const isActive = parseActiveValue(activeString)
   const windowWidth = parseInteger(windowWidthString)
   const windowHeight = parseInteger(windowHeightString)
 
@@ -68,6 +69,7 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
     height === null ||
     left === null ||
     top === null ||
+    isActive === null ||
     windowWidth === null ||
     windowHeight === null
   ) {
@@ -82,7 +84,7 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
       left,
       top,
       title: fields.slice(MANDATORY_PANE_FIELD_COUNT).join("\t"),
-      isActive: activeString === "1",
+      isActive,
     },
     windowWidth,
     windowHeight,
@@ -120,6 +122,14 @@ function getMandatoryPaneFields(fields: string[]): MandatoryPaneFields | null {
 }
 
 function parseInteger(value: string): number | null {
+  if (!/^\d+$/.test(value)) return null
+
   const parsedValue = Number.parseInt(value, 10)
   return Number.isNaN(parsedValue) ? null : parsedValue
+}
+
+function parseActiveValue(value: string): boolean | null {
+  if (value === "1") return true
+  if (value === "0") return false
+  return null
 }
