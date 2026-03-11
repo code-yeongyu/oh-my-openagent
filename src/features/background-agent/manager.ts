@@ -54,7 +54,7 @@ import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import {
   createSubagentDepthLimitError,
   createSubagentDescendantLimitError,
-  getMaxRootDescendants,
+  getMaxRootSessionSpawnBudget,
   getMaxSubagentDepth,
   resolveSubagentSpawnContext,
   type SubagentSpawnContext,
@@ -165,13 +165,13 @@ export class BackgroundManager {
       })
     }
 
-    const maxDescendants = getMaxRootDescendants(this.config)
+    const maxRootSessionSpawnBudget = getMaxRootSessionSpawnBudget(this.config)
     const descendantCount = this.rootDescendantCounts.get(spawnContext.rootSessionID) ?? 0
-    if (descendantCount >= maxDescendants) {
+    if (descendantCount >= maxRootSessionSpawnBudget) {
       throw createSubagentDescendantLimitError({
         rootSessionID: spawnContext.rootSessionID,
         descendantCount,
-        maxDescendants,
+        maxDescendants: maxRootSessionSpawnBudget,
       })
     }
 

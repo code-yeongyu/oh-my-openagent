@@ -1731,15 +1731,22 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
      }
    }
 
-    function createMockClientWithSessionChain(
-      sessions: Record<string, { directory: string; parentID?: string }>
+  function createMockClientWithSessionChain(
+      sessions: Record<string, { directory: string; parentID?: string }>,
+      options?: { sessionLookupError?: Error }
     ) {
       return {
         session: {
           create: async (_args?: any) => ({ data: { id: `ses_${crypto.randomUUID()}` } }),
-          get: async ({ path }: { path: { id: string } }) => ({
-            data: sessions[path.id] ?? { directory: "/test/dir" },
-          }),
+          get: async ({ path }: { path: { id: string } }) => {
+            if (options?.sessionLookupError) {
+              throw options.sessionLookupError
+            }
+
+            return {
+              data: sessions[path.id] ?? { directory: "/test/dir" },
+            }
+          },
           prompt: async () => ({}),
           promptAsync: async () => ({}),
           messages: async () => ({ data: [] }),
@@ -2057,6 +2064,37 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       // then
       await expect(result).rejects.toThrow("background_task.maxDescendants=1")
+    })
+
+    test("should fail closed when session lineage lookup fails", async () => {
+      // given
+      manager.shutdown()
+      manager = new BackgroundManager(
+        {
+          client: createMockClientWithSessionChain(
+            {
+              "session-root": { directory: "/test/dir" },
+            },
+            { sessionLookupError: new Error("session lookup failed") }
+          ),
+          directory: tmpdir(),
+        } as unknown as PluginInput,
+        { maxDescendants: 1 },
+      )
+
+      const input = {
+        description: "Test task",
+        prompt: "Do something",
+        agent: "test-agent",
+        parentSessionID: "session-root",
+        parentMessageID: "parent-message",
+      }
+
+      // when
+      const result = manager.launch(input)
+
+      // then
+      await expect(result).rejects.toThrow("background_task.maxDescendants cannot be enforced safely")
     })
   })
 
