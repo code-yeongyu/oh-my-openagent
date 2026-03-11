@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
-import { buildAntiDuplicationSection } from "../dynamic-agent-prompt-builder"
+import { buildAntiDuplicationSection } from "./dynamic-agent-prompt-builder"
 import { createAgentToolRestrictions } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
