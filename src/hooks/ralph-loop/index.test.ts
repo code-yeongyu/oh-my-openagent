@@ -1021,8 +1021,12 @@ Original task: Build something`
     })
 
     test("should detect completion from tool_result entry in transcript", async () => {
-      // given - transcript contains a tool_result with completion promise
+      // given - transcript receives a tool_result with completion promise after the loop starts
       const transcriptPath = join(TEST_DIR, "transcript.jsonl")
+      const hook = createRalphLoopHook(createMockPluginInput(), {
+        getTranscriptPath: () => transcriptPath,
+      })
+      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
       const toolResultEntry = JSON.stringify({
         type: "tool_result",
         timestamp: new Date().toISOString(),
@@ -1031,11 +1035,6 @@ Original task: Build something`
         tool_output: { output: "Task complete! <promise>DONE</promise>" },
       })
       writeFileSync(transcriptPath, toolResultEntry + "\n")
-
-      const hook = createRalphLoopHook(createMockPluginInput(), {
-        getTranscriptPath: () => transcriptPath,
-      })
-      hook.startLoop("session-123", "Build something", { completionPromise: "DONE" })
 
       // when - session goes idle
       await hook.event({

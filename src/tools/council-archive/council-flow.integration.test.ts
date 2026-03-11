@@ -55,13 +55,12 @@ function mockTaskOutputNoTags(agent: string, body: string): string {
   ].join("\n")
 }
 
-function extractPreparedPromptPath(output: string): string {
-  const match = output.match(/^Council prompt saved to: (.+?) \(mode:/m)
-  if (!match) {
-    throw new Error(`Failed to parse prompt file path from output: ${output}`)
+function extractPreparedPromptPath(output: unknown): string {
+  if (typeof output === "string") {
+    return String(JSON.parse(output).promptFile)
   }
 
-  return match[1]
+  throw new Error(`Failed to parse prompt file path from output: ${String(output)}`)
 }
 
 async function pathExists(path: string): Promise<boolean> {

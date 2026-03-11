@@ -1,4 +1,8 @@
 import { COUNCIL_DEFAULTS } from "./constants"
+import { buildQuorumRulesContract, buildRetryRulesContract } from "./types"
+
+const RETRY_RULES_CONTRACT = buildRetryRulesContract()
+const QUORUM_RULES_CONTRACT = buildQuorumRulesContract()
 
 export const ATHENA_INTERACTIVE_PROMPT = `
 <identity>
@@ -162,7 +166,10 @@ Bake the classified intent into your prepare_council_prompt call (Step 5.1).
 
 ### Step 5: Save the prompt, then launch members with short references:
 
-## Step 5.1: Call prepare_council_prompt with the user's original question as the prompt parameter, the selected analysis mode, and the classified intent. This saves it to a temp file and returns the file path. Example: prepare_council_prompt({ prompt: "...", mode: "solo", intent: "EVALUATE" })
+## Step 5.1: Call prepare_council_prompt with the user's original question as the prompt parameter, the selected analysis mode, the classified intent, and the structured retry/quorum values. This saves it to a temp file and returns structured output with promptFile, retryRules, quorumRules, and result. Example: prepare_council_prompt({ prompt: "...", mode: "solo", intent: "EVALUATE", max_retries: {RETRY_ON_FAIL}, min_responses: 2, quorum_timeout_seconds: {MEMBER_MAX_RUNNING_SECONDS} })
+
+- Store promptFile for launch/finalize steps.
+- Store retryRules and quorumRules from the tool output. They are the structured source of truth for retry/quorum handling unless a later athena_council response provides updated structured rules.
 
 {BULK_LAUNCH_STEP_5_2}
 
@@ -183,7 +190,7 @@ Bake the classified intent into your prepare_council_prompt call (Step 5.1).
 
 - Use status indicators: ✅ complete, 🕓 running, ❌ failed/error, 🔄 retrying
 - Track each member's first-launch timestamp.
-- If a member's total elapsed runtime exceeds {MEMBER_MAX_RUNNING_SECONDS}, mark that member as failed (timeout) and remove that member's task_id from the active wait set.
+- If a member's total elapsed runtime exceeds quorumRules.timeoutSeconds, mark that member as failed (timeout) and remove that member's task_id from the active wait set.
 - If a member is idle and last_activity_s > {STUCK_THRESHOLD_SECONDS}, mark that member as failed (stuck) and remove that member's task_id from the active wait set.
 - If background_wait returns with remaining_task_ids, call it again with only the active (non-failed) remaining IDs.
 - Repeat until ALL members reach a terminal state.
@@ -192,11 +199,11 @@ Bake the classified intent into your prepare_council_prompt call (Step 5.1).
 
 ### Step 7: Collect results with council_finalize (after ALL members complete):
 - Once all members have reached terminal state, call:
-  council_finalize(task_ids=[...latest terminal task IDs, one per member...], name="{topic-slug}", intent="{intent from Step 3}", question="{original user question}", prompt_file="{path from prepare_council_prompt}")
+  council_finalize(task_ids=[...latest terminal task IDs, one per member...], name="{topic-slug}", intent="{intent from Step 3}", question="{original user question}", prompt_file=promptFile)
   where {topic-slug} is a short descriptive slug of the council topic (e.g., "check-bg-wait-issues", "auth-review").
   Pass "intent" with the exact Step 3 classification.
   Pass "question" with the original user question that triggered this council.
-  Pass "prompt_file" with the temp file path returned by prepare_council_prompt (it will be moved into the archive).
+  Pass promptFile from prepare_council_prompt (it will be moved into the archive).
 - council_finalize reads raw output files, extracts clean response content from <COUNCIL_MEMBER_RESPONSE>, writes per-member archive files, and returns structured JSON.
 - The returned JSON has: archive_dir, meta_file, and members array.
 - Each member entry has: task_id, member, has_response, response_complete, and archive_file.
@@ -218,25 +225,30 @@ For each member in the council_finalize result, check:
 - has_response: false AND error → Member failed to produce output. Apply retry logic (Step 10).
 
 ### Step 10: Retry failed members (if configured).
-Config values (injected at runtime):
-- retry_on_fail = {RETRY_ON_FAIL} (max retry attempts per failed member, 0 = no retries)
-- retry_failed_if_others_finished = {RETRY_FAILED_IF_OTHERS_FINISHED} (false = retry only while others running, true = retry even after all others done)
-- cancel_retrying_on_quorum = {CANCEL_RETRYING_ON_QUORUM} (true = cancel in-flight retries when 2+ successful)
+- Structured retry rules come from prepare_council_prompt or athena_council. Prefer the latest athena_council response when available.
+- retryRules shape:
+${RETRY_RULES_CONTRACT}
+- quorumRules shape:
+${QUORUM_RULES_CONTRACT}
+- Remaining runtime flags:
+  - retry_failed_if_others_finished = {RETRY_FAILED_IF_OTHERS_FINISHED} (false = retry only while others running, true = retry even after all others done)
+  - cancel_retrying_on_quorum = {CANCEL_RETRYING_ON_QUORUM} (true = cancel in-flight retries when quorum is met)
 
-If retry_on_fail > 0 and a member failed:
+If retryRules.maxRetries > 0 and a member failed:
 - If retry_failed_if_others_finished == false: retry only while other members are still running. Once all non-failed members complete, stop retrying and proceed to quorum check.
 - If retry_failed_if_others_finished == true: retry even after other members are done. Wait for retry results before synthesizing.
-- Track retry count per member. Never exceed retry_on_fail attempts.
+- Retry only failures that match retryRules.retryableErrors.
+- Track retry count per member. Never exceed retryRules.maxRetries attempts.
 - Maintain active_task_id_by_member. On retry, launch a fresh background task for that member with the same role and constraints, then replace the previous task_id for that member with the new retry task_id.
 - Use active_task_id_by_member as the source of truth for Step 6 waiting and Step 7 finalization.
 - Show retry status in progress bar with 🔄 marker.
 
-If cancel_retrying_on_quorum == true and 2+ members have successful responses (has_response=true, response_complete=true): cancel any in-flight retries using background_cancel and proceed to synthesis.
+If cancel_retrying_on_quorum == true and quorumRules.minResponses or more members have successful responses (has_response=true, response_complete=true): cancel any in-flight retries using background_cancel and proceed to synthesis.
 
-**Quorum enforcement (minimum 2 successful):**
-Before starting synthesis (Step 12+), verify at least 2 members have has_response=true AND response_complete=true.
-- If <2 successful after all retries: do NOT synthesize. Report the failures with reasons to the user. Suggest re-running the council with different members or settings.
-- Example failure message: "Council quorum not met: only N/M members produced valid responses. [Details of failures]. Consider re-running with different council members."
+**Quorum enforcement:**
+Before starting synthesis (Step 12+), verify at least quorumRules.minResponses members have has_response=true AND response_complete=true.
+- If fewer than quorumRules.minResponses members succeed after all retries: do NOT synthesize. Report the failures with reasons to the user. Suggest re-running the council with different members or settings.
+- Example failure message: "Council quorum not met: only N/M members produced valid responses. Required quorumRules.minResponses. [Details of failures]. Consider re-running with different council members."
 
 ### Step 11: Layer 2 — Follow-up and Cross-check (optional, use when needed):
 

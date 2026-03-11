@@ -14,6 +14,12 @@ describe("Athena prompt config injection placeholders", () => {
         expect(athenaConfig.prompt).toContain("{RETRY_ON_FAIL}")
       })
 
+      it("#then references structured retry/quorum outputs instead of appended resilience prose", () => {
+        expect(athenaConfig.prompt).toContain("retryRules")
+        expect(athenaConfig.prompt).toContain("quorumRules")
+        expect(athenaConfig.prompt).not.toContain("## Council Resilience Config")
+      })
+
       it("#then contains STUCK_THRESHOLD_SECONDS placeholder", () => {
         expect(athenaConfig.prompt).toContain("{STUCK_THRESHOLD_SECONDS}")
       })
@@ -151,14 +157,14 @@ describe("Athena-Junior prompt metadata", () => {
 
     describe("#when checking useWhen entries", () => {
       it("#then includes an entry mentioning oh-my-opencode run", () => {
-        const hasCLIEntry = ATHENA_JUNIOR_PROMPT_METADATA.useWhen.some((entry) =>
+        const hasCLIEntry = (ATHENA_JUNIOR_PROMPT_METADATA.useWhen ?? []).some((entry) =>
           entry.includes("oh-my-opencode run"),
         )
         expect(hasCLIEntry).toBe(true)
       })
 
       it("#then includes an entry mentioning structured or agent-to-agent", () => {
-        const hasStructuredEntry = ATHENA_JUNIOR_PROMPT_METADATA.useWhen.some((entry) =>
+        const hasStructuredEntry = (ATHENA_JUNIOR_PROMPT_METADATA.useWhen ?? []).some((entry) =>
           entry.includes("structured") || entry.includes("agent-to-agent"),
         )
         expect(hasStructuredEntry).toBe(true)

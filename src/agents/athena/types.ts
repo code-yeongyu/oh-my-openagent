@@ -1,7 +1,24 @@
+import { COUNCIL_DEFAULTS } from "./constants"
+
 export const ATHENA_NON_INTERACTIVE_MODES = ["delegation", "solo"] as const
+
+export const COUNCIL_RETRY_BACKOFF_MULTIPLIER = 2
+export const COUNCIL_RETRYABLE_ERRORS = ["network_error", "timeout_error"] as const
 
 export type AthenaNonInteractiveMode = (typeof ATHENA_NON_INTERACTIVE_MODES)[number]
 export type AthenaNonInteractiveMembers = "all" | "custom"
+
+export interface RetryRules {
+  maxRetries: number
+  backoffMultiplier: number
+  retryableErrors: string[]
+}
+
+export interface QuorumRules {
+  threshold: number
+  minResponses: number
+  timeoutSeconds: number
+}
 
 export interface AthenaNonInteractiveConfig {
   non_interactive_mode?: AthenaNonInteractiveMode
@@ -129,8 +146,38 @@ export function resolveAthenaNonInteractiveMode(mode: string | undefined): Athen
   return validateAthenaNonInteractiveMode(mode ?? "delegation")
 }
 
+export function createRetryRules(maxRetries: number = COUNCIL_DEFAULTS.MAX_RETRIES): RetryRules {
+  const backoffMultiplier: number = COUNCIL_RETRY_BACKOFF_MULTIPLIER
+
+  return {
+    maxRetries,
+    backoffMultiplier,
+    retryableErrors: [...COUNCIL_RETRYABLE_ERRORS],
+  }
+}
+
+export function createQuorumRules(options?: Partial<QuorumRules>): QuorumRules {
+  const threshold: number = options?.threshold ?? COUNCIL_DEFAULTS.QUORUM_THRESHOLD
+  const minResponses: number = options?.minResponses ?? 2
+  const timeoutSeconds: number = options?.timeoutSeconds ?? COUNCIL_DEFAULTS.MEMBER_MAX_RUNNING_SECONDS
+
+  return {
+    threshold,
+    minResponses,
+    timeoutSeconds,
+  }
+}
+
 export function buildNonInteractiveModeValidationLines(): string {
   return ATHENA_NON_INTERACTIVE_MODES.map((candidateMode) => formatModeValidation(candidateMode)).join("\n")
+}
+
+export function buildRetryRulesContract(rules: RetryRules = createRetryRules()): string {
+  return JSON.stringify(rules, null, 2)
+}
+
+export function buildQuorumRulesContract(rules: QuorumRules = createQuorumRules()): string {
+  return JSON.stringify(rules, null, 2)
 }
 
 export function buildCouncilFailureMetadataContract(): string {

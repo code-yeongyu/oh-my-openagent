@@ -3,7 +3,17 @@ import { randomUUID } from "node:crypto"
 import { writeFile, unlink, mkdir, readdir, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { log } from "../../shared/logger"
-import { COUNCIL_SOLO_ADDENDUM, COUNCIL_DELEGATION_ADDENDUM, COUNCIL_INTENT_ADDENDUMS, getValidCouncilIntents, resolveCouncilIntent, type CouncilIntent, COUNCIL_DEFAULTS } from "../../agents/athena"
+import {
+  COUNCIL_SOLO_ADDENDUM,
+  COUNCIL_DELEGATION_ADDENDUM,
+  COUNCIL_INTENT_ADDENDUMS,
+  getValidCouncilIntents,
+  resolveCouncilIntent,
+  type CouncilIntent,
+  COUNCIL_DEFAULTS,
+  createQuorumRules,
+  createRetryRules,
+} from "../../agents/athena"
 
 const CLEANUP_DELAY_MS = COUNCIL_DEFAULTS.CLEANUP_DELAY_MS
 const COUNCIL_TMP_DIR = ".sisyphus/tmp"
@@ -74,14 +84,32 @@ Returns the file path to reference in subsequent task() calls.`
       prompt: tool.schema.string().describe("The full analysis prompt/question for council members"),
       mode: tool.schema.string().optional().describe('Analysis mode: "solo" (default) or "delegation"'),
       intent: tool.schema.string().optional().describe('Question intent: "DIAGNOSE", "AUDIT", "PLAN", "EVALUATE", "EXPLAIN", "CREATE", "PERSPECTIVES", "FREEFORM"'),
+      max_retries: tool.schema.number().optional().describe("Structured retry rule override. Defaults to council max retries."),
+      min_responses: tool.schema.number().optional().describe("Structured quorum rule override. Defaults to 2 successful members."),
+      quorum_timeout_seconds: tool.schema.number().optional().describe("Structured quorum timeout override in seconds."),
     },
-    async execute(args: { prompt: string; mode?: string; intent?: string }) {
+    async execute(
+      args: { prompt: string; mode?: string; intent?: string; max_retries?: number; min_responses?: number; quorum_timeout_seconds?: number },
+      _toolContext,
+    ): Promise<string> {
       if (!args.prompt?.trim()) {
         return "Prompt cannot be empty."
       }
 
       if (args.mode !== undefined && args.mode !== "solo" && args.mode !== "delegation") {
         return `Invalid mode: "${args.mode}". Valid modes: "solo", "delegation".`
+      }
+
+      if (args.max_retries !== undefined && (args.max_retries < 0 || !Number.isInteger(args.max_retries))) {
+        return `Invalid max_retries: "${args.max_retries}". Expected a non-negative integer.`
+      }
+
+      if (args.min_responses !== undefined && (args.min_responses < 1 || !Number.isInteger(args.min_responses))) {
+        return `Invalid min_responses: "${args.min_responses}". Expected a positive integer.`
+      }
+
+      if (args.quorum_timeout_seconds !== undefined && (args.quorum_timeout_seconds < 1 || !Number.isInteger(args.quorum_timeout_seconds))) {
+        return `Invalid quorum_timeout_seconds: "${args.quorum_timeout_seconds}". Expected a positive integer.`
       }
 
       let resolvedIntent: CouncilIntent | undefined
@@ -95,6 +123,11 @@ Returns the file path to reference in subsequent task() calls.`
       }
 
       const mode = args.mode === "delegation" ? "delegation" : "solo"
+      const retryRules = createRetryRules(args.max_retries)
+      const quorumRules = createQuorumRules({
+        minResponses: args.min_responses,
+        timeoutSeconds: args.quorum_timeout_seconds,
+      })
 
       try {
         const tmpDir = join(directory, COUNCIL_TMP_DIR)
@@ -113,12 +146,14 @@ Returns the file path to reference in subsequent task() calls.`
 
         log("[prepare-council-prompt] Saved prompt", { filePath, length: args.prompt.length, mode })
 
-        return `Council prompt saved to: ${filePath} (mode: ${mode}, intent: ${resolvedIntent ?? "none"})
-
-Use this path in each council member's task() call:
-- prompt: "Read ${filePath} for your instructions."
-
-The file stays in .sisyphus/tmp until council_finalize archives and cleans it up.`
+        return JSON.stringify({
+          result: `Council prompt saved to: ${filePath} (mode: ${mode}, intent: ${resolvedIntent ?? "none"})\n\nUse this path in each council member's task() call:\n- prompt: "Read ${filePath} for your instructions."\n\nThe file stays in .sisyphus/tmp until council_finalize archives and cleans it up.`,
+          promptFile: filePath,
+          mode,
+          intent: resolvedIntent ?? null,
+          retryRules,
+          quorumRules,
+        }, null, 2)
       } catch (err) {
         return `Error saving council prompt: ${String(err)}`
       }

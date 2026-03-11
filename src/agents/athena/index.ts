@@ -15,6 +15,10 @@ export { ATHENA_NON_INTERACTIVE_PROMPT } from "./non-interactive-prompt"
 export {
   buildCouncilFailureMetadataContract,
   buildNonInteractiveModeValidationLines,
+  buildQuorumRulesContract,
+  buildRetryRulesContract,
+  createQuorumRules,
+  createRetryRules,
   describeCouncilFailure,
   resolveAthenaNonInteractiveMode,
   validateAthenaNonInteractiveMode,
@@ -25,7 +29,9 @@ export type {
   AthenaNonInteractiveMode,
   CouncilFailure,
   NetworkError,
+  QuorumRules,
   QuorumError,
+  RetryRules,
   TimeoutError,
   ValidationError,
 } from "./types"

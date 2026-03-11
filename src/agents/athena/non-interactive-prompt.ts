@@ -1,7 +1,14 @@
-import { buildCouncilFailureMetadataContract, buildNonInteractiveModeValidationLines } from "./types"
+import {
+  buildCouncilFailureMetadataContract,
+  buildNonInteractiveModeValidationLines,
+  buildQuorumRulesContract,
+  buildRetryRulesContract,
+} from "./types"
 
 const NON_INTERACTIVE_MODE_VALIDATION_LINES = buildNonInteractiveModeValidationLines()
 const COUNCIL_FAILURE_METADATA_CONTRACT = buildCouncilFailureMetadataContract()
+const RETRY_RULES_CONTRACT = buildRetryRulesContract()
+const QUORUM_RULES_CONTRACT = buildQuorumRulesContract()
 
 export const ATHENA_NON_INTERACTIVE_PROMPT = `
 <identity>
@@ -59,18 +66,23 @@ Precedence for ambiguous cases: DIAGNOSE > AUDIT > PLAN > EVALUATE > EXPLAIN > C
 - prompt: the original question
 - mode: from Step 2
 - intent: from Step 3
+- max_retries: {RETRY_ON_FAIL}
+- min_responses: 2
+- quorum_timeout_seconds: {MEMBER_MAX_RUNNING_SECONDS}
+- Store promptFile, retryRules, and quorumRules from the structured tool output.
 
 #### Step 4.2: Call athena_council to launch ALL members at once:
-- prompt_file: the path returned from Step 4.1
+- prompt_file: promptFile from Step 4.1
 - members: the resolved member names from Step 1 (omit to launch all configured members)
 
-athena_council launches all members in parallel and returns JSON with task IDs.
-Track every task_id from the response for use in Step 5.
+athena_council launches all members in parallel and returns structured output with launched members plus retryRules and quorumRules.
+Track every launched[].task_id from the response for use in Step 5.
+Use the latest athena_council retryRules and quorumRules as the source of truth for retry/quorum handling.
 
 ### Step 5: Track progress with background_wait.
 - Call background_wait(task_ids=[...all task IDs...], timeout={MEMBER_WAIT_TIMEOUT_MS}).
 - Parse returned metadata JSON for member states.
-- If a member's elapsed runtime exceeds {MEMBER_MAX_RUNNING_SECONDS}, mark as failed and record failure_metadata with failure_type: "timeout_error".
+- If a member's elapsed runtime exceeds quorumRules.timeoutSeconds, mark as failed and record failure_metadata with failure_type: "timeout_error".
 - If a member is idle and last_activity_s > {STUCK_THRESHOLD_SECONDS}, mark as failed (stuck).
 - If launch, provider, or transport work fails for a member, record failure_metadata with failure_type: "network_error".
 - If ALL members are now terminal (completed/error/cancelled/marked failed), proceed to Step 6 immediately.
@@ -93,20 +105,24 @@ Track every task_id from the response for use in Step 5.
 - has_response: false → treat as failed
 
 ### Step 9: Retry failed members (if configured).
-- retry_on_fail = {RETRY_ON_FAIL} (max retries, 0 = none)
+- retryRules shape:
+${RETRY_RULES_CONTRACT}
+- quorumRules shape:
+${QUORUM_RULES_CONTRACT}
 - retry_failed_if_others_finished = {RETRY_FAILED_IF_OTHERS_FINISHED}
 - cancel_retrying_on_quorum = {CANCEL_RETRYING_ON_QUORUM}
-- Quorum enforcement: minimum 2 successful members required before synthesis. If quorum is not met, record failure_metadata with failure_type: "quorum_error".
+- Quorum enforcement: require quorumRules.minResponses successful members before synthesis. If quorum is not met, record failure_metadata with failure_type: "quorum_error".
 
-If retry_on_fail > 0 and failed members exist:
+If retryRules.maxRetries > 0 and failed members exist:
 1. Re-launch failed members via athena_council with the same prompt_file and members parameter set to the failed member names.
 2. Return to Step 5 to wait for their completion via background_wait.
 3. Call council_finalize again to collect retried results.
 4. Continue retrying until retry count exhausted or quorum met.
+- Retry only failures that match retryRules.retryableErrors.
 - If retry_failed_if_others_finished is false, retry opportunistically as soon as failures are detected while others are still running.
 - If retry_failed_if_others_finished is true, only retry after all non-failed members have completed.
-- If cancel_retrying_on_quorum is true, stop retrying once quorum (2+ successful) is met.
-- If retry_on_fail is 0, no failed members remain, or retry budget is exhausted, do NOT re-launch members.
+- If cancel_retrying_on_quorum is true, stop retrying once quorum (quorumRules.minResponses successful members) is met.
+- If retryRules.maxRetries is 0, no failed members remain, or retry budget is exhausted, do NOT re-launch members.
 - If Step 6 (council_finalize) has already executed for the current task IDs, proceed to Step 10.
 - Otherwise, return to Step 5 and continue tracking until Step 6 can run for the current task IDs.
 

@@ -4,11 +4,12 @@ import { readFile } from "node:fs/promises"
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CouncilConfig, CouncilMemberConfig } from "../../config/schema/athena"
+import { COUNCIL_DEFAULTS, createQuorumRules, createRetryRules } from "../../agents/athena"
 import { launchCouncilMember, type CouncilLaunchContext } from "./council-launcher"
 import type { AthenaCouncilToolArgs, LaunchedMemberInfo, AthenaCouncilResult } from "./types"
 import { resolveSymlink } from "../../shared/file-utils"
 import { log } from "../../shared/logger"
-import { normalizeMemberId, areMemberIdsEqual } from "../../shared/member-id-normalizer"
+import { normalizeMemberId } from "../../shared/member-id-normalizer"
 
 const SESSION_WAIT_INTERVAL_MS = 100
 const SESSION_WAIT_TIMEOUT_MS = 30_000
@@ -153,7 +154,7 @@ export function createAthenaCouncilTool(args: {
         .optional()
         .describe("Optional list of council member names to launch. Defaults to all configured members."),
     },
-    async execute(toolArgs: AthenaCouncilToolArgs, toolContext) {
+    async execute(toolArgs: AthenaCouncilToolArgs, toolContext): Promise<string> {
       if (!councilConfig || councilConfig.members.length === 0) {
         return "Council not configured. Add agents.athena.council.members to your config."
       }
@@ -219,9 +220,15 @@ export function createAthenaCouncilTool(args: {
       }))
 
       const output: AthenaCouncilResult = {
+        result: `Use background_wait with task_ids=${JSON.stringify(launchedInfo.map((l) => l.task_id))} to wait for completion. Then use background_output for each task_id to collect individual results.`,
         launched: launchedInfo,
         failures,
         total_requested: members.length,
+        retryRules: createRetryRules(councilConfig.retry_on_fail ?? COUNCIL_DEFAULTS.MAX_RETRIES),
+        quorumRules: createQuorumRules({
+          minResponses: 2,
+          timeoutSeconds: councilConfig.member_max_running_seconds ?? COUNCIL_DEFAULTS.MEMBER_MAX_RUNNING_SECONDS,
+        }),
       }
 
       log("[athena_council] Launch complete", {
@@ -229,11 +236,7 @@ export function createAthenaCouncilTool(args: {
         failed: failures.length,
       })
 
-      const taskIdList = launchedInfo.map((l) => l.task_id)
-      return `${JSON.stringify(output, null, 2)}
-
-Use background_wait with task_ids=${JSON.stringify(taskIdList)} to wait for completion.
-Then use background_output for each task_id to collect individual results.`
+      return JSON.stringify(output, null, 2)
     },
   })
 }

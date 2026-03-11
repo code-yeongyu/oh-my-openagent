@@ -3,6 +3,10 @@ import { describe, expect, it } from "bun:test"
 import {
   buildCouncilFailureMetadataContract,
   buildNonInteractiveModeValidationLines,
+  buildQuorumRulesContract,
+  buildRetryRulesContract,
+  createQuorumRules,
+  createRetryRules,
   describeCouncilFailure,
   resolveAthenaNonInteractiveMode,
   validateAthenaNonInteractiveMode,
@@ -122,6 +126,46 @@ describe("Athena non-interactive mode validation", () => {
 
       expect(validationLines).toContain('"delegation" -> mode: "delegation"')
       expect(validationLines).toContain('"solo" -> mode: "solo"')
+    })
+  })
+})
+
+describe("Athena structured retry and quorum rules", () => {
+  describe("#when creating retry rules", () => {
+    it("#then returns the structured retry shape", () => {
+      expect(createRetryRules(3)).toEqual({
+        maxRetries: 3,
+        backoffMultiplier: 2,
+        retryableErrors: ["network_error", "timeout_error"],
+      })
+    })
+  })
+
+  describe("#when creating quorum rules", () => {
+    it("#then returns the structured quorum shape", () => {
+      expect(createQuorumRules({ minResponses: 2, timeoutSeconds: 900 })).toEqual({
+        threshold: 0.6,
+        minResponses: 2,
+        timeoutSeconds: 900,
+      })
+    })
+  })
+
+  describe("#when building the prompt contracts", () => {
+    it("#then includes retry rule keys", () => {
+      const contract = buildRetryRulesContract()
+
+      expect(contract).toContain("maxRetries")
+      expect(contract).toContain("backoffMultiplier")
+      expect(contract).toContain("retryableErrors")
+    })
+
+    it("#then includes quorum rule keys", () => {
+      const contract = buildQuorumRulesContract()
+
+      expect(contract).toContain("threshold")
+      expect(contract).toContain("minResponses")
+      expect(contract).toContain("timeoutSeconds")
     })
   })
 })

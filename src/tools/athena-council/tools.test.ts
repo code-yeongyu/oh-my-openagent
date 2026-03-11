@@ -15,6 +15,7 @@ mock.module("./council-launcher", () => ({
 import { createAthenaCouncilTool } from "./tools"
 import type { BackgroundManager } from "../../features/background-agent"
 import type { CouncilConfig } from "../../config/schema/athena"
+import type { AthenaCouncilResult } from "./types"
 
 const TEST_TMP_DIR = join(tmpdir(), "athena-council-test")
 const SISYPHUS_TMP_DIR = join(TEST_TMP_DIR, ".sisyphus", "tmp")
@@ -30,8 +31,13 @@ const makeToolContext = () => ({
   sessionID: "ses-test",
   messageID: "msg-test",
   agent: "athena",
-  abort: undefined,
+  abort: new AbortController().signal,
 })
+
+function expectSuccess(result: unknown): AthenaCouncilResult {
+  expect(typeof result).toBe("string")
+  return JSON.parse(String(result)) as AthenaCouncilResult
+}
 
 const makeCouncilConfig = (members?: Array<{ name: string; model: string; variant?: string }>): CouncilConfig => ({
   members: members ?? [
@@ -126,9 +132,7 @@ describe("createAthenaCouncilTool", () => {
           { prompt_file: PROMPT_FILE, members: ["Claude Opus"] },
           makeToolContext(),
         )
-        const jsonMatch = result.match(/\{[\s\S]*\}/)
-        expect(jsonMatch).not.toBeNull()
-        const parsed = JSON.parse(jsonMatch![0])
+        const parsed = expectSuccess(result)
         expect(parsed.total_requested).toBe(1)
         expect(parsed.launched).toHaveLength(1)
         expect(parsed.launched[0].member_name).toBe("Claude Opus")
@@ -145,12 +149,20 @@ describe("createAthenaCouncilTool", () => {
           directory: TEST_TMP_DIR,
         })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
-        const jsonMatch = result.match(/\{[\s\S]*\}/)
-        expect(jsonMatch).not.toBeNull()
-        const parsed = JSON.parse(jsonMatch![0])
+        const parsed = expectSuccess(result)
         expect(parsed.total_requested).toBe(2)
         expect(parsed.launched).toHaveLength(2)
         expect(parsed.failures).toHaveLength(0)
+        expect(parsed.retryRules).toEqual({
+          maxRetries: 0,
+          backoffMultiplier: 2,
+          retryableErrors: ["network_error", "timeout_error"],
+        })
+        expect(parsed.quorumRules).toEqual({
+          threshold: 0.6,
+          minResponses: 2,
+          timeoutSeconds: 600,
+        })
       })
 
       it("#then includes task IDs and background_wait instructions in the output", async () => {
@@ -160,8 +172,9 @@ describe("createAthenaCouncilTool", () => {
           directory: TEST_TMP_DIR,
         })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
-        expect(result).toContain("background_wait")
-        expect(result).toContain("task_ids=")
+        const parsed = expectSuccess(result)
+        expect(parsed.result).toContain("background_wait")
+        expect(parsed.result).toContain("task_ids=")
       })
     })
   })
@@ -186,9 +199,7 @@ describe("createAthenaCouncilTool", () => {
           directory: TEST_TMP_DIR,
         })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
-        const jsonMatch = result.match(/\{[\s\S]*\}/)
-        expect(jsonMatch).not.toBeNull()
-        const parsed = JSON.parse(jsonMatch![0])
+        const parsed = expectSuccess(result)
         expect(parsed.launched).toHaveLength(1)
       })
 
@@ -199,9 +210,7 @@ describe("createAthenaCouncilTool", () => {
           directory: TEST_TMP_DIR,
         })
         const result = await tool.execute({ prompt_file: PROMPT_FILE }, makeToolContext())
-        const jsonMatch = result.match(/\{[\s\S]*\}/)
-        expect(jsonMatch).not.toBeNull()
-        const parsed = JSON.parse(jsonMatch![0])
+        const parsed = expectSuccess(result)
         expect(parsed.failures).toHaveLength(1)
         expect(parsed.failures[0].error).toContain("Launch failed for member")
       })

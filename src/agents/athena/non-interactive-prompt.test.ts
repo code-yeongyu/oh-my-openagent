@@ -131,6 +131,12 @@ describe("ATHENA_NON_INTERACTIVE_PROMPT", () => {
         expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain('"delegation" -> mode: "delegation"')
         expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain('"solo" -> mode: "solo"')
       })
+
+      it("#then references structured retry and quorum outputs", () => {
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("retryRules")
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("quorumRules")
+        expect(ATHENA_NON_INTERACTIVE_PROMPT).toContain("promptFile")
+      })
     })
   })
 

@@ -11,10 +11,26 @@ const mockContext = {
   abort: new AbortController().signal,
 }
 
-function extractFilePath(result: string): string {
-  const match = result.match(/Council prompt saved to: (.+?) \(/)
-  if (!match) throw new Error(`Could not extract file path from result: ${result}`)
-  return match[1]
+type PrepareCouncilPromptSuccess = {
+  result: string
+  promptFile: string
+  mode: string
+  intent: string | null
+  retryRules: {
+    maxRetries: number
+    backoffMultiplier: number
+    retryableErrors: string[]
+  }
+  quorumRules: {
+    threshold: number
+    minResponses: number
+    timeoutSeconds: number
+  }
+}
+
+function expectSuccess(result: unknown): PrepareCouncilPromptSuccess {
+  expect(typeof result).toBe("string")
+  return JSON.parse(String(result)) as PrepareCouncilPromptSuccess
 }
 
 describe("createPrepareCouncilPromptTool", () => {
@@ -33,7 +49,7 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "Analyze the auth module", intent: "AUDIT" }, mockContext)
 
-        const filePath = extractFilePath(result)
+        const filePath = expectSuccess(result).promptFile
         const content = await readFile(filePath, "utf-8")
         expect(content).toContain("## Analysis Intent: AUDIT")
       })
@@ -45,7 +61,7 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "Compare REST vs GraphQL", intent: "EVALUATE" }, mockContext)
 
-        const filePath = extractFilePath(result)
+        const filePath = expectSuccess(result).promptFile
         const content = await readFile(filePath, "utf-8")
         expect(content).toContain("## Analysis Intent: EVALUATE")
       })
@@ -57,7 +73,7 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "Plan the migration to v2", intent: "PLAN" }, mockContext)
 
-        const filePath = extractFilePath(result)
+        const filePath = expectSuccess(result).promptFile
         const content = await readFile(filePath, "utf-8")
         expect(content).toContain("## Analysis Intent: PLAN")
       })
@@ -69,7 +85,7 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "How does the event loop work?", intent: "EXPLAIN" }, mockContext)
 
-        const filePath = extractFilePath(result)
+        const filePath = expectSuccess(result).promptFile
         const content = await readFile(filePath, "utf-8")
         expect(content).toContain("## Analysis Intent: EXPLAIN")
       })
@@ -81,7 +97,7 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "Why is the API returning 500 errors?", intent: "DIAGNOSE" }, mockContext)
 
-        const filePath = extractFilePath(result)
+        const filePath = expectSuccess(result).promptFile
         const content = await readFile(filePath, "utf-8")
         expect(content).toContain("## Analysis Intent: DIAGNOSE")
       })
@@ -93,7 +109,7 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "Write a poem about TypeScript", intent: "CREATE" }, mockContext)
 
-        const filePath = extractFilePath(result)
+        const filePath = expectSuccess(result).promptFile
         const content = await readFile(filePath, "utf-8")
         expect(content).toContain("## Analysis Intent: CREATE")
       })
@@ -105,7 +121,7 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "What do you think about microservices?", intent: "PERSPECTIVES" }, mockContext)
 
-        const filePath = extractFilePath(result)
+        const filePath = expectSuccess(result).promptFile
         const content = await readFile(filePath, "utf-8")
         expect(content).toContain("## Analysis Intent: PERSPECTIVES")
       })
@@ -117,7 +133,7 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "Tell me something interesting", intent: "FREEFORM" }, mockContext)
 
-        const filePath = extractFilePath(result)
+        const filePath = expectSuccess(result).promptFile
         const content = await readFile(filePath, "utf-8")
         expect(content).toContain("## Analysis Intent: FREEFORM")
       })
@@ -129,9 +145,9 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "Review this module" }, mockContext)
 
-        expect(result).toContain("intent: none")
-        const filePath = extractFilePath(result)
-        const content = await readFile(filePath, "utf-8")
+        const prepared = expectSuccess(result)
+        expect(prepared.result).toContain("intent: none")
+        const content = await readFile(prepared.promptFile, "utf-8")
         expect(content).not.toContain("## Analysis Intent:")
         expect(content).toContain("## Analysis Question")
       })
@@ -157,7 +173,7 @@ describe("createPrepareCouncilPromptTool", () => {
           mockContext,
         )
 
-        const filePath = extractFilePath(result)
+        const filePath = expectSuccess(result).promptFile
         const content = await readFile(filePath, "utf-8")
         expect(content).toContain("## Delegation Mode")
         expect(content).toContain("## Analysis Intent: EVALUATE")
@@ -170,7 +186,7 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "" }, mockContext)
 
-        expect(result.toLowerCase()).toContain("empty")
+        expect(String(result).toLowerCase()).toContain("empty")
       })
     })
 
@@ -183,8 +199,7 @@ describe("createPrepareCouncilPromptTool", () => {
           mockContext,
         )
 
-        const filePath = extractFilePath(result)
-        const content = await readFile(filePath, "utf-8")
+        const content = await readFile(expectSuccess(result).promptFile, "utf-8")
 
         const modeIdx = content.indexOf("## Solo Analysis Mode")
         const intentIdx = content.indexOf("## Analysis Intent: PLAN")
@@ -204,10 +219,10 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "Review security", intent: "audit" }, mockContext)
 
-        expect(result).not.toContain("Invalid intent")
-        expect(result).toContain("intent: AUDIT")
-        const filePath = extractFilePath(result)
-        const content = await readFile(filePath, "utf-8")
+        const prepared = expectSuccess(result)
+        expect(prepared.result).not.toContain("Invalid intent")
+        expect(prepared.result).toContain("intent: AUDIT")
+        const content = await readFile(prepared.promptFile, "utf-8")
         expect(content).toContain("## Analysis Intent: AUDIT")
       })
     })
@@ -218,11 +233,39 @@ describe("createPrepareCouncilPromptTool", () => {
         const toolDef = createPrepareCouncilPromptTool(tmpDir)
         const result = await toolDef.execute({ prompt: "Why is the API failing?", intent: "Diagnose" }, mockContext)
 
-        expect(result).not.toContain("Invalid intent")
-        expect(result).toContain("intent: DIAGNOSE")
-        const filePath = extractFilePath(result)
-        const content = await readFile(filePath, "utf-8")
+        const prepared = expectSuccess(result)
+        expect(prepared.result).not.toContain("Invalid intent")
+        expect(prepared.result).toContain("intent: DIAGNOSE")
+        const content = await readFile(prepared.promptFile, "utf-8")
         expect(content).toContain("## Analysis Intent: DIAGNOSE")
+      })
+    })
+
+    describe("#when called with structured retry and quorum overrides", () => {
+      it("#then returns structured retryRules and quorumRules", async () => {
+        tmpDir = await mkdtemp(join(tmpdir(), "council-test-"))
+        const toolDef = createPrepareCouncilPromptTool(tmpDir)
+        const result = await toolDef.execute(
+          {
+            prompt: "Analyze retries",
+            max_retries: 3,
+            min_responses: 2,
+            quorum_timeout_seconds: 900,
+          },
+          mockContext,
+        )
+
+        const prepared = expectSuccess(result)
+        expect(prepared.retryRules).toEqual({
+          maxRetries: 3,
+          backoffMultiplier: 2,
+          retryableErrors: ["network_error", "timeout_error"],
+        })
+        expect(prepared.quorumRules).toEqual({
+          threshold: 0.6,
+          minResponses: 2,
+          timeoutSeconds: 900,
+        })
       })
     })
   })

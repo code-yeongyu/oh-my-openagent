@@ -125,7 +125,8 @@ describe("createCouncilFinalize", () => {
       expect(result.members[0].archive_file).toBeDefined()
 
       expect(result.members[1].has_response).toBe(false)
-      expect(result.members[1].error).toBe("Task output file not found")
+      expect(result.members[1].error).toContain("File not found:")
+      expect(result.members[1].error).toContain("attempted read from council archive")
       expect(result.members[1].member).toBe("unknown")
 
       expect(result.members[2].has_response).toBe(true)

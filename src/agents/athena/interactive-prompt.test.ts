@@ -39,6 +39,12 @@ describe("ATHENA_INTERACTIVE_PROMPT", () => {
       it("#then contains Step 2: Council setup", () => {
         expect(ATHENA_INTERACTIVE_PROMPT).toContain("Step 2: Council setup")
       })
+
+      it("#then references structured retry and quorum outputs", () => {
+        expect(ATHENA_INTERACTIVE_PROMPT).toContain("retryRules")
+        expect(ATHENA_INTERACTIVE_PROMPT).toContain("quorumRules")
+        expect(ATHENA_INTERACTIVE_PROMPT).toContain("promptFile")
+      })
     })
 
     describe("#when checking non-interactive content exclusion", () => {
