@@ -2,7 +2,7 @@ import type { BackgroundTaskConfig } from "../../config/schema"
 import type { OpencodeClient } from "./constants"
 
 export const DEFAULT_MAX_SUBAGENT_DEPTH = 3
-export const DEFAULT_MAX_ROOT_DESCENDANTS = 50
+export const DEFAULT_MAX_ROOT_SESSION_SPAWN_BUDGET = 50
 
 export interface SubagentSpawnContext {
   rootSessionID: string
@@ -14,8 +14,8 @@ export function getMaxSubagentDepth(config?: BackgroundTaskConfig): number {
   return config?.maxDepth ?? DEFAULT_MAX_SUBAGENT_DEPTH
 }
 
-export function getMaxRootDescendants(config?: BackgroundTaskConfig): number {
-  return config?.maxDescendants ?? DEFAULT_MAX_ROOT_DESCENDANTS
+export function getMaxRootSessionSpawnBudget(config?: BackgroundTaskConfig): number {
+  return config?.maxDescendants ?? DEFAULT_MAX_ROOT_SESSION_SPAWN_BUDGET
 }
 
 export async function resolveSubagentSpawnContext(
@@ -34,11 +34,19 @@ export async function resolveSubagentSpawnContext(
 
     visitedSessionIDs.add(currentSessionID)
 
-    const session = await client.session.get({
-      path: { id: currentSessionID },
-    }).catch(() => null)
+    let nextParentSessionID: string | undefined
+    try {
+      const session = await client.session.get({
+        path: { id: currentSessionID },
+      })
+      nextParentSessionID = session.data?.parentID
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      throw new Error(
+        `Subagent spawn blocked: failed to resolve session lineage for ${parentSessionID}, so background_task.maxDescendants cannot be enforced safely. ${reason}`
+      )
+    }
 
-    const nextParentSessionID = session?.data?.parentID
     if (!nextParentSessionID) {
       rootSessionID = currentSessionID
       break
