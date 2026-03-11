@@ -15,6 +15,10 @@ export async function getOrCreateClient(params: {
 }): Promise<Client> {
   const { state, clientKey, info, config } = params
 
+  if (state.disposed) {
+    throw new Error(`MCP manager for "${info.sessionID}" has been shut down, cannot create new connections.`)
+  }
+
   const existing = state.clients.get(clientKey)
   if (existing) {
     existing.lastUsedAt = Date.now()
