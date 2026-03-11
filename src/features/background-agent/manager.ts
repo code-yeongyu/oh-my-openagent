@@ -51,6 +51,14 @@ import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
+import {
+  createSubagentDepthLimitError,
+  createSubagentDescendantLimitError,
+  getMaxRootDescendants,
+  getMaxSubagentDepth,
+  resolveSubagentSpawnContext,
+  type SubagentSpawnContext,
+} from "./subagent-spawn-limits"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -115,6 +123,7 @@ export class BackgroundManager {
   private completionTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
   private notificationQueueByParent: Map<string, Promise<void>> = new Map()
+  private rootDescendantCounts: Map<string, number>
   private enableParentSessionNotifications: boolean
   readonly taskHistory = new TaskHistory()
 
@@ -139,8 +148,40 @@ export class BackgroundManager {
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.onShutdown = options?.onShutdown
+    this.rootDescendantCounts = new Map()
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
     this.registerProcessCleanup()
+  }
+
+  async assertCanSpawn(parentSessionID: string): Promise<SubagentSpawnContext> {
+    const spawnContext = await resolveSubagentSpawnContext(this.client, parentSessionID)
+    const maxDepth = getMaxSubagentDepth(this.config)
+    if (spawnContext.childDepth > maxDepth) {
+      throw createSubagentDepthLimitError({
+        childDepth: spawnContext.childDepth,
+        maxDepth,
+        parentSessionID,
+        rootSessionID: spawnContext.rootSessionID,
+      })
+    }
+
+    const maxDescendants = getMaxRootDescendants(this.config)
+    const descendantCount = this.rootDescendantCounts.get(spawnContext.rootSessionID) ?? 0
+    if (descendantCount >= maxDescendants) {
+      throw createSubagentDescendantLimitError({
+        rootSessionID: spawnContext.rootSessionID,
+        descendantCount,
+        maxDescendants,
+      })
+    }
+
+    return spawnContext
+  }
+
+  private registerRootDescendant(rootSessionID: string): number {
+    const nextCount = (this.rootDescendantCounts.get(rootSessionID) ?? 0) + 1
+    this.rootDescendantCounts.set(rootSessionID, nextCount)
+    return nextCount
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -155,16 +196,28 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required")
     }
 
+    const spawnContext = await this.assertCanSpawn(input.parentSessionID)
+    const descendantCount = this.registerRootDescendant(spawnContext.rootSessionID)
+
+    log("[background-agent] spawn guard passed", {
+      parentSessionID: input.parentSessionID,
+      rootSessionID: spawnContext.rootSessionID,
+      childDepth: spawnContext.childDepth,
+      descendantCount,
+    })
+
     // Create task immediately with status="pending"
     const task: BackgroundTask = {
       id: `bg_${crypto.randomUUID().slice(0, 8)}`,
       status: "pending",
       queuedAt: new Date(),
+      rootSessionID: spawnContext.rootSessionID,
       // Do NOT set startedAt - will be set when running
       // Do NOT set sessionID - will be set when running
       description: input.description,
       prompt: input.prompt,
       agent: input.agent,
+      spawnDepth: spawnContext.childDepth,
       parentSessionID: input.parentSessionID,
       parentMessageID: input.parentMessageID,
       parentModel: input.parentModel,
@@ -209,7 +262,7 @@ export class BackgroundManager {
     // Trigger processing (fire-and-forget)
     this.processKey(key)
 
-    return task
+    return { ...task }
   }
 
   private async processKey(key: string): Promise<void> {
@@ -885,6 +938,7 @@ export class BackgroundManager {
         }
       }
 
+      this.rootDescendantCounts.delete(sessionID)
       SessionCategoryRegistry.remove(sessionID)
     }
 
@@ -1625,6 +1679,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.pendingNotifications.clear()
     this.pendingByParent.clear()
     this.notificationQueueByParent.clear()
+    this.rootDescendantCounts.clear()
     this.queuesByKey.clear()
     this.processingKeys.clear()
     this.unregisterProcessCleanup()

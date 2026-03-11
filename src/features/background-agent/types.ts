@@ -20,11 +20,13 @@ export interface TaskProgress {
 export interface BackgroundTask {
   id: string
   sessionID?: string
+  rootSessionID?: string
   parentSessionID: string
   parentMessageID: string
   description: string
   prompt: string
   agent: string
+  spawnDepth?: number
   status: BackgroundTaskStatus
   queuedAt?: Date
   startedAt?: Date

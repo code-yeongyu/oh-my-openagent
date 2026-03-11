@@ -23,12 +23,20 @@ export async function executeSyncTask(
   fallbackChain?: import("../../shared/model-requirements").FallbackEntry[],
   deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
-  const { client, directory, onSyncSessionCreated, syncPollTimeoutMs } = executorCtx
+  const { manager, client, directory, onSyncSessionCreated, syncPollTimeoutMs } = executorCtx
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
 
   try {
+    const spawnContext = typeof manager?.assertCanSpawn === "function"
+      ? await manager.assertCanSpawn(parentContext.sessionID)
+      : {
+          rootSessionID: parentContext.sessionID,
+          parentDepth: 0,
+          childDepth: 1,
+        }
+
     const createSessionResult = await deps.createSyncSession(client, {
       parentSessionID: parentContext.sessionID,
       agentToUse,
@@ -90,6 +98,7 @@ export async function executeSyncTask(
         run_in_background: args.run_in_background,
         sessionId: sessionID,
         sync: true,
+        spawnDepth: spawnContext.childDepth,
         command: args.command,
         model: categoryModel ? { providerID: categoryModel.providerID, modelID: categoryModel.modelID } : undefined,
       },
