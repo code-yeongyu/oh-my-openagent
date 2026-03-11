@@ -184,6 +184,22 @@ describe("getOrCreateClient disconnectAll race", () => {
     await expect(clientPromise).rejects.toThrow(/connection completed after shutdown/)
     expect(state.clients.has(clientKey)).toBe(false)
   })
+
+  it("#given state after disconnectAll() completed #when getOrCreateClient() is called #then it throws shut down error and registers nothing", async () => {
+    const state = createState()
+    const info = createClientInfo("session-b")
+    const clientKey = createClientKey(info)
+
+    await disconnectAll(state)
+
+    await expect(getOrCreateClient({ state, clientKey, info, config: stdioConfig })).rejects.toThrow(/has been shut down/)
+    expect(state.clients.size).toBe(0)
+    expect(state.pendingConnections.size).toBe(0)
+    expect(state.inFlightConnections.size).toBe(0)
+    expect(state.disposed).toBe(true)
+    expect(createdClients).toHaveLength(0)
+    expect(createdTransports).toHaveLength(0)
+  })
 })
 
 describe("getOrCreateClient multi-key disconnect race", () => {
