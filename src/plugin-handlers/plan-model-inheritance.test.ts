@@ -64,7 +64,7 @@ describe("buildPlanDemoteConfig", () => {
       reasoningEffort: "high",
     }
     const planOverride = {
-      model: "openai/gpt-5.2",
+      model: "openai/gpt-5.4",
       variant: "high",
       temperature: 0.5,
       reasoningEffort: "low",
@@ -74,7 +74,7 @@ describe("buildPlanDemoteConfig", () => {
     const result = buildPlanDemoteConfig(prometheusConfig, planOverride)
 
     //#then
-    expect(result.model).toBe("openai/gpt-5.2")
+    expect(result.model).toBe("openai/gpt-5.4")
     expect(result.variant).toBe("high")
     expect(result.temperature).toBe(0.5)
     expect(result.reasoningEffort).toBe("low")
@@ -89,14 +89,14 @@ describe("buildPlanDemoteConfig", () => {
       reasoningEffort: "high",
     }
     const planOverride = {
-      model: "openai/gpt-5.2",
+      model: "openai/gpt-5.4",
     }
 
     //#when
     const result = buildPlanDemoteConfig(prometheusConfig, planOverride)
 
     //#then - plan model wins, rest inherits from prometheus
-    expect(result.model).toBe("openai/gpt-5.2")
+    expect(result.model).toBe("openai/gpt-5.4")
     expect(result.variant).toBe("max")
     expect(result.temperature).toBe(0.1)
     expect(result.reasoningEffort).toBe("high")

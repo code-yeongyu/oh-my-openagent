@@ -193,10 +193,9 @@ jobs:
           if-no-files-found: error
 
   # =============================================================================
-  # Job 2: Publish all platforms using OIDC/Provenance
+  # Job 2: Publish all platforms (oh-my-opencode + oh-my-openagent)
   # - Runs on ubuntu-latest for ALL platforms (just downloading artifacts)
-  # - Uses npm Trusted Publishing (OIDC) - no NODE_AUTH_TOKEN needed
-  # - Fresh OIDC token at publish time avoids timeout issues
+  # - Uses NODE_AUTH_TOKEN for auth + OIDC for provenance attestation
   # =============================================================================
   publish:
     needs: build
@@ -208,7 +207,7 @@ jobs:
       matrix:
         platform: [darwin-arm64, darwin-x64, darwin-x64-baseline, linux-x64, linux-x64-baseline, linux-arm64, linux-x64-musl, linux-x64-musl-baseline, linux-arm64-musl, windows-x64, windows-x64-baseline]
     steps:
-      - name: Check if already published
+      - name: Check if oh-my-opencode already published
         id: check
         run: |
           PKG_NAME="oh-my-opencode-${{ matrix.platform }}"
@@ -222,9 +221,23 @@ jobs:
             echo "→ ${PKG_NAME}@${VERSION} will be published"
           fi
 
+      - name: Check if oh-my-openagent already published
+        id: check-openagent
+        run: |
+          PKG_NAME="oh-my-openagent-${{ matrix.platform }}"
+          VERSION="${{ inputs.version }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://registry.npmjs.org/${PKG_NAME}/${VERSION}")
+          if [ "$STATUS" = "200" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "✓ ${PKG_NAME}@${VERSION} already published, skipping"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            echo "→ ${PKG_NAME}@${VERSION} will be published"
+          fi
+
       - name: Download artifact
         id: download
-        if: steps.check.outputs.skip != 'true'
+        if: steps.check.outputs.skip != 'true' || steps.check-openagent.outputs.skip != 'true'
         continue-on-error: true
         uses: actions/download-artifact@v4
         with:
@@ -232,7 +245,7 @@ jobs:
           path: .
 
       - name: Extract artifact
-        if: steps.check.outputs.skip != 'true' && steps.download.outcome == 'success'
+        if: (steps.check.outputs.skip != 'true' || steps.check-openagent.outputs.skip != 'true') && steps.download.outcome == 'success'
         run: |
           PLATFORM="${{ matrix.platform }}"
           mkdir -p packages/${PLATFORM}
@@ -248,7 +261,7 @@ jobs:
           ls -la packages/${PLATFORM}/bin/
 
       - uses: actions/setup-node@v4
-        if: steps.check.outputs.skip != 'true' && steps.download.outcome == 'success'
+        if: (steps.check.outputs.skip != 'true' || steps.check-openagent.outputs.skip != 'true') && steps.download.outcome == 'success'
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
@@ -257,6 +270,28 @@ jobs:
         if: steps.check.outputs.skip != 'true' && steps.download.outcome == 'success'
         run: |
           cd packages/${{ matrix.platform }}
+          
+          TAG_ARG=""
+          if [ -n "${{ inputs.dist_tag }}" ]; then
+            TAG_ARG="--tag ${{ inputs.dist_tag }}"
+          fi
+          
+          npm publish --access public --provenance $TAG_ARG
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+        timeout-minutes: 15
+
+      - name: Publish oh-my-openagent-${{ matrix.platform }}
+        if: steps.check-openagent.outputs.skip != 'true' && steps.download.outcome == 'success'
+        run: |
+          cd packages/${{ matrix.platform }}
+          
+          # Rename package for oh-my-openagent
+          jq --arg name "oh-my-openagent-${{ matrix.platform }}" \
+             --arg desc "Platform-specific binary for oh-my-openagent (${{ matrix.platform }})" \
+             '.name = $name | .description = $desc | .bin = {"oh-my-openagent": (.bin | to_entries | .[0].value)}' \
+             package.json > tmp.json && mv tmp.json package.json
           
           TAG_ARG=""
           if [ -n "${{ inputs.dist_tag }}" ]; then

@@ -1,11 +1,12 @@
+/** GPT-5.3 Codex optimized Hephaestus prompt */
 import type { AgentConfig } from "@opencode-ai/sdk";
-import type { AgentMode } from "./types";
+import type { AgentMode } from "../types";
 import type {
   AvailableAgent,
   AvailableTool,
   AvailableSkill,
   AvailableCategory,
-} from "./dynamic-agent-prompt-builder";
+} from "../dynamic-agent-prompt-builder";
 import {
   buildKeyTriggersSection,
   buildToolSelectionTable,
@@ -16,9 +17,9 @@ import {
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
+  buildToolCallFormatSection,
   categorizeTools,
-} from "./dynamic-agent-prompt-builder";
-
+} from "../dynamic-agent-prompt-builder";
 const MODE: AgentMode = "all";
 
 function buildTodoDisciplineSection(useTaskSystem: boolean): string {
@@ -103,7 +104,7 @@ function buildTodoDisciplineSection(useTaskSystem: boolean): string {
  * - End-to-end task completion without premature stopping
  */
 
-function buildHephaestusPrompt(
+export function buildHephaestusPrompt(
   availableAgents: AvailableAgent[] = [],
   availableTools: AvailableTool[] = [],
   availableSkills: AvailableSkill[] = [],
@@ -127,7 +128,7 @@ function buildHephaestusPrompt(
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
   const todoDiscipline = buildTodoDisciplineSection(useTaskSystem);
-
+  const toolCallFormat = buildToolCallFormatSection();
   return `You are Hephaestus, an autonomous deep worker for software engineering.
 
 ## Identity
@@ -166,6 +167,7 @@ ${hardBlocks}
 
 ${antiPatterns}
 
+${toolCallFormat}
 ## Phase 0 - Intent Gate (EVERY task)
 
 ${keyTriggers}
@@ -522,7 +524,7 @@ export function createHephaestusAgent(
 
   return {
     description:
-      "Autonomous Deep Worker - goal-oriented execution with GPT 5.2 Codex. Explores thoroughly before acting, uses explore/librarian agents for comprehensive context, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
+      "Autonomous Deep Worker - goal-oriented execution with GPT 5.4 Codex. Explores thoroughly before acting, uses explore/librarian agents for comprehensive context, completes tasks end-to-end. Inspired by AmpCode deep mode. (Hephaestus - OhMyOpenCode)",
     mode: MODE,
     model,
     maxTokens: 32000,

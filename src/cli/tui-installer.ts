@@ -2,9 +2,7 @@ import * as p from "@clack/prompts"
 import color from "picocolors"
 import type { InstallArgs } from "./types"
 import {
-  addAuthPlugins,
   addPluginToOpenCodeConfig,
-  addProviderConfig,
   detectCurrentConfig,
   getOpenCodeVersion,
   isOpenCodeInstalled,
@@ -54,26 +52,6 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   }
   spinner.stop(`Plugin added to ${color.cyan(pluginResult.configPath)}`)
 
-  if (config.hasGemini) {
-    spinner.start("Adding auth plugins (fetching latest versions)")
-    const authResult = await addAuthPlugins(config)
-    if (!authResult.success) {
-      spinner.stop(`Failed to add auth plugins: ${authResult.error}`)
-      p.outro(color.red("Installation failed."))
-      return 1
-    }
-    spinner.stop(`Auth plugins added to ${color.cyan(authResult.configPath)}`)
-
-    spinner.start("Adding provider configurations")
-    const providerResult = addProviderConfig(config)
-    if (!providerResult.success) {
-      spinner.stop(`Failed to add provider config: ${providerResult.error}`)
-      p.outro(color.red("Installation failed."))
-      return 1
-    }
-    spinner.stop(`Provider config added to ${color.cyan(providerResult.configPath)}`)
-  }
-
   spinner.start("Writing oh-my-opencode configuration")
   const omoResult = writeOmoConfig(config)
   if (!omoResult.success) {
@@ -115,7 +93,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
 
   p.log.message(`${color.yellow("★")} If you found this helpful, consider starring the repo!`)
   p.log.message(
-    `  ${color.dim("gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-opencode >/dev/null 2>&1 || true")}`,
+    `  ${color.dim("gh api --silent --method PUT /user/starred/code-yeongyu/oh-my-openagent >/dev/null 2>&1 || true")}`,
   )
 
   p.outro(color.green("oMoMoMoMo... Enjoy!"))
@@ -123,7 +101,7 @@ export async function runTuiInstaller(args: InstallArgs, version: string): Promi
   if ((config.hasClaude || config.hasGemini || config.hasCopilot) && !args.skipAuth) {
     const providers: string[] = []
     if (config.hasClaude) providers.push(`Anthropic ${color.gray("→ Claude Pro/Max")}`)
-    if (config.hasGemini) providers.push(`Google ${color.gray("→ OAuth with Antigravity")}`)
+    if (config.hasGemini) providers.push(`Google ${color.gray("→ Gemini")}`)
     if (config.hasCopilot) providers.push(`GitHub ${color.gray("→ Copilot")}`)
 
     console.log()

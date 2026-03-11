@@ -1,7 +1,7 @@
 const ENGLISH_PATTERNS = [/\bultrathink\b/i, /\bthink\b/i]
 
 const MULTILINGUAL_KEYWORDS = [
-  "생각", "고민", "검토", "제대로",
+  "생각", "검토", "제대로",
   "思考", "考虑", "考慮",
   "思考", "考え", "熟考",
   "सोच", "विचार",

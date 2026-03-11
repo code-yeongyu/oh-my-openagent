@@ -13,6 +13,7 @@ import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import { createAthenaAgent, createAthenaJuniorAgent, ATHENA_JUNIOR_PROMPT_METADATA, COUNCIL_DEFAULTS } from "./athena"
+import { createSisyphusJuniorAgentWithOverrides } from "./sisyphus-junior"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -48,6 +49,7 @@ const agentSources: Partial<Record<BuiltinAgentName, AgentSource>> = {
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
+  "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as unknown as AgentFactory,
 }
 
 /**
@@ -97,7 +99,7 @@ export async function createBuiltinAgents(
   )
   // IMPORTANT: Do NOT call OpenCode client APIs during plugin initialization.
   // This function is called from config handler, and calling client API causes deadlock.
-  // See: https://github.com/code-yeongyu/oh-my-opencode/issues/1301
+  // See: https://github.com/code-yeongyu/oh-my-openagent/issues/1301
   const availableModels = await fetchAvailableModels(undefined, {
     connectedProviders: mergedConnectedProviders.length > 0 ? mergedConnectedProviders : undefined,
   })

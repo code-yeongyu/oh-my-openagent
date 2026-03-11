@@ -7,7 +7,7 @@ import { HOOK_NAME } from "./hook-name"
 import { DIRECT_WORK_REMINDER } from "./system-reminder-templates"
 import { isSisyphusPath } from "./sisyphus-path"
 import { extractSessionIdFromOutput } from "./subagent-session-id"
-import { buildOrchestratorReminder, buildStandaloneVerificationReminder } from "./verification-reminders"
+import { buildCompletionGate, buildOrchestratorReminder, buildStandaloneVerificationReminder } from "./verification-reminders"
 import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 import type { ToolExecuteAfterInput, ToolExecuteAfterOutput } from "./types"
 
@@ -76,7 +76,11 @@ export function createToolExecuteAfterHandler(input: {
         // Preserve original subagent response - critical for debugging failed tasks
         const originalResponse = toolOutput.output
 
-toolOutput.output = `
+        toolOutput.output = `
+<system-reminder>
+${buildCompletionGate(boulderState.plan_name, subagentSessionId)}
+</system-reminder>
+
 ## SUBAGENT WORK COMPLETED
 
 ${fileChanges}
@@ -88,7 +92,7 @@ ${fileChanges}
 ${originalResponse}
 
 <system-reminder>
-${buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId, autoCommit)}
+${buildOrchestratorReminder(boulderState.plan_name, progress, subagentSessionId, autoCommit, false)}
 </system-reminder>`
         log(`[${HOOK_NAME}] Output transformed for orchestrator mode (boulder)`, {
           plan: boulderState.plan_name,

@@ -48,6 +48,7 @@ import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
+import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 
 import { writeTaskOutput } from "./task-output-writer"
 import { isCouncilMemberAgent, sendCouncilContinuationNudge, resetCouncilNudgeCount } from "./council-continuation-enforcer"
@@ -227,7 +228,7 @@ export class BackgroundManager {
 
         await this.concurrencyManager.acquire(key)
 
-        if (item.task.status === "cancelled" || item.task.status === "error") {
+        if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
           this.concurrencyManager.release(key)
           queue.shift()
           continue
@@ -237,9 +238,10 @@ export class BackgroundManager {
           await this.startTask(item)
         } catch (error) {
           log("[background-agent] Error starting task:", error)
-          // Release concurrency slot if startTask failed and didn't release it itself
-          // This prevents slot leaks when errors occur after acquire but before task.concurrencyKey is set
-          if (!item.task.concurrencyKey) {
+          if (item.task.concurrencyKey) {
+            this.concurrencyManager.release(item.task.concurrencyKey)
+            item.task.concurrencyKey = undefined
+          } else {
             this.concurrencyManager.release(key)
           }
         }
@@ -388,6 +390,8 @@ export class BackgroundManager {
           this.concurrencyManager.release(existingTask.concurrencyKey)
           existingTask.concurrencyKey = undefined
         }
+
+        removeTaskToastTracking(existingTask.id)
 
         // Abort the session to prevent infinite polling hang
         this.client.session.abort({
@@ -657,6 +661,8 @@ export class BackgroundManager {
         this.concurrencyManager.release(existingTask.concurrencyKey)
         existingTask.concurrencyKey = undefined
       }
+
+      removeTaskToastTracking(existingTask.id)
 
       // Abort the session to prevent infinite polling hang
       if (existingTask.sessionID) {
@@ -1141,11 +1147,9 @@ export class BackgroundManager {
       SessionCategoryRegistry.remove(task.sessionID)
     }
 
+    removeTaskToastTracking(task.id)
+
     if (options?.skipNotification) {
-      const toastManager = getTaskToastManager()
-      if (toastManager) {
-        toastManager.removeTask(task.id)
-      }
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
       return true
     }
@@ -1242,6 +1246,8 @@ export class BackgroundManager {
     task.sessionState = undefined
     this.taskHistory.record(task.parentSessionID, { id: task.id, sessionID: task.sessionID, agent: task.agent, description: task.description, status: "completed", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
     resetCouncilNudgeCount(task.id)
+
+    removeTaskToastTracking(task.id)
 
     // Release concurrency BEFORE any async operations to prevent slot leaks
     if (task.concurrencyKey) {
@@ -1490,6 +1496,7 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           this.concurrencyManager.release(task.concurrencyKey)
           task.concurrencyKey = undefined
         }
+        removeTaskToastTracking(task.id)
         this.cleanupPendingByParent(task)
         if (wasPending) {
           const key = task.model
@@ -1553,42 +1560,8 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       try {
         const sessionStatus = allStatuses[sessionID]
         task.sessionState = sessionStatus?.type
-        
-        if (sessionStatus?.type === "idle") {
 
-          // Refresh lastUpdate so the next poll's stale check doesn't kill
-          // the task while we're awaiting async validation
-          if (task.progress) {
-            task.progress.lastUpdate = new Date()
-          }
-
-          // Edge guard: Validate session has actual output before completing
-          const hasValidOutput = await this.validateSessionHasOutput(sessionID)
-          if (!hasValidOutput) {
-            log("[background-agent] Polling idle but no valid output yet, waiting:", task.id)
-            continue
-          }
-
-          // Re-check status after async operation
-          if (task.status !== "running") continue
-
-          const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-          if (hasIncompleteTodos) {
-            log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
-            continue
-          }
-
-          const councilNudged = await this.nudgeCouncilMemberIfNeeded(task, sessionID)
-          if (councilNudged) continue
-
-          await this.tryCompleteTask(task, "polling (idle status)")
-          continue
-        }
-
-        // Session is still actively running (not idle).
-        // Progress is already tracked via handleEvent(message.part.updated),
-        // so we skip the expensive session.messages() fetch here.
-        // Completion will be detected when session transitions to idle.
+        // Handle retry before checking running state
         if (sessionStatus?.type === "retry") {
           const retryMessage = typeof (sessionStatus as { message?: string }).message === "string"
             ? (sessionStatus as { message?: string }).message
@@ -1599,12 +1572,49 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
           }
         }
 
-        log("[background-agent] Session still running, relying on event-based progress:", {
-          taskId: task.id,
-          sessionID,
-          sessionStatus: sessionStatus?.type ?? "not_in_status",
-          toolCalls: task.progress?.toolCalls ?? 0,
-        })
+        // Match sync-session-poller pattern: only skip completion check when
+        // status EXISTS and is not idle (i.e., session is actively running).
+        // When sessionStatus is undefined, the session has completed and dropped
+        // from the status response — fall through to completion detection.
+        if (sessionStatus?.type === "idle" && task.progress) {
+          task.progress.lastUpdate = new Date()
+        }
+
+        if (sessionStatus && sessionStatus.type !== "idle") {
+          log("[background-agent] Session still running, relying on event-based progress:", {
+            taskId: task.id,
+            sessionID,
+            sessionStatus: sessionStatus.type,
+            toolCalls: task.progress?.toolCalls ?? 0,
+          })
+          continue
+        }
+
+        // Session is idle or no longer in status response (completed/disappeared)
+        const completionSource = sessionStatus?.type === "idle"
+          ? "polling (idle status)"
+          : "polling (session gone from status)"
+        const hasValidOutput = await this.validateSessionHasOutput(sessionID)
+        if (!hasValidOutput) {
+          log("[background-agent] Polling idle/gone but no valid output yet, waiting:", task.id)
+          continue
+        }
+
+        // Re-check status after async operation
+        if (task.status !== "running") continue
+
+        const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
+        if (hasIncompleteTodos) {
+          log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
+          continue
+        }
+
+        if (sessionStatus?.type === "idle") {
+          const councilNudged = await this.nudgeCouncilMemberIfNeeded(task, sessionID)
+          if (councilNudged) continue
+        }
+
+        await this.tryCompleteTask(task, completionSource)
       } catch (error) {
         log("[background-agent] Poll error for task:", { taskId: task.id, error })
       }

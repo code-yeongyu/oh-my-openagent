@@ -4,6 +4,8 @@ import { isPlanFamily } from "./constants"
 import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { normalizeFallbackModels } from "../../shared/model-resolver"
+import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
 import { getAgentDisplayName, getAgentConfigKey } from "../../shared/agent-display-names"
 import { normalizeSDKResponse } from "../../shared"
 import { log } from "../../shared/logger"
@@ -21,7 +23,7 @@ export async function resolveSubagentExecution(
   parentAgent: string | undefined,
   categoryExamples: string
 ): Promise<{ agentToUse: string; categoryModel: { providerID: string; modelID: string; variant?: string } | undefined; fallbackChain?: FallbackEntry[]; error?: string }> {
-  const { client, agentOverrides } = executorCtx
+  const { client, agentOverrides, userCategories } = executorCtx
 
   if (!args.subagent_type?.trim()) {
     return { agentToUse: "", categoryModel: undefined, error: `Agent name cannot be empty.` }
@@ -114,7 +116,10 @@ Create the work plan directly - that's your job as the planning agent.`,
     const agentOverride = agentOverrides?.[agentConfigKey as keyof typeof agentOverrides]
       ?? (agentOverrides ? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1] : undefined)
     const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentConfigKey]
-    fallbackChain = agentRequirement?.fallbackChain
+    const normalizedAgentFallbackModels = normalizeFallbackModels(
+      agentOverride?.fallback_models
+      ?? (agentOverride?.category ? userCategories?.[agentOverride.category]?.fallback_models : undefined)
+    )
 
     if (agentOverride?.model || agentRequirement || matchedAgent.model) {
       const availableModels = await getAvailableModelsForDelegateTask(client)
@@ -128,6 +133,7 @@ Create the work plan directly - that's your job as the planning agent.`,
 
       const resolution = resolveModelForDelegateTask({
         userModel: agentOverride?.model,
+        userFallbackModels: normalizedAgentFallbackModels,
         categoryDefaultModel: matchedAgentModelStr,
         fallbackChain: agentRequirement?.fallbackChain,
         availableModels,
@@ -141,6 +147,15 @@ Create the work plan directly - that's your job as the planning agent.`,
           categoryModel = variantToUse ? { ...normalized, variant: variantToUse } : normalized
         }
       }
+
+      const defaultProviderID = categoryModel?.providerID
+        ?? normalizedMatchedModel?.providerID
+        ?? "opencode"
+      const configuredFallbackChain = buildFallbackChainFromModels(
+        normalizedAgentFallbackModels,
+        defaultProviderID,
+      )
+      fallbackChain = configuredFallbackChain ?? agentRequirement?.fallbackChain
     }
 
     if (!categoryModel && matchedAgent.model) {

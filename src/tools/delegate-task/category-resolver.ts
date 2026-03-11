@@ -7,6 +7,8 @@ import { SISYPHUS_JUNIOR_AGENT } from "./sisyphus-junior-agent"
 import { resolveCategoryConfig } from "./categories"
 import { parseModelString } from "./model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
+import { normalizeFallbackModels } from "../../shared/model-resolver"
+import { buildFallbackChainFromModels } from "../../shared/fallback-chain-from-models"
 import { getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 
@@ -79,6 +81,7 @@ Available categories: ${allCategoryNames}`,
   }
 
   const requirement = CATEGORY_MODEL_REQUIREMENTS[args.category!]
+  const normalizedConfiguredFallbackModels = normalizeFallbackModels(resolved.config.fallback_models)
   let actualModel: string | undefined
   let modelInfo: ModelFallbackInfo | undefined
   let categoryModel: { providerID: string; modelID: string; variant?: string } | undefined
@@ -99,6 +102,7 @@ Available categories: ${allCategoryNames}`,
   } else {
     const resolution = resolveModelForDelegateTask({
       userModel: explicitCategoryModel ?? overrideModel,
+      userFallbackModels: normalizedConfiguredFallbackModels,
       categoryDefaultModel: resolved.model,
       fallbackChain: requirement.fallbackChain,
       availableModels,
@@ -178,6 +182,14 @@ Available categories: ${categoryNames.join(", ")}`,
   const categoryConfigModel = resolved.config.model?.toLowerCase()
   const isUnstableAgent = resolved.config.is_unstable_agent === true || [unstableModel, categoryConfigModel].some(m => m ? m.includes("gemini") || m.includes("minimax") || m.includes("kimi") : false)
 
+  const defaultProviderID = categoryModel?.providerID
+    ?? parseModelString(actualModel ?? "")?.providerID
+    ?? "opencode"
+  const configuredFallbackChain = buildFallbackChainFromModels(
+    normalizedConfiguredFallbackModels,
+    defaultProviderID,
+  )
+
   return {
     agentToUse: SISYPHUS_JUNIOR_AGENT,
     categoryModel,
@@ -186,6 +198,6 @@ Available categories: ${categoryNames.join(", ")}`,
     modelInfo,
     actualModel,
     isUnstableAgent,
-    fallbackChain: requirement?.fallbackChain,
+    fallbackChain: configuredFallbackChain ?? requirement?.fallbackChain,
   }
 }

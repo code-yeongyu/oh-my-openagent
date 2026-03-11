@@ -162,7 +162,7 @@ describe("createAnthropicEffortHook", () => {
       const hook = createAnthropicEffortHook()
       const { input, output } = createMockParams({
         providerID: "openai",
-        modelID: "gpt-5.2",
+        modelID: "gpt-5.4",
       })
 
       //#when chat.params hook is called
