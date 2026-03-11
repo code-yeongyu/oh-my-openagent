@@ -420,6 +420,21 @@ describe("checkAndInterruptStaleTasks", () => {
 })
 
 describe("pruneStaleTasksAndNotifications", () => {
+  function createTerminalTask(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
+    return {
+      id: "terminal-task",
+      parentSessionID: "parent",
+      parentMessageID: "msg",
+      description: "terminal",
+      prompt: "terminal",
+      agent: "explore",
+      status: "completed",
+      startedAt: new Date(Date.now() - 40 * 60 * 1000),
+      completedAt: new Date(Date.now() - 31 * 60 * 1000),
+      ...overrides,
+    }
+  }
+
   it("should prune tasks that exceeded TTL", () => {
     //#given
     const tasks = new Map<string, BackgroundTask>()
@@ -449,24 +464,18 @@ describe("pruneStaleTasksAndNotifications", () => {
     expect(pruned).toContain("old-task")
   })
 
-  it("should skip terminal tasks even when they exceeded TTL", () => {
+  it("should prune terminal tasks when completion time exceeds terminal TTL", () => {
     //#given
     const tasks = new Map<string, BackgroundTask>()
-    const oldStartedAt = new Date(Date.now() - 31 * 60 * 1000)
     const terminalStatuses: BackgroundTask["status"][] = ["completed", "error", "cancelled", "interrupt"]
 
     for (const status of terminalStatuses) {
-      tasks.set(status, {
+      tasks.set(status, createTerminalTask({
         id: status,
-        parentSessionID: "parent",
-        parentMessageID: "msg",
         description: status,
         prompt: status,
-        agent: "explore",
         status,
-        startedAt: oldStartedAt,
-        completedAt: new Date(),
-      })
+      }))
     }
 
     const pruned: string[] = []
@@ -480,6 +489,26 @@ describe("pruneStaleTasksAndNotifications", () => {
 
     //#then
     expect(pruned).toEqual([])
-    expect(Array.from(tasks.keys())).toEqual(terminalStatuses)
+    expect(Array.from(tasks.keys())).toEqual([])
+  })
+
+  it("should keep terminal tasks with pending notifications until notification cleanup", () => {
+    //#given
+    const task = createTerminalTask()
+    const tasks = new Map<string, BackgroundTask>([[task.id, task]])
+    const notifications = new Map<string, BackgroundTask[]>([[task.parentSessionID, [task]]])
+    const pruned: string[] = []
+
+    //#when
+    pruneStaleTasksAndNotifications({
+      tasks,
+      notifications,
+      onTaskPruned: (taskId) => pruned.push(taskId),
+    })
+
+    //#then
+    expect(pruned).toEqual([])
+    expect(tasks.has(task.id)).toBe(true)
+    expect(notifications.has(task.parentSessionID)).toBe(false)
   })
 })
