@@ -11,9 +11,7 @@ export interface PluginEntryInfo {
   configPath: string
 }
 
-function isExplicitVersionPin(pinnedVersion: string): boolean {
-  return /^\d+\.\d+\.\d+/.test(pinnedVersion)
-}
+const EXACT_SEMVER_REGEX = /^\d+\.\d+\.\d+(-[\w.]+)?$/
 
 export function findPluginEntry(directory: string): PluginEntryInfo | null {
   for (const configPath of getConfigPaths(directory)) {
@@ -29,7 +27,7 @@ export function findPluginEntry(directory: string): PluginEntryInfo | null {
         }
         if (entry.startsWith(`${PACKAGE_NAME}@`)) {
           const pinnedVersion = entry.slice(PACKAGE_NAME.length + 1)
-          const isPinned = isExplicitVersionPin(pinnedVersion)
+          const isPinned = EXACT_SEMVER_REGEX.test(pinnedVersion.trim())
           return { entry, isPinned, pinnedVersion, configPath }
         }
       }

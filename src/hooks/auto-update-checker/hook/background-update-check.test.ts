@@ -33,11 +33,14 @@ const mockShowAutoUpdatedToast = mock(
   async (_ctx: PluginInput, _fromVersion: string, _toVersion: string): Promise<void> => {}
 )
 
+const mockSyncCachePackageJsonToIntent = mock(() => false)
+
 mock.module("../checker", () => ({
   findPluginEntry: mockFindPluginEntry,
   getCachedVersion: mockGetCachedVersion,
   getLatestVersion: mockGetLatestVersion,
   revertPinnedVersion: mock(() => false),
+  syncCachePackageJsonToIntent: mockSyncCachePackageJsonToIntent,
 }))
 mock.module("../version-channel", () => ({ extractChannel: mockExtractChannel }))
 mock.module("../cache", () => ({ invalidatePackage: mockInvalidatePackage }))
@@ -65,12 +68,14 @@ describe("runBackgroundUpdateCheck", () => {
     mockRunBunInstall.mockReset()
     mockShowUpdateAvailableToast.mockReset()
     mockShowAutoUpdatedToast.mockReset()
+    mockSyncCachePackageJsonToIntent.mockReset()
 
     mockFindPluginEntry.mockReturnValue(createPluginEntry())
     mockGetCachedVersion.mockReturnValue("3.4.0")
     mockGetLatestVersion.mockResolvedValue("3.5.0")
     mockExtractChannel.mockReturnValue("latest")
     mockRunBunInstall.mockResolvedValue(true)
+    mockSyncCachePackageJsonToIntent.mockReturnValue({ synced: true, error: null })
   })
 
   describe("#given no plugin entry found", () => {
@@ -180,16 +185,37 @@ describe("runBackgroundUpdateCheck", () => {
   })
 
   describe("#given unpinned with auto-update and install succeeds", () => {
-    it("invalidates cache, installs, and shows auto-updated toast", async () => {
+    it("syncs cache, invalidates, installs, and shows auto-updated toast", async () => {
       //#given
       mockRunBunInstall.mockResolvedValue(true)
       //#when
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
       //#then
+      expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
       expect(mockInvalidatePackage).toHaveBeenCalledTimes(1)
       expect(mockRunBunInstall).toHaveBeenCalledTimes(1)
       expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockCtx, "3.4.0", "3.5.0")
       expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
+    })
+
+    it("syncs before invalidate and install (correct order)", async () => {
+      //#given
+      const callOrder: string[] = []
+      mockSyncCachePackageJsonToIntent.mockImplementation(() => {
+        callOrder.push("sync")
+        return { synced: true, error: null }
+      })
+      mockInvalidatePackage.mockImplementation(() => {
+        callOrder.push("invalidate")
+      })
+      mockRunBunInstall.mockImplementation(async () => {
+        callOrder.push("install")
+        return true
+      })
+      //#when
+      await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
+      //#then
+      expect(callOrder).toEqual(["sync", "invalidate", "install"])
     })
   })
 
@@ -201,6 +227,82 @@ describe("runBackgroundUpdateCheck", () => {
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
       //#then
       expect(mockRunBunInstall).toHaveBeenCalledTimes(1)
+      expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
+      expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("#given sync fails with file_not_found", () => {
+    it("aborts update and shows notification-only toast", async () => {
+      //#given
+      mockSyncCachePackageJsonToIntent.mockReturnValue({
+        synced: false,
+        error: "file_not_found",
+        message: "Cache package.json not found",
+      })
+      //#when
+      await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
+      //#then
+      expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
+      expect(mockInvalidatePackage).not.toHaveBeenCalled()
+      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
+      expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("#given sync fails with plugin_not_in_deps", () => {
+    it("aborts update and shows notification-only toast", async () => {
+      //#given
+      mockSyncCachePackageJsonToIntent.mockReturnValue({
+        synced: false,
+        error: "plugin_not_in_deps",
+        message: "Plugin not in cache package.json dependencies",
+      })
+      //#when
+      await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
+      //#then
+      expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
+      expect(mockInvalidatePackage).not.toHaveBeenCalled()
+      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
+      expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("#given sync fails with parse_error", () => {
+    it("aborts update and shows notification-only toast", async () => {
+      //#given
+      mockSyncCachePackageJsonToIntent.mockReturnValue({
+        synced: false,
+        error: "parse_error",
+        message: "Failed to parse cache package.json (malformed JSON)",
+      })
+      //#when
+      await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
+      //#then
+      expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
+      expect(mockInvalidatePackage).not.toHaveBeenCalled()
+      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
+      expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("#given sync fails with write_error", () => {
+    it("aborts update and shows notification-only toast", async () => {
+      //#given
+      mockSyncCachePackageJsonToIntent.mockReturnValue({
+        synced: false,
+        error: "write_error",
+        message: "Failed to write cache package.json",
+      })
+      //#when
+      await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
+      //#then
+      expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
+      expect(mockInvalidatePackage).not.toHaveBeenCalled()
+      expect(mockRunBunInstall).not.toHaveBeenCalled()
       expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })
