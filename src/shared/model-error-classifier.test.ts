@@ -1,27 +1,28 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 
-import { mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as dataPath from "./data-path"
 import { shouldRetryError, selectFallbackProvider } from "./model-error-classifier"
 
-const TEST_CACHE_DIR = join(import.meta.dir, "__test-cache__")
-
 describe("model-error-classifier", () => {
   let cacheDirSpy: ReturnType<typeof spyOn>
+  let testCacheDir: string
 
   beforeEach(() => {
-    cacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(TEST_CACHE_DIR)
-    if (existsSync(TEST_CACHE_DIR)) {
-      rmSync(TEST_CACHE_DIR, { recursive: true })
+    testCacheDir = mkdtempSync(join(tmpdir(), "omo-model-error-"))
+    cacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(testCacheDir)
+    if (existsSync(testCacheDir)) {
+      rmSync(testCacheDir, { recursive: true })
     }
-    mkdirSync(TEST_CACHE_DIR, { recursive: true })
+    mkdirSync(testCacheDir, { recursive: true })
   })
 
   afterEach(() => {
     cacheDirSpy.mockRestore()
-    if (existsSync(TEST_CACHE_DIR)) {
-      rmSync(TEST_CACHE_DIR, { recursive: true })
+    if (existsSync(testCacheDir)) {
+      rmSync(testCacheDir, { recursive: true })
     }
   })
 
@@ -53,7 +54,7 @@ describe("model-error-classifier", () => {
   test("selectFallbackProvider prefers first connected provider in preference order", () => {
     //#given
     writeFileSync(
-      join(TEST_CACHE_DIR, "connected-providers.json"),
+      join(testCacheDir, "connected-providers.json"),
       JSON.stringify({ connected: ["anthropic", "nvidia"], updatedAt: new Date().toISOString() }, null, 2),
     )
 
@@ -67,7 +68,7 @@ describe("model-error-classifier", () => {
   test("selectFallbackProvider falls back to next connected provider when first is disconnected", () => {
     //#given
     writeFileSync(
-      join(TEST_CACHE_DIR, "connected-providers.json"),
+      join(testCacheDir, "connected-providers.json"),
       JSON.stringify({ connected: ["nvidia"], updatedAt: new Date().toISOString() }, null, 2),
     )
 
@@ -91,7 +92,7 @@ describe("model-error-classifier", () => {
   test("selectFallbackProvider uses connected preferred provider when fallback providers are unavailable", () => {
     //#given
     writeFileSync(
-      join(TEST_CACHE_DIR, "connected-providers.json"),
+      join(testCacheDir, "connected-providers.json"),
       JSON.stringify({ connected: ["provider-x"], updatedAt: new Date().toISOString() }, null, 2),
     )
 

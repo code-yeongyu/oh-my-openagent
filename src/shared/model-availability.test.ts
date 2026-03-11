@@ -1,8 +1,9 @@
 declare const require: (name: string) => any
-const { describe, it, expect, beforeEach, afterEach, beforeAll } = require("bun:test")
+const { describe, it, expect, beforeEach, afterEach, beforeAll, spyOn } = require("bun:test")
 import { mkdtempSync, writeFileSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
+import * as dataPath from "./data-path"
 
 let __resetModelCache: () => void
 let fetchAvailableModels: (client?: unknown, options?: { connectedProviders?: string[] | null }) => Promise<Set<string>>
@@ -651,21 +652,19 @@ describe("fetchAvailableModels with connected providers filtering", () => {
 
 describe("fetchAvailableModels with provider-models cache (whitelist-filtered)", () => {
 	let tempDir: string
-	let originalXdgCache: string | undefined
+	let openCodeCacheDirSpy: ReturnType<typeof spyOn>
+	let omoCacheDirSpy: ReturnType<typeof spyOn>
 
 	beforeEach(() => {
 		__resetModelCache()
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
-		originalXdgCache = process.env.XDG_CACHE_HOME
-		process.env.XDG_CACHE_HOME = tempDir
+		openCodeCacheDirSpy = spyOn(dataPath, "getOpenCodeCacheDir").mockReturnValue(join(tempDir, "opencode"))
+		omoCacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(join(tempDir, "oh-my-opencode"))
 	})
 
 	afterEach(() => {
-		if (originalXdgCache !== undefined) {
-			process.env.XDG_CACHE_HOME = originalXdgCache
-		} else {
-			delete process.env.XDG_CACHE_HOME
-		}
+		openCodeCacheDirSpy.mockRestore()
+		omoCacheDirSpy.mockRestore()
 		rmSync(tempDir, { recursive: true, force: true })
 	})
 
@@ -878,21 +877,16 @@ describe("isModelAvailable", () => {
 
 describe("fallback model availability", () => {
 	let tempDir: string
-	let originalXdgCache: string | undefined
+	let omoCacheDirSpy: ReturnType<typeof spyOn>
 
 	beforeEach(() => {
 		// given
 		tempDir = mkdtempSync(join(tmpdir(), "opencode-test-"))
-		originalXdgCache = process.env.XDG_CACHE_HOME
-		process.env.XDG_CACHE_HOME = tempDir
+		omoCacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(join(tempDir, "oh-my-opencode"))
 	})
 
 	afterEach(() => {
-		if (originalXdgCache !== undefined) {
-			process.env.XDG_CACHE_HOME = originalXdgCache
-		} else {
-			delete process.env.XDG_CACHE_HOME
-		}
+		omoCacheDirSpy.mockRestore()
 		rmSync(tempDir, { recursive: true, force: true })
 	})
 

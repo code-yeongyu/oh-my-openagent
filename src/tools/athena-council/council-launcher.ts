@@ -3,6 +3,7 @@ import type { BackgroundTask } from "../../features/background-agent/types"
 import type { CouncilMemberConfig } from "../../config/schema/athena"
 import { parseModelString } from "../delegate-task/model-string-parser"
 import { COUNCIL_MEMBER_KEY_PREFIX } from "../../agents/builtin-agents/council-member-agents"
+import { normalizeMemberId } from "../../shared/member-id-normalizer"
 
 export interface CouncilLaunchContext {
   parentSessionID: string
@@ -30,7 +31,8 @@ export async function launchCouncilMember(
     throw new Error(`Invalid model format: "${member.model}" (expected "provider/model-id")`)
   }
 
-  const agentKey = `${COUNCIL_MEMBER_KEY_PREFIX}${member.name}`
+  const normalizedName = normalizeMemberId(member.name)
+  const agentKey = `${COUNCIL_MEMBER_KEY_PREFIX}${normalizedName}`
   const memberName = member.name ?? member.model
 
   const task = await manager.launch({

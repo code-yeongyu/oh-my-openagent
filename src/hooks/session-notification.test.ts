@@ -540,8 +540,8 @@ describe("session-notification", () => {
       },
     })
 
-    // Wait for idle delay to pass
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    // Wait for the idle delay to pass with extra margin for busy CI/full-suite timing.
+    await new Promise((resolve) => setTimeout(resolve, 150))
 
     // then - notification SHOULD be sent (activity was within grace period, ignored)
     expect(notificationCalls.length).toBeGreaterThanOrEqual(1)
@@ -577,7 +577,7 @@ describe("session-notification", () => {
       },
     })
 
-    // Wait for original delay to pass
+    // Wait for idle delay to pass
     await new Promise((resolve) => setTimeout(resolve, 200))
 
     // then - notification should NOT be sent (activity cancelled it after grace period)

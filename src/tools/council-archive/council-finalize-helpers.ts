@@ -66,19 +66,19 @@ export async function movePromptFile(
     const absPromptSrc = isAbsolute(promptFilePath) ? promptFilePath : resolve(base, promptFilePath)
     const expectedPromptRoot = join(base, ".sisyphus", "tmp")
     if (isPathEscaping(expectedPromptRoot, absPromptSrc)) {
-      log("[council-finalize] Rejected prompt_file outside .sisyphus/tmp/", { promptFile: promptFilePath })
+      log("[council-finalize] Rejected prompt_file outside .sisyphus/tmp/", { promptFile: promptFilePath }, true)
       return undefined
     }
     const absPromptDest = join(absArchiveDir, promptFilename)
     await rename(absPromptSrc, absPromptDest).catch(async (renameErr) => {
-      log("[council-finalize] Rename failed, falling back to copy", { promptFile: promptFilePath, error: String(renameErr) })
+      log("[council-finalize] Rename failed, falling back to copy", { promptFile: promptFilePath, error: String(renameErr) }, false)
       const content = await readFile(absPromptSrc, "utf-8")
       await writeFile(absPromptDest, content, "utf-8")
-      await unlink(absPromptSrc).catch((err) => { log("[council-finalize] Failed to delete prompt source file", { error: String(err) }) })
+      await unlink(absPromptSrc).catch((err) => { log("[council-finalize] Failed to delete prompt source file", { error: String(err) }, true) })
     })
     return toPosixPath(join(relArchiveDir, promptFilename))
   } catch (err) {
-    log("[council-finalize] Failed to move prompt file", { promptFile: promptFilePath, error: String(err) })
+    log("[council-finalize] Failed to move prompt file", { promptFile: promptFilePath, error: String(err) }, true)
     return undefined
   }
 }

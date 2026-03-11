@@ -8,6 +8,7 @@ import { launchCouncilMember, type CouncilLaunchContext } from "./council-launch
 import type { AthenaCouncilToolArgs, LaunchedMemberInfo, AthenaCouncilResult } from "./types"
 import { resolveSymlink } from "../../shared/file-utils"
 import { log } from "../../shared/logger"
+import { normalizeMemberId, areMemberIdsEqual } from "../../shared/member-id-normalizer"
 
 const SESSION_WAIT_INTERVAL_MS = 100
 const SESSION_WAIT_TIMEOUT_MS = 30_000
@@ -71,9 +72,9 @@ function filterMembers(
 
   const lookup = new Map<string, CouncilMemberConfig>()
   for (const member of allMembers) {
-    lookup.set(member.model.toLowerCase(), member)
+    lookup.set(normalizeMemberId(member.model), member)
     if (member.name) {
-      lookup.set(member.name.toLowerCase(), member)
+      lookup.set(normalizeMemberId(member.name), member)
     }
   }
 
@@ -82,7 +83,8 @@ function filterMembers(
   const unresolved: string[] = []
 
   for (const name of selectedNames) {
-    const match = lookup.get(name.toLowerCase())
+    const normalizedName = normalizeMemberId(name)
+    const match = lookup.get(normalizedName)
     if (!match) {
       unresolved.push(name)
       continue

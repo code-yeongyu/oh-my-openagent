@@ -20,7 +20,7 @@ describe("formatMetaYaml", () => {
       expect(result).toContain("created_at: 2026-03-02T10:00:00Z")
       expect(result).toContain("members:")
       expect(result).toContain("  - task_id: task-123")
-      expect(result).toContain('    member: "Oracle"')
+      expect(result).toContain("    member: Oracle")
       expect(result).toContain("    member_slug: oracle")
       expect(result).toContain("    task_output_path: /tmp/oracle-output.txt")
       expect(result).toContain("    archive_file: oracle.md")
@@ -44,9 +44,9 @@ describe("formatMetaYaml", () => {
       const result = formatMetaYaml("multi-council", "2026-03-02T10:00:00Z", [baseMember, secondMember])
 
       expect(result).toContain("  - task_id: task-123")
-      expect(result).toContain('    member: "Oracle"')
+      expect(result).toContain("    member: Oracle")
       expect(result).toContain("  - task_id: task-456")
-      expect(result).toContain('    member: "Librarian"')
+      expect(result).toContain("    member: Librarian")
     })
   })
 
@@ -128,7 +128,7 @@ describe("formatMetaYaml", () => {
       const member: MetaMember = { ...baseMember, member: "Hephaestus" }
       const result = formatMetaYaml("quote-council", "2026-03-02T10:00:00Z", [member])
 
-      expect(result).toContain('    member: "Hephaestus"')
+      expect(result).toContain("    member: Hephaestus")
     })
   })
 
@@ -149,7 +149,7 @@ describe("formatMetaYaml", () => {
         "created_at: 2026-03-02T10:00:00Z",
         "members:",
         "  - task_id: task-123",
-        '    member: "Oracle"',
+        "    member: Oracle",
         "    member_slug: oracle",
         "    task_output_path: /tmp/oracle-output.txt",
         "    archive_file: oracle.md",
@@ -158,6 +158,51 @@ describe("formatMetaYaml", () => {
       ].join("\n") + "\n"
 
       expect(result).toBe(expected)
+    })
+  })
+
+  describe("#given member field with colon in value", () => {
+    it("#then quotes the value to escape YAML special character", () => {
+      const member: MetaMember = { ...baseMember, task_id: "task:123:special" }
+      const result = formatMetaYaml("colon-council", "2026-03-02T10:00:00Z", [member])
+
+      expect(result).toContain('  - task_id: "task:123:special"')
+    })
+  })
+
+  describe("#given member field with hash in value", () => {
+    it("#then quotes the value to escape YAML special character", () => {
+      const member: MetaMember = { ...baseMember, archive_file: "file#name.md" }
+      const result = formatMetaYaml("hash-council", "2026-03-02T10:00:00Z", [member])
+
+      expect(result).toContain('    archive_file: "file#name.md"')
+    })
+  })
+
+  describe("#given member field with quote in value", () => {
+    it("#then escapes the quote and wraps in quotes", () => {
+      const member: MetaMember = { ...baseMember, member: 'Oracle "The Wise"' }
+      const result = formatMetaYaml("quote-council", "2026-03-02T10:00:00Z", [member])
+
+      expect(result).toContain('    member: "Oracle \\"The Wise\\""')
+    })
+  })
+
+  describe("#given member field with leading space", () => {
+    it("#then quotes the value to preserve leading space", () => {
+      const member: MetaMember = { ...baseMember, member_slug: " oracle-slug" }
+      const result = formatMetaYaml("space-council", "2026-03-02T10:00:00Z", [member])
+
+      expect(result).toContain('    member_slug: " oracle-slug"')
+    })
+  })
+
+  describe("#given member field with trailing space", () => {
+    it("#then quotes the value to preserve trailing space", () => {
+      const member: MetaMember = { ...baseMember, member_slug: "oracle-slug " }
+      const result = formatMetaYaml("space-council", "2026-03-02T10:00:00Z", [member])
+
+      expect(result).toContain('    member_slug: "oracle-slug "')
     })
   })
 })

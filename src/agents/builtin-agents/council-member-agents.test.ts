@@ -39,8 +39,8 @@ describe("council-member-agents", () => {
     const result = registerCouncilMemberAgents(config)
     //#then
     expect(result.registeredKeys).toHaveLength(2)
-    expect(result.registeredKeys).toContain("Council: GPT")
-    expect(result.registeredKeys).toContain("Council: Claude")
+    expect(result.registeredKeys).toContain("Council: gpt")
+    expect(result.registeredKeys).toContain("Council: claude")
   })
 
   test("allows same model with different names", () => {
@@ -60,8 +60,8 @@ describe("council-member-agents", () => {
     const result = registerCouncilMemberAgents(config)
     //#then
     expect(result.registeredKeys).toHaveLength(2)
-    expect(result.agents).toHaveProperty("Council: GPT Codex")
-    expect(result.agents).toHaveProperty("Council: Codex GPT")
+    expect(result.agents).toHaveProperty("Council: gpt_codex")
+    expect(result.agents).toHaveProperty("Council: codex_gpt")
   })
 
   test("returns empty when valid members below 2", () => {
@@ -153,5 +153,49 @@ describe("council-member-agents", () => {
     expect(result.skippedMembers[0].reason).toContain("Invalid model format")
     expect(result.skippedMembers[1].name).toBe("gpt")
     expect(result.skippedMembers[1].reason).toContain("Duplicate name")
+  })
+
+  test("normalizes member names with spaces to underscores", () => {
+    //#given
+    const config = {
+      members: [
+        { model: "openai/gpt-5.3-codex", name: "GPT 5.3 Codex" },
+        { model: "anthropic/claude-opus-4-6", name: "Claude Opus" },
+      ],
+      retry_on_fail: 0,
+      retry_failed_if_others_finished: false,
+      cancel_retrying_on_quorum: true,
+      stuck_threshold_seconds: 120,
+      member_max_running_seconds: 1800,
+    }
+    //#when
+    const result = registerCouncilMemberAgents(config)
+    //#then
+    expect(result.registeredKeys).toHaveLength(2)
+    expect(result.registeredKeys).toContain("Council: gpt_5.3_codex")
+    expect(result.registeredKeys).toContain("Council: claude_opus")
+  })
+
+  test("detects normalized duplicates with different spacing", () => {
+    //#given
+    const config = {
+      members: [
+        { model: "openai/gpt-5.3-codex", name: "GPT Codex" },
+        { model: "anthropic/claude-opus-4-6", name: "Claude" },
+        { model: "google/gemini-3-pro", name: "gpt codex" },
+      ],
+      retry_on_fail: 0,
+      retry_failed_if_others_finished: false,
+      cancel_retrying_on_quorum: true,
+      stuck_threshold_seconds: 120,
+      member_max_running_seconds: 1800,
+    }
+    //#when
+    const result = registerCouncilMemberAgents(config)
+    //#then
+    expect(result.registeredKeys).toHaveLength(2)
+    expect(result.skippedMembers).toHaveLength(1)
+    expect(result.skippedMembers[0].name).toBe("gpt codex")
+    expect(result.skippedMembers[0].reason).toContain("Duplicate name")
   })
 })

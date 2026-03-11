@@ -3,6 +3,7 @@ import type { CouncilConfig, CouncilMemberConfig } from "../../config/schema/ath
 import { createCouncilMemberAgent } from "../athena"
 import { parseModelString } from "../../tools/delegate-task/model-string-parser"
 import { log } from "../../shared/logger"
+import { normalizeMemberId } from "../../shared/member-id-normalizer"
 
 /** Prefix used for all dynamically-registered council member agent keys. */
 export const COUNCIL_MEMBER_KEY_PREFIX = "Council: "
@@ -11,7 +12,8 @@ export const COUNCIL_MEMBER_KEY_PREFIX = "Council: "
  * Generates a stable agent registration key from a council member's name.
  */
 function getCouncilMemberAgentKey(member: CouncilMemberConfig): string {
-  return `${COUNCIL_MEMBER_KEY_PREFIX}${member.name}`
+  const normalizedName = normalizeMemberId(member.name)
+  return `${COUNCIL_MEMBER_KEY_PREFIX}${normalizedName}`
 }
 
 /**
@@ -27,7 +29,7 @@ export function registerCouncilMemberAgents(
   const agents: Record<string, AgentConfig> = {}
   const registeredKeys: string[] = []
   const skippedMembers: SkippedMember[] = []
-  const registeredNamesLower = new Set<string>()
+  const registeredNamesNormalized = new Set<string>()
 
   for (const member of councilConfig.members) {
     const parsed = parseModelString(member.model)
@@ -41,12 +43,12 @@ export function registerCouncilMemberAgents(
     }
 
     const key = getCouncilMemberAgentKey(member)
-    const nameLower = member.name.toLowerCase()
+    const nameNormalized = normalizeMemberId(member.name)
 
-    if (registeredNamesLower.has(nameLower)) {
+    if (registeredNamesNormalized.has(nameNormalized)) {
       skippedMembers.push({
         name: member.name,
-        reason: `Duplicate name: '${member.name}' already registered (case-insensitive match)`,
+        reason: `Duplicate name: '${member.name}' already registered (normalized match)`,
       })
       log("[council-member-agents] Skipping duplicate council member name", {
         name: member.name,
@@ -67,7 +69,7 @@ export function registerCouncilMemberAgents(
     }
 
     registeredKeys.push(key)
-    registeredNamesLower.add(nameLower)
+    registeredNamesNormalized.add(nameNormalized)
 
     log("[council-member-agents] Registered council member agent", {
       key,

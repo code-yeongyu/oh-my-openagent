@@ -50,7 +50,7 @@ describe("launchCouncilMember", () => {
 
       it("#then passes the correct agent key with Council: prefix", () => {
         const launchArgs = (manager.launch as ReturnType<typeof mock>).mock.calls[0][0]
-        expect(launchArgs.agent).toBe("Council: Claude Opus")
+        expect(launchArgs.agent).toBe("Council: claude_opus")
       })
 
       it("#then passes the prompt content", () => {

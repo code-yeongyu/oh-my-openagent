@@ -332,5 +332,47 @@ describe("extractCouncilResponse", () => {
     })
   })
 
+  describe("#given response with leading/trailing whitespace (99 chars after trim)", () => {
+    it("#then trims before checking MIN_RESPONSE_LENGTH and returns has_response false", () => {
+      const content = "a".repeat(99)
+      const text = `<COUNCIL_MEMBER_RESPONSE>   ${content}   </COUNCIL_MEMBER_RESPONSE>`
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: false,
+        response_complete: true,
+        result: content,
+      })
+    })
+  })
+
+  describe("#given response with leading/trailing whitespace (100 chars after trim)", () => {
+    it("#then trims before checking MIN_RESPONSE_LENGTH and returns has_response true", () => {
+      const content = "a".repeat(100)
+      const text = `<COUNCIL_MEMBER_RESPONSE>   ${content}   </COUNCIL_MEMBER_RESPONSE>`
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: content,
+      })
+    })
+  })
+
+  describe("#given response with newlines and spaces (100 chars after trim)", () => {
+    it("#then trims all whitespace before checking MIN_RESPONSE_LENGTH", () => {
+      const content = "a".repeat(100)
+      const text = `<COUNCIL_MEMBER_RESPONSE>\n  \n${content}\n  \n</COUNCIL_MEMBER_RESPONSE>`
+      const result = extractCouncilResponse(text)
+
+      expect(result).toEqual({
+        has_response: true,
+        response_complete: true,
+        result: content,
+      })
+    })
+  })
+
 })
 

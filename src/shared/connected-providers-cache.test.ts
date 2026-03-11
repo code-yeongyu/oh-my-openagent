@@ -1,18 +1,17 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test"
+import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
-
+import * as dataPath from "./data-path"
 import { updateConnectedProvidersCache, readProviderModelsCache } from "./connected-providers-cache"
 
 describe("updateConnectedProvidersCache", () => {
+	let cacheDirSpy: ReturnType<typeof spyOn>
 	let testCacheDir: string
-	let originalXdgCache: string | undefined
 
 	beforeEach(() => {
 		testCacheDir = mkdtempSync(join(tmpdir(), "omo-connected-providers-"))
-		originalXdgCache = process.env.XDG_CACHE_HOME
-		process.env.XDG_CACHE_HOME = testCacheDir
+		cacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(testCacheDir)
 		if (existsSync(testCacheDir)) {
 			rmSync(testCacheDir, { recursive: true })
 		}
@@ -20,11 +19,7 @@ describe("updateConnectedProvidersCache", () => {
 	})
 
 	afterEach(() => {
-		if (originalXdgCache !== undefined) {
-			process.env.XDG_CACHE_HOME = originalXdgCache
-		} else {
-			delete process.env.XDG_CACHE_HOME
-		}
+		cacheDirSpy.mockRestore()
 		if (existsSync(testCacheDir)) {
 			rmSync(testCacheDir, { recursive: true })
 		}
