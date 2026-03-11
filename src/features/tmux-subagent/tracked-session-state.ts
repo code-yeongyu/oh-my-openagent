@@ -23,5 +23,6 @@ export function markTrackedSessionClosePending(tracked: TrackedSession): Tracked
   return {
     ...tracked,
     closePending: true,
+    closeRetryCount: tracked.closePending ? tracked.closeRetryCount + 1 : tracked.closeRetryCount,
   }
 }

@@ -74,6 +74,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   const dispose = createPluginDispose({
     backgroundManager: managers.backgroundManager,
     skillMcpManager: managers.skillMcpManager,
+    tmuxSessionManager: managers.tmuxSessionManager,
     disposeHooks: hooks.disposeHooks,
   })
 

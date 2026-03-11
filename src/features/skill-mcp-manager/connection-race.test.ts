@@ -154,11 +154,11 @@ describe("getOrCreateClient disconnect race", () => {
     expect(createdClients[0]?.close).not.toHaveBeenCalled()
   })
 
-  it("#given no pending connections #when disconnectSession is called #then no errors occur and the session is added to disconnectedSessions", async () => {
+  it("#given no pending connections #when disconnectSession is called #then no errors occur and session is not added to disconnectedSessions", async () => {
     const state = createState()
 
     await expect(disconnectSession(state, "session-a")).resolves.toBeUndefined()
-    expect(state.disconnectedSessions.has("session-a")).toBe(true)
+    expect(state.disconnectedSessions.has("session-a")).toBe(false)
     expect(state.pendingConnections.size).toBe(0)
     expect(state.clients.size).toBe(0)
   })
