@@ -57,7 +57,7 @@ export function syncCachePackageJsonToIntent(pluginInfo: PluginEntryInfo): SyncR
     return { synced: false, error: "parse_error", message: "Failed to parse cache package.json (malformed JSON)" }
   }
 
-  if (!pkgJson.dependencies?.[PACKAGE_NAME]) {
+  if (!pkgJson || !pkgJson.dependencies?.[PACKAGE_NAME]) {
     log("[auto-update-checker] Plugin not in cache package.json dependencies, nothing to sync")
     return { synced: false, error: "plugin_not_in_deps", message: "Plugin not in cache package.json dependencies" }
   }

@@ -241,25 +241,27 @@ describe("syncCachePackageJsonToIntent", () => {
         renameSync: fs.renameSync,
       }))
 
-      const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+      try {
+        const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
 
-      const pluginInfo: PluginEntryInfo = {
-        entry: "oh-my-opencode@latest",
-        isPinned: false,
-        pinnedVersion: "latest",
-        configPath: "/tmp/opencode.json",
+        const pluginInfo: PluginEntryInfo = {
+          entry: "oh-my-opencode@latest",
+          isPinned: false,
+          pinnedVersion: "latest",
+          configPath: "/tmp/opencode.json",
+        }
+
+        const result = syncCachePackageJsonToIntent(pluginInfo)
+
+        expect(result.synced).toBe(false)
+        expect(result.error).toBe("write_error")
+      } finally {
+        mock.module("node:fs", () => ({
+          ...fs,
+          writeFileSync: originalWriteFileSync,
+          renameSync: originalRenameSync,
+        }))
       }
-
-      const result = syncCachePackageJsonToIntent(pluginInfo)
-
-      expect(result.synced).toBe(false)
-      expect(result.error).toBe("write_error")
-
-      mock.module("node:fs", () => ({
-        ...fs,
-        writeFileSync: originalWriteFileSync,
-        renameSync: originalRenameSync,
-      }))
     })
   })
 
@@ -289,27 +291,29 @@ describe("syncCachePackageJsonToIntent", () => {
         }),
       }))
 
-      const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
+      try {
+        const { syncCachePackageJsonToIntent } = await import("./sync-package-json")
 
-      const pluginInfo: PluginEntryInfo = {
-        entry: "oh-my-opencode@latest",
-        isPinned: false,
-        pinnedVersion: "latest",
-        configPath: "/tmp/opencode.json",
+        const pluginInfo: PluginEntryInfo = {
+          entry: "oh-my-opencode@latest",
+          isPinned: false,
+          pinnedVersion: "latest",
+          configPath: "/tmp/opencode.json",
+        }
+
+        const result = syncCachePackageJsonToIntent(pluginInfo)
+
+        expect(result.synced).toBe(false)
+        expect(result.error).toBe("write_error")
+        expect(tempFilePath).not.toBeNull()
+        expect(existsSync(tempFilePath!)).toBe(false)
+      } finally {
+        mock.module("node:fs", () => ({
+          ...fs,
+          writeFileSync: originalWriteFileSync,
+          renameSync: originalRenameSync,
+        }))
       }
-
-      const result = syncCachePackageJsonToIntent(pluginInfo)
-
-      expect(result.synced).toBe(false)
-      expect(result.error).toBe("write_error")
-      expect(tempFilePath).not.toBeNull()
-      expect(existsSync(tempFilePath!)).toBe(false)
-
-      mock.module("node:fs", () => ({
-        ...fs,
-        writeFileSync: originalWriteFileSync,
-        renameSync: originalRenameSync,
-      }))
     })
   })
 })
