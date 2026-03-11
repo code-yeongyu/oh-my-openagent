@@ -332,7 +332,7 @@ You can create powerful specialized agents by combining Categories and Skills.
 
 - **Category**: `ultrabrain`
 - **load_skills**: `[]` (pure reasoning)
-- **Effect**: Leverages GPT-5.3 Codex's logical reasoning for in-depth system architecture analysis.
+- **Effect**: Leverages GPT-5.4 xhigh reasoning for in-depth system architecture analysis.
 
 #### The Maintainer (Quick Fixes)
 
