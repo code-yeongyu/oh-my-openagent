@@ -5,6 +5,8 @@ import { normalizeSDKResponse } from "../../shared/normalize-sdk-response"
 import { normalizePromptTools } from "../../shared/prompt-tools"
 import { getSessionModel } from "../../shared/session-model-state"
 import { getSessionTools } from "../../shared/session-tools-store"
+import { isCompactionAgent } from "./session-id"
+import { resolveValidatedModel } from "./validated-model"
 
 type SessionMessage = {
   info?: {
@@ -28,30 +30,13 @@ type ResolverContext = {
   directory: string
 }
 
-function isCompactionAgent(agent: string | undefined): boolean {
-  return agent?.trim().toLowerCase() === "compaction"
-}
-
-function resolveModel(
-  info: SessionMessage["info"],
-): CompactionAgentConfigCheckpoint["model"] | undefined {
-  const providerID = info?.model?.providerID ?? info?.providerID
-  const modelID = info?.model?.modelID ?? info?.modelID
-
-  if (!providerID || !modelID) {
-    return undefined
-  }
-
-  return { providerID, modelID }
-}
-
 export async function resolveSessionPromptConfig(
   ctx: ResolverContext,
   sessionID: string,
 ): Promise<CompactionAgentConfigCheckpoint> {
+  const storedModel = getSessionModel(sessionID)
   const promptConfig: CompactionAgentConfigCheckpoint = {
     agent: getSessionAgent(sessionID),
-    model: getSessionModel(sessionID),
     tools: getSessionTools(sessionID),
   }
 
@@ -69,7 +54,7 @@ export async function resolveSessionPromptConfig(
       }
 
       if (!promptConfig.model) {
-        const model = resolveModel(info)
+        const model = resolveValidatedModel(info)
         if (model) {
           promptConfig.model = model
         }
@@ -94,6 +79,10 @@ export async function resolveSessionPromptConfig(
     })
   }
 
+  if (!promptConfig.model && storedModel) {
+    promptConfig.model = storedModel
+  }
+
   return promptConfig
 }
 
@@ -112,7 +101,7 @@ export async function resolveLatestSessionPromptConfig(
       return {}
     }
 
-    const model = resolveModel(latestInfo)
+    const model = resolveValidatedModel(latestInfo)
     const tools = normalizePromptTools(latestInfo.tools)
 
     return {
