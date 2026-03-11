@@ -255,7 +255,7 @@ export function createDelegateTask(options: DelegateTaskToolOptions): ToolDefini
       })
 
       if (runInBackground) {
-        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain)
+        return executeBackgroundTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, fallbackChain, steps, permission)
       }
 
       return executeSyncTask(args, ctx, options, parentContext, agentToUse, categoryModel, systemContent, modelInfo, fallbackChain, steps, permission)

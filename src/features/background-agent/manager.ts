@@ -262,6 +262,8 @@ export class BackgroundManager {
         fallbackChain: input.fallbackChain,
         attemptCount: 0,
         category: input.category,
+        steps: input.steps,
+        permission: input.permission,
       }
 
       this.tasks.set(task.id, task)
@@ -465,6 +467,8 @@ export class BackgroundManager {
           setSessionTools(sessionID, tools)
           return tools
         })(),
+        ...(input.steps !== undefined ? { steps: input.steps } : {}),
+        ...(input.permission ? { permission: input.permission } : {}),
         parts: [createInternalAgentTextPart(input.prompt)],
       },
     }).catch((error) => {

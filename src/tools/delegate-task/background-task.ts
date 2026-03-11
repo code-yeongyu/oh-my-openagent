@@ -1,6 +1,7 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import type { FallbackEntry } from "../../shared/model-requirements"
+import type { AgentPermission } from "../../config/schema"
 import { getTimingConfig } from "./timing"
 import { buildTaskPrompt } from "./prompt-builder"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
@@ -18,6 +19,8 @@ export async function executeBackgroundTask(
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
   fallbackChain?: FallbackEntry[],
+  steps?: number,
+  permission?: AgentPermission,
 ): Promise<string> {
   const { manager } = executorCtx
 
@@ -38,6 +41,8 @@ export async function executeBackgroundTask(
       skillContent: systemContent,
       category: args.category,
       sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+      steps,
+      permission,
     })
 
     // OpenCode TUI's `Task` tool UI calculates toolcalls by looking up

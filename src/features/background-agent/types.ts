@@ -1,5 +1,6 @@
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
+import type { AgentPermission } from "../../config/schema"
 
 export type BackgroundTaskStatus =
   | "pending"
@@ -52,6 +53,10 @@ export interface BackgroundTask {
   isUnstableAgent?: boolean
   /** Category used for this task (e.g., 'quick', 'visual-engineering') */
   category?: string
+  /** Maximum number of steps for this task (category/agent override) */
+  steps?: number
+  /** Agent permissions for this task */
+  permission?: AgentPermission
 
   /** Last message count for stability detection */
   lastMsgCount?: number
@@ -76,6 +81,10 @@ export interface LaunchInput {
   skillContent?: string
   category?: string
   sessionPermission?: SessionPermissionRule[]
+  /** Maximum number of steps for this task */
+  steps?: number
+  /** Agent permissions for this task */
+  permission?: AgentPermission
 }
 
 export interface ResumeInput {
