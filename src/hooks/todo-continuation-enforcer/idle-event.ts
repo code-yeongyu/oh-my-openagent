@@ -186,7 +186,7 @@ export async function handleSessionIdle(args: {
     return
   }
 
-  const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, incompleteCount)
+  const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, incompleteCount, todos)
   if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
     return
   }
