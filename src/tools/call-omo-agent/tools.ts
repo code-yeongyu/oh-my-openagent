@@ -96,9 +96,12 @@ export function createCallOmoAgent(
       }
 
       if (!args.session_id) {
+        let spawnReservation: Awaited<ReturnType<BackgroundManager["reserveSubagentSpawn"]>> | undefined
         try {
-          await backgroundManager.assertCanSpawn(toolCtx.sessionID)
+          spawnReservation = await backgroundManager.reserveSubagentSpawn(toolCtx.sessionID)
+          return await executeSync(args, toolCtx, ctx, undefined, fallbackChain, spawnReservation)
         } catch (error) {
+          spawnReservation?.rollback()
           return `Error: ${error instanceof Error ? error.message : String(error)}`
         }
       }

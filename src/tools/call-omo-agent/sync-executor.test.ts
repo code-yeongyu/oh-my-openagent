@@ -249,4 +249,52 @@ describe("executeSync", () => {
     expect(deps.waitForCompletion).not.toHaveBeenCalled()
     expect(deps.processMessages).not.toHaveBeenCalled()
   })
+
+  test("commits reserved descendant quota after creating a new sync session", async () => {
+    //#given
+    const { executeSync } = require("./sync-executor")
+
+    const deps = {
+      createOrGetSession: mock(async () => ({ sessionID: "ses-test-789", isNew: true })),
+      waitForCompletion: mock(async () => {}),
+      processMessages: mock(async () => "agent response"),
+      setSessionFallbackChain: mock(() => {}),
+    }
+
+    const spawnReservation = {
+      commit: mock(() => 1),
+      rollback: mock(() => {}),
+    }
+
+    const args = {
+      subagent_type: "explore",
+      description: "test task",
+      prompt: "find something",
+    }
+
+    const toolContext = {
+      sessionID: "parent-session",
+      messageID: "msg-4",
+      agent: "sisyphus",
+      abort: new AbortController().signal,
+      metadata: mock(async () => {}),
+    }
+
+    const ctx = {
+      client: {
+        session: {
+          promptAsync: mock(async () => ({ data: {} })),
+        },
+      },
+    }
+
+    //#when
+    await executeSync(args, toolContext, ctx as any, deps, undefined, spawnReservation)
+
+    //#then
+    expect(spawnReservation.commit).toHaveBeenCalledTimes(1)
+    expect(spawnReservation.rollback).toHaveBeenCalledTimes(0)
+  })
 })
+
+export {}

@@ -178,10 +178,45 @@ export class BackgroundManager {
     return spawnContext
   }
 
+  async reserveSubagentSpawn(parentSessionID: string): Promise<{
+    spawnContext: SubagentSpawnContext
+    descendantCount: number
+    commit: () => number
+    rollback: () => void
+  }> {
+    const spawnContext = await this.assertCanSpawn(parentSessionID)
+    const descendantCount = this.registerRootDescendant(spawnContext.rootSessionID)
+    let settled = false
+
+    return {
+      spawnContext,
+      descendantCount,
+      commit: () => {
+        settled = true
+        return descendantCount
+      },
+      rollback: () => {
+        if (settled) return
+        settled = true
+        this.unregisterRootDescendant(spawnContext.rootSessionID)
+      },
+    }
+  }
+
   private registerRootDescendant(rootSessionID: string): number {
     const nextCount = (this.rootDescendantCounts.get(rootSessionID) ?? 0) + 1
     this.rootDescendantCounts.set(rootSessionID, nextCount)
     return nextCount
+  }
+
+  private unregisterRootDescendant(rootSessionID: string): void {
+    const currentCount = this.rootDescendantCounts.get(rootSessionID) ?? 0
+    if (currentCount <= 1) {
+      this.rootDescendantCounts.delete(rootSessionID)
+      return
+    }
+
+    this.rootDescendantCounts.set(rootSessionID, currentCount - 1)
   }
 
   async launch(input: LaunchInput): Promise<BackgroundTask> {
@@ -196,73 +231,79 @@ export class BackgroundManager {
       throw new Error("Agent parameter is required")
     }
 
-    const spawnContext = await this.assertCanSpawn(input.parentSessionID)
-    const descendantCount = this.registerRootDescendant(spawnContext.rootSessionID)
+    const spawnReservation = await this.reserveSubagentSpawn(input.parentSessionID)
 
-    log("[background-agent] spawn guard passed", {
-      parentSessionID: input.parentSessionID,
-      rootSessionID: spawnContext.rootSessionID,
-      childDepth: spawnContext.childDepth,
-      descendantCount,
-    })
-
-    // Create task immediately with status="pending"
-    const task: BackgroundTask = {
-      id: `bg_${crypto.randomUUID().slice(0, 8)}`,
-      status: "pending",
-      queuedAt: new Date(),
-      rootSessionID: spawnContext.rootSessionID,
-      // Do NOT set startedAt - will be set when running
-      // Do NOT set sessionID - will be set when running
-      description: input.description,
-      prompt: input.prompt,
-      agent: input.agent,
-      spawnDepth: spawnContext.childDepth,
-      parentSessionID: input.parentSessionID,
-      parentMessageID: input.parentMessageID,
-      parentModel: input.parentModel,
-      parentAgent: input.parentAgent,
-      parentTools: input.parentTools,
-      model: input.model,
-      fallbackChain: input.fallbackChain,
-      attemptCount: 0,
-      category: input.category,
-    }
-
-    this.tasks.set(task.id, task)
-    this.taskHistory.record(input.parentSessionID, { id: task.id, agent: input.agent, description: input.description, status: "pending", category: input.category })
-
-    // Track for batched notifications immediately (pending state)
-    if (input.parentSessionID) {
-      const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
-      pending.add(task.id)
-      this.pendingByParent.set(input.parentSessionID, pending)
-    }
-
-    // Add to queue
-    const key = this.getConcurrencyKeyFromInput(input)
-    const queue = this.queuesByKey.get(key) ?? []
-    queue.push({ task, input })
-    this.queuesByKey.set(key, queue)
-
-    log("[background-agent] Task queued:", { taskId: task.id, key, queueLength: queue.length })
-
-    const toastManager = getTaskToastManager()
-    if (toastManager) {
-      toastManager.addTask({
-        id: task.id,
-        description: input.description,
-        agent: input.agent,
-        isBackground: true,
-        status: "queued",
-        skills: input.skills,
+    try {
+      log("[background-agent] spawn guard passed", {
+        parentSessionID: input.parentSessionID,
+        rootSessionID: spawnReservation.spawnContext.rootSessionID,
+        childDepth: spawnReservation.spawnContext.childDepth,
+        descendantCount: spawnReservation.descendantCount,
       })
+
+      // Create task immediately with status="pending"
+      const task: BackgroundTask = {
+        id: `bg_${crypto.randomUUID().slice(0, 8)}`,
+        status: "pending",
+        queuedAt: new Date(),
+        rootSessionID: spawnReservation.spawnContext.rootSessionID,
+        // Do NOT set startedAt - will be set when running
+        // Do NOT set sessionID - will be set when running
+        description: input.description,
+        prompt: input.prompt,
+        agent: input.agent,
+        spawnDepth: spawnReservation.spawnContext.childDepth,
+        parentSessionID: input.parentSessionID,
+        parentMessageID: input.parentMessageID,
+        parentModel: input.parentModel,
+        parentAgent: input.parentAgent,
+        parentTools: input.parentTools,
+        model: input.model,
+        fallbackChain: input.fallbackChain,
+        attemptCount: 0,
+        category: input.category,
+      }
+
+      this.tasks.set(task.id, task)
+      this.taskHistory.record(input.parentSessionID, { id: task.id, agent: input.agent, description: input.description, status: "pending", category: input.category })
+
+      // Track for batched notifications immediately (pending state)
+      if (input.parentSessionID) {
+        const pending = this.pendingByParent.get(input.parentSessionID) ?? new Set()
+        pending.add(task.id)
+        this.pendingByParent.set(input.parentSessionID, pending)
+      }
+
+      // Add to queue
+      const key = this.getConcurrencyKeyFromInput(input)
+      const queue = this.queuesByKey.get(key) ?? []
+      queue.push({ task, input })
+      this.queuesByKey.set(key, queue)
+
+      log("[background-agent] Task queued:", { taskId: task.id, key, queueLength: queue.length })
+
+      const toastManager = getTaskToastManager()
+      if (toastManager) {
+        toastManager.addTask({
+          id: task.id,
+          description: input.description,
+          agent: input.agent,
+          isBackground: true,
+          status: "queued",
+          skills: input.skills,
+        })
+      }
+
+      spawnReservation.commit()
+
+      // Trigger processing (fire-and-forget)
+      this.processKey(key)
+
+      return { ...task }
+    } catch (error) {
+      spawnReservation.rollback()
+      throw error
     }
-
-    // Trigger processing (fire-and-forget)
-    this.processKey(key)
-
-    return { ...task }
   }
 
   private async processKey(key: string): Promise<void> {
@@ -1474,14 +1515,6 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
         this.completionTimers.set(taskId, timer)
       }
     }
-  }
-
-  private formatDuration(start: Date, end?: Date): string {
-    return formatDuration(start, end)
-  }
-
-  private isAbortedSessionError(error: unknown): boolean {
-    return isAbortedSessionError(error)
   }
 
   private hasRunningTasks(): boolean {

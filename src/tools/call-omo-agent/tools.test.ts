@@ -1,18 +1,24 @@
-import { describe, test, expect, mock } from "bun:test"
-import type { PluginInput } from "@opencode-ai/plugin"
-import type { BackgroundManager } from "../../features/background-agent"
-import type { FallbackEntry } from "../../shared/model-requirements"
-import { createCallOmoAgent } from "./tools"
+const { beforeEach, describe, test, expect, mock } = require("bun:test")
+const { createCallOmoAgent } = require("./tools")
 
 describe("createCallOmoAgent", () => {
   const assertCanSpawnMock = mock(() => Promise.resolve(undefined))
+  const reserveCommitMock = mock(() => 1)
+  const reserveRollbackMock = mock(() => {})
+  const reserveSubagentSpawnMock = mock(() => Promise.resolve({
+    spawnContext: { rootSessionID: "root-session", parentDepth: 0, childDepth: 1 },
+    descendantCount: 1,
+    commit: reserveCommitMock,
+    rollback: reserveRollbackMock,
+  }))
   const mockCtx = {
     client: {},
     directory: "/test",
-  } as unknown as PluginInput
+  }
 
   const mockBackgroundManager = {
     assertCanSpawn: assertCanSpawnMock,
+    reserveSubagentSpawn: reserveSubagentSpawnMock,
     launch: mock(() => Promise.resolve({
       id: "test-task-id",
       sessionID: null,
@@ -20,7 +26,14 @@ describe("createCallOmoAgent", () => {
       agent: "test-agent",
       status: "pending",
     })),
-  } as unknown as BackgroundManager
+  }
+
+  beforeEach(() => {
+    assertCanSpawnMock.mockClear()
+    reserveSubagentSpawnMock.mockClear()
+    reserveCommitMock.mockClear()
+    reserveRollbackMock.mockClear()
+  })
 
   test("should reject agent in disabled_agents list", async () => {
     //#given
@@ -105,7 +118,7 @@ describe("createCallOmoAgent", () => {
 
   test("uses agent override fallback_models when launching background subagent", async () => {
     //#given
-    const launch = mock((_input: { fallbackChain?: FallbackEntry[] }) => Promise.resolve({
+    const launch = mock((_input: { fallbackChain?: Array<{ providers: string[]; model: string; variant?: string }> }) => Promise.resolve({
       id: "task-fallback",
       sessionID: "sub-session",
       description: "Test task",
@@ -115,7 +128,7 @@ describe("createCallOmoAgent", () => {
     const managerWithLaunch = {
       launch,
       getTask: mock(() => undefined),
-    } as unknown as BackgroundManager
+    }
     const toolDef = createCallOmoAgent(
       mockCtx,
       managerWithLaunch,
@@ -154,7 +167,7 @@ describe("createCallOmoAgent", () => {
 
   test("should return a tool error when sync spawn depth validation fails", async () => {
     //#given
-    assertCanSpawnMock.mockRejectedValueOnce(new Error("Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3."))
+    reserveSubagentSpawnMock.mockRejectedValueOnce(new Error("Subagent spawn blocked: child depth 4 exceeds background_task.maxDepth=3."))
     const toolDef = createCallOmoAgent(mockCtx, mockBackgroundManager, [])
     const executeFunc = toolDef.execute as Function
 
@@ -173,3 +186,5 @@ describe("createCallOmoAgent", () => {
     expect(result).toContain("background_task.maxDepth=3")
   })
 })
+
+export {}
