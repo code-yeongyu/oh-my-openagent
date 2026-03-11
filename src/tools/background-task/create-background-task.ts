@@ -98,7 +98,7 @@ export function createBackgroundTask(
             ...(sessionId ? { sessionId } : {}),
           },
         }
-        ctx.metadata?.(bgMeta)
+        await ctx.metadata?.(bgMeta)
 
         if (ctx.callID) {
           storeToolMetadata(ctx.sessionID, ctx.callID, bgMeta)
