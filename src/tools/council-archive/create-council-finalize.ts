@@ -10,10 +10,40 @@ import {
   getValidCouncilIntents,
   resolveCouncilIntent,
   COUNCIL_DEFAULTS,
+  createQuorumRules,
 } from "../../agents/athena"
 import { readFileWithContext } from "../../shared/file-utils"
-import type { CouncilGuidanceMode } from "../../agents/athena"
-import type { CouncilFinalizeArgs, CouncilMemberResult, CouncilFinalizeResult } from "./types"
+import type { CouncilGuidanceMode, QuorumRules } from "../../agents/athena"
+import type {
+  CouncilFinalizeArgs,
+  CouncilFinalizeQuorumStatus,
+  CouncilMemberResult,
+  CouncilFinalizeResult,
+} from "./types"
+
+interface QuorumResponse {
+  status: "success" | "failure"
+}
+
+function checkQuorum(
+  responses: QuorumResponse[],
+  quorumRules: QuorumRules,
+): CouncilFinalizeQuorumStatus {
+  const successful = responses.filter((response) => response.status === "success").length
+  const ratio = responses.length === 0 ? 0 : successful / responses.length
+  const required = Math.ceil(quorumRules.threshold * responses.length)
+
+  return {
+    met: responses.length > 0 && ratio >= quorumRules.threshold,
+    actual: successful,
+    required,
+  }
+}
+
+function toQuorumResponse(member: CouncilMemberResult): QuorumResponse {
+  const isSuccessful = member.has_response && member.response_complete === true && member.error === undefined
+  return { status: isSuccessful ? "success" : "failure" }
+}
 
 export function createCouncilFinalize(
   basePath?: string,
@@ -36,6 +66,11 @@ export function createCouncilFinalize(
         .string()
         .optional()
         .describe('Council guidance mode: "interactive" (default) includes action paths with Question tool, "non-interactive" strips action paths for programmatic use'),
+      quorum_rules: tool.schema.object({
+        threshold: tool.schema.number().optional().describe("Structured quorum threshold override. Defaults to council quorum threshold."),
+        minResponses: tool.schema.number().optional().describe("Structured minimum response count override from the quorum rules contract."),
+        timeoutSeconds: tool.schema.number().optional().describe("Structured quorum timeout override from the quorum rules contract."),
+      }).optional().describe("Structured quorum rules from prepare_council_prompt/athena_council."),
     },
     async execute(args: CouncilFinalizeArgs, _toolContext) {
       const base = basePath ?? process.cwd()
@@ -160,10 +195,24 @@ export function createCouncilFinalize(
           "utf-8",
         )
 
+        const quorumRules = createQuorumRules({
+          threshold: args.quorum_rules?.threshold ?? COUNCIL_DEFAULTS.QUORUM_THRESHOLD,
+          minResponses: args.quorum_rules?.minResponses,
+          timeoutSeconds: args.quorum_rules?.timeoutSeconds,
+        })
+        const quorum = checkQuorum(members.map(toQuorumResponse), quorumRules)
+
         const result: CouncilFinalizeResult = {
+          success: quorum.met,
+          error: quorum.met ? undefined : `Quorum not met: ${quorum.actual}/${quorum.required} responses`,
           archive_dir: relArchiveDirForOutput,
           meta_file: relMetaFileForOutput,
           members,
+          quorum,
+        }
+
+        if (!quorum.met) {
+          return JSON.stringify(result, null, 2)
         }
 
         const resolvedMode = (args.mode === "non-interactive" ? "non-interactive" : "interactive") as CouncilGuidanceMode

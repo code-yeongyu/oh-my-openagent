@@ -50,6 +50,125 @@ describe("createCouncilFinalize", () => {
     await mkdir(join(tmpDir, ".sisyphus", "task-outputs"), { recursive: true })
   })
 
+  describe("#given quorum enforcement scenarios", () => {
+    it("#then succeeds when successful responses meet the default 60 percent quorum", async () => {
+      const agents = [
+        {
+          id: "bg_quorum_pass_1",
+          agent: "Council: Claude Opus",
+          response: "Opus analysis: This is a detailed analysis from Opus model covering the full scope of the council question.",
+        },
+        {
+          id: "bg_quorum_pass_2",
+          agent: "Council: GPT-5",
+          response: "GPT analysis: This is a detailed analysis from GPT model covering the full scope of the council question.",
+        },
+        {
+          id: "bg_quorum_pass_3",
+          agent: "Council: Gemini",
+          response: "Gemini analysis: This is a detailed analysis from Gemini model covering the full scope of the council question.",
+        },
+      ]
+
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", `${agents[0].id}.md`),
+        mockTaskOutput(agents[0].agent, agents[0].response),
+        "utf-8",
+      )
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", `${agents[1].id}.md`),
+        mockTaskOutput(agents[1].agent, agents[1].response),
+        "utf-8",
+      )
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: agents.map((agent) => agent.id), name: "quorum-pass", intent: "FREEFORM" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
+
+      expect(result.success).toBe(true)
+      expect(result.error).toBeUndefined()
+      expect(result.quorum).toEqual({ met: true, actual: 2, required: 2 })
+      expect(result.members).toHaveLength(3)
+    })
+
+    it("#then fails when successful responses stay below the default 60 percent quorum", async () => {
+      await writeFile(
+        join(tmpDir, ".sisyphus", "task-outputs", "bg_quorum_fail_1.md"),
+        mockTaskOutput("Council: Claude Opus", "Opus analysis: This is a detailed analysis from Opus model covering the full scope of the council question."),
+        "utf-8",
+      )
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        {
+          task_ids: ["bg_quorum_fail_1", "bg_quorum_fail_2", "bg_quorum_fail_3"],
+          name: "quorum-fail",
+          intent: "FREEFORM",
+        },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe("Quorum not met: 1/2 responses")
+      expect(result.quorum).toEqual({ met: false, actual: 1, required: 2 })
+      expect(result.members).toHaveLength(3)
+    })
+
+    it("#then treats exactly 60 percent successful responses as quorum met", async () => {
+      const passingAgents = [
+        { id: "bg_quorum_edge_1", agent: "Council: Claude Opus" },
+        { id: "bg_quorum_edge_2", agent: "Council: GPT-5" },
+        { id: "bg_quorum_edge_3", agent: "Council: Gemini" },
+      ]
+
+      for (const agent of passingAgents) {
+        await writeFile(
+          join(tmpDir, ".sisyphus", "task-outputs", `${agent.id}.md`),
+          mockTaskOutput(agent.agent, `${agent.agent} analysis: This is a detailed analysis covering the full scope of the council question.`),
+          "utf-8",
+        )
+      }
+
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        {
+          task_ids: [
+            "bg_quorum_edge_1",
+            "bg_quorum_edge_2",
+            "bg_quorum_edge_3",
+            "bg_quorum_edge_4",
+            "bg_quorum_edge_5",
+          ],
+          name: "quorum-edge",
+          intent: "FREEFORM",
+        },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
+
+      expect(result.success).toBe(true)
+      expect(result.quorum).toEqual({ met: true, actual: 3, required: 3 })
+    })
+
+    it("#then reports quorum failure for empty task lists", async () => {
+      const toolDef = createCouncilFinalize(tmpDir)
+      const resultStr = await toolDef.execute(
+        { task_ids: [], name: "quorum-empty", intent: "FREEFORM" },
+        mockCtx,
+      )
+      const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe("Quorum not met: 0/0 responses")
+      expect(result.quorum).toEqual({ met: false, actual: 0, required: 0 })
+      expect(result.members).toEqual([])
+    })
+  })
+
   describe("#given 3 members with valid output files", () => {
     it("#then creates full archive with all has_response true", async () => {
       const agents = [

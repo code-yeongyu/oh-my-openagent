@@ -1,3 +1,5 @@
+import type { QuorumRules } from "../../agents/athena"
+
 export interface CouncilFinalizeArgs {
   task_ids: string[]
   name: string
@@ -5,6 +7,7 @@ export interface CouncilFinalizeArgs {
   question?: string
   prompt_file?: string
   mode?: string
+  quorum_rules?: QuorumRules
 }
 
 export interface CouncilMemberResult {
@@ -16,8 +19,17 @@ export interface CouncilMemberResult {
   error?: string
 }
 
+export interface CouncilFinalizeQuorumStatus {
+  met: boolean
+  actual: number
+  required: number
+}
+
 export interface CouncilFinalizeResult {
+  success: boolean
+  error?: string
   archive_dir: string
   meta_file: string
   members: CouncilMemberResult[]
+  quorum: CouncilFinalizeQuorumStatus
 }
