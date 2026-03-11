@@ -1,3 +1,5 @@
+/// <reference types="bun-types" />
+
 import * as fs from "node:fs"
 
 import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test"
