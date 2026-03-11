@@ -4,7 +4,7 @@ import { log } from "../../../shared/logger"
 import { invalidatePackage } from "../cache"
 import { PACKAGE_NAME } from "../constants"
 import { extractChannel } from "../version-channel"
-import { findPluginEntry, getCachedVersion, getLatestVersion, revertPinnedVersion } from "../checker"
+import { findPluginEntry, getCachedVersion, getLatestVersion, revertPinnedVersion, syncCachePackageJsonToIntent } from "../checker"
 import { showAutoUpdatedToast, showUpdateAvailableToast } from "./update-toasts"
 
 function getPinnedVersionToastMessage(latestVersion: string): string {
@@ -65,6 +65,7 @@ export async function runBackgroundUpdateCheck(
     return
   }
 
+  syncCachePackageJsonToIntent(pluginInfo)
   invalidatePackage(PACKAGE_NAME)
 
   const installSuccess = await runBunInstallSafe()
