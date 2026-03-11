@@ -1,7 +1,7 @@
 import { log } from "../../shared/logger"
-import type { AgentConfig } from "@opencode-ai/sdk"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { McpServerConfig } from "../claude-code-mcp-loader/types"
+import type { ClaudeCodeAgentConfig } from "../claude-code-agent-loader/types"
 import type { HooksConfig, LoadedPlugin, PluginLoadError, PluginLoaderOptions } from "./types"
 import { discoverInstalledPlugins } from "./discovery"
 import { loadPluginCommands } from "./command-loader"
@@ -20,7 +20,7 @@ export { loadPluginHooksConfigs } from "./hook-loader"
 export interface PluginComponentsResult {
   commands: Record<string, CommandDefinition>
   skills: Record<string, CommandDefinition>
-  agents: Record<string, AgentConfig>
+  agents: Record<string, ClaudeCodeAgentConfig>
   mcpServers: Record<string, McpServerConfig>
   hooksConfigs: HooksConfig[]
   plugins: LoadedPlugin[]
