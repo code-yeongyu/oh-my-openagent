@@ -8,7 +8,8 @@ export type ContextLimitModelCacheState = {
 }
 
 function isAnthropicProvider(providerID: string): boolean {
-  return providerID.toLowerCase().includes("anthropic")
+  const normalized = providerID.toLowerCase()
+  return normalized === "anthropic" || normalized === "google-vertex-anthropic" || normalized === "aws-bedrock-anthropic"
 }
 
 function getAnthropicActualLimit(modelCacheState?: ContextLimitModelCacheState): number {
