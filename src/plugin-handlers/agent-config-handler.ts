@@ -78,6 +78,22 @@ export async function applyAgentConfig(params: {
   const useTaskSystem = params.pluginConfig.experimental?.task_system ?? false;
   const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
 
+  const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
+  const userAgents = includeClaudeAgents ? loadUserAgents() : {};
+  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
+  const rawPluginAgents = params.pluginComponents.agents;
+
+  const customAgentSummaries = [
+    ...Object.entries(userAgents),
+    ...Object.entries(projectAgents),
+    ...Object.entries(rawPluginAgents).filter(([, config]) => config !== undefined),
+  ].map(([name, config]) => ({
+    name,
+    description: typeof (config as Record<string, unknown>)?.description === "string"
+      ? (config as Record<string, unknown>).description as string
+      : "",
+  }));
+
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
     params.pluginConfig.agents,
@@ -86,7 +102,7 @@ export async function applyAgentConfig(params: {
     params.pluginConfig.categories,
     params.pluginConfig.git_master,
     allDiscoveredSkills,
-    params.ctx.client,
+    customAgentSummaries,
     browserProvider,
     currentModel,
     disabledSkills,
@@ -94,11 +110,6 @@ export async function applyAgentConfig(params: {
     disableOmoEnv,
   );
 
-  const includeClaudeAgents = params.pluginConfig.claude_code?.agents ?? true;
-  const userAgents = includeClaudeAgents ? loadUserAgents() : {};
-  const projectAgents = includeClaudeAgents ? loadProjectAgents(params.ctx.directory) : {};
-
-  const rawPluginAgents = params.pluginComponents.agents;
   const pluginAgents = Object.fromEntries(
     Object.entries(rawPluginAgents).map(([key, value]) => [
       key,
