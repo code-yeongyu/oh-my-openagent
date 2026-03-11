@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+/// <reference path="../../../bun-test.d.ts" />
+
+import { afterEach, beforeEach, describe, expect, it as test } from "bun:test"
 
 import { createSessionStateStore, type SessionStateStore } from "./session-state"
 
@@ -45,5 +47,79 @@ describe("createSessionStateStore", () => {
     expect(progressUpdate.hasProgressed).toBe(true)
     expect(progressUpdate.stagnationCount).toBe(0)
     expect(sessionStateStore.getState(sessionID).lastIncompleteCount).toBe(2)
+  })
+
+  test("given one todo completes while another is added, resets stagnation even when incomplete count stays the same", () => {
+    // given
+    const sessionID = "ses-completion-with-addition"
+    const state = sessionStateStore.getState(sessionID)
+    state.lastInjectedAt = Date.now()
+    const initialTodos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    const progressedTodos = [
+      { id: "1", content: "Task 1", status: "completed", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+      { id: "3", content: "Task 3", status: "pending", priority: "low" },
+    ]
+    sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+    sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+
+    // when
+    const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, progressedTodos)
+
+    // then
+    expect(progressUpdate.hasProgressed).toBe(true)
+    expect(progressUpdate.stagnationCount).toBe(0)
+  })
+
+  test("given todo status changes without count changes, treats it as progress", () => {
+    // given
+    const sessionID = "ses-status-change-progress"
+    const state = sessionStateStore.getState(sessionID)
+    state.lastInjectedAt = Date.now()
+    const initialTodos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    const progressedTodos = [
+      { id: "1", content: "Task 1", status: "in_progress", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+    sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+
+    // when
+    const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, progressedTodos)
+
+    // then
+    expect(progressUpdate.hasProgressed).toBe(true)
+    expect(progressUpdate.stagnationCount).toBe(0)
+  })
+
+  test("given progress resumes after stagnation, restarts the stagnation count from zero", () => {
+    // given
+    const sessionID = "ses-progress-restarts-stagnation"
+    const state = sessionStateStore.getState(sessionID)
+    state.lastInjectedAt = Date.now()
+    const initialTodos = [
+      { id: "1", content: "Task 1", status: "pending", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    const progressedTodos = [
+      { id: "1", content: "Task 1", status: "in_progress", priority: "high" },
+      { id: "2", content: "Task 2", status: "pending", priority: "medium" },
+    ]
+    sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+    sessionStateStore.trackContinuationProgress(sessionID, 2, initialTodos)
+    sessionStateStore.trackContinuationProgress(sessionID, 2, progressedTodos)
+
+    // when
+    const stagnatedAgainUpdate = sessionStateStore.trackContinuationProgress(sessionID, 2, progressedTodos)
+
+    // then
+    expect(stagnatedAgainUpdate.hasProgressed).toBe(false)
+    expect(stagnatedAgainUpdate.stagnationCount).toBe(1)
   })
 })
