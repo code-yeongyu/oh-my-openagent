@@ -288,7 +288,7 @@ Disable categories: `{ "disabled_categories": ["ultrabrain"] }`
 | **artistry**           | `gemini-3.1-pro`    | `gemini-3.1-pro` → `claude-opus-4-6` → `gpt-5.4`               |
 | **quick**              | `claude-haiku-4-5`  | `claude-haiku-4-5` → `gemini-3-flash` → `gpt-5-nano`           |
 | **unspecified-low**    | `claude-sonnet-4-6` | `claude-sonnet-4-6` → `gpt-5.3-codex` → `gemini-3-flash`       |
-| **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4` → `glm-5` → `k2p5` → `kimi-k2.5` |
+| **unspecified-high**   | `claude-opus-4-6`   | `claude-opus-4-6` → `gpt-5.4 (high)` → `glm-5` → `k2p5` → `kimi-k2.5` |
 | **writing**            | `gemini-3-flash`    | `gemini-3-flash` → `claude-sonnet-4-6`                         |
 
 Run `bunx oh-my-opencode doctor --verbose` to see effective model resolution for your config.

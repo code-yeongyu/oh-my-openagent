@@ -151,7 +151,7 @@ When agents delegate work, they don't pick a model name — they pick a **catego
 | `deep`               | Deep coding, complex logic | GPT-5.3 Codex → Claude Opus → Gemini 3.1 Pro |
 | `artistry`           | Creative, novel approaches | Gemini 3.1 Pro → Claude Opus → GPT-5.4       |
 | `quick`              | Simple, fast tasks         | Claude Haiku → Gemini Flash → GPT-5-Nano     |
-| `unspecified-high`   | General complex work       | Claude Opus → GPT-5.4 → GLM 5 → K2P5         |
+| `unspecified-high`   | General complex work       | Claude Opus → GPT-5.4 (high) → GLM 5 → K2P5  |
 | `unspecified-low`    | General standard work      | Claude Sonnet → GPT-5.3 Codex → Gemini Flash |
 | `writing`            | Text, docs, prose          | Gemini Flash → Claude Sonnet                 |
 
