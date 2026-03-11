@@ -3785,7 +3785,7 @@ describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
     manager.shutdown()
   })
 
-  test("should start cleanup timers only after all tasks complete", async () => {
+  test("should start per-task cleanup timers independently of sibling completion", async () => {
     // given
     const client = {
       session: {
@@ -3832,7 +3832,7 @@ describe("BackgroundManager.completionTimers - Memory Leak Fix", () => {
 
     // then
     const completionTimers = getCompletionTimers(manager)
-    expect(completionTimers.size).toBe(0)
+    expect(completionTimers.size).toBe(1)
 
     // when
     await (manager as unknown as { notifyParentSession: (task: BackgroundTask) => Promise<void> })
