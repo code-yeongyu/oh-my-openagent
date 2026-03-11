@@ -14,7 +14,10 @@ export function shouldStopForStagnation(args: {
     log(`[${HOOK_NAME}] Progress detected: reset stagnation count`, {
       sessionID,
       previousIncompleteCount: progressUpdate.previousIncompleteCount,
+      previousStagnationCount: progressUpdate.previousStagnationCount,
       incompleteCount,
+      progressSource: progressUpdate.progressSource,
+      recoveredFromStagnationStop: progressUpdate.previousStagnationCount >= MAX_STAGNATION_COUNT,
     })
   }
 
