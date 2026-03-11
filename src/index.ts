@@ -83,13 +83,14 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       _input: { sessionID: string },
       output: { context: string[] },
     ): Promise<void> => {
+      await hooks.compactionContextInjector?.capture(_input.sessionID)
       await hooks.compactionTodoPreserver?.capture(_input.sessionID)
       await hooks.claudeCodeHooks?.["experimental.session.compacting"]?.(
         _input,
         output,
       )
       if (hooks.compactionContextInjector) {
-        output.context.push(hooks.compactionContextInjector(_input.sessionID))
+        output.context.push(hooks.compactionContextInjector.inject(_input.sessionID))
       }
     },
   }

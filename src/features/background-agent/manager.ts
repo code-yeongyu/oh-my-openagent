@@ -41,7 +41,10 @@ import {
 } from "./error-classifier"
 import { tryFallbackRetry } from "./fallback-retry-handler"
 import { registerManagerForCleanup, unregisterManagerForCleanup } from "./process-cleanup"
-import { isCompactionAgent, findNearestMessageExcludingCompaction } from "./compaction-aware-message-resolver"
+import {
+  findNearestMessageExcludingCompaction,
+  resolvePromptContextFromSessionMessages,
+} from "./compaction-aware-message-resolver"
 import { handleSessionIdleBackgroundEvent } from "./session-idle-event-handler"
 import { MESSAGE_STORAGE } from "../hook-message-injector"
 import { join } from "node:path"
@@ -1323,20 +1326,20 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
               tools?: Record<string, boolean | "allow" | "deny" | "ask">
             }
           }>)
-          for (let i = messages.length - 1; i >= 0; i--) {
-            const info = messages[i].info
-            if (isCompactionAgent(info?.agent)) {
-              continue
-            }
-            const normalizedTools = isRecord(info?.tools)
-              ? normalizePromptTools(info.tools as Record<string, boolean | "allow" | "deny" | "ask">)
+          const promptContext = resolvePromptContextFromSessionMessages(
+            messages,
+            task.parentSessionID,
+          )
+          const normalizedTools = isRecord(promptContext?.tools)
+            ? normalizePromptTools(promptContext.tools)
+            : undefined
+
+          if (promptContext?.agent || promptContext?.model || normalizedTools) {
+            agent = promptContext?.agent ?? task.parentAgent
+            model = promptContext?.model?.providerID && promptContext.model.modelID
+              ? { providerID: promptContext.model.providerID, modelID: promptContext.model.modelID }
               : undefined
-            if (info?.agent || info?.model || (info?.modelID && info?.providerID) || normalizedTools) {
-              agent = info?.agent ?? task.parentAgent
-              model = info?.model ?? (info?.providerID && info?.modelID ? { providerID: info.providerID, modelID: info.modelID } : undefined)
-              tools = normalizedTools ?? tools
-              break
-            }
+            tools = normalizedTools ?? tools
           }
         } catch (error) {
           if (isAbortedSessionError(error)) {
@@ -1346,7 +1349,9 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
             })
           }
           const messageDir = join(MESSAGE_STORAGE, task.parentSessionID)
-          const currentMessage = messageDir ? findNearestMessageExcludingCompaction(messageDir) : null
+          const currentMessage = messageDir
+            ? findNearestMessageExcludingCompaction(messageDir, task.parentSessionID)
+            : null
           agent = currentMessage?.agent ?? task.parentAgent
           model = currentMessage?.model?.providerID && currentMessage?.model?.modelID
             ? { providerID: currentMessage.model.providerID, modelID: currentMessage.model.modelID }
