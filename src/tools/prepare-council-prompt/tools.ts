@@ -111,15 +111,6 @@ Returns the file path to reference in subsequent task() calls.`
 
         await writeFile(filePath, content, "utf-8")
 
-        setTimeout(() => {
-          unlink(filePath).catch((err) => {
-            const code = (err as NodeJS.ErrnoException).code
-            if (code !== "ENOENT") {
-              log("[prepare-council-prompt] Failed to clean up temp file", { filePath, error: String(err) })
-            }
-          })
-        }, CLEANUP_DELAY_MS)
-
         log("[prepare-council-prompt] Saved prompt", { filePath, length: args.prompt.length, mode })
 
         return `Council prompt saved to: ${filePath} (mode: ${mode}, intent: ${resolvedIntent ?? "none"})
@@ -127,7 +118,7 @@ Returns the file path to reference in subsequent task() calls.`
 Use this path in each council member's task() call:
 - prompt: "Read ${filePath} for your instructions."
 
-The file auto-deletes after 30 minutes.`
+The file stays in .sisyphus/tmp until council_finalize archives and cleans it up.`
       } catch (err) {
         return `Error saving council prompt: ${String(err)}`
       }

@@ -5,6 +5,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createCouncilFinalize } from "./create-council-finalize"
+import { createPrepareCouncilPromptTool } from "../prepare-council-prompt/tools"
 import type { CouncilFinalizeResult } from "./types"
 import type { BackgroundTask } from "../../features/background-agent"
 import type { BackgroundOutputManager } from "../background-task/clients"
@@ -52,6 +53,19 @@ function mockTaskOutputNoTags(agent: string, body: string): string {
     "[assistant] 14:00:00",
     body,
   ].join("\n")
+}
+
+function extractPreparedPromptPath(output: string): string {
+  const match = output.match(/^Council prompt saved to: (.+?) \(mode:/m)
+  if (!match) {
+    throw new Error(`Failed to parse prompt file path from output: ${output}`)
+  }
+
+  return match[1]
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  return stat(path).then(() => true).catch(() => false)
 }
 
 const toolContext = {
@@ -266,6 +280,72 @@ describe("council archive integration flow", () => {
   })
 
   describe("#given question and prompt_file params", () => {
+    describe("#when prompt file is prepared before council finalize", () => {
+      it("#then the temp prompt exists during the council run and is removed from tmp on finalize", async () => {
+        const taskId = "bg_prompt_lifecycle"
+        await writeFile(
+          join(tmpDir, ".sisyphus", "task-outputs", `${taskId}.md`),
+          mockTaskOutput("Council: Opus", "Lifecycle analysis result"),
+          "utf-8",
+        )
+
+        const prepareTool = createPrepareCouncilPromptTool(tmpDir)
+        const prepareResult = await prepareTool.execute(
+          { prompt: "How should prompt lifecycle work?", mode: "solo", intent: "FREEFORM" },
+          toolContext,
+        )
+        const promptFile = extractPreparedPromptPath(prepareResult)
+
+        expect(await pathExists(promptFile)).toBe(true)
+
+        const finalizeTool = createCouncilFinalize(tmpDir)
+        const resultStr = await finalizeTool.execute(
+          {
+            task_ids: [taskId],
+            name: "prompt-lifecycle",
+            intent: "FREEFORM",
+            question: "How should prompt lifecycle work?",
+            prompt_file: promptFile,
+          },
+          toolContext,
+        )
+        const result: CouncilFinalizeResult = JSON.parse(extractJson(resultStr))
+
+        expect(await pathExists(promptFile)).toBe(false)
+
+        const promptDest = join(tmpDir, result.archive_dir, "council-prompt.md")
+        expect(await pathExists(promptDest)).toBe(true)
+        expect(await readFile(promptDest, "utf-8")).toContain("How should prompt lifecycle work?")
+      })
+    })
+
+    describe("#when council finalize errors after prepare_council_prompt created a temp file", () => {
+      it("#then finalize still removes the temp prompt file", async () => {
+        const prepareTool = createPrepareCouncilPromptTool(tmpDir)
+        const prepareResult = await prepareTool.execute(
+          { prompt: "Should cleanup run on finalize errors?", mode: "solo", intent: "FREEFORM" },
+          toolContext,
+        )
+        const promptFile = extractPreparedPromptPath(prepareResult)
+
+        expect(await pathExists(promptFile)).toBe(true)
+
+        const finalizeTool = createCouncilFinalize(tmpDir)
+        const result = await finalizeTool.execute(
+          {
+            task_ids: ["bg_unused"],
+            name: "prompt-lifecycle-error",
+            intent: "NOT_A_REAL_INTENT",
+            prompt_file: promptFile,
+          },
+          toolContext,
+        )
+
+        expect(result).toContain("Invalid intent")
+        expect(await pathExists(promptFile)).toBe(false)
+      })
+    })
+
     describe("#when finalize is called with question and prompt_file", () => {
       it("#then meta.yaml includes question and prompt_file, and prompt file is moved to archive", async () => {
         const taskId = "bg_with_meta"
@@ -303,7 +383,7 @@ describe("council archive integration flow", () => {
         const promptContent = await readFile(promptDest, "utf-8")
         expect(promptContent).toBe("Council prompt content here")
 
-        const originalExists = await stat(join(tmpDir, promptFile)).then(() => true).catch(() => false)
+        const originalExists = await pathExists(join(tmpDir, promptFile))
         expect(originalExists).toBe(false)
       })
     })
