@@ -134,4 +134,51 @@ describe("context-window-monitor modelContextLimitsCache", () => {
       })
     })
   })
+
+  describe("#given Anthropic provider with cached context limit and 1M mode disabled", () => {
+    describe("#when cached usage exceeds the Anthropic default limit", () => {
+      it("#then should ignore the cached limit and append the reminder from the default Anthropic limit", async () => {
+        // given
+        const modelContextLimitsCache = new Map<string, number>()
+        modelContextLimitsCache.set("anthropic/claude-sonnet-4-5", 500000)
+
+        const hook = createContextWindowMonitorHook({} as never, {
+          anthropicContext1MEnabled: false,
+          modelContextLimitsCache,
+        })
+        const sessionID = "ses_anthropic_default_overrides_cached_limit"
+
+        await hook.event({
+          event: {
+            type: "message.updated",
+            properties: {
+              info: {
+                role: "assistant",
+                sessionID,
+                providerID: "anthropic",
+                modelID: "claude-sonnet-4-5",
+                finish: true,
+                tokens: {
+                  input: 150000,
+                  output: 0,
+                  reasoning: 0,
+                  cache: { read: 10000, write: 0 },
+                },
+              },
+            },
+          },
+        })
+
+        // when
+        const output = createOutput()
+        await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, output)
+
+        // then
+        expect(output.output).toContain("context remaining")
+        expect(output.output).toContain("200,000-token context window")
+        expect(output.output).not.toContain("500,000-token context window")
+        expect(output.output).not.toContain("1,000,000-token context window")
+      })
+    })
+  })
 })
