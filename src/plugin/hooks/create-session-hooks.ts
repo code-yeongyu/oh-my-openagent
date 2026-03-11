@@ -25,8 +25,13 @@ import {
   createQuestionLabelTruncatorHook,
   createPreemptiveCompactionHook,
   createRuntimeFallbackHook,
+  createTtsrHook,
+  type TtsrHook,
 } from "../../hooks"
 import { createAnthropicEffortHook } from "../../hooks/anthropic-effort"
+import { createAbortRetryHandler } from "../../hooks/ttsr/abort-retry-handler"
+import { discoverTtsrRules } from "../../hooks/ttsr/rule-discovery"
+import { createBuiltinTtsrRules } from "../../features/ttsr/builtin-rules"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -60,6 +65,7 @@ export type SessionHooks = {
   taskResumeInfo: ReturnType<typeof createTaskResumeInfoHook> | null
   anthropicEffort: ReturnType<typeof createAnthropicEffortHook> | null
   runtimeFallback: ReturnType<typeof createRuntimeFallbackHook> | null
+  ttsrHook: TtsrHook | null
 }
 
 export function createSessionHooks(args: {
@@ -261,6 +267,61 @@ export function createSessionHooks(args: {
           pluginConfig,
         }))
     : null
+
+  const ttsrHook: TtsrHook | null = (() => {
+    if (!isHookEnabled("ttsr")) return null
+    const ttsrConfig = pluginConfig.ttsr
+    if (!ttsrConfig?.enabled) return null
+    return safeHook("ttsr", () => {
+      const abortRetryHandler = createAbortRetryHandler({
+        abort: async (sessionID) => {
+          await ctx.client.session.abort({ path: { id: sessionID } }).catch((err) => {
+            log("[ttsr] Failed to abort session", { sessionID, error: String(err) })
+          })
+        },
+        promptAsync: async (sessionID, content) => {
+          await ctx.client.session
+            .prompt({
+              path: { id: sessionID },
+              body: { parts: [{ type: "text", text: content }] },
+              query: { directory: ctx.directory },
+            })
+            .catch((err) => {
+              log("[ttsr] Failed to send interrupt prompt", { sessionID, error: String(err) })
+            })
+        },
+      })
+      const rules: import("../../features/ttsr/types").TtsrRule[] = [...createBuiltinTtsrRules()]
+      let hookInstance: import("../../hooks").TtsrHook | null = null
+      discoverTtsrRules(ctx.directory).then((discovered) => {
+        rules.push(...discovered)
+        hookInstance?.addRulesToExistingManagers(discovered)
+      }).catch((err) => {
+        log("[ttsr] Failed to discover TTSR rules", { error: String(err) })
+      })
+      const settings: import("../../features/ttsr/types").TtsrSettings = {
+        enabled: ttsrConfig.enabled ?? false,
+        contextMode: ttsrConfig.contextMode ?? "discard",
+        interruptMode: ttsrConfig.interruptMode ?? "always",
+        repeatMode: ttsrConfig.repeatMode ?? "once",
+        repeatGap: ttsrConfig.repeatGap ?? 10,
+        maxRetriesPerRule: ttsrConfig.maxRetriesPerRule ?? 3,
+      }
+      const hook = createTtsrHook({
+        settings,
+        rules,
+        onMatch: async (sessionID, matchedRules) => {
+          await abortRetryHandler.handleMatches(sessionID, matchedRules, settings)
+          const manager = hookInstance?.getManager(sessionID)
+          if (manager) {
+            manager.markInjected(matchedRules.map((r) => r.name))
+          }
+        },
+      })
+      hookInstance = hook
+      return hook
+    })
+  })()
   return {
     contextWindowMonitor,
     preemptiveCompaction,
@@ -285,5 +346,6 @@ export function createSessionHooks(args: {
     taskResumeInfo,
     anthropicEffort,
     runtimeFallback,
+    ttsrHook,
   }
 }

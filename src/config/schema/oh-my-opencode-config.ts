@@ -17,6 +17,7 @@ import { RuntimeFallbackConfigSchema } from "./runtime-fallback"
 import { SkillsConfigSchema } from "./skills"
 import { SisyphusConfigSchema } from "./sisyphus"
 import { SisyphusAgentConfigSchema } from "./sisyphus-agent"
+import { TtsrConfigSchema } from "./ttsr"
 import { TmuxConfigSchema } from "./tmux"
 import { StartWorkConfigSchema } from "./start-work"
 import { WebsearchConfigSchema } from "./websearch"
@@ -62,6 +63,8 @@ export const OhMyOpenCodeConfigSchema = z.object({
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),
   start_work: StartWorkConfigSchema.optional(),
+  /** TTSR stream rule monitoring configuration */
+  ttsr: TtsrConfigSchema.optional(),
   /** Migration history to prevent re-applying migrations (e.g., model version upgrades) */
   _migrations: z.array(z.string()).optional(),
 })
