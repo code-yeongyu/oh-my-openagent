@@ -45,7 +45,8 @@ export function detectCurrentConfig(): DetectedConfig {
     hasCopilot: false,
     hasOpencodeZen: true,
     hasZaiCodingPlan: false,
-    hasKimiForCoding: false,
+hasKimiForCoding: false,
+    hasOpencodeGo: false,
   }
 
   const { format, path } = detectConfigFormat()
