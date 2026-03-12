@@ -80,7 +80,8 @@ export function buildSisyphusJuniorPrompt(
 export async function createSisyphusJuniorAgentWithOverrides(
   override: AgentOverrideConfig | undefined,
   systemDefaultModel?: string,
-  useTaskSystem = false
+  useTaskSystem = false,
+  fallbackModels?: string[]
 ): Promise<AgentConfig> {
   if (override?.disable) {
     override = undefined
@@ -89,19 +90,14 @@ export async function createSisyphusJuniorAgentWithOverrides(
   const overrideModel = (override as { model?: string } | undefined)?.model
   let model = overrideModel ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
   
-  // Check if model provider is blacklisted and fallback if needed
+  // Check if model provider is blacklisted and use fallback if needed
   if (model) {
     const parts = model.split("/")
     if (parts.length >= 2) {
       const providerID = parts[0]
       const blacklisted = await isProviderBlacklisted(providerID)
-      if (blacklisted) {
-        // Fallback to first non-blacklisted model
-        const fallbackModels = [
-          "alibaba-coding-plan/kimi-k2.5",
-          "zai-coding-plan/glm-5",
-          "openai/gpt-5.3-codex"
-        ]
+      if (blacklisted && fallbackModels && fallbackModels.length > 0) {
+        // Use first non-blacklisted fallback model from config
         for (const fallback of fallbackModels) {
           const fallbackParts = fallback.split("/")
           if (fallbackParts.length >= 2) {

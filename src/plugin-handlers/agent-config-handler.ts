@@ -149,10 +149,23 @@ export async function applyAgentConfig(params: {
       sisyphus: builtinAgents.sisyphus,
     };
 
+    // Provide default fallback_models for sisyphus-junior if not configured
+    const sjOverride = params.pluginConfig.agents?.["sisyphus-junior"]
+    const sjConfigWithFallback = sjOverride ? { ...sjOverride } : {}
+    if (!sjConfigWithFallback.fallback_models) {
+      // Default fallback chain for sisyphus-junior (matches common category defaults)
+      sjConfigWithFallback.fallback_models = [
+        "alibaba-coding-plan/kimi-k2.5",
+        "zai-coding-plan/glm-5",
+        "openai/gpt-5.3-codex"
+      ]
+    }
+    
     agentConfig["sisyphus-junior"] = await createSisyphusJuniorAgentWithOverrides(
-      params.pluginConfig.agents?.["sisyphus-junior"],
+      sjConfigWithFallback,
       undefined,
       useTaskSystem,
+      (sjConfigWithFallback as any).fallback_models,
     );
 
     if (builderEnabled) {
