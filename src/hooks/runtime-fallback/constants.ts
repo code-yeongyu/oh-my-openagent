@@ -27,6 +27,9 @@ export const RETRYABLE_ERROR_PATTERNS = [
   /too.?many.?requests/i,
   /quota.?exceeded/i,
   /quota\s+will\s+reset\s+after/i,
+  /limit\s+exhausted/i,
+  /weekly\/monthly/i,
+  /your\s+limit\s+will\s+reset/i,
   /all\s+credentials\s+for\s+model/i,
   /cool(?:ing)?\s+down/i,
   /exhausted\s+your\s+capacity/i,
@@ -46,3 +49,49 @@ export const RETRYABLE_ERROR_PATTERNS = [
  * Hook name for identification and logging
  */
 export const HOOK_NAME = "runtime-fallback"
+
+/**
+ * Global provider blacklist - shared across all sessions
+ * Maps providerID -> timestamp when it was blacklisted
+ */
+export const globalProviderBlacklist = new Map<string, number>()
+
+/**
+ * Check if a provider is globally blacklisted
+ */
+export function isProviderBlacklisted(providerID: string, cooldownSeconds: number): boolean {
+  const blacklistedAt = globalProviderBlacklist.get(providerID)
+  if (blacklistedAt === undefined) return false
+  const cooldownMs = cooldownSeconds * 1000
+  const isStillBlacklisted = Date.now() - blacklistedAt < cooldownMs
+  if (!isStillBlacklisted) {
+    globalProviderBlacklist.delete(providerID)
+  }
+  return isStillBlacklisted
+}
+
+/**
+ * Blacklist a provider globally
+ */
+export function blacklistProvider(providerID: string): void {
+  globalProviderBlacklist.set(providerID, Date.now())
+}
+
+/**
+ * Get list of currently blacklisted providers
+ */
+export function getBlacklistedProviders(cooldownSeconds: number): string[] {
+  const now = Date.now()
+  const cooldownMs = cooldownSeconds * 1000
+  const result: string[] = []
+  
+  for (const [providerID, blacklistedAt] of globalProviderBlacklist.entries()) {
+    if (now - blacklistedAt < cooldownMs) {
+      result.push(providerID)
+    } else {
+      globalProviderBlacklist.delete(providerID)
+    }
+  }
+  
+  return result
+}

@@ -1,7 +1,12 @@
 import type { FallbackState, FallbackResult } from "./types"
-import { HOOK_NAME } from "./constants"
+import { HOOK_NAME, isProviderBlacklisted } from "./constants"
 import { log } from "../../shared/logger"
 import type { RuntimeFallbackConfig } from "../../config"
+
+function extractProviderFromModel(model: string): string | undefined {
+  const parts = model.split("/")
+  return parts.length > 0 ? parts[0] : undefined
+}
 
 export function createFallbackState(originalModel: string): FallbackState {
   return {
@@ -28,10 +33,25 @@ export function findNextAvailableFallback(
 ): string | undefined {
   for (let i = state.fallbackIndex + 1; i < fallbackModels.length; i++) {
     const candidate = fallbackModels[i]
-    if (!isModelInCooldown(candidate, state, cooldownSeconds)) {
-      return candidate
+    
+    // Check session-level cooldown
+    if (isModelInCooldown(candidate, state, cooldownSeconds)) {
+      log(`[${HOOK_NAME}] Skipping fallback model in cooldown`, { model: candidate, index: i })
+      continue
     }
-    log(`[${HOOK_NAME}] Skipping fallback model in cooldown`, { model: candidate, index: i })
+    
+    // Check global provider blacklist
+    const providerID = extractProviderFromModel(candidate)
+    if (providerID && isProviderBlacklisted(providerID, cooldownSeconds)) {
+      log(`[${HOOK_NAME}] Skipping fallback model - provider globally blacklisted`, { 
+        model: candidate, 
+        provider: providerID,
+        index: i 
+      })
+      continue
+    }
+    
+    return candidate
   }
   return undefined
 }
@@ -71,4 +91,22 @@ export function prepareFallback(
   state.pendingFallbackModel = nextModel
 
   return { success: true, newModel: nextModel }
+}
+
+/**
+ * Blacklist the original model's provider when rate limited
+ * This prevents new sessions/subagents from using the same provider
+ */
+export function blacklistFailedProvider(model: string, cooldownSeconds: number): void {
+  const providerID = extractProviderFromModel(model)
+  if (providerID) {
+    const { blacklistProvider, isProviderBlacklisted } = require("./constants")
+    if (!isProviderBlacklisted(providerID, cooldownSeconds)) {
+      blacklistProvider(providerID)
+      log(`[${HOOK_NAME}] Globally blacklisted provider due to rate limit`, { 
+        provider: providerID,
+        cooldownSeconds 
+      })
+    }
+  }
 }

@@ -1,12 +1,17 @@
 import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
-import { HOOK_NAME } from "./constants"
+import { HOOK_NAME, isProviderBlacklisted, blacklistProvider } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal } from "./error-classifier"
 import { createFallbackState, prepareFallback } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
+
+function extractProviderFromModel(model: string): string | undefined {
+  const parts = model.split("/")
+  return parts.length > 0 ? parts[0] : undefined
+}
 
 export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
   const { config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts } = deps
@@ -128,10 +133,10 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
 
     let state = sessionStates.get(sessionID)
-    const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+    const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig, config.cooldown_seconds)
 
     if (fallbackModels.length === 0) {
-      log(`[${HOOK_NAME}] No fallback models configured`, { sessionID, agent })
+      log(`[${HOOK_NAME}] No fallback models configured (all may be blacklisted)`, { sessionID, agent })
       return
     }
 
@@ -159,6 +164,17 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       }
     } else {
       sessionLastAccess.set(sessionID, Date.now())
+    }
+
+    // Blacklist the current model's provider globally before preparing fallback
+    const currentModelProvider = extractProviderFromModel(state.currentModel)
+    if (currentModelProvider) {
+      blacklistProvider(currentModelProvider)
+      log(`[${HOOK_NAME}] Blacklisted provider due to rate limit error`, { 
+        sessionID, 
+        provider: currentModelProvider,
+        model: state.currentModel 
+      })
     }
 
     const result = prepareFallback(sessionID, state, fallbackModels, config)
@@ -209,8 +225,11 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-    const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
-    if (fallbackModels.length === 0) return
+    const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig, config.cooldown_seconds)
+    if (fallbackModels.length === 0) {
+      log(`[${HOOK_NAME}] No fallback models available for session.status (all may be blacklisted)`, { sessionID })
+      return
+    }
 
     let state = sessionStates.get(sessionID)
     if (!state) {
@@ -243,6 +262,17 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     })
 
     await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
+
+    // Blacklist the current model's provider globally before preparing fallback
+    const currentModelProvider = extractProviderFromModel(state.currentModel)
+    if (currentModelProvider) {
+      blacklistProvider(currentModelProvider)
+      log(`[${HOOK_NAME}] Blacklisted provider due to auto-retry signal`, { 
+        sessionID, 
+        provider: currentModelProvider,
+        model: state.currentModel 
+      })
+    }
 
     const result = prepareFallback(sessionID, state, fallbackModels, config)
     if (result.success && config.notify_on_fallback) {

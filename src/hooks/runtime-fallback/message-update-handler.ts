@@ -1,10 +1,15 @@
 import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
-import { HOOK_NAME } from "./constants"
+import { HOOK_NAME, blacklistProvider, isProviderBlacklisted } from "./constants"
 import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
 import { createFallbackState, prepareFallback } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
+
+function extractProviderFromModel(model: string): string | undefined {
+  const parts = model.split("/")
+  return parts.length > 0 ? parts[0] : undefined
+}
 
 export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof extractAutoRetrySignal) {
   return async (
@@ -147,9 +152,10 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       let state = sessionStates.get(sessionID)
       const agent = info?.agent as string | undefined
       const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig, config.cooldown_seconds)
 
       if (fallbackModels.length === 0) {
+        log(`[${HOOK_NAME}] No fallback models available (all may be blacklisted)`, { sessionID })
         return
       }
 
@@ -201,6 +207,17 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
           return
           }
         }
+      }
+
+      // Blacklist the current model's provider globally before preparing fallback
+      const currentModelProvider = extractProviderFromModel(state.currentModel)
+      if (currentModelProvider) {
+        blacklistProvider(currentModelProvider)
+        log(`[${HOOK_NAME}] Blacklisted provider due to rate limit error`, { 
+          sessionID, 
+          provider: currentModelProvider,
+          model: state.currentModel 
+        })
       }
 
       const result = prepareFallback(sessionID, state, fallbackModels, config)

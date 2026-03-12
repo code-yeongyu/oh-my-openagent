@@ -57,4 +57,57 @@ describe("runtime-fallback error classifier", () => {
     //#then
     expect(signal).toBeUndefined()
   })
+
+  test("detects Weekly/Monthly Limit Exhausted as retryable", () => {
+    //#given
+    const error = {
+      message: "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-03-14 09:17:47",
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("detects 'limit exhausted' pattern as retryable", () => {
+    //#given
+    const error = {
+      message: "Limit exhausted - please try again later",
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("detects 'your limit will reset' pattern as retryable", () => {
+    //#given
+    const error = {
+      message: "Your limit will reset after 24 hours",
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
+
+  test("detects quota exceeded with status code 429", () => {
+    //#given
+    const error = {
+      message: "Rate limit exceeded",
+      statusCode: 429,
+    }
+
+    //#when
+    const retryable = isRetryableError(error, [429, 500, 502, 503, 504])
+
+    //#then
+    expect(retryable).toBe(true)
+  })
 })
