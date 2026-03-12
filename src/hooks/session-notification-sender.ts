@@ -112,7 +112,8 @@ export async function playSessionNotificationSound(
       const powershellPath = await getPowershellPath()
       if (!powershellPath) return
       const escaped = escapePowerShellSingleQuotedText(soundPath)
-      ctx.$`${powershellPath} -Command ${("(New-Object Media.SoundPlayer '" + escaped + "').PlaySync()")}`.catch(() => {})
+      const soundCommand = `try { (New-Object -ErrorAction Stop Media.SoundPlayer '${escaped}').PlaySync() } catch { }`
+      ctx.$`${powershellPath} -Command ${soundCommand}`.catch(() => {})
       break
     }
   }

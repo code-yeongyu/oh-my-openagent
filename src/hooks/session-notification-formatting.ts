@@ -10,7 +10,7 @@ export function buildWindowsToastScript(title: string, message: string): string 
   const psTitle = escapePowerShellSingleQuotedText(title)
   const psMessage = escapePowerShellSingleQuotedText(message)
 
-  return `
+  const script = `
 [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
 $Template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
 $RawXml = [xml] $Template.GetXml()
@@ -22,4 +22,6 @@ $Toast = [Windows.UI.Notifications.ToastNotification]::new($SerializedXml)
 $Notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('OpenCode')
 $Notifier.Show($Toast)
 `.trim().replace(/\n/g, "; ")
+
+  return `try { ${script} } catch { }`
 }
