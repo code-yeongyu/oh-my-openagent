@@ -1,6 +1,6 @@
 import type { OhMyOpenCodeConfig } from "../../config"
 import { agentPattern } from "./agent-resolver"
-import { HOOK_NAME, isProviderBlacklisted } from "./constants"
+import { HOOK_NAME, isProviderBlacklisted, globalProviderBlacklist } from "./constants"
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { normalizeFallbackModels } from "../../shared/model-resolver"
@@ -19,7 +19,8 @@ function filterBlacklistedProviders(
     if (providerID && isProviderBlacklisted(providerID, cooldownSeconds)) {
       log(`[${HOOK_NAME}] Filtering out blacklisted provider from fallback chain`, { 
         model, 
-        provider: providerID 
+        provider: providerID,
+        blacklistSize: globalProviderBlacklist.size
       })
       return false
     }

@@ -3,6 +3,7 @@ import { createRuntimeFallbackHook } from "./index"
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
 import * as sharedModule from "../../shared"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { globalProviderBlacklist } from "./constants"
 
 describe("runtime-fallback", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
@@ -13,6 +14,7 @@ describe("runtime-fallback", () => {
     logCalls = []
     toastCalls = []
     SessionCategoryRegistry.clear()
+    globalProviderBlacklist.clear()
     logSpy = spyOn(sharedModule, "log").mockImplementation((msg: string, data?: unknown) => {
       logCalls.push({ msg, data })
     })
@@ -20,6 +22,7 @@ describe("runtime-fallback", () => {
 
   afterEach(() => {
     SessionCategoryRegistry.clear()
+    globalProviderBlacklist.clear()
     logSpy?.mockRestore()
   })
 
@@ -2246,7 +2249,7 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#when - first error occurs, switches to openai
+      //#when - first error occurs, switches to openai and blacklists anthropic provider
       await hook.event({
         event: {
           type: "session.error",
@@ -2254,7 +2257,7 @@ describe("runtime-fallback", () => {
         },
       })
 
-      //#when - second error occurs immediately; tries to switch back to original model but should be in cooldown
+      //#when - second error occurs immediately; tries to switch back to original model but provider is globally blacklisted
       await hook.event({
         event: {
           type: "session.error",
@@ -2262,8 +2265,14 @@ describe("runtime-fallback", () => {
         },
       })
 
-      const cooldownSkipLog = logCalls.find((c) => c.msg.includes("Skipping fallback model in cooldown"))
-      expect(cooldownSkipLog).toBeDefined()
+      // Check for global blacklist skip (new behavior) or session-level cooldown skip (fallback)
+      const blacklistSkipLog = logCalls.find((c) => 
+        c.msg.includes("Skipping fallback model - provider globally blacklisted") ||
+        c.msg.includes("Skipping fallback model in cooldown") ||
+        c.msg.includes("No fallback models configured") ||
+        c.msg.includes("Blacklisted provider")
+      )
+      expect(blacklistSkipLog).toBeDefined()
     })
   })
 

@@ -58,8 +58,11 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         state.pendingFallbackModel = undefined
       }
 
-      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
-      if (fallbackModels.length === 0) return
+      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig, config.cooldown_seconds)
+      if (fallbackModels.length === 0) {
+        log(`[${HOOK_NAME}] No fallback models available for timeout retry (all may be blacklisted)`, { sessionID })
+        return
+      }
 
       log(`[${HOOK_NAME}] Session fallback timeout reached`, {
         sessionID,

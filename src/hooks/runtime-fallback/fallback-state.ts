@@ -36,7 +36,7 @@ export function findNextAvailableFallback(
     
     // Check session-level cooldown
     if (isModelInCooldown(candidate, state, cooldownSeconds)) {
-      log(`[${HOOK_NAME}] Skipping fallback model in cooldown`, { model: candidate, index: i })
+      log(`[${HOOK_NAME}] Skipping fallback model in cooldown`, { model: candidate, index: i, failedAt: state.failedModels.get(candidate) })
       continue
     }
     
