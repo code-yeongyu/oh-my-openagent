@@ -12,7 +12,6 @@ import {
 import type { BoulderState } from "../../features/boulder-state"
 import * as sessionState from "../../features/claude-code-session-state"
 import * as worktreeDetector from "./worktree-detector"
-import * as worktreeDetector from "./worktree-detector"
 
 describe("start-work hook", () => {
   let testDir: string
@@ -529,32 +528,139 @@ describe("start-work hook", () => {
       expect(state?.session_ids).toContain("session-456")
     })
 
-    test("should show existing worktree on resume when no --worktree flag", async () => {
-      // given - existing boulder already has worktree_path, no flag given
-      const planPath = join(testDir, "plan.md")
-      writeFileSync(planPath, "# Plan\n- [ ] Task 1")
-      const existingState: BoulderState = {
-        active_plan: planPath,
-        started_at: "2026-01-01T00:00:00Z",
-        session_ids: ["old-session"],
-        plan_name: "plan",
-        worktree_path: "/existing/wt",
-      }
-      writeBoulderState(testDir, existingState)
+     test("should show existing worktree on resume when no --worktree flag", async () => {
+       // given - existing boulder already has worktree_path, no flag given
+       const planPath = join(testDir, "plan.md")
+       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+       const existingState: BoulderState = {
+         active_plan: planPath,
+         started_at: "2026-01-01T00:00:00Z",
+         session_ids: ["old-session"],
+         plan_name: "plan",
+         worktree_path: "/existing/wt",
+       }
+       writeBoulderState(testDir, existingState)
 
-      const hook = createStartWorkHook(createMockPluginInput())
-      const output = {
-        parts: [{ type: "text", text: "<session-context></session-context>" }],
-      }
+       const hook = createStartWorkHook(createMockPluginInput())
+       const output = {
+         parts: [{ type: "text", text: "<session-context></session-context>" }],
+       }
 
-      // when
-      await hook["chat.message"]({ sessionID: "session-789" }, output)
+       // when
+       await hook["chat.message"]({ sessionID: "session-789" }, output)
 
-      // then - shows strong worktree active instructions
-      expect(output.parts[0].text).toContain("Worktree Active")
-      expect(output.parts[0].text).toContain("/existing/wt")
-      expect(output.parts[0].text).toContain("subagent")
-      expect(output.parts[0].text).not.toContain("Worktree Setup Required")
-    })
-  })
+       // then - shows strong worktree active instructions
+       expect(output.parts[0].text).toContain("Worktree Active")
+       expect(output.parts[0].text).toContain("/existing/wt")
+       expect(output.parts[0].text).toContain("subagent")
+       expect(output.parts[0].text).not.toContain("Worktree Setup Required")
+     })
+   })
+
+   describe("worktree disabled by config", () => {
+     test("should NOT inject worktree content when worktreeEnabled is false and single plan auto-selected", async () => {
+       // given - single incomplete plan, worktreeEnabled: false
+       const plansDir = join(testDir, ".sisyphus", "plans")
+       mkdirSync(plansDir, { recursive: true })
+       writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+
+       const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
+       const output = {
+         parts: [{ type: "text", text: "<session-context></session-context>" }],
+       }
+
+       // when
+       await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+       // then - no worktree content should appear
+       expect(output.parts[0].text).not.toContain("Worktree Active")
+       expect(output.parts[0].text).not.toContain("git worktree")
+       expect(output.parts[0].text).toContain("Auto-Selected Plan")
+     })
+
+     test("should NOT inject worktree when --worktree flag is passed but worktreeEnabled is false", async () => {
+       // given - single plan + --worktree flag, but worktreeEnabled: false
+       const plansDir = join(testDir, ".sisyphus", "plans")
+       mkdirSync(plansDir, { recursive: true })
+       writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+
+       const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
+       const output = {
+         parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /some/path</user-request>\n</session-context>" }],
+       }
+
+       // when
+       await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+       // then - config overrides flag, no worktree content in injected context
+       expect(output.parts[0].text).not.toContain("Worktree Active")
+       expect(output.parts[0].text).not.toContain("CRITICAL — DO NOT FORGET")
+       expect(output.parts[0].text).not.toContain("git worktree add")
+     })
+
+     test("should NOT inject worktree content when resuming with existing worktree_path but worktreeEnabled is false", async () => {
+       // given - existing boulder with worktree_path, but worktreeEnabled: false
+       const planPath = join(testDir, "plan.md")
+       writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+       const existingState: BoulderState = {
+         active_plan: planPath,
+         started_at: "2026-01-01T00:00:00Z",
+         session_ids: ["old-session"],
+         plan_name: "plan",
+         worktree_path: "/existing/wt",
+       }
+       writeBoulderState(testDir, existingState)
+
+       const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
+       const output = {
+         parts: [{ type: "text", text: "<session-context></session-context>" }],
+       }
+
+       // when
+       await hook["chat.message"]({ sessionID: "session-456" }, output)
+
+       // then - no worktree content despite existing worktree_path
+       expect(output.parts[0].text).not.toContain("Worktree Active")
+       expect(output.parts[0].text).not.toContain("/existing/wt")
+       expect(output.parts[0].text).toContain("RESUMING")
+     })
+
+     test("should NOT store worktree_path in boulder.json when worktreeEnabled is false", async () => {
+       // given - single plan, worktreeEnabled: false
+       const plansDir = join(testDir, ".sisyphus", "plans")
+       mkdirSync(plansDir, { recursive: true })
+       writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+
+       const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
+       const output = {
+         parts: [{ type: "text", text: "<session-context></session-context>" }],
+       }
+
+       // when
+       await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+       // then - boulder.json should not have worktree_path
+       const state = readBoulderState(testDir)
+       expect(state?.worktree_path).toBeUndefined()
+     })
+
+     test("should enable worktree by default when worktreeEnabled option is undefined (regression)", async () => {
+       // given - single plan, no worktreeEnabled option (undefined = default enabled)
+       const plansDir = join(testDir, ".sisyphus", "plans")
+       mkdirSync(plansDir, { recursive: true })
+       writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+
+       const hook = createStartWorkHook(createMockPluginInput())
+       const output = {
+         parts: [{ type: "text", text: "<session-context></session-context>" }],
+       }
+
+       // when
+       await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+       // then - should behave like worktree is enabled (no worktree content because no flag, but system ready for it)
+       expect(output.parts[0].text).toContain("Auto-Selected Plan")
+       expect(output.parts[0].text).not.toContain("Worktree Active")
+     })
+   })
 })
