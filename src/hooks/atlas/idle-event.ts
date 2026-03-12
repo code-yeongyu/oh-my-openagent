@@ -1,7 +1,8 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { appendSessionId, getPlanProgress, readBoulderState } from "../../features/boulder-state"
+import { getTeamWorkerSessionIds } from "../../features/team-mode"
 import type { BoulderState, PlanProgress } from "../../features/boulder-state"
-import { subagentSessions } from "../../features/claude-code-session-state"
+import { getTeamSessionRole, subagentSessions } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { injectBoulderContinuation } from "./boulder-continuation-injector"
 import { HOOK_NAME } from "./hook-name"
@@ -18,6 +19,33 @@ function hasRunningBackgroundTasks(sessionID: string, options?: AtlasHookOptions
     : false
 }
 
+function resolveTeamSessionRole(input: {
+  directory: string
+  sessionID: string
+  options?: AtlasHookOptions
+}): "leader" | "worker" | null {
+  const explicitRole = input.options?.resolveTeamSessionRole?.(input.sessionID)
+  if (explicitRole) {
+    return explicitRole
+  }
+
+  const trackedRole = getTeamSessionRole(input.sessionID)
+  if (trackedRole) {
+    return trackedRole
+  }
+
+  const boulderState = readBoulderState(input.directory)
+  if (boulderState?.execution_mode !== "teammode") {
+    return null
+  }
+
+  if (boulderState.session_ids.includes(input.sessionID)) {
+    return "leader"
+  }
+
+  return null
+}
+
 function resolveActiveBoulderSession(input: {
   directory: string
   sessionID: string
@@ -32,6 +60,13 @@ function resolveActiveBoulderSession(input: {
   }
 
   const progress = getPlanProgress(boulderState.active_plan)
+
+  if (boulderState.execution_mode === "teammode" && boulderState.active_team_id) {
+    const teamWorkerSessionIds = getTeamWorkerSessionIds(input.directory, boulderState.active_team_id)
+    if (teamWorkerSessionIds.includes(input.sessionID)) {
+      return null
+    }
+  }
   if (progress.isComplete) {
     return { boulderState, progress, appendedSession: false }
   }
@@ -135,6 +170,16 @@ export async function handleAtlasSessionIdle(input: {
   const { ctx, options, getState, sessionID } = input
 
   log(`[${HOOK_NAME}] session.idle`, { sessionID })
+
+  const teamSessionRole = resolveTeamSessionRole({
+    directory: ctx.directory,
+    sessionID,
+    options,
+  })
+  if (teamSessionRole === "worker") {
+    log(`[${HOOK_NAME}] Skipped: team worker session bypasses standard atlas idle continuation`, { sessionID })
+    return
+  }
 
   const activeBoulderSession = resolveActiveBoulderSession({
     directory: ctx.directory,

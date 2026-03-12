@@ -234,6 +234,16 @@ describe("createToolRegistry", () => {
         backgroundManager: {},
         tmuxSessionManager: {},
         skillMcpManager: {},
+        teamModeManager: {
+          findActiveTeamForLeaderSession: () => null,
+          readRuntime: () => null,
+          getTeamStatePath: () => ".sisyphus/team/test",
+          claimNextTask: () => ({ ok: false, reason: "no_pending_task" }),
+          transitionTask: () => ({ ok: false, reason: "team_not_found" }),
+          appendMailboxMessage: () => ({ ok: true }),
+          markMailboxMessageDelivered: () => ({ ok: true }),
+          requestShutdown: () => ({ ok: true }),
+        },
       },
       skillContext: {
         mergedSkills: [],
@@ -244,6 +254,20 @@ describe("createToolRegistry", () => {
       availableCategories: [],
     }
   }
+
+  describe("#given team mode manager is available", () => {
+    describe("#when creating tool registry", () => {
+      test("#then should register team mode tools", () => {
+        const result = createToolRegistry(createRegistryInput())
+
+        expect(result.filteredTools.team_mode_status).toBeDefined()
+        expect(result.filteredTools.team_mode_claim_task).toBeDefined()
+        expect(result.filteredTools.team_mode_transition_task).toBeDefined()
+        expect(result.filteredTools.team_mode_mailbox).toBeDefined()
+        expect(result.filteredTools.team_mode_shutdown).toBeDefined()
+      })
+    })
+  })
 
   describe("#given hashline_edit is undefined", () => {
     describe("#when creating tool registry", () => {

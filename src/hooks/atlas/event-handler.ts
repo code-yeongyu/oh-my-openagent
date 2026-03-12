@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { clearTeamSession } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./hook-name"
 import { isAbortError } from "./is-abort-error"
@@ -80,6 +81,7 @@ export function createAtlasEventHandler(input: {
           clearTimeout(deletedState.pendingRetryTimer)
         }
         sessions.delete(sessionInfo.id)
+        clearTeamSession(sessionInfo.id)
         log(`[${HOOK_NAME}] Session deleted: cleaned up`, { sessionID: sessionInfo.id })
       }
       return
@@ -93,6 +95,7 @@ export function createAtlasEventHandler(input: {
           clearTimeout(compactedState.pendingRetryTimer)
         }
         sessions.delete(sessionID)
+        clearTeamSession(sessionID)
         log(`[${HOOK_NAME}] Session compacted: cleaned up`, { sessionID })
       }
     }

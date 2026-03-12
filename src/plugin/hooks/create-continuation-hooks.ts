@@ -1,5 +1,7 @@
 import type { HookName, OhMyOpenCodeConfig } from "../../config"
+import { readBoulderState } from "../../features/boulder-state"
 import type { BackgroundManager } from "../../features/background-agent"
+import { getTeamSessionRole } from "../../features/claude-code-session-state"
 import type { PluginContext } from "../types"
 
 import {
@@ -124,6 +126,33 @@ export function createContinuationHooks(args: {
             stopContinuationGuard?.isStopped(sessionID) ?? false,
           shouldSkipContinuation: (sessionID: string) =>
             gptPermissionContinuation?.wasRecentlyInjected(sessionID) ?? false,
+          resolveTeamSessionRole: (sessionID: string) => {
+            const trackedRole = getTeamSessionRole(sessionID)
+            if (trackedRole) {
+              return trackedRole
+            }
+
+            const boulderState = readBoulderState(ctx.directory)
+            if (boulderState?.execution_mode !== "teammode") {
+              return null
+            }
+
+            if (boulderState.session_ids.includes(sessionID)) {
+              return "leader"
+            }
+
+            const backgroundTask = backgroundManager.findBySession(sessionID)
+            if (!backgroundTask) {
+              return null
+            }
+
+            const leaderSessionID = boulderState.session_ids[0]
+            const isDedicatedTeamWorker =
+              backgroundTask.parentSessionID === leaderSessionID &&
+              backgroundTask.description.startsWith("Team Mode worker-")
+
+            return isDedicatedTeamWorker ? "worker" : null
+          },
           agentOverrides: pluginConfig.agents,
           autoCommit: pluginConfig.start_work?.auto_commit,
         }))

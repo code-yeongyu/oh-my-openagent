@@ -137,6 +137,25 @@ describe("boulder-state", () => {
   })
 
   describe("writeBoulderState", () => {
+
+    test("should write team-mode pointer metadata when provided", () => {
+      const state = createBoulderState(
+        "/test/plan.md",
+        "ses-team",
+        "atlas",
+        "/tmp/worktree",
+        {
+          execution_mode: "teammode",
+          active_team_id: "team-123",
+          team_state_path: "/tmp/.sisyphus/team/team-123",
+        },
+      )
+
+      expect(state.execution_mode).toBe("teammode")
+      expect(state.active_team_id).toBe("team-123")
+      expect(state.team_state_path).toBe("/tmp/.sisyphus/team/team-123")
+    })
+
     test("should write state and create .sisyphus directory if needed", () => {
       // given - state to write
       const state: BoulderState = {

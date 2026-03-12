@@ -16,6 +16,7 @@ import { detectWorktreePath } from "./worktree-detector"
 import { parseUserRequest } from "./parse-user-request"
 
 export const HOOK_NAME = "start-work" as const
+const START_WORK_PROMPT_MARKER = "You are starting a Sisyphus work session."
 
 interface StartWorkHookInput {
   sessionID: string
@@ -75,7 +76,7 @@ export function createStartWorkHook(ctx: PluginInput) {
           .join("\n")
           .trim() || ""
 
-      if (!promptText.includes("<session-context>")) return
+      if (!promptText.includes(START_WORK_PROMPT_MARKER) || !promptText.includes("<session-context>")) return
 
       log(`[${HOOK_NAME}] Processing start-work command`, { sessionID: input.sessionID })
       updateSessionAgent(input.sessionID, "atlas")

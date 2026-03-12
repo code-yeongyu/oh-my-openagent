@@ -9,7 +9,13 @@ import {
   readBoulderState,
 } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
-import { _resetForTesting, subagentSessions, updateSessionAgent } from "../../features/claude-code-session-state"
+import {
+  _resetForTesting,
+  registerTeamLeaderSession,
+  registerTeamWorkerSession,
+  subagentSessions,
+  updateSessionAgent,
+} from "../../features/claude-code-session-state"
 
 const TEST_STORAGE_ROOT = join(tmpdir(), `atlas-message-storage-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE_ROOT, "message")
@@ -877,6 +883,70 @@ describe("atlas hook", () => {
       expect(mockInput._promptMock).toHaveBeenCalled()
       const callArgs = mockInput._promptMock.mock.calls[0][0]
       expect(callArgs.path.id).toBe(subagentSessionID)
+    })
+
+    test("should not append or inject for team worker sessions", async () => {
+      const teamWorkerSessionID = "team-worker-session-456"
+      const planPath = join(TEST_DIR, "team-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "team-plan",
+        execution_mode: "teammode",
+        active_team_id: "team-123",
+        team_state_path: join(TEST_DIR, ".sisyphus", "team", "team-123"),
+      }
+      writeBoulderState(TEST_DIR, state)
+      registerTeamLeaderSession(MAIN_SESSION_ID)
+      registerTeamWorkerSession(teamWorkerSessionID)
+      subagentSessions.add(teamWorkerSessionID)
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: teamWorkerSessionID },
+        },
+      })
+
+      expect(readBoulderState(TEST_DIR)?.session_ids).not.toContain(teamWorkerSessionID)
+      expect(mockInput._promptMock).not.toHaveBeenCalled()
+    })
+
+    test("should continue team leader sessions through atlas idle handling", async () => {
+      const planPath = join(TEST_DIR, "team-leader-plan.md")
+      writeFileSync(planPath, "# Plan\n- [ ] Task 1\n- [ ] Task 2")
+
+      const state: BoulderState = {
+        active_plan: planPath,
+        started_at: "2026-01-02T10:00:00Z",
+        session_ids: [MAIN_SESSION_ID],
+        plan_name: "team-leader-plan",
+        execution_mode: "teammode",
+        active_team_id: "team-456",
+        team_state_path: join(TEST_DIR, ".sisyphus", "team", "team-456"),
+      }
+      writeBoulderState(TEST_DIR, state)
+      registerTeamLeaderSession(MAIN_SESSION_ID)
+
+      const mockInput = createMockPluginInput()
+      const hook = createAtlasHook(mockInput)
+
+      await hook.handler({
+        event: {
+          type: "session.idle",
+          properties: { sessionID: MAIN_SESSION_ID },
+        },
+      })
+
+      expect(mockInput._promptMock).toHaveBeenCalled()
+      const callArgs = mockInput._promptMock.mock.calls[0][0]
+      expect(callArgs.path.id).toBe(MAIN_SESSION_ID)
     })
 
     test("should inject when registered boulder session has incomplete tasks even if last agent differs", async () => {

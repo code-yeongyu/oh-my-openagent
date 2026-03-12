@@ -8,6 +8,7 @@ export interface AtlasHookOptions {
   backgroundManager?: BackgroundManager
   isContinuationStopped?: (sessionID: string) => boolean
   shouldSkipContinuation?: (sessionID: string) => boolean
+  resolveTeamSessionRole?: (sessionID: string) => "leader" | "worker" | null
   agentOverrides?: AgentOverrides
   /** Enable auto-commit after each atomic task completion (default: true) */
   autoCommit?: boolean

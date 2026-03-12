@@ -21,9 +21,9 @@ export type ChatMessageInput = {
   agent?: string
   model?: { providerID: string; modelID: string }
 }
-type StartWorkHookOutput = { parts: Array<{ type: string; text?: string }> }
+type CommandHookOutput = { parts: Array<{ type: string; text?: string }> }
 
-function isStartWorkHookOutput(value: unknown): value is StartWorkHookOutput {
+function isCommandHookOutput(value: unknown): value is CommandHookOutput {
   if (typeof value !== "object" || value === null) return false
   const record = value as Record<string, unknown>
   const partsValue = record["parts"]
@@ -105,8 +105,13 @@ export function createChatMessageHandler(args: {
     await hooks.autoSlashCommand?.["chat.message"]?.(input, output)
     await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
     await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
-    if (hooks.startWork && isStartWorkHookOutput(output)) {
-      await hooks.startWork["chat.message"]?.(input, output)
+    if (isCommandHookOutput(output)) {
+      if (hooks.startTeammode) {
+        await hooks.startTeammode["chat.message"]?.(input, output)
+      }
+      if (hooks.startWork) {
+        await hooks.startWork["chat.message"]?.(input, output)
+      }
     }
 
     if (!hasConnectedProvidersCache()) {
