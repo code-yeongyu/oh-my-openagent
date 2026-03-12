@@ -28,7 +28,7 @@ export async function dispatchFallbackRetry(
     source: options.source,
   })
 
-  const result = prepareFallback(
+  const result = await prepareFallback(
     options.sessionID,
     options.state,
     options.fallbackModels,

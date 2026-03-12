@@ -82,7 +82,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         currentModel: state.currentModel,
       })
 
-      const result = prepareFallback(sessionID, state, fallbackModels, config)
+      const result = await prepareFallback(sessionID, state, fallbackModels, config)
       if (result.success && result.newModel) {
         await autoRetryWithFallback(sessionID, result.newModel, resolvedAgent, "session.timeout")
       }

@@ -1,5 +1,6 @@
 import type { FallbackState, FallbackResult } from "./types"
 import { HOOK_NAME } from "./constants"
+import { isProviderBlacklisted } from "../../shared/global-blacklist"
 import { log } from "../../shared/logger"
 import type { RuntimeFallbackConfig } from "../../config"
 
@@ -21,33 +22,45 @@ export function isModelInCooldown(model: string, state: FallbackState, cooldownS
   return Date.now() - failedAt < cooldownMs
 }
 
-export function findNextAvailableFallback(
+export async function findNextAvailableFallback(
   state: FallbackState,
   fallbackModels: string[],
   cooldownSeconds: number
-): string | undefined {
+): Promise<string | undefined> {
   for (let i = state.fallbackIndex + 1; i < fallbackModels.length; i++) {
     const candidate = fallbackModels[i]
+    
+    // Check session-level cooldown
     if (!isModelInCooldown(candidate, state, cooldownSeconds)) {
-      return candidate
+      // Also check global blacklist
+      const providerID = candidate.split("/")[0]
+      if (providerID && !(await isProviderBlacklisted(providerID))) {
+        return candidate
+      }
+      log(`[${HOOK_NAME}] Skipping fallback model - provider globally blacklisted`, { 
+        model: candidate, 
+        provider: providerID,
+        index: i 
+      })
+      continue
     }
     log(`[${HOOK_NAME}] Skipping fallback model in cooldown`, { model: candidate, index: i })
   }
   return undefined
 }
 
-export function prepareFallback(
+export async function prepareFallback(
   sessionID: string,
   state: FallbackState,
   fallbackModels: string[],
   config: Required<RuntimeFallbackConfig>
-): FallbackResult {
+): Promise<FallbackResult> {
   if (state.attemptCount >= config.max_fallback_attempts) {
     log(`[${HOOK_NAME}] Max fallback attempts reached`, { sessionID, attempts: state.attemptCount })
     return { success: false, error: "Max fallback attempts reached", maxAttemptsReached: true }
   }
 
-  const nextModel = findNextAvailableFallback(state, fallbackModels, config.cooldown_seconds)
+  const nextModel = await findNextAvailableFallback(state, fallbackModels, config.cooldown_seconds)
 
   if (!nextModel) {
     log(`[${HOOK_NAME}] No available fallback models`, { sessionID })
