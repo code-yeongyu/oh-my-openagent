@@ -384,7 +384,7 @@ describe("skill tool - ordering and priority", () => {
     }
   }
 
-  it("lists skills before commands in available_items", () => {
+  it("shows skills as command items with slash prefix in available_items", () => {
     //#given: mix of skills and commands
     const skills = [
       createMockSkillWithScope("builtin-skill", "builtin"),
@@ -398,16 +398,17 @@ describe("skill tool - ordering and priority", () => {
     //#when: creating tool with both
     const tool = createSkillTool({ skills, commands })
 
-    //#then: skills should appear before commands
+    //#then: skills should appear as <command> items with / prefix, listed before regular commands
     const desc = tool.description
-    const skillIndex = desc.indexOf("<skill>")
-    const commandIndex = desc.indexOf("<command>")
-    expect(skillIndex).toBeGreaterThan(0)
-    expect(commandIndex).toBeGreaterThan(0)
-    expect(skillIndex).toBeLessThan(commandIndex)
+    expect(desc).toContain("<name>/builtin-skill</name>")
+    expect(desc).toContain("<name>/project-skill</name>")
+    expect(desc).not.toContain("<skill>")
+    const skillCmdIndex = desc.indexOf("/project-skill")
+    const regularCmdIndex = desc.indexOf("/project-cmd")
+    expect(skillCmdIndex).toBeLessThan(regularCmdIndex)
   })
 
-  it("sorts skills by priority: project > user > opencode > builtin", () => {
+  it("sorts skill-commands by priority: project > user > opencode > builtin", () => {
     //#given: skills in random order
     const skills = [
       createMockSkillWithScope("builtin-skill", "builtin"),
@@ -421,10 +422,10 @@ describe("skill tool - ordering and priority", () => {
 
     //#then: should be sorted by priority
     const desc = tool.description
-    const projectIndex = desc.indexOf("project-skill")
-    const userIndex = desc.indexOf("user-skill")
-    const opencodeIndex = desc.indexOf("opencode-skill")
-    const builtinIndex = desc.indexOf("builtin-skill")
+    const projectIndex = desc.indexOf("/project-skill")
+    const userIndex = desc.indexOf("/user-skill")
+    const opencodeIndex = desc.indexOf("/opencode-skill")
+    const builtinIndex = desc.indexOf("/builtin-skill")
 
     expect(projectIndex).toBeLessThan(userIndex)
     expect(userIndex).toBeLessThan(opencodeIndex)
@@ -468,7 +469,7 @@ describe("skill tool - ordering and priority", () => {
     expect(tool.description).toContain("Skills listed before commands")
   })
 
-  it("uses <available_items> wrapper with unified format", () => {
+  it("uses <available_items> wrapper with unified command format", () => {
     //#given: mix of skills and commands
     const skills = [createMockSkillWithScope("test-skill", "project")]
     const commands = [createMockCommand("test-cmd", "project")]
@@ -476,10 +477,12 @@ describe("skill tool - ordering and priority", () => {
     //#when: creating tool
     const tool = createSkillTool({ skills, commands })
 
-    //#then: should use unified wrapper
+    //#then: should use unified wrapper with all items as commands
     expect(tool.description).toContain("<available_items>")
     expect(tool.description).toContain("</available_items>")
-    expect(tool.description).toContain("<skill>")
+    expect(tool.description).not.toContain("<skill>")
     expect(tool.description).toContain("<command>")
+    expect(tool.description).toContain("/test-skill")
+    expect(tool.description).toContain("/test-cmd")
   })
 })

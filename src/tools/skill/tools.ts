@@ -45,23 +45,24 @@ function formatCombinedDescription(skills: SkillInfo[], commands: CommandInfo[])
 
   const allItems: string[] = []
 
-  // Sort and add skills first (skills before commands)
+  // Skills rendered as command items (skills are also slash-invocable)
   if (skills.length > 0) {
     const sortedSkills = [...skills].sort((a, b) => {
       const priorityA = scopePriority[a.scope] || 0
       const priorityB = scopePriority[b.scope] || 0
-      return priorityB - priorityA // Higher priority first
+      return priorityB - priorityA
     })
     sortedSkills.forEach(skill => {
       const parts = [
-        "  <skill>",
-        `    <name>${skill.name}</name>`,
+        "  <command>",
+        `    <name>/${skill.name}</name>`,
         `    <description>${skill.description}</description>`,
+        `    <scope>${skill.scope}</scope>`,
       ]
       if (skill.compatibility) {
         parts.push(`    <compatibility>${skill.compatibility}</compatibility>`)
       }
-      parts.push("  </skill>")
+      parts.push("  </command>")
       allItems.push(parts.join("\n"))
     })
   }
