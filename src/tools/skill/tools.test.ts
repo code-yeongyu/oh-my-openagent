@@ -486,3 +486,42 @@ describe("skill tool - ordering and priority", () => {
     expect(tool.description).toContain("/test-cmd")
   })
 })
+
+describe("skill tool - dynamic discovery", () => {
+  it("discovers skills from disk on every invocation instead of caching", async () => {
+    // given: tool created with initial skills
+    const initialSkills = [createMockSkill("initial-skill")]
+    const tool = createSkillTool({ skills: initialSkills })
+
+    // when: executing with the initial skill name
+    const result = await tool.execute({ name: "initial-skill" }, mockContext)
+
+    // then: initial skill found (merged from options.skills since not on disk)
+    expect(result).toContain("Skill: initial-skill")
+  })
+
+  it("merges pre-provided skills with dynamically discovered ones", async () => {
+    // given: tool with a synthetic skill not on disk
+    const syntheticSkill = createMockSkill("synthetic-only")
+    const tool = createSkillTool({ skills: [syntheticSkill] })
+
+    // when: looking up the synthetic skill
+    const result = await tool.execute({ name: "synthetic-only" }, mockContext)
+
+    // then: synthetic skill is still accessible via merge
+    expect(result).toContain("Skill: synthetic-only")
+  })
+
+  it("prefers disk-discovered skills over pre-provided ones", async () => {
+    // given: tool with a pre-provided skill that also exists on disk (builtin)
+    const overrideSkill = createMockSkill("playwright")
+    overrideSkill.definition.description = "SHOULD_BE_OVERRIDDEN"
+    const tool = createSkillTool({ skills: [overrideSkill] })
+
+    // when: executing with the builtin skill name
+    const result = await tool.execute({ name: "playwright" }, mockContext)
+
+    // then: disk version wins (not the pre-provided override)
+    expect(result).not.toContain("SHOULD_BE_OVERRIDDEN")
+  })
+})
