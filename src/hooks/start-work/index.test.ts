@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
+import { describe, expect, test, beforeEach, afterEach, spyOn, mock } from "bun:test"
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir, homedir } from "node:os"
@@ -20,8 +20,12 @@ describe("start-work hook", () => {
   function createMockPluginInput() {
     return {
       directory: testDir,
-      client: {},
-    } as Parameters<typeof createStartWorkHook>[0]
+      client: {
+        tui: {
+          showToast: mock(() => Promise.resolve()),
+        },
+      },
+    } as unknown as Parameters<typeof createStartWorkHook>[0]
   }
 
   beforeEach(() => {
@@ -611,25 +615,27 @@ describe("start-work hook", () => {
        expect(output.parts[0].text).toContain("Auto-Selected Plan")
      })
 
-     test("should NOT inject worktree when --worktree flag is passed but worktreeEnabled is false", async () => {
-       // given - single plan + --worktree flag, but worktreeEnabled: false
-       const plansDir = join(testDir, ".sisyphus", "plans")
-       mkdirSync(plansDir, { recursive: true })
-       writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+      test("should INJECT worktree when --worktree flag overrides worktreeEnabled:false", async () => {
+        // given - single plan + --worktree flag with path, worktreeEnabled: false (flag should override)
+        const plansDir = join(testDir, ".sisyphus", "plans")
+        mkdirSync(plansDir, { recursive: true })
+        writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+        detectSpy.mockReturnValue("/some/path")
 
-       const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
-       const output = {
-         parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /some/path</user-request>\n</session-context>" }],
-       }
+        const mockShowToast = (createMockPluginInput().client.tui.showToast as any) as ReturnType<typeof mock>
+        const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
+        const output = {
+          parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /some/path</user-request>\n</session-context>" }],
+        }
 
-       // when
-       await hook["chat.message"]({ sessionID: "session-123" }, output)
+        // when
+        await hook["chat.message"]({ sessionID: "session-123" }, output)
 
-       // then - config overrides flag, no worktree content in injected context
-       expect(output.parts[0].text).not.toContain("Worktree Active")
-       expect(output.parts[0].text).not.toContain("CRITICAL — DO NOT FORGET")
-       expect(output.parts[0].text).not.toContain("git worktree add")
-     })
+        // then - flag overrides config, worktree content IS injected
+        expect(output.parts[0].text).toContain("Worktree Active")
+        expect(output.parts[0].text).toContain("CRITICAL — DO NOT FORGET")
+        expect(output.parts[0].text).toContain("/some/path")
+      })
 
      test("should NOT inject worktree content when resuming with existing worktree_path but worktreeEnabled is false", async () => {
        // given - existing boulder with worktree_path, but worktreeEnabled: false
@@ -658,24 +664,96 @@ describe("start-work hook", () => {
        expect(output.parts[0].text).toContain("RESUMING")
      })
 
-      test("should NOT store worktree_path in boulder.json when worktreeEnabled is false", async () => {
-        // given - single plan, worktreeEnabled: false, valid --worktree flag that would normally be stored
-        const plansDir = join(testDir, ".sisyphus", "plans")
-        mkdirSync(plansDir, { recursive: true })
-        writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
-        detectSpy.mockReturnValue("/some/valid/wt")
+       test("should STORE worktree_path in boulder.json when --worktree flag overrides worktreeEnabled:false", async () => {
+         // given - single plan, worktreeEnabled: false, valid --worktree flag (flag should override)
+         const plansDir = join(testDir, ".sisyphus", "plans")
+         mkdirSync(plansDir, { recursive: true })
+         writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+         detectSpy.mockReturnValue("/some/valid/wt")
 
-        const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
-        const output = {
-          parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /some/valid/wt</user-request>\n</session-context>" }],
-        }
+         const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
+         const output = {
+           parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /some/valid/wt</user-request>\n</session-context>" }],
+         }
 
-        // when
-        await hook["chat.message"]({ sessionID: "session-123" }, output)
+         // when
+         await hook["chat.message"]({ sessionID: "session-123" }, output)
 
-        // then - boulder.json should not have worktree_path despite the flag being present and valid
-        const state = readBoulderState(testDir)
-        expect(state?.worktree_path).toBeUndefined()
-      })
-   })
+         // then - boulder.json SHOULD have worktree_path because flag overrides config
+         const state = readBoulderState(testDir)
+         expect(state?.worktree_path).toBe("/some/valid/wt")
+       })
+
+       test("should NOT override when --worktree flag has no path value and worktreeEnabled is false", async () => {
+         // given - single plan, --worktree flag without path value, worktreeEnabled: false
+         const plansDir = join(testDir, ".sisyphus", "plans")
+         mkdirSync(plansDir, { recursive: true })
+         writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+
+         const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
+         const output = {
+           parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree</user-request>\n</session-context>" }],
+         }
+
+         // when
+         await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+         // then - no override (flag needs a path value), no worktree content
+         expect(output.parts[0].text).not.toContain("Worktree Active")
+         expect(output.parts[0].text).not.toContain("git worktree")
+         const state = readBoulderState(testDir)
+         expect(state?.worktree_path).toBeUndefined()
+       })
+
+       test("should show needs setup block when override active but path is invalid", async () => {
+         // given - single plan, --worktree flag with invalid path, worktreeEnabled: false
+         const plansDir = join(testDir, ".sisyphus", "plans")
+         mkdirSync(plansDir, { recursive: true })
+         writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+         detectSpy.mockReturnValue(null)
+
+         const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
+         const output = {
+           parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /invalid/path</user-request>\n</session-context>" }],
+         }
+
+         // when
+         await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+         // then - needs setup block shown, worktree_path undefined
+         expect(output.parts[0].text).toContain("needs setup")
+         expect(output.parts[0].text).toContain("git worktree add /invalid/path")
+         const state = readBoulderState(testDir)
+         expect(state?.worktree_path).toBeUndefined()
+       })
+
+       test("should override and show worktree active when resuming with --worktree flag and worktreeEnabled is false", async () => {
+         // given - existing boulder state, --worktree flag with valid path, worktreeEnabled: false
+         const planPath = join(testDir, "plan.md")
+         writeFileSync(planPath, "# Plan\n- [ ] Task 1")
+         const existingState: BoulderState = {
+           active_plan: planPath,
+           started_at: "2026-01-01T00:00:00Z",
+           session_ids: ["old-session"],
+           plan_name: "plan",
+         }
+         writeBoulderState(testDir, existingState)
+         detectSpy.mockReturnValue("/override/wt")
+
+         const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
+         const output = {
+           parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /override/wt</user-request>\n</session-context>" }],
+         }
+
+         // when
+         await hook["chat.message"]({ sessionID: "session-456" }, output)
+
+         // then - override is active, worktree content shown, worktree_path stored
+         expect(output.parts[0].text).toContain("Worktree Active")
+         expect(output.parts[0].text).toContain("/override/wt")
+         expect(output.parts[0].text).toContain("RESUMING")
+         const state = readBoulderState(testDir)
+         expect(state?.worktree_path).toBe("/override/wt")
+       })
+    })
 })

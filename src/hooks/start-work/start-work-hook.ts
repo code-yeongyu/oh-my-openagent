@@ -34,7 +34,10 @@ function findPlanByName(plans: string[], requestedName: string): string | null {
   return partialMatch || null
 }
 
-function createWorktreeActiveBlock(worktreePath: string): string {
+function createWorktreeActiveBlock(worktreePath: string, overrideActive?: boolean): string {
+  const overrideNote = overrideActive
+    ? "\n\n> ⚠️ Worktree was enabled via --worktree flag override (config has start_work.worktree=false)"
+    : ""
   return `
 ## Worktree Active
 
@@ -43,11 +46,12 @@ function createWorktreeActiveBlock(worktreePath: string): string {
 **CRITICAL — DO NOT FORGET**: You are working inside a git worktree. ALL operations MUST be performed exclusively within this worktree directory.
 - Every file read, write, edit, and git operation MUST target paths under: \`${worktreePath}\`
 - When delegating tasks to subagents, you MUST include the worktree path in your delegation prompt so they also operate exclusively within the worktree
-- NEVER operate on the main repository directory — always use the worktree path above`
+- NEVER operate on the main repository directory — always use the worktree path above${overrideNote}`
 }
 
 function resolveWorktreeContext(
   explicitWorktreePath: string | null,
+  overrideActive?: boolean,
 ): { worktreePath: string | undefined; block: string } {
   if (explicitWorktreePath === null) {
     return { worktreePath: undefined, block: "" }
@@ -55,7 +59,7 @@ function resolveWorktreeContext(
 
   const validatedPath = detectWorktreePath(explicitWorktreePath)
   if (validatedPath) {
-    return { worktreePath: validatedPath, block: createWorktreeActiveBlock(validatedPath) }
+    return { worktreePath: validatedPath, block: createWorktreeActiveBlock(validatedPath, overrideActive) }
   }
 
   return {
@@ -86,9 +90,24 @@ export function createStartWorkHook(ctx: PluginInput, options?: { worktreeEnable
 
       const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)
       const worktreeDisabled = options?.worktreeEnabled === false
-      const { worktreePath, block: worktreeBlock } = worktreeDisabled
+      const worktreeOverrideActive = worktreeDisabled && explicitWorktreePath !== null
+      const effectiveWorktreeDisabled = worktreeDisabled && !worktreeOverrideActive
+
+      if (worktreeOverrideActive) {
+        ctx.client.tui.showToast({
+          body: {
+            title: "Worktree Override Active",
+            message: "--worktree flag is overriding start_work.worktree=false config. Worktree enabled for this session.",
+            variant: "warning",
+            duration: 8000,
+          },
+        }).catch(() => {}) // Non-fatal
+        log(`[${HOOK_NAME}] Worktree override active - flag overriding config`, { sessionID: input.sessionID })
+      }
+
+      const { worktreePath, block: worktreeBlock } = effectiveWorktreeDisabled
         ? { worktreePath: undefined, block: "" }
-        : resolveWorktreeContext(explicitWorktreePath)
+        : resolveWorktreeContext(explicitWorktreePath, worktreeOverrideActive)
 
       let contextInfo = ""
 
@@ -107,9 +126,9 @@ export function createStartWorkHook(ctx: PluginInput, options?: { worktreeEnable
 
 The requested plan "${getPlanName(matchedPlan)}" has been completed.
 All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
-          } else {
-            if (existingState) clearBoulderState(ctx.directory)
-            const newState = createBoulderState(matchedPlan, sessionId, "atlas", worktreeDisabled ? undefined : worktreePath)
+           } else {
+             if (existingState) clearBoulderState(ctx.directory)
+             const newState = createBoulderState(matchedPlan, sessionId, "atlas", effectiveWorktreeDisabled ? undefined : worktreePath)
             writeBoulderState(ctx.directory, newState)
 
             contextInfo = `
@@ -154,10 +173,10 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
       } else if (existingState) {
         const progress = getPlanProgress(existingState.active_plan)
 
-        if (!progress.isComplete) {
-          const effectiveWorktree = worktreeDisabled ? undefined : (worktreePath ?? existingState.worktree_path)
+         if (!progress.isComplete) {
+           const effectiveWorktree = effectiveWorktreeDisabled ? undefined : (worktreePath ?? existingState.worktree_path)
 
-          if (!worktreeDisabled && worktreePath !== undefined) {
+           if (!effectiveWorktreeDisabled && worktreePath !== undefined) {
             const updatedSessions = existingState.session_ids.includes(sessionId)
               ? existingState.session_ids
               : [...existingState.session_ids, sessionId]
@@ -170,7 +189,7 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
             appendSessionId(ctx.directory, sessionId)
           }
 
-          const worktreeDisplay = effectiveWorktree ? createWorktreeActiveBlock(effectiveWorktree) : worktreeBlock
+          const worktreeDisplay = effectiveWorktree ? createWorktreeActiveBlock(effectiveWorktree, worktreeOverrideActive) : worktreeBlock
 
           contextInfo = `
 ## Active Work Session Found
@@ -213,10 +232,10 @@ Use Prometheus to create a work plan first: /plan "your task"`
 ## All Plans Complete
 
 All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your task"`
-        } else if (incompletePlans.length === 1) {
-          const planPath = incompletePlans[0]
-          const progress = getPlanProgress(planPath)
-          const newState = createBoulderState(planPath, sessionId, "atlas", worktreeDisabled ? undefined : worktreePath)
+         } else if (incompletePlans.length === 1) {
+           const planPath = incompletePlans[0]
+           const progress = getPlanProgress(planPath)
+           const newState = createBoulderState(planPath, sessionId, "atlas", effectiveWorktreeDisabled ? undefined : worktreePath)
           writeBoulderState(ctx.directory, newState)
 
           contextInfo += `
