@@ -102,6 +102,7 @@ export interface ExecutorOptions {
   skills?: LoadedSkill[]
   pluginsEnabled?: boolean
   enabledPluginsOverride?: Record<string, boolean>
+  startWorkConfig?: { worktree?: boolean }
 }
 
 function discoverPluginCommands(options?: ExecutorOptions): CommandInfo[] {
@@ -132,7 +133,7 @@ async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandIn
   const opencodeGlobalCommands = discoverCommandsFromDir(opencodeGlobalDir, "opencode")
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
   const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
-  const builtinCommandsMap = loadBuiltinCommands()
+  const builtinCommandsMap = loadBuiltinCommands(undefined, options?.startWorkConfig)
   const builtinCommands: CommandInfo[] = Object.values(builtinCommandsMap).map(cmd => ({
     name: cmd.name,
     metadata: {
