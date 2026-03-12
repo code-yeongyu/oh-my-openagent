@@ -105,6 +105,7 @@ describe("BackgroundManager.cancelTask cleanup", () => {
 
     // then
     expect(cancelled).toBe(true)
+    expect(getPendingByParent(manager).get(task.parentSessionID)).toBeUndefined()
     runScheduledCleanup(manager, task.id)
     expect(manager.getTask(task.id)).toBeUndefined()
   })
