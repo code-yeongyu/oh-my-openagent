@@ -41,7 +41,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   hephaestus: {
     fallbackChain: [
       {
-        providers: ["openai", "venice", "opencode"],
+        providers: ["openai", "github-copilot", "venice", "opencode"],
         model: "gpt-5.3-codex",
         variant: "medium",
       },
@@ -204,7 +204,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   ultrabrain: {
     fallbackChain: [
       {
-        providers: ["openai", "opencode"],
+        providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.4",
         variant: "xhigh",
       },
@@ -223,7 +223,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   deep: {
     fallbackChain: [
       {
-        providers: ["openai", "opencode"],
+        providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.3-codex",
         variant: "medium",
       },
@@ -276,7 +276,7 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "claude-sonnet-4-6",
       },
       {
-        providers: ["openai", "opencode"],
+        providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.3-codex",
         variant: "medium",
       },

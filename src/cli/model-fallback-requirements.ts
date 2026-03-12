@@ -21,12 +21,12 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
   hephaestus: {
     fallbackChain: [
       {
-        providers: ["openai", "opencode"],
+        providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.3-codex",
         variant: "medium",
       },
     ],
-    requiresProvider: ["openai", "opencode"],
+    requiresProvider: ["openai", "github-copilot", "opencode"],
   },
   oracle: {
     fallbackChain: [
@@ -175,7 +175,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
     ultrabrain: {
       fallbackChain: [
         {
-          providers: ["openai", "opencode"],
+          providers: ["openai", "github-copilot", "opencode"],
           model: "gpt-5.3-codex",
           variant: "xhigh",
         },
@@ -194,7 +194,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
     deep: {
       fallbackChain: [
         {
-          providers: ["openai", "opencode"],
+          providers: ["openai", "github-copilot", "opencode"],
           model: "gpt-5.3-codex",
           variant: "medium",
         },
@@ -250,7 +250,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
           model: "claude-sonnet-4-5",
         },
         {
-          providers: ["openai", "opencode"],
+          providers: ["openai", "github-copilot", "opencode"],
           model: "gpt-5.3-codex",
           variant: "medium",
         },
