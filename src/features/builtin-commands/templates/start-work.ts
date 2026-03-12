@@ -1,13 +1,47 @@
-export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
+export function createStartWorkTemplate(options?: { worktreeEnabled?: boolean }): string {
+  const worktreeEnabled = options?.worktreeEnabled ?? true
 
-## ARGUMENTS
-
-- \`/start-work [plan-name] [--worktree <path>]\`
+  const argumentsSection = worktreeEnabled
+    ? `- \`/start-work [plan-name] [--worktree <path>]\`
   - \`plan-name\` (optional): name or partial match of the plan to start
   - \`--worktree <path>\` (optional): absolute path to an existing git worktree to work in
     - If specified and valid: hook pre-sets worktree_path in boulder.json
     - If specified but invalid: you must run \`git worktree add <path> <branch>\` first
-    - If omitted: you MUST choose or create a worktree (see Worktree Setup below)
+    - If omitted: you MUST choose or create a worktree (see Worktree Setup below)`
+    : `- \`/start-work [plan-name]\`
+  - \`plan-name\` (optional): name or partial match of the plan to start`
+
+  const worktreeSetupSection = worktreeEnabled
+    ? `
+4. **Worktree Setup** (when \`worktree_path\` not already set in boulder.json):
+   1. \`git worktree list --porcelain\` — see available worktrees
+   2. Create: \`git worktree add <absolute-path> <branch-or-HEAD>\`
+   3. Update boulder.json to add \`"worktree_path": "<absolute-path>"\`
+   4. All work happens inside that worktree directory
+`
+    : ``
+
+  const boulderJsonWorktreeLine = worktreeEnabled
+    ? `      "worktree_path": "/absolute/path/to/git/worktree"\n`
+    : ``
+
+  const resumingWorktreeLine = worktreeEnabled
+    ? `Worktree: {worktree_path}\n`
+    : ``
+
+  const startingWorktreeLine = worktreeEnabled
+    ? `Worktree: {worktree_path}\n`
+    : ``
+
+  const worktreeCritical = worktreeEnabled
+    ? `- Always set worktree_path in boulder.json before executing any tasks\n`
+    : ``
+
+  return `You are starting a Sisyphus work session.
+
+## ARGUMENTS
+
+${argumentsSection}
 
 ## WHAT TO DO
 
@@ -23,25 +57,18 @@ export const START_WORK_TEMPLATE = `You are starting a Sisyphus work session.
      - List available plan files
      - If ONE plan: auto-select it
      - If MULTIPLE plans: show list with timestamps, ask user to select
-
-4. **Worktree Setup** (when \`worktree_path\` not already set in boulder.json):
-   1. \`git worktree list --porcelain\` — see available worktrees
-   2. Create: \`git worktree add <absolute-path> <branch-or-HEAD>\`
-   3. Update boulder.json to add \`"worktree_path": "<absolute-path>"\`
-   4. All work happens inside that worktree directory
-
-5. **Create/Update boulder.json**:
+${worktreeSetupSection}
+${worktreeEnabled ? "5" : "4"}. **Create/Update boulder.json**:
    \`\`\`json
    {
      "active_plan": "/absolute/path/to/plan.md",
      "started_at": "ISO_TIMESTAMP",
      "session_ids": ["session_id_1", "session_id_2"],
-     "plan_name": "plan-name",
-     "worktree_path": "/absolute/path/to/git/worktree"
+     "plan_name": "plan-name"${worktreeEnabled ? `,\n     "worktree_path": "/absolute/path/to/git/worktree"` : ""}
    }
    \`\`\`
 
-6. **Read the plan file** and start executing tasks according to atlas workflow
+${worktreeEnabled ? "6" : "5"}. **Read the plan file** and start executing tasks according to atlas workflow
 
 ## OUTPUT FORMAT
 
@@ -65,8 +92,7 @@ Resuming Work Session
 Active Plan: {plan-name}
 Progress: {completed}/{total} tasks
 Sessions: {count} (appending current session)
-Worktree: {worktree_path}
-
+${resumingWorktreeLine}
 Reading plan and continuing from last incomplete task...
 \`\`\`
 
@@ -77,8 +103,7 @@ Starting Work Session
 Plan: {plan-name}
 Session ID: {session_id}
 Started: {timestamp}
-Worktree: {worktree_path}
-
+${startingWorktreeLine}
 Reading plan and beginning execution...
 \`\`\`
 
@@ -86,6 +111,8 @@ Reading plan and beginning execution...
 
 - The session_id is injected by the hook - use it directly
 - Always update boulder.json BEFORE starting work
-- Always set worktree_path in boulder.json before executing any tasks
-- Read the FULL plan file before delegating any tasks
+${worktreeCritical}- Read the FULL plan file before delegating any tasks
 - Follow atlas delegation protocols (7-section format)`
+}
+
+export const START_WORK_TEMPLATE = createStartWorkTemplate()

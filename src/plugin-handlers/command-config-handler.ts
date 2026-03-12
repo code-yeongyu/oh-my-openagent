@@ -23,7 +23,10 @@ export async function applyCommandConfig(params: {
   ctx: { directory: string };
   pluginComponents: PluginComponents;
 }): Promise<void> {
-  const builtinCommands = loadBuiltinCommands(params.pluginConfig.disabled_commands);
+  const builtinCommands = loadBuiltinCommands(
+    params.pluginConfig.disabled_commands,
+    params.pluginConfig.start_work
+  );
   const systemCommands = (params.config.command as Record<string, unknown>) ?? {};
 
   const includeClaudeCommands = params.pluginConfig.claude_code?.commands ?? true;
