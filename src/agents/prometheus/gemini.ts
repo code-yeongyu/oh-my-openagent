@@ -321,6 +321,7 @@ After plan complete:
  Use incremental write protocol for large plans
  Delete draft after plan completion
  Present "Start Work" vs "High Accuracy" choice after plan
+ Final Verification Wave must require explicit user "okay" before marking work complete
  **USE TOOL CALLS for every phase transition — not internal reasoning**
 </critical_rules>
 

@@ -3,7 +3,7 @@ import { basename, join } from "path"
 import {
   parseFrontmatter,
   sanitizeModelField,
-  getOpenCodeConfigDir,
+  getOpenCodeCommandDirs,
   discoverPluginCommandDefinitions,
 } from "../../shared"
 import type { CommandFrontmatter } from "../../features/claude-code-command-loader/types"
@@ -79,14 +79,15 @@ export function discoverCommandsSync(
   directory?: string,
   options?: CommandDiscoveryOptions,
 ): CommandInfo[] {
-  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
   const userCommandsDir = join(getClaudeConfigDir(), "commands")
   const projectCommandsDir = join(directory ?? process.cwd(), ".claude", "commands")
-  const opencodeGlobalDir = join(configDir, "command")
+  const opencodeGlobalDirs = getOpenCodeCommandDirs({ binary: "opencode" })
   const opencodeProjectDir = join(directory ?? process.cwd(), ".opencode", "command")
 
   const userCommands = discoverCommandsFromDir(userCommandsDir, "user")
-  const opencodeGlobalCommands = discoverCommandsFromDir(opencodeGlobalDir, "opencode")
+  const opencodeGlobalCommands = opencodeGlobalDirs.flatMap((commandsDir) =>
+    discoverCommandsFromDir(commandsDir, "opencode")
+  )
   const projectCommands = discoverCommandsFromDir(projectCommandsDir, "project")
   const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
   const pluginCommands = discoverPluginCommands(options)

@@ -2,7 +2,7 @@
 
 import { beforeAll, beforeEach, afterEach, describe, expect, mock, test } from "bun:test"
 
-import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as dataPath from "./data-path"
@@ -15,6 +15,16 @@ const getOmoOpenCodeCacheDirMock = mock(() => testCacheDir)
 let updateConnectedProvidersCache: typeof import("./connected-providers-cache").updateConnectedProvidersCache
 let readProviderModelsCache: typeof import("./connected-providers-cache").readProviderModelsCache
 
+async function prepareConnectedProvidersCacheTestModule(): Promise<void> {
+	testCacheDir = mkdtempSync(join(tmpdir(), "connected-providers-cache-test-"))
+	getOmoOpenCodeCacheDirMock.mockClear()
+	mock.module("./data-path", () => ({
+		getOmoOpenCodeCacheDir: getOmoOpenCodeCacheDirMock,
+	}))
+	moduleImportCounter += 1
+	;({ updateConnectedProvidersCache, readProviderModelsCache } = await import(`./connected-providers-cache?test=${moduleImportCounter}`))
+}
+
 describe("updateConnectedProvidersCache", () => {
 	beforeAll(() => {
 		mock.restore()
@@ -22,18 +32,7 @@ describe("updateConnectedProvidersCache", () => {
 
 	beforeEach(async () => {
 		mock.restore()
-		const realCacheDir = join(dataPath.getCacheDir(), "oh-my-opencode")
-		if (existsSync(realCacheDir)) {
-			rmSync(realCacheDir, { recursive: true, force: true })
-		}
-
-		testCacheDir = mkdtempSync(join(tmpdir(), "connected-providers-cache-test-"))
-		getOmoOpenCodeCacheDirMock.mockClear()
-		mock.module("./data-path", () => ({
-			getOmoOpenCodeCacheDir: getOmoOpenCodeCacheDirMock,
-		}))
-		moduleImportCounter += 1
-		;({ updateConnectedProvidersCache, readProviderModelsCache } = await import(`./connected-providers-cache?test=${moduleImportCounter}`))
+		await prepareConnectedProvidersCacheTestModule()
 	})
 
 	afterEach(() => {
@@ -149,5 +148,26 @@ describe("updateConnectedProvidersCache", () => {
 		//#then
 		const cache = readProviderModelsCache()
 		expect(cache).toBeNull()
+	})
+
+	test("does not remove the user's real cache directory during test setup", async () => {
+		//#given
+		const realCacheDir = join(dataPath.getCacheDir(), "oh-my-opencode")
+		const sentinelPath = join(realCacheDir, "connected-providers-cache.test-sentinel.json")
+		mkdirSync(realCacheDir, { recursive: true })
+		writeFileSync(sentinelPath, JSON.stringify({ keep: true }))
+
+		try {
+			//#when
+			await prepareConnectedProvidersCacheTestModule()
+
+			//#then
+			expect(existsSync(sentinelPath)).toBe(true)
+			expect(readFileSync(sentinelPath, "utf-8")).toBe(JSON.stringify({ keep: true }))
+		} finally {
+			if (existsSync(sentinelPath)) {
+				rmSync(sentinelPath, { force: true })
+			}
+		}
 	})
 })

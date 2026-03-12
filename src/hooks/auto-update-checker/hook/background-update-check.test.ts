@@ -25,7 +25,7 @@ const mockGetCachedVersion = mock((): string | null => "3.4.0")
 const mockGetLatestVersion = mock(async (): Promise<string | null> => "3.5.0")
 const mockExtractChannel = mock(() => "latest")
 const mockInvalidatePackage = mock(() => {})
-const mockRunBunInstall = mock(async () => true)
+const mockRunBunInstallWithDetails = mock(async () => ({ success: true }))
 const mockShowUpdateAvailableToast = mock(
   async (_ctx: PluginInput, _latestVersion: string, _getToastMessage: ToastMessageGetter): Promise<void> => {}
 )
@@ -44,7 +44,7 @@ mock.module("../checker", () => ({
 }))
 mock.module("../version-channel", () => ({ extractChannel: mockExtractChannel }))
 mock.module("../cache", () => ({ invalidatePackage: mockInvalidatePackage }))
-mock.module("../../../cli/config-manager", () => ({ runBunInstall: mockRunBunInstall }))
+mock.module("../../../cli/config-manager", () => ({ runBunInstallWithDetails: mockRunBunInstallWithDetails }))
 mock.module("./update-toasts", () => ({
   showUpdateAvailableToast: mockShowUpdateAvailableToast,
   showAutoUpdatedToast: mockShowAutoUpdatedToast,
@@ -65,7 +65,7 @@ describe("runBackgroundUpdateCheck", () => {
     mockGetLatestVersion.mockReset()
     mockExtractChannel.mockReset()
     mockInvalidatePackage.mockReset()
-    mockRunBunInstall.mockReset()
+    mockRunBunInstallWithDetails.mockReset()
     mockShowUpdateAvailableToast.mockReset()
     mockShowAutoUpdatedToast.mockReset()
     mockSyncCachePackageJsonToIntent.mockReset()
@@ -74,7 +74,7 @@ describe("runBackgroundUpdateCheck", () => {
     mockGetCachedVersion.mockReturnValue("3.4.0")
     mockGetLatestVersion.mockResolvedValue("3.5.0")
     mockExtractChannel.mockReturnValue("latest")
-    mockRunBunInstall.mockResolvedValue(true)
+    mockRunBunInstallWithDetails.mockResolvedValue({ success: true })
     mockSyncCachePackageJsonToIntent.mockReturnValue({ synced: true, error: null })
   })
 
@@ -88,7 +88,7 @@ describe("runBackgroundUpdateCheck", () => {
       expect(mockFindPluginEntry).toHaveBeenCalledTimes(1)
       expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
     })
   })
 
@@ -115,7 +115,7 @@ describe("runBackgroundUpdateCheck", () => {
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
       //#then
       expect(mockGetLatestVersion).toHaveBeenCalledWith("latest")
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })
@@ -130,7 +130,7 @@ describe("runBackgroundUpdateCheck", () => {
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
       //#then
       expect(mockGetLatestVersion).toHaveBeenCalledTimes(1)
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })
@@ -144,7 +144,7 @@ describe("runBackgroundUpdateCheck", () => {
       await runBackgroundUpdateCheck(mockCtx, autoUpdate, getToastMessage)
       //#then
       expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })
   })
@@ -157,7 +157,7 @@ describe("runBackgroundUpdateCheck", () => {
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
       //#then
       expect(mockShowUpdateAvailableToast).toHaveBeenCalledTimes(1)
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })
 
@@ -187,13 +187,13 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given unpinned with auto-update and install succeeds", () => {
     it("syncs cache, invalidates, installs, and shows auto-updated toast", async () => {
       //#given
-      mockRunBunInstall.mockResolvedValue(true)
+      mockRunBunInstallWithDetails.mockResolvedValue({ success: true })
       //#when
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
       //#then
       expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
       expect(mockInvalidatePackage).toHaveBeenCalledTimes(1)
-      expect(mockRunBunInstall).toHaveBeenCalledTimes(1)
+      expect(mockRunBunInstallWithDetails).toHaveBeenCalledTimes(1)
       expect(mockShowAutoUpdatedToast).toHaveBeenCalledWith(mockCtx, "3.4.0", "3.5.0")
       expect(mockShowUpdateAvailableToast).not.toHaveBeenCalled()
     })
@@ -208,9 +208,9 @@ describe("runBackgroundUpdateCheck", () => {
       mockInvalidatePackage.mockImplementation(() => {
         callOrder.push("invalidate")
       })
-      mockRunBunInstall.mockImplementation(async () => {
+      mockRunBunInstallWithDetails.mockImplementation(async () => {
         callOrder.push("install")
-        return true
+        return { success: true }
       })
       //#when
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
@@ -222,11 +222,11 @@ describe("runBackgroundUpdateCheck", () => {
   describe("#given unpinned with auto-update and install fails", () => {
     it("falls back to notification-only toast", async () => {
       //#given
-      mockRunBunInstall.mockResolvedValue(false)
+      mockRunBunInstallWithDetails.mockResolvedValue({ success: false })
       //#when
       await runBackgroundUpdateCheck(mockCtx, true, getToastMessage)
       //#then
-      expect(mockRunBunInstall).toHaveBeenCalledTimes(1)
+      expect(mockRunBunInstallWithDetails).toHaveBeenCalledTimes(1)
       expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })
@@ -245,7 +245,7 @@ describe("runBackgroundUpdateCheck", () => {
       //#then
       expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
       expect(mockInvalidatePackage).not.toHaveBeenCalled()
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })
@@ -264,7 +264,7 @@ describe("runBackgroundUpdateCheck", () => {
       //#then
       expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
       expect(mockInvalidatePackage).not.toHaveBeenCalled()
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })
@@ -283,7 +283,7 @@ describe("runBackgroundUpdateCheck", () => {
       //#then
       expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
       expect(mockInvalidatePackage).not.toHaveBeenCalled()
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })
@@ -302,7 +302,7 @@ describe("runBackgroundUpdateCheck", () => {
       //#then
       expect(mockSyncCachePackageJsonToIntent).toHaveBeenCalledTimes(1)
       expect(mockInvalidatePackage).not.toHaveBeenCalled()
-      expect(mockRunBunInstall).not.toHaveBeenCalled()
+      expect(mockRunBunInstallWithDetails).not.toHaveBeenCalled()
       expect(mockShowUpdateAvailableToast).toHaveBeenCalledWith(mockCtx, "3.5.0", getToastMessage)
       expect(mockShowAutoUpdatedToast).not.toHaveBeenCalled()
     })

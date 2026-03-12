@@ -73,4 +73,5 @@ export interface HookDeps {
   sessionRetryInFlight: Set<string>
   sessionAwaitingFallbackResult: Set<string>
   sessionFallbackTimeouts: Map<string, RuntimeFallbackTimeout>
+  sessionStatusRetryKeys: Map<string, string>
 }

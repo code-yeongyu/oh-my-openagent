@@ -1,26 +1,41 @@
 import { describe, it, expect, spyOn, beforeEach, afterEach } from "bun:test"
 import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hide"
+import * as loggerModule from "../../shared/logger"
 import { executeOnCompleteHook } from "./on-complete-hook"
 
 describe("executeOnCompleteHook", () => {
-  function createProc(exitCode: number) {
+  function createStream(text: string): ReadableStream<Uint8Array> | undefined {
+    if (text.length === 0) {
+      return undefined
+    }
+
+    const encoder = new TextEncoder()
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode(text))
+        controller.close()
+      },
+    })
+  }
+
+  function createProc(exitCode: number, output?: { stdout?: string; stderr?: string }) {
     return {
       exited: Promise.resolve(exitCode),
       exitCode,
-      stdout: undefined,
-      stderr: undefined,
+      stdout: createStream(output?.stdout ?? ""),
+      stderr: createStream(output?.stderr ?? ""),
       kill: () => {},
     } satisfies ReturnType<typeof spawnWithWindowsHideModule.spawnWithWindowsHide>
   }
 
-  let consoleErrorSpy: ReturnType<typeof spyOn<typeof console, "error">>
+  let logSpy: ReturnType<typeof spyOn<typeof loggerModule, "log">>
 
   beforeEach(() => {
-    consoleErrorSpy = spyOn(console, "error").mockImplementation(() => {})
+    logSpy = spyOn(loggerModule, "log").mockImplementation(() => {})
   })
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore()
+    logSpy.mockRestore()
   })
 
   it("executes command with correct env vars", async () => {
@@ -46,8 +61,8 @@ describe("executeOnCompleteHook", () => {
       expect(options?.env?.EXIT_CODE).toBe("0")
       expect(options?.env?.DURATION_MS).toBe("5000")
       expect(options?.env?.MESSAGE_COUNT).toBe("10")
-      expect(options?.stdout).toBe("inherit")
-      expect(options?.stderr).toBe("inherit")
+      expect(options?.stdout).toBe("pipe")
+      expect(options?.stderr).toBe("pipe")
     } finally {
       spawnSpy.mockRestore()
     }
@@ -140,9 +155,8 @@ describe("executeOnCompleteHook", () => {
       ).resolves.toBeUndefined()
 
       // then
-      expect(consoleErrorSpy).toHaveBeenCalled()
-      const warningCall = consoleErrorSpy.mock.calls.find(
-        (call) => typeof call[0] === "string" && call[0].includes("Warning: on-complete hook exited with code 1")
+      const warningCall = logSpy.mock.calls.find(
+        (call) => call[0] === "On-complete hook exited with non-zero code"
       )
       expect(warningCall).toBeDefined()
     } finally {
@@ -170,12 +184,41 @@ describe("executeOnCompleteHook", () => {
       ).resolves.toBeUndefined()
 
       // then
-      expect(consoleErrorSpy).toHaveBeenCalled()
-      const errorCalls = consoleErrorSpy.mock.calls.filter((call) => {
-        const firstArg = call[0]
-        return typeof firstArg === "string" && (firstArg.includes("Warning") || firstArg.toLowerCase().includes("error"))
+      const errorCall = logSpy.mock.calls.find(
+        (call) => call[0] === "Failed to execute on-complete hook"
+      )
+      expect(errorCall).toBeDefined()
+    } finally {
+      spawnSpy.mockRestore()
+    }
+  })
+
+  it("hook stdout and stderr are logged to file logger", async () => {
+    // given
+    const spawnSpy = spyOn(spawnWithWindowsHideModule, "spawnWithWindowsHide").mockReturnValue(
+      createProc(0, { stdout: "hook output\n", stderr: "hook warning\n" })
+    )
+
+    try {
+      // when
+      await executeOnCompleteHook({
+        command: "echo test",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
       })
-      expect(errorCalls.length).toBeGreaterThan(0)
+
+      // then
+      const stdoutCall = logSpy.mock.calls.find(
+        (call) => call[0] === "On-complete hook stdout"
+      )
+      const stderrCall = logSpy.mock.calls.find(
+        (call) => call[0] === "On-complete hook stderr"
+      )
+
+      expect(stdoutCall?.[1]).toEqual({ command: "echo test", stdout: "hook output" })
+      expect(stderrCall?.[1]).toEqual({ command: "echo test", stderr: "hook warning" })
     } finally {
       spawnSpy.mockRestore()
     }
