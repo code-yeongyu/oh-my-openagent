@@ -54,6 +54,10 @@ export class TaskHistory {
     this.entries.delete(parentSessionID)
   }
 
+  clearAll(): void {
+    this.entries.clear()
+  }
+
   formatForCompaction(parentSessionID: string): string | null {
     const list = this.getByParentSession(parentSessionID)
     if (list.length === 0) return null

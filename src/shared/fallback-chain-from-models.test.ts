@@ -32,6 +32,21 @@ describe("fallback-chain-from-models", () => {
     })
   })
 
+  test("uses opencode as absolute fallback provider when context provider is missing", () => {
+    //#given
+    const fallbackModel = "gemini-3-flash"
+
+    //#when
+    const parsed = parseFallbackModelEntry(fallbackModel, undefined)
+
+    //#then
+    expect(parsed).toEqual({
+      providers: ["opencode"],
+      model: "gemini-3-flash",
+      variant: undefined,
+    })
+  })
+
   test("builds fallback chain from normalized fallback_models input", () => {
     //#given
     const fallbackModels = ["quotio/kimi-k2.5", "gpt-5.2 medium"]

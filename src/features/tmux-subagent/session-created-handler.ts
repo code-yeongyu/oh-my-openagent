@@ -6,6 +6,7 @@ import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, type SessionMapping } from "./decision-engine"
 import { executeActions } from "./action-executor"
 import type { SessionCreatedEvent } from "./session-created-event"
+import { createTrackedSession } from "./tracked-session-state"
 
 type OpencodeClient = PluginInput["client"]
 
@@ -152,14 +153,14 @@ export async function handleSessionCreated(
       return
     }
 
-    const now = Date.now()
-    deps.sessions.set(sessionId, {
+    deps.sessions.set(
       sessionId,
-      paneId: result.spawnedPaneId,
-      description: title,
-      createdAt: new Date(now),
-      lastSeenAt: new Date(now),
-    })
+      createTrackedSession({
+        sessionId,
+        paneId: result.spawnedPaneId,
+        description: title,
+      }),
+    )
 
     log("[tmux-session-manager] pane spawned and tracked", {
       sessionId,
