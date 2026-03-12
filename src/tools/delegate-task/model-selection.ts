@@ -87,15 +87,25 @@ export async function resolveModelForDelegateTask(input: {
   const fallbackChain = input.fallbackChain
   if (fallbackChain && fallbackChain.length > 0) {
     if (input.availableModels.size === 0) {
-      const first = fallbackChain[0]
-      const provider = first?.providers?.[0]
-      if (provider) {
-        const transformedModelId = transformModelForProvider(provider, first.model)
-        return { model: `${provider}/${transformedModelId}`, variant: first.variant }
+      // Find first non-blacklisted provider in the chain
+      for (const entry of fallbackChain) {
+        for (const provider of entry.providers) {
+          const blacklisted = await isProviderBlacklisted(provider)
+          if (!blacklisted) {
+            const transformedModelId = transformModelForProvider(provider, entry.model)
+            return { model: `${provider}/${transformedModelId}`, variant: entry.variant }
+          }
+        }
       }
     } else {
       for (const entry of fallbackChain) {
         for (const provider of entry.providers) {
+          // Check if provider is blacklisted
+          const blacklisted = await isProviderBlacklisted(provider)
+          if (blacklisted) {
+            continue  // Skip blacklisted provider
+          }
+          
           const fullModel = `${provider}/${entry.model}`
           const match = fuzzyMatchModel(fullModel, input.availableModels, [provider])
           if (match) {
