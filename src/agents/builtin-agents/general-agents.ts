@@ -75,7 +75,7 @@ export function collectPendingBuiltinAgents(input: {
       availableModels,
       systemDefaultModel,
     })
-    if (!resolution && isFirstRunNoCache && !override?.model) {
+    if (!resolution && !override?.model) {
       resolution = getFirstFallbackModel(requirement)
     }
     if (!resolution) continue
