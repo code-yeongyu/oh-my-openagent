@@ -555,6 +555,29 @@ describe("start-work hook", () => {
        expect(output.parts[0].text).toContain("subagent")
        expect(output.parts[0].text).not.toContain("Worktree Setup Required")
      })
+
+     test("should enable worktree by default when worktreeEnabled option is undefined (regression)", async () => {
+       // given - single plan, no worktreeEnabled option (undefined = default enabled), valid worktree flag
+       const plansDir = join(testDir, ".sisyphus", "plans")
+       mkdirSync(plansDir, { recursive: true })
+       writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+       detectSpy.mockReturnValue("/valid/wt")
+
+       const hook = createStartWorkHook(createMockPluginInput())
+       const output = {
+         parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /valid/wt</user-request>\n</session-context>" }],
+       }
+
+       // when
+       await hook["chat.message"]({ sessionID: "session-123" }, output)
+
+       // then - worktree is enabled by default, so Worktree Active block is injected
+       expect(output.parts[0].text).toContain("Auto-Selected Plan")
+       expect(output.parts[0].text).toContain("Worktree Active")
+       expect(output.parts[0].text).toContain("/valid/wt")
+       const state = readBoulderState(testDir)
+       expect(state?.worktree_path).toBe("/valid/wt")
+     })
    })
 
    describe("worktree disabled by config", () => {
@@ -625,42 +648,23 @@ describe("start-work hook", () => {
        expect(output.parts[0].text).toContain("RESUMING")
      })
 
-     test("should NOT store worktree_path in boulder.json when worktreeEnabled is false", async () => {
-       // given - single plan, worktreeEnabled: false
-       const plansDir = join(testDir, ".sisyphus", "plans")
-       mkdirSync(plansDir, { recursive: true })
-       writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+      test("should NOT store worktree_path in boulder.json when worktreeEnabled is false", async () => {
+        // given - single plan, worktreeEnabled: false
+        const plansDir = join(testDir, ".sisyphus", "plans")
+        mkdirSync(plansDir, { recursive: true })
+        writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
 
-       const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
-       const output = {
-         parts: [{ type: "text", text: "<session-context></session-context>" }],
-       }
+        const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
+        const output = {
+          parts: [{ type: "text", text: "<session-context></session-context>" }],
+        }
 
-       // when
-       await hook["chat.message"]({ sessionID: "session-123" }, output)
+        // when
+        await hook["chat.message"]({ sessionID: "session-123" }, output)
 
-       // then - boulder.json should not have worktree_path
-       const state = readBoulderState(testDir)
-       expect(state?.worktree_path).toBeUndefined()
-     })
-
-     test("should enable worktree by default when worktreeEnabled option is undefined (regression)", async () => {
-       // given - single plan, no worktreeEnabled option (undefined = default enabled)
-       const plansDir = join(testDir, ".sisyphus", "plans")
-       mkdirSync(plansDir, { recursive: true })
-       writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
-
-       const hook = createStartWorkHook(createMockPluginInput())
-       const output = {
-         parts: [{ type: "text", text: "<session-context></session-context>" }],
-       }
-
-       // when
-       await hook["chat.message"]({ sessionID: "session-123" }, output)
-
-       // then - should behave like worktree is enabled (no worktree content because no flag, but system ready for it)
-       expect(output.parts[0].text).toContain("Auto-Selected Plan")
-       expect(output.parts[0].text).not.toContain("Worktree Active")
-     })
+        // then - boulder.json should not have worktree_path
+        const state = readBoulderState(testDir)
+        expect(state?.worktree_path).toBeUndefined()
+      })
    })
 })
