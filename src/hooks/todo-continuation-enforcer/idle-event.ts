@@ -13,10 +13,10 @@ import {
   FAILURE_RESET_WINDOW_MS,
   HOOK_NAME,
   MAX_CONSECUTIVE_FAILURES,
+  MAX_STAGNATION_COUNT,
 } from "./constants"
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { hasUnansweredQuestion } from "./pending-question-detection"
-import { shouldStopForStagnation } from "./stagnation-detection"
 import { getIncompleteCount } from "./todo"
 import type { MessageInfo, ResolvedMessageInfo, Todo } from "./types"
 import type { SessionStateStore } from "./session-state"
@@ -134,6 +134,18 @@ export async function handleSessionIdle(args: {
     return
   }
 
+  if (state.cooldownUntil && Date.now() < state.cooldownUntil) {
+    log(`[${HOOK_NAME}] Skipped: extended cooldown active`, {
+      sessionID,
+      cooldownUntil: state.cooldownUntil,
+      remainingMs: state.cooldownUntil - Date.now(),
+    })
+    return
+  }
+  if (state.cooldownUntil && Date.now() >= state.cooldownUntil) {
+    state.cooldownUntil = undefined
+  }
+
   const effectiveCooldown =
     CONTINUATION_COOLDOWN_MS * Math.pow(2, Math.min(state.consecutiveFailures, 5))
   if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < effectiveCooldown) {
@@ -193,10 +205,39 @@ export async function handleSessionIdle(args: {
     return
   }
 
-  const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, incompleteCount, todos)
-  if (shouldStopForStagnation({ sessionID, incompleteCount, progressUpdate })) {
+  if (state.awaitingPostInjectionProgressCheck && state.lastTodoSnapshot !== undefined) {
+    const previousTodoCount = state.lastTodoSnapshot
+    if (incompleteCount === previousTodoCount) {
+      state.stagnationCount += 1
+      log(`[${HOOK_NAME}] Todo stagnation detected`, {
+        sessionID,
+        previousTodoCount,
+        currentTodoCount: incompleteCount,
+        stagnationCount: state.stagnationCount,
+        maxStagnationCount: MAX_STAGNATION_COUNT,
+      })
+    } else {
+      state.stagnationCount = 0
+      log(`[${HOOK_NAME}] Todo progress detected: reset stagnation`, {
+        sessionID,
+        previousTodoCount,
+        currentTodoCount: incompleteCount,
+      })
+    }
+    state.awaitingPostInjectionProgressCheck = false
+  }
+
+  if (state.stagnationCount >= MAX_STAGNATION_COUNT) {
+    log(`[${HOOK_NAME}] Skipped: max todo stagnation reached`, {
+      sessionID,
+      stagnationCount: state.stagnationCount,
+      maxStagnationCount: MAX_STAGNATION_COUNT,
+      incompleteCount,
+    })
     return
   }
+
+  state.lastTodoCount = incompleteCount
 
   startCountdown({
     ctx,

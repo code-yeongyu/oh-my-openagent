@@ -219,6 +219,9 @@ export function createSessionStateStore(): SessionStateStore {
     const { state } = trackedSession
 
     state.lastIncompleteCount = undefined
+    state.lastTodoSnapshot = undefined
+    state.lastTodoCount = undefined
+    state.cooldownUntil = undefined
     state.stagnationCount = 0
     state.awaitingPostInjectionProgressCheck = false
     trackedSession.lastCompletedCount = undefined

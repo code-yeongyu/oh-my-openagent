@@ -164,6 +164,8 @@ ${todoList}`
     if (injectionState) {
       injectionState.inFlight = false
       injectionState.lastInjectedAt = Date.now()
+      injectionState.lastTodoSnapshot = freshIncompleteCount
+      injectionState.lastTodoCount = freshIncompleteCount
       injectionState.awaitingPostInjectionProgressCheck = true
       injectionState.consecutiveFailures = 0
     }
