@@ -67,9 +67,9 @@ export function createTodoContinuationHandler(args: {
       const sessionID = (props?.sessionID ?? (props?.info as { id?: string } | undefined)?.id) as string | undefined
       if (sessionID) {
         const state = sessionStateStore.getState(sessionID)
-        state.hasRecentCompaction = true
+        state.recentCompactionAt = Date.now()
         sessionStateStore.cancelCountdown(sessionID)
-        log(`[${HOOK_NAME}] Session compacted: marked hasRecentCompaction`, { sessionID })
+        log(`[${HOOK_NAME}] Session compacted: marked recentCompactionAt`, { sessionID })
       }
       return
     }
