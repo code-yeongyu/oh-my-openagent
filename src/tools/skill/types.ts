@@ -37,4 +37,6 @@ export interface SkillLoadOptions {
   pluginsEnabled?: boolean
   /** Override plugin enablement from Claude settings by plugin key */
   enabledPluginsOverride?: Record<string, boolean>
+  /** start-work command configuration, controls worktree instructions in /start-work template */
+  startWorkConfig?: { worktree?: boolean }
 }

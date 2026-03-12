@@ -199,6 +199,7 @@ export function createSkillTool(options: SkillLoadOptions = {}): ToolDefinition 
     cachedCommands = discoverCommandsSync(undefined, {
       pluginsEnabled: options.pluginsEnabled,
       enabledPluginsOverride: options.enabledPluginsOverride,
+      startWorkConfig: options.startWorkConfig,
     })
     return cachedCommands
   }
