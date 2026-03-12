@@ -177,14 +177,14 @@ export function createEventHandler(args: {
       return lastKnownModel.providerID;
     }
 
-    const connectedProvider = readConnectedProvidersCache()?.[0];
-    if (connectedProvider) {
-      return connectedProvider;
-    }
-
     const normalizedProviderHint = providerHint?.trim();
     if (normalizedProviderHint) {
       return normalizedProviderHint;
+    }
+
+    const connectedProvider = readConnectedProvidersCache()?.[0];
+    if (connectedProvider) {
+      return connectedProvider;
     }
 
     return "opencode";
