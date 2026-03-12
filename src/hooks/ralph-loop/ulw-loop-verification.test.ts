@@ -282,6 +282,84 @@ describe("ulw-loop verification", () => {
 		expect(hook.getState()?.completion_promise).toBe("DONE")
 	})
 
+	test("#given ulw loop was awaiting verification #when different session starts a new ulw loop #then prior verification state is overwritten", async () => {
+		const hook = createRalphLoopHook(createMockPluginInput(), {
+			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+		hook.startLoop("session-456", "Ship CLI", { ultrawork: true })
+
+		expect(hook.getState()?.session_id).toBe("session-456")
+		expect(hook.getState()?.prompt).toBe("Ship CLI")
+		expect(hook.getState()?.verification_pending).toBeUndefined()
+		expect(hook.getState()?.completion_promise).toBe("DONE")
+	})
+
+	test("#given verification state was overwritten by different ulw loop #when stale oracle session idles #then new loop remains active", async () => {
+		const hook = createRalphLoopHook(createMockPluginInput(), {
+			getTranscriptPath: (sessionID) => sessionID === "ses-oracle-old" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+		writeState(testDir, {
+			...hook.getState()!,
+			verification_session_id: "ses-oracle-old",
+		})
+		hook.startLoop("session-456", "Ship CLI", { ultrawork: true })
+		writeFileSync(
+			oracleTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: `verified <promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>` } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "ses-oracle-old" } } })
+
+		expect(hook.getState()?.session_id).toBe("session-456")
+		expect(hook.getState()?.prompt).toBe("Ship CLI")
+		expect(hook.getState()?.iteration).toBe(1)
+		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP COMPLETE!")).toBe(false)
+	})
+
+	test("#given verification state was overwritten by restarted ulw loop #when stale oracle session idles #then restarted loop remains active", async () => {
+		const hook = createRalphLoopHook(createMockPluginInput(), {
+			getTranscriptPath: (sessionID) => sessionID === "ses-oracle-old" ? oracleTranscriptPath : parentTranscriptPath,
+		})
+		hook.startLoop("session-123", "Build API", { ultrawork: true })
+		writeFileSync(
+			parentTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: "done <promise>DONE</promise>" } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "session-123" } } })
+		writeState(testDir, {
+			...hook.getState()!,
+			verification_session_id: "ses-oracle-old",
+		})
+		hook.startLoop("session-123", "Restarted task", { ultrawork: true })
+		writeFileSync(
+			oracleTranscriptPath,
+			`${JSON.stringify({ type: "tool_result", timestamp: new Date().toISOString(), tool_output: { output: `verified <promise>${ULTRAWORK_VERIFICATION_PROMISE}</promise>` } })}\n`,
+		)
+
+		await hook.event({ event: { type: "session.idle", properties: { sessionID: "ses-oracle-old" } } })
+
+		expect(hook.getState()?.session_id).toBe("session-123")
+		expect(hook.getState()?.prompt).toBe("Restarted task")
+		expect(hook.getState()?.iteration).toBe(1)
+		expect(hook.getState()?.verification_pending).toBeUndefined()
+		expect(toastCalls.some((toast) => toast.title === "ULTRAWORK LOOP COMPLETE!")).toBe(false)
+	})
+
 	test("#given parent session emits VERIFIED #when oracle session is not tracked #then ulw loop continues instead of completing", async () => {
 		const hook = createRalphLoopHook(createMockPluginInput(), {
 			getTranscriptPath: (sessionID) => sessionID === "ses-oracle" ? oracleTranscriptPath : parentTranscriptPath,
