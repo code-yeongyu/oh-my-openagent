@@ -9,6 +9,7 @@ import {
   FAILURE_RESET_WINDOW_MS,
   MAX_CONSECUTIVE_FAILURES,
   MAX_STAGNATION_COUNT,
+  TOKEN_LIMIT_COOLDOWN_MS,
 } from "./constants"
 
 type TimerCallback = (...args: any[]) => void
@@ -1013,6 +1014,62 @@ describe("todo-continuation-enforcer", () => {
 
     // then - continuation injected (non-abort errors don't block)
     expect(promptCalls.length).toBe(1)
+  }, { timeout: 15000 })
+
+  test("should skip continuation during token-limit cooldown on ContextLengthError", async () => {
+    //#given
+    const sessionID = "main-context-length-cooldown"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when - context length error is reported
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "ContextLengthError", message: "prompt exceeds context window" },
+        },
+      },
+    })
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(3000, true)
+
+    //#then - no continuation while extended cooldown is active
+    expect(promptCalls).toHaveLength(0)
+
+    //#when - cooldown passes
+    await fakeTimers.advanceClockBy(TOKEN_LIMIT_COOLDOWN_MS)
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(2500, true)
+
+    //#then - continuation resumes after cooldown
+    expect(promptCalls).toHaveLength(1)
+  }, { timeout: 15000 })
+
+  test("should skip continuation during overloaded error cooldown", async () => {
+    //#given
+    const sessionID = "main-overloaded-cooldown"
+    setMainSession(sessionID)
+    const hook = createTodoContinuationEnforcer(createMockPluginInput(), {})
+
+    //#when - overloaded error is reported
+    await hook.handler({
+      event: {
+        type: "session.error",
+        properties: {
+          sessionID,
+          error: { name: "ProviderConnectionError", message: "model is overloaded, please try again" },
+        },
+      },
+    })
+
+    await hook.handler({ event: { type: "session.idle", properties: { sessionID } } })
+    await fakeTimers.advanceBy(3000, true)
+
+    //#then - no continuation while cooldown is active
+    expect(promptCalls).toHaveLength(0)
   }, { timeout: 15000 })
 
 
