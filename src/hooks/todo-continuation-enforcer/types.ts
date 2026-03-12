@@ -30,6 +30,7 @@ export interface SessionState {
   lastInjectedAt?: number
   inFlight?: boolean
   consecutiveFailures: number
+  hasRecentCompaction?: boolean
 }
 
 export interface MessageInfo {
