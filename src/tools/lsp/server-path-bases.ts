@@ -11,5 +11,6 @@ export function getLspServerAdditionalPathBases(workingDirectory: string): strin
     join(configDir, "bin"),
     join(configDir, "node_modules", ".bin"),
     join(dataDir, "bin"),
+    join(dataDir, "bin", "node_modules", ".bin"),
   ]
 }
