@@ -105,6 +105,7 @@ export function createToolRegistry(args: {
   const commands = discoverCommandsSync(ctx.directory, {
     pluginsEnabled: pluginConfig.claude_code?.plugins ?? true,
     enabledPluginsOverride: pluginConfig.claude_code?.plugins_override,
+    startWorkConfig: pluginConfig.start_work,
   })
   const skillTool = createSkillTool({
     commands,
@@ -112,6 +113,7 @@ export function createToolRegistry(args: {
     mcpManager: managers.skillMcpManager,
     getSessionID: getSessionIDForMcp,
     gitMasterConfig: pluginConfig.git_master,
+    startWorkConfig: pluginConfig.start_work,
   })
 
   const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false
