@@ -28,10 +28,10 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const sisyphus = AGENT_MODEL_REQUIREMENTS["sisyphus"]
 
     // #when - accessing Sisyphus requirement
-    // #then - fallbackChain has 6 entries with correct ordering
+    // #then - fallbackChain has 7 entries with correct ordering
     expect(sisyphus).toBeDefined()
     expect(sisyphus.fallbackChain).toBeArray()
-    expect(sisyphus.fallbackChain).toHaveLength(6)
+    expect(sisyphus.fallbackChain).toHaveLength(7)
     expect(sisyphus.requiresAnyModel).toBe(true)
 
     const primary = sisyphus.fallbackChain[0]
@@ -40,35 +40,54 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.variant).toBe("max")
 
     const second = sisyphus.fallbackChain[1]
-    expect(second.providers).toEqual(["kimi-for-coding"])
-    expect(second.model).toBe("k2p5")
+    expect(second.providers).toEqual(["opencode-go"])
+    expect(second.model).toBe("kimi-k2.5")
 
     const third = sisyphus.fallbackChain[2]
-    expect(third.model).toBe("kimi-k2.5")
+    expect(third.providers).toEqual(["kimi-for-coding"])
+    expect(third.model).toBe("k2p5")
 
     const fourth = sisyphus.fallbackChain[3]
-    expect(fourth.providers).toContain("openai")
-    expect(fourth.model).toBe("gpt-5.4")
-    expect(fourth.variant).toBe("medium")
+    expect(fourth.model).toBe("kimi-k2.5")
 
-    const last = sisyphus.fallbackChain[5]
+    const fifth = sisyphus.fallbackChain[4]
+    expect(fifth.providers).toContain("openai")
+    expect(fifth.model).toBe("gpt-5.4")
+    expect(fifth.variant).toBe("medium")
+
+    const sixth = sisyphus.fallbackChain[5]
+    expect(sixth.providers[0]).toBe("zai-coding-plan")
+    expect(sixth.model).toBe("glm-5")
+
+    const last = sisyphus.fallbackChain[6]
     expect(last.providers[0]).toBe("opencode")
     expect(last.model).toBe("big-pickle")
   })
 
-  test("librarian has valid fallbackChain with gemini-3-flash as primary", () => {
+  test("librarian has valid fallbackChain with opencode-go/minimax-m2.5 as primary", () => {
     // given - librarian agent requirement
     const librarian = AGENT_MODEL_REQUIREMENTS["librarian"]
 
     // when - accessing librarian requirement
-    // then - fallbackChain exists with gemini-3-flash as first entry
+    // then - fallbackChain exists with opencode-go/minimax-m2.5 as first entry
     expect(librarian).toBeDefined()
     expect(librarian.fallbackChain).toBeArray()
     expect(librarian.fallbackChain.length).toBeGreaterThan(0)
 
     const primary = librarian.fallbackChain[0]
-    expect(primary.providers[0]).toBe("google")
-    expect(primary.model).toBe("gemini-3-flash")
+    expect(primary.providers[0]).toBe("opencode-go")
+    expect(primary.model).toBe("minimax-m2.5")
+
+    const second = librarian.fallbackChain[1]
+    expect(second.providers[0]).toBe("opencode")
+    expect(second.model).toBe("minimax-m2.5-free")
+
+    const tertiary = librarian.fallbackChain[2]
+    expect(tertiary.providers).toContain("anthropic")
+    expect(tertiary.model).toBe("claude-haiku-4-5")
+
+    const quaternary = librarian.fallbackChain[3]
+    expect(quaternary.model).toBe("gpt-5-nano")
   })
 
   test("explore has valid fallbackChain with grok-code-fast-1 as primary", () => {
@@ -76,26 +95,30 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const explore = AGENT_MODEL_REQUIREMENTS["explore"]
 
     // when - accessing explore requirement
-    // then - fallbackChain: grok → minimax-free → haiku → nano
+    // then - fallbackChain: grok → opencode-go/minimax → minimax-free → haiku → nano
     expect(explore).toBeDefined()
     expect(explore.fallbackChain).toBeArray()
-    expect(explore.fallbackChain).toHaveLength(4)
+    expect(explore.fallbackChain).toHaveLength(5)
 
     const primary = explore.fallbackChain[0]
     expect(primary.providers).toContain("github-copilot")
     expect(primary.model).toBe("grok-code-fast-1")
 
     const secondary = explore.fallbackChain[1]
-    expect(secondary.providers).toContain("opencode")
-    expect(secondary.model).toBe("minimax-m2.5-free")
+    expect(secondary.providers).toContain("opencode-go")
+    expect(secondary.model).toBe("minimax-m2.5")
 
     const tertiary = explore.fallbackChain[2]
-    expect(tertiary.providers).toContain("anthropic")
-    expect(tertiary.model).toBe("claude-haiku-4-5")
+    expect(tertiary.providers).toContain("opencode")
+    expect(tertiary.model).toBe("minimax-m2.5-free")
 
     const quaternary = explore.fallbackChain[3]
-    expect(quaternary.providers).toContain("opencode")
-    expect(quaternary.model).toBe("gpt-5-nano")
+    expect(quaternary.providers).toContain("anthropic")
+    expect(quaternary.model).toBe("claude-haiku-4-5")
+
+    const fifth = explore.fallbackChain[4]
+    expect(fifth.providers).toContain("opencode")
+    expect(fifth.model).toBe("gpt-5-nano")
   })
 
   test("multimodal-looker has valid fallbackChain with gpt-5.4 as primary", () => {
@@ -103,22 +126,24 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     const multimodalLooker = AGENT_MODEL_REQUIREMENTS["multimodal-looker"]
 
     // when - accessing multimodal-looker requirement
-    // then - fallbackChain: gpt-5.4 -> k2p5 -> gemini-3-flash -> glm-4.6v -> gpt-5-nano
+    // then - fallbackChain: gpt-5.4 -> opencode-go/kimi-k2.5 -> glm-4.6v -> gpt-5-nano
     expect(multimodalLooker).toBeDefined()
     expect(multimodalLooker.fallbackChain).toBeArray()
-    expect(multimodalLooker.fallbackChain).toHaveLength(5)
+    expect(multimodalLooker.fallbackChain).toHaveLength(4)
 
     const primary = multimodalLooker.fallbackChain[0]
     expect(primary.providers).toEqual(["openai", "opencode"])
     expect(primary.model).toBe("gpt-5.4")
     expect(primary.variant).toBe("medium")
+
     const secondary = multimodalLooker.fallbackChain[1]
-    expect(secondary.providers).toEqual(["kimi-for-coding"])
-    expect(secondary.model).toBe("k2p5")
+    expect(secondary.providers).toEqual(["opencode-go"])
+    expect(secondary.model).toBe("kimi-k2.5")
 
     const tertiary = multimodalLooker.fallbackChain[2]
-    expect(tertiary.model).toBe("gemini-3-flash")
-    const last = multimodalLooker.fallbackChain[4]
+    expect(tertiary.model).toBe("glm-4.6v")
+
+    const last = multimodalLooker.fallbackChain[3]
     expect(last.providers).toEqual(["openai", "github-copilot", "opencode"])
     expect(last.model).toBe("gpt-5-nano")
   })
@@ -186,8 +211,8 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
     expect(primary.providers[0]).toBe("anthropic")
 
     const secondary = atlas.fallbackChain[1]
-    expect(secondary.model).toBe("gpt-5.4")
-    expect(secondary.variant).toBe("medium")
+    expect(secondary.model).toBe("kimi-k2.5")
+    expect(secondary.providers[0]).toBe("opencode-go")
   })
 
   test("hephaestus supports openai, github-copilot, venice, and opencode providers", () => {
@@ -276,10 +301,10 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const visualEngineering = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
     // when - accessing visual-engineering requirement
-    // then - fallbackChain: gemini-3.1-pro(high) → glm-5 → opus-4-6(max)
+    // then - fallbackChain: gemini-3.1-pro(high) → glm-5 → opus-4-6(max) → opencode-go/glm-5 → k2p5
     expect(visualEngineering).toBeDefined()
     expect(visualEngineering.fallbackChain).toBeArray()
-    expect(visualEngineering.fallbackChain).toHaveLength(3)
+    expect(visualEngineering.fallbackChain).toHaveLength(5)
 
     const primary = visualEngineering.fallbackChain[0]
     expect(primary.providers[0]).toBe("google")
@@ -294,6 +319,13 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(third.model).toBe("claude-opus-4-6")
     expect(third.variant).toBe("max")
 
+    const fourth = visualEngineering.fallbackChain[3]
+    expect(fourth.providers[0]).toBe("opencode-go")
+    expect(fourth.model).toBe("glm-5")
+
+    const fifth = visualEngineering.fallbackChain[4]
+    expect(fifth.providers[0]).toBe("kimi-for-coding")
+    expect(fifth.model).toBe("k2p5")
   })
 
   test("quick has valid fallbackChain with claude-haiku-4-5 as primary", () => {
@@ -368,18 +400,22 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     const writing = CATEGORY_MODEL_REQUIREMENTS["writing"]
 
     // when - accessing writing requirement
-    // then - fallbackChain: gemini-3-flash -> claude-sonnet-4-6
+    // then - fallbackChain: gemini-3-flash -> kimi-k2.5 -> claude-sonnet-4-6
     expect(writing).toBeDefined()
     expect(writing.fallbackChain).toBeArray()
-    expect(writing.fallbackChain).toHaveLength(2)
+    expect(writing.fallbackChain).toHaveLength(3)
 
     const primary = writing.fallbackChain[0]
     expect(primary.model).toBe("gemini-3-flash")
     expect(primary.providers[0]).toBe("google")
 
     const second = writing.fallbackChain[1]
-    expect(second.model).toBe("claude-sonnet-4-6")
-    expect(second.providers[0]).toBe("anthropic")
+    expect(second.model).toBe("kimi-k2.5")
+    expect(second.providers[0]).toBe("opencode-go")
+
+    const third = writing.fallbackChain[2]
+    expect(third.model).toBe("claude-sonnet-4-6")
+    expect(third.providers[0]).toBe("anthropic")
   })
 
   test("all 8 categories have valid fallbackChain arrays", () => {
