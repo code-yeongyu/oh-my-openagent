@@ -1,5 +1,4 @@
-import type { PluginInput } from "@opencode-ai/plugin"
-import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackOptions } from "./types"
+import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
 import { DEFAULT_CONFIG, HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { loadPluginConfig } from "../../plugin-config"
@@ -8,8 +7,12 @@ import { createEventHandler } from "./event-handler"
 import { createMessageUpdateHandler } from "./message-update-handler"
 import { createChatMessageHandler } from "./chat-message-handler"
 
+declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
+declare function clearInterval(interval: RuntimeFallbackInterval): void
+declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
+
 export function createRuntimeFallbackHook(
-  ctx: PluginInput,
+  ctx: RuntimeFallbackPluginInput,
   options?: RuntimeFallbackOptions
 ): RuntimeFallbackHook {
   const config = {
@@ -60,8 +63,23 @@ export function createRuntimeFallbackHook(
     await baseEventHandler({ event })
   }
 
+  const dispose = () => {
+    clearInterval(cleanupInterval)
+
+    for (const fallbackTimeout of deps.sessionFallbackTimeouts.values()) {
+      clearTimeout(fallbackTimeout)
+    }
+
+    deps.sessionStates.clear()
+    deps.sessionLastAccess.clear()
+    deps.sessionRetryInFlight.clear()
+    deps.sessionAwaitingFallbackResult.clear()
+    deps.sessionFallbackTimeouts.clear()
+  }
+
   return {
     event: eventHandler,
     "chat.message": chatMessageHandler,
+    dispose,
   } as RuntimeFallbackHook
 }

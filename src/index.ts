@@ -7,12 +7,15 @@ import { createHooks } from "./create-hooks"
 import { createManagers } from "./create-managers"
 import { createTools } from "./create-tools"
 import { createPluginInterface } from "./plugin-interface"
+import { createPluginDispose, type PluginDispose } from "./plugin-dispose"
 
 import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log } from "./shared"
 import { startTmuxCheck } from "./tools"
+
+let activePluginDispose: PluginDispose | null = null
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   // Initialize config context for plugin runtime (prevents warnings from hooks)
@@ -23,6 +26,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
 
   injectServerAuthIntoClient(ctx.client)
   startTmuxCheck()
+  await activePluginDispose?.()
 
   const pluginConfig = loadPluginConfig(ctx.directory, ctx)
   const disabledHooks = new Set(pluginConfig.disabled_hooks ?? [])
@@ -67,6 +71,12 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     availableSkills: toolsResult.availableSkills,
   })
 
+  const dispose = createPluginDispose({
+    backgroundManager: managers.backgroundManager,
+    skillMcpManager: managers.skillMcpManager,
+    disposeHooks: hooks.disposeHooks,
+  })
+
   const pluginInterface = createPluginInterface({
     ctx,
     pluginConfig,
@@ -75,6 +85,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
     hooks,
     tools: toolsResult.filteredTools,
   })
+
+  activePluginDispose = dispose
 
   return {
     ...pluginInterface,

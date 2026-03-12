@@ -1,4 +1,4 @@
-import type { HookDeps } from "./types"
+import type { HookDeps, RuntimeFallbackTimeout } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { normalizeAgentName, resolveAgentForSession } from "./agent-resolver"
@@ -9,8 +9,8 @@ import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
-declare function setTimeout(callback: () => void | Promise<void>, delay?: number): ReturnType<typeof globalThis.setTimeout>
-declare function clearTimeout(timeout: ReturnType<typeof globalThis.setTimeout>): void
+declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
+declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 
 export function createAutoRetryHelpers(deps: HookDeps) {
   const { ctx, config, options, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, pluginConfig } = deps

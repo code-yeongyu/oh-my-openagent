@@ -1,12 +1,12 @@
 import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
-import { log } from "../../shared"
+import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
+import { clearSessionFallbackChain, setSessionFallbackChain } from "../../hooks/model-fallback/hook"
+import { getAgentToolRestrictions, log } from "../../shared"
 import type { FallbackEntry } from "../../shared/model-requirements"
-import { getAgentToolRestrictions } from "../../shared"
-import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
-import { createOrGetSession } from "./session-creator"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
+import { createOrGetSession } from "./session-creator"
 
 type SessionWithPromptAsync = {
   promptAsync: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
@@ -17,6 +17,7 @@ type ExecuteSyncDeps = {
   waitForCompletion: typeof waitForCompletion
   processMessages: typeof processMessages
   setSessionFallbackChain: typeof setSessionFallbackChain
+  clearSessionFallbackChain: typeof clearSessionFallbackChain
 }
 
 type SpawnReservation = {
@@ -29,6 +30,7 @@ const defaultDeps: ExecuteSyncDeps = {
   waitForCompletion,
   processMessages,
   setSessionFallbackChain,
+  clearSessionFallbackChain,
 }
 
 export async function executeSync(
@@ -46,10 +48,15 @@ export async function executeSync(
   spawnReservation?: SpawnReservation,
 ): Promise<string> {
   let sessionID: string | undefined
+  let createdSessionForExecution = false
+  let appliedFallbackChain = false
 
   try {
     const session = await deps.createOrGetSession(args, toolContext, ctx)
     sessionID = session.sessionID
+    createdSessionForExecution = session.isNew
+    subagentSessions.add(sessionID)
+    syncSubagentSessions.add(sessionID)
 
     if (session.isNew) {
       spawnReservation?.commit()
@@ -57,12 +64,15 @@ export async function executeSync(
 
     if (fallbackChain && fallbackChain.length > 0) {
       deps.setSessionFallbackChain(sessionID, fallbackChain)
+      appliedFallbackChain = true
     }
 
-    await toolContext.metadata?.({
-      title: args.description,
-      metadata: { sessionId: sessionID },
-    })
+    await Promise.resolve(
+      toolContext.metadata?.({
+        title: args.description,
+        metadata: { sessionId: sessionID },
+      })
+    )
 
     log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
     log(`[call_omo_agent] Prompt text:`, args.prompt.substring(0, 100))
@@ -93,12 +103,18 @@ export async function executeSync(
 
     const responseText = await deps.processMessages(sessionID, ctx)
 
-    const output =
-      responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
-
-    return output
+    return responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
   } catch (error) {
     spawnReservation?.rollback()
     throw error
+  } finally {
+    if (sessionID && appliedFallbackChain) {
+      deps.clearSessionFallbackChain(sessionID)
+    }
+
+    if (sessionID && createdSessionForExecution) {
+      subagentSessions.delete(sessionID)
+      syncSubagentSessions.delete(sessionID)
+    }
   }
 }

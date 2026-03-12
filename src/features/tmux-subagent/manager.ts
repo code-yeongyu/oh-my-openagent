@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
-import type { TrackedSession, CapacityConfig } from "./types"
+import type { TrackedSession, CapacityConfig, WindowState } from "./types"
 import { log, normalizeSDKResponse } from "../../shared"
 import {
   isInsideTmux as defaultIsInsideTmux,
@@ -13,6 +13,7 @@ import { queryWindowState } from "./pane-state-querier"
 import { decideSpawnActions, decideCloseAction, type SessionMapping } from "./decision-engine"
 import { executeActions, executeAction } from "./action-executor"
 import { TmuxPollingManager } from "./polling-manager"
+import { createTrackedSession, markTrackedSessionClosePending } from "./tracked-session-state"
 type OpencodeClient = PluginInput["client"]
 
 interface SessionCreatedEvent {
@@ -38,6 +39,7 @@ const defaultTmuxDeps: TmuxUtilDeps = {
 
 const DEFERRED_SESSION_TTL_MS = 5 * 60 * 1000
 const MAX_DEFERRED_QUEUE_SIZE = 20
+const MAX_CLOSE_RETRY_COUNT = 3
 
 /**
  * State-first Tmux Session Manager
@@ -104,6 +106,123 @@ export class TmuxSessionManager {
       paneId: s.paneId,
       createdAt: s.createdAt,
     }))
+  }
+
+  private removeTrackedSession(sessionId: string): void {
+    this.sessions.delete(sessionId)
+
+    if (this.sessions.size === 0) {
+      this.pollingManager.stopPolling()
+    }
+  }
+
+  private markSessionClosePending(sessionId: string): void {
+    const tracked = this.sessions.get(sessionId)
+    if (!tracked) return
+
+    this.sessions.set(sessionId, markTrackedSessionClosePending(tracked))
+    log("[tmux-session-manager] marked session close pending", {
+      sessionId,
+      paneId: tracked.paneId,
+      closeRetryCount: tracked.closeRetryCount,
+    })
+  }
+
+  private async queryWindowStateSafely(): Promise<WindowState | null> {
+    if (!this.sourcePaneId) return null
+
+    try {
+      return await queryWindowState(this.sourcePaneId)
+    } catch (error) {
+      log("[tmux-session-manager] failed to query window state for close", {
+        error: String(error),
+      })
+      return null
+    }
+  }
+
+  private async tryCloseTrackedSession(tracked: TrackedSession): Promise<boolean> {
+    const state = await this.queryWindowStateSafely()
+    if (!state) return false
+
+    try {
+      const result = await executeAction(
+        { type: "close", paneId: tracked.paneId, sessionId: tracked.sessionId },
+        {
+          config: this.tmuxConfig,
+          serverUrl: this.serverUrl,
+          windowState: state,
+          sourcePaneId: this.sourcePaneId,
+        }
+      )
+
+      return result.success
+    } catch (error) {
+      log("[tmux-session-manager] close session pane failed", {
+        sessionId: tracked.sessionId,
+        paneId: tracked.paneId,
+        error: String(error),
+      })
+      return false
+    }
+  }
+
+  private async retryPendingCloses(): Promise<void> {
+    const pendingSessions = Array.from(this.sessions.values()).filter(
+      (tracked) => tracked.closePending,
+    )
+
+    for (const tracked of pendingSessions) {
+      if (!this.sessions.has(tracked.sessionId)) continue
+
+      if (tracked.closeRetryCount >= MAX_CLOSE_RETRY_COUNT) {
+        log("[tmux-session-manager] force removing close-pending session after max retries", {
+          sessionId: tracked.sessionId,
+          paneId: tracked.paneId,
+          closeRetryCount: tracked.closeRetryCount,
+        })
+        this.removeTrackedSession(tracked.sessionId)
+        continue
+      }
+
+      const closed = await this.tryCloseTrackedSession(tracked)
+      if (closed) {
+        log("[tmux-session-manager] retried close succeeded", {
+          sessionId: tracked.sessionId,
+          paneId: tracked.paneId,
+          closeRetryCount: tracked.closeRetryCount,
+        })
+        this.removeTrackedSession(tracked.sessionId)
+        continue
+      }
+
+      const currentTracked = this.sessions.get(tracked.sessionId)
+      if (!currentTracked || !currentTracked.closePending) {
+        continue
+      }
+
+      const nextRetryCount = currentTracked.closeRetryCount + 1
+      if (nextRetryCount >= MAX_CLOSE_RETRY_COUNT) {
+        log("[tmux-session-manager] force removing close-pending session after failed retry", {
+          sessionId: currentTracked.sessionId,
+          paneId: currentTracked.paneId,
+          closeRetryCount: nextRetryCount,
+        })
+        this.removeTrackedSession(currentTracked.sessionId)
+        continue
+      }
+
+      this.sessions.set(currentTracked.sessionId, {
+        ...currentTracked,
+        closePending: true,
+        closeRetryCount: nextRetryCount,
+      })
+      log("[tmux-session-manager] retried close failed", {
+        sessionId: currentTracked.sessionId,
+        paneId: currentTracked.paneId,
+        closeRetryCount: nextRetryCount,
+      })
+    }
   }
 
   private enqueueDeferredSession(sessionId: string, title: string): void {
@@ -257,14 +376,14 @@ export class TmuxSessionManager {
       })
     }
 
-    const now = Date.now()
-    this.sessions.set(sessionId, {
+    this.sessions.set(
       sessionId,
-      paneId: result.spawnedPaneId,
-      description: deferred.title,
-      createdAt: new Date(now),
-      lastSeenAt: new Date(now),
-    })
+      createTrackedSession({
+        sessionId,
+        paneId: result.spawnedPaneId,
+        description: deferred.title,
+      }),
+    )
     this.removeDeferredSession(sessionId)
     this.pollingManager.startPolling()
     log("[tmux-session-manager] deferred session attached", {
@@ -324,17 +443,19 @@ export class TmuxSessionManager {
     const sessionId = info.id
     const title = info.title ?? "Subagent"
 
+    if (!this.sourcePaneId) {
+      log("[tmux-session-manager] no source pane id")
+      return
+    }
+
+    await this.retryPendingCloses()
+
     if (
       this.sessions.has(sessionId) ||
       this.pendingSessions.has(sessionId) ||
       this.deferredSessions.has(sessionId)
     ) {
       log("[tmux-session-manager] session already tracked or pending", { sessionId })
-      return
-    }
-
-    if (!this.sourcePaneId) {
-      log("[tmux-session-manager] no source pane id")
       return
     }
     const sourcePaneId = this.sourcePaneId
@@ -418,14 +539,14 @@ export class TmuxSessionManager {
             })
           }
 
-          const now = Date.now()
-          this.sessions.set(sessionId, {
+          this.sessions.set(
             sessionId,
-            paneId: result.spawnedPaneId,
-            description: title,
-            createdAt: new Date(now),
-            lastSeenAt: new Date(now),
-          })
+            createTrackedSession({
+              sessionId,
+              paneId: result.spawnedPaneId,
+              description: title,
+            }),
+          )
           log("[tmux-session-manager] pane spawned and tracked", {
             sessionId,
             paneId: result.spawnedPaneId,
@@ -485,27 +606,40 @@ export class TmuxSessionManager {
 
     log("[tmux-session-manager] onSessionDeleted", { sessionId: event.sessionID })
 
-    const state = await queryWindowState(this.sourcePaneId)
+    const state = await this.queryWindowStateSafely()
     if (!state) {
-      this.sessions.delete(event.sessionID)
+      this.markSessionClosePending(event.sessionID)
       return
     }
 
     const closeAction = decideCloseAction(state, event.sessionID, this.getSessionMappings())
-    if (closeAction) {
-      await executeAction(closeAction, {
+    if (!closeAction) {
+      this.removeTrackedSession(event.sessionID)
+      return
+    }
+
+    try {
+      const result = await executeAction(closeAction, {
         config: this.tmuxConfig,
         serverUrl: this.serverUrl,
         windowState: state,
         sourcePaneId: this.sourcePaneId,
       })
+
+      if (!result.success) {
+        this.markSessionClosePending(event.sessionID)
+        return
+      }
+    } catch (error) {
+      log("[tmux-session-manager] failed to close pane for deleted session", {
+        sessionId: event.sessionID,
+        error: String(error),
+      })
+      this.markSessionClosePending(event.sessionID)
+      return
     }
 
-    this.sessions.delete(event.sessionID)
-
-    if (this.sessions.size === 0) {
-      this.pollingManager.stopPolling()
-    }
+    this.removeTrackedSession(event.sessionID)
   }
 
 
@@ -513,29 +647,28 @@ export class TmuxSessionManager {
     const tracked = this.sessions.get(sessionId)
     if (!tracked) return
 
+    if (tracked.closePending && tracked.closeRetryCount >= MAX_CLOSE_RETRY_COUNT) {
+      log("[tmux-session-manager] force removing close-pending session after max retries", {
+        sessionId,
+        paneId: tracked.paneId,
+        closeRetryCount: tracked.closeRetryCount,
+      })
+      this.removeTrackedSession(sessionId)
+      return
+    }
+
     log("[tmux-session-manager] closing session pane", {
       sessionId,
       paneId: tracked.paneId,
     })
 
-    const state = this.sourcePaneId ? await queryWindowState(this.sourcePaneId) : null
-    if (state) {
-      await executeAction(
-        { type: "close", paneId: tracked.paneId, sessionId },
-        {
-          config: this.tmuxConfig,
-          serverUrl: this.serverUrl,
-          windowState: state,
-          sourcePaneId: this.sourcePaneId,
-        }
-      )
+    const closed = await this.tryCloseTrackedSession(tracked)
+    if (!closed) {
+      this.markSessionClosePending(sessionId)
+      return
     }
 
-    this.sessions.delete(sessionId)
-
-    if (this.sessions.size === 0) {
-      this.pollingManager.stopPolling()
-    }
+    this.removeTrackedSession(sessionId)
   }
 
   createEventHandler(): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {
@@ -552,29 +685,21 @@ export class TmuxSessionManager {
 
     if (this.sessions.size > 0) {
       log("[tmux-session-manager] closing all panes", { count: this.sessions.size })
-      const state = this.sourcePaneId ? await queryWindowState(this.sourcePaneId) : null
-      
-      if (state) {
-        const closePromises = Array.from(this.sessions.values()).map((s) =>
-          executeAction(
-            { type: "close", paneId: s.paneId, sessionId: s.sessionId },
-            {
-              config: this.tmuxConfig,
-              serverUrl: this.serverUrl,
-              windowState: state,
-              sourcePaneId: this.sourcePaneId,
-            }
-          ).catch((err) =>
-            log("[tmux-session-manager] cleanup error for pane", {
-              paneId: s.paneId,
-              error: String(err),
-            }),
-          ),
-        )
-        await Promise.all(closePromises)
+
+      const sessionIds = Array.from(this.sessions.keys())
+      for (const sessionId of sessionIds) {
+        try {
+          await this.closeSessionById(sessionId)
+        } catch (error) {
+          log("[tmux-session-manager] cleanup error for pane", {
+            sessionId,
+            error: String(error),
+          })
+        }
       }
-      this.sessions.clear()
     }
+
+    await this.retryPendingCloses()
 
     log("[tmux-session-manager] cleanup complete")
   }
