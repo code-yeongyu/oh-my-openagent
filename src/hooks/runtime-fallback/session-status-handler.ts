@@ -46,7 +46,12 @@ export function createSessionStatusHandler(
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
     const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
-    if (fallbackModels.length === 0) return
+    if (fallbackModels.length === 0) {
+      if (!sessionStates.has(sessionID)) {
+        sessionStatusRetryKeys.delete(sessionID)
+      }
+      return
+    }
 
     let state = sessionStates.get(sessionID)
     if (!state) {
@@ -58,6 +63,7 @@ export function createSessionStatusHandler(
         pluginConfig,
       })
       if (!initialModel) {
+        sessionStatusRetryKeys.delete(sessionID)
         log(`[${HOOK_NAME}] session.status retry missing model info, cannot fallback`, { sessionID })
         return
       }
