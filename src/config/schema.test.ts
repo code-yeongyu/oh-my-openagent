@@ -884,6 +884,25 @@ describe("GitMasterConfigSchema", () => {
     //#then
     expect(result.success).toBe(false)
   })
+
+  test("accepts shell-safe git_env_prefix", () => {
+    const config = { git_env_prefix: "MY_HOOK=active" }
+
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.git_env_prefix).toBe("MY_HOOK=active")
+    }
+  })
+
+  test("rejects git_env_prefix with shell metacharacters", () => {
+    const config = { git_env_prefix: "A=1; rm -rf /" }
+
+    const result = GitMasterConfigSchema.safeParse(config)
+
+    expect(result.success).toBe(false)
+  })
 })
 
 describe("skills schema", () => {

@@ -82,6 +82,11 @@ jobs:
           cd packages/${{ matrix.platform }}
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
 
+      - name: Set root package version
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          jq --arg v "${{ inputs.version }}" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+
       - name: Pre-download baseline compile target
         if: steps.check.outputs.skip != 'true' && endsWith(matrix.platform, '-baseline')
         shell: bash

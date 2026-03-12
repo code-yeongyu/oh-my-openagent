@@ -30,8 +30,8 @@ export function createHashlineEditTool(): ToolDefinition {
             pos: tool.schema.string().optional().describe("Primary anchor in LINE#ID format"),
             end: tool.schema.string().optional().describe("Range end anchor in LINE#ID format"),
             lines: tool.schema
-              .union([tool.schema.string(), tool.schema.array(tool.schema.string()), tool.schema.null()])
-              .describe("Replacement or inserted lines. null/[] deletes with replace"),
+              .union([tool.schema.string(), tool.schema.null()])
+              .describe("Replacement or inserted lines as newline-delimited string. null deletes with replace"),
           })
         )
         .describe("Array of edit operations to apply (empty when delete=true)"),

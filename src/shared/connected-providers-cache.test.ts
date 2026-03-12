@@ -1,27 +1,47 @@
-import { describe, test, expect, beforeEach, afterEach, spyOn } from "bun:test"
-import { existsSync, mkdirSync, rmSync } from "fs"
-import { join } from "path"
-import * as dataPath from "./data-path"
-import { updateConnectedProvidersCache, readProviderModelsCache } from "./connected-providers-cache"
+/// <reference types="bun-types" />
 
-const TEST_CACHE_DIR = join(import.meta.dir, "__test-cache__")
+import { beforeAll, beforeEach, afterEach, describe, expect, mock, test } from "bun:test"
+
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import * as dataPath from "./data-path"
+
+let testCacheDir = ""
+let moduleImportCounter = 0
+
+const getOmoOpenCodeCacheDirMock = mock(() => testCacheDir)
+
+let updateConnectedProvidersCache: typeof import("./connected-providers-cache").updateConnectedProvidersCache
+let readProviderModelsCache: typeof import("./connected-providers-cache").readProviderModelsCache
 
 describe("updateConnectedProvidersCache", () => {
-	let cacheDirSpy: ReturnType<typeof spyOn>
+	beforeAll(() => {
+		mock.restore()
+	})
 
-	beforeEach(() => {
-		cacheDirSpy = spyOn(dataPath, "getOmoOpenCodeCacheDir").mockReturnValue(TEST_CACHE_DIR)
-		if (existsSync(TEST_CACHE_DIR)) {
-			rmSync(TEST_CACHE_DIR, { recursive: true })
+	beforeEach(async () => {
+		mock.restore()
+		const realCacheDir = join(dataPath.getCacheDir(), "oh-my-opencode")
+		if (existsSync(realCacheDir)) {
+			rmSync(realCacheDir, { recursive: true, force: true })
 		}
-		mkdirSync(TEST_CACHE_DIR, { recursive: true })
+
+		testCacheDir = mkdtempSync(join(tmpdir(), "connected-providers-cache-test-"))
+		getOmoOpenCodeCacheDirMock.mockClear()
+		mock.module("./data-path", () => ({
+			getOmoOpenCodeCacheDir: getOmoOpenCodeCacheDirMock,
+		}))
+		moduleImportCounter += 1
+		;({ updateConnectedProvidersCache, readProviderModelsCache } = await import(`./connected-providers-cache?test=${moduleImportCounter}`))
 	})
 
 	afterEach(() => {
-		cacheDirSpy.mockRestore()
-		if (existsSync(TEST_CACHE_DIR)) {
-			rmSync(TEST_CACHE_DIR, { recursive: true })
+		mock.restore()
+		if (existsSync(testCacheDir)) {
+			rmSync(testCacheDir, { recursive: true, force: true })
 		}
+		testCacheDir = ""
 	})
 
 	test("extracts models from provider.list().all response", async () => {

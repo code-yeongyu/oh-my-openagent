@@ -170,9 +170,11 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.claudeCodeHooks?.event?.(input));
     await Promise.resolve(hooks.backgroundNotificationHook?.event?.(input));
     await Promise.resolve(hooks.sessionNotification?.(input));
+    await Promise.resolve(hooks.gptPermissionContinuation?.handler?.(input));
     await Promise.resolve(hooks.todoContinuationEnforcer?.handler?.(input));
     await Promise.resolve(hooks.unstableAgentBabysitter?.event?.(input));
     await Promise.resolve(hooks.contextWindowMonitor?.event?.(input));
+    await Promise.resolve(hooks.preemptiveCompaction?.event?.(input));
     await Promise.resolve(hooks.directoryAgentsInjector?.event?.(input));
     await Promise.resolve(hooks.directoryReadmeInjector?.event?.(input));
     await Promise.resolve(hooks.rulesInjector?.event?.(input));
@@ -184,6 +186,7 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.interactiveBashSession?.event?.(input as EventInput));
     await Promise.resolve(hooks.ralphLoop?.event?.(input));
     await Promise.resolve(hooks.stopContinuationGuard?.event?.(input));
+    await Promise.resolve(hooks.compactionContextInjector?.event?.(input));
     await Promise.resolve(hooks.compactionTodoPreserver?.event?.(input));
     await Promise.resolve(hooks.writeExistingFileGuard?.event?.(input));
     await Promise.resolve(hooks.atlasHook?.handler?.(input));
@@ -315,12 +318,13 @@ export function createEventHandler(args: {
       const agent = info?.agent as string | undefined;
       const role = info?.role as string | undefined;
       if (sessionID && role === "user") {
-        if (agent && !isCompactionAgent(agent)) {
+        const isCompactionMessage = agent ? isCompactionAgent(agent) : false;
+        if (agent && !isCompactionMessage) {
           updateSessionAgent(sessionID, agent);
         }
         const providerID = info?.providerID as string | undefined;
         const modelID = info?.modelID as string | undefined;
-        if (providerID && modelID) {
+        if (providerID && modelID && !isCompactionMessage) {
           lastKnownModelBySession.set(sessionID, { providerID, modelID });
           setSessionModel(sessionID, { providerID, modelID });
         }

@@ -94,9 +94,11 @@ export function createBackgroundTask(
 
         const bgMeta = {
           title: args.description,
-          metadata: { sessionId: sessionId ?? "pending" },
+          metadata: {
+            ...(sessionId ? { sessionId } : {}),
+          },
         }
-        await ctx.metadata?.(bgMeta)
+        ctx.metadata?.(bgMeta)
 
         if (ctx.callID) {
           storeToolMetadata(ctx.sessionID, ctx.callID, bgMeta)
@@ -105,7 +107,7 @@ export function createBackgroundTask(
         return `Background task launched successfully.
 
 Task ID: ${task.id}
-Session ID: ${sessionId ?? "pending"}
+Session ID: ${sessionId ?? "(not yet assigned)"}
 Description: ${task.description}
 Agent: ${task.agent}
 Status: ${task.status}

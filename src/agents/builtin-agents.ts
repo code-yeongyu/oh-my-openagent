@@ -14,6 +14,7 @@ import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
 import { createSubPrometheusAgent } from "./sub-prometheus"
 import { createCoeusAgent, coeusPromptMetadata } from "./coeus"
+import { createSisyphusJuniorAgentWithOverrides } from "./sisyphus-junior"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -45,6 +46,7 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   // Note: Atlas is handled specially in createBuiltinAgents()
   // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
+  "sisyphus-junior": createSisyphusJuniorAgentWithOverrides as unknown as AgentFactory,
 }
 
 /**
@@ -118,6 +120,7 @@ export async function createBuiltinAgents(
     browserProvider,
     uiSelectedModel,
     availableModels,
+    isFirstRunNoCache,
     disabledSkills,
     disableOmoEnv,
   })

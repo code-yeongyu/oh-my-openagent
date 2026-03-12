@@ -37,6 +37,7 @@ import {
   buildOracleSection,
   buildHardBlocksSection,
   buildAntiPatternsSection,
+  buildAntiDuplicationSection,
   buildNonClaudePlannerSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
@@ -233,7 +234,7 @@ ${librarianSection}
 <tool_method>
 - Fire 2-5 explore/librarian agents in parallel for any non-trivial codebase question.
 - Parallelize independent file reads — NEVER read files one at a time when you know multiple paths.
-- When delegating AND doing direct work: do both simultaneously.
+- When delegating AND doing direct work: do only non-overlapping work simultaneously.
 </tool_method>
 
 Explore and Librarian agents are background grep — always \`run_in_background=true\`, always parallel.
@@ -246,11 +247,14 @@ Each agent prompt should include:
 
 Background result collection:
 1. Launch parallel agents → receive task_ids
-2. If you have DIFFERENT independent work → do it now
-3. Otherwise → **END YOUR RESPONSE.**
-4. System sends \`<system-reminder>\` on completion → triggers your next turn
-5. Collect via \`background_output(task_id="...")\`
-6. Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+2. Continue only with non-overlapping work
+   - If you have DIFFERENT independent work → do it now
+   - Otherwise → **END YOUR RESPONSE.**
+3. System sends \`<system-reminder>\` on completion → triggers your next turn
+4. Collect via \`background_output(task_id="...")\`
+5. Cancel disposable tasks individually via \`background_cancel(taskId="...")\`
+
+${buildAntiDuplicationSection()}
 
 Stop searching when: you have enough context, same info repeating, 2 iterations with no new data, or direct answer found.
 </explore>`;
