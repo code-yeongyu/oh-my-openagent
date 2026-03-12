@@ -7,6 +7,13 @@ import { createHttpClient } from "./http-client"
 import { createStdioClient } from "./stdio-client"
 import type { SkillMcpClientConnectionParams, SkillMcpClientInfo, SkillMcpManagerState } from "./types"
 
+function removeClientIfCurrent(state: SkillMcpManagerState, clientKey: string, client: Client): void {
+  const managed = state.clients.get(clientKey)
+  if (managed?.client === client) {
+    state.clients.delete(clientKey)
+  }
+}
+
 export async function getOrCreateClient(params: {
   state: SkillMcpManagerState
   clientKey: string
@@ -14,6 +21,10 @@ export async function getOrCreateClient(params: {
   config: ClaudeCodeMcpServer
 }): Promise<Client> {
   const { state, clientKey, info, config } = params
+
+  if (state.disposed) {
+    throw new Error(`MCP manager for "${info.sessionID}" has been shut down, cannot create new connections.`)
+  }
 
   const existing = state.clients.get(clientKey)
   if (existing) {
@@ -28,14 +39,52 @@ export async function getOrCreateClient(params: {
   }
 
   const expandedConfig = expandEnvVarsInObject(config)
-  const connectionPromise = createClient({ state, clientKey, info, config: expandedConfig })
-  state.pendingConnections.set(clientKey, connectionPromise)
+  let currentConnectionPromise!: Promise<Client>
+  state.inFlightConnections.set(info.sessionID, (state.inFlightConnections.get(info.sessionID) ?? 0) + 1)
+  currentConnectionPromise = (async () => {
+    const disconnectGenAtStart = state.disconnectedSessions.get(info.sessionID) ?? 0
+    const shutdownGenAtStart = state.shutdownGeneration
+
+    const client = await createClient({ state, clientKey, info, config: expandedConfig })
+
+    const isStale = state.pendingConnections.has(clientKey) && state.pendingConnections.get(clientKey) !== currentConnectionPromise
+    if (isStale) {
+      removeClientIfCurrent(state, clientKey, client)
+      try { await client.close() } catch {}
+      throw new Error(`Connection for "${info.sessionID}" was superseded by a newer connection attempt.`)
+    }
+
+    if (state.shutdownGeneration !== shutdownGenAtStart) {
+      removeClientIfCurrent(state, clientKey, client)
+      try { await client.close() } catch {}
+      throw new Error(`Shutdown occurred during MCP connection for "${info.sessionID}"`)
+    }
+
+    const currentDisconnectGen = state.disconnectedSessions.get(info.sessionID) ?? 0
+    if (currentDisconnectGen > disconnectGenAtStart) {
+      await forceReconnect(state, clientKey)
+      throw new Error(`Session "${info.sessionID}" disconnected during MCP connection setup.`)
+    }
+
+    return client
+  })()
+
+  state.pendingConnections.set(clientKey, currentConnectionPromise)
 
   try {
-    const client = await connectionPromise
+    const client = await currentConnectionPromise
     return client
   } finally {
-    state.pendingConnections.delete(clientKey)
+    if (state.pendingConnections.get(clientKey) === currentConnectionPromise) {
+      state.pendingConnections.delete(clientKey)
+    }
+    const remaining = (state.inFlightConnections.get(info.sessionID) ?? 1) - 1
+    if (remaining <= 0) {
+      state.inFlightConnections.delete(info.sessionID)
+      state.disconnectedSessions.delete(info.sessionID)
+    } else {
+      state.inFlightConnections.set(info.sessionID, remaining)
+    }
   }
 }
 

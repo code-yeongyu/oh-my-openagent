@@ -14,6 +14,7 @@ function getStdioCommand(config: ClaudeCodeMcpServer, serverName: string): strin
 
 export async function createStdioClient(params: SkillMcpClientConnectionParams): Promise<Client> {
   const { state, clientKey, info, config } = params
+  const shutdownGenAtStart = state.shutdownGeneration
 
   const command = getStdioCommand(config, info.serverName)
   const args = config.args ?? []
@@ -53,6 +54,12 @@ export async function createStdioClient(params: SkillMcpClientConnectionParams):
       `  - Check if the MCP server package exists\n` +
       `  - Verify the args are correct for this server`
     )
+  }
+
+  if (state.shutdownGeneration !== shutdownGenAtStart) {
+    try { await client.close() } catch {}
+    try { await transport.close() } catch {}
+    throw new Error(`MCP server "${info.serverName}" connection completed after shutdown`)
   }
 
   const managedClient = {
