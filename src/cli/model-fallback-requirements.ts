@@ -130,6 +130,13 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go"], model: "kimi-k2.5" },
     ],
   },
+  "sisyphus-junior": {
+    fallbackChain: [
+      { providers: ["anthropic", "github-copilot", "opencode"], model: "claude-sonnet-4-6" },
+      { providers: ["opencode-go"], model: "kimi-k2.5" },
+      { providers: ["opencode"], model: "big-pickle" },
+    ],
+  },
 };
 
 export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
