@@ -128,6 +128,15 @@ function createWindowState(overrides?: Partial<WindowState>): WindowState {
   }
 }
 
+function getManagerServerUrl(manager: object): string {
+  const serverUrl = Reflect.get(manager, 'serverUrl')
+  if (typeof serverUrl !== 'string') {
+    throw new TypeError('expected manager.serverUrl to be a string')
+  }
+
+  return serverUrl
+}
+
 describe('TmuxSessionManager', () => {
   beforeEach(() => {
     mockQueryWindowState.mockClear()
@@ -245,8 +254,8 @@ describe('TmuxSessionManager', () => {
       const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
       // then - should use dynamic port, not hardcoded 4096
-      const serverUrl = (manager as any).serverUrl as string
-      expect(serverUrl).toContain(`:${dynamicPort}`)
+      const serverUrl = getManagerServerUrl(manager)
+      expect(serverUrl).toBe(`http://localhost:${dynamicPort}`)
       expect(serverUrl).not.toContain('4096')
     })
 
@@ -269,7 +278,7 @@ describe('TmuxSessionManager', () => {
         const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
         // then - should use env var port, not hardcoded 4096
-        const serverUrl = (manager as any).serverUrl as string
+        const serverUrl = getManagerServerUrl(manager)
         expect(serverUrl).toBe('http://localhost:8080')
         expect(serverUrl).not.toContain('4096')
       } finally {
