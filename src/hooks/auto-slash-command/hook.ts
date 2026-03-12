@@ -24,6 +24,7 @@ export interface AutoSlashCommandHookOptions {
   skills?: LoadedSkill[]
   pluginsEnabled?: boolean
   enabledPluginsOverride?: Record<string, boolean>
+  startWorkConfig?: { worktree?: boolean }
 }
 
 export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions) {
@@ -31,6 +32,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
     skills: options?.skills,
     pluginsEnabled: options?.pluginsEnabled,
     enabledPluginsOverride: options?.enabledPluginsOverride,
+    startWorkConfig: options?.startWorkConfig,
   }
 
   return {
