@@ -1242,6 +1242,7 @@ export class BackgroundManager {
     removeTaskToastTracking(task.id)
 
     if (options?.skipNotification) {
+      this.cleanupPendingByParent(task)
       this.scheduleTaskRemoval(task.id)
       log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
       return true
