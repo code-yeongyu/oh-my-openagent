@@ -3,6 +3,7 @@ import type { HookDeps, FallbackState } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { prepareFallback } from "./fallback-state"
+import { blacklistProvider } from "../../shared/global-blacklist"
 
 type DispatchFallbackRetryOptions = {
   sessionID: string

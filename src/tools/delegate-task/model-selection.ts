@@ -3,6 +3,7 @@ import { normalizeModel } from "../../shared/model-normalization"
 import { fuzzyMatchModel } from "../../shared/model-availability"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
 import { hasConnectedProvidersCache, hasProviderModelsCache } from "../../shared/connected-providers-cache"
+import { isProviderBlacklisted } from "../../shared/global-blacklist"
 
 function isExplicitHighModel(model: string): boolean {
   return /(?:^|\/)[^/]+-high$/.test(model)
@@ -13,14 +14,14 @@ function getExplicitHighBaseModel(model: string): string | null {
 }
 
 
-export function resolveModelForDelegateTask(input: {
+export async function resolveModelForDelegateTask(input: {
   userModel?: string
   userFallbackModels?: string[]
   categoryDefaultModel?: string
   fallbackChain?: FallbackEntry[]
   availableModels: Set<string>
   systemDefaultModel?: string
-}): { model: string; variant?: string } | undefined {
+}): Promise<{ model: string; variant?: string } | undefined> {
   const userModel = normalizeModel(input.userModel)
   if (userModel) {
     return { model: userModel }
@@ -64,7 +65,16 @@ export function resolveModelForDelegateTask(input: {
         const normalizedFallback = normalizeModel(fallbackModel)
         if (!normalizedFallback) continue
 
+        // Check if provider is blacklisted
         const parts = normalizedFallback.split("/")
+        if (parts.length >= 2) {
+          const providerID = parts[0]
+          const blacklisted = await isProviderBlacklisted(providerID)
+          if (blacklisted) {
+            continue  // Skip blacklisted provider
+          }
+        }
+
         const providerHint = parts.length >= 2 ? [parts[0]] : undefined
         const match = fuzzyMatchModel(normalizedFallback, input.availableModels, providerHint)
         if (match) {

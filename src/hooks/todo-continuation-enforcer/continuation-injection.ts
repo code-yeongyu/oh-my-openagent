@@ -23,6 +23,7 @@ import {
 import { getMessageDir } from "./message-directory"
 import { getIncompleteCount } from "./todo"
 import type { ResolvedMessageInfo, Todo } from "./types"
+import { isProviderBlacklisted } from "../../shared/global-blacklist"
 import type { SessionStateStore } from "./session-state"
 
 function hasWritePermission(tools: Record<string, ToolPermission> | undefined): boolean {
@@ -90,6 +91,14 @@ export async function injectContinuation(args: {
 
   let agentName = resolvedInfo?.agent
   let model = resolvedInfo?.model
+  
+  // Check if model provider is blacklisted
+  if (model) {
+    const blacklisted = await isProviderBlacklisted(model.providerID)
+    if (blacklisted) {
+      model = undefined
+    }
+  }
   let tools = resolvedInfo?.tools
 
   if (!agentName || !model) {

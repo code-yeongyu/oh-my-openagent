@@ -1,3 +1,4 @@
+import { isProviderBlacklisted } from "../../shared/global-blacklist"
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
@@ -75,13 +76,24 @@ export async function findNearestMessageWithFieldsFromSDK(
     for (let i = messages.length - 1; i >= 0; i--) {
       const stored = convertSDKMessageToStoredMessage(messages[i])
       if (stored?.agent && stored.model?.providerID && stored.model?.modelID) {
-        return stored
+        // Check if model provider is blacklisted
+        const blacklisted = await isProviderBlacklisted(stored.model.providerID)
+        if (!blacklisted) {
+          return stored
+        }
       }
     }
 
     for (let i = messages.length - 1; i >= 0; i--) {
       const stored = convertSDKMessageToStoredMessage(messages[i])
       if (stored?.agent || (stored?.model?.providerID && stored?.model?.modelID)) {
+        // Check if model provider is blacklisted (only if model exists)
+        if (stored?.model?.providerID) {
+          const blacklisted = await isProviderBlacklisted(stored.model.providerID)
+          if (blacklisted) {
+            continue
+          }
+        }
         return stored
       }
     }

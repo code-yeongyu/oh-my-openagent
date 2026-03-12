@@ -7,6 +7,7 @@ import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
+import { blacklistProvider } from "../../shared/global-blacklist"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { createSessionStatusHandler } from "./session-status-handler"
 
@@ -155,6 +156,17 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
       sessionLastAccess.set(sessionID, Date.now())
     } else {
       sessionLastAccess.set(sessionID, Date.now())
+    }
+
+    // Blacklist the current model's provider
+    const currentModelProvider = state.currentModel.split("/")[0]
+    if (currentModelProvider) {
+      await blacklistProvider(currentModelProvider, config.cooldown_seconds, "Rate limit or error")
+      log(`[${HOOK_NAME}] Blacklisted provider due to rate limit error`, { 
+        sessionID, 
+        provider: currentModelProvider,
+        model: state.currentModel 
+      })
     }
 
     await dispatchFallbackRetry(deps, helpers, {

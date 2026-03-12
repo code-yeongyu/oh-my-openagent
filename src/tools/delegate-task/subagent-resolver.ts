@@ -115,7 +115,7 @@ Create the work plan directly - that's your job as the planning agent.`,
         ? `${normalizedMatchedModel.providerID}/${normalizedMatchedModel.modelID}`
         : undefined
 
-      const resolution = resolveModelForDelegateTask({
+      const resolution = await resolveModelForDelegateTask({
         userModel: agentOverride?.model,
         userFallbackModels: normalizedAgentFallbackModels,
         categoryDefaultModel: matchedAgentModelStr,

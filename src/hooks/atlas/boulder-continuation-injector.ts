@@ -5,6 +5,7 @@ import { createInternalAgentTextPart, resolveInheritedPromptTools } from "../../
 import { HOOK_NAME } from "./hook-name"
 import { BOULDER_CONTINUATION_PROMPT } from "./system-reminder-templates"
 import { resolveRecentPromptContextForSession } from "./recent-model-resolver"
+import { isProviderBlacklisted } from "../../shared/global-blacklist"
 import type { SessionState } from "./types"
 
 export async function injectBoulderContinuation(input: {
@@ -49,6 +50,14 @@ export async function injectBoulderContinuation(input: {
     log(`[${HOOK_NAME}] Injecting boulder continuation`, { sessionID, planName, remaining })
 
     const promptContext = await resolveRecentPromptContextForSession(ctx, sessionID)
+    
+    // Check if model provider is blacklisted
+    if (promptContext.model) {
+      const blacklisted = await isProviderBlacklisted(promptContext.model.providerID)
+      if (blacklisted) {
+        delete promptContext.model
+      }
+    }
     const inheritedTools = resolveInheritedPromptTools(sessionID, promptContext.tools)
 
     await ctx.client.session.promptAsync({

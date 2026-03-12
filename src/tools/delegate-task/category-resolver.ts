@@ -100,7 +100,7 @@ Available categories: ${allCategoryNames}`,
         : { model: actualModel, type: "system-default", source: "system-default" }
     }
   } else {
-    const resolution = resolveModelForDelegateTask({
+    const resolution = await resolveModelForDelegateTask({
       userModel: explicitCategoryModel ?? overrideModel,
       userFallbackModels: normalizedConfiguredFallbackModels,
       categoryDefaultModel: resolved.model,
