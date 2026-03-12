@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { getLatestVersion } from "../../../hooks/auto-update-checker/checker"
 import { extractChannel } from "../../../hooks/auto-update-checker"
 import { PACKAGE_NAME } from "../constants"
-import { getOpenCodeCacheDir, getOpenCodeConfigPaths, parseJsonc } from "../../../shared"
+import { getOpenCodeCacheDir, getOpenCodeConfigPaths, parseJsonc, getOpenCodeConfigDir } from "../../../shared"
 
 interface PackageJsonShape {
   version?: string
@@ -54,39 +54,45 @@ function normalizeVersion(value: string | undefined): string | null {
 }
 
 export function getLoadedPluginVersion(): LoadedVersionInfo {
-  const configPaths = getOpenCodeConfigPaths({ binary: "opencode" })
-  const cacheDir = resolveOpenCodeCacheDir()
-  const candidates = [
-    {
-      cacheDir: configPaths.configDir,
-      cachePackagePath: configPaths.packageJson,
-      installedPackagePath: join(configPaths.configDir, "node_modules", PACKAGE_NAME, "package.json"),
-    },
-    {
-      cacheDir,
-      cachePackagePath: join(cacheDir, "package.json"),
-      installedPackagePath: join(cacheDir, "node_modules", PACKAGE_NAME, "package.json"),
-    },
-  ]
+   const configPaths = getOpenCodeConfigPaths({ binary: "opencode" })
+   const cacheDir = resolveOpenCodeCacheDir()
+   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+   const candidates = [
+     {
+       cacheDir: configPaths.configDir,
+       cachePackagePath: configPaths.packageJson,
+       installedPackagePath: join(configPaths.configDir, "node_modules", PACKAGE_NAME, "package.json"),
+     },
+     {
+       cacheDir,
+       cachePackagePath: join(cacheDir, "package.json"),
+       installedPackagePath: join(cacheDir, "node_modules", PACKAGE_NAME, "package.json"),
+     },
+     {
+       cacheDir: configDir,
+       cachePackagePath: join(configDir, "package.json"),
+       installedPackagePath: join(configDir, "node_modules", PACKAGE_NAME, "package.json"),
+     },
+   ]
 
-  const selectedCandidate = candidates.find((candidate) => existsSync(candidate.installedPackagePath)) ?? candidates[0]
+   const selectedCandidate = candidates.find((candidate) => existsSync(candidate.installedPackagePath)) ?? candidates[0]
 
-  const { cacheDir: selectedDir, cachePackagePath, installedPackagePath } = selectedCandidate
+   const { cacheDir: selectedDir, cachePackagePath, installedPackagePath } = selectedCandidate
 
-  const cachePackage = readPackageJson(cachePackagePath)
-  const installedPackage = readPackageJson(installedPackagePath)
+   const cachePackage = readPackageJson(cachePackagePath)
+   const installedPackage = readPackageJson(installedPackagePath)
 
-  const expectedVersion = normalizeVersion(cachePackage?.dependencies?.[PACKAGE_NAME])
-  const loadedVersion = normalizeVersion(installedPackage?.version)
+   const expectedVersion = normalizeVersion(cachePackage?.dependencies?.[PACKAGE_NAME])
+   const loadedVersion = normalizeVersion(installedPackage?.version)
 
-  return {
-    cacheDir: selectedDir,
-    cachePackagePath,
-    installedPackagePath,
-    expectedVersion,
-    loadedVersion,
-  }
-}
+   return {
+     cacheDir: selectedDir,
+     cachePackagePath,
+     installedPackagePath,
+     expectedVersion,
+     loadedVersion,
+   }
+ }
 
 export async function getLatestPluginVersion(currentVersion: string | null): Promise<string | null> {
   const channel = extractChannel(currentVersion)

@@ -20,6 +20,9 @@ export function formatVerbose(result: DoctorResult): string {
     lines.push(`  ${formatStatusSymbol("pass")} bun         ${systemInfo.bunVersion}`)
   }
   lines.push(`  ${formatStatusSymbol("pass")} path        ${systemInfo.opencodePath ?? "unknown"}`)
+  if (systemInfo.configPath) {
+    lines.push(`  ${formatStatusSymbol("pass")} config      ${systemInfo.configPath}`)
+  }
   if (systemInfo.isLocalDev) {
     lines.push(`  ${color.yellow("*")} ${color.dim("(local development mode)")}`)
   }
