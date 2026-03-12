@@ -248,4 +248,44 @@ describe("getOrCreateClient multi-key disconnect race", () => {
     expect(state.clients.has(clientKey)).toBe(false)
     expect(createdClients[0]?.close).toHaveBeenCalledTimes(1)
   })
+
+  it("#given a superseded pending connection #when a newer client already replaced the map entry #then the stale cleanup does not delete the newer client", async () => {
+    const state = createState()
+    const info = createClientInfo("session-a")
+    const clientKey = createClientKey(info)
+    const pendingConnect = createDeferred<void>()
+    const supersedingConnection = createDeferred<Awaited<ReturnType<typeof getOrCreateClient>>>()
+    pendingConnects.push(pendingConnect)
+
+    const newerClient = new MockClient(
+      { name: "newer-client", version: "1.0.0" },
+      { capabilities: {} },
+    )
+    const newerTransport = new MockStdioClientTransport({ command: "mock-mcp-server" })
+    let replacedEntry = false
+    const originalSet = state.clients.set.bind(state.clients)
+    Reflect.set(state.clients, "set", (key: string, value: SkillMcpManagerState["clients"] extends Map<string, infer TValue> ? TValue : never) => {
+      originalSet(key, value)
+      if (!replacedEntry && key === clientKey) {
+        replacedEntry = true
+        originalSet(key, {
+          client: newerClient as never,
+          transport: newerTransport as never,
+          skillName: info.skillName,
+          lastUsedAt: Date.now(),
+          connectionType: "stdio",
+        })
+      }
+      return state.clients
+    })
+
+    const clientPromise = getOrCreateClient({ state, clientKey, info, config: stdioConfig })
+    state.pendingConnections.set(clientKey, supersedingConnection.promise)
+
+    pendingConnect.resolve(undefined)
+
+    await expect(clientPromise).rejects.toThrow(/superseded by a newer connection attempt/)
+    expect(state.clients.get(clientKey)?.client.close).toBe(newerClient.close)
+    expect(newerClient.close).not.toHaveBeenCalled()
+  })
 })

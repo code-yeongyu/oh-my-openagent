@@ -14,6 +14,8 @@ afterEach(() => {
   trackedStates.length = 0
 })
 
+const expectedCleanupHandlerCount = process.platform === "win32" ? 3 : 2
+
 function createState(): SkillMcpManagerState {
   const state: SkillMcpManagerState = {
     clients: new Map(),
@@ -82,7 +84,7 @@ describe("disconnectSession cleanup registration", () => {
     // then
     expect(state.clients.has("session-2:skill-2:server-2")).toBe(true)
     expect(state.cleanupRegistered).toBe(true)
-    expect(state.cleanupHandlers).toHaveLength(2)
+    expect(state.cleanupHandlers).toHaveLength(expectedCleanupHandlerCount)
     expect(process.listenerCount("SIGINT")).toBe(signalIntCountBeforeRegister + 1)
     expect(process.listenerCount("SIGTERM")).toBe(signalTermCountBeforeRegister + 1)
   })
@@ -124,7 +126,7 @@ describe("disconnectSession cleanup registration", () => {
     expect(state.clients.size).toBe(0)
     expect(state.pendingConnections.size).toBe(1)
     expect(state.cleanupRegistered).toBe(true)
-    expect(state.cleanupHandlers).toHaveLength(2)
+    expect(state.cleanupHandlers).toHaveLength(expectedCleanupHandlerCount)
     expect(process.listenerCount("SIGINT")).toBe(signalIntCountBeforeRegister + 1)
     expect(process.listenerCount("SIGTERM")).toBe(signalTermCountBeforeRegister + 1)
   })
