@@ -129,6 +129,27 @@ describe("applyToolConfig", () => {
           expect(agent.permission.question).toBe("deny")
         },
       )
+
+      it.each(["sisyphus", "hephaestus", "prometheus"])(
+        "#then should parse JSONC config content for %s",
+        (agentName) => {
+          process.env.OPENCODE_CONFIG_CONTENT = `{
+            // allow comments in config content
+            "permission": {
+              "question": "deny"
+            }
+          }`
+          delete process.env.OPENCODE_CLI_RUN_MODE
+          const params = createParams({ agents: [agentName] })
+
+          applyToolConfig(params)
+
+          const agent = params.agentResult[agentName] as {
+            permission: Record<string, unknown>
+          }
+          expect(agent.permission.question).toBe("deny")
+        },
+      )
     })
 
     describe("#when config does not deny question permission", () => {

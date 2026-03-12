@@ -1,4 +1,5 @@
 import type { OhMyOpenCodeConfig } from "../config";
+import { parse } from "jsonc-parser";
 import { getAgentDisplayName } from "../shared/agent-display-names";
 import { isTaskSystemEnabled } from "../shared";
 
@@ -8,7 +9,7 @@ function getConfigQuestionPermission(): string | null {
   const configContent = process.env.OPENCODE_CONFIG_CONTENT;
   if (!configContent) return null;
   try {
-    const parsed = JSON.parse(configContent);
+    const parsed = parse(configContent);
     return parsed?.permission?.question ?? null;
   } catch {
     return null;
