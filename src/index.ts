@@ -12,6 +12,7 @@ import { loadPluginConfig } from "./plugin-config"
 import { createModelCacheState } from "./plugin-state"
 import { createFirstMessageVariantGate } from "./shared/first-message-variant"
 import { injectServerAuthIntoClient, log } from "./shared"
+import { configureRetryDelegation } from "./shared/retry-delegation"
 import { startTmuxCheck } from "./tools"
 
 const OhMyOpenCodePlugin: Plugin = async (ctx) => {
@@ -20,6 +21,10 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
   log("[OhMyOpenCodePlugin] ENTRY - plugin loading", {
     directory: ctx.directory,
   })
+
+  // Configure OpenCode to delegate retry logic to this plugin
+  // This ensures rate limits trigger fallback instead of waiting hours
+  await configureRetryDelegation()
 
   injectServerAuthIntoClient(ctx.client)
   startTmuxCheck()
