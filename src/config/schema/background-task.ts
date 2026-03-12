@@ -11,6 +11,10 @@ export const BackgroundTaskConfigSchema = z.object({
   /** Timeout for tasks that never received any progress update, falling back to startedAt (default: 1800000 = 30 minutes, minimum: 60000 = 1 minute) */
   messageStalenessTimeoutMs: z.number().min(60000).optional(),
   syncPollTimeoutMs: z.number().min(60000).optional(),
+  /** Task TTL in milliseconds - maximum time a task can exist before being pruned (default: 1800000 = 30 minutes, minimum: 600000 = 10 minutes) */
+  taskTtlMs: z.number().min(600000).optional(),
+  /** Task cleanup delay in milliseconds - delay before removing completed tasks from memory (default: 600000 = 10 minutes, minimum: 60000 = 1 minute) */
+  taskCleanupDelayMs: z.number().min(60000).optional(),
 })
 
 export type BackgroundTaskConfig = z.infer<typeof BackgroundTaskConfigSchema>

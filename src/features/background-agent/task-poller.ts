@@ -9,7 +9,7 @@ import {
   DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
   MIN_RUNTIME_BEFORE_STALE_MS,
-  TASK_TTL_MS,
+  DEFAULT_TASK_TTL_MS,
 } from "./constants"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 
@@ -25,10 +25,12 @@ const TERMINAL_TASK_STATUSES = new Set<BackgroundTask["status"]>([
 export function pruneStaleTasksAndNotifications(args: {
   tasks: Map<string, BackgroundTask>
   notifications: Map<string, BackgroundTask[]>
+  config: BackgroundTaskConfig | undefined
   onTaskPruned: (taskId: string, task: BackgroundTask, errorMessage: string) => void
 }): void {
-  const { tasks, notifications, onTaskPruned } = args
+  const { tasks, notifications, config, onTaskPruned } = args
   const now = Date.now()
+  const taskTtlMs = config?.taskTtlMs ?? DEFAULT_TASK_TTL_MS
   const tasksWithPendingNotifications = new Set<string>()
 
   for (const queued of notifications.values()) {
@@ -59,7 +61,7 @@ export function pruneStaleTasksAndNotifications(args: {
     if (!timestamp) continue
 
     const age = now - timestamp
-    if (age <= TASK_TTL_MS) continue
+    if (age <= taskTtlMs) continue
 
     const errorMessage = task.status === "pending"
       ? "Task timed out while queued (30 minutes)"
@@ -77,7 +79,7 @@ export function pruneStaleTasksAndNotifications(args: {
     const validNotifications = queued.filter((task) => {
       if (!task.startedAt) return false
       const age = now - task.startedAt.getTime()
-      return age <= TASK_TTL_MS
+      return age <= taskTtlMs
     })
 
     if (validNotifications.length === 0) {
@@ -110,6 +112,7 @@ export async function checkAndInterruptStaleTasks(args: {
   } = args
   const staleTimeoutMs = config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
   const now = Date.now()
+  const taskTtlMs = config?.taskTtlMs ?? DEFAULT_TASK_TTL_MS
 
   const messageStalenessMs = config?.messageStalenessTimeoutMs ?? DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS
 
