@@ -743,6 +743,8 @@ export class BackgroundManager {
           setSessionTools(existingTask.sessionID!, tools)
           return tools
         })(),
+        ...(existingTask.steps !== undefined ? { steps: existingTask.steps } : {}),
+        ...(existingTask.permission ? { permission: existingTask.permission } : {}),
         parts: [createInternalAgentTextPart(input.prompt)],
       },
     }).catch((error) => {

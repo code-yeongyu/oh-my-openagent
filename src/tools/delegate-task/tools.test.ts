@@ -2157,7 +2157,7 @@ describe("sisyphus-task", () => {
       // given - custom category with is_unstable_agent=true but non-gemini model
       const { createDelegateTask } = require("./tools")
       let launchCalled = false
-      
+
       const launchedTask = {
         id: "task-custom-unstable",
         sessionID: "ses_custom_unstable",
@@ -2172,7 +2172,7 @@ describe("sisyphus-task", () => {
         },
         getTask: () => launchedTask,
       }
-      
+
       const mockClient = {
         app: { agents: async () => ({ data: [] }) },
         config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
@@ -2189,7 +2189,7 @@ describe("sisyphus-task", () => {
           status: async () => ({ data: { "ses_custom_unstable": { type: "idle" } } }),
         },
       }
-      
+
       const tool = createDelegateTask({
         manager: mockManager,
         client: mockClient,
@@ -2200,14 +2200,14 @@ describe("sisyphus-task", () => {
           },
         },
       })
-      
+
       const toolContext = {
         sessionID: "parent-session",
         messageID: "parent-message",
         agent: "sisyphus",
         abort: new AbortController().signal,
       }
-      
+
       // when - using custom unstable category with run_in_background=false
       const result = await tool.execute(
         {
@@ -2219,13 +2219,345 @@ describe("sisyphus-task", () => {
         },
         toolContext
       )
-      
+
       // then - should launch as background BUT wait for and return actual result
       expect(launchCalled).toBe(true)
       expect(result).toContain("SUPERVISED TASK COMPLETED")
       expect(result).toContain("Custom unstable result")
     }, { timeout: 20000 })
-  })
+
+    test("forced-background unstable-agent path propagates steps and permission to manager.launch", async () => {
+      // given - gemini model (unstable) with run_in_background=false should force background
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const launchedTask = {
+        id: "task-unstable-steps",
+        sessionID: "ses_unstable_steps",
+        description: "Unstable steps test",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return launchedTask
+        },
+        getTask: () => launchedTask,
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ provider: "google", id: "gemini-3.1-pro" }] },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_unstable_steps" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Done" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_unstable_steps": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          "visual-engineering": {
+            model: "google/gemini-3.1-pro",
+            steps: 50,
+            permission: { edit: "allow", bash: "ask", webfetch: "ask", task: false, doom_loop: false, external_directory: false },
+          },
+        },
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - using gemini category with run_in_background=false (forces background)
+      await tool.execute(
+        {
+          description: "Test steps propagation",
+          prompt: "Do something visual",
+          category: "visual-engineering",
+          run_in_background: false,
+          load_skills: ["git-master"],
+        },
+        toolContext
+      )
+
+      // then - steps and permission should be propagated to manager.launch
+      expect(launchInput.steps).toBe(50)
+      expect(launchInput.permission).toEqual({ edit: "allow", bash: "ask", webfetch: "ask", task: false, doom_loop: false, external_directory: false })
+    }, { timeout: 20000 })
+
+    test("forced-background unstable-agent path handles undefined steps and permission gracefully", async () => {
+      // given - gemini model with no steps/permission configured
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const launchedTask = {
+        id: "task-unstable-no-steps",
+        sessionID: "ses_unstable_no_steps",
+        description: "Unstable no steps test",
+        agent: "sisyphus-junior",
+        status: "running",
+      }
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return launchedTask
+        },
+        getTask: () => launchedTask,
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ provider: "google", id: "gemini-3.1-pro" }] },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_unstable_no_steps" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({
+            data: [
+              { info: { role: "assistant", time: { created: Date.now() } }, parts: [{ type: "text", text: "Done" }] }
+            ]
+          }),
+          status: async () => ({ data: { "ses_unstable_no_steps": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - using visual-engineering (gemini) with no steps/permission
+      await tool.execute(
+        {
+          description: "Test no steps",
+          prompt: "Do something",
+          category: "visual-engineering",
+          run_in_background: false,
+          load_skills: ["git-master"],
+        },
+        toolContext
+      )
+
+      // then - steps and permission should be undefined (not propagated)
+      expect(launchInput.steps).toBeUndefined()
+      expect(launchInput.permission).toBeUndefined()
+    }, { timeout: 20000 })
+   })
+
+   describe("runInBackground branching steps/permission propagation", () => {
+    test("standard background launch (run_in_background=true) propagates steps and permission", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return {
+            id: "task-bg-steps",
+            sessionID: "ses_bg_steps",
+            description: "Background steps test",
+            agent: "sisyphus-junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ provider: "openai", id: "gpt-5.3-codex" }] },
+        session: {
+          create: async () => ({ data: { id: "ses_bg_steps" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          "deep": {
+            model: "openai/gpt-5.3-codex",
+            steps: 100,
+            permission: { edit: "allow", bash: "allow", webfetch: "allow", task: "allow", doom_loop: false, external_directory: false },
+          },
+        },
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - standard background launch with run_in_background=true
+      await tool.execute(
+        {
+          description: "Test background steps",
+          prompt: "Do something",
+          category: "deep",
+          run_in_background: true,
+          load_skills: ["git-master"],
+        },
+        toolContext
+      )
+
+      // then - steps and permission should be propagated
+      expect(launchInput.steps).toBe(100)
+      expect(launchInput.permission).toEqual({ edit: "allow", bash: "allow", webfetch: "allow", task: "allow", doom_loop: false, external_directory: false })
+    }, { timeout: 10000 })
+
+    test("sync task (run_in_background=false) propagates steps and permission to session.prompt", async () => {
+      // given
+      const { createDelegateTask } = require("./tools")
+      let promptBody: any
+
+      const mockManager = { launch: async () => ({}) }
+
+      const promptMock = async (input: any) => {
+        promptBody = input.body
+        return { data: {} }
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ provider: "openai", id: "gpt-5.3-codex" }] },
+        session: {
+          get: async () => ({ data: { directory: "/project" } }),
+          create: async () => ({ data: { id: "ses_sync_steps" } }),
+          prompt: promptMock,
+          promptAsync: promptMock,
+          messages: async () => ({
+            data: [{ info: { role: "assistant" }, parts: [{ type: "text", text: "Done" }] }]
+          }),
+          status: async () => ({ data: { "ses_sync_steps": { type: "idle" } } }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+        userCategories: {
+          "deep": {
+            model: "openai/gpt-5.3-codex",
+            steps: 75,
+            permission: { edit: "allow", bash: "ask", webfetch: "allow", task: "allow", doom_loop: false, external_directory: false },
+          },
+        },
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - sync task with run_in_background=false
+      await tool.execute(
+        {
+          description: "Test sync steps",
+          prompt: "Do something",
+          category: "deep",
+          run_in_background: false,
+          load_skills: ["git-master"],
+        },
+        toolContext
+      )
+
+      // then - steps and permission should be propagated to session.prompt
+      expect(promptBody.steps).toBe(75)
+      expect(promptBody.permission).toEqual({ edit: "allow", bash: "ask", webfetch: "allow", task: "allow", doom_loop: false, external_directory: false })
+    }, { timeout: 20000 })
+
+    test("all branches handle undefined steps and permission consistently", async () => {
+      // given - category without steps/permission
+      const { createDelegateTask } = require("./tools")
+      let launchInput: any
+
+      const mockManager = {
+        launch: async (input: any) => {
+          launchInput = input
+          return {
+            id: "task-no-constraints",
+            sessionID: "ses_no_constraints",
+            description: "No constraints test",
+            agent: "sisyphus-junior",
+            status: "running",
+          }
+        },
+      }
+
+      const mockClient = {
+        app: { agents: async () => ({ data: [] }) },
+        config: { get: async () => ({ data: { model: SYSTEM_DEFAULT_MODEL } }) },
+        model: { list: async () => [{ provider: "openai", id: "gpt-5.3-codex" }] },
+        session: {
+          create: async () => ({ data: { id: "ses_no_constraints" } }),
+          prompt: async () => ({ data: {} }),
+          promptAsync: async () => ({ data: {} }),
+          messages: async () => ({ data: [] }),
+        },
+      }
+
+      const tool = createDelegateTask({
+        manager: mockManager,
+        client: mockClient,
+      })
+
+      const toolContext = {
+        sessionID: "parent-session",
+        messageID: "parent-message",
+        agent: "sisyphus",
+        abort: new AbortController().signal,
+      }
+
+      // when - standard background launch without steps/permission
+      await tool.execute(
+        {
+          description: "Test no constraints",
+          prompt: "Do something",
+          category: "deep",
+          run_in_background: true,
+          load_skills: ["git-master"],
+        },
+        toolContext
+      )
+
+      // then - steps and permission should be undefined
+      expect(launchInput.steps).toBeUndefined()
+      expect(launchInput.permission).toBeUndefined()
+    }, { timeout: 10000 })
+   })
 
   describe("category model resolution fallback", () => {
     test("category uses resolved.model when connectedProvidersCache is null and availableModels is empty", async () => {

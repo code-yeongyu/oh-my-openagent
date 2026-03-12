@@ -1,5 +1,6 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata } from "./types"
 import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
+import type { AgentPermission } from "../../config/schema"
 import { DEFAULT_SYNC_POLL_TIMEOUT_MS, getTimingConfig } from "./timing"
 import { buildTaskPrompt } from "./prompt-builder"
 import { storeToolMetadata } from "../../features/tool-metadata-store"
@@ -17,7 +18,9 @@ export async function executeUnstableAgentTask(
   agentToUse: string,
   categoryModel: { providerID: string; modelID: string; variant?: string } | undefined,
   systemContent: string | undefined,
-  actualModel: string | undefined
+  actualModel: string | undefined,
+  steps?: number,
+  permission?: AgentPermission,
 ): Promise<string> {
   const { manager, client, syncPollTimeoutMs } = executorCtx
 
@@ -37,6 +40,8 @@ export async function executeUnstableAgentTask(
       skillContent: systemContent,
       category: args.category,
       sessionPermission: QUESTION_DENIED_SESSION_PERMISSION,
+      steps,
+      permission,
     })
 
     const timing = getTimingConfig()
