@@ -342,5 +342,6 @@ export const momusPromptMetadata: AgentPromptMetadata = {
     "When user explicitly wants to skip review",
     "For trivial plans that don't need formal review",
   ],
-  keyTrigger: "Work plan created → invoke Momus for review before execution",
+  keyTrigger:
+    "Work plan saved to `.sisyphus/plans/*.md` → invoke Momus with the file path as the sole prompt (e.g. `prompt=\".sisyphus/plans/my-plan.md\"`). Do NOT invoke Momus for inline plans or todo lists.",
 };
