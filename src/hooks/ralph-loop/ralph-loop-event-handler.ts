@@ -8,8 +8,8 @@ import {
 	detectCompletionInTranscript,
 } from "./completion-promise-detector"
 import { continueIteration } from "./iteration-continuation"
+import { handlePendingVerification } from "./pending-verification-handler"
 import { handleDeletedLoopSession, handleErroredLoopSession } from "./session-event-handler"
-import { handleFailedVerification } from "./verification-failure-handler"
 
 type SessionRecovery = {
 	isRecovering: (sessionID: string) => boolean
@@ -136,22 +136,15 @@ export function createRalphLoopEventHandler(
 				}
 
 				if (state.verification_pending) {
-					if (verificationSessionID && matchesVerificationSession) {
-						const restarted = await handleFailedVerification(ctx, {
-							state,
-							loopState: options.loopState,
-							directory: options.directory,
-							apiTimeoutMs: options.apiTimeoutMs,
-						})
-						if (restarted) {
-							return
-						}
-					}
-
-					log(`[${HOOK_NAME}] Waiting for oracle verification`, {
+					await handlePendingVerification(ctx, {
 						sessionID,
+						state,
 						verificationSessionID,
-						iteration: state.iteration,
+						matchesParentSession,
+						matchesVerificationSession,
+						loopState: options.loopState,
+						directory: options.directory,
+						apiTimeoutMs: options.apiTimeoutMs,
 					})
 					return
 				}
