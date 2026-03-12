@@ -7,6 +7,13 @@ import { createHttpClient } from "./http-client"
 import { createStdioClient } from "./stdio-client"
 import type { SkillMcpClientConnectionParams, SkillMcpClientInfo, SkillMcpManagerState } from "./types"
 
+function removeClientIfCurrent(state: SkillMcpManagerState, clientKey: string, client: Client): void {
+  const managed = state.clients.get(clientKey)
+  if (managed?.client === client) {
+    state.clients.delete(clientKey)
+  }
+}
+
 export async function getOrCreateClient(params: {
   state: SkillMcpManagerState
   clientKey: string
@@ -42,12 +49,13 @@ export async function getOrCreateClient(params: {
 
     const isStale = state.pendingConnections.has(clientKey) && state.pendingConnections.get(clientKey) !== currentConnectionPromise
     if (isStale) {
-      state.clients.delete(clientKey)
+      removeClientIfCurrent(state, clientKey, client)
       try { await client.close() } catch {}
       throw new Error(`Connection for "${info.sessionID}" was superseded by a newer connection attempt.`)
     }
 
     if (state.shutdownGeneration !== shutdownGenAtStart) {
+      removeClientIfCurrent(state, clientKey, client)
       try { await client.close() } catch {}
       throw new Error(`Shutdown occurred during MCP connection for "${info.sessionID}"`)
     }
