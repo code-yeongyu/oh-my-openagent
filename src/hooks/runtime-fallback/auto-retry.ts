@@ -1,11 +1,4 @@
-<<<<<<< HEAD
 import type { HookDeps, RuntimeFallbackTimeout } from "./types"
-||||||| parent of b6f740ed (fix: enable runtime fallback for delegated child sessions (#2357))
-import type { HookDeps } from "./types"
-=======
-import type { HookDeps } from "./types"
-import type { TimerHandle } from "./timer-handle"
->>>>>>> b6f740ed (fix: enable runtime fallback for delegated child sessions (#2357))
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { normalizeAgentName, resolveAgentForSession } from "./agent-resolver"
@@ -19,19 +12,22 @@ import { extractSessionMessages } from "./session-messages"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
-<<<<<<< HEAD
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
-||||||| parent of b6f740ed (fix: enable runtime fallback for delegated child sessions (#2357))
-declare function setTimeout(callback: () => void | Promise<void>, delay?: number): ReturnType<typeof globalThis.setTimeout>
-declare function clearTimeout(timeout: ReturnType<typeof globalThis.setTimeout>): void
-=======
-declare function setTimeout(callback: () => void | Promise<void>, delay?: number): TimerHandle
-declare function clearTimeout(timeout: TimerHandle): void
->>>>>>> b6f740ed (fix: enable runtime fallback for delegated child sessions (#2357))
 
 export function createAutoRetryHelpers(deps: HookDeps) {
-  const { ctx, config, options, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, pluginConfig, sessionStatusRetryKeys } = deps
+  const {
+    ctx,
+    config,
+    options,
+    sessionStates,
+    sessionLastAccess,
+    sessionRetryInFlight,
+    sessionAwaitingFallbackResult,
+    sessionFallbackTimeouts,
+    pluginConfig,
+    sessionStatusRetryKeys,
+  } = deps
 
   const abortSessionRequest = async (sessionID: string, source: string): Promise<void> => {
     try {
