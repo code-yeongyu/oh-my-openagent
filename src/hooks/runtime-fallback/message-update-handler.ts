@@ -7,6 +7,7 @@ import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
+import { extractSessionMessages } from "./session-messages"
 
 export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof extractAutoRetrySignal) {
   return async (
@@ -20,12 +21,7 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
         query: { directory: ctx.directory },
       })
 
-      const msgs = (messagesResp as {
-        data?: Array<{
-          info?: Record<string, unknown>
-          parts?: Array<{ type?: string; text?: string }>
-        }>
-      }).data
+      const msgs = extractSessionMessages(messagesResp)
 
       if (!msgs || msgs.length === 0) return false
 
