@@ -24,6 +24,7 @@ type Dependencies = {
   waitForCompletion: ReturnType<typeof mock>
   processMessages: ReturnType<typeof mock>
   setSessionFallbackChain: ReturnType<typeof mock>
+  clearSessionFallbackChain: ReturnType<typeof mock>
 }
 
 async function importExecuteSync(): Promise<ExecuteSync> {
@@ -37,6 +38,7 @@ function createDependencies(overrides?: Partial<Dependencies>): Dependencies {
     waitForCompletion: mock(async () => {}),
     processMessages: mock(async () => "agent response"),
     setSessionFallbackChain: mock(() => {}),
+    clearSessionFallbackChain: mock(() => {}),
     ...overrides,
   }
 }
@@ -259,6 +261,7 @@ describe("executeSync", () => {
       waitForCompletion: mock(async () => {}),
       processMessages: mock(async () => "agent response"),
       setSessionFallbackChain: mock(() => {}),
+      clearSessionFallbackChain: mock(() => {}),
     }
 
     const spawnReservation = {

@@ -1,7 +1,7 @@
 import type { CallOmoAgentArgs } from "./types"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
-import { setSessionFallbackChain } from "../../hooks/model-fallback/hook"
+import { clearSessionFallbackChain, setSessionFallbackChain } from "../../hooks/model-fallback/hook"
 import { getAgentToolRestrictions, log } from "../../shared"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import { waitForCompletion } from "./completion-poller"
@@ -17,6 +17,7 @@ type ExecuteSyncDeps = {
   waitForCompletion: typeof waitForCompletion
   processMessages: typeof processMessages
   setSessionFallbackChain: typeof setSessionFallbackChain
+  clearSessionFallbackChain: typeof clearSessionFallbackChain
 }
 
 type SpawnReservation = {
@@ -29,6 +30,7 @@ const defaultDeps: ExecuteSyncDeps = {
   waitForCompletion,
   processMessages,
   setSessionFallbackChain,
+  clearSessionFallbackChain,
 }
 
 export async function executeSync(
@@ -47,11 +49,14 @@ export async function executeSync(
 ): Promise<string> {
   let sessionID: string | undefined
   let createdSessionForExecution = false
+  let appliedFallbackChain = false
 
   try {
     const session = await deps.createOrGetSession(args, toolContext, ctx)
     sessionID = session.sessionID
     createdSessionForExecution = session.isNew
+    subagentSessions.add(sessionID)
+    syncSubagentSessions.add(sessionID)
 
     if (session.isNew) {
       spawnReservation?.commit()
@@ -59,6 +64,7 @@ export async function executeSync(
 
     if (fallbackChain && fallbackChain.length > 0) {
       deps.setSessionFallbackChain(sessionID, fallbackChain)
+      appliedFallbackChain = true
     }
 
     await Promise.resolve(
@@ -102,6 +108,10 @@ export async function executeSync(
     spawnReservation?.rollback()
     throw error
   } finally {
+    if (sessionID && appliedFallbackChain) {
+      deps.clearSessionFallbackChain(sessionID)
+    }
+
     if (sessionID && createdSessionForExecution) {
       subagentSessions.delete(sessionID)
       syncSubagentSessions.delete(sessionID)
