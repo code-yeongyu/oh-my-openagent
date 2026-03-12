@@ -244,9 +244,9 @@ describe('TmuxSessionManager', () => {
       // when
       const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
-      // then - should use dynamic port, not hardcoded 4096
-      const serverUrl = (manager as any).serverUrl as string
-      expect(serverUrl).toContain(`:${dynamicPort}`)
+      // then - should use dynamic port origin form, not hardcoded 4096
+      const serverUrl = Reflect.get(manager, 'serverUrl') as string
+      expect(serverUrl).toBe(`http://localhost:${dynamicPort}`)
       expect(serverUrl).not.toContain('4096')
     })
 
@@ -269,7 +269,7 @@ describe('TmuxSessionManager', () => {
         const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
 
         // then - should use env var port, not hardcoded 4096
-        const serverUrl = (manager as any).serverUrl as string
+        const serverUrl = Reflect.get(manager, 'serverUrl') as string
         expect(serverUrl).toBe('http://localhost:8080')
         expect(serverUrl).not.toContain('4096')
       } finally {

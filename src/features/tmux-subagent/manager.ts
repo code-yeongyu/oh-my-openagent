@@ -77,8 +77,14 @@ export class TmuxSessionManager {
     let serverUrl: string | null = null
 
     // Priority 1: ctx.serverUrl (provided by plugin framework)
-    if (ctx.serverUrl) {
-      serverUrl = ctx.serverUrl.origin
+    // Wrapped in try/catch because ctx.serverUrl is a getter that can throw
+    // in some opencode versions (see fix/serverurl-throw-getter)
+    try {
+      if (ctx.serverUrl) {
+        serverUrl = ctx.serverUrl.origin
+      }
+    } catch {
+      // getter threw - fall through to lower-priority resolution
     }
 
     // Priority 2: Extract from client's internal config (dynamic port)

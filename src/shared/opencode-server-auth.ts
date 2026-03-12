@@ -133,9 +133,9 @@ function tryInjectViaTopLevelFetch(client: unknown, auth: string): boolean {
 /**
  * Injects HTTP Basic Auth header into the OpenCode SDK client.
  *
- * This function accesses the SDK's internal `_client.setConfig()` method.
- * While `_client` has an underscore prefix (suggesting internal use), this is actually
- * a stable public API from `@hey-api/openapi-ts` generated client:
+ * This function accesses the SDK's internal transport client via `getInternalClient()`,
+ * which supports both v1 SDK (`client._client`) and v2 SDK (`client.client`).
+ * It uses the `setConfig()` method from `@hey-api/openapi-ts` generated client:
  * - `setConfig()` MERGES headers (does not replace existing ones)
  * - This is the documented way to update client config at runtime
  *
