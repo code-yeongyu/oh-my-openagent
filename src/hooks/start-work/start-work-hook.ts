@@ -64,7 +64,7 @@ function resolveWorktreeContext(
   }
 }
 
-export function createStartWorkHook(ctx: PluginInput) {
+export function createStartWorkHook(ctx: PluginInput, options?: { worktreeEnabled?: boolean }) {
   return {
     "chat.message": async (input: StartWorkHookInput, output: StartWorkHookOutput): Promise<void> => {
       const parts = output.parts
@@ -85,7 +85,10 @@ export function createStartWorkHook(ctx: PluginInput) {
       const timestamp = new Date().toISOString()
 
       const { planName: explicitPlanName, explicitWorktreePath } = parseUserRequest(promptText)
-      const { worktreePath, block: worktreeBlock } = resolveWorktreeContext(explicitWorktreePath)
+      const worktreeDisabled = options?.worktreeEnabled === false
+      const { worktreePath, block: worktreeBlock } = worktreeDisabled
+        ? { worktreePath: undefined, block: "" }
+        : resolveWorktreeContext(explicitWorktreePath)
 
       let contextInfo = ""
 
@@ -106,7 +109,7 @@ The requested plan "${getPlanName(matchedPlan)}" has been completed.
 All ${progress.total} tasks are done. Create a new plan with: /plan "your task"`
           } else {
             if (existingState) clearBoulderState(ctx.directory)
-            const newState = createBoulderState(matchedPlan, sessionId, "atlas", worktreePath)
+            const newState = createBoulderState(matchedPlan, sessionId, "atlas", worktreeDisabled ? undefined : worktreePath)
             writeBoulderState(ctx.directory, newState)
 
             contextInfo = `
@@ -152,9 +155,9 @@ No incomplete plans available. Create a new plan with: /plan "your task"`
         const progress = getPlanProgress(existingState.active_plan)
 
         if (!progress.isComplete) {
-          const effectiveWorktree = worktreePath ?? existingState.worktree_path
+          const effectiveWorktree = worktreeDisabled ? undefined : (worktreePath ?? existingState.worktree_path)
 
-          if (worktreePath !== undefined) {
+          if (!worktreeDisabled && worktreePath !== undefined) {
             const updatedSessions = existingState.session_ids.includes(sessionId)
               ? existingState.session_ids
               : [...existingState.session_ids, sessionId]
@@ -213,7 +216,7 @@ All ${plans.length} plan(s) are complete. Create a new plan with: /plan "your ta
         } else if (incompletePlans.length === 1) {
           const planPath = incompletePlans[0]
           const progress = getPlanProgress(planPath)
-          const newState = createBoulderState(planPath, sessionId, "atlas", worktreePath)
+          const newState = createBoulderState(planPath, sessionId, "atlas", worktreeDisabled ? undefined : worktreePath)
           writeBoulderState(ctx.directory, newState)
 
           contextInfo += `
