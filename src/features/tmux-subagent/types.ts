@@ -16,6 +16,8 @@ export const MIN_PANE_HEIGHT = 11
 
 export interface TmuxPaneInfo {
   paneId: string
+  tmuxSessionId?: string
+  windowId?: string
   width: number
   height: number
   left: number
@@ -25,6 +27,8 @@ export interface TmuxPaneInfo {
 }
 
 export interface WindowState {
+  tmuxSessionId?: string
+  windowId?: string
   windowWidth: number
   windowHeight: number
   mainPane: TmuxPaneInfo | null

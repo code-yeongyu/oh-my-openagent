@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test"
+import { describe, test, expect, mock } from "bun:test"
 
 import { createChatMessageHandler } from "./chat-message"
 
@@ -23,6 +23,7 @@ function createMockHandlerArgs(overrides?: {
       keywordDetector: null,
       claudeCodeHooks: null,
       autoSlashCommand: null,
+      startTeammode: null,
       startWork: null,
       ralphLoop: null,
     } as any,
@@ -46,79 +47,68 @@ function createMockOutput(variant?: string): ChatMessageHandlerOutput {
   return { message, parts: [] }
 }
 
+const startTeammodePrompt =
+  "You are starting Atlas Team Mode.\n<session-context>Session ID: $SESSION_ID\nTimestamp: $TIMESTAMP</session-context>"
+const startWorkPrompt =
+  "You are starting a Sisyphus work session.\n<session-context>Session ID: $SESSION_ID\nTimestamp: $TIMESTAMP</session-context>"
+
 describe("createChatMessageHandler - TUI variant passthrough", () => {
   test("first message: does not override TUI variant when user has no selection", async () => {
-    //#given - first message, no user-selected variant
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
     const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
-    const output = createMockOutput() // no variant set
+    const output = createMockOutput()
 
-    //#when
     await handler(input, output)
 
-    //#then - TUI sent undefined, should stay undefined (no config override)
     expect(output.message["variant"]).toBeUndefined()
   })
 
   test("first message: preserves user-selected variant when already set", async () => {
-    //#given - first message, user already selected "xhigh" variant in OpenCode UI
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
     const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
-    const output = createMockOutput("xhigh") // user selected xhigh
+    const output = createMockOutput("xhigh")
 
-    //#when
     await handler(input, output)
 
-    //#then - user's xhigh must be preserved
     expect(output.message["variant"]).toBe("xhigh")
   })
 
   test("subsequent message: preserves TUI variant", async () => {
-    //#given - not first message, variant already set
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
     const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
     const output = createMockOutput("xhigh")
 
-    //#when
     await handler(input, output)
 
-    //#then
     expect(output.message["variant"]).toBe("xhigh")
   })
 
   test("subsequent message: does not inject variant when TUI sends none", async () => {
-    //#given - not first message, no variant from TUI
     const args = createMockHandlerArgs({ shouldOverride: false })
     const handler = createChatMessageHandler(args)
     const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
-    const output = createMockOutput() // no variant
+    const output = createMockOutput()
 
-    //#when
     await handler(input, output)
 
-    //#then - should stay undefined, not auto-resolved from config
     expect(output.message["variant"]).toBeUndefined()
   })
 
   test("first message: marks gate as applied regardless of variant presence", async () => {
-    //#given - first message with user-selected variant
     const args = createMockHandlerArgs({ shouldOverride: true })
     const handler = createChatMessageHandler(args)
     const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
     const output = createMockOutput("xhigh")
 
-    //#when
     await handler(input, output)
 
-    //#then - gate should still be marked as applied
     expect(args._appliedSessions).toContain("test-session")
   })
 
   test("injects queued background notifications through chat.message hook", async () => {
-    //#given
     const args = createMockHandlerArgs()
     args.hooks.backgroundNotificationHook = {
       "chat.message": async (
@@ -135,11 +125,47 @@ describe("createChatMessageHandler - TUI variant passthrough", () => {
     const input = createMockInput("hephaestus", { providerID: "openai", modelID: "gpt-5.3-codex" })
     const output = createMockOutput()
 
-    //#when
     await handler(input, output)
 
-    //#then
     expect(output.parts).toHaveLength(1)
     expect(output.parts[0].text).toContain("[BACKGROUND TASK COMPLETED]")
+  })
+
+  test("start-teammode short-circuits start-work", async () => {
+    const args = createMockHandlerArgs()
+    const startTeammode = mock(async () => {})
+    const startWork = mock(async () => {})
+    args.hooks.startTeammode = { "chat.message": startTeammode }
+    args.hooks.startWork = { "chat.message": startWork }
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput()
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: startTeammodePrompt }],
+    }
+
+    await handler(input, output)
+
+    expect(startTeammode).toHaveBeenCalledTimes(1)
+    expect(startWork).toHaveBeenCalledTimes(0)
+  })
+
+  test("start-work still runs for non-teammode command output", async () => {
+    const args = createMockHandlerArgs()
+    const startTeammode = mock(async () => {})
+    const startWork = mock(async () => {})
+    args.hooks.startTeammode = { "chat.message": startTeammode }
+    args.hooks.startWork = { "chat.message": startWork }
+    const handler = createChatMessageHandler(args)
+    const input = createMockInput()
+    const output: ChatMessageHandlerOutput = {
+      message: {},
+      parts: [{ type: "text", text: startWorkPrompt }],
+    }
+
+    await handler(input, output)
+
+    expect(startTeammode).toHaveBeenCalledTimes(1)
+    expect(startWork).toHaveBeenCalledTimes(1)
   })
 })

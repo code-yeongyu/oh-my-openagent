@@ -6,6 +6,7 @@ import {
   claimNextTeamTask,
   initializeTeamRuntime,
   markTeamMailboxMessageDelivered,
+  markTeamWorkersLaunched,
   requestTeamShutdown,
   transitionTeamTask,
 } from "./runtime"
@@ -48,6 +49,55 @@ describe("team-mode runtime", () => {
     expect(getTeamStatePath(testDir, runtime.manifest.team_id)).toContain(runtime.manifest.team_id)
     expect(persisted?.summary.pending_tasks).toBe(2)
     expect(persisted?.monitor.worker_status["worker-1"]).toBe("pending")
+  })
+
+
+  test("#given verified worker launch metadata #when workers are marked launched #then runtime stores background task, session, pane, and window ids", () => {
+    const runtime = initializeTeamRuntime({
+      directory: testDir,
+      leaderSessionId: "session-1",
+      planPath,
+      planName: "sample-plan",
+      workerCount: 2,
+    })
+
+    const updated = markTeamWorkersLaunched(testDir, runtime.manifest.team_id, [
+      { id: "worker-1", backgroundTaskId: "bg-1", sessionID: "ses-1", paneId: "%11", windowId: "@1" },
+      { id: "worker-2", backgroundTaskId: "bg-2", sessionID: "ses-2", paneId: "%12", windowId: "@1" },
+    ])
+
+    expect(updated?.workers.find((worker) => worker.id === "worker-1")).toMatchObject({
+      background_task_id: "bg-1",
+      session_id: "ses-1",
+      pane_id: "%11",
+      window_id: "@1",
+      status: "running",
+    })
+    expect(updated?.workers.find((worker) => worker.id === "worker-2")).toMatchObject({
+      background_task_id: "bg-2",
+      session_id: "ses-2",
+      pane_id: "%12",
+      window_id: "@1",
+      status: "running",
+    })
+  })
+
+  test("#given missing verified worker launch metadata #when workers are marked launched #then runtime throws instead of entering running phase", () => {
+    const runtime = initializeTeamRuntime({
+      directory: testDir,
+      leaderSessionId: "session-1",
+      planPath,
+      planName: "sample-plan",
+      workerCount: 2,
+    })
+
+    expect(() =>
+      markTeamWorkersLaunched(testDir, runtime.manifest.team_id, [
+        { id: "worker-1", backgroundTaskId: "bg-1", sessionID: "ses-1", paneId: "%11", windowId: "@1" },
+      ]),
+    ).toThrow("Missing verified launch metadata")
+
+    expect(readTeamRuntimeState(testDir, runtime.manifest.team_id)?.manifest.phase).toBe("starting")
   })
 
   test("#given pending team tasks #when a worker claims and completes one #then claim token, versions, mailbox, and summaries are updated durably", () => {

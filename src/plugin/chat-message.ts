@@ -23,6 +23,9 @@ export type ChatMessageInput = {
 }
 type CommandHookOutput = { parts: Array<{ type: string; text?: string }> }
 
+const START_TEAMMODE_PROMPT_MARKER = "You are starting Atlas Team Mode."
+const SESSION_CONTEXT_MARKER = "<session-context>"
+
 function isCommandHookOutput(value: unknown): value is CommandHookOutput {
   if (typeof value !== "object" || value === null) return false
   const record = value as Record<string, unknown>
@@ -33,6 +36,18 @@ function isCommandHookOutput(value: unknown): value is CommandHookOutput {
     const partRecord = part as Record<string, unknown>
     return typeof partRecord["type"] === "string"
   })
+}
+
+function getPromptText(output: CommandHookOutput): string {
+  return output.parts
+    .filter((part) => part.type === "text" && part.text)
+    .map((part) => part.text)
+    .join("\n")
+}
+
+function isStartTeammodeCommand(output: CommandHookOutput): boolean {
+  const promptText = getPromptText(output)
+  return promptText.includes(START_TEAMMODE_PROMPT_MARKER) && promptText.includes(SESSION_CONTEXT_MARKER)
 }
 
 export function createChatMessageHandler(args: {
@@ -106,10 +121,11 @@ export function createChatMessageHandler(args: {
     await hooks.noSisyphusGpt?.["chat.message"]?.(input, output)
     await hooks.noHephaestusNonGpt?.["chat.message"]?.(input, output)
     if (isCommandHookOutput(output)) {
+      const isTeammodeCommand = isStartTeammodeCommand(output)
       if (hooks.startTeammode) {
         await hooks.startTeammode["chat.message"]?.(input, output)
       }
-      if (hooks.startWork) {
+      if (!isTeammodeCommand && hooks.startWork) {
         await hooks.startWork["chat.message"]?.(input, output)
       }
     }

@@ -310,6 +310,21 @@ describe("createAutoSlashCommandHook", () => {
       expect(output.parts[0].text).toContain("<auto-slash-command>")
       expect(output.parts[0].text).toContain("/ralph-loop Command")
     })
+    it("should inject template for start-teammode builtin commands", async () => {
+      //#given
+      const hook = createAutoSlashCommandHook()
+      const input = createCommandInput("start-teammode")
+      const output = createCommandOutput("original")
+
+      //#when
+      await hook["command.execute.before"](input, output)
+
+      //#then
+      expect(output.parts[0].text).toContain("<auto-slash-command>")
+      expect(output.parts[0].text).toContain("/start-teammode Command")
+      expect(output.parts[0].text).toContain("You are starting Atlas Team Mode.")
+    })
+
 
     it("should pass command arguments correctly", async () => {
       //#given

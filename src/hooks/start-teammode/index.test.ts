@@ -29,11 +29,22 @@ describe("start-teammode hook", () => {
     } as Parameters<typeof createStartTeammodeHook>[0]
   }
 
-  function createBackgroundManager() {
+  function createBackgroundManager(options?: { verifiedLaunchMetadata?: boolean }) {
+    const tasks = new Map<string, { id: string; sessionID?: string; paneId?: string; windowId?: string }>()
+
     return {
-      launch: mock(async ({ description }: { description: string }) => ({
-        id: `${description.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${randomUUID().slice(0, 6)}`,
-      })),
+      launch: mock(async ({ description }: { description: string }) => {
+        const id = `${description.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${randomUUID().slice(0, 6)}`
+        tasks.set(id, {
+          id,
+          sessionID: `${id}-session`,
+          ...(options?.verifiedLaunchMetadata === false
+            ? {}
+            : { paneId: `%${tasks.size + 1}`, windowId: "@1" }),
+        })
+        return { id }
+      }),
+      getTask: mock((id: string) => tasks.get(id)),
     } as Parameters<typeof createStartTeammodeHook>[1]
   }
 
@@ -85,6 +96,21 @@ describe("start-teammode hook", () => {
     expect(boulderState?.active_team_id).toBeTruthy()
     expect(boulderState?.team_state_path).toBe(getTeamStatePath(testDir, boulderState!.active_team_id!))
   })
+
+  test("should refuse to emit started output without verified worker launch metadata", async () => {
+    const plansDir = join(testDir, ".sisyphus", "plans")
+    mkdirSync(plansDir, { recursive: true })
+    writeFileSync(join(plansDir, "plan-a.md"), "# Plan A\n- [ ] Task 1")
+
+    const backgroundManager = createBackgroundManager({ verifiedLaunchMetadata: false })
+    const hook = createStartTeammodeHook(createMockPluginInput(), backgroundManager)
+    const output = { parts: [{ type: "text", text: startTeammodePrompt("") }] }
+
+    await expect(hook["chat.message"]({ sessionID: "session-123", messageID: "msg-1" }, output)).rejects.toThrow(
+      "Missing verified tmux launch metadata",
+    )
+    expect(output.parts[0].text).not.toContain("Team Mode Started")
+  }, 7000)
 
   test("should refuse to bootstrap team mode outside tmux", async () => {
     const plansDir = join(testDir, ".sisyphus", "plans")

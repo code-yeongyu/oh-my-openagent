@@ -87,5 +87,26 @@ export async function spawnTmuxPane(
 		})
 	}
 
-	return { success: true, paneId }
+	const proofProc = spawn(
+		[tmux, "display-message", "-p", "-t", paneId, "#{session_id}\t#{window_id}\t#{pane_id}"],
+		{ stdout: "pipe", stderr: "pipe" },
+	)
+	const proofExitCode = await proofProc.exited
+	const proofStdout = await new Response(proofProc.stdout).text()
+	if (proofExitCode !== 0) {
+		log("[spawnTmuxPane] WARNING: failed to collect pane proof", {
+			paneId,
+			exitCode: proofExitCode,
+		})
+		return { success: true, paneId }
+	}
+
+	const [tmuxSessionId, windowId, provenPaneId] = proofStdout.trim().split("\t")
+	return {
+		success: true,
+		paneId,
+		tmuxSessionId: tmuxSessionId || undefined,
+		windowId: windowId || undefined,
+		...(provenPaneId ? { paneId: provenPaneId } : {}),
+	}
 }

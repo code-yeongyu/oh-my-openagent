@@ -27,12 +27,22 @@ export interface TeamTaskTransitionRecord {
   at: string
 }
 
+export interface TeamWorkerLaunchRecord {
+  id: string
+  backgroundTaskId: string
+  sessionID: string
+  paneId: string
+  windowId: string
+}
+
 export interface TeamWorkerRecord {
   id: string
   role: TeamRole
   status: TeamWorkerStatus
   background_task_id?: string
   session_id?: string
+  pane_id?: string
+  window_id?: string
   claimed_task_ids: string[]
   started_at?: string
   updated_at: string

@@ -1,8 +1,10 @@
 import type { TmuxPaneInfo } from "./types"
 
-const MANDATORY_PANE_FIELD_COUNT = 8
+const MANDATORY_PANE_FIELD_COUNT = 10
 
 type ParsedPaneState = {
+  tmuxSessionId?: string
+  windowId?: string
   windowWidth: number
   windowHeight: number
   panes: TmuxPaneInfo[]
@@ -10,12 +12,16 @@ type ParsedPaneState = {
 
 type ParsedPaneLine = {
   pane: TmuxPaneInfo
+  tmuxSessionId?: string
+  windowId?: string
   windowWidth: number
   windowHeight: number
 }
 
 type MandatoryPaneFields = [
   paneId: string,
+  tmuxSessionId: string,
+  windowId: string,
   widthString: string,
   heightString: string,
   leftString: string,
@@ -43,6 +49,8 @@ export function parsePaneStateOutput(stdout: string): ParsedPaneState | null {
   if (!latestPaneLine) return null
 
   return {
+    tmuxSessionId: latestPaneLine.tmuxSessionId,
+    windowId: latestPaneLine.windowId,
     windowWidth: latestPaneLine.windowWidth,
     windowHeight: latestPaneLine.windowHeight,
     panes: parsedPaneLines.map(({ pane }) => pane),
@@ -54,7 +62,7 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
   const mandatoryFields = getMandatoryPaneFields(fields)
   if (!mandatoryFields) return null
 
-  const [paneId, widthString, heightString, leftString, topString, activeString, windowWidthString, windowHeightString] = mandatoryFields
+  const [paneId, tmuxSessionId, windowId, widthString, heightString, leftString, topString, activeString, windowWidthString, windowHeightString] = mandatoryFields
 
   const width = parseInteger(widthString)
   const height = parseInteger(heightString)
@@ -76,16 +84,20 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
     return null
   }
 
-  return {
-    pane: {
-      paneId,
-      width,
-      height,
-      left,
-      top,
+    return {
+      pane: {
+        paneId,
+        tmuxSessionId,
+        windowId,
+        width,
+        height,
+        left,
+        top,
       title: fields.slice(MANDATORY_PANE_FIELD_COUNT).join("\t"),
       isActive,
     },
+    tmuxSessionId,
+    windowId,
     windowWidth,
     windowHeight,
   }
@@ -94,10 +106,12 @@ function parsePaneLine(line: string): ParsedPaneLine | null {
 function getMandatoryPaneFields(fields: string[]): MandatoryPaneFields | null {
   if (fields.length < MANDATORY_PANE_FIELD_COUNT) return null
 
-  const [paneId, widthString, heightString, leftString, topString, activeString, windowWidthString, windowHeightString] = fields
+  const [paneId, tmuxSessionId, windowId, widthString, heightString, leftString, topString, activeString, windowWidthString, windowHeightString] = fields
 
   if (
     paneId === undefined ||
+    tmuxSessionId === undefined ||
+    windowId === undefined ||
     widthString === undefined ||
     heightString === undefined ||
     leftString === undefined ||
@@ -111,6 +125,8 @@ function getMandatoryPaneFields(fields: string[]): MandatoryPaneFields | null {
 
   return [
     paneId,
+    tmuxSessionId,
+    windowId,
     widthString,
     heightString,
     leftString,

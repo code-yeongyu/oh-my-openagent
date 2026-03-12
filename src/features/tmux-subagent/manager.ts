@@ -27,6 +27,18 @@ interface DeferredSession {
   queuedAt: Date
 }
 
+export interface StrictAttachResult {
+  ok: boolean
+  sessionId: string
+  paneId?: string
+  tmuxSessionId?: string
+  windowId?: string
+  sourcePaneId?: string
+  sourceTmuxSessionId?: string
+  sourceWindowId?: string
+  error?: string
+}
+
 export interface TmuxUtilDeps {
   isInsideTmux: () => boolean
   getCurrentPaneId: () => string | undefined
@@ -110,6 +122,232 @@ export class TmuxSessionManager {
       paneId: s.paneId,
       createdAt: s.createdAt,
     }))
+  }
+
+  private resolveSourcePaneId(sourcePaneId?: string): string | undefined {
+    return sourcePaneId ?? this.deps.getCurrentPaneId() ?? this.sourcePaneId
+  }
+
+  private createStrictAttachFailure(
+    sessionId: string,
+    error: string,
+    sourcePaneId?: string,
+    state?: WindowState | null,
+    paneId?: string,
+  ): StrictAttachResult {
+    return {
+      ok: false,
+      sessionId,
+      error,
+      ...(paneId ? { paneId } : {}),
+      ...(sourcePaneId ? { sourcePaneId } : {}),
+      ...(state?.tmuxSessionId ? { sourceTmuxSessionId: state.tmuxSessionId } : {}),
+      ...(state?.windowId ? { sourceWindowId: state.windowId } : {}),
+    }
+  }
+
+  private async closeSpawnedPane(
+    paneId: string,
+    sessionId: string,
+    state: WindowState,
+  ): Promise<void> {
+    await executeAction(
+      { type: "close", paneId, sessionId },
+      { config: this.tmuxConfig, serverUrl: this.serverUrl, windowState: state },
+    ).catch((error) => {
+      log("[tmux-session-manager] strict attach cleanup failed", {
+        sessionId,
+        paneId,
+        error: String(error),
+      })
+    })
+  }
+
+  private async verifyStrictAttachment(
+    sessionId: string,
+    sourcePaneId: string,
+    paneId: string,
+    sourceState: WindowState,
+  ): Promise<StrictAttachResult> {
+    const latestState = await queryWindowState(sourcePaneId)
+    if (!latestState) {
+      return this.createStrictAttachFailure(
+        sessionId,
+        "strict attach failed: unable to query window state after spawn",
+        sourcePaneId,
+        sourceState,
+        paneId,
+      )
+    }
+
+    const attachedPane =
+      latestState.mainPane?.paneId === paneId
+        ? latestState.mainPane
+        : latestState.agentPanes.find((pane) => pane.paneId === paneId)
+
+    if (!attachedPane) {
+      return this.createStrictAttachFailure(
+        sessionId,
+        "strict attach failed: spawned pane is not attached to the source window",
+        sourcePaneId,
+        latestState,
+        paneId,
+      )
+    }
+
+    if (
+      sourceState.windowId &&
+      latestState.windowId &&
+      sourceState.windowId !== latestState.windowId
+    ) {
+      return this.createStrictAttachFailure(
+        sessionId,
+        "strict attach failed: source window changed during attach",
+        sourcePaneId,
+        latestState,
+        paneId,
+      )
+    }
+
+    if (
+      sourceState.tmuxSessionId &&
+      latestState.tmuxSessionId &&
+      sourceState.tmuxSessionId !== latestState.tmuxSessionId
+    ) {
+      return this.createStrictAttachFailure(
+        sessionId,
+        "strict attach failed: source tmux session changed during attach",
+        sourcePaneId,
+        latestState,
+        paneId,
+      )
+    }
+
+    return {
+      ok: true,
+      sessionId,
+      paneId,
+      ...(latestState.tmuxSessionId ? { tmuxSessionId: latestState.tmuxSessionId } : {}),
+      ...(latestState.windowId ? { windowId: latestState.windowId } : {}),
+      sourcePaneId,
+      ...(sourceState.tmuxSessionId ? { sourceTmuxSessionId: sourceState.tmuxSessionId } : {}),
+      ...(sourceState.windowId ? { sourceWindowId: sourceState.windowId } : {}),
+    }
+  }
+
+  async attachSessionStrict(input: {
+    sessionId: string
+    title: string
+    sourcePaneId?: string
+  }): Promise<StrictAttachResult> {
+    if (!this.tmuxConfig.enabled || !this.deps.isInsideTmux()) {
+      return this.createStrictAttachFailure(input.sessionId, "strict attach unavailable: tmux is not enabled")
+    }
+
+    const sourcePaneId = this.resolveSourcePaneId(input.sourcePaneId)
+    if (!sourcePaneId) {
+      return this.createStrictAttachFailure(input.sessionId, "strict attach unavailable: missing source pane id")
+    }
+
+    await this.retryPendingCloses()
+
+    if (
+      this.sessions.has(input.sessionId) ||
+      this.pendingSessions.has(input.sessionId) ||
+      this.deferredSessions.has(input.sessionId)
+    ) {
+      return this.createStrictAttachFailure(
+        input.sessionId,
+        "strict attach unavailable: session already tracked or pending",
+        sourcePaneId,
+      )
+    }
+
+    this.pendingSessions.add(input.sessionId)
+
+    try {
+      const state = await queryWindowState(sourcePaneId)
+      if (!state) {
+        return this.createStrictAttachFailure(
+          input.sessionId,
+          "strict attach failed: unable to query source window state",
+          sourcePaneId,
+        )
+      }
+
+      const decision = decideSpawnActions(
+        state,
+        input.sessionId,
+        input.title,
+        this.getCapacityConfig(),
+        this.getSessionMappings(),
+      )
+
+      if (!decision.canSpawn) {
+        return this.createStrictAttachFailure(
+          input.sessionId,
+          `strict attach failed: ${decision.reason ?? "window cannot accept another pane"}`,
+          sourcePaneId,
+          state,
+        )
+      }
+
+      const result = await executeActions(decision.actions, {
+        config: this.tmuxConfig,
+        serverUrl: this.serverUrl,
+        windowState: state,
+        sourcePaneId,
+      })
+
+      if (!result.success || !result.spawnedPaneId) {
+        if (result.spawnedPaneId) {
+          await this.closeSpawnedPane(result.spawnedPaneId, input.sessionId, state)
+        }
+        return this.createStrictAttachFailure(
+          input.sessionId,
+          "strict attach failed: tmux pane spawn did not complete successfully",
+          sourcePaneId,
+          state,
+          result.spawnedPaneId,
+        )
+      }
+
+      const sessionReady = await this.waitForSessionReady(input.sessionId)
+      if (!sessionReady) {
+        await this.closeSpawnedPane(result.spawnedPaneId, input.sessionId, state)
+        return this.createStrictAttachFailure(
+          input.sessionId,
+          "strict attach failed: session not ready after timeout",
+          sourcePaneId,
+          state,
+          result.spawnedPaneId,
+        )
+      }
+
+      const proof = await this.verifyStrictAttachment(
+        input.sessionId,
+        sourcePaneId,
+        result.spawnedPaneId,
+        state,
+      )
+      if (!proof.ok) {
+        await this.closeSpawnedPane(result.spawnedPaneId, input.sessionId, state)
+        return proof
+      }
+
+      this.sessions.set(
+        input.sessionId,
+        createTrackedSession({
+          sessionId: input.sessionId,
+          paneId: result.spawnedPaneId,
+          description: input.title,
+        }),
+      )
+      this.pollingManager.startPolling()
+      return proof
+    } finally {
+      this.pendingSessions.delete(input.sessionId)
+    }
   }
 
   private removeTrackedSession(sessionId: string): void {
@@ -429,7 +667,7 @@ export class TmuxSessionManager {
 
   async onSessionCreated(
     event: SessionCreatedEvent,
-    options?: { force?: boolean },
+    options?: { force?: boolean; strictAttach?: boolean; sourcePaneId?: string },
   ): Promise<void> {
     const enabled = options?.force ? this.deps.isInsideTmux() : this.isEnabled()
     log("[tmux-session-manager] onSessionCreated called", {
@@ -451,7 +689,8 @@ export class TmuxSessionManager {
     const sessionId = info.id
     const title = info.title ?? "Subagent"
 
-    if (!this.sourcePaneId) {
+    const sourcePaneId = this.resolveSourcePaneId(options?.sourcePaneId)
+    if (!sourcePaneId) {
       log("[tmux-session-manager] no source pane id")
       return
     }
@@ -466,7 +705,17 @@ export class TmuxSessionManager {
       log("[tmux-session-manager] session already tracked or pending", { sessionId })
       return
     }
-    const sourcePaneId = this.sourcePaneId
+    if (options?.strictAttach) {
+      const strictResult = await this.attachSessionStrict({
+        sessionId,
+        title,
+        sourcePaneId,
+      })
+      if (!strictResult.ok) {
+        log("[tmux-session-manager] strict attach failed", strictResult)
+      }
+      return
+    }
 
     this.pendingSessions.add(sessionId)
 

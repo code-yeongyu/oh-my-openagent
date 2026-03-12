@@ -18,6 +18,7 @@ import type {
   TeamRuntimeState,
   TeamSummaryState,
   TeamTaskRecord,
+  TeamWorkerLaunchRecord,
   TeamWorkerRecord,
   TransitionTeamTaskInput,
 } from "./types"
@@ -247,10 +248,16 @@ export function setTeamPhase(directory: string, teamId: string, phase: TeamPhase
 export function markTeamWorkersLaunched(
   directory: string,
   teamId: string,
-  launchedWorkers: Array<{ id: string; backgroundTaskId: string }>,
+  launchedWorkers: TeamWorkerLaunchRecord[],
 ): TeamRuntimeState | null {
   const state = readTeamRuntimeState(directory, teamId)
   if (!state) return null
+
+  const expectedWorkerIds = state.workers.filter((worker) => worker.role === "worker").map((worker) => worker.id)
+  const missingWorkerIds = expectedWorkerIds.filter((workerId) => !launchedWorkers.some((candidate) => candidate.id === workerId))
+  if (missingWorkerIds.length > 0) {
+    throw new Error(`Missing verified launch metadata for workers: ${missingWorkerIds.join(", ")}`)
+  }
 
   const timestamp = nowIso()
   const workers = state.workers.map((worker) => {
@@ -259,6 +266,9 @@ export function markTeamWorkersLaunched(
     return {
       ...worker,
       background_task_id: launched.backgroundTaskId,
+      session_id: launched.sessionID,
+      pane_id: launched.paneId,
+      window_id: launched.windowId,
       status: "running" as const,
       started_at: worker.started_at ?? timestamp,
       updated_at: timestamp,

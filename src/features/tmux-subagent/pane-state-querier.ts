@@ -15,7 +15,7 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
       "-t",
       sourcePaneId,
       "-F",
-			"#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{pane_title}",
+			"#{pane_id}\t#{session_id}\t#{window_id}\t#{pane_width}\t#{pane_height}\t#{pane_left}\t#{pane_top}\t#{pane_active}\t#{window_width}\t#{window_height}\t#{pane_title}",
     ],
     { stdout: "pipe", stderr: "pipe" }
   )
@@ -66,11 +66,20 @@ export async function queryWindowState(sourcePaneId: string): Promise<WindowStat
   const agentPanes = panes.filter((p) => p.paneId !== mainPane.paneId)
 
   log("[pane-state-querier] window state", {
+    tmuxSessionId: parsedPaneState.tmuxSessionId,
+    windowId: parsedPaneState.windowId,
     windowWidth,
     windowHeight,
     mainPane: mainPane.paneId,
     agentPaneCount: agentPanes.length,
   })
 
-  return { windowWidth, windowHeight, mainPane, agentPanes }
+  return {
+    tmuxSessionId: parsedPaneState.tmuxSessionId,
+    windowId: parsedPaneState.windowId,
+    windowWidth,
+    windowHeight,
+    mainPane,
+    agentPanes,
+  }
 }
