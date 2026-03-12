@@ -2,6 +2,7 @@ import { join } from "path"
 import { homedir } from "os"
 import { getClaudeConfigDir } from "../../shared/claude-config-dir"
 import { getOpenCodeConfigDir } from "../../shared/opencode-config-dir"
+import { getOpenCodeSkillDirs } from "../../shared/opencode-command-dirs"
 import type { CommandDefinition } from "../claude-code-command-loader/types"
 import type { LoadedSkill } from "./types"
 import { skillsToCommandDefinitionRecord } from "./skill-definition-record"
@@ -21,10 +22,11 @@ export async function loadProjectSkills(directory?: string): Promise<Record<stri
 }
 
 export async function loadOpencodeGlobalSkills(): Promise<Record<string, CommandDefinition>> {
-  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
-  const opencodeSkillsDir = join(configDir, "skills")
-  const skills = await loadSkillsFromDir({ skillsDir: opencodeSkillsDir, scope: "opencode" })
-  return skillsToCommandDefinitionRecord(skills)
+  const skillDirs = getOpenCodeSkillDirs({ binary: "opencode" })
+  const allSkills = await Promise.all(
+    skillDirs.map(skillsDir => loadSkillsFromDir({ skillsDir, scope: "opencode" }))
+  )
+  return skillsToCommandDefinitionRecord(deduplicateSkillsByName(allSkills.flat()))
 }
 
 export async function loadOpencodeProjectSkills(directory?: string): Promise<Record<string, CommandDefinition>> {
@@ -107,9 +109,11 @@ export async function discoverProjectClaudeSkills(directory?: string): Promise<L
 }
 
 export async function discoverOpencodeGlobalSkills(): Promise<LoadedSkill[]> {
-  const configDir = getOpenCodeConfigDir({ binary: "opencode" })
-  const opencodeSkillsDir = join(configDir, "skills")
-  return loadSkillsFromDir({ skillsDir: opencodeSkillsDir, scope: "opencode" })
+  const skillDirs = getOpenCodeSkillDirs({ binary: "opencode" })
+  const allSkills = await Promise.all(
+    skillDirs.map(skillsDir => loadSkillsFromDir({ skillsDir, scope: "opencode" }))
+  )
+  return deduplicateSkillsByName(allSkills.flat())
 }
 
 export async function discoverOpencodeProjectSkills(directory?: string): Promise<LoadedSkill[]> {
