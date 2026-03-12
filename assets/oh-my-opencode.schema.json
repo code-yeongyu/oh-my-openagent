@@ -3758,6 +3758,15 @@
       "properties": {
         "force_enable": {
           "type": "boolean"
+        },
+        "script": {
+          "type": "string"
+        },
+        "playSound": {
+          "type": "boolean"
+        },
+        "soundPath": {
+          "type": "string"
         }
       },
       "additionalProperties": false

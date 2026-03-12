@@ -10,12 +10,14 @@ import {
 import * as sessionNotificationSender from "./session-notification-sender"
 import { hasIncompleteTodos } from "./session-todo-status"
 import { createIdleNotificationScheduler } from "./session-notification-scheduler"
+import { executeNotificationScript } from "./session-notification-script-executor"
 
 interface SessionNotificationConfig {
   title?: string
   message?: string
   questionMessage?: string
   permissionMessage?: string
+  script?: string
   playSound?: boolean
   soundPath?: string
   /** Delay in ms before sending notification to confirm session is still idle (default: 1500) */
@@ -61,12 +63,22 @@ export function createSessionNotification(
         typeof hookCtx.client.session.get !== "function"
         && typeof hookCtx.client.session.messages !== "function"
       ) {
-        await sessionNotificationSender.sendSessionNotification(
-          hookCtx,
-          platform,
-          mergedConfig.title,
-          mergedConfig.message,
-        )
+        if (mergedConfig.script) {
+          await executeNotificationScript(hookCtx, mergedConfig.script, {
+            hookType: "idle",
+            sessionID,
+            projectDir: hookCtx.directory,
+            title: mergedConfig.title,
+            message: mergedConfig.message,
+          })
+        } else {
+          await sessionNotificationSender.sendSessionNotification(
+            hookCtx,
+            platform,
+            mergedConfig.title,
+            mergedConfig.message,
+          )
+        }
         return
       }
 
@@ -76,7 +88,17 @@ export function createSessionNotification(
         baseMessage: mergedConfig.message,
       })
 
-      await sessionNotificationSender.sendSessionNotification(hookCtx, platform, content.title, content.message)
+      if (mergedConfig.script) {
+        await executeNotificationScript(hookCtx, mergedConfig.script, {
+          hookType: "idle",
+          sessionID,
+          projectDir: hookCtx.directory,
+          title: content.title,
+          message: content.message,
+        })
+      } else {
+        await sessionNotificationSender.sendSessionNotification(hookCtx, platform, content.title, content.message)
+      }
     },
     playSound: sessionNotificationSender.playSessionNotificationSound,
   })
@@ -172,12 +194,24 @@ export function createSessionNotification(
       if (!shouldNotifyForSession(sessionID)) return
 
       scheduler.markSessionActivity(sessionID)
-      await sessionNotificationSender.sendSessionNotification(
-        ctx,
-        currentPlatform,
-        mergedConfig.title,
-        mergedConfig.permissionMessage,
-      )
+      
+      if (mergedConfig.script) {
+        await executeNotificationScript(ctx, mergedConfig.script, {
+          hookType: "permission",
+          sessionID,
+          projectDir: ctx.directory,
+          title: mergedConfig.title,
+          message: mergedConfig.permissionMessage,
+        })
+      } else {
+        await sessionNotificationSender.sendSessionNotification(
+          ctx,
+          currentPlatform,
+          mergedConfig.title,
+          mergedConfig.permissionMessage,
+        )
+      }
+      
       if (mergedConfig.playSound && mergedConfig.soundPath) {
         await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
       }
@@ -198,8 +232,20 @@ export function createSessionNotification(
             const message = PERMISSION_HINT_PATTERN.test(questionText)
               ? mergedConfig.permissionMessage
               : mergedConfig.questionMessage
+            const hookType = PERMISSION_HINT_PATTERN.test(questionText) ? "permission" : "question"
 
-            await sessionNotificationSender.sendSessionNotification(ctx, currentPlatform, mergedConfig.title, message)
+            if (mergedConfig.script) {
+              await executeNotificationScript(ctx, mergedConfig.script, {
+                hookType,
+                sessionID,
+                projectDir: ctx.directory,
+                title: mergedConfig.title,
+                message,
+              })
+            } else {
+              await sessionNotificationSender.sendSessionNotification(ctx, currentPlatform, mergedConfig.title, message)
+            }
+            
             if (mergedConfig.playSound && mergedConfig.soundPath) {
               await sessionNotificationSender.playSessionNotificationSound(ctx, currentPlatform, mergedConfig.soundPath)
             }
