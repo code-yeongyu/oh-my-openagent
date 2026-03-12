@@ -15,6 +15,7 @@ import type { CommandInfo, CommandMetadata, CommandScope } from "./types"
 export interface CommandDiscoveryOptions {
   pluginsEnabled?: boolean
   enabledPluginsOverride?: Record<string, boolean>
+  startWorkConfig?: { worktree?: boolean }
 }
 
 function discoverCommandsFromDir(commandsDir: string, scope: CommandScope): CommandInfo[] {
@@ -91,7 +92,7 @@ export function discoverCommandsSync(
   const opencodeProjectCommands = discoverCommandsFromDir(opencodeProjectDir, "opencode-project")
   const pluginCommands = discoverPluginCommands(options)
 
-  const builtinCommandsMap = loadBuiltinCommands()
+  const builtinCommandsMap = loadBuiltinCommands(undefined, options?.startWorkConfig)
   const builtinCommands: CommandInfo[] = Object.values(builtinCommandsMap).map((command) => ({
     name: command.name,
     metadata: {
