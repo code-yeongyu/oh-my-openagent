@@ -146,7 +146,6 @@ export async function handleSessionIdle(args: {
   }
 
   let resolvedInfo: ResolvedMessageInfo | undefined
-  let hasCompactionMessage = false
   try {
     const messagesResp = await ctx.client.session.messages({
       path: { id: sessionID },
@@ -155,7 +154,6 @@ export async function handleSessionIdle(args: {
     for (let i = messages.length - 1; i >= 0; i--) {
       const info = messages[i].info
       if (info?.agent === "compaction") {
-        hasCompactionMessage = true
         continue
       }
       if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
@@ -171,14 +169,14 @@ export async function handleSessionIdle(args: {
     log(`[${HOOK_NAME}] Failed to fetch messages for agent check`, { sessionID, error: String(error) })
   }
 
-  log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents, hasCompactionMessage })
+  log(`[${HOOK_NAME}] Agent check`, { sessionID, agentName: resolvedInfo?.agent, skipAgents, hasRecentCompaction: state.hasRecentCompaction })
 
   const resolvedAgentName = resolvedInfo?.agent
   if (resolvedAgentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(resolvedAgentName))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedAgentName })
     return
   }
-  if (hasCompactionMessage && !resolvedInfo?.agent) {
+  if (state.hasRecentCompaction && !resolvedInfo?.agent) {
     log(`[${HOOK_NAME}] Skipped: compaction occurred but no agent info resolved`, { sessionID })
     return
   }

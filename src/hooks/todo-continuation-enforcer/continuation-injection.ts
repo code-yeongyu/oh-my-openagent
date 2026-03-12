@@ -120,6 +120,14 @@ export async function injectContinuation(args: {
     return
   }
 
+  if (!agentName) {
+    const compactionState = sessionStateStore.getExistingState(sessionID)
+    if (compactionState?.hasRecentCompaction) {
+      log(`[${HOOK_NAME}] Skipped: agent unknown after compaction`, { sessionID })
+      return
+    }
+  }
+
   if (!hasWritePermission(tools)) {
     log(`[${HOOK_NAME}] Skipped: agent lacks write permission`, { sessionID, agent: agentName })
     return

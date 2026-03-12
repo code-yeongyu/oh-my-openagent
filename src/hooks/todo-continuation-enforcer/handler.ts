@@ -63,6 +63,17 @@ export function createTodoContinuationHandler(args: {
       return
     }
 
+    if (event.type === "session.compacted") {
+      const sessionID = (props?.sessionID ?? (props?.info as { id?: string } | undefined)?.id) as string | undefined
+      if (sessionID) {
+        const state = sessionStateStore.getState(sessionID)
+        state.hasRecentCompaction = true
+        sessionStateStore.cancelCountdown(sessionID)
+        log(`[${HOOK_NAME}] Session compacted: marked hasRecentCompaction`, { sessionID })
+      }
+      return
+    }
+
     if (event.type === "session.deleted") {
       const sessionInfo = props?.info as { id?: string } | undefined
       if (sessionInfo?.id) {

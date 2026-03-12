@@ -35,6 +35,7 @@ export interface SessionState {
   inFlight?: boolean
   stagnationCount: number
   consecutiveFailures: number
+  hasRecentCompaction?: boolean
 }
 
 export interface MessageInfo {
