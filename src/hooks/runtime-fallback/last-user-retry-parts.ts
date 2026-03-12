@@ -1,22 +1,9 @@
-type MessageItem = {
-  info?: Record<string, unknown>
-  parts?: Array<{ type?: string; text?: string }>
-}
-
-function extractMessages(messagesResponse: unknown): MessageItem[] | undefined {
-  if (messagesResponse == null) return undefined
-  if (Array.isArray(messagesResponse)) return messagesResponse as MessageItem[]
-  if (typeof messagesResponse === "object") {
-    const data = (messagesResponse as Record<string, unknown>).data
-    if (Array.isArray(data)) return data as MessageItem[]
-  }
-  return undefined
-}
+import { extractSessionMessages } from "./session-messages"
 
 export function getLastUserRetryParts(
   messagesResponse: unknown,
 ): Array<{ type: "text"; text: string }> {
-  const messages = extractMessages(messagesResponse)
+  const messages = extractSessionMessages(messagesResponse)
   const lastUserMessage = messages?.filter((message) => message.info?.role === "user").pop()
   const lastUserParts =
     lastUserMessage?.parts
