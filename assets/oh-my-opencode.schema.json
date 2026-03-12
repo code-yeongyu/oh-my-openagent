@@ -83,6 +83,7 @@
           "no-sisyphus-gpt",
           "no-hephaestus-non-gpt",
           "start-work",
+          "start-teammode",
           "atlas",
           "unstable-agent-babysitter",
           "task-resume-info",
@@ -107,6 +108,7 @@
           "cancel-ralph",
           "refactor",
           "start-work",
+          "start-teammode",
           "stop-continuation"
         ]
       }

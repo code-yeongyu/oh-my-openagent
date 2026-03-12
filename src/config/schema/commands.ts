@@ -7,6 +7,7 @@ export const BuiltinCommandNameSchema = z.enum([
   "cancel-ralph",
   "refactor",
   "start-work",
+  "start-teammode",
   "stop-continuation",
 ])
 

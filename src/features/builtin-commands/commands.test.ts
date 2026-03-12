@@ -4,6 +4,30 @@ import { HANDOFF_TEMPLATE } from "./templates/handoff"
 import type { BuiltinCommandName } from "./types"
 
 describe("loadBuiltinCommands", () => {
+
+
+  test("should include start-teammode command in loaded commands", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = []
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["start-teammode"]).toBeDefined()
+    expect(commands["start-teammode"].name).toBe("start-teammode")
+  })
+
+  test("should exclude start-teammode when disabled", () => {
+    //#given
+    const disabledCommands: BuiltinCommandName[] = ["start-teammode"]
+
+    //#when
+    const commands = loadBuiltinCommands(disabledCommands)
+
+    //#then
+    expect(commands["start-teammode"]).toBeUndefined()
+  })
   test("should include handoff command in loaded commands", () => {
     //#given
     const disabledCommands: BuiltinCommandName[] = []

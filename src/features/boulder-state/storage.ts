@@ -6,7 +6,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs"
 import { dirname, join, basename } from "node:path"
-import type { BoulderState, PlanProgress } from "./types"
+import type { BoulderState, BoulderTeamModePointer, PlanProgress } from "./types"
 import { BOULDER_DIR, BOULDER_FILE, PROMETHEUS_PLANS_DIR } from "./constants"
 
 export function getBoulderFilePath(directory: string): string {
@@ -152,6 +152,7 @@ export function createBoulderState(
   sessionId: string,
   agent?: string,
   worktreePath?: string,
+  execution?: Pick<BoulderState, "execution_mode" | "active_team_id" | "team_state_path">,
 ): BoulderState {
   return {
     active_plan: planPath,
@@ -160,5 +161,8 @@ export function createBoulderState(
     plan_name: getPlanName(planPath),
     ...(agent !== undefined ? { agent } : {}),
     ...(worktreePath !== undefined ? { worktree_path: worktreePath } : {}),
+    ...(execution?.execution_mode ? { execution_mode: execution.execution_mode } : {}),
+    ...(execution?.active_team_id ? { active_team_id: execution.active_team_id } : {}),
+    ...(execution?.team_state_path ? { team_state_path: execution.team_state_path } : {}),
   }
 }

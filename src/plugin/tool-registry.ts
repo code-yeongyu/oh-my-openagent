@@ -25,6 +25,7 @@ import {
   createTaskList,
   createTaskUpdateTool,
   createHashlineEditTool,
+  createTeamModeTools,
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
@@ -42,7 +43,7 @@ export type ToolRegistryResult = {
 export function createToolRegistry(args: {
   ctx: PluginContext
   pluginConfig: OhMyOpenCodeConfig
-  managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager">
+  managers: Pick<Managers, "backgroundManager" | "tmuxSessionManager" | "skillMcpManager" | "teamModeManager">
   skillContext: SkillContext
   availableCategories: AvailableCategory[]
 }): ToolRegistryResult {
@@ -114,6 +115,8 @@ export function createToolRegistry(args: {
     gitMasterConfig: pluginConfig.git_master,
   })
 
+  const teamModeTools = createTeamModeTools(managers.teamModeManager)
+
   const taskSystemEnabled = pluginConfig.experimental?.task_system ?? false
   const taskToolsRecord: Record<string, ToolDefinition> = taskSystemEnabled
     ? {
@@ -142,6 +145,7 @@ export function createToolRegistry(args: {
     skill_mcp: skillMcpTool,
     skill: skillTool,
     interactive_bash,
+    ...teamModeTools,
     ...taskToolsRecord,
     ...hashlineToolsRecord,
   }

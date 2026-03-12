@@ -6,6 +6,7 @@ import type { SubagentSessionCreatedEvent } from "./features/background-agent"
 import { BackgroundManager } from "./features/background-agent"
 import { SkillMcpManager } from "./features/skill-mcp-manager"
 import { initTaskToastManager } from "./features/task-toast-manager"
+import { TeamModeManager } from "./features/team-mode"
 import { TmuxSessionManager } from "./features/tmux-subagent"
 import { createConfigHandler } from "./plugin-handlers"
 import { log } from "./shared"
@@ -14,6 +15,7 @@ export type Managers = {
   tmuxSessionManager: TmuxSessionManager
   backgroundManager: BackgroundManager
   skillMcpManager: SkillMcpManager
+  teamModeManager: TeamModeManager
   configHandler: ReturnType<typeof createConfigHandler>
 }
 
@@ -40,16 +42,19 @@ export function createManagers(args: {
           title: event.title,
         })
 
-        await tmuxSessionManager.onSessionCreated({
-          type: "session.created",
-          properties: {
-            info: {
-              id: event.sessionID,
-              parentID: event.parentID,
-              title: event.title,
+        await tmuxSessionManager.onSessionCreated(
+          {
+            type: "session.created",
+            properties: {
+              info: {
+                id: event.sessionID,
+                parentID: event.parentID,
+                title: event.title,
+              },
             },
           },
-        })
+          { force: event.forceTmuxPane === true },
+        )
 
         log("[index] onSubagentSessionCreated callback completed")
       },
@@ -65,6 +70,7 @@ export function createManagers(args: {
   initTaskToastManager(ctx.client)
 
   const skillMcpManager = new SkillMcpManager()
+  const teamModeManager = new TeamModeManager(ctx.directory, backgroundManager, tmuxSessionManager)
 
   const configHandler = createConfigHandler({
     ctx: { directory: ctx.directory, client: ctx.client },
@@ -76,6 +82,7 @@ export function createManagers(args: {
     tmuxSessionManager,
     backgroundManager,
     skillMcpManager,
+    teamModeManager,
     configHandler,
   }
 }

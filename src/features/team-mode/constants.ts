@@ -1,0 +1,12 @@
+export const TEAM_MODE_DIR = ".sisyphus/team"
+export const TEAM_MANIFEST_FILE = "manifest.json"
+export const TEAM_WORKERS_FILE = "workers.json"
+export const TEAM_TASKS_FILE = "tasks.json"
+export const TEAM_MAILBOX_FILE = "mailbox.json"
+export const TEAM_GOVERNANCE_FILE = "governance.json"
+export const TEAM_PHASE_FILE = "phase.json"
+export const TEAM_SUMMARY_FILE = "summary.json"
+export const TEAM_MONITOR_FILE = "monitor.json"
+export const DEFAULT_TEAM_WORKER_COUNT = 3
+export const DEFAULT_TEAM_CLAIM_LEASE_MS = 15 * 60 * 1000
+export const TEAM_WORKER_ID_PREFIX = "worker-"
