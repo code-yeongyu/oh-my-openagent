@@ -15,6 +15,7 @@ import { prepareFallback } from "./fallback-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { buildRetryModelPayload } from "./retry-model-payload"
 import { getLastUserRetryParts } from "./last-user-retry-parts"
+import { extractSessionMessages } from "./session-messages"
 
 const SESSION_TTL_MS = 30 * 60 * 1000
 
@@ -172,7 +173,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         path: { id: sessionID },
         query: { directory: ctx.directory },
       })
-      const msgs = (messagesResp as { data?: Array<{ info?: Record<string, unknown> }> }).data
+      const msgs = extractSessionMessages(messagesResp)
       if (!msgs || msgs.length === 0) return undefined
 
       for (let i = msgs.length - 1; i >= 0; i--) {
