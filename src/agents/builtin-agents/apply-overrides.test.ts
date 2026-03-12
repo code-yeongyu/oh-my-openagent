@@ -44,9 +44,9 @@ describe("applyOverrides", () => {
         edit: "deny" as const,
         bash: "deny" as const,
         webfetch: "deny" as const,
-        task: false as const,
-        doom_loop: true,
-        external_directory: true,
+        task: "deny" as const,
+        doom_loop: "deny" as const,
+        external_directory: "deny" as const,
       },
     }
 
@@ -63,9 +63,9 @@ describe("applyOverrides", () => {
       edit: "deny",
       bash: "deny",
       webfetch: "deny",
-      task: false,
-      doom_loop: true,
-      external_directory: true,
+      task: "deny",
+      doom_loop: "deny",
+      external_directory: "deny",
     })
   })
 
