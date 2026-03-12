@@ -8,7 +8,7 @@ import {
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 120_000
 
-const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
+const DEFAULT_COMPACTION_THRESHOLD = 0.78
 
 interface TokenInfo {
   input: number
@@ -59,11 +59,20 @@ type PluginInput = {
   directory: string
 }
 
+function resolveCompactionThreshold(pluginConfig: OhMyOpenCodeConfig): number {
+  const setting = pluginConfig.experimental?.preemptive_compaction
+  if (typeof setting === "object" && setting !== null && setting.threshold !== undefined) {
+    return setting.threshold
+  }
+  return DEFAULT_COMPACTION_THRESHOLD
+}
+
 export function createPreemptiveCompactionHook(
   ctx: PluginInput,
   pluginConfig: OhMyOpenCodeConfig,
   modelCacheState?: ContextLimitModelCacheState,
 ) {
+  const threshold = resolveCompactionThreshold(pluginConfig)
   const compactionInProgress = new Set<string>()
   const compactedSessions = new Set<string>()
   const tokenCache = new Map<string, CachedCompactionState>()
@@ -96,7 +105,7 @@ export function createPreemptiveCompactionHook(
     const totalInputTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0)
     const usageRatio = totalInputTokens / actualLimit
 
-    if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD) return
+    if (usageRatio < threshold) return
 
     const modelID = cached.modelID
     if (!modelID) return

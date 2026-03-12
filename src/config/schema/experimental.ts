@@ -4,7 +4,13 @@ import { DynamicContextPruningConfigSchema } from "./dynamic-context-pruning"
 export const ExperimentalConfigSchema = z.object({
   aggressive_truncation: z.boolean().optional(),
   auto_resume: z.boolean().optional(),
-  preemptive_compaction: z.boolean().optional(),
+  preemptive_compaction: z.union([
+    z.boolean(),
+    z.object({
+      /** Context usage ratio (0-1) at which preemptive compaction triggers (default: 0.78) */
+      threshold: z.number().min(0).max(1).optional(),
+    }),
+  ]).optional(),
   /** Truncate all tool outputs, not just whitelisted tools (default: false). Tool output truncator is enabled by default - disable via disabled_hooks. */
   truncate_all_tool_outputs: z.boolean().optional(),
   /** Dynamic context pruning configuration */
