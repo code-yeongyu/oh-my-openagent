@@ -57,6 +57,19 @@ export function formatVerbose(result: DoctorResult): string {
   }
   lines.push("")
 
+  for (const check of results) {
+    if (!check.details || check.details.length === 0) {
+      continue
+    }
+
+    lines.push(`${color.bold(check.name)}`)
+    lines.push(`${color.dim("\u2500".repeat(40))}`)
+    for (const detail of check.details) {
+      lines.push(detail)
+    }
+    lines.push("")
+  }
+
   const allIssues = results.flatMap((r) => r.issues)
   if (allIssues.length > 0) {
     lines.push(`${color.bold("Issues")}`)
