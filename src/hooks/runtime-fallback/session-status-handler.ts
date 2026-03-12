@@ -90,12 +90,16 @@ export function createSessionStatusHandler(
 
     await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
 
+    // Extract provider BEFORE prepareFallback updates state
+    const currentModelProvider = state.currentModel.split("/")[0]
+
     await dispatchFallbackRetry(deps, helpers, {
       sessionID,
       state,
       fallbackModels,
       resolvedAgent,
       source: "session.status",
+      currentModelProvider,
     })
   }
 }

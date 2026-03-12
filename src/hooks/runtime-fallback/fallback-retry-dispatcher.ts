@@ -11,6 +11,7 @@ type DispatchFallbackRetryOptions = {
   fallbackModels: string[]
   resolvedAgent?: string
   source: string
+  currentModelProvider: string
 }
 
 export async function dispatchFallbackRetry(
@@ -18,6 +19,15 @@ export async function dispatchFallbackRetry(
   helpers: AutoRetryHelpers,
   options: DispatchFallbackRetryOptions,
 ): Promise<void> {
+  // Blacklist the ORIGINAL model's provider (extracted before prepareFallback)
+  await blacklistProvider(options.currentModelProvider, deps.config.cooldown_seconds, `Fallback from ${options.source}`)
+  log(`[${HOOK_NAME}] Blacklisted provider due to rate limit error`, {
+    sessionID: options.sessionID,
+    provider: options.currentModelProvider,
+    model: options.state.currentModel,
+    source: options.source,
+  })
+
   const result = prepareFallback(
     options.sessionID,
     options.state,

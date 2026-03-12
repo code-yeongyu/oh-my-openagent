@@ -192,12 +192,16 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         }
       }
 
+      // Extract provider BEFORE prepareFallback updates state
+      const currentModelProvider = state.currentModel.split("/")[0]
+
       await dispatchFallbackRetry(deps, helpers, {
         sessionID,
         state,
         fallbackModels,
         resolvedAgent,
         source: "message.updated",
+        currentModelProvider,
       })
     }
   }
