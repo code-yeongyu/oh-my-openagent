@@ -161,7 +161,10 @@ export function applyUltraworkModelOverrideOnMessage(
     : currentModel
 
   if (!client || typeof (client as { provider?: { list?: unknown } }).provider?.list !== "function") {
-    applyResolvedUltraworkOverride({ override, validatedVariant: override.variant, output, inputAgentName, tui })
+    log("[ultrawork-model-override] SDK validation unavailable, skipping variant override", {
+      variant: override.variant,
+    })
+    applyResolvedUltraworkOverride({ override, validatedVariant: undefined, output, inputAgentName, tui })
     return
   }
 
