@@ -27,6 +27,8 @@ export function applyCategoryOverride(
   if (categoryConfig.thinking !== undefined) result.thinking = categoryConfig.thinking
   if (categoryConfig.top_p !== undefined) result.top_p = categoryConfig.top_p
   if (categoryConfig.maxTokens !== undefined) result.maxTokens = categoryConfig.maxTokens
+  if (categoryConfig.steps !== undefined) result.steps = categoryConfig.steps
+  if (categoryConfig.permission !== undefined) result.permission = categoryConfig.permission
 
   if (categoryConfig.prompt_append && typeof result.prompt === "string") {
     result.prompt = result.prompt + "\n" + resolvePromptAppend(categoryConfig.prompt_append)
