@@ -191,6 +191,20 @@ describe("opencode-config-dir", () => {
         // then returns ~/.config/opencode (cross-platform default)
         expect(result).toBe(join(homedir(), ".config", "opencode"))
       })
+
+      test("returns ~/.config/opencode on Windows even when APPDATA is set (#2502)", () => {
+        // given opencode CLI binary detected, platform is Windows with APPDATA set
+        // (regression test: previously would check AppData for existing config)
+        Object.defineProperty(process, "platform", { value: "win32" })
+        process.env.APPDATA = "C:\\Users\\TestUser\\AppData\\Roaming"
+        delete process.env.OPENCODE_CONFIG_DIR
+
+        // when getOpenCodeConfigDir is called with binary="opencode"
+        const result = getOpenCodeConfigDir({ binary: "opencode", version: "1.0.200", checkExisting: false })
+
+        // then returns ~/.config/opencode (ignores APPDATA entirely for CLI)
+        expect(result).toBe(join(homedir(), ".config", "opencode"))
+      })
     })
 
     describe("for opencode-desktop Tauri binary", () => {
