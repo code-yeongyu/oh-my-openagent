@@ -6,13 +6,13 @@ import { readConnectedProvidersCache } from "./connected-providers-cache"
  * These errors completely halt the action loop and should trigger fallback retry.
  */
 const RETRYABLE_ERROR_NAMES = new Set([
-  "ProviderModelNotFoundError",
-  "RateLimitError",
-  "QuotaExceededError",
-  "InsufficientCreditsError",
-  "ModelUnavailableError",
-  "ProviderConnectionError",
-  "AuthenticationError",
+  "providermodelnotfounderror",
+  "ratelimiterror",
+  "quotaexceedederror",
+  "insufficientcreditserror",
+  "modelunavailableerror",
+  "providerconnectionerror",
+  "authenticationerror",
   "freeusagelimiterror",
 ])
 
@@ -21,13 +21,13 @@ const RETRYABLE_ERROR_NAMES = new Set([
  * These errors are typically user-induced or fixable without switching models.
  */
 const NON_RETRYABLE_ERROR_NAMES = new Set([
-  "MessageAbortedError",
-  "PermissionDeniedError",
-  "ContextLengthError",
-  "TimeoutError",
-  "ValidationError",
-  "SyntaxError",
-  "UserError",
+  "messageabortederror",
+  "permissiondeniederror",
+  "contextlengtherror",
+  "timeouterror",
+  "validationerror",
+  "syntaxerror",
+  "usererror",
 ])
 
 /**
