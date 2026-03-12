@@ -83,7 +83,7 @@ describe("model-error-classifier", () => {
     expect(provider).toBe("provider-x")
   })
 
-  test("treats FreeUsageLimitError (lowercase) as retryable by name", () => {
+  test("treats FreeUsageLimitError (PascalCase name) as retryable by name", () => {
     //#given
     const error = { name: "FreeUsageLimitError" }
 
