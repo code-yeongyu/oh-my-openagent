@@ -107,7 +107,7 @@ export function createSessionRecoveryHook(ctx: PluginInput, options?: SessionRec
       let success = false
 
       if (errorType === "tool_result_missing") {
-        success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg)
+        success = await recoverToolResultMissing(ctx.client, sessionID, failedMsg, msgs ?? [], info.error)
       } else if (errorType === "unavailable_tool") {
         success = await recoverUnavailableTool(ctx.client, sessionID, failedMsg)
       } else if (errorType === "thinking_block_order") {

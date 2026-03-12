@@ -3,6 +3,7 @@ import type { MessageData } from "./types"
 import { readParts } from "./storage"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { normalizeSDKResponse } from "../../shared"
+import { extractMessageIndex } from "./detect-error-type"
 
 type Client = ReturnType<typeof createOpencodeClient>
 type ClientWithPromptAsync = {
@@ -28,6 +29,13 @@ function extractToolUseIds(parts: MessagePart[]): string[] {
   return parts.filter((part): part is ToolUsePart => part.type === "tool_use" && !!part.id).map((part) => part.id)
 }
 
+function mapStoredPartsToMessageParts(parts: Array<{ type: string; callID?: string; id?: string }>): MessagePart[] {
+  return parts.map((part) => ({
+    type: part.type === "tool" ? "tool_use" : part.type,
+    id: "callID" in part ? (part as { callID?: string }).callID : part.id,
+  }))
+}
+
 async function readPartsFromSDKFallback(
   client: Client,
   sessionID: string,
@@ -39,34 +47,75 @@ async function readPartsFromSDKFallback(
     const target = messages.find((m) => m.info?.id === messageID)
     if (!target?.parts) return []
 
-    return target.parts.map((part) => ({
-      type: part.type === "tool" ? "tool_use" : part.type,
-      id: "callID" in part ? (part as { callID?: string }).callID : part.id,
-    }))
+    return mapStoredPartsToMessageParts(target.parts)
   } catch {
     return []
   }
 }
 
-export async function recoverToolResultMissing(
+async function resolvePartsForMessage(
   client: Client,
   sessionID: string,
-  failedAssistantMsg: MessageData
-): Promise<boolean> {
-  let parts = failedAssistantMsg.parts || []
-  if (parts.length === 0 && failedAssistantMsg.info?.id) {
-    if (isSqliteBackend()) {
-      parts = await readPartsFromSDKFallback(client, sessionID, failedAssistantMsg.info.id)
-    } else {
-      const storedParts = readParts(failedAssistantMsg.info.id)
-      parts = storedParts.map((part) => ({
-        type: part.type === "tool" ? "tool_use" : part.type,
-        id: "callID" in part ? (part as { callID?: string }).callID : part.id,
-      }))
+  msg: MessageData
+): Promise<MessagePart[]> {
+  const parts = msg.parts || []
+  if (parts.length > 0) {
+    return mapStoredPartsToMessageParts(parts)
+  }
+
+  if (!msg.info?.id) return []
+
+  if (isSqliteBackend()) {
+    return readPartsFromSDKFallback(client, sessionID, msg.info.id)
+  }
+
+  const storedParts = readParts(msg.info.id)
+  return mapStoredPartsToMessageParts(storedParts)
+}
+
+export function findBrokenMessageByIndex(
+  allMessages: MessageData[],
+  error: unknown
+): MessageData | null {
+  const errorIndex = extractMessageIndex(error)
+  if (errorIndex === null) return null
+
+  for (let i = allMessages.length - 1; i >= 0; i--) {
+    const msg = allMessages[i]
+    if (msg.info?.role === "assistant" && !msg.info?.error) {
+      const parts = msg.parts || []
+      const hasToolParts = parts.some(
+        (p) => p.type === "tool" || p.type === "tool_use"
+      )
+      if (hasToolParts) return msg
     }
   }
 
-  const toolUseIds = extractToolUseIds(parts)
+  return null
+}
+
+export async function recoverToolResultMissing(
+  client: Client,
+  sessionID: string,
+  failedAssistantMsg: MessageData,
+  allMessages: MessageData[] = [],
+  error?: unknown
+): Promise<boolean> {
+  let toolUseIds: string[] = []
+
+  if (allMessages.length > 0 && error) {
+    const brokenMsg = findBrokenMessageByIndex(allMessages, error)
+    if (brokenMsg) {
+      const parts = await resolvePartsForMessage(client, sessionID, brokenMsg)
+      toolUseIds = extractToolUseIds(parts)
+    }
+  }
+
+  if (toolUseIds.length === 0) {
+    const parts = await resolvePartsForMessage(client, sessionID, failedAssistantMsg)
+    toolUseIds = extractToolUseIds(parts)
+  }
+
   if (toolUseIds.length === 0) {
     return false
   }
