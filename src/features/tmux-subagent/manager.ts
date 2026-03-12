@@ -427,10 +427,14 @@ export class TmuxSessionManager {
     return false
   }
 
-  async onSessionCreated(event: SessionCreatedEvent): Promise<void> {
-    const enabled = this.isEnabled()
+  async onSessionCreated(
+    event: SessionCreatedEvent,
+    options?: { force?: boolean },
+  ): Promise<void> {
+    const enabled = options?.force ? this.deps.isInsideTmux() : this.isEnabled()
     log("[tmux-session-manager] onSessionCreated called", {
       enabled,
+      forced: options?.force === true,
       tmuxConfigEnabled: this.tmuxConfig.enabled,
       isInsideTmux: this.deps.isInsideTmux(),
       eventType: event.type,

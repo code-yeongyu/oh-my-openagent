@@ -22,6 +22,7 @@ export async function launchTeamWorkers(
       parentSessionID: input.sessionID,
       parentMessageID: input.parentMessageID ?? "teammode",
       parentAgent: "atlas",
+      forceTmuxPane: true,
     })
     launchedWorkers.push({ id: workerId, backgroundTaskId: task.id })
   }

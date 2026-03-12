@@ -42,16 +42,19 @@ export function createManagers(args: {
           title: event.title,
         })
 
-        await tmuxSessionManager.onSessionCreated({
-          type: "session.created",
-          properties: {
-            info: {
-              id: event.sessionID,
-              parentID: event.parentID,
-              title: event.title,
+        await tmuxSessionManager.onSessionCreated(
+          {
+            type: "session.created",
+            properties: {
+              info: {
+                id: event.sessionID,
+                parentID: event.parentID,
+                title: event.title,
+              },
             },
           },
-        })
+          { force: event.forceTmuxPane === true },
+        )
 
         log("[index] onSubagentSessionCreated callback completed")
       },

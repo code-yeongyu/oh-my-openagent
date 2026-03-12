@@ -48,6 +48,7 @@ export interface SubagentSessionCreatedEvent {
   sessionID: string
   parentID: string
   title: string
+  forceTmuxPane?: boolean
 }
 
 export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>

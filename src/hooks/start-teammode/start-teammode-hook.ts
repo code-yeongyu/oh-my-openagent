@@ -14,6 +14,7 @@ import { bootstrapTeamModeRun, getTeamStatePath, initializeTeamRuntime, readTeam
 import type { BackgroundManager } from "../../features/background-agent"
 import { updateSessionAgent } from "../../features/claude-code-session-state"
 import { log } from "../../shared/logger"
+import { isInsideTmux } from "../../shared/tmux"
 import { parseUserRequest } from "../start-work/parse-user-request"
 import { detectWorktreePath } from "../start-work/worktree-detector"
 
@@ -105,6 +106,17 @@ export function createStartTeammodeHook(ctx: PluginInput, backgroundManager: Bac
     "chat.message": async (input: StartTeammodeHookInput, output: StartTeammodeHookOutput): Promise<void> => {
       const promptText = output.parts.filter((part) => part.type === "text" && part.text).map((part) => part.text).join("\n")
       if (!isStartTeammodePrompt(promptText)) return
+
+      if (!isInsideTmux()) {
+        const idx = output.parts.findIndex((part) => part.type === "text" && part.text)
+        if (idx >= 0 && output.parts[idx].text) {
+          output.parts[idx].text = output.parts[idx].text
+            .replace(/\$SESSION_ID/g, input.sessionID)
+            .replace(/\$TIMESTAMP/g, new Date().toISOString())
+          output.parts[idx].text += "\n\n---\n## Team Mode Requires tmux\n\n`start-teammode` only succeeds when OpenCode is running inside tmux, because each worker must get a real pane/session. Start OpenCode inside tmux and retry."
+        }
+        return
+      }
 
       updateSessionAgent(input.sessionID, "atlas")
       const timestamp = new Date().toISOString()

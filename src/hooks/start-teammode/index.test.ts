@@ -13,6 +13,7 @@ import {
 } from "../../features/boulder-state"
 import { getTeamStatePath, initializeTeamRuntime } from "../../features/team-mode"
 import * as sessionState from "../../features/claude-code-session-state"
+import * as tmux from "../../shared/tmux"
 
 describe("start-teammode hook", () => {
   let testDir: string
@@ -77,9 +78,30 @@ describe("start-teammode hook", () => {
     expect(output.parts[0].text).toContain("session-123")
     expect(output.parts[0].text).not.toContain("$TIMESTAMP")
     expect(backgroundManager.launch).toHaveBeenCalledTimes(3)
+    for (const call of backgroundManager.launch.mock.calls) {
+      expect(call[0]?.forceTmuxPane).toBe(true)
+    }
     expect(boulderState?.execution_mode).toBe("teammode")
     expect(boulderState?.active_team_id).toBeTruthy()
     expect(boulderState?.team_state_path).toBe(getTeamStatePath(testDir, boulderState!.active_team_id!))
+  })
+
+  test("should refuse to bootstrap team mode outside tmux", async () => {
+    const plansDir = join(testDir, ".sisyphus", "plans")
+    mkdirSync(plansDir, { recursive: true })
+    writeFileSync(join(plansDir, "plan-a.md"), "# Plan A\n- [ ] Task 1")
+
+    const insideTmuxSpy = spyOn(tmux, "isInsideTmux").mockReturnValue(false)
+    const backgroundManager = createBackgroundManager()
+    const hook = createStartTeammodeHook(createMockPluginInput(), backgroundManager)
+    const output = { parts: [{ type: "text", text: startTeammodePrompt("") }] }
+
+    await hook["chat.message"]({ sessionID: "session-123", messageID: "msg-1" }, output)
+
+    expect(output.parts[0].text).toContain("Team Mode Requires tmux")
+    expect(backgroundManager.launch).toHaveBeenCalledTimes(0)
+    expect(readBoulderState(testDir)).toBeNull()
+    insideTmuxSpy.mockRestore()
   })
 
   test("should resume active team mode from a new session id", async () => {
