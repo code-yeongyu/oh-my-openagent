@@ -64,7 +64,7 @@ function logCapturedOutputOnFailure(outputMode: BunInstallOutputMode, output: Bu
 }
 
 export async function runBunInstallWithDetails(options?: RunBunInstallOptions): Promise<BunInstallResult> {
-  const outputMode = options?.outputMode ?? "inherit"
+  const outputMode = options?.outputMode ?? "pipe"
   const cacheDir = getOpenCodeCacheDir()
   const packageJsonPath = `${cacheDir}/package.json`
 
