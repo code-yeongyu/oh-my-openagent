@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, jest, spyOn, test } from "bun:test"
-import { sendSessionNotification, playSessionNotificationSound } from "./session-notification-sender"
+import * as sender from "./session-notification-sender"
 import * as utils from "./session-notification-utils"
 import type { PluginInput } from "@opencode-ai/plugin"
+
+
 
 function createShellPromise(handler: (cmdStr: string) => void) {
 	return (cmd: TemplateStringsArray, ...values: unknown[]) => {
@@ -63,6 +65,7 @@ function createThrowingShellPromise(shouldThrow: (cmdStr: string) => boolean) {
 
 describe("session-notification-sender", () => {
 	beforeEach(() => {
+		jest.restoreAllMocks()
 		spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
 		spyOn(utils, "getOsascriptPath").mockResolvedValue("/usr/bin/osascript")
 		spyOn(utils, "getNotifySendPath").mockResolvedValue("/usr/bin/notify-send")
@@ -70,9 +73,6 @@ describe("session-notification-sender", () => {
 		spyOn(utils, "getAfplayPath").mockResolvedValue("/usr/bin/afplay")
 		spyOn(utils, "getPaplayPath").mockResolvedValue("/usr/bin/paplay")
 		spyOn(utils, "getAplayPath").mockResolvedValue("/usr/bin/aplay")
-	})
-	afterEach(() => {
-		jest.restoreAllMocks()
 	})
 
 	describe("#given sendSessionNotification", () => {
@@ -96,7 +96,7 @@ describe("session-notification-sender", () => {
 					},
 				} as unknown as PluginInput
 
-				await sendSessionNotification(mockCtx, "darwin", "Test", "Message")
+				await sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")
 
 				expect(quietCalls.length).toBeGreaterThanOrEqual(1)
 				expect(quietCalls[0]).toContain("terminal-notifier")
@@ -131,7 +131,7 @@ describe("session-notification-sender", () => {
 					},
 				} as unknown as PluginInput
 
-				await sendSessionNotification(mockCtx, "darwin", "Test", "Message")
+				await sender.sendSessionNotification(mockCtx, "darwin", "Test", "Message")
 
 				expect(quietCalls.length).toBeGreaterThanOrEqual(1)
 				expect(quietCalls[0]).toContain("osascript")
@@ -164,7 +164,7 @@ describe("session-notification-sender", () => {
 					},
 				} as unknown as PluginInput
 
-				await sendSessionNotification(mockCtx, "linux", "Test", "Message")
+				await sender.sendSessionNotification(mockCtx, "linux", "Test", "Message")
 
 				expect(quietCalls.length).toBe(1)
 				expect(quietCalls[0]).toContain("notify-send")
@@ -197,7 +197,7 @@ describe("session-notification-sender", () => {
 					},
 				} as unknown as PluginInput
 
-				await sendSessionNotification(mockCtx, "win32", "Test", "Message")
+				await sender.sendSessionNotification(mockCtx, "win32", "Test", "Message")
 
 				expect(quietCalls.length).toBe(1)
 				expect(quietCalls[0]).toContain("powershell")
@@ -234,7 +234,7 @@ describe("session-notification-sender", () => {
 					},
 				} as unknown as PluginInput
 
-				await playSessionNotificationSound(mockCtx, "darwin", "/sound.aiff")
+				await sender.playSessionNotificationSound(mockCtx, "darwin", "/sound.aiff")
 
 				expect(quietCalls.length).toBe(1)
 				expect(quietCalls[0]).toContain("afplay")
@@ -267,7 +267,7 @@ describe("session-notification-sender", () => {
 					},
 				} as unknown as PluginInput
 
-				await playSessionNotificationSound(mockCtx, "linux", "/sound.oga")
+				await sender.playSessionNotificationSound(mockCtx, "linux", "/sound.oga")
 
 				expect(quietCalls.length).toBe(1)
 				expect(quietCalls[0]).toContain("paplay")
@@ -302,7 +302,7 @@ describe("session-notification-sender", () => {
 					},
 				} as unknown as PluginInput
 
-				await playSessionNotificationSound(mockCtx, "linux", "/sound.oga")
+				await sender.playSessionNotificationSound(mockCtx, "linux", "/sound.oga")
 
 				expect(quietCalls.length).toBe(1)
 				expect(quietCalls[0]).toContain("aplay")
@@ -335,7 +335,7 @@ describe("session-notification-sender", () => {
 					},
 				} as unknown as PluginInput
 
-				await playSessionNotificationSound(mockCtx, "win32", "C:\\sound.wav")
+				await sender.playSessionNotificationSound(mockCtx, "win32", "C:\\sound.wav")
 
 				expect(quietCalls.length).toBe(1)
 				expect(quietCalls[0]).toContain("powershell")
