@@ -149,7 +149,7 @@ export async function applyAgentConfig(params: {
       sisyphus: builtinAgents.sisyphus,
     };
 
-    agentConfig["sisyphus-junior"] = createSisyphusJuniorAgentWithOverrides(
+    agentConfig["sisyphus-junior"] = await createSisyphusJuniorAgentWithOverrides(
       params.pluginConfig.agents?.["sisyphus-junior"],
       undefined,
       useTaskSystem,

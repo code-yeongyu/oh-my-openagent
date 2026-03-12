@@ -14,6 +14,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
 import { isGptModel, isGeminiModel } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
+import { isProviderBlacklisted } from "../../shared/global-blacklist"
 import {
   createAgentToolRestrictions,
   type PermissionValue,
@@ -76,17 +77,45 @@ export function buildSisyphusJuniorPrompt(
   }
 }
 
-export function createSisyphusJuniorAgentWithOverrides(
+export async function createSisyphusJuniorAgentWithOverrides(
   override: AgentOverrideConfig | undefined,
   systemDefaultModel?: string,
   useTaskSystem = false
-): AgentConfig {
+): Promise<AgentConfig> {
   if (override?.disable) {
     override = undefined
   }
 
   const overrideModel = (override as { model?: string } | undefined)?.model
-  const model = overrideModel ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
+  let model = overrideModel ?? systemDefaultModel ?? SISYPHUS_JUNIOR_DEFAULTS.model
+  
+  // Check if model provider is blacklisted and fallback if needed
+  if (model) {
+    const parts = model.split("/")
+    if (parts.length >= 2) {
+      const providerID = parts[0]
+      const blacklisted = await isProviderBlacklisted(providerID)
+      if (blacklisted) {
+        // Fallback to first non-blacklisted model
+        const fallbackModels = [
+          "alibaba-coding-plan/kimi-k2.5",
+          "zai-coding-plan/glm-5",
+          "openai/gpt-5.3-codex"
+        ]
+        for (const fallback of fallbackModels) {
+          const fallbackParts = fallback.split("/")
+          if (fallbackParts.length >= 2) {
+            const fallbackProvider = fallbackParts[0]
+            const fallbackBlacklisted = await isProviderBlacklisted(fallbackProvider)
+            if (!fallbackBlacklisted) {
+              model = fallback
+              break
+            }
+          }
+        }
+      }
+    }
+  }
   const temperature = override?.temperature ?? SISYPHUS_JUNIOR_DEFAULTS.temperature
 
   const promptAppend = override?.prompt_append
