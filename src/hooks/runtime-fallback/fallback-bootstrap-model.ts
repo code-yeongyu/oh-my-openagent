@@ -32,6 +32,20 @@ export function resolveFallbackBootstrapModel(
     return agentModel
   }
 
+  const agentCategory = typeof agentConfig?.category === "string" ? agentConfig.category : undefined
+  if (agentCategory) {
+    const agentCategoryModel = options.pluginConfig?.categories?.[agentCategory]?.model
+    if (typeof agentCategoryModel === "string" && agentCategoryModel.length > 0) {
+      log(`[${HOOK_NAME}] Derived model from agent category config for ${options.source}`, {
+        sessionID: options.sessionID,
+        agent: options.resolvedAgent,
+        category: agentCategory,
+        model: agentCategoryModel,
+      })
+      return agentCategoryModel
+    }
+  }
+
   const sessionCategory = SessionCategoryRegistry.get(options.sessionID)
   const categoryModel = sessionCategory
     ? options.pluginConfig?.categories?.[sessionCategory]?.model

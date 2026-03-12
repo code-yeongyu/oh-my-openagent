@@ -72,11 +72,6 @@ export interface HookDeps {
   sessionLastAccess: Map<string, number>
   sessionRetryInFlight: Set<string>
   sessionAwaitingFallbackResult: Set<string>
-<<<<<<< HEAD
   sessionFallbackTimeouts: Map<string, RuntimeFallbackTimeout>
-||||||| parent of b6f740ed (fix: enable runtime fallback for delegated child sessions (#2357))
-  sessionFallbackTimeouts: Map<string, ReturnType<typeof setTimeout>>
-=======
-  sessionFallbackTimeouts: Map<string, TimerHandle>
->>>>>>> b6f740ed (fix: enable runtime fallback for delegated child sessions (#2357))
+  sessionStatusRetryKeys: Map<string, string>
 }

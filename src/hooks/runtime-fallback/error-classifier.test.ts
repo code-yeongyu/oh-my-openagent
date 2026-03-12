@@ -1,5 +1,4 @@
-declare const require: (name: string) => any
-const { describe, expect, test } = require("bun:test")
+import { describe, expect, test } from "bun:test"
 
 import { classifyErrorType, extractAutoRetrySignal, isRetryableError } from "./error-classifier"
 

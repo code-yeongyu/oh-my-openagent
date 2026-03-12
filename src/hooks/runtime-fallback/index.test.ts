@@ -1,5 +1,4 @@
-declare const require: (name: string) => any
-const { describe, expect, test, beforeEach, afterEach, spyOn } = require("bun:test")
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
 import { createRuntimeFallbackHook } from "./index"
 import type { RuntimeFallbackConfig, OhMyOpenCodeConfig } from "../../config"
 import * as sharedModule from "../../shared"

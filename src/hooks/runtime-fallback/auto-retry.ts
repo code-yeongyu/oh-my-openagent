@@ -30,7 +30,7 @@ declare function clearTimeout(timeout: TimerHandle): void
 >>>>>>> b6f740ed (fix: enable runtime fallback for delegated child sessions (#2357))
 
 export function createAutoRetryHelpers(deps: HookDeps) {
-  const { ctx, config, options, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, pluginConfig } = deps
+  const { ctx, config, options, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionFallbackTimeouts, pluginConfig, sessionStatusRetryKeys } = deps
 
   const abortSessionRequest = async (sessionID: string, source: string): Promise<void> => {
     try {
@@ -201,6 +201,7 @@ export function createAutoRetryHelpers(deps: HookDeps) {
         sessionAwaitingFallbackResult.delete(sessionID)
         clearSessionFallbackTimeout(sessionID)
         SessionCategoryRegistry.remove(sessionID)
+        sessionStatusRetryKeys.delete(sessionID)
         cleanedCount++
       }
     }
