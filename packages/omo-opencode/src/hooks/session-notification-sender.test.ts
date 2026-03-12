@@ -2,6 +2,9 @@
 
 import { afterEach, beforeEach, describe, expect, jest, spyOn, test } from "bun:test"
 import * as childProcess from "node:child_process"
+import { appendFileSync, chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import * as sender from "./session-notification-sender"
 import * as utils from "./session-notification-utils"
 import type { PluginInput } from "@opencode-ai/plugin"
@@ -93,6 +96,16 @@ function mockExecFile(calls: ExecFileCall[], error: Error | null = null): Return
 	)
 }
 
+async function waitForFileContent(path: string, expected: string): Promise<string> {
+	const deadline = Date.now() + 2_000
+	while (Date.now() < deadline) {
+		const content = existsSync(path) ? readFileSync(path, "utf8") : ""
+		if (content.includes(expected)) return content
+		await Bun.sleep(20)
+	}
+	throw new Error(`Timed out waiting for ${expected}`)
+}
+
 describe("session-notification-sender", () => {
 	beforeEach(() => {
 		jest.restoreAllMocks()
@@ -137,6 +150,79 @@ describe("session-notification-sender", () => {
 		})
 
 		describe("#when calling ctx.$ for notifications", () => {
+			test.skipIf(process.platform === "win32")("#then it runs a custom script after platform dispatch even when the platform command fails", async () => {
+				const tempDir = mkdtempSync(join(tmpdir(), "omo-notification-"))
+				const scriptPath = join(tempDir, "notify.sh")
+				const logPath = join(tempDir, "events.log")
+				const previousLogPath = process.env.NOTIFICATION_TEST_LOG
+
+				writeFileSync(scriptPath, "#!/bin/sh\nprintf 'script:%s\\n' \"$1\" >> \"$NOTIFICATION_TEST_LOG\"\ncat >> \"$NOTIFICATION_TEST_LOG\"\n")
+				chmodSync(scriptPath, 0o755)
+				process.env.NOTIFICATION_TEST_LOG = logPath
+
+				try {
+					const mockCtx = unsafeTestValue<PluginInput>({
+						$: createShellPromise(() => appendFileSync(logPath, "builtin\n")),
+						directory: "/tmp/project",
+					})
+
+					await sender.sendSessionNotification(mockCtx, "linux", "Done", "Task completed", {
+						scriptPath,
+						hookType: "idle",
+						sessionID: "session-1",
+						projectDir: "/tmp/project",
+					})
+
+					const output = await waitForFileContent(logPath, '"sessionID":"session-1"')
+					expect(output).toStartWith("builtin\nscript:idle\n")
+					expect(output).toContain('"sessionID":"session-1"')
+
+					writeFileSync(logPath, "")
+					mockExecFile([], new Error("platform notification failed"))
+					await sender.sendSessionNotification(
+						unsafeTestValue<PluginInput>({ directory: "/tmp/project" }),
+						"win32",
+						"Done",
+						"Task completed",
+						{ scriptPath, hookType: "idle", sessionID: "session-1", projectDir: "/tmp/project" }
+					)
+					expect(await waitForFileContent(logPath, "script:idle")).toStartWith("script:idle\n")
+				} finally {
+					if (previousLogPath === undefined) delete process.env.NOTIFICATION_TEST_LOG
+					else process.env.NOTIFICATION_TEST_LOG = previousLogPath
+					rmSync(tempDir, { recursive: true, force: true })
+				}
+			})
+
+			test.skipIf(process.platform === "win32")("#then a slow custom script does not block the caller", async () => {
+				const tempDir = mkdtempSync(join(tmpdir(), "omo-notification-slow-"))
+				const scriptPath = join(tempDir, "notify.sh")
+				const logPath = join(tempDir, "done")
+				const previousLogPath = process.env.NOTIFICATION_TEST_LOG
+				writeFileSync(scriptPath, "#!/bin/sh\ncat >/dev/null\nsleep 1\nprintf done > \"$NOTIFICATION_TEST_LOG\"\n")
+				chmodSync(scriptPath, 0o755)
+				process.env.NOTIFICATION_TEST_LOG = logPath
+
+				try {
+					const startedAt = Date.now()
+					await sender.sendSessionNotification(
+						unsafeTestValue<PluginInput>({ directory: "/tmp/project" }),
+						"unsupported",
+						"Done",
+						"Task completed",
+						{ scriptPath, hookType: "idle", sessionID: "session-1", projectDir: "/tmp/project" }
+					)
+					const elapsedMs = Date.now() - startedAt
+
+					expect(elapsedMs).toBeLessThan(500)
+					expect(await waitForFileContent(logPath, "done")).toBe("done")
+				} finally {
+					if (previousLogPath === undefined) delete process.env.NOTIFICATION_TEST_LOG
+					else process.env.NOTIFICATION_TEST_LOG = previousLogPath
+					rmSync(tempDir, { recursive: true, force: true })
+				}
+			})
+
 			test("#then should call .quiet() on all shell commands to suppress stdout/stderr", async () => {
 				const quietCalls: string[] = []
 				const mockCtx = unsafeTestValue<PluginInput>({

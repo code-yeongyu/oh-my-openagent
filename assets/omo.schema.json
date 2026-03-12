@@ -10501,6 +10501,9 @@
           "properties": {
             "force_enable": {
               "type": "boolean"
+            },
+            "script": {
+              "type": "string"
             }
           },
           "additionalProperties": false
@@ -23862,6 +23865,9 @@
                 "properties": {
                   "force_enable": {
                     "type": "boolean"
+                  },
+                  "script": {
+                    "type": "string"
                   }
                 },
                 "additionalProperties": false

@@ -665,13 +665,22 @@ Customize the comment quality checker:
 
 ### Notification
 
-Force-enable session notifications:
+Force-enable session notifications and optionally run a custom script after the built-in notification:
 
 ```json
-{ "notification": { "force_enable": true } }
+{
+  "[opencode]": {
+    "notification": {
+      "force_enable": true,
+      "script": "~/.config/opencode/notification.sh"
+    }
+  }
+}
 ```
 
 `force_enable` (`false`) - force session-notification even if external notification plugins are detected.
+
+`script` - executable invoked asynchronously with the hook type as its first argument and notification context as JSON on stdin. See [Custom Notification Script](../custom-notification-script.md).
 
 ### MCPs
 
