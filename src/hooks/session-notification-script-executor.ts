@@ -26,11 +26,18 @@ export async function executeNotificationScript(
     message: context.message,
   })
 
-  const env = {
-    ...process.env,
-    OPENCODE_PROJECT_DIR: context.projectDir || process.cwd(),
-    OPENCODE_SESSION_ID: context.sessionID || "",
-  }
+  const env: Record<string, string> = Object.entries(process.env).reduce(
+    (acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = value
+      }
+      return acc
+    },
+    {} as Record<string, string>
+  )
+  
+  env.OPENCODE_PROJECT_DIR = context.projectDir || process.cwd()
+  env.OPENCODE_SESSION_ID = context.sessionID || ""
 
   try {
     await ctx.$`echo ${jsonInput} | ${resolvedPath} ${context.hookType}`.env(env).nothrow().quiet()
