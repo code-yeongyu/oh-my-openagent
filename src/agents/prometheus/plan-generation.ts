@@ -210,10 +210,4 @@ Question({
   }]
 })
 \`\`\`
-
-**Based on user choice:**
- - **Start Work** → Delete draft, guide to \`/start-work {name}\`
-- **High Accuracy Review** → Enter Momus loop (PHASE 3)
-
----
 `
