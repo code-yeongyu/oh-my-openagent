@@ -12,6 +12,7 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
+import { createPrometheusCreditAgent } from "./prometheus-credit/index.js"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -32,6 +33,7 @@ type AgentSource = AgentFactory | AgentConfig
 const agentSources: Record<BuiltinAgentName, AgentSource> = {
   sisyphus: createSisyphusAgent,
   hephaestus: createHephaestusAgent,
+  "prometheus-credit": createPrometheusCreditAgent,
   oracle: createOracleAgent,
   librarian: createLibrarianAgent,
   explore: createExploreAgent,

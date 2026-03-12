@@ -65,6 +65,7 @@ export const AgentOverridesSchema = z.object({
   "sisyphus-junior": AgentOverrideConfigSchema.optional(),
   "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
   prometheus: AgentOverrideConfigSchema.optional(),
+  "prometheus-credit": AgentOverrideConfigSchema.optional(),
   metis: AgentOverrideConfigSchema.optional(),
   momus: AgentOverrideConfigSchema.optional(),
   oracle: AgentOverrideConfigSchema.optional(),
