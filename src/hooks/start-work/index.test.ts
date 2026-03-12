@@ -581,6 +581,16 @@ describe("start-work hook", () => {
    })
 
    describe("worktree disabled by config", () => {
+     let detectSpy: ReturnType<typeof spyOn>
+
+     beforeEach(() => {
+       detectSpy = spyOn(worktreeDetector, "detectWorktreePath").mockReturnValue(null)
+     })
+
+     afterEach(() => {
+       detectSpy.mockRestore()
+     })
+
      test("should NOT inject worktree content when worktreeEnabled is false and single plan auto-selected", async () => {
        // given - single incomplete plan, worktreeEnabled: false
        const plansDir = join(testDir, ".sisyphus", "plans")
@@ -649,20 +659,21 @@ describe("start-work hook", () => {
      })
 
       test("should NOT store worktree_path in boulder.json when worktreeEnabled is false", async () => {
-        // given - single plan, worktreeEnabled: false
+        // given - single plan, worktreeEnabled: false, valid --worktree flag that would normally be stored
         const plansDir = join(testDir, ".sisyphus", "plans")
         mkdirSync(plansDir, { recursive: true })
         writeFileSync(join(plansDir, "my-plan.md"), "# Plan\n- [ ] Task 1")
+        detectSpy.mockReturnValue("/some/valid/wt")
 
         const hook = createStartWorkHook(createMockPluginInput(), { worktreeEnabled: false })
         const output = {
-          parts: [{ type: "text", text: "<session-context></session-context>" }],
+          parts: [{ type: "text", text: "<session-context>\n<user-request>--worktree /some/valid/wt</user-request>\n</session-context>" }],
         }
 
         // when
         await hook["chat.message"]({ sessionID: "session-123" }, output)
 
-        // then - boulder.json should not have worktree_path
+        // then - boulder.json should not have worktree_path despite the flag being present and valid
         const state = readBoulderState(testDir)
         expect(state?.worktree_path).toBeUndefined()
       })
