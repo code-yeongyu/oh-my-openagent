@@ -46,9 +46,9 @@ export async function sendSessionNotification(
         const bundleId = process.env.__CFBundleIdentifier
         try {
           if (bundleId) {
-            await ctx.$`${terminalNotifierPath} -title ${title} -message ${message} -activate ${bundleId}`
+            await ctx.$`${terminalNotifierPath} -title ${title} -message ${message} -activate ${bundleId}`.quiet()
           } else {
-            await ctx.$`${terminalNotifierPath} -title ${title} -message ${message}`
+            await ctx.$`${terminalNotifierPath} -title ${title} -message ${message}`.quiet()
           }
           break
         } catch {
@@ -61,16 +61,14 @@ export async function sendSessionNotification(
 
       const escapedTitle = escapeAppleScriptText(title)
       const escapedMessage = escapeAppleScriptText(message)
-      await ctx.$`${osascriptPath} -e ${"display notification \"" + escapedMessage + "\" with title \"" + escapedTitle + "\""}`.catch(
-        () => {}
-      )
+      await ctx.$`${osascriptPath} -e ${"display notification \"" + escapedMessage + "\" with title \"" + escapedTitle + "\""}`.nothrow().quiet()
       break
     }
     case "linux": {
       const notifySendPath = await getNotifySendPath()
       if (!notifySendPath) return
 
-      await ctx.$`${notifySendPath} ${title} ${message} 2>/dev/null`.catch(() => {})
+      await ctx.$`${notifySendPath} ${title} ${message} 2>/dev/null`.nothrow().quiet()
       break
     }
     case "win32": {
@@ -78,7 +76,7 @@ export async function sendSessionNotification(
       if (!powershellPath) return
 
       const toastScript = buildWindowsToastScript(title, message)
-      await ctx.$`${powershellPath} -Command ${toastScript}`.catch(() => {})
+      await ctx.$`${powershellPath} -Command ${toastScript}`.nothrow().quiet()
       break
     }
   }
@@ -93,17 +91,17 @@ export async function playSessionNotificationSound(
     case "darwin": {
       const afplayPath = await getAfplayPath()
       if (!afplayPath) return
-      ctx.$`${afplayPath} ${soundPath}`.catch(() => {})
+      ctx.$`${afplayPath} ${soundPath}`.nothrow().quiet()
       break
     }
     case "linux": {
       const paplayPath = await getPaplayPath()
       if (paplayPath) {
-        ctx.$`${paplayPath} ${soundPath} 2>/dev/null`.catch(() => {})
+        ctx.$`${paplayPath} ${soundPath} 2>/dev/null`.nothrow().quiet()
       } else {
         const aplayPath = await getAplayPath()
         if (aplayPath) {
-          ctx.$`${aplayPath} ${soundPath} 2>/dev/null`.catch(() => {})
+          ctx.$`${aplayPath} ${soundPath} 2>/dev/null`.nothrow().quiet()
         }
       }
       break
@@ -112,7 +110,7 @@ export async function playSessionNotificationSound(
       const powershellPath = await getPowershellPath()
       if (!powershellPath) return
       const escaped = escapePowerShellSingleQuotedText(soundPath)
-      ctx.$`${powershellPath} -Command ${("(New-Object Media.SoundPlayer '" + escaped + "').PlaySync()")}`.catch(() => {})
+      ctx.$`${powershellPath} -Command ${"(New-Object Media.SoundPlayer '" + escaped + "').PlaySync()"}`.nothrow().quiet()
       break
     }
   }

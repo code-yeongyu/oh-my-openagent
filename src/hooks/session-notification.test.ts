@@ -390,12 +390,16 @@ describe("session-notification", () => {
   function createSenderMockCtx() {
     const notifyCalls: string[] = []
     const mockCtx = {
-      $: async (cmd: TemplateStringsArray | string, ...values: any[]) => {
+      $: (cmd: TemplateStringsArray | string, ...values: any[]) => {
         const cmdStr = typeof cmd === "string"
           ? cmd
           : cmd.reduce((acc, part, i) => acc + part + (values[i] ?? ""), "")
         notifyCalls.push(cmdStr)
-        return { stdout: "", stderr: "", exitCode: 0 }
+        const result = { stdout: "", stderr: "", exitCode: 0 }
+        const promise = Promise.resolve(result) as any
+        promise.quiet = () => promise
+        promise.nothrow = () => { const p = Promise.resolve(result) as any; p.quiet = () => p; p.nothrow = () => p; return p }
+        return promise
       },
     } as any
     return { mockCtx, notifyCalls }
@@ -451,17 +455,25 @@ describe("session-notification", () => {
     spyOn(sender, "sendSessionNotification").mockRestore()
     const notifyCalls: string[] = []
     const mockCtx = {
-      $: async (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
+      $: (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
         const cmdStr = typeof cmd === "string"
           ? cmd
           : cmd.reduce((acc, part, index) => `${acc}${part}${String(values[index] ?? "")}`, "")
         notifyCalls.push(cmdStr)
 
         if (cmdStr.includes("terminal-notifier")) {
-          throw new Error("terminal-notifier failed")
+          const err = Object.assign(new Error("terminal-notifier failed"), { stdout: "", stderr: "", exitCode: 1 })
+          const rejected = Promise.reject(err) as any
+          rejected.quiet = () => rejected
+          rejected.nothrow = () => { const p = Promise.resolve({ stdout: "", stderr: "", exitCode: 1 }) as any; p.quiet = () => p; p.nothrow = () => p; return p }
+          return rejected
         }
 
-        return { stdout: "", stderr: "", exitCode: 0 }
+        const result = { stdout: "", stderr: "", exitCode: 0 }
+        const promise = Promise.resolve(result) as any
+        promise.quiet = () => promise
+        promise.nothrow = () => { const p = Promise.resolve(result) as any; p.quiet = () => p; p.nothrow = () => p; return p }
+        return promise
       },
     } as any
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
@@ -482,16 +494,24 @@ describe("session-notification", () => {
     spyOn(sender, "sendSessionNotification").mockRestore()
     const notifyCalls: string[] = []
     const mockCtx = {
-      $: async (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
+      $: (cmd: TemplateStringsArray | string, ...values: unknown[]) => {
         if (values.some(Array.isArray)) {
-          throw new Error("array interpolation unsupported")
+          const err = Object.assign(new Error("array interpolation unsupported"), { stdout: "", stderr: "", exitCode: 1 })
+          const rejected = Promise.reject(err) as any
+          rejected.quiet = () => rejected
+          rejected.nothrow = () => { const p = Promise.resolve({ stdout: "", stderr: "", exitCode: 1 }) as any; p.quiet = () => p; p.nothrow = () => p; return p }
+          return rejected
         }
 
         const commandString = typeof cmd === "string"
           ? cmd
           : cmd.reduce((acc, part, index) => `${acc}${part}${String(values[index] ?? "")}`, "")
         notifyCalls.push(commandString)
-        return { stdout: "", stderr: "", exitCode: 0 }
+        const result = { stdout: "", stderr: "", exitCode: 0 }
+        const promise = Promise.resolve(result) as any
+        promise.quiet = () => promise
+        promise.nothrow = () => { const p = Promise.resolve(result) as any; p.quiet = () => p; p.nothrow = () => p; return p }
+        return promise
       },
     } as any
     spyOn(utils, "getTerminalNotifierPath").mockResolvedValue("/usr/local/bin/terminal-notifier")
