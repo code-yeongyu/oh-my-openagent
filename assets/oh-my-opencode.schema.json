@@ -3912,10 +3912,15 @@
         "auto_commit": {
           "default": true,
           "type": "boolean"
+        },
+        "worktree": {
+          "default": true,
+          "type": "boolean"
         }
       },
       "required": [
-        "auto_commit"
+        "auto_commit",
+        "worktree"
       ],
       "additionalProperties": false
     },
