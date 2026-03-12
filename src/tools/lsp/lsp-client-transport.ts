@@ -1,4 +1,5 @@
 import { Readable, Writable } from "node:stream"
+import { delimiter } from "path"
 import {
   createMessageConnection,
   StreamMessageReader,
@@ -7,6 +8,7 @@ import {
 } from "vscode-jsonrpc/node"
 import type { Diagnostic, ResolvedServer } from "./types"
 import { spawnProcess, type UnifiedProcess } from "./lsp-process"
+import { getLspServerAdditionalPathBases } from "./server-path-bases"
 import { log } from "../../shared/logger"
 export class LSPClientTransport {
   protected proc: UnifiedProcess | null = null
@@ -18,12 +20,22 @@ export class LSPClientTransport {
 
   constructor(protected root: string, protected server: ResolvedServer) {}
   async start(): Promise<void> {
+    const env = {
+      ...process.env,
+      ...this.server.env,
+    }
+    const pathValue = process.platform === "win32" ? env.PATH ?? env.Path ?? "" : env.PATH ?? ""
+    const spawnPath = [pathValue, ...getLspServerAdditionalPathBases(this.root)]
+      .filter(Boolean)
+      .join(delimiter)
+    if (process.platform === "win32" && env.Path !== undefined) {
+      env.Path = spawnPath
+    }
+    env.PATH = spawnPath
+
     this.proc = spawnProcess(this.server.command, {
       cwd: this.root,
-      env: {
-        ...process.env,
-        ...this.server.env,
-      },
+      env,
     })
     if (!this.proc) {
       throw new Error(`Failed to spawn LSP server: ${this.server.command.join(" ")}`)
