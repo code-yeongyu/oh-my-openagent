@@ -1,5 +1,4 @@
-declare const require: (name: string) => any
-const { describe, test, expect } = require("bun:test")
+import { describe, test, expect } from "bun:test"
 import { buildFallbackChainFromModels, parseFallbackModelEntry } from "./fallback-chain-from-models"
 
 describe("fallback-chain-from-models", () => {
