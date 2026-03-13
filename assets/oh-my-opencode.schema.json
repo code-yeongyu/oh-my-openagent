@@ -92,7 +92,8 @@
           "write-existing-file-guard",
           "anthropic-effort",
           "hashline-read-enhancer",
-          "read-image-resizer"
+          "read-image-resizer",
+          "subagent-blacklist-guard"
         ]
       }
     },

@@ -32,6 +32,7 @@ import type { CreatedHooks } from "../create-hooks";
 import type { Managers } from "../create-managers";
 import { pruneRecentSyntheticIdles } from "./recent-synthetic-idles";
 import { normalizeSessionStatusToIdle } from "./session-status-normalizer";
+import { clearSubagentBlacklistGuard } from "../hooks/subagent-blacklist-guard";
 
 type FirstMessageVariantGate = {
   markSessionCreated: (sessionInfo: { id?: string; title?: string; parentID?: string } | undefined) => void;
@@ -224,6 +225,7 @@ export function createEventHandler(args: {
 
   const shouldAutoRetrySession = (sessionID: string): boolean => {
     if (syncSubagentSessions.has(sessionID)) return true;
+    if (subagentSessions.has(sessionID)) return true; // Enable auto-retry for ALL subagents
     const mainSessionID = getMainSessionID();
     if (mainSessionID) return sessionID === mainSessionID;
     // Headless runs (or resumed sessions) may not emit session.created, so mainSessionID can be unset.
@@ -298,6 +300,13 @@ export function createEventHandler(args: {
 
       if (!sessionInfo?.parentID) {
         setMainSession(sessionInfo?.id);
+      } else {
+        // This is a subagent session - track it for fallback handling
+        // This handles BOTH call_omo_agent subagents AND native task tool subagents
+        if (sessionInfo?.id) {
+          subagentSessions.add(sessionInfo.id);
+          log("[event] Tracked subagent session", { sessionID: sessionInfo.id, parentID: sessionInfo.parentID });
+        }
       }
 
       firstMessageVariantGate.markSessionCreated(sessionInfo);
@@ -329,6 +338,8 @@ export function createEventHandler(args: {
         firstMessageVariantGate.clear(sessionInfo.id);
         clearSessionModel(sessionInfo.id);
         syncSubagentSessions.delete(sessionInfo.id);
+        subagentSessions.delete(sessionInfo.id);
+        clearSubagentBlacklistGuard(sessionInfo.id);
         deleteSessionTools(sessionInfo.id);
         await managers.skillMcpManager.disconnectSession(sessionInfo.id);
         await lspManager.cleanupTempDirectoryClients();
@@ -375,6 +386,19 @@ export function createEventHandler(args: {
             if (shouldRetryError(errorInfo)) {
               // Prefer the agent/model/provider from the assistant message payload.
               let agentName = agent ?? getSessionAgent(sessionID);
+              
+              // For subagents without tracked agent name, try to extract from error or use default
+              if (!agentName && subagentSessions.has(sessionID)) {
+                if (errorMessage.includes("claude-opus") || errorMessage.includes("opus")) {
+                  agentName = "sisyphus-junior";
+                } else if (errorMessage.includes("gpt-5")) {
+                  agentName = "hephaestus-junior";
+                } else {
+                  agentName = "sisyphus-junior";
+                }
+                log("[event] Using default subagent name for fallback (message.updated)", { sessionID, agentName });
+              }
+              
               if (!agentName && sessionID === getMainSessionID()) {
                 if (errorMessage.includes("claude-opus") || errorMessage.includes("opus")) {
                   agentName = "sisyphus";
@@ -433,6 +457,19 @@ export function createEventHandler(args: {
           const errorInfo = { name: undefined as string | undefined, message: retryMessage };
           if (shouldRetryError(errorInfo)) {
             let agentName = getSessionAgent(sessionID);
+            
+            // For subagents without tracked agent name, try to extract from error or use default
+            if (!agentName && subagentSessions.has(sessionID)) {
+              if (retryMessage.includes("claude-opus") || retryMessage.includes("opus")) {
+                agentName = "sisyphus-junior";
+              } else if (retryMessage.includes("gpt-5")) {
+                agentName = "hephaestus-junior";
+              } else {
+                agentName = "sisyphus-junior";
+              }
+              log("[event] Using default subagent name for fallback (session.status)", { sessionID, agentName });
+            }
+            
             if (!agentName && sessionID === getMainSessionID()) {
               if (retryMessage.includes("claude-opus") || retryMessage.includes("opus")) {
                 agentName = "sisyphus";
@@ -505,6 +542,20 @@ export function createEventHandler(args: {
         // Second, try model fallback for model errors (rate limit, quota, provider issues, etc.)
         else if (sessionID && shouldRetryError(errorInfo) && !isRuntimeFallbackEnabled && isModelFallbackEnabled) {
           let agentName = getSessionAgent(sessionID);
+
+          // For subagents without tracked agent name, try to extract from error or use default
+          if (!agentName && subagentSessions.has(sessionID)) {
+            // Try to extract agent name from error message
+            if (errorMessage.includes("claude-opus") || errorMessage.includes("opus")) {
+              agentName = "sisyphus-junior";
+            } else if (errorMessage.includes("gpt-5")) {
+              agentName = "hephaestus-junior";
+            } else {
+              // Default subagent fallback
+              agentName = "sisyphus-junior";
+            }
+            log("[event] Using default subagent name for fallback", { sessionID, agentName });
+          }
 
           if (!agentName && sessionID === getMainSessionID()) {
             if (errorMessage.includes("claude-opus") || errorMessage.includes("opus")) {
