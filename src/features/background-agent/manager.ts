@@ -1707,9 +1707,14 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
     this.shutdownTriggered = true
     log("[background-agent] Shutting down BackgroundManager")
     this.stopPolling()
+    const trackedSessionIDs = new Set<string>()
 
     // Abort all running sessions to prevent zombie processes (#1240)
     for (const task of this.tasks.values()) {
+      if (task.sessionID) {
+        trackedSessionIDs.add(task.sessionID)
+      }
+
       if (task.status === "running" && task.sessionID) {
         this.client.session.abort({
           path: { id: task.sessionID },
@@ -1743,6 +1748,11 @@ Use \`background_output(task_id="${task.id}")\` to retrieve this result when rea
       clearTimeout(timer)
     }
     this.idleDeferralTimers.clear()
+
+    for (const sessionID of trackedSessionIDs) {
+      subagentSessions.delete(sessionID)
+      SessionCategoryRegistry.remove(sessionID)
+    }
 
     this.concurrencyManager.clear()
     this.tasks.clear()
