@@ -3,6 +3,9 @@
 !.sisyphus/rules/
 node_modules/
 
+# Debug mode artifacts
+.opencode/debug/
+
 # Build output
 dist/
 
