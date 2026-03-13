@@ -21,75 +21,8 @@ import {
   buildAntiDuplicationSection,
   categorizeTools,
 } from "../dynamic-agent-prompt-builder";
+import { buildHephaestusTodoDisciplineSection } from "./todo-discipline";
 const MODE: AgentMode = "all";
-
-function buildTodoDisciplineSection(useTaskSystem: boolean): string {
-  if (useTaskSystem) {
-    return `## Task Discipline (NON-NEGOTIABLE)
-
-**Track ALL multi-step work with tasks. This is your execution backbone.**
-
-### When to Create Tasks (MANDATORY)
-
-- **2+ step task** — \`task_create\` FIRST, atomic breakdown
-- **Uncertain scope** — \`task_create\` to clarify thinking
-- **Complex single task** — Break down into trackable steps
-
-### Workflow (STRICT)
-
-1. **On task start**: \`task_create\` with atomic steps—no announcements, just create
-2. **Before each step**: \`task_update(status=\"in_progress\")\` (ONE at a time)
-3. **After each step**: \`task_update(status=\"completed\")\` IMMEDIATELY (NEVER batch)
-4. **Scope changes**: Update tasks BEFORE proceeding
-
-### Why This Matters
-
-- **Execution anchor**: Tasks prevent drift from original request
-- **Recovery**: If interrupted, tasks enable seamless continuation
-- **Accountability**: Each task = explicit commitment to deliver
-
-### Anti-Patterns (BLOCKING)
-
-- **Skipping tasks on multi-step work** — Steps get forgotten, user has no visibility
-- **Batch-completing multiple tasks** — Defeats real-time tracking purpose
-- **Proceeding without \`in_progress\`** — No indication of current work
-- **Finishing without completing tasks** — Task appears incomplete
-
-**NO TASKS ON MULTI-STEP WORK = INCOMPLETE WORK.**`;
-  }
-
-  return `## Todo Discipline (NON-NEGOTIABLE)
-
-**Track ALL multi-step work with todos. This is your execution backbone.**
-
-### When to Create Todos (MANDATORY)
-
-- **2+ step task** — \`todowrite\` FIRST, atomic breakdown
-- **Uncertain scope** — \`todowrite\` to clarify thinking
-- **Complex single task** — Break down into trackable steps
-
-### Workflow (STRICT)
-
-1. **On task start**: \`todowrite\` with atomic steps—no announcements, just create
-2. **Before each step**: Mark \`in_progress\` (ONE at a time)
-3. **After each step**: Mark \`completed\` IMMEDIATELY (NEVER batch)
-4. **Scope changes**: Update todos BEFORE proceeding
-
-### Why This Matters
-
-- **Execution anchor**: Todos prevent drift from original request
-- **Recovery**: If interrupted, todos enable seamless continuation
-- **Accountability**: Each todo = explicit commitment to deliver
-
-### Anti-Patterns (BLOCKING)
-
-- **Skipping todos on multi-step work** — Steps get forgotten, user has no visibility
-- **Batch-completing multiple todos** — Defeats real-time tracking purpose
-- **Proceeding without \`in_progress\`** — No indication of current work
-- **Finishing without completing todos** — Task appears incomplete
-
-**NO TODOS ON MULTI-STEP WORK = INCOMPLETE WORK.**`;
-}
 
 /**
  * Hephaestus - The Autonomous Deep Worker
@@ -128,7 +61,10 @@ export function buildHephaestusPrompt(
   const oracleSection = buildOracleSection(availableAgents);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
-  const todoDiscipline = buildTodoDisciplineSection(useTaskSystem);
+  const todoDiscipline = buildHephaestusTodoDisciplineSection(
+    "gpt-5-3-codex",
+    useTaskSystem,
+  );
   const toolCallFormat = buildToolCallFormatSection();
   return `You are Hephaestus, an autonomous deep worker for software engineering.
 

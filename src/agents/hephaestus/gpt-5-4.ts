@@ -18,52 +18,7 @@ import {
   buildAntiPatternsSection,
   buildAntiDuplicationSection,
 } from "../dynamic-agent-prompt-builder";
-
-function buildTodoDisciplineSection(useTaskSystem: boolean): string {
-  if (useTaskSystem) {
-    return `## Task Discipline (NON-NEGOTIABLE)
-
-Track ALL multi-step work with tasks. This is your execution backbone.
-
-### When to Create Tasks (MANDATORY)
-
-- 2+ step task — \`task_create\` FIRST, atomic breakdown
-- Uncertain scope — \`task_create\` to clarify thinking
-- Complex single task — break down into trackable steps
-
-### Workflow (STRICT)
-
-1. On task start: \`task_create\` with atomic steps — no announcements, just create
-2. Before each step: \`task_update(status="in_progress")\` (ONE at a time)
-3. After each step: \`task_update(status="completed")\` IMMEDIATELY (NEVER batch)
-4. Scope changes: update tasks BEFORE proceeding
-
-Tasks prevent drift, enable recovery if interrupted, and make each commitment explicit. Skipping tasks on multi-step work, batch-completing, or proceeding without \`in_progress\` are blocking violations.
-
-**NO TASKS ON MULTI-STEP WORK = INCOMPLETE WORK.**`;
-  }
-
-  return `## Todo Discipline (NON-NEGOTIABLE)
-
-Track ALL multi-step work with todos. This is your execution backbone.
-
-### When to Create Todos (MANDATORY)
-
-- 2+ step task — \`todowrite\` FIRST, atomic breakdown
-- Uncertain scope — \`todowrite\` to clarify thinking
-- Complex single task — break down into trackable steps
-
-### Workflow (STRICT)
-
-1. On task start: \`todowrite\` with atomic steps — no announcements, just create
-2. Before each step: mark \`in_progress\` (ONE at a time)
-3. After each step: mark \`completed\` IMMEDIATELY (NEVER batch)
-4. Scope changes: update todos BEFORE proceeding
-
-Todos prevent drift, enable recovery if interrupted, and make each commitment explicit. Skipping todos on multi-step work, batch-completing, or proceeding without \`in_progress\` are blocking violations.
-
-**NO TODOS ON MULTI-STEP WORK = INCOMPLETE WORK.**`;
-}
+import { buildHephaestusTodoDisciplineSection } from "./todo-discipline";
 
 export function buildHephaestusPrompt(
   availableAgents: AvailableAgent[] = [],
@@ -88,7 +43,10 @@ export function buildHephaestusPrompt(
   const oracleSection = buildOracleSection(availableAgents);
   const hardBlocks = buildHardBlocksSection();
   const antiPatterns = buildAntiPatternsSection();
-  const todoDiscipline = buildTodoDisciplineSection(useTaskSystem);
+  const todoDiscipline = buildHephaestusTodoDisciplineSection(
+    "gpt-5-4",
+    useTaskSystem,
+  );
 
   return `You are Hephaestus, an autonomous deep worker for software engineering.
 
