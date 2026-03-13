@@ -1,4 +1,4 @@
-import * as fs from "fs/promises"
+import * as fs from "fs"
 import * as path from "path"
 import { homedir } from "os"
 import { log } from "./logger"
@@ -17,22 +17,33 @@ export interface BlacklistData {
   updatedAt: number
 }
 
-async function readBlacklist(): Promise<BlacklistData> {
+// Synchronous version for reading blacklist (used in agent factories)
+function readBlacklistSync(): BlacklistData {
   try {
-    const content = await fs.readFile(BLACKLIST_FILE, "utf-8")
+    const content = fs.readFileSync(BLACKLIST_FILE, "utf-8")
     return JSON.parse(content)
   } catch {
     return { providers: {}, updatedAt: Date.now() }
   }
 }
 
-async function writeBlacklist(data: BlacklistData): Promise<void> {
+// Async version for backward compatibility
+async function readBlacklist(): Promise<BlacklistData> {
+  return readBlacklistSync()
+}
+
+function writeBlacklistSync(data: BlacklistData): void {
   try {
-    await fs.mkdir(path.dirname(BLACKLIST_FILE), { recursive: true })
-    await fs.writeFile(BLACKLIST_FILE, JSON.stringify(data, null, 2), "utf-8")
+    fs.mkdirSync(path.dirname(BLACKLIST_FILE), { recursive: true })
+    fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(data, null, 2), "utf-8")
   } catch (error) {
     log("[global-blacklist] Failed to write blacklist", { error: String(error) })
   }
+}
+
+// Async version for backward compatibility
+async function writeBlacklist(data: BlacklistData): Promise<void> {
+  writeBlacklistSync(data)
 }
 
 export async function blacklistProvider(
@@ -60,21 +71,32 @@ export async function blacklistProvider(
   })
 }
 
-export async function isProviderBlacklisted(providerID: string): Promise<boolean> {
-  const blacklist = await readBlacklist()
+// Synchronous version for agent factories and other sync contexts
+export function isProviderBlacklistedSync(providerID: string): boolean {
+  const blacklist = readBlacklistSync()
   const entry = blacklist.providers[providerID]
   
   if (!entry) return false
   
   const now = Date.now()
   if (now >= entry.expiresAt) {
+    // Clean up expired entry
     delete blacklist.providers[providerID]
     blacklist.updatedAt = now
-    await writeBlacklist(blacklist)
+    try {
+      writeBlacklistSync(blacklist)
+    } catch {
+      // Ignore write errors in sync context
+    }
     return false
   }
   
   return true
+}
+
+// Async version for backward compatibility
+export async function isProviderBlacklisted(providerID: string): Promise<boolean> {
+  return isProviderBlacklistedSync(providerID)
 }
 
 export async function getBlacklistedProviders(): Promise<string[]> {

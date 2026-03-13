@@ -14,7 +14,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
 import { isGptModel, isGeminiModel } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
-import { isProviderBlacklisted } from "../../shared/global-blacklist"
+import { isProviderBlacklistedSync } from "../../shared/global-blacklist"
 import {
   createAgentToolRestrictions,
   type PermissionValue,
@@ -77,12 +77,12 @@ export function buildSisyphusJuniorPrompt(
   }
 }
 
-export async function createSisyphusJuniorAgentWithOverrides(
+export function createSisyphusJuniorAgentWithOverrides(
   override: AgentOverrideConfig | undefined,
   systemDefaultModel?: string,
   useTaskSystem = false,
   fallbackModels?: string[]
-): Promise<AgentConfig> {
+): AgentConfig {
   if (override?.disable) {
     override = undefined
   }
@@ -95,14 +95,14 @@ export async function createSisyphusJuniorAgentWithOverrides(
     const parts = model.split("/")
     if (parts.length >= 2) {
       const providerID = parts[0]
-      const blacklisted = await isProviderBlacklisted(providerID)
+      const blacklisted = isProviderBlacklistedSync(providerID)
       if (blacklisted && fallbackModels && fallbackModels.length > 0) {
         // Use first non-blacklisted fallback model from config
         for (const fallback of fallbackModels) {
           const fallbackParts = fallback.split("/")
           if (fallbackParts.length >= 2) {
             const fallbackProvider = fallbackParts[0]
-            const fallbackBlacklisted = await isProviderBlacklisted(fallbackProvider)
+            const fallbackBlacklisted = isProviderBlacklistedSync(fallbackProvider)
             if (!fallbackBlacklisted) {
               model = fallback
               break
