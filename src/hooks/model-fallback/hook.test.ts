@@ -134,8 +134,8 @@ describe("model fallback hook", () => {
 
     //#then - chain should progress to entry[1], not repeat entry[0]
     expect(secondOutput.message["model"]).toEqual({
-      providerID: "kimi-for-coding",
-      modelID: "k2p5",
+      providerID: "opencode-go",
+      modelID: "kimi-k2.5",
     })
     expect(secondOutput.message["variant"]).toBeUndefined()
   })

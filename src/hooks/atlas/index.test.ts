@@ -45,6 +45,7 @@ describe("atlas hook", () => {
       directory: TEST_DIR,
       client: {
         session: {
+          get: async () => ({ data: { parentID: "main-session-123" } }),
           prompt: promptMock,
           promptAsync: promptMock,
         },

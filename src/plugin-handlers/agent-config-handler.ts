@@ -15,6 +15,10 @@ import { loadProjectAgents, loadUserAgents } from "../features/claude-code-agent
 import type { PluginComponents } from "./plugin-components-loader";
 import { reorderAgentsByPriority } from "./agent-priority-order";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
+import {
+  createProtectedAgentNameSet,
+  filterProtectedAgentOverrides,
+} from "./agent-override-protection";
 import { buildPrometheusAgentConfig } from "./prometheus-agent-config-builder";
 import { buildPlanDemoteConfig } from "./plan-model-inheritance";
 
@@ -209,19 +213,21 @@ export async function applyAgentConfig(params: {
         )
       : undefined;
 
-    // Collect all builtin agent names to prevent user/project .md files from overriding them
-    const builtinAgentNames = new Set([
+    const protectedBuiltinAgentNames = createProtectedAgentNameSet([
       ...Object.keys(agentConfig),
       ...Object.keys(builtinAgents),
     ]);
-
-    // Filter user/project agents that duplicate builtin agents (they have mode: "subagent" hardcoded
-    // in loadAgentsFromDir which would incorrectly override the builtin mode: "primary")
-    const filteredUserAgents = Object.fromEntries(
-      Object.entries(userAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    const filteredUserAgents = filterProtectedAgentOverrides(
+      userAgents,
+      protectedBuiltinAgentNames,
     );
-    const filteredProjectAgents = Object.fromEntries(
-      Object.entries(projectAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    const filteredProjectAgents = filterProtectedAgentOverrides(
+      projectAgents,
+      protectedBuiltinAgentNames,
+    );
+    const filteredPluginAgents = filterProtectedAgentOverrides(
+      pluginAgents,
+      protectedBuiltinAgentNames,
     );
 
     params.config.agent = {
@@ -231,26 +237,33 @@ export async function applyAgentConfig(params: {
       ),
       ...filterDisabledAgents(filteredUserAgents),
       ...filterDisabledAgents(filteredProjectAgents),
-      ...filterDisabledAgents(pluginAgents),
+      ...filterDisabledAgents(filteredPluginAgents),
       ...filteredConfigAgents,
       build: { ...migratedBuild, mode: "subagent", hidden: true },
       ...(planDemoteConfig ? { plan: planDemoteConfig } : {}),
     };
   } else {
-    // Filter user/project agents that duplicate builtin agents
-    const builtinAgentNames = new Set(Object.keys(builtinAgents));
-    const filteredUserAgents = Object.fromEntries(
-      Object.entries(userAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    const protectedBuiltinAgentNames = createProtectedAgentNameSet(
+      Object.keys(builtinAgents),
     );
-    const filteredProjectAgents = Object.fromEntries(
-      Object.entries(projectAgents).filter(([key]) => !builtinAgentNames.has(key)),
+    const filteredUserAgents = filterProtectedAgentOverrides(
+      userAgents,
+      protectedBuiltinAgentNames,
+    );
+    const filteredProjectAgents = filterProtectedAgentOverrides(
+      projectAgents,
+      protectedBuiltinAgentNames,
+    );
+    const filteredPluginAgents = filterProtectedAgentOverrides(
+      pluginAgents,
+      protectedBuiltinAgentNames,
     );
 
     params.config.agent = {
       ...builtinAgents,
       ...filterDisabledAgents(filteredUserAgents),
       ...filterDisabledAgents(filteredProjectAgents),
-      ...filterDisabledAgents(pluginAgents),
+      ...filterDisabledAgents(filteredPluginAgents),
       ...configAgent,
     };
   }

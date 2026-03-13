@@ -319,6 +319,7 @@ export function createEventHandler(args: {
       }
 
       if (sessionInfo?.id) {
+        const wasSyncSubagentSession = syncSubagentSessions.has(sessionInfo.id);
         clearSessionAgent(sessionInfo.id);
         lastHandledModelErrorMessageID.delete(sessionInfo.id);
         lastHandledRetryStatusKey.delete(sessionInfo.id);
@@ -329,6 +330,9 @@ export function createEventHandler(args: {
         firstMessageVariantGate.clear(sessionInfo.id);
         clearSessionModel(sessionInfo.id);
         syncSubagentSessions.delete(sessionInfo.id);
+        if (wasSyncSubagentSession) {
+          subagentSessions.delete(sessionInfo.id);
+        }
         deleteSessionTools(sessionInfo.id);
         await managers.skillMcpManager.disconnectSession(sessionInfo.id);
         await lspManager.cleanupTempDirectoryClients();

@@ -7,49 +7,12 @@ import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
-import { extractSessionMessages } from "./session-messages"
+import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
-export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof extractAutoRetrySignal) {
-  return async (
-    ctx: HookDeps["ctx"],
-    sessionID: string,
-    _info: Record<string, unknown> | undefined,
-  ): Promise<boolean> => {
-    try {
-      const messagesResp = await ctx.client.session.messages({
-        path: { id: sessionID },
-        query: { directory: ctx.directory },
-      })
-
-      const msgs = extractSessionMessages(messagesResp)
-
-      if (!msgs || msgs.length === 0) return false
-
-      const lastAssistant = [...msgs].reverse().find((m) => m.info?.role === "assistant")
-      if (!lastAssistant) return false
-      if (lastAssistant.info?.error) return false
-
-      const parts = lastAssistant.parts ??
-        (lastAssistant.info?.parts as Array<{ type?: string; text?: string }> | undefined)
-
-      const textFromParts = (parts ?? [])
-        .filter((p) => p.type === "text" && typeof p.text === "string")
-        .map((p) => p.text!.trim())
-        .filter((text) => text.length > 0)
-        .join("\n")
-
-      if (!textFromParts) return false
-      if (extractAutoRetrySignalFn({ message: textFromParts })) return false
-
-      return true
-    } catch {
-      return false
-    }
-  }
-}
+export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
 export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
-  const { ctx, config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult } = deps
+  const { ctx, config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionStatusRetryKeys } = deps
   const checkVisibleResponse = hasVisibleAssistantResponse(extractAutoRetrySignal)
 
   return async (props: Record<string, unknown> | undefined) => {
@@ -91,6 +54,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       }
 
       sessionAwaitingFallbackResult.delete(sessionID)
+      sessionStatusRetryKeys.delete(sessionID)
       helpers.clearSessionFallbackTimeout(sessionID)
       const state = sessionStates.get(sessionID)
       if (state?.pendingFallbackModel) {
