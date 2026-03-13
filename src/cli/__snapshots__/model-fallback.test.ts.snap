@@ -31,6 +31,9 @@ exports[`generateModelConfig no providers available returns ULTIMATE_FALLBACK fo
     "prometheus": {
       "model": "opencode/glm-4.7-free",
     },
+    "sisyphus-junior": {
+      "model": "opencode/glm-4.7-free",
+    },
   },
   "categories": {
     "artistry": {
@@ -71,9 +74,6 @@ exports[`generateModelConfig single native provider uses Claude models when only
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
-    "librarian": {
-      "model": "anthropic/claude-sonnet-4-5",
-    },
     "metis": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
@@ -96,6 +96,9 @@ exports[`generateModelConfig single native provider uses Claude models when only
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -133,9 +136,6 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
-    "librarian": {
-      "model": "anthropic/claude-sonnet-4-5",
-    },
     "metis": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
@@ -158,6 +158,9 @@ exports[`generateModelConfig single native provider uses Claude models with isMa
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -191,8 +194,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "openai/gpt-5.4",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
     },
     "explore": {
       "model": "openai/gpt-5.4",
@@ -207,8 +209,7 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
       "variant": "medium",
     },
     "metis": {
-      "model": "openai/gpt-5.4",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "momus": {
       "model": "openai/gpt-5.4",
@@ -229,6 +230,9 @@ exports[`generateModelConfig single native provider uses OpenAI models when only
     "sisyphus": {
       "model": "openai/gpt-5.4",
       "variant": "medium",
+    },
+    "sisyphus-junior": {
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -273,8 +277,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "openai/gpt-5.4",
-      "variant": "medium",
+      "model": "opencode/glm-4.7-free",
     },
     "explore": {
       "model": "openai/gpt-5.4",
@@ -289,8 +292,7 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
       "variant": "medium",
     },
     "metis": {
-      "model": "openai/gpt-5.4",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "momus": {
       "model": "openai/gpt-5.4",
@@ -311,6 +313,9 @@ exports[`generateModelConfig single native provider uses OpenAI models with isMa
     "sisyphus": {
       "model": "openai/gpt-5.4",
       "variant": "medium",
+    },
+    "sisyphus-junior": {
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -355,24 +360,20 @@ exports[`generateModelConfig single native provider uses Gemini models when only
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "google/gemini-3.1-pro-preview",
+      "model": "opencode/glm-4.7-free",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
-    "librarian": {
-      "model": "opencode/glm-4.7-free",
-    },
     "metis": {
-      "model": "google/gemini-3.1-pro-preview",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "momus": {
       "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "opencode/glm-4.7-free",
     },
     "oracle": {
       "model": "google/gemini-3.1-pro-preview",
@@ -380,6 +381,9 @@ exports[`generateModelConfig single native provider uses Gemini models when only
     },
     "prometheus": {
       "model": "google/gemini-3.1-pro-preview",
+    },
+    "sisyphus-junior": {
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -416,24 +420,20 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
   "$schema": "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json",
   "agents": {
     "atlas": {
-      "model": "google/gemini-3.1-pro-preview",
+      "model": "opencode/glm-4.7-free",
     },
     "explore": {
       "model": "opencode/gpt-5-nano",
     },
-    "librarian": {
-      "model": "opencode/glm-4.7-free",
-    },
     "metis": {
-      "model": "google/gemini-3.1-pro-preview",
-      "variant": "high",
+      "model": "opencode/glm-4.7-free",
     },
     "momus": {
       "model": "google/gemini-3.1-pro-preview",
       "variant": "high",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "opencode/glm-4.7-free",
     },
     "oracle": {
       "model": "google/gemini-3.1-pro-preview",
@@ -441,6 +441,9 @@ exports[`generateModelConfig single native provider uses Gemini models with isMa
     },
     "prometheus": {
       "model": "google/gemini-3.1-pro-preview",
+    },
+    "sisyphus-junior": {
+      "model": "opencode/glm-4.7-free",
     },
   },
   "categories": {
@@ -486,9 +489,6 @@ exports[`generateModelConfig all native providers uses preferred models from fal
       "model": "openai/gpt-5.3-codex",
       "variant": "medium",
     },
-    "librarian": {
-      "model": "anthropic/claude-sonnet-4-5",
-    },
     "metis": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
@@ -512,6 +512,9 @@ exports[`generateModelConfig all native providers uses preferred models from fal
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -561,9 +564,6 @@ exports[`generateModelConfig all native providers uses preferred models with isM
       "model": "openai/gpt-5.3-codex",
       "variant": "medium",
     },
-    "librarian": {
-      "model": "anthropic/claude-sonnet-4-5",
-    },
     "metis": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
@@ -587,6 +587,9 @@ exports[`generateModelConfig all native providers uses preferred models with isM
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -637,9 +640,6 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
       "model": "opencode/gpt-5.3-codex",
       "variant": "medium",
     },
-    "librarian": {
-      "model": "opencode/glm-4.7-free",
-    },
     "metis": {
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
@@ -663,6 +663,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models when on
     "sisyphus": {
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "opencode/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -712,9 +715,6 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
       "model": "opencode/gpt-5.3-codex",
       "variant": "medium",
     },
-    "librarian": {
-      "model": "opencode/glm-4.7-free",
-    },
     "metis": {
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
@@ -738,6 +738,9 @@ exports[`generateModelConfig fallback providers uses OpenCode Zen models with is
     "sisyphus": {
       "model": "opencode/claude-opus-4-6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "opencode/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -784,9 +787,6 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "explore": {
       "model": "github-copilot/gpt-5-mini",
     },
-    "librarian": {
-      "model": "github-copilot/claude-sonnet-4.5",
-    },
     "metis": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
@@ -796,7 +796,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
       "variant": "xhigh",
     },
     "multimodal-looker": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "opencode/glm-4.7-free",
     },
     "oracle": {
       "model": "github-copilot/gpt-5.4",
@@ -809,6 +809,9 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models when 
     "sisyphus": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "github-copilot/claude-sonnet-4.6",
     },
   },
   "categories": {
@@ -850,9 +853,6 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     "explore": {
       "model": "github-copilot/gpt-5-mini",
     },
-    "librarian": {
-      "model": "github-copilot/claude-sonnet-4.5",
-    },
     "metis": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
@@ -862,7 +862,7 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
       "variant": "xhigh",
     },
     "multimodal-looker": {
-      "model": "github-copilot/gemini-3-flash-preview",
+      "model": "opencode/glm-4.7-free",
     },
     "oracle": {
       "model": "github-copilot/gpt-5.4",
@@ -875,6 +875,9 @@ exports[`generateModelConfig fallback providers uses GitHub Copilot models with 
     "sisyphus": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "github-copilot/claude-sonnet-4.6",
     },
   },
   "categories": {
@@ -938,6 +941,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian whe
     "sisyphus": {
       "model": "zai-coding-plan/glm-5",
     },
+    "sisyphus-junior": {
+      "model": "opencode/glm-4.7-free",
+    },
   },
   "categories": {
     "quick": {
@@ -993,6 +999,9 @@ exports[`generateModelConfig fallback providers uses ZAI model for librarian wit
     "sisyphus": {
       "model": "zai-coding-plan/glm-5",
     },
+    "sisyphus-junior": {
+      "model": "opencode/glm-4.7-free",
+    },
   },
   "categories": {
     "quick": {
@@ -1031,9 +1040,6 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
       "model": "opencode/gpt-5.3-codex",
       "variant": "medium",
     },
-    "librarian": {
-      "model": "opencode/glm-4.7-free",
-    },
     "metis": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
@@ -1057,6 +1063,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + OpenCode Zen
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1106,9 +1115,6 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
       "model": "openai/gpt-5.3-codex",
       "variant": "medium",
     },
-    "librarian": {
-      "model": "github-copilot/claude-sonnet-4.5",
-    },
     "metis": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
@@ -1132,6 +1138,9 @@ exports[`generateModelConfig mixed provider scenarios uses OpenAI + Copilot comb
     "sisyphus": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "github-copilot/claude-sonnet-4.6",
     },
   },
   "categories": {
@@ -1203,6 +1212,9 @@ exports[`generateModelConfig mixed provider scenarios uses Claude + ZAI combinat
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
+    "sisyphus-junior": {
+      "model": "anthropic/claude-sonnet-4-6",
+    },
   },
   "categories": {
     "quick": {
@@ -1238,9 +1250,6 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
     "explore": {
       "model": "anthropic/claude-haiku-4-5",
     },
-    "librarian": {
-      "model": "anthropic/claude-sonnet-4-5",
-    },
     "metis": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
@@ -1250,7 +1259,7 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
       "variant": "max",
     },
     "multimodal-looker": {
-      "model": "google/gemini-3-flash-preview",
+      "model": "opencode/glm-4.7-free",
     },
     "oracle": {
       "model": "google/gemini-3.1-pro-preview",
@@ -1263,6 +1272,9 @@ exports[`generateModelConfig mixed provider scenarios uses Gemini + Claude combi
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
@@ -1334,6 +1346,9 @@ exports[`generateModelConfig mixed provider scenarios uses all fallback provider
     "sisyphus": {
       "model": "github-copilot/claude-opus-4.6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "github-copilot/claude-sonnet-4.6",
     },
   },
   "categories": {
@@ -1410,6 +1425,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers togethe
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
     },
+    "sisyphus-junior": {
+      "model": "anthropic/claude-sonnet-4-6",
+    },
   },
   "categories": {
     "artistry": {
@@ -1484,6 +1502,9 @@ exports[`generateModelConfig mixed provider scenarios uses all providers with is
     "sisyphus": {
       "model": "anthropic/claude-opus-4-6",
       "variant": "max",
+    },
+    "sisyphus-junior": {
+      "model": "anthropic/claude-sonnet-4-6",
     },
   },
   "categories": {
