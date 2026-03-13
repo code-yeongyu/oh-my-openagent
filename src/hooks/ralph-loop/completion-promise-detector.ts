@@ -51,7 +51,8 @@ export function detectCompletionInTranscript(
 				if (entry.type === "user") continue
 				if (startedAt && entry.timestamp && entry.timestamp < startedAt) continue
 				if (entry.type === "assistant") {
-					lastAssistantLine = line
+					const parsed = entry as { type?: string; text?: string; content?: string }
+					lastAssistantLine = parsed.text ?? parsed.content ?? ""
 				}
 				if (pattern.test(line)) return true
 			} catch {

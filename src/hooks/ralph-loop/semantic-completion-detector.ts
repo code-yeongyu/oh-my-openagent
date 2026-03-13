@@ -23,8 +23,8 @@ const PHRASE_PATTERNS = COMPLETION_PHRASES.map(
 )
 
 function isNegated(text: string, matchIndex: number): boolean {
-	const prefix = text.slice(Math.max(0, matchIndex - 12), matchIndex).toLowerCase()
-	return NEGATION_PREFIXES.some((neg) => prefix.endsWith(neg))
+	const prefix = text.slice(Math.max(0, matchIndex - 40), matchIndex).toLowerCase()
+	return NEGATION_PREFIXES.some((neg) => prefix.includes(neg))
 }
 
 export function detectSemanticCompletion(text: string): string | undefined {
