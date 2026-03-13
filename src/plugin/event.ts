@@ -307,6 +307,17 @@ export function createEventHandler(args: {
         if (sessionInfo?.id) {
           subagentSessions.add(sessionInfo.id);
           log("[event] Tracked subagent session", { sessionID: sessionInfo.id, parentID: sessionInfo.parentID });
+          
+          // Set up fallback chain for subagent based on title (which contains agent name)
+          const title = sessionInfo.title || "";
+          const agentMatch = title.match(/@([^\s]+)\s+subagent/i);
+          const agentName = agentMatch ? agentMatch[1].toLowerCase() : "sisyphus-junior";
+          
+          // Apply fallback chain for common subagent types
+          if (agentName.includes("junior") || agentName.includes("explore") || agentName.includes("librarian")) {
+            applyUserConfiguredFallbackChain(sessionInfo.id, agentName, "anthropic", args.pluginConfig);
+            log("[event] Set up fallback chain for subagent", { sessionID: sessionInfo.id, agentName });
+          }
         }
       }
 
