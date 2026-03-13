@@ -5,6 +5,7 @@ import { log } from "../../shared/logger"
 import { extractAutoRetrySignal } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
+import { blacklistProvider } from "../../shared/global-blacklist"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
@@ -99,7 +100,7 @@ export function createSessionStatusHandler(
       fallbackModels,
       resolvedAgent,
       source: "session.status",
-      currentModelProvider,
+      
     })
   }
 }

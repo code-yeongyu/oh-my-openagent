@@ -5,6 +5,7 @@ import { log } from "../../shared/logger"
 import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
+import { blacklistProvider } from "../../shared/global-blacklist"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { extractSessionMessages } from "./session-messages"
@@ -201,7 +202,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         fallbackModels,
         resolvedAgent,
         source: "message.updated",
-        currentModelProvider,
+        
       })
     }
   }

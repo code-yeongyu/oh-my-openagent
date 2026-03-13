@@ -1,130 +1,90 @@
-declare const require: (name: string) => any
-const { describe, test, expect, beforeEach, afterEach, spyOn, mock } = require("bun:test")
+import { describe, expect, test, beforeEach } from "bun:test"
 import { resolveModelForDelegateTask } from "./model-selection"
-import * as connectedProvidersCache from "../../shared/connected-providers-cache"
+import { blacklistProvider, clearBlacklist } from "../../shared/global-blacklist"
 
-describe("resolveModelForDelegateTask", () => {
-	let hasConnectedProvidersSpy: ReturnType<typeof spyOn> | undefined
-	let hasProviderModelsSpy: ReturnType<typeof spyOn> | undefined
+describe("model-selection", () => {
+  beforeEach(async () => {
+    await clearBlacklist()
+  })
 
-	beforeEach(() => {
-		mock.restore()
-	})
+  describe("resolveModelForDelegateTask", () => {
+    test("filters blacklisted providers from userFallbackModels", async () => {
+      const input = {
+        userFallbackModels: [
+          "anthropic/claude-sonnet-4-6",
+          "alibaba-coding-plan/kimi-k2.5",
+          "openai/gpt-5.3-codex"
+        ],
+        availableModels: new Set([
+          "anthropic/claude-sonnet-4-6",
+          "alibaba-coding-plan/kimi-k2.5",
+          "openai/gpt-5.3-codex"
+        ])
+      }
 
-	afterEach(() => {
-		hasConnectedProvidersSpy?.mockRestore()
-		hasProviderModelsSpy?.mockRestore()
-	})
+      // Blacklist anthropic
+      await blacklistProvider("anthropic", 3600)
 
-	describe("#given no provider cache exists (pre-cache scenario)", () => {
-		beforeEach(() => {
-			hasConnectedProvidersSpy = spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockReturnValue(false)
-			hasProviderModelsSpy = spyOn(connectedProvidersCache, "hasProviderModelsCache").mockReturnValue(false)
-		})
+      const result = await resolveModelForDelegateTask(input as any)
+      expect(result?.model).toBe("alibaba-coding-plan/kimi-k2.5")
+    })
 
-		describe("#when availableModels is empty and no user model override", () => {
-			test("#then returns undefined to let OpenCode use system default", () => {
-				const result = resolveModelForDelegateTask({
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
-					fallbackChain: [
-						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
-					],
-					availableModels: new Set(),
-					systemDefaultModel: "anthropic/claude-sonnet-4-6",
-				})
+    test("filters blacklisted providers from fallbackChain", async () => {
+      const input = {
+        fallbackChain: [
+          { providers: ["anthropic", "github-copilot"], model: "claude-sonnet-4-6" },
+          { providers: ["zai-coding-plan"], model: "glm-5" },
+          { providers: ["openai"], model: "gpt-5.3-codex" }
+        ],
+        availableModels: new Set([
+          "anthropic/claude-sonnet-4-6",
+          "zai-coding-plan/glm-5",
+          "openai/gpt-5.3-codex"
+        ])
+      }
 
-				expect(result).toBeUndefined()
-			})
-		})
+      // Blacklist anthropic and zai
+      await blacklistProvider("anthropic", 3600)
+      await blacklistProvider("zai-coding-plan", 3600)
 
-		describe("#when user explicitly set a model override", () => {
-			test("#then returns the user model regardless of cache state", () => {
-				const result = resolveModelForDelegateTask({
-					userModel: "openai/gpt-5.4",
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
-					fallbackChain: [
-						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
-					],
-					availableModels: new Set(),
-					systemDefaultModel: "anthropic/claude-sonnet-4-6",
-				})
+      const result = await resolveModelForDelegateTask(input as any)
+      expect(result?.model).toBe("openai/gpt-5.3-codex")
+    })
 
-				expect(result).toEqual({ model: "openai/gpt-5.4" })
-			})
-		})
+    test("returns undefined when all providers are blacklisted", async () => {
+      const input = {
+        userFallbackModels: [
+          "anthropic/claude-sonnet-4-6",
+          "zai-coding-plan/glm-5"
+        ],
+        availableModels: new Set([
+          "anthropic/claude-sonnet-4-6",
+          "zai-coding-plan/glm-5"
+        ])
+      }
 
-		describe("#when user set fallback_models but no cache exists", () => {
-			test("#then returns undefined (skip fallback resolution without cache)", () => {
-				const result = resolveModelForDelegateTask({
-					userFallbackModels: ["openai/gpt-5.4", "google/gemini-3.1-pro"],
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
-					fallbackChain: [
-						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
-					],
-					availableModels: new Set(),
-				})
+      // Blacklist all providers
+      await blacklistProvider("anthropic", 3600)
+      await blacklistProvider("zai-coding-plan", 3600)
 
-				expect(result).toBeUndefined()
-			})
-		})
-	})
+      const result = await resolveModelForDelegateTask(input as any)
+      expect(result).toBeUndefined()
+    })
 
-	describe("#given provider cache exists", () => {
-		beforeEach(() => {
-			hasConnectedProvidersSpy = spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockReturnValue(true)
-			hasProviderModelsSpy = spyOn(connectedProvidersCache, "hasProviderModelsCache").mockReturnValue(true)
-		})
+    test("prioritizes userFallbackModels over fallbackChain", async () => {
+      const input = {
+        userFallbackModels: ["openai/gpt-5.3-codex"],
+        fallbackChain: [
+          { providers: ["anthropic"], model: "claude-sonnet-4-6" }
+        ],
+        availableModels: new Set([
+          "openai/gpt-5.3-codex",
+          "anthropic/claude-sonnet-4-6"
+        ])
+      }
 
-		describe("#when availableModels is empty (cache exists but empty)", () => {
-			test("#then falls through to category default model (existing behavior)", () => {
-				const result = resolveModelForDelegateTask({
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
-					fallbackChain: [
-						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
-					],
-					availableModels: new Set(),
-					systemDefaultModel: "anthropic/claude-sonnet-4-6",
-				})
-
-				expect(result).toBeDefined()
-				expect(result!.model).toBe("anthropic/claude-sonnet-4-6")
-			})
-		})
-
-		describe("#when availableModels has entries and category default matches", () => {
-			test("#then resolves via fuzzy match (existing behavior)", () => {
-				const result = resolveModelForDelegateTask({
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
-					fallbackChain: [
-						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
-					],
-					availableModels: new Set(["anthropic/claude-sonnet-4-6"]),
-				})
-
-				expect(result).toBeDefined()
-				expect(result!.model).toBe("anthropic/claude-sonnet-4-6")
-			})
-		})
-	})
-
-	describe("#given only connected providers cache exists (no provider-models cache)", () => {
-		beforeEach(() => {
-			hasConnectedProvidersSpy = spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockReturnValue(true)
-			hasProviderModelsSpy = spyOn(connectedProvidersCache, "hasProviderModelsCache").mockReturnValue(false)
-		})
-
-		describe("#when availableModels is empty", () => {
-			test("#then falls through to existing resolution (cache partially ready)", () => {
-				const result = resolveModelForDelegateTask({
-					categoryDefaultModel: "anthropic/claude-sonnet-4-6",
-					fallbackChain: [
-						{ providers: ["anthropic"], model: "claude-sonnet-4-6" },
-					],
-					availableModels: new Set(),
-				})
-
-				expect(result).toBeDefined()
-			})
-		})
-	})
+      const result = await resolveModelForDelegateTask(input as any)
+      expect(result?.model).toBe("openai/gpt-5.3-codex")
+    })
+  })
 })

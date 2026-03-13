@@ -119,11 +119,16 @@ export async function resolveModelForDelegateTask(input: {
 
         const crossProviderMatch = fuzzyMatchModel(entry.model, input.availableModels)
         if (crossProviderMatch) {
-          if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
-            return { model: explicitHighModel }
-          }
+          // Check if the matched model's provider is blacklisted
+          const matchProvider = crossProviderMatch.split("/")[0]
+          const blacklisted = await isProviderBlacklisted(matchProvider)
+          if (!blacklisted) {
+            if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
+              return { model: explicitHighModel }
+            }
 
-          return { model: crossProviderMatch, variant: entry.variant }
+            return { model: crossProviderMatch, variant: entry.variant }
+          }
         }
       }
     }
