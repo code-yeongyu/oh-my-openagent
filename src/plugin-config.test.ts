@@ -115,6 +115,23 @@ describe("mergeConfigs", () => {
       expect(result.disabled_hooks).toContain("session-recovery");
       expect(result.disabled_hooks?.length).toBe(3);
     });
+
+    it("should union disabled_tools from base and override without duplicates", () => {
+      const base: OhMyOpenCodeConfig = {
+        disabled_tools: ["todowrite", "interactive_bash"],
+      };
+
+      const override: OhMyOpenCodeConfig = {
+        disabled_tools: ["interactive_bash", "look_at"],
+      };
+
+      const result = mergeConfigs(base, override);
+
+      expect(result.disabled_tools).toContain("todowrite");
+      expect(result.disabled_tools).toContain("interactive_bash");
+      expect(result.disabled_tools).toContain("look_at");
+      expect(result.disabled_tools?.length).toBe(3);
+    });
   });
 });
 
