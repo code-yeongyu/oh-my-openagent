@@ -12,6 +12,7 @@ import { createMetisAgent, metisPromptMetadata } from "./metis"
 import { createAtlasAgent, atlasPromptMetadata } from "./atlas"
 import { createMomusAgent, momusPromptMetadata } from "./momus"
 import { createHephaestusAgent } from "./hephaestus"
+import { createPegasusAgentWithOverrides, PEGASUS_PROMPT_METADATA } from "./pegasus"
 import type { AvailableCategory } from "./dynamic-agent-prompt-builder"
 import {
   fetchAvailableModels,
@@ -38,9 +39,8 @@ const agentSources: Record<BuiltinAgentName, AgentSource> = {
   "multimodal-looker": createMultimodalLookerAgent,
   metis: createMetisAgent,
   momus: createMomusAgent,
-  // Note: Atlas is handled specially in createBuiltinAgents()
-  // because it needs OrchestratorContext, not just a model string
   atlas: createAtlasAgent as AgentFactory,
+  pegasus: createPegasusAgentWithOverrides as AgentFactory,
 }
 
 /**
@@ -55,6 +55,7 @@ const agentMetadata: Partial<Record<BuiltinAgentName, AgentPromptMetadata>> = {
   metis: metisPromptMetadata,
   momus: momusPromptMetadata,
   atlas: atlasPromptMetadata,
+  pegasus: PEGASUS_PROMPT_METADATA,
 }
 
 export async function createBuiltinAgents(
@@ -131,6 +132,14 @@ export async function createBuiltinAgents(
       name: agent.name,
       description: agent.description,
       metadata: buildCustomAgentMetadata(agent.name, agent.description),
+    })
+  }
+
+  if (!disabledAgentNames.has("pegasus") && agentMetadata.pegasus) {
+    availableAgents.push({
+      name: "pegasus",
+      description: "Focused file executor with write access but no agent delegation. (Pegasus - OhMyOpenCode)",
+      metadata: agentMetadata.pegasus,
     })
   }
 

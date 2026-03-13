@@ -104,6 +104,19 @@ export function isGeminiModel(model: string): boolean {
   return modelName.startsWith("gemini-");
 }
 
+const KIMI_PROVIDERS = ["kimi-for-coding/", "kimi/", "moonshot/"];
+
+export function isKimiModel(model: string): boolean {
+  if (KIMI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true;
+
+  const modelName = extractModelName(model).toLowerCase();
+  return (
+    modelName.startsWith("kimi-") ||
+    modelName.startsWith("k2p5") ||
+    modelName.startsWith("k2.5")
+  );
+}
+
 export type BuiltinAgentName =
   | "sisyphus"
   | "hephaestus"
@@ -113,7 +126,8 @@ export type BuiltinAgentName =
   | "multimodal-looker"
   | "metis"
   | "momus"
-  | "atlas";
+  | "atlas"
+  | "pegasus";
 
 export type OverridableAgentName = "build" | BuiltinAgentName;
 

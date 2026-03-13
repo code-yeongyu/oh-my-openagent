@@ -2,6 +2,13 @@ import { z } from "zod"
 import { FallbackModelsSchema } from "./fallback-models"
 import { AgentPermissionSchema } from "./internal/permission"
 
+export const FilePermissionSchema = z.object({
+  allow: z.array(z.string()).optional(),
+  deny: z.array(z.string()).optional(),
+})
+
+export type FilePermission = z.infer<typeof FilePermissionSchema>
+
 export const AgentOverrideConfigSchema = z.object({
   /** @deprecated Use `category` instead. Model is inherited from category defaults. */
   model: z.string().optional(),
@@ -53,6 +60,7 @@ export const AgentOverrideConfigSchema = z.object({
       variant: z.string().optional(),
     })
     .optional(),
+  file_permissions: FilePermissionSchema.optional(),
 })
 
 export const AgentOverridesSchema = z.object({
@@ -63,6 +71,7 @@ export const AgentOverridesSchema = z.object({
     allow_non_gpt_model: z.boolean().optional(),
   }).optional(),
   "sisyphus-junior": AgentOverrideConfigSchema.optional(),
+  pegasus: AgentOverrideConfigSchema.optional(),
   "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
   prometheus: AgentOverrideConfigSchema.optional(),
   metis: AgentOverrideConfigSchema.optional(),
