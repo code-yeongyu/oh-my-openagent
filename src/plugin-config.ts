@@ -140,6 +140,12 @@ export function mergeConfigs(
         ...(override.disabled_commands ?? []),
       ]),
     ],
+    disabled_tools: [
+      ...new Set([
+        ...(base.disabled_tools ?? []),
+        ...(override.disabled_tools ?? []),
+      ]),
+    ],
     disabled_skills: [
       ...new Set([
         ...(base.disabled_skills ?? []),

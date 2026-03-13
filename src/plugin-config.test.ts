@@ -115,6 +115,23 @@ describe("mergeConfigs", () => {
       expect(result.disabled_hooks).toContain("session-recovery");
       expect(result.disabled_hooks?.length).toBe(3);
     });
+
+    it("should merge disabled_tools without duplicates", () => {
+      const base: OhMyOpenCodeConfig = {
+        disabled_tools: ["delegate_task", "web_search"],
+      };
+
+      const override: OhMyOpenCodeConfig = {
+        disabled_tools: ["web_search", "call_omo_agent"],
+      };
+
+      const result = mergeConfigs(base, override);
+
+      expect(result.disabled_tools).toContain("delegate_task");
+      expect(result.disabled_tools).toContain("web_search");
+      expect(result.disabled_tools).toContain("call_omo_agent");
+      expect(result.disabled_tools?.length).toBe(3);
+    });
   });
 });
 
