@@ -97,6 +97,7 @@ export interface SubagentSessionCreatedEvent {
   parentID: string
   title: string
   forceTmuxPane?: boolean
+  strictTmuxAttach?: boolean
 }
 
 export type OnSubagentSessionCreated = (event: SubagentSessionCreatedEvent) => Promise<void>
@@ -389,14 +390,15 @@ export class BackgroundManager {
     const sessionID = createResult.data.id
     subagentSessions.add(sessionID)
 
-    log("[background-agent] tmux callback check", {
-      hasCallback: !!this.onSubagentSessionCreated,
-      tmuxEnabled: this.tmuxEnabled,
-      forceTmuxPane: input.forceTmuxPane === true,
-      isInsideTmux: isInsideTmux(),
-      sessionID,
-      parentID: input.parentSessionID,
-    })
+      log("[background-agent] tmux callback check", {
+        hasCallback: !!this.onSubagentSessionCreated,
+        tmuxEnabled: this.tmuxEnabled,
+        forceTmuxPane: input.forceTmuxPane === true,
+        strictTmuxAttach: input.strictTmuxAttach === true,
+        isInsideTmux: isInsideTmux(),
+        sessionID,
+        parentID: input.parentSessionID,
+      })
 
     const tmuxCallback = this.onSubagentSessionCreated
     const shouldSpawnTmuxPane =
@@ -411,6 +413,7 @@ export class BackgroundManager {
         parentID: input.parentSessionID,
         title: input.description,
         forceTmuxPane: input.forceTmuxPane === true,
+        strictTmuxAttach: input.strictTmuxAttach === true,
       }).catch((err) => {
         log("[background-agent] Failed to spawn tmux pane:", err)
       })

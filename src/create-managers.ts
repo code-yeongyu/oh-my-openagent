@@ -53,7 +53,10 @@ export function createManagers(args: {
               },
             },
           },
-          { force: event.forceTmuxPane === true },
+          {
+            force: event.forceTmuxPane === true,
+            strictAttach: event.strictTmuxAttach === true,
+          },
         )
 
         log("[index] onSubagentSessionCreated callback completed")

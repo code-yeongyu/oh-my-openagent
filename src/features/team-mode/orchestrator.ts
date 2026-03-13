@@ -97,6 +97,7 @@ export async function launchTeamWorkers(
       parentMessageID: input.parentMessageID ?? "teammode",
       parentAgent: "atlas",
       forceTmuxPane: true,
+      strictTmuxAttach: true,
     })
     launchedWorkers.push(
       await waitForVerifiedLaunchRecord({

@@ -65,8 +65,8 @@ export interface LaunchInput {
   agent: string
   parentSessionID: string
   parentMessageID: string
-  /** Force tmux pane spawning for this launch even when general tmux integration is disabled. */
   forceTmuxPane?: boolean
+  strictTmuxAttach?: boolean
   parentModel?: { providerID: string; modelID: string }
   parentAgent?: string
   parentTools?: Record<string, boolean>

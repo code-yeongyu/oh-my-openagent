@@ -91,6 +91,7 @@ describe("start-teammode hook", () => {
     expect(backgroundManager.launch).toHaveBeenCalledTimes(3)
     for (const call of backgroundManager.launch.mock.calls) {
       expect(call[0]?.forceTmuxPane).toBe(true)
+      expect(call[0]?.strictTmuxAttach).toBe(true)
     }
     expect(boulderState?.execution_mode).toBe("teammode")
     expect(boulderState?.active_team_id).toBeTruthy()
