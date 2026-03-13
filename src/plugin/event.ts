@@ -6,10 +6,13 @@ import {
   getMainSessionID,
   getSessionAgent,
   setMainSession,
+  setSessionAgent,
   subagentSessions,
   syncSubagentSessions,
   updateSessionAgent,
 } from "../features/claude-code-session-state";
+import { clearBlacklistGuard } from "../hooks/blacklist-guard";
+import { clearSubagentBlacklistGuard } from "../hooks/subagent-blacklist-guard";
 import {
   clearPendingModelFallback,
   clearSessionFallbackChain,
@@ -164,7 +167,7 @@ export function createEventHandler(args: {
   // Avoid triggering multiple abort+continue cycles for the same failing assistant message.
   const lastHandledModelErrorMessageID = new Map<string, string>();
   const lastHandledRetryStatusKey = new Map<string, string>();
-  const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string }>();
+  const lastKnownModelBySession = new Map<string, { providerID: string; modelID: string; agentName?: string }>();
 
   const resolveFallbackProviderID = (sessionID: string, providerHint?: string): string => {
     const sessionModel = getSessionModel(sessionID);
@@ -298,6 +301,26 @@ export function createEventHandler(args: {
 
       if (!sessionInfo?.parentID) {
         setMainSession(sessionInfo?.id);
+      } else {
+        // This is a subagent session - track it for fallback handling
+        // This handles BOTH call_omo_agent subagents AND native task tool subagents
+        if (sessionInfo?.id) {
+          subagentSessions.add(sessionInfo.id);
+          log("[event] Tracked subagent session", { sessionID: sessionInfo.id, parentID: sessionInfo.parentID });
+          
+          // Extract agent name from title for ANY subagent
+          const title = sessionInfo.title || "";
+          const agentMatch = title.match(/@([^\s]+)\s+subagent/i);
+          const agentName = agentMatch ? agentMatch[1].toLowerCase() : "sisyphus-junior";
+          
+          // Store agent name for this subagent session
+          setSessionAgent(sessionInfo.id, agentName);
+          log("[event] Set agent for subagent session", { sessionID: sessionInfo.id, agentName });
+          
+          // Apply fallback chain for ALL subagents
+          applyUserConfiguredFallbackChain(sessionInfo.id, agentName, "anthropic", args.pluginConfig);
+          log("[event] Set up fallback chain for subagent", { sessionID: sessionInfo.id, agentName });
+        }
       }
 
       firstMessageVariantGate.markSessionCreated(sessionInfo);
@@ -330,9 +353,9 @@ export function createEventHandler(args: {
         firstMessageVariantGate.clear(sessionInfo.id);
         clearSessionModel(sessionInfo.id);
         syncSubagentSessions.delete(sessionInfo.id);
-        if (wasSyncSubagentSession) {
-          subagentSessions.delete(sessionInfo.id);
-        }
+        subagentSessions.delete(sessionInfo.id);
+        clearSubagentBlacklistGuard(sessionInfo.id);
+        clearBlacklistGuard(sessionInfo.id);
         deleteSessionTools(sessionInfo.id);
         await managers.skillMcpManager.disconnectSession(sessionInfo.id);
         await lspManager.cleanupTempDirectoryClients();
@@ -354,8 +377,9 @@ export function createEventHandler(args: {
         }
         const providerID = info?.providerID as string | undefined;
         const modelID = info?.modelID as string | undefined;
+        const agentName = agent || getSessionAgent(sessionID);
         if (providerID && modelID && !isCompactionMessage) {
-          lastKnownModelBySession.set(sessionID, { providerID, modelID });
+          lastKnownModelBySession.set(sessionID, { providerID, modelID, agentName });
           setSessionModel(sessionID, { providerID, modelID });
         }
       }
@@ -509,6 +533,17 @@ export function createEventHandler(args: {
         // Second, try model fallback for model errors (rate limit, quota, provider issues, etc.)
         else if (sessionID && shouldRetryError(errorInfo) && !isRuntimeFallbackEnabled && isModelFallbackEnabled) {
           let agentName = getSessionAgent(sessionID);
+
+          // For subagents without tracked agent name, use session tracking
+          if (!agentName && subagentSessions.has(sessionID)) {
+            const lastKnown = lastKnownModelBySession.get(sessionID);
+            if (lastKnown?.agentName) {
+              agentName = lastKnown.agentName;
+            } else {
+              agentName = "sisyphus-junior";
+            }
+            log("[event] Using subagent name for fallback", { sessionID, agentName });
+          }
 
           if (!agentName && sessionID === getMainSessionID()) {
             if (errorMessage.includes("claude-opus") || errorMessage.includes("opus")) {
