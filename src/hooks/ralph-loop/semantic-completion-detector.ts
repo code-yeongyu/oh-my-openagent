@@ -16,10 +16,21 @@ const COMPLETION_PHRASES = [
 	"no remaining tasks",
 ] as const
 
+const NEGATION_PREFIXES = ["not ", "n't ", "no ", "never ", "hardly ", "barely "]
+
+const PHRASE_PATTERNS = COMPLETION_PHRASES.map(
+	(phrase) => ({ phrase, pattern: new RegExp(`\\b${phrase.replace(/\s+/g, "\\s+")}\\b`, "i") })
+)
+
+function isNegated(text: string, matchIndex: number): boolean {
+	const prefix = text.slice(Math.max(0, matchIndex - 12), matchIndex).toLowerCase()
+	return NEGATION_PREFIXES.some((neg) => prefix.endsWith(neg))
+}
+
 export function detectSemanticCompletion(text: string): string | undefined {
-	const normalizedText = text.toLowerCase()
-	for (const phrase of COMPLETION_PHRASES) {
-		if (normalizedText.includes(phrase)) {
+	for (const { phrase, pattern } of PHRASE_PATTERNS) {
+		const match = pattern.exec(text)
+		if (match && !isNegated(text, match.index)) {
 			return phrase
 		}
 	}

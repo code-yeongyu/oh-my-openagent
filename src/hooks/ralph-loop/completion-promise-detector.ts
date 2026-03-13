@@ -50,7 +50,9 @@ export function detectCompletionInTranscript(
 				const entry = JSON.parse(line) as { type?: string; timestamp?: string }
 				if (entry.type === "user") continue
 				if (startedAt && entry.timestamp && entry.timestamp < startedAt) continue
-				lastAssistantLine = line
+				if (entry.type === "assistant") {
+					lastAssistantLine = line
+				}
 				if (pattern.test(line)) return true
 			} catch {
 				continue
