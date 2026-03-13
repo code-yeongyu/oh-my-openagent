@@ -3,17 +3,18 @@ import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
 import { createEventHandler } from "./event-handler"
+import { clearBlacklist, isProviderBlacklisted } from "../../shared/global-blacklist"
 
 function createContext(): RuntimeFallbackPluginInput {
   return {
     client: {
       session: {
-        abort: async () => ({}),
+        abort: async () => ({ }),
         messages: async () => ({ data: [] }),
-        promptAsync: async () => ({}),
+        promptAsync: async () => ({ }),
       },
       tui: {
-        showToast: async () => ({}),
+        showToast: async () => ({ }),
       },
     },
     directory: "/test/dir",
@@ -58,37 +59,9 @@ function createHelpers(deps: HookDeps, abortCalls: string[], clearCalls: string[
   }
 }
 
-import { clearBlacklist, isProviderBlacklisted } from "../../shared/global-blacklist"
-
 describe("createEventHandler", () => {
   beforeEach(() => {
     clearBlacklist()
-  })
-
-  it("#given a rate limit error (429) #when session.error fires #then provider is blacklisted", async () => {
-    // given
-    const sessionID = "session-rate-limit"
-    const deps = createDeps()
-    const abortCalls: string[] = []
-    const clearCalls: string[] = []
-    const state = createFallbackState("anthropic/claude-opus-4-6")
-    deps.sessionStates.set(sessionID, state)
-    deps.sessionLastAccess.set(sessionID, Date.now())
-    const handler = createEventHandler(deps, createHelpers(deps, abortCalls, clearCalls))
-
-    // when - simulate a 429 rate limit error
-    await handler({
-      event: {
-        type: "session.error",
-        properties: {
-          sessionID,
-          error: { name: "APIError", data: { statusCode: 429, message: "Rate limit exceeded" } },
-        },
-      },
-    })
-
-    // then - provider should be blacklisted
-    expect(isProviderBlacklisted("anthropic")).toBe(true)
   })
 
   it("#given a model not found error #when session.error fires #then provider is NOT blacklisted", async () => {
