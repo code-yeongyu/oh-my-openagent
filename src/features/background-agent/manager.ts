@@ -340,14 +340,16 @@ export class BackgroundManager {
     try {
       const queue = this.queuesByKey.get(key)
       while (queue && queue.length > 0) {
-        const item = queue[0]
+        const item = queue.shift()
+        if (!item) {
+          continue
+        }
 
         await this.concurrencyManager.acquire(key)
 
         if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
           this.rollbackPreStartDescendantReservation(item.task)
           this.concurrencyManager.release(key)
-          queue.shift()
           continue
         }
 
@@ -363,8 +365,6 @@ export class BackgroundManager {
             this.concurrencyManager.release(key)
           }
         }
-
-        queue.shift()
       }
     } finally {
       this.processingKeys.delete(key)
@@ -411,6 +411,17 @@ export class BackgroundManager {
     }
 
     const sessionID = createResult.data.id
+
+    if (task.status === "cancelled") {
+      await this.client.session.abort({
+        path: { id: sessionID },
+      }).catch((error) => {
+        log("[background-agent] Failed to abort cancelled pre-start session:", error)
+      })
+      this.concurrencyManager.release(concurrencyKey)
+      return
+    }
+
     this.settlePreStartDescendantReservation(task)
     subagentSessions.add(sessionID)
 
