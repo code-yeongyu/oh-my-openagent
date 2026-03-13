@@ -9,7 +9,7 @@ export interface ProviderAvailability {
 	zai: boolean
 	kimiForCoding: boolean
 	minimaxCnCodingPlan: boolean
-	minimaxIoCodingPlan: boolean
+	minimaxCodingPlan: boolean
 	isMaxPlan: boolean
 }
 

@@ -14,7 +14,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasMinimaxCnCodingPlan: false,
-    hasMinimaxIoCodingPlan: false,
+    hasMinimaxCodingPlan: false,
     ...overrides,
   }
 }
@@ -459,19 +459,19 @@ describe("generateModelConfig", () => {
       expect(result.categories?.writing?.model).toBe("minimax-cn-coding-plan/MiniMax-M2.5-highspeed")
     })
 
-    test("MiniMax IO is used when only MiniMax IO is available", () => {
-      // #given only MiniMax IO is available
-      const config = createConfig({ hasMinimaxIoCodingPlan: true })
+    test("MiniMax minimax.io plan is used when only minimax.io is available", () => {
+      // #given only MiniMax Coding Plan (minimax.io) is available
+      const config = createConfig({ hasMinimaxCodingPlan: true })
 
       // #when generateModelConfig is called
       const result = generateModelConfig(config)
 
-      // #then agents and categories should use MiniMax IO
-      expect(result.agents?.sisyphus?.model).toBe("minimax-io/MiniMax-M2.5-highspeed")
-      expect(result.agents?.prometheus?.model).toBe("minimax-io/MiniMax-M2.5-highspeed")
-      expect(result.agents?.metis?.model).toBe("minimax-io/MiniMax-M2.5-highspeed")
-      expect(result.agents?.atlas?.model).toBe("minimax-io/MiniMax-M2.5-highspeed")
-      expect(result.categories?.writing?.model).toBe("minimax-io/MiniMax-M2.5-highspeed")
+      // #then agents and categories should use MiniMax Coding Plan (minimax.io)
+      expect(result.agents?.sisyphus?.model).toBe("minimax-coding-plan/MiniMax-M2.5-highspeed")
+      expect(result.agents?.prometheus?.model).toBe("minimax-coding-plan/MiniMax-M2.5-highspeed")
+      expect(result.agents?.metis?.model).toBe("minimax-coding-plan/MiniMax-M2.5-highspeed")
+      expect(result.agents?.atlas?.model).toBe("minimax-coding-plan/MiniMax-M2.5-highspeed")
+      expect(result.categories?.writing?.model).toBe("minimax-coding-plan/MiniMax-M2.5-highspeed")
     })
   })
 

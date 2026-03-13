@@ -181,6 +181,8 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasMinimaxCnCodingPlan: false,
+      hasMinimaxCodingPlan: false,
     }
 
     // #when generating config
@@ -201,6 +203,8 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasMinimaxCnCodingPlan: false,
+      hasMinimaxCodingPlan: false,
     }
 
     // #when generating config
@@ -222,6 +226,8 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: true,
       hasKimiForCoding: false,
+      hasMinimaxCnCodingPlan: false,
+      hasMinimaxCodingPlan: false,
     }
 
     // #when generating config
@@ -244,6 +250,8 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasMinimaxCnCodingPlan: false,
+      hasMinimaxCodingPlan: false,
     }
 
     // #when generating config
@@ -269,6 +277,8 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasMinimaxCnCodingPlan: false,
+      hasMinimaxCodingPlan: false,
     }
 
     // #when generating config
@@ -289,6 +299,8 @@ describe("generateOmoConfig - model fallback system", () => {
       hasOpencodeZen: false,
       hasZaiCodingPlan: false,
       hasKimiForCoding: false,
+      hasMinimaxCnCodingPlan: false,
+      hasMinimaxCodingPlan: false,
     }
 
     // #when generating config

@@ -17,9 +17,9 @@ import {
 
 export type { GeneratedOmoConfig } from "./model-fallback-types"
 
-const ZAI_MODEL = "zai-coding-plan/glm-4.7"
-const MINIMAX_CN_MODEL = "minimax-cn-coding-plan/MiniMax-M2.5-highspeed"
-const MINIMAX_IO_MODEL = "minimax-io/MiniMax-M2.5-highspeed"
+const ZAI_MODEL                    = "zai-coding-plan/glm-4.7"
+const MINIMAX_CN_CODING_PLAN_MODEL        = "minimax-cn-coding-plan/MiniMax-M2.5-highspeed"
+const MINIMAX_CODING_PLAN_MODEL    = "minimax-coding-plan/MiniMax-M2.5-highspeed"
 
 const ULTIMATE_FALLBACK = "opencode/glm-4.7-free"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/oh-my-opencode.schema.json"
@@ -35,7 +35,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
     avail.zai ||
     avail.kimiForCoding ||
     avail.minimaxCnCodingPlan ||
-    avail.minimaxIoCodingPlan
+    avail.minimaxCodingPlan
 
   if (!hasAnyProvider) {
     return {
@@ -68,9 +68,9 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       } else if (avail.copilot) {
         agents[role] = { model: "github-copilot/gpt-5-mini" }
       } else if (avail.minimaxCnCodingPlan) {
-        agents[role] = { model: MINIMAX_CN_MODEL }
-      } else if (avail.minimaxIoCodingPlan) {
-        agents[role] = { model: MINIMAX_IO_MODEL }
+        agents[role] = { model: MINIMAX_CN_CODING_PLAN_MODEL }
+      } else if (avail.minimaxCodingPlan) {
+        agents[role] = { model: MINIMAX_CODING_PLAN_MODEL }
       } else {
         agents[role] = { model: "opencode/gpt-5-nano" }
       }

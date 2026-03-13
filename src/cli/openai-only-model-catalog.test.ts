@@ -13,6 +13,8 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasOpencodeZen: false,
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
+    hasMinimaxCnCodingPlan: false,
+    hasMinimaxCodingPlan: false,
     ...overrides,
   }
 }

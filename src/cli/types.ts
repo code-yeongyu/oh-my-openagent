@@ -11,7 +11,7 @@ export interface InstallArgs {
   zaiCodingPlan?: BooleanArg
   kimiForCoding?: BooleanArg
   minimaxCnCodingPlan?: BooleanArg
-  minimaxIoCodingPlan?: BooleanArg
+  minimaxCodingPlan?: BooleanArg
   skipAuth?: boolean
 }
 
@@ -25,7 +25,7 @@ export interface InstallConfig {
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasMinimaxCnCodingPlan: boolean
-  hasMinimaxIoCodingPlan: boolean
+  hasMinimaxCodingPlan: boolean
 }
 
 export interface ConfigMergeResult {
@@ -45,5 +45,5 @@ export interface DetectedConfig {
   hasZaiCodingPlan: boolean
   hasKimiForCoding: boolean
   hasMinimaxCnCodingPlan: boolean
-  hasMinimaxIoCodingPlan: boolean
+  hasMinimaxCodingPlan: boolean
 }

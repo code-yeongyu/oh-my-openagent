@@ -18,6 +18,8 @@ const installConfig: InstallConfig = {
   hasOpencodeZen: false,
   hasZaiCodingPlan: false,
   hasKimiForCoding: false,
+  hasMinimaxCnCodingPlan: false,
+  hasMinimaxCodingPlan: false,
 }
 
 function getRecord(value: unknown): Record<string, unknown> {

@@ -101,24 +101,24 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
   if (!kimiForCoding) return null
 
   const minimaxCnCodingPlan = await selectOrCancel({
-    message: "Do you have a MiniMax CN Coding Plan subscription?",
+    message: "Do you have a MiniMax Coding Plan (minimaxi.com) subscription?",
     options: [
       { value: "no", label: "No", hint: "Will use other configured providers" },
-      { value: "yes", label: "Yes", hint: "MiniMax M2.5 for fast coding fallback (CN)" },
+      { value: "yes", label: "Yes", hint: "MiniMax M2.5-highspeed fallback via minimaxi.com" },
     ],
     initialValue: initial.minimaxCnCodingPlan,
   })
   if (!minimaxCnCodingPlan) return null
 
-  const minimaxIoCodingPlan = await selectOrCancel({
-    message: "Do you have a MiniMax.io Coding Plan subscription?",
+  const minimaxCodingPlan = await selectOrCancel({
+    message: "Do you have a MiniMax Coding Plan (minimax.io) subscription?",
     options: [
       { value: "no", label: "No", hint: "Will use other configured providers" },
-      { value: "yes", label: "Yes", hint: "MiniMax M2.5 for fast coding fallback (IO)" },
+      { value: "yes", label: "Yes", hint: "MiniMax M2.5-highspeed fallback via minimax.io" },
     ],
-    initialValue: initial.minimaxIoCodingPlan,
+    initialValue: initial.minimaxCodingPlan,
   })
-  if (!minimaxIoCodingPlan) return null
+  if (!minimaxCodingPlan) return null
 
   return {
     hasClaude: claude !== "no",
@@ -130,6 +130,6 @@ export async function promptInstallConfig(detected: DetectedConfig): Promise<Ins
     hasZaiCodingPlan: zaiCodingPlan === "yes",
     hasKimiForCoding: kimiForCoding === "yes",
     hasMinimaxCnCodingPlan: minimaxCnCodingPlan === "yes",
-    hasMinimaxIoCodingPlan: minimaxIoCodingPlan === "yes",
+    hasMinimaxCodingPlan: minimaxCodingPlan === "yes",
   }
 }

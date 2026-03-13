@@ -16,7 +16,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["openai", "github-copilot", "opencode"], model: "gpt-5.4", variant: "medium" },
       { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
-      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5-highspeed" },
     ],
     requiresAnyModel: true,
   },
@@ -63,7 +63,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["github-copilot"], model: "grok-code-fast-1" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
-      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5-highspeed" },
       { providers: ["anthropic", "opencode"], model: "claude-haiku-4-5" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
@@ -82,7 +82,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["zai-coding-plan"], model: "glm-4.6v" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
-      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5-highspeed" },
       { providers: ["opencode"], model: "gpt-5-nano" },
     ],
   },
@@ -95,7 +95,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
-      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5-highspeed" },
       {
         providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.4",
@@ -116,7 +116,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
-      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5-highspeed" },
       {
         providers: ["openai", "github-copilot", "opencode"],
         model: "gpt-5.4",
@@ -152,7 +152,7 @@ export const CLI_AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
-      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5-highspeed" },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: "claude-sonnet-4-5",
@@ -182,7 +182,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
       },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
-      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5-highspeed" },
     ],
   },
   ultrabrain: {
@@ -288,7 +288,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
       { providers: ["zai-coding-plan", "opencode"], model: "glm-5" },
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
-      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5-highspeed" },
       { providers: ["opencode"], model: "kimi-k2.5" },
     ],
   },
@@ -296,7 +296,7 @@ export const CLI_CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> =
     fallbackChain: [
       { providers: ["kimi-for-coding"], model: "k2p5" },
       { providers: ["minimax-cn-coding-plan"], model: "MiniMax-M2.5-highspeed" },
-      { providers: ["minimax-io"], model: "MiniMax-M2.5-highspeed" },
+      { providers: ["minimax-coding-plan"], model: "MiniMax-M2.5-highspeed" },
       {
         providers: ["google", "github-copilot", "opencode"],
         model: "gemini-3-flash",
