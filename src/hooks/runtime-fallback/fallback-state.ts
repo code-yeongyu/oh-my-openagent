@@ -34,7 +34,7 @@ export async function findNextAvailableFallback(
     if (!isModelInCooldown(candidate, state, cooldownSeconds)) {
       // Also check global blacklist
       const providerID = candidate.split("/")[0]
-      if (providerID && !(await isProviderBlacklisted(providerID))) {
+      if (providerID && !(isProviderBlacklisted(providerID))) {
         return candidate
       }
       log(`[${HOOK_NAME}] Skipping fallback model - provider globally blacklisted`, { 

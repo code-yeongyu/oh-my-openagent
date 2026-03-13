@@ -94,7 +94,7 @@ export async function injectContinuation(args: {
   
   // Check if model provider is blacklisted
   if (model) {
-    const blacklisted = await isProviderBlacklisted(model.providerID)
+    const blacklisted = isProviderBlacklisted(model.providerID)
     if (blacklisted) {
       model = undefined
     }

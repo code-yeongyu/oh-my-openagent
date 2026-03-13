@@ -14,7 +14,7 @@ import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode } from "../types"
 import { isGptModel, isGeminiModel } from "../types"
 import type { AgentOverrideConfig } from "../../config/schema"
-import { isProviderBlacklistedSync } from "../../shared/global-blacklist"
+import { isProviderBlacklisted } from "../../shared/global-blacklist"
 import {
   createAgentToolRestrictions,
   type PermissionValue,
@@ -95,14 +95,14 @@ export function createSisyphusJuniorAgentWithOverrides(
     const parts = model.split("/")
     if (parts.length >= 2) {
       const providerID = parts[0]
-      const blacklisted = isProviderBlacklistedSync(providerID)
+      const blacklisted = isProviderBlacklisted(providerID)
       if (blacklisted && fallbackModels && fallbackModels.length > 0) {
         // Use first non-blacklisted fallback model from config
         for (const fallback of fallbackModels) {
           const fallbackParts = fallback.split("/")
           if (fallbackParts.length >= 2) {
             const fallbackProvider = fallbackParts[0]
-            const fallbackBlacklisted = isProviderBlacklistedSync(fallbackProvider)
+            const fallbackBlacklisted = isProviderBlacklisted(fallbackProvider)
             if (!fallbackBlacklisted) {
               model = fallback
               break

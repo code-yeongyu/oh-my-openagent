@@ -69,7 +69,7 @@ export async function resolveModelForDelegateTask(input: {
         const parts = normalizedFallback.split("/")
         if (parts.length >= 2) {
           const providerID = parts[0]
-          const blacklisted = await isProviderBlacklisted(providerID)
+          const blacklisted = isProviderBlacklisted(providerID)
           if (blacklisted) {
             continue  // Skip blacklisted provider
           }
@@ -90,7 +90,7 @@ export async function resolveModelForDelegateTask(input: {
       // Find first non-blacklisted provider in the chain
       for (const entry of fallbackChain) {
         for (const provider of entry.providers) {
-          const blacklisted = await isProviderBlacklisted(provider)
+          const blacklisted = isProviderBlacklisted(provider)
           if (!blacklisted) {
             const transformedModelId = transformModelForProvider(provider, entry.model)
             return { model: `${provider}/${transformedModelId}`, variant: entry.variant }
@@ -101,7 +101,7 @@ export async function resolveModelForDelegateTask(input: {
       for (const entry of fallbackChain) {
         for (const provider of entry.providers) {
           // Check if provider is blacklisted
-          const blacklisted = await isProviderBlacklisted(provider)
+          const blacklisted = isProviderBlacklisted(provider)
           if (blacklisted) {
             continue  // Skip blacklisted provider
           }
@@ -121,7 +121,7 @@ export async function resolveModelForDelegateTask(input: {
         if (crossProviderMatch) {
           // Check if the matched model's provider is blacklisted
           const matchProvider = crossProviderMatch.split("/")[0]
-          const blacklisted = await isProviderBlacklisted(matchProvider)
+          const blacklisted = isProviderBlacklisted(matchProvider)
           if (!blacklisted) {
             if (explicitHighModel && entry.variant === "high" && crossProviderMatch === explicitHighBaseModel) {
               return { model: explicitHighModel }

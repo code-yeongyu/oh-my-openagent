@@ -77,7 +77,7 @@ export async function findNearestMessageWithFieldsFromSDK(
       const stored = convertSDKMessageToStoredMessage(messages[i])
       if (stored?.agent && stored.model?.providerID && stored.model?.modelID) {
         // Check if model provider is blacklisted
-        const blacklisted = await isProviderBlacklisted(stored.model.providerID)
+        const blacklisted = isProviderBlacklisted(stored.model.providerID)
         if (!blacklisted) {
           return stored
         }
@@ -89,7 +89,7 @@ export async function findNearestMessageWithFieldsFromSDK(
       if (stored?.agent || (stored?.model?.providerID && stored?.model?.modelID)) {
         // Check if model provider is blacklisted (only if model exists)
         if (stored?.model?.providerID) {
-          const blacklisted = await isProviderBlacklisted(stored.model.providerID)
+          const blacklisted = isProviderBlacklisted(stored.model.providerID)
           if (blacklisted) {
             continue
           }

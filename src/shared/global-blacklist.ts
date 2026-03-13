@@ -17,8 +17,7 @@ export interface BlacklistData {
   updatedAt: number
 }
 
-// Synchronous version for reading blacklist (used in agent factories)
-function readBlacklistSync(): BlacklistData {
+function readBlacklist(): BlacklistData {
   try {
     const content = fs.readFileSync(BLACKLIST_FILE, "utf-8")
     return JSON.parse(content)
@@ -27,12 +26,7 @@ function readBlacklistSync(): BlacklistData {
   }
 }
 
-// Async version for backward compatibility
-async function readBlacklist(): Promise<BlacklistData> {
-  return readBlacklistSync()
-}
-
-function writeBlacklistSync(data: BlacklistData): void {
+function writeBlacklist(data: BlacklistData): void {
   try {
     fs.mkdirSync(path.dirname(BLACKLIST_FILE), { recursive: true })
     fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(data, null, 2), "utf-8")
@@ -41,17 +35,12 @@ function writeBlacklistSync(data: BlacklistData): void {
   }
 }
 
-// Async version for backward compatibility
-async function writeBlacklist(data: BlacklistData): Promise<void> {
-  writeBlacklistSync(data)
-}
-
-export async function blacklistProvider(
+export function blacklistProvider(
   providerID: string,
   cooldownSeconds: number,
   reason: string = "Rate limit exceeded"
-): Promise<void> {
-  const blacklist = await readBlacklist()
+): void {
+  const blacklist = readBlacklist()
   const now = Date.now()
   
   blacklist.providers[providerID] = {
@@ -62,7 +51,7 @@ export async function blacklistProvider(
   }
   blacklist.updatedAt = now
   
-  await writeBlacklist(blacklist)
+  writeBlacklist(blacklist)
   log("[global-blacklist] Provider blacklisted", {
     provider: providerID,
     cooldownSeconds,
@@ -71,9 +60,8 @@ export async function blacklistProvider(
   })
 }
 
-// Synchronous version for agent factories and other sync contexts
-export function isProviderBlacklistedSync(providerID: string): boolean {
-  const blacklist = readBlacklistSync()
+export function isProviderBlacklisted(providerID: string): boolean {
+  const blacklist = readBlacklist()
   const entry = blacklist.providers[providerID]
   
   if (!entry) return false
@@ -84,9 +72,9 @@ export function isProviderBlacklistedSync(providerID: string): boolean {
     delete blacklist.providers[providerID]
     blacklist.updatedAt = now
     try {
-      writeBlacklistSync(blacklist)
+      writeBlacklist(blacklist)
     } catch {
-      // Ignore write errors in sync context
+      // Ignore write errors
     }
     return false
   }
@@ -94,13 +82,8 @@ export function isProviderBlacklistedSync(providerID: string): boolean {
   return true
 }
 
-// Async version for backward compatibility
-export async function isProviderBlacklisted(providerID: string): Promise<boolean> {
-  return isProviderBlacklistedSync(providerID)
-}
-
-export async function getBlacklistedProviders(): Promise<string[]> {
-  const blacklist = await readBlacklist()
+export function getBlacklistedProviders(): string[] {
+  const blacklist = readBlacklist()
   const now = Date.now()
   
   const activeProviders: string[] = []
@@ -119,13 +102,17 @@ export async function getBlacklistedProviders(): Promise<string[]> {
       delete blacklist.providers[providerID]
     }
     blacklist.updatedAt = now
-    await writeBlacklist(blacklist)
+    try {
+      writeBlacklist(blacklist)
+    } catch {
+      // Ignore write errors
+    }
   }
   
   return activeProviders
 }
 
-export async function clearBlacklist(): Promise<void> {
-  await writeBlacklist({ providers: {}, updatedAt: Date.now() })
+export function clearBlacklist(): void {
+  writeBlacklist({ providers: {}, updatedAt: Date.now() })
   log("[global-blacklist] Blacklist cleared")
 }

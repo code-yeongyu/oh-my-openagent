@@ -77,7 +77,7 @@ export function createSubagentBlacklistGuard(args: {
       })
 
       // Check if provider is blacklisted
-      const blacklisted = await isProviderBlacklisted(providerID)
+      const blacklisted = isProviderBlacklisted(providerID)
       
       if (!blacklisted) {
         log("[subagent-blacklist-guard] Provider not blacklisted", { sessionID, providerID })

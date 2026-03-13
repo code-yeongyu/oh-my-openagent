@@ -20,7 +20,7 @@ async function filterBlacklistedProviders(
   for (const model of models) {
     const providerID = extractProviderFromModel(model)
     if (providerID) {
-      const blacklisted = await isProviderBlacklisted(providerID)
+      const blacklisted = isProviderBlacklisted(providerID)
       if (blacklisted) {
         log(`[${HOOK_NAME}] Filtering out blacklisted provider from fallback chain`, { 
           model, 

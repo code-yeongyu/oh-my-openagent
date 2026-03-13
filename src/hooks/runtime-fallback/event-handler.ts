@@ -163,7 +163,7 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     // Extract and blacklist the CURRENT model's provider BEFORE prepareFallback updates it
     const currentModelProvider = state.currentModel.split("/")[0]
     if (currentModelProvider) {
-      await blacklistProvider(currentModelProvider, config.cooldown_seconds, `Rate limit or error`)
+      blacklistProvider(currentModelProvider, config.cooldown_seconds, `Rate limit or error`)
       log(`[${HOOK_NAME}] Blacklisted provider due to rate limit error`, {
         sessionID,
         provider: currentModelProvider,

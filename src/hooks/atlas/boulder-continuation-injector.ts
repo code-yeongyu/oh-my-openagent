@@ -53,7 +53,7 @@ export async function injectBoulderContinuation(input: {
     
     // Check if model provider is blacklisted
     if (promptContext.model) {
-      const blacklisted = await isProviderBlacklisted(promptContext.model.providerID)
+      const blacklisted = isProviderBlacklisted(promptContext.model.providerID)
       if (blacklisted) {
         delete promptContext.model
       }

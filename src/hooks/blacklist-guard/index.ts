@@ -73,7 +73,7 @@ export function createBlacklistGuard(args: {
       })
 
       // Check if provider is blacklisted
-      const blacklisted = await isProviderBlacklisted(providerID)
+      const blacklisted = isProviderBlacklisted(providerID)
       
       if (!blacklisted) {
         log("[blacklist-guard] Provider not blacklisted", { sessionID, providerID })
