@@ -76,6 +76,7 @@ export function createRuntimeFallbackHook(
     deps.sessionRetryInFlight.clear()
     deps.sessionAwaitingFallbackResult.clear()
     deps.sessionFallbackTimeouts.clear()
+    deps.sessionStatusRetryKeys.clear()
   }
 
   return {
