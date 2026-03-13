@@ -242,6 +242,26 @@ export class BackgroundManager {
     this.unregisterRootDescendant(task.rootSessionID)
   }
 
+  private getActiveTaskCount(): number {
+    let count = 0
+    for (const task of this.tasks.values()) {
+      if (task.status === "running" || task.status === "pending") {
+        count += 1
+      }
+    }
+    return count
+  }
+
+  private getActiveTaskCountForParent(parentSessionID: string): number {
+    let count = 0
+    for (const task of this.tasks.values()) {
+      if (task.parentSessionID === parentSessionID && (task.status === "running" || task.status === "pending")) {
+        count += 1
+      }
+    }
+    return count
+  }
+
   async launch(input: LaunchInput): Promise<BackgroundTask> {
     log("[background-agent] launch() called with:", {
       agent: input.agent,
@@ -252,6 +272,26 @@ export class BackgroundManager {
 
     if (!input.agent || input.agent.trim() === "") {
       throw new Error("Agent parameter is required")
+    }
+
+    const maxSessions = this.config?.maxSessions
+    if (maxSessions !== undefined) {
+      const activeCount = this.getActiveTaskCount()
+      if (activeCount >= maxSessions) {
+        throw new Error(
+          `Background task spawn blocked: ${activeCount} active sessions meets background_task.maxSessions=${maxSessions}. Wait for existing tasks to complete before spawning new ones.`
+        )
+      }
+    }
+
+    const maxTasksPerParent = this.config?.maxTasksPerParent
+    if (maxTasksPerParent !== undefined) {
+      const parentCount = this.getActiveTaskCountForParent(input.parentSessionID)
+      if (parentCount >= maxTasksPerParent) {
+        throw new Error(
+          `Background task spawn blocked: parent session ${input.parentSessionID} already has ${parentCount} active tasks, which meets background_task.maxTasksPerParent=${maxTasksPerParent}. Wait for existing tasks to complete or reuse a session.`
+        )
+      }
     }
 
     const spawnReservation = await this.reserveSubagentSpawn(input.parentSessionID)
