@@ -161,9 +161,12 @@ export function createEventHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
     }
 
     // Extract and blacklist the CURRENT model's provider BEFORE prepareFallback updates it
+    // Only blacklist for rate limit errors (429), not for other retryable errors like "model not found"
+    const statusCode = extractStatusCode(error, config.retry_on_errors)
+    const isRateLimit = statusCode === 429 || /rate.*limit|too.*many.*requests/i.test(String(error))
     const currentModelProvider = state.currentModel.split("/")[0]
-    if (currentModelProvider) {
-      blacklistProvider(currentModelProvider, config.cooldown_seconds, `Rate limit or error`)
+    if (currentModelProvider && isRateLimit) {
+      blacklistProvider(currentModelProvider, config.cooldown_seconds, `Rate limit error`)
       log(`[${HOOK_NAME}] Blacklisted provider due to rate limit error`, {
         sessionID,
         provider: currentModelProvider,
